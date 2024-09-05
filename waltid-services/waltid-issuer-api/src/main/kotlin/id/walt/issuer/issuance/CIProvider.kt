@@ -277,10 +277,10 @@ open class CIProvider : OpenIDCredentialIssuer(
                     exampleIssuerDid,
                     IssuanceRequest(
                         issuerKey = Json.parseToJsonElement(KeySerialization.serializeKey(exampleIssuerKey)).jsonObject,
-                        issuerDid = exampleIssuerDid,
                         credentialConfigurationId = "OpenBadgeCredential_${credentialRequest.format.value}",
                         credentialData = W3CVC.fromJson(IssuanceExamples.openBadgeCredentialData),
-                        mdocData = null
+                        mdocData = null,
+                        issuerDid = exampleIssuerDid
                     ),
                 )
             )
@@ -294,13 +294,13 @@ open class CIProvider : OpenIDCredentialIssuer(
             val vc = data.request.credentialData ?: throw MissingFieldException(listOf("credentialData"), "credentialData")
 
             data.run {
-                var issuerKid = issuerDid
-                if (issuerDid.startsWith("did:key") && issuerDid.length == 186) // EBSI conformance corner case when issuer uses did:key instead of did:ebsi and no trust framework is defined
-                    issuerKid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
-
-                if (issuerDid.startsWith("did:ebsi"))
-                    issuerKid = issuerDid + "#" + issuerKey.key.getKeyId()
-
+                var issuerKid = issuerDid ?: data.issuerKey.key.getKeyId()
+                if(!issuerDid.isNullOrEmpty()) {
+                    if (issuerDid.startsWith("did:key") && issuerDid.length == 186) // EBSI conformance corner case when issuer uses did:key instead of did:ebsi and no trust framework is defined
+                        issuerKid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
+                    else if (issuerDid.startsWith("did:ebsi"))
+                        issuerKid = issuerDid + "#" + issuerKey.key.getKeyId()
+                }
                 when (data.request.issuanceType) {
                     IssuanceType.sdjwt -> sdJwtVc(JWKKey.importJWK(holderKey.toString()).getOrNull(), vc, data, holderDid)
                     else -> nonSdJwtVc(vc, issuerKid, holderDid, holderKey)
@@ -504,14 +504,14 @@ open class CIProvider : OpenIDCredentialIssuer(
     data class IssuanceSessionData(
         val id: String,
         val issuerKey: DirectSerializedKey,
-        val issuerDid: String,
+        val issuerDid: String?,
         val request: IssuanceRequest,
         val callbackUrl: String? = null,
     ) {
         constructor(
             id: String,
             issuerKey: Key,
-            issuerDid: String,
+            issuerDid: String?,
             request: IssuanceRequest,
             callbackUrl: String? = null,
         ) : this(id, DirectSerializedKey(issuerKey), issuerDid, request, callbackUrl)
@@ -580,7 +580,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         holderDid: String?,
     ) = vc.mergingSdJwtIssue(
         issuerKey = issuerKey.key,
-        issuerDid = issuerDid.ifEmpty { issuerKey.key.getKeyId() },
+        issuerDid = issuerDid,
         subjectDid = holderDid ?: holderKey?.getKeyId() ?: throw IllegalArgumentException("Either holderKey or holderDid must be given"),
         mappings = request.mapping ?: JsonObject(emptyMap()),
         type = SDJwtVC.SD_JWT_VC_TYPE_HEADER,
@@ -588,7 +588,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
         } ?: mapOf(),
         additionalJwtOptions = SDJwtVC.defaultPayloadProperties(
-            issuerId = issuerDid.ifEmpty { issuerKey.key.getKeyId() },
+            issuerId = issuerDid ?: issuerKey.key.getKeyId(),
             cnf = JsonObject(holderKey?.let {
                 buildJsonObject { put("jwk", it.exportJWKObject()) }
             } ?: buildJsonObject { put("kid", holderDid) }),

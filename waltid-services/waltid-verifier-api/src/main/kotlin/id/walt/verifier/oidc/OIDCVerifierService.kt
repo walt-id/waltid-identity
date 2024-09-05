@@ -174,7 +174,9 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         return when (session.openId4VPProfile) {
             OpenId4VPProfile.ISO_18013_7_MDOC -> verifyMdoc(tokenResponse, session)
             OpenId4VPProfile.HAIP -> runBlocking { verifySdJwtVC(tokenResponse, session) }
-            else -> {
+            else -> if(SDJwtVC.isSdJwtVCPresentation(vpToken)) {
+                runBlocking { verifySdJwtVC(tokenResponse, session) }
+            } else {
                 val results = runBlocking {
                     Verifier.verifyPresentation(
                         vpTokenJwt = vpToken,
@@ -227,7 +229,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     }
 
     private suspend fun resolveIssuerKeyFromSdJwt(sdJwt: SDJwtVC): Key {
-        val kid = sdJwt.header.get("kid")?.jsonPrimitive?.content ?: randomUUID()
+        val kid = sdJwt.keyID ?: randomUUID()
         return if(DidUtils.isDidUrl(kid)) {
             DidService.resolveToKey(kid).getOrThrow()
         } else {
@@ -244,7 +246,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val issuerKey = resolveIssuerKeyFromSdJwt(sdJwtVC)
         val verificationResult = sdJwtVC.verifyVC(
             WaltIdJWTCryptoProvider(mapOf(
-                issuerKey.getKeyId() to issuerKey,
+                (sdJwtVC.keyID ?: issuerKey.getKeyId()) to issuerKey,
                 holderKey.getKeyId() to holderKey)
             ),
             requiresHolderKeyBinding = true,
