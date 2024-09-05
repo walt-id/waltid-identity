@@ -95,7 +95,7 @@ const projects = [
     },
     {
         id: 3,
-        name: "howest.neom.walt-test.cloud",
+        name: "howest.n2.walt-test.cloud",
         href: "#",
         status: "Complete",
         issuedTo: "did:key:z6Mkipa1mwZTvUaTCPkHsdKGWNWteQbpEmvcr9HFed9gS4Ye",

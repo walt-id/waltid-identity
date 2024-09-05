@@ -14,7 +14,7 @@ import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class UserPassCredentials(val email: String, val password: String)
+data class UserPassCredentials(val username: String, val password: String)
 
 object UserPass : UserPassBasedAuthMethod("userpass") {
 
