@@ -14,7 +14,7 @@ import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.sdjwt.JWTVCIssuerMetadata
-import id.walt.sdjwt.SDTypeMetadata
+import id.walt.sdjwt.SDJWTVCTypeMetadata
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
@@ -79,9 +79,9 @@ object OidcApi : CIProvider() {
                 val vctMetadata = getVctBySupportedCredentialConfiguration(baseUrl, credType)
                 call.respond(
                     HttpStatusCode.OK,
-                    when (vctMetadata.sdTypeMetadata != null) {
-                        true -> SDTypeMetadata.fromJSON(vctMetadata.sdTypeMetadata!!.toJSON())
-                        else -> SDTypeMetadata(vct = vctMetadata.vct!!, name = credType, description = "$credType Verifiable Credential")
+                    when (vctMetadata.sdJwtVcTypeMetadata != null) {
+                        true -> SDJWTVCTypeMetadata.fromJSON(vctMetadata.sdJwtVcTypeMetadata!!.toJSON())
+                        else -> SDJWTVCTypeMetadata(vct = vctMetadata.vct!!, name = credType, description = "$credType Verifiable Credential")
                     }
                 )
             }

@@ -8,7 +8,7 @@ import id.walt.oid4vc.data.CredentialSupported
 import id.walt.oid4vc.data.ProofType
 import id.walt.oid4vc.data.ProofTypeMetadata
 import id.walt.oid4vc.data.CredentialDefinition
-import id.walt.sdjwt.SDTypeMetadata
+import id.walt.sdjwt.SDJWTVCTypeMetadata
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
@@ -70,7 +70,7 @@ data class CredentialTypeConfig(
                 cryptographicBindingMethodsSupported = setOf("jwk"),
                 credentialSigningAlgValuesSupported = setOf("ES256"),
                 vct = baseUrl.plus("/identity_credential"),
-                sdTypeMetadata =  SDTypeMetadata(vct = baseUrl.plus("/identity_credential"), name = "Identity Credential", description = "The Identity Verifiable Credential")
+                sdJwtVcTypeMetadata =  SDJWTVCTypeMetadata(vct = baseUrl.plus("/identity_credential"), name = "Identity Credential", description = "The Identity Verifiable Credential")
             )
         ),
         "my_custom_vct_vc+sd-jwt" to vc(

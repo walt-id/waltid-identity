@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
 @Serializable
-data class SDTypeMetadata(
+data class SDJWTVCTypeMetadata(
     @SerialName("name") val name: String? = null,
     @SerialName("description") val description: String? = null,
     @SerialName("extends") val extends: String? = null,
@@ -18,14 +18,14 @@ data class SDTypeMetadata(
     @SerialName("schema_uri#integrity") val schemaUriIntegrity: String? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
     ) : JsonDataObject() {
-    override fun toJSON(): JsonObject = Json.encodeToJsonElement(SDTypeMetadataSerializer, this).jsonObject
+    override fun toJSON(): JsonObject = Json.encodeToJsonElement(SDJWTVCTypeMetadataSerializer, this).jsonObject
 
-    companion object : JsonDataObjectFactory<SDTypeMetadata>() {
-        override fun fromJSON(jsonObject: JsonObject): SDTypeMetadata =
-            Json.decodeFromJsonElement(SDTypeMetadataSerializer, jsonObject)
+    companion object : JsonDataObjectFactory<SDJWTVCTypeMetadata>() {
+        override fun fromJSON(jsonObject: JsonObject): SDJWTVCTypeMetadata =
+            Json.decodeFromJsonElement(SDJWTVCTypeMetadataSerializer, jsonObject)
     }
 }
 
-object SDTypeMetadataSerializer :
-    JsonDataObjectSerializer<SDTypeMetadata>(SDTypeMetadata.serializer())
+object SDJWTVCTypeMetadataSerializer :
+    JsonDataObjectSerializer<SDJWTVCTypeMetadata>(SDJWTVCTypeMetadata.serializer())
 

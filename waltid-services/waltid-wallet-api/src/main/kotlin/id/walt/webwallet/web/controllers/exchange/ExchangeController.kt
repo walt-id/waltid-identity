@@ -3,7 +3,7 @@ package id.walt.webwallet.web.controllers.exchange
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.CredentialOfferRequest
-import id.walt.sdjwt.SDTypeMetadata
+import id.walt.sdjwt.SDJWTVCTypeMetadata
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
@@ -249,7 +249,7 @@ fun Application.exchange() = walletRoute {
             response {
                 HttpStatusCode.OK to {
                     description = "Resolved VCT"
-                    body<SDTypeMetadata>()
+                    body<SDJWTVCTypeMetadata>()
                 }
             }
         }) {
