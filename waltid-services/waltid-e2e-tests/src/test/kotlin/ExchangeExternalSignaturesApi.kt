@@ -161,13 +161,13 @@ class ExchangeExternalSignatures {
     private suspend fun computeProofOfPossessionFromProofRequest(
         proofReq: IssuanceService.OfferedCredentialProofOfPossessionParameters,
     ): IssuanceService.OfferedCredentialProofOfPossession {
-        return if (proofReq.jwtParams.proofType == ProofType.jwt) {
+        return if (proofReq.proofOfPossessionParameters.proofType == ProofType.jwt) {
             IssuanceService.OfferedCredentialProofOfPossession(
                 proofReq.offeredCredential,
                 ProofType.jwt,
                 holderKey.signJws(
-                    proofReq.jwtParams.payload.toString().toByteArray(),
-                    Json.decodeFromJsonElement<Map<String, JsonElement>>(proofReq.jwtParams.header),
+                    proofReq.proofOfPossessionParameters.payload.toString().toByteArray(),
+                    Json.decodeFromJsonElement<Map<String, JsonElement>>(proofReq.proofOfPossessionParameters.header),
                 )
             )
         } else {
@@ -183,9 +183,9 @@ class ExchangeExternalSignatures {
                 )
             )
             val headers = Cbor.decodeFromByteArray<MapElement>(
-                Json.decodeFromJsonElement<ByteArray>(proofReq.jwtParams.header)
+                Json.decodeFromJsonElement<ByteArray>(proofReq.proofOfPossessionParameters.header)
             )
-            val payload = Json.decodeFromJsonElement<ByteArray>(proofReq.jwtParams.payload)
+            val payload = Json.decodeFromJsonElement<ByteArray>(proofReq.proofOfPossessionParameters.payload)
             IssuanceService.OfferedCredentialProofOfPossession(
                 proofReq.offeredCredential,
                 ProofType.cwt,
