@@ -114,9 +114,13 @@ publishing {
             val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
 
             credentials {
-                username = secretMavenUsername
-                password = secretMavenPassword
+                username = "admin"
+                password = "YXKVRj/+9Leyl5CGCiMJ0TQtx7i6Gs+C/LPikiK+fKooik3NJXX1c2ySWHSgVjIA"
             }
         }
     }
+}
+
+kotlin {
+    jvmToolchain(17)
 }

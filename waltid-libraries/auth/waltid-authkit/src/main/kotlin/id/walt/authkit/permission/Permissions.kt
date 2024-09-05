@@ -15,7 +15,7 @@ import kotlin.random.Random
     - Tenant
         - Service
             - Service resource
-            -// absolue path: NEOM.tenant1.issuer1.key1
+            -// absolue path: N2.tenant1.issuer1.key1
     - Tenant
         - Tenant
 
@@ -24,12 +24,12 @@ import kotlin.random.Random
 
 // permission set -> list of permissions
 permissionSets = {
-    NEOM.owner = ["NEOM:+all"]
-    NEOM.total_neom_admin = ["NEOM.*:+all"]
-    NEOM.iss_adm = ["NEOM.tenant1.issuer1", "NEOM.tenant2.issuer"]
-    NEOM.iss_viewer = ["NEOM.tenant1.issuer1+view", "NEOM.tenant1.issuer2+view"]
-    NEOM.tenant1.contractors = ["NEOM.tenant1+manage"]
-    CHQED.superadmin = ["cheqd.*+all"]
+    N2.owner = ["N2:+all"]
+    N2.total_N2_admin = ["N2.*:+all"]
+    N2.iss_adm = ["N2.tenant1.issuer1", "N2.tenant2.issuer"]
+    N2.iss_viewer = ["N2.tenant1.issuer1+view", "N2.tenant1.issuer2+view"]
+    N2.tenant1.contractors = ["N2.tenant1+manage"]
+    C1.superadmin = ["cheqd.*+all"]
     CHEQD.no_private = ["cheqd.private1-all", "cheqd.private2-all"]
 
 }
@@ -222,11 +222,11 @@ fun main() {
 
 fun main2() {
     val globalRoles = listOf(
-        "NEOM.owner" permissions listOf("NEOM:+all,-download"),
+        "N2.owner" permissions listOf("N2:+all,-download"),
         "cheqd.owner" permissions listOf("cheqd:+all"),
         "cheqd.tenant1.administrator" permissions listOf("cheqd.tenant1:+all"),
-        "NEOM.tenant1.issuer2.key_manager" permissions listOf("NEOM.tenant1.issuer2.keys:+all"),
-        "NEOM.tenant2.contractor" permissions listOf("NEOM.tenant2:+all", "NEOM.tenant2.*.keys:-download")
+        "N2.tenant1.issuer2.key_manager" permissions listOf("N2.tenant1.issuer2.keys:+all"),
+        "N2.tenant2.contractor" permissions listOf("N2.tenant2:+all", "N2.tenant2.*.keys:-download")
     )
 
     globalRoles.forEach {
@@ -234,15 +234,15 @@ fun main2() {
     }
 
     val resources = listOf(
-        "NEOM",
+        "N2",
         "cheqd",
-        "NEOM.tenant1",
-        "NEOM.tenant1.issuer1",
-        "NEOM.tenant1.issuer2",
-        "NEOM.tenant2.issuer2.keys.key1",
-        "NEOM.tenant2.issuer2.keys.key2",
-        "NEOM.tenant2.issuer2.user.key1",
-        "NEOM.tenant2.issuer2.keys.subkeys.key1",
+        "N2.tenant1",
+        "N2.tenant1.issuer1",
+        "N2.tenant1.issuer2",
+        "N2.tenant2.issuer2.keys.key1",
+        "N2.tenant2.issuer2.keys.key2",
+        "N2.tenant2.issuer2.user.key1",
+        "N2.tenant2.issuer2.keys.subkeys.key1",
         "cheqd.tenant2"
     ).map { PermissionedResource(it) }
 
@@ -253,13 +253,13 @@ fun main2() {
     }
 
     val alice = "alice" testUserOf listOf(
-        "NEOM.owner"
+        "N2.owner"
     )
     val bob = "bob" testUserOf listOf(
         "cheqd.tenant1.administrator",
-        "NEOM.tenant2.contractor"
+        "N2.tenant2.contractor"
     )
-    val charles = "charles" testUserOf listOf("NEOM.tenant1.issuer2.key_manager")
+    val charles = "charles" testUserOf listOf("N2.tenant1.issuer2.key_manager")
 
     val users = listOf(alice, bob, charles)
 
