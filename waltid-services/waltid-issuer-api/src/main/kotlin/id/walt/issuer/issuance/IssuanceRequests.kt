@@ -84,7 +84,6 @@ enum class IssuanceType {
 @Serializable
 data class IssuanceRequest(
     val issuerKey: JsonObject,
-    val issuerDid: String,
     val credentialConfigurationId: String,
     val credentialData: W3CVC?,
     val mdocData: Map<String, JsonObject>? = null,
@@ -94,6 +93,7 @@ data class IssuanceRequest(
     val vpRequestValue: String? = null,
     val vpProfile: OpenId4VPProfile? = null,
     val useJar: Boolean? = null,
+    val issuerDid: String? = null,
     val x5Chain: List<String>? = null,
     val trustedRootCAs: List<String>? = null,
     var issuanceType: IssuanceType? = null
