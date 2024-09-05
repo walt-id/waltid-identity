@@ -3,6 +3,8 @@ package id.walt.issuer.lspPotential
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.commons.interop.LspPotentialInterop
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.did.dids.registrar.dids.DidCreateOptions
+import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.IssuanceType
@@ -23,6 +25,9 @@ object LspPotentialIssuanceInterop {
             ECKey.parseFromPEMEncodedObjects(LspPotentialInterop.POTENTIAL_ISSUER_PRIV + LspPotentialInterop.POTENTIAL_ISSUER_PUB)
                 .toJSONString()
         ).getOrThrow()
+    }
+    val ISSUER_DID = runBlocking {
+        DidJwkRegistrar().registerByKey(POTENTIAL_ISSUER_JWK_KEY, DidCreateOptions("jwk", mapOf())).did
     }
 
     fun createInteropSampleCredentialOfferUri(issuanceRequestExample: String): String = runBlocking {
