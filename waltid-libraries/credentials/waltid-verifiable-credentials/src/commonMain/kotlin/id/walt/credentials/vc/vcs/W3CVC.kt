@@ -51,7 +51,7 @@ data class W3CVC(
     @JsExport.Ignore
     suspend fun signSdJwt(
         issuerKey: Key,
-        issuerDid: String,
+        issuerKeyId: String,
         subjectDid: String,
         disclosureMap: SDMap,
         /** Set additional options in the JWT header */
@@ -73,7 +73,7 @@ data class W3CVC(
     @JsExport.Ignore
     suspend fun signJws(
         issuerKey: Key,
-        issuerDid: String,
+        issuerDid: String?,
         issuerKid: String? = null,
         subjectDid: String,
         /** Set additional options in the JWT header */
@@ -81,7 +81,7 @@ data class W3CVC(
         /** Set additional options in the JWT payload */
         additionalJwtOptions: Map<String, JsonElement> = emptyMap()
     ): String {
-        val kid = issuerKid ?: issuerDid
+        val kid = issuerKid ?: issuerDid ?: issuerKey.getKeyId()
 
         return JwsSignatureScheme().sign(
             data = this.toJsonObject(),

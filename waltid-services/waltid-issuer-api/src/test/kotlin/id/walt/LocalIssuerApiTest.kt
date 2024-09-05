@@ -137,10 +137,10 @@ class IssuerApiTest {
         val issueRequest =
             IssuanceRequest(
                 issuerKey = jsonKeyObj,
-                issuerDid = TEST_ISSUER_DID,
                 credentialData = w3cVc,
                 credentialConfigurationId = "OpenBadgeCredential_jwt_vc_json",
-                mapping = jsonMappingObj
+                mapping = jsonMappingObj,
+                issuerDid = TEST_ISSUER_DID
             )
 
         ConfigManager.testWithConfigs(testConfigs)
@@ -160,11 +160,11 @@ class IssuerApiTest {
         val selectiveDisclosureMap = SDMapBuilder().addField("sd", true).build()
         val issueRequest = IssuanceRequest(
             issuerKey = jsonKeyObj,
-            issuerDid = TEST_ISSUER_DID,
             credentialData = w3cVc,
             credentialConfigurationId = "OpenBadgeCredential",
             mapping = jsonMappingObj,
-            selectiveDisclosure = selectiveDisclosureMap
+            selectiveDisclosure = selectiveDisclosureMap,
+            issuerDid = TEST_ISSUER_DID
         )
 
         ConfigManager.testWithConfigs(testConfigs)
@@ -200,17 +200,17 @@ class IssuerApiTest {
 
         val issueRequest1 = IssuanceRequest(
             issuerKey = jsonKeyObj,
-            issuerDid = TEST_ISSUER_DID,
             credentialData = w3cVc1,
             credentialConfigurationId = "OpenBadgeCredential_jwt_vc_json",
-            mapping = jsonMappingObj
+            mapping = jsonMappingObj,
+            issuerDid = TEST_ISSUER_DID,
         )
         val issueRequest2 = IssuanceRequest(
             issuerKey = jsonKeyObj,
-            issuerDid = TEST_ISSUER_DID,
             credentialConfigurationId = "BankId_jwt_vc_json",
             credentialData = w3cVc2,
-            mapping = jsonMappingObj
+            mapping = jsonMappingObj,
+            issuerDid = TEST_ISSUER_DID,
         )
 
         val issuanceRequests = listOf(issueRequest1, issueRequest2)

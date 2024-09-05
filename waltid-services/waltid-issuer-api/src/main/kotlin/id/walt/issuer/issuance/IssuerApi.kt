@@ -349,6 +349,7 @@ fun Application.issuerApi() {
                         }.onFailure {
                             throwError(it)
                         }
+
                     }
                     post("issueBatch", {
                         summary = "Signs a list of credentials and starts an OIDC credential exchange flow."
@@ -377,6 +378,8 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
+
+
                         runCatching {
                             val issuanceRequests = context.receive<List<IssuanceRequest>>()
                             val offerUri = createCredentialOfferUri(issuanceRequests, getFormatByCredentialConfigurationId(issuanceRequests.first().credentialConfigurationId) ?: throw IllegalArgumentException("Invalid Credential Configuration Id"), getCallbackUriHeader())
@@ -391,7 +394,8 @@ fun Application.issuerApi() {
                 route("sdjwt") {
                     post("issue", {
                         summary = "Signs credential using SD-JWT and starts an OIDC credential exchange flow."
-                        description = "This endpoint issues a W3C or SD-JWT-VC Verifiable Credential, and returns an issuance URL "
+                        description =
+                            "This endpoint issues a W3C or SD-JWT-VC Verifiable Credential, and returns an issuance URL "
 
                         request {
                             statusCallbackUriHeader()
@@ -401,6 +405,7 @@ fun Application.issuerApi() {
                                 example("W3C SD-JWT example", IssuanceExamples.sdJwtW3CExample)
                                 example("SD-JWT-VC example", IssuanceExamples.sdJwtVCExample)
                                 example("SD-JWT-VC example featuring selectively disclosable sub and iat claims", IssuanceExamples.sdJwtVCExampleWithSDSub)
+                                example("SD-JWT-VC example with issuer DID", IssuanceExamples.sdJwtVCWithIssuerDidExample)
                                 required = true
                             }
                         }
@@ -460,6 +465,8 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
+
+
                         runCatching {
                             val sdJwtIssuanceRequests = context.receive<List<IssuanceRequest>>()
                             val offerUri =
