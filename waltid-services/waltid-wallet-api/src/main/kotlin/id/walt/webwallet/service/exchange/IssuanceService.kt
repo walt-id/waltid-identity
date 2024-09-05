@@ -91,16 +91,11 @@ object IssuanceService {
         validateTokenResponse(tokenResp)
 
         val offeredCredentialsProofRequests = offeredCredentials.map { offeredCredential ->
-            if (offeredCredential.proofTypesSupported?.containsKey(ProofType.jwt) == false)
-                throw UnsupportedOperationException(
-                    "Only ${ProofType.jwt} is supported in credential offer handling with external signatures." +
-                            "Not found in issuer's supported proof types for offer: $offeredCredential"
-                )
             OfferedCredentialProofOfPossessionParameters(
                 offeredCredential,
-                getOfferedCredentialUnsignedJWTParams(
+                getOfferedCredentialProofOfPossessionParameters(
+                    credentialOffer,
                     offeredCredential,
-                    credentialOffer.credentialIssuer,
                     did,
                     keyId,
                     tokenResp.cNonce,
@@ -114,34 +109,24 @@ object IssuanceService {
         )
     }
 
-    private suspend fun getOfferedCredentialUnsignedJWTParams(
+    private suspend fun getOfferedCredentialProofOfPossessionParameters(
+        credentialOffer: CredentialOffer,
         offeredCredential: OfferedCredential,
-        issuerURL: String,
         did: String,
         keyId: String,
         nonce: String?,
-    ): UnsignedJWTParameters {
-        val jwtBuilder = if (offeredCredential.cryptographicBindingMethodsSupported != null &&
-            !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did")
-        ) {
-            val key = DidService.resolveToKey(did).getOrThrow()
-            ProofOfPossession.JWTProofBuilder(
-                issuerUrl = issuerURL,
-                nonce = nonce,
-                keyJwk = key.getPublicKey().exportJWKObject(),
-                keyId = key.getKeyId(),
-            )
-        } else { //proof of did possession here
-            ProofOfPossession.JWTProofBuilder(
-                issuerURL,
-                did,
-                nonce,
-                keyId,
-            )
-        }
-        return UnsignedJWTParameters(
-            jwtBuilder.headers.toMap(),
-            jwtBuilder.payload.toString(),
+    ): ProofOfPossessionParameters {
+        val useKeyProof = (offeredCredential.cryptographicBindingMethodsSupported != null &&
+                (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
+                        offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
+                !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
+        return ProofOfPossessionParameterFactory.new(
+            did,
+            keyId,
+            useKeyProof,
+            offeredCredential,
+            credentialOffer,
+            nonce,
         )
     }
 
@@ -188,7 +173,6 @@ object IssuanceService {
         logger.debug { "Using issuer URL: $credentialIssuerURL" }
         val credReqs = offeredCredentialProofsOfPossession.map { offeredCredentialProofOfPossession ->
             val offeredCredential = offeredCredentialProofOfPossession.offeredCredential
-            val proof = offeredCredentialProofOfPossession.signedProofOfPossession
             logger.info("Offered credential format: ${offeredCredential.format.name}")
             logger.info(
                 "Offered credential cryptographic binding methods: ${
@@ -199,9 +183,7 @@ object IssuanceService {
             )
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
-                proof = ProofOfPossession.JWTProofBuilder(
-                    issuerUrl = credentialIssuerURL,
-                ).build(proof)
+                proof = offeredCredentialProofOfPossession.toProofOfPossession(),
             )
         }
         logger.debug { "credReqs: $credReqs" }
@@ -500,18 +482,23 @@ object IssuanceService {
     @Serializable
     data class OfferedCredentialProofOfPossessionParameters(
         val offeredCredential: OfferedCredential,
-        val jwtParams: UnsignedJWTParameters,
+        val jwtParams: ProofOfPossessionParameters,
     )
 
     @Serializable
     data class OfferedCredentialProofOfPossession(
         val offeredCredential: OfferedCredential,
+        val proofType: ProofType,
         val signedProofOfPossession: String,
-    )
-
-    @Serializable
-    data class UnsignedJWTParameters(
-        val header: Map<String, JsonElement>,
-        val payload: String,
-    )
+    ) {
+        fun toProofOfPossession() = when(proofType) {
+            ProofType.cwt -> {
+                ProofOfPossession.CWTProofBuilder("").build(signedProofOfPossession)
+            }
+            ProofType.ldp_vp -> TODO("ldp_vp proof not yet implemented")
+            else -> {
+                ProofOfPossession.JWTProofBuilder("").build(signedProofOfPossession)
+            }
+        }
+    }
 }
