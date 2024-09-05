@@ -20,29 +20,37 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(ProofOfPossessionSerializer, this).jsonObject
 
-    suspend fun validateJwtProof(key: Key,
-                                 issuerUrl: String, clientId: String?, nonce: String?, keyId: String?): Boolean {
+    suspend fun validateJwtProof(
+        key: Key,
+        issuerUrl: String, clientId: String?, nonce: String?, keyId: String?
+    ): Boolean {
         return proofType == ProofType.jwt && jwt != null &&
-            key.verifyJws(jwt).isSuccess &&
-            JwtUtils.parseJWTHeader(jwt).let { header ->
-                header.containsKey("typ") && header["typ"]?.jsonPrimitive?.content?.equals(JWT_HEADER_TYPE) ?: false &&
-                (keyId.isNullOrEmpty() || header.containsKey("kid") && header["kid"]!!.jsonPrimitive.content == keyId)
-            } &&
-            JwtUtils.parseJWTPayload(jwt).let { payload ->
-                (issuerUrl.isNotEmpty() && payload.containsKey("aud") && payload["aud"]!!.jsonPrimitive.content == issuerUrl) &&
-                (clientId.isNullOrEmpty() || payload.containsKey("iss") && payload["iss"]!!.jsonPrimitive.content == clientId) &&
-                (nonce.isNullOrEmpty() || payload.containsKey("nonce") && payload["nonce"]!!.jsonPrimitive.content == nonce)
-            }
+                key.verifyJws(jwt).isSuccess &&
+                JwtUtils.parseJWTHeader(jwt).let { header ->
+                    header.containsKey("typ") && header["typ"]?.jsonPrimitive?.content?.equals(JWT_HEADER_TYPE) ?: false &&
+                            (keyId.isNullOrEmpty() || header.containsKey("kid") && header["kid"]!!.jsonPrimitive.content == keyId)
+                } &&
+                JwtUtils.parseJWTPayload(jwt).let { payload ->
+                    (issuerUrl.isNotEmpty() && payload.containsKey("aud") && payload["aud"]!!.jsonPrimitive.content == issuerUrl) &&
+                            (clientId.isNullOrEmpty() || payload.containsKey("iss") && payload["iss"]!!.jsonPrimitive.content == clientId) &&
+                            (nonce.isNullOrEmpty() || payload.containsKey("nonce") && payload["nonce"]!!.jsonPrimitive.content == nonce)
+                }
     }
 
     abstract class ProofBuilder {
         abstract suspend fun build(key: Key): ProofOfPossession
     }
 
-    class JWTProofBuilder(private val issuerUrl: String, private val clientId: String? = null,
-                          private val nonce: String? = null, private val keyId: String? = null,
-                          private val keyJwk: JsonObject? = null, private val x5c: JsonArray? = null,
-                          private val trustChain: JsonArray? = null, private val audience: String? = null): ProofBuilder() {
+    class JWTProofBuilder(
+        private val issuerUrl: String,
+        private val clientId: String? = null,
+        private val nonce: String? = null,
+        private val keyId: String? = null,
+        private val keyJwk: JsonObject? = null,
+        private val x5c: JsonArray? = null,
+        private val trustChain: JsonArray? = null,
+        private val audience: String? = null,
+    ) : ProofBuilder() {
         val headers = buildJsonObject {
             put("typ", JWT_HEADER_TYPE)
             keyId?.let { put("kid", it) }
@@ -71,9 +79,14 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
      * @param x5Chain X509 certificate chain, for device/holder key, mutually exclusive with x5Cert and coseKey!
      *
      */
-    class CWTProofBuilder(private val issuerUrl: String,
-                          private val clientId: String?, private val nonce: String?,
-                          private val coseKey: ByteArray? = null, private val x5Cert: ByteArray? = null, private val x5Chain: List<ByteArray>? = null): ProofBuilder() {
+    class CWTProofBuilder(
+        private val issuerUrl: String,
+        private val clientId: String? = null,
+        private val nonce: String? = null,
+        private val coseKey: ByteArray? = null,
+        private val x5Cert: ByteArray? = null,
+        private val x5Chain: List<ByteArray>? = null,
+    ) : ProofBuilder() {
         val headers = MapElement(buildMap {
             put(MapKey(HEADER_LABEL_CONTENT_TYPE), StringElement(CWT_HEADER_TYPE))
             coseKey?.let { put(MapKey(HEADER_LABEL_COSE_KEY), ByteStringElement(it)) }
@@ -133,6 +146,6 @@ enum class ProofType {
 }
 
 @Serializable
-data class ProofTypeMetadata (
+data class ProofTypeMetadata(
     @SerialName("proof_signing_alg_values_supported") val proofSigningAlgValuesSupported: Set<String>
 )
