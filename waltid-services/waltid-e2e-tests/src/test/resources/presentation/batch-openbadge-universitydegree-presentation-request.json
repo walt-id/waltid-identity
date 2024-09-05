@@ -1,0 +1,7 @@
+{
+  "request_credentials":
+  [
+    "OpenBadgeCredential",
+    "UniversityDegreeCredential"
+  ]
+}
