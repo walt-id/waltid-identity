@@ -482,7 +482,7 @@ object IssuanceService {
     @Serializable
     data class OfferedCredentialProofOfPossessionParameters(
         val offeredCredential: OfferedCredential,
-        val jwtParams: ProofOfPossessionParameters,
+        val proofOfPossessionParameters: ProofOfPossessionParameters,
     )
 
     @Serializable
