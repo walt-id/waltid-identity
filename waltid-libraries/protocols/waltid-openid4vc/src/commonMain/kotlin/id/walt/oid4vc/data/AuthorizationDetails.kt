@@ -31,11 +31,12 @@ private val json = Json {
 data class AuthorizationDetails @OptIn(ExperimentalSerializationApi::class) constructor(
     @EncodeDefault val type: String = OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
     val format: CredentialFormat? = null,
-    val types: List<String>? = null,
+    val vct: String? = null,
+    @SerialName("types") val types: List<String>? = null,
     @Serializable(ClaimDescriptorMapSerializer::class) val credentialSubject: Map<String, ClaimDescriptor>? = null,
     @SerialName("doctype") val docType: String? = null,
     @Serializable(ClaimDescriptorNamespacedMapSerializer::class) val claims: Map<String, Map<String, ClaimDescriptor>>? = null,
-    @SerialName("credential_definition") val credentialDefinition: JsonLDCredentialDefinition? = null,
+    @SerialName("credential_definition") val credentialDefinition: CredentialDefinition? = null,
     val locations: List<String>? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
@@ -47,7 +48,7 @@ data class AuthorizationDetails @OptIn(ExperimentalSerializationApi::class) cons
 
         fun fromOfferedCredential(offeredCredential: OfferedCredential, issuerLocation: String? = null) = AuthorizationDetails(
             OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
-            offeredCredential.format, offeredCredential.types, null,
+            offeredCredential.format, offeredCredential.vct, offeredCredential.types, null,
             offeredCredential.docType, null,
             offeredCredential.credentialDefinition, issuerLocation?.let { listOf(it) }, offeredCredential.customParameters
         )

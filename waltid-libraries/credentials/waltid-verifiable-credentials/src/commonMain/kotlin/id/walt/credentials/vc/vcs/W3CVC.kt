@@ -64,14 +64,9 @@ data class W3CVC(
         val sdPayload = SDPayload.createSDPayload(vc, disclosureMap)
         val signable = Json.encodeToString(sdPayload.undisclosedPayload).toByteArray()
 
-        val signed = issuerKey.signJws(
-            signable, mapOf(
-                "typ" to "vc+sd-jwt".toJsonElement(),
-                "cty" to "credential-claims-set+json".toJsonElement(),
-                "kid" to issuerKeyId.toJsonElement()
-            ).plus(additionalJwtHeaders)
-        )
-
+        val signed = issuerKey.signJws(signable, additionalJwtHeaders.plus(mapOf(
+                "kid" to issuerKeyId.toJsonElement())
+        ))
         return SDJwt.createFromSignedJwt(signed, sdPayload).toString()
     }
     @JvmBlocking

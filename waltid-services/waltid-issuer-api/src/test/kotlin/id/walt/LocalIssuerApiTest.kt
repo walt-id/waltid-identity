@@ -4,8 +4,8 @@ import id.walt.commons.config.ConfigManager
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.issuer.issuance.IssuanceRequest
-import id.walt.issuer.issuance.IssuanceType
 import id.walt.issuer.issuance.createCredentialOfferUri
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.sdjwt.SDMapBuilder
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -144,7 +144,7 @@ class IssuerApiTest {
             )
 
         ConfigManager.testWithConfigs(testConfigs)
-        val offerUri = createCredentialOfferUri(listOf(issueRequest), IssuanceType.w3c)
+        val offerUri = createCredentialOfferUri(listOf(issueRequest), CredentialFormat.jwt_vc_json)
 
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
     }
@@ -168,7 +168,7 @@ class IssuerApiTest {
         )
 
         ConfigManager.testWithConfigs(testConfigs)
-        val offerUri = createCredentialOfferUri(listOf(issueRequest), IssuanceType.w3c)
+        val offerUri = createCredentialOfferUri(listOf(issueRequest), CredentialFormat.jwt_vc_json)
 
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
     }
@@ -216,7 +216,7 @@ class IssuerApiTest {
         val issuanceRequests = listOf(issueRequest1, issueRequest2)
 
         ConfigManager.loadConfigs(emptyArray())
-        val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.w3c)
+        val offerUri = createCredentialOfferUri(issuanceRequests, CredentialFormat.jwt_vc_json)
 
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
 
