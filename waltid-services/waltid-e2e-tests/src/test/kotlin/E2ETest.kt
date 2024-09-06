@@ -9,6 +9,7 @@ import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.AccountWalletListing
+import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
@@ -30,30 +31,49 @@ import kotlin.time.Duration.Companion.minutes
 
 class E2ETest {
 
-    private val defaultTestTimeout = 5.minutes
-    private val defaultEmailAccount = EmailAccountRequest(
-        email = "user@email.com",
-        password = "password"
-    )
-    private val issuerKey = loadResource("issuance/key.json")
-    private val issuerDid = loadResource("issuance/did.txt")
-    private val openBadgeCredentialData = loadResource("issuance/openbadgecredential.json")
-    private val credentialMapping = loadResource("issuance/mapping.json")
-    private val credentialDisclosure = loadResource("issuance/disclosure.json")
-    private val jwtCredential = buildJsonObject {
-        put("issuerKey", Json.decodeFromString<JsonElement>(issuerKey))
-        put("issuerDid", issuerDid)
-        put("credentialConfigurationId", "OpenBadgeCredential_jwt_vc_json")
-        put("credentialData", Json.decodeFromString<JsonElement>(openBadgeCredentialData))
-        put("mapping", Json.decodeFromString<JsonElement>(credentialMapping))
-    }
-    private val sdjwtCredential = JsonObject(
-        jwtCredential.plus(
-            Pair(//todo: converted to map
-                "selectiveDisclosure", Json.decodeFromString<JsonElement>(credentialDisclosure)
-            )
+    companion object {
+        val defaultTestTimeout = 5.minutes
+        val defaultEmailAccount = EmailAccountRequest(
+            email = "user@email.com",
+            password = "password"
         )
-    )
+        val issuerKey = loadResource("issuance/key.json")
+        val issuerDid = loadResource("issuance/did.txt")
+        val openBadgeCredentialData = loadResource("issuance/openbadgecredential.json")
+        val credentialMapping = loadResource("issuance/mapping.json")
+        val credentialDisclosure = loadResource("issuance/disclosure.json")
+        val sdjwtCredential = buildJsonObject {
+            put("issuerKey", Json.decodeFromString<JsonElement>(issuerKey))
+            put("issuerDid", issuerDid)
+            put("credentialConfigurationId", "OpenBadgeCredential_jwt_vc_json")
+            put("credentialData", Json.decodeFromString<JsonElement>(openBadgeCredentialData))
+            put("mapping", Json.decodeFromString<JsonElement>(credentialMapping))
+            put("selectiveDisclosure", Json.decodeFromString<JsonElement>(credentialDisclosure))
+        }
+        val jwtCredential = JsonObject(sdjwtCredential.minus("selectiveDisclosure"))
+        val simplePresentationRequestPayload =
+            loadResource("presentation/openbadgecredential-presentation-request.json")
+        val nameFieldSchemaPresentationRequestPayload =
+            loadResource("presentation/openbadgecredential-name-field-presentation-request.json")
+
+        fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
+            install(ContentNegotiation) {
+                json(httpJson)
+            }
+            install(DefaultRequest) {
+                contentType(ContentType.Application.Json)
+                host = "127.0.0.1"
+                port = 22222
+
+                if (token != null) bearerAuth(token)
+            }
+            install(Logging) {
+                level = LogLevel.ALL
+            }
+            followRedirects = doFollowRedirects
+        }
+    }
+
 
     @Test
     fun e2e() = testBlock(defaultTestTimeout) {
@@ -204,12 +224,9 @@ class E2ETest {
         lateinit var verificationId: String
         val sessionApi = Verifier.SessionApi(client)
         val verificationApi = Verifier.VerificationApi(client)
-        verificationApi.verify(loadResource("presentation/openbadgecredential-presentation-request.json")) {
+        verificationApi.verify(simplePresentationRequestPayload) {
             verificationUrl = it
-            assert(verificationUrl.contains("presentation_definition_uri="))
-            assert(!verificationUrl.contains("presentation_definition="))
             verificationId = Url(verificationUrl).parameters.getOrFail("state")
-            verificationUrl
         }
         //endregion -Verifier / request url-
 
@@ -229,7 +246,9 @@ class E2ETest {
             wallet, presentationDefinition, listOf(newCredentialId)
         )
         exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet, presentationDefinition)
-        exchangeApi.usePresentationRequest(wallet, did, resolvedPresentationOfferString, listOf(newCredentialId))
+        exchangeApi.usePresentationRequest(
+            wallet, UsePresentationRequest(did, resolvedPresentationOfferString, listOf(newCredentialId))
+        )
 
         sessionApi.get(verificationId) {
             assert(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
@@ -252,8 +271,8 @@ class E2ETest {
         lspPotentialWallet.testMdocPresentation()
         lspPotentialWallet.testSDJwtVCIssuance()
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
-            lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
-            lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
+        lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
+        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
 
         //endregion -Exchange / presentation-
 
@@ -264,6 +283,10 @@ class E2ETest {
             assert(it.any { it.operation == "useOfferRequest" } && it.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
         }
         //endregion -History-
+        val sdJwtTest = E2ESdJwtTest(issuerApi, exchangeApi, sessionApi, verificationApi)
+        //cleanup credentials
+        credentialsApi.delete(wallet, newCredentialId)
+        sdJwtTest.e2e(wallet, did)
 
         // Test Authorization Code flow with available authentication methods in Issuer API
         val authorizationCodeFlow = AuthorizationCodeFlow(testHttpClient(doFollowRedirects = false))
@@ -271,98 +294,6 @@ class E2ETest {
 
         // test External Signature API Endpoints
         ExchangeExternalSignatures().executeTestCases()
-    }
-
-    @Test
-    fun e2eSdJwt() = testBlock(defaultTestTimeout) {
-        var client = testHttpClient()
-        lateinit var accountId: UUID
-        lateinit var wallet: UUID
-        //region -Login-
-        var authApi = AuthApi(client)
-        authApi.login(defaultEmailAccount) {
-            client = testHttpClient(token = it["token"]!!.jsonPrimitive.content)
-            accountId = UUID(it["id"]!!.jsonPrimitive.content)
-            authApi = AuthApi(client)
-        }
-        authApi.userSession()
-        authApi.userWallets(accountId) {
-            wallet = it.wallets.first().id
-            println("Selected wallet: $wallet")
-        }
-        //endregion -Login-
-
-        val didsApi = DidsApi(client)
-        lateinit var did: String
-        didsApi.list(wallet, DidsApi.DefaultDidOption.Any) {
-            did = it.first { it.default }.did
-        }
-
-        //region -Issuer / offer url-
-        lateinit var offerUrl: String
-        val issuerApi = IssuerApi(client)
-        val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(sdjwtCredential)
-        println("issuance-request:")
-        println(issuanceRequest)
-        issuerApi.sdjwt(issuanceRequest) {
-            offerUrl = it
-            println("offer: $offerUrl")
-        }
-        //endregion -Issuer / offer url-
-
-        //region -Exchange / claim-
-        val exchangeApi = ExchangeApi(client)
-        lateinit var newCredentialId: String
-        exchangeApi.resolveCredentialOffer(wallet, offerUrl)
-        exchangeApi.useOfferRequest(wallet, offerUrl, 1) {
-            val cred = it.first()
-            newCredentialId = cred.id
-        }
-        //endregion -Exchange / claim-
-
-        //region -Verifier / request url-
-        lateinit var verificationUrl: String
-        lateinit var verificationId: String
-        val sessionApi = Verifier.SessionApi(client)
-        val verificationApi = Verifier.VerificationApi(client)
-        verificationApi.verify(loadResource("presentation/openbadgecredential-presentation-request.json")) {
-            verificationUrl = it
-            assert(verificationUrl.contains("presentation_definition_uri="))
-            assert(!verificationUrl.contains("presentation_definition="))
-            verificationId = Url(verificationUrl).parameters.getOrFail("state")
-            verificationUrl
-        }
-        //endregion -Verifier / request url-
-
-        //region -Exchange / presentation-
-        lateinit var resolvedPresentationOfferString: String
-        lateinit var presentationDefinition: String
-        exchangeApi.resolvePresentationRequest(wallet, verificationUrl) {
-            resolvedPresentationOfferString = it
-            presentationDefinition = Url(it).parameters.getOrFail("presentation_definition")
-        }
-
-        sessionApi.get(verificationId) {
-            assert(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
-        }
-
-        exchangeApi.matchCredentialsForPresentationDefinition(
-            wallet, presentationDefinition, listOf(newCredentialId)
-        )
-        exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet, presentationDefinition)
-        exchangeApi.usePresentationRequest(wallet, did, resolvedPresentationOfferString, listOf(newCredentialId))
-
-        sessionApi.get(verificationId) {
-            assert(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-            assert(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
-
-            assert(it.verificationResult == true) { "overall verification should be valid" }
-            it.policyResults.let {
-                require(it != null) { "policyResults should be available after running policies" }
-                assert(it.size > 1) { "no policies have run" }
-            }
-        }
-        //endregion -Exchange / presentation-
     }
 
     //@Test // enable to execute test selectively
@@ -418,26 +349,6 @@ class E2ETest {
         lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
     }
-
-    companion object {
-
-        fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
-            install(ContentNegotiation) {
-                json(httpJson)
-            }
-            install(DefaultRequest) {
-                contentType(ContentType.Application.Json)
-                host = "127.0.0.1"
-                port = 22222
-
-                if (token != null) bearerAuth(token)
-            }
-            install(Logging) {
-                level = LogLevel.ALL
-            }
-            followRedirects = doFollowRedirects
-        }
-    }
 }
 
 fun String.expectLooksLikeJwt(): String =
@@ -447,12 +358,13 @@ suspend fun HttpResponse.expectSuccess(): HttpResponse = also {
     assert(status.isSuccess()) { "HTTP status is non-successful for response: $it, body is ${it.bodyAsText()}" }
 }
 
-suspend fun HttpResponse.expectFailure(): HttpResponse = also {
-    assert(!status.isSuccess()) { "HTTP status is successful for response: $it, body is ${it.bodyAsText()}" }
-}
-
 fun HttpResponse.expectRedirect(): HttpResponse = also {
     assert(status == HttpStatusCode.Found) { "HTTP status is non-successful" }
+}
+
+//todo: temporary
+fun HttpResponse.expectFailure(): HttpResponse = also {
+    assert(!status.isSuccess()) { "HTTP status is successful" }
 }
 
 fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {
