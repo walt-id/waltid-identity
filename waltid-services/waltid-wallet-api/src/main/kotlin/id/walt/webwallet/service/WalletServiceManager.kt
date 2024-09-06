@@ -28,6 +28,7 @@ import id.walt.webwallet.service.notifications.NotificationService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.trust.DefaultTrustValidationService
 import id.walt.webwallet.usecase.claim.ExplicitClaimStrategy
+import id.walt.webwallet.usecase.claim.ExternalSignatureClaimStrategy
 import id.walt.webwallet.usecase.claim.SilentClaimStrategy
 import id.walt.webwallet.usecase.credential.CredentialStatusUseCase
 import id.walt.webwallet.usecase.entity.EntityNameResolutionUseCase
@@ -136,6 +137,13 @@ object WalletServiceManager {
         credentialService = credentialService,
         eventUseCase = eventUseCase,
     )
+    val externalSignatureClaimStrategy by lazy {
+        ExternalSignatureClaimStrategy(
+            issuanceService = IssuanceService,
+            credentialService = credentialService,
+            eventUseCase = eventUseCase,
+        )
+    }
     val credentialStatusUseCase = CredentialStatusUseCase(
         credentialService = credentialService,
         credentialStatusServiceFactory = credentialStatusServiceFactory,

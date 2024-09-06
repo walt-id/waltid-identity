@@ -60,7 +60,7 @@ class AuthorizationCodeFlow(private val client: HttpClient) {
                     type = "openid_credential",
                     locations = listOf(credOffer["credential_issuer"]!!.jsonPrimitive.content),
                     format = CredentialFormat.jwt_vc,
-                    types = listOf("VerifiableCredential","OpenBadgeCredential")
+                    credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential","OpenBadgeCredential"))
                 )
             )
         )
@@ -93,7 +93,7 @@ class AuthorizationCodeFlow(private val client: HttpClient) {
                     type = "openid_credential",
                     locations = listOf(credOffer["credential_issuer"]!!.jsonPrimitive.content),
                     format = CredentialFormat.jwt_vc,
-                    types = listOf("VerifiableCredential","OpenBadgeCredential")
+                    credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential","OpenBadgeCredential"))
                 )
             )
         )
@@ -127,7 +127,7 @@ class AuthorizationCodeFlow(private val client: HttpClient) {
                     type = "openid_credential",
                     locations = listOf(credOffer["credential_issuer"]!!.jsonPrimitive.content),
                     format = CredentialFormat.jwt_vc,
-                    types = listOf("VerifiableCredential","OpenBadgeCredential")
+                    credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential","OpenBadgeCredential"))
                 )
             )
         )
