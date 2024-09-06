@@ -7,11 +7,11 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.utils.randomUUID
 import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
-import id.walt.issuer.issuance.IssuanceType
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.*
 import id.walt.oid4vc.data.AuthenticationMethod
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.ProofType
 import id.walt.sdjwt.utils.Base64Utils.encodeToBase64Url
 import id.walt.webwallet.db.models.WalletCredential
@@ -149,18 +149,18 @@ class ExchangeExternalSignatures {
         val openBadgeIssuanceRequest = Json.decodeFromString<IssuanceRequest>(
             loadResource("issuance/openbadgecredential-issuance-request.json")
         ).apply {
-            this.issuanceType = IssuanceType.w3c
+            this.credentialFormat = CredentialFormat.jwt_vc_json
         }
         val universityDegreeIssuanceRequest = Json.decodeFromString<IssuanceRequest>(
             loadResource("issuance/universitydegree-issuance-request.json")
         ).apply {
-            this.issuanceType = IssuanceType.w3c
+            this.credentialFormat = CredentialFormat.jwt_vc_json
         }
         val mDocIssuanceRequest = Json.decodeFromString<IssuanceRequest>(
             IssuanceExamples.mDLCredentialIssuanceData
         ).copy(
             authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
-            issuanceType = IssuanceType.mdoc,
+            credentialFormat = CredentialFormat.mso_mdoc,
         )
         val openbadgePresentationRequest = loadResource(
             "presentation/openbadgecredential-presentation-request.json"
@@ -253,10 +253,10 @@ class ExchangeExternalSignatures {
         lateinit var offerURL: String
         assert(issuanceRequests.isNotEmpty()) { "How can I test the flow with no issuance requests?" }
         val firstIssuanceRequest = issuanceRequests.first()
-        assertNotNull(firstIssuanceRequest.issuanceType) { "Issuance type must be defined to infer which issuer endpoint to call" }
+        assertNotNull(firstIssuanceRequest.credentialFormat) { "Credential format must be defined to infer which issuer endpoint to call" }
         if (issuanceRequests.size == 1) {
-            when (firstIssuanceRequest.issuanceType) {
-                IssuanceType.mdoc -> {
+            when (firstIssuanceRequest.credentialFormat) {
+                CredentialFormat.mso_mdoc -> {
                     issuerApi.issueMDoc(
                         firstIssuanceRequest,
                     ) {
@@ -265,7 +265,7 @@ class ExchangeExternalSignatures {
                     }
                 }
 
-                IssuanceType.sdjwt -> {
+                CredentialFormat.sd_jwt_vc -> {
                     issuerApi.issueSdJwt(
                         firstIssuanceRequest,
                     ) {
@@ -285,12 +285,12 @@ class ExchangeExternalSignatures {
             }
         } else {
             assertNotEquals(
-                IssuanceType.mdoc,
-                firstIssuanceRequest.issuanceType,
+                CredentialFormat.mso_mdoc,
+                firstIssuanceRequest.credentialFormat,
                 "There is no batch issuance endpoint for mDocs",
             )
-            when (firstIssuanceRequest.issuanceType) {
-                IssuanceType.w3c -> {
+            when (firstIssuanceRequest.credentialFormat) {
+                CredentialFormat.jwt_vc_json -> {
                     issuerApi.issueJwtBatch(
                         issuanceRequests,
                     ) {
