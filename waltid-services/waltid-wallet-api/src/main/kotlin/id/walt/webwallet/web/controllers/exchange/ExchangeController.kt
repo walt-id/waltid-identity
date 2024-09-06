@@ -4,7 +4,6 @@ import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.sdjwt.SDJWTVCTypeMetadata
-import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.WalletServiceManager
@@ -36,13 +35,8 @@ fun Application.exchange() = walletRoute {
                     description = "The offer request to use"
                 }
             }
-            response {
-                HttpStatusCode.OK to {
-                    body<List<WalletCredential>> {
-                        description = "List of credentials"
-                    }
-                }
-            }
+
+            response(OpenAPICommons.useOfferRequestEndpointResponseParams())
         }) {
             val wallet = getWalletService()
 
