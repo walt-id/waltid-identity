@@ -74,7 +74,7 @@ class E2ESdJwtTest(
                 selectedCredentials = listOf(newCredential.id),
                 disclosures = newCredential.disclosures?.let { mapOf(newCredential.id to listOf(it)) },
             ),
-            expectStatus = HttpResponse::expectFailure,
+            expectStatus = expectFailure,
         )
 
         sessionApi.get(verificationId) {

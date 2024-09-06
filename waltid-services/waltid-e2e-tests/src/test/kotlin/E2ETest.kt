@@ -354,17 +354,17 @@ class E2ETest {
 fun String.expectLooksLikeJwt(): String =
     also { assert(startsWith("ey") && count { it == '.' } == 2) { "Does not look like JWT" } }
 
-suspend fun HttpResponse.expectSuccess(): HttpResponse = also {
-    assert(status.isSuccess()) { "HTTP status is non-successful for response: $it, body is ${it.bodyAsText()}" }
+
+val expectSuccess: suspend HttpResponse.() -> HttpResponse = {
+    assert(this.status.isSuccess()) { "HTTP status is non-successful for response: $this, body is ${this.bodyAsText()}" }; this
 }
 
-fun HttpResponse.expectRedirect(): HttpResponse = also {
-    assert(status == HttpStatusCode.Found) { "HTTP status is non-successful" }
+val expectRedirect: HttpResponse.() -> HttpResponse = {
+    assert(this.status == HttpStatusCode.Found) { "HTTP status is non-successful" }; this
 }
 
-//todo: temporary
-fun HttpResponse.expectFailure(): HttpResponse = also {
-    assert(!status.isSuccess()) { "HTTP status is successful" }
+val expectFailure: HttpResponse.() -> HttpResponse = {
+    assert(!status.isSuccess()) { "HTTP status is successful" }; this
 }
 
 fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {
