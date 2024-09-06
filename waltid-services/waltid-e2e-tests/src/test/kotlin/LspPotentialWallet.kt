@@ -50,7 +50,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         val issuanceReq = Json.decodeFromString<IssuanceRequest>(IssuanceExamples.mDLCredentialIssuanceData).copy(
             authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED
         )
-        val offerResp = client.post("/openid4vc/sdjwt/issue") {
+        val offerResp = client.post("/openid4vc/mdoc/issue") {
             contentType(ContentType.Application.Json)
             setBody(Json.encodeToJsonElement(issuanceReq).toString())
         }
@@ -128,7 +128,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
                 put("given_name", "John")
                 put("birthdate", "1940-01-01")
             }),
-            null,
+            "identity_credential",
             x5Chain = listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT),
             trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT),
             selectiveDisclosure = SDMap(mapOf(

@@ -16,6 +16,7 @@ import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
 import id.walt.oid4vc.util.randomUUID
+import id.walt.sdjwt.SDJWTVCTypeMetadata
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
 import id.walt.webwallet.utils.WalletHttpClients
@@ -131,7 +132,7 @@ object IssuanceService {
             val useKeyProof = (offeredCredential.cryptographicBindingMethodsSupported != null &&
                     (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
                             offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
-                    !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
+                    !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did") || (offeredCredential.format.value == "vc+sd-jwt"))
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
                 proof = ProofOfPossessionFactory.new(useKeyProof, credentialWallet, offeredCredential, credentialOffer, nonce)
@@ -261,6 +262,15 @@ object IssuanceService {
                 )
             }
         }
+    }
+
+    suspend fun resolveVct(vct: String): SDJWTVCTypeMetadata {
+        val authority = Url(vct).protocolWithAuthority
+        val response = http.get("$authority/.well-known/vct${vct.substringAfter(authority)}")
+
+        require(response.status.isSuccess()) {"VCT URL returns error: ${response.status}"}
+
+        return response.body<JsonObject>().let { SDJWTVCTypeMetadata.fromJSON(it) }
     }
 
     @Serializable

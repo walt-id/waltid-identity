@@ -10,10 +10,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.mdoc.dataelement.MapElement
-import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.data.CredentialSupported
-import id.walt.oid4vc.data.ResponseMode
-import id.walt.oid4vc.data.ResponseType
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.*
 import id.walt.oid4vc.interfaces.CredentialResult
@@ -55,14 +52,14 @@ class CITestProvider : OpenIDCredentialIssuer(
                 CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"),
                 credentialSigningAlgValuesSupported = setOf("ES256K"),
-                types = listOf("VerifiableCredential", "VerifiableId"),
+                credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableId")),
                 customParameters = mapOf("foo" to JsonPrimitive("bar"))
             ),
             "VerifiableDiploma" to CredentialSupported(
                 CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"),
                 credentialSigningAlgValuesSupported = setOf("ES256K"),
-                types = listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableDiploma")
+                credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableDiploma"))
             )
         )
     )
@@ -136,7 +133,7 @@ class CITestProvider : OpenIDCredentialIssuer(
             credentialRequest,
             CredentialErrorCode.unsupported_credential_format
         )
-        val types = credentialRequest.types ?: credentialRequest.credentialDefinition?.types ?: throw CredentialError(
+        val types = credentialRequest.credentialDefinition?.type ?: throw CredentialError(
             credentialRequest,
             CredentialErrorCode.unsupported_credential_type
         )
@@ -152,7 +149,7 @@ class CITestProvider : OpenIDCredentialIssuer(
         )
         return runBlocking {
             CredentialBuilder(CredentialBuilderType.W3CV2CredentialBuilder).apply {
-                type = credentialRequest.types ?: listOf("VerifiableCredential")
+                type = credentialRequest.credentialDefinition?.type ?: listOf("VerifiableCredential")
                 issuerDid = CI_ISSUER_DID
                 subjectDid = holderKid
             }.buildW3C().baseIssue(CI_DID_KEY, CI_ISSUER_DID, holderKid, mapOf(), mapOf(), mapOf(), mapOf())
