@@ -3,8 +3,7 @@ import E2ETest.Companion.sdjwtCredential
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.web.controllers.UsePresentationRequest
-import io.ktor.client.statement.*
+import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.ktor.http.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.test.runTest
