@@ -1,0 +1,9 @@
+{
+  "fields": {
+    "name": {
+      "sd": true
+    }
+  },
+  "decoyMode": "NONE",
+  "decoys": 0
+}
