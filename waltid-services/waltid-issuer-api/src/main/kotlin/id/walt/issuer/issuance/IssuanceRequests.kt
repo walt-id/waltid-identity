@@ -75,17 +75,12 @@ data class NewIssuanceRequest(
     val credential: List<NewSingleCredentialIssuanceRequest>,
 )
 
-enum class IssuanceType {
-    w3c,
-    sdjwt,
-    mdoc
-}
-
 @Serializable
 data class IssuanceRequest(
     val issuerKey: JsonObject,
     val credentialConfigurationId: String,
     val credentialData: W3CVC?,
+    val vct: String? = null,
     val mdocData: Map<String, JsonObject>? = null,
     val mapping: JsonObject? = null,
     val selectiveDisclosure: SDMap? = null,
@@ -96,7 +91,8 @@ data class IssuanceRequest(
     val issuerDid: String? = null,
     val x5Chain: List<String>? = null,
     val trustedRootCAs: List<String>? = null,
-    var issuanceType: IssuanceType? = null
+
+    var credentialFormat: CredentialFormat? = null
 ) {
     init {
 
@@ -114,6 +110,7 @@ data class IssuanceRequest(
 
     }
 }
+
 
 @Serializable
 data class IssuerOnboardingResponse(

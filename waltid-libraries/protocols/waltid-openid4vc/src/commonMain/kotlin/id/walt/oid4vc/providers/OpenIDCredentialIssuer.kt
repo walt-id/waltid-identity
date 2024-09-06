@@ -53,7 +53,7 @@ abstract class OpenIDCredentialIssuer(
         return config.credentialConfigurationsSupported.values.any { cred ->
             format == cred.format && (
                     (docType != null && cred.docType == docType) ||
-                            (types != null && cred.types != null && cred.types.containsAll(types))
+                            (types != null && cred.credentialDefinition?.type != null && cred.credentialDefinition.type.containsAll(types))
                     )
         }
     }
@@ -62,8 +62,8 @@ abstract class OpenIDCredentialIssuer(
         return authorizationDetails.type == OPENID_CREDENTIAL_AUTHORIZATION_TYPE &&
                 config.credentialConfigurationsSupported.values.any { credentialSupported ->
                     credentialSupported.format == authorizationDetails.format &&
-                            ((authorizationDetails.types != null && credentialSupported.types?.containsAll(
-                                authorizationDetails.types
+                            ((authorizationDetails.credentialDefinition?.type != null && credentialSupported.credentialDefinition?.type?.containsAll(
+                                authorizationDetails.credentialDefinition.type
                             ) == true) ||
                                     (authorizationDetails.docType != null && credentialSupported.docType == authorizationDetails.docType)
                                     )

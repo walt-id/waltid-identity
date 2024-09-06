@@ -306,7 +306,7 @@ async function register() {
         password: passwordInput,
         type: "email",
     };
-    await $fetch("/wallet-api/auth/create", {
+    await $fetch("/wallet-api/auth/register", {
         method: "POST",
         body: user,
     })
