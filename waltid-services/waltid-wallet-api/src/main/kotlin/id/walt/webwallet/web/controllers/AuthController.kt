@@ -134,6 +134,24 @@ fun Application.auth() {
                                     )
                                 }
                                 example("OIDC") { value = OidcAccountRequest(token = "ey...") }
+                                example("Keycloak username + password") {
+                                    value = KeycloakAccountRequest(
+                                        username = "Max_Mustermann",
+                                        password = "password"
+                                    )
+                                }
+                                example("Keycloak username + Access Token ") {
+                                    value = KeycloakAccountRequest(
+                                        username = "Max_Mustermann",
+                                        token = "eyJhb..."
+                                    )
+                                }
+
+                                example("Keycloak user Access Token ") {
+                                    value = KeycloakAccountRequest(
+                                        token = "eyJhb..."
+                                    )
+                                }
                             }
                         }
                         response {
@@ -167,6 +185,14 @@ fun Application.auth() {
                                 value = OidcUniqueSubjectRequest(token = "ey...")
                             }
                             example("Keycloak") { value = KeycloakAccountRequest() }
+                            example("Keycloak: username + email + password") {
+                                value = KeycloakAccountRequest(
+                                    username = "Max_Mustermann",
+                                    email = "user@email.com",
+                                    password = "password",
+                                    token = "eyJhb..."
+                                )
+                            }
                         }
                     }
                     response {
@@ -243,79 +269,6 @@ fun Application.auth() {
                 logger.debug { "Fetching Keycloak access token" }
                 val accessToken = KeycloakAccountStrategy.getAccessToken()
                 call.respond(accessToken)
-            }
-
-            // Create Keycloak User
-            post(
-                "create",
-                {
-                    summary = "Keycloak registration with [username + email + password]"
-                    description = "Creates a user in the configured Keycloak instance."
-                    request {
-                        body<AccountRequest> {
-                            example("username + email + password") {
-                                value = KeycloakAccountRequest(
-                                    username = "Max_Mustermann",
-                                    email = "user@email.com",
-                                    password = "password",
-                                    token = "eyJhb..."
-                                )
-                            }
-                        }
-                    }
-                    response {
-                        HttpStatusCode.Created to { description = "Registration succeeded " }
-                        HttpStatusCode.BadRequest to { description = "Registration failed" }
-                    }
-                }) {
-                val req = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
-
-                logger.debug { "Creating Keycloak user" }
-
-                AccountsService.register("", req)
-                    .onSuccess {
-                        call.response.status(HttpStatusCode.Created)
-                        call.respond("Registration succeeded ")
-                    }
-                    .onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
-            }
-
-            // Login a Keycloak user
-            rateLimit(RateLimitName("login")) {
-                post("login", {
-                    summary = "Keycloak login with [username + password]"
-                    description = "Login of a user managed by Keycloak."
-                    request {
-                        body<AccountRequest> {
-                            example("Keycloak username + password") {
-                                value = KeycloakAccountRequest(
-                                    username = "Max_Mustermann",
-                                    password = "password"
-                                )
-                            }
-                            example("Keycloak username + Access Token ") {
-                                value = KeycloakAccountRequest(
-                                    username = "Max_Mustermann",
-                                    token = "eyJhb..."
-                                )
-                            }
-
-                            example("Keycloak user Access Token ") {
-                                value = KeycloakAccountRequest(
-                                    token = "eyJhb..."
-                                )
-                            }
-                        }
-                    }
-
-                    response {
-                        HttpStatusCode.OK to { description = "Login successful" }
-                        HttpStatusCode.Unauthorized to { description = "Unauthorized" }
-                        HttpStatusCode.BadRequest to { description = "Bad request" }
-                    }
-                }) {
-                    doLogin()
-                }
             }
 
             // Terminate Keycloak session
