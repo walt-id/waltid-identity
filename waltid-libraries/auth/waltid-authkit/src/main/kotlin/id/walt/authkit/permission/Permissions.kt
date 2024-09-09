@@ -15,7 +15,7 @@ import kotlin.random.Random
     - Tenant
         - Service
             - Service resource
-            -// absolue path: NEOM.tenant1.issuer1.key1
+            -// absolue path: customerAbc.tenant1.issuer1.key1
     - Tenant
         - Tenant
 
@@ -24,13 +24,13 @@ import kotlin.random.Random
 
 // permission set -> list of permissions
 permissionSets = {
-    NEOM.owner = ["NEOM:+all"]
-    NEOM.total_neom_admin = ["NEOM.*:+all"]
-    NEOM.iss_adm = ["NEOM.tenant1.issuer1", "NEOM.tenant2.issuer"]
-    NEOM.iss_viewer = ["NEOM.tenant1.issuer1+view", "NEOM.tenant1.issuer2+view"]
-    NEOM.tenant1.contractors = ["NEOM.tenant1+manage"]
-    CHQED.superadmin = ["cheqd.*+all"]
-    CHEQD.no_private = ["cheqd.private1-all", "cheqd.private2-all"]
+    customerAbc.owner = ["customerAbc:+all"]
+    customerAbc.total_customerAbc_admin = ["customerAbc.*:+all"]
+    customerAbc.iss_adm = ["customerAbc.tenant1.issuer1", "customerAbc.tenant2.issuer"]
+    customerAbc.iss_viewer = ["customerAbc.tenant1.issuer1+view", "customerAbc.tenant1.issuer2+view"]
+    customerAbc.tenant1.contractors = ["customerAbc.tenant1+manage"]
+    customerXyz.superadmin = ["customerXyz.*+all"]
+    customerXyz.no_private = ["customerXyz.private1-all", "customerXyz.private2-all"]
 
 }
 
@@ -143,31 +143,31 @@ private infix fun String.userWith(roles: List<PermissionSet>) = TestUser(this, r
 fun main() {
     /*
      * Alice is allowed to operate the diploma issuers of the
-     * - engineering sciences departments of ETH Zürich,
+     * - engineering sciences departments of University1,
      * - colleges of ETH Lausanne
-     * - private (non-SWITCH) SBS University
+     * - private (non-universitygroup) SBS University
      */
     ("alice" userWith listOf(
-        "switch.eth_zurich.engineering_sciences.diploma_manager" permissions listOf(
-            "switch.eth_zurich.departement_informatics.diploma_issuer1:+issue,+config",
-            "switch.eth_zurich.departement_informatics.diploma_issuer2:+issue,+config",
-            "switch.eth_zurich.departement_biosystems.diploma_issuer:+issue,+config",
-            "switch.eth_zurich.departement_material_sc.diploma_issuer:+issue,+config",
-            "switch.eth_zurich.departement_electrical_eng.diploma_issuer:+issue,+config",
-            "switch.eth_zurich.departement_mechanical_eng.diploma_issuer:+issue,+config",
+        "universitygroup.university1.engineering_sciences.diploma_manager" permissions listOf(
+            "universitygroup.university1.departement_informatics.diploma_issuer1:+issue,+config",
+            "universitygroup.university1.departement_informatics.diploma_issuer2:+issue,+config",
+            "universitygroup.university1.departement_biosystems.diploma_issuer:+issue,+config",
+            "universitygroup.university1.departement_material_sc.diploma_issuer:+issue,+config",
+            "universitygroup.university1.departement_electrical_eng.diploma_issuer:+issue,+config",
+            "universitygroup.university1.departement_mechanical_eng.diploma_issuer:+issue,+config",
         ),
-        "switch.eth_lausanne.colleges_diploma_manager" permissions listOf(
-            "switch.eth_lausanne.college_humanities.diploma_issuer1:+issue,+config",
-            "switch.eth_lausanne.college_technology.diploma_issuer1:+issue,+config"
+        "universitygroup.university2.colleges_diploma_manager" permissions listOf(
+            "universitygroup.university2.college_humanities.diploma_issuer1:+issue,+config",
+            "universitygroup.university2.college_technology.diploma_issuer1:+issue,+config"
         ),
-        "sbs.swiss_business_school.diploma_issuer" permissions listOf(
-            "sbs.swiss_business_school.diploma_issuer1:+issue",
-            "sbs.swiss_business_school.diploma_issuer2:+issue",
-            "sbs.swiss_business_school.diploma_issuer3:+issue",
+        "universityX.diploma_issuer" permissions listOf(
+            "universityX.diploma_issuer1:+issue",
+            "universityX.diploma_issuer2:+issue",
+            "universityX.diploma_issuer3:+issue",
         )
     )).apply {
-        checkAccessTo("switch.eth_zurich.departement_informatics.diploma_issuer1", "issue") expect true
-        checkAccessTo("switch.eth_lausanne.college_humanities.diploma_issuer1", "config") expect true
+        checkAccessTo("universitygroup.university1.departement_informatics.diploma_issuer1", "issue") expect true
+        checkAccessTo("universitygroup.university2.college_humanities.diploma_issuer1", "config") expect true
     }
 
     /*
@@ -175,14 +175,14 @@ fun main() {
      * - operate the certificate courses issuer
      */
     ("bob" userWith listOf(
-        "sbs.user.bob" permissions listOf(
-            "sbs.swiss_business_school.certificate_courses.investment_banking.certificate_issuer:+issue",
+        "universityX.user.bob" permissions listOf(
+            "universityX.certificate_courses.investment_banking.certificate_issuer:+issue",
         )
     )).apply {
-        checkAccessTo("switch.eth_zurich.departement_informatics.diploma_issuer1", "issue") expect false
+        checkAccessTo("universitygroup.university1.departement_informatics.diploma_issuer1", "issue") expect false
 
-        checkAccessTo("sbs.swiss_business_school.certificate_courses.commodities_hedging.certificate_issuer", "issue") expect false
-        checkAccessTo("sbs.swiss_business_school.certificate_courses.investment_banking.certificate_issuer", "issue") expect true
+        checkAccessTo("universityX.certificate_courses.commodities_hedging.certificate_issuer", "issue") expect false
+        checkAccessTo("universityX.certificate_courses.investment_banking.certificate_issuer", "issue") expect true
     }
 
     /*
@@ -190,43 +190,43 @@ fun main() {
      * -
      */
     ("charlie" userWith listOf(
-        "sbs.certificate_issuer" permissions listOf(
-            "sbs.swiss_business_school.certificate_courses.*.certificate_issuer:+issue"
+        "universityX.certificate_issuer" permissions listOf(
+            "universityX.certificate_courses.*.certificate_issuer:+issue"
         )
     )).apply {
-        checkAccessTo("sbs.swiss_business_school.certificate_courses.commodities_hedging.certificate_issuer", "issue") expect true
-        checkAccessTo("sbs.swiss_business_school.certificate_courses.investment_banking.certificate_issuer", "issue") expect true
+        checkAccessTo("universityX.certificate_courses.commodities_hedging.certificate_issuer", "issue") expect true
+        checkAccessTo("universityX.certificate_courses.investment_banking.certificate_issuer", "issue") expect true
     }
 
     /*
      * Diana:
-     * - has full authority over all services belonging to ETH Lausanne
-     * - view (read-only) configuration of the Informatics department of ETH Zürich
+     * - has full authority over all services belonging to Univerity2
+     * - view (read-only) configuration of the Informatics department of University1
      */
     ("diana" userWith listOf(
-        "switch.eth_lausanne.superadmin" permissions listOf(
-            "switch.eth_lausanne:+all"
+        "universitygroup.university2.superadmin" permissions listOf(
+            "universitygroup.university2:+all"
         ),
-        "switch.eth_zurich.departement_informatics.config_guest" permissions listOf(
-            "switch.eth_zurich.departement_informatics:+view"
+        "universitygroup.university1.departement_informatics.config_guest" permissions listOf(
+            "universitygroup.university1.departement_informatics:+view"
         )
     )).apply {
-        checkAccessTo("switch.eth_zurich.departement_informatics.diploma_issuer1", "issue") expect false
-        checkAccessTo("switch.eth_zurich.departement_informatics.diploma_issuer1", "view") expect true
+        checkAccessTo("universitygroup.university1.departement_informatics.diploma_issuer1", "issue") expect false
+        checkAccessTo("universitygroup.university1.departement_informatics.diploma_issuer1", "view") expect true
 
 
-        checkAccessTo("switch.eth_lausanne.tenant${Random.nextInt()}", "delete") expect true
+        checkAccessTo("universitygroup.university2.tenant${Random.nextInt()}", "delete") expect true
     }
 }
 
 
 fun main2() {
     val globalRoles = listOf(
-        "NEOM.owner" permissions listOf("NEOM:+all,-download"),
-        "cheqd.owner" permissions listOf("cheqd:+all"),
-        "cheqd.tenant1.administrator" permissions listOf("cheqd.tenant1:+all"),
-        "NEOM.tenant1.issuer2.key_manager" permissions listOf("NEOM.tenant1.issuer2.keys:+all"),
-        "NEOM.tenant2.contractor" permissions listOf("NEOM.tenant2:+all", "NEOM.tenant2.*.keys:-download")
+        "customerAbc.owner" permissions listOf("customerAbc:+all,-download"),
+        "customerXyz.owner" permissions listOf("customerXyz:+all"),
+        "customerXyz.tenant1.administrator" permissions listOf("customerXyz.tenant1:+all"),
+        "customerAbc.tenant1.issuer2.key_manager" permissions listOf("customerAbc.tenant1.issuer2.keys:+all"),
+        "customerAbc.tenant2.contractor" permissions listOf("customerAbc.tenant2:+all", "customerAbc.tenant2.*.keys:-download")
     )
 
     globalRoles.forEach {
@@ -234,16 +234,16 @@ fun main2() {
     }
 
     val resources = listOf(
-        "NEOM",
-        "cheqd",
-        "NEOM.tenant1",
-        "NEOM.tenant1.issuer1",
-        "NEOM.tenant1.issuer2",
-        "NEOM.tenant2.issuer2.keys.key1",
-        "NEOM.tenant2.issuer2.keys.key2",
-        "NEOM.tenant2.issuer2.user.key1",
-        "NEOM.tenant2.issuer2.keys.subkeys.key1",
-        "cheqd.tenant2"
+        "customerAbc",
+        "customerXyz",
+        "customerAbc.tenant1",
+        "customerAbc.tenant1.issuer1",
+        "customerAbc.tenant1.issuer2",
+        "customerAbc.tenant2.issuer2.keys.key1",
+        "customerAbc.tenant2.issuer2.keys.key2",
+        "customerAbc.tenant2.issuer2.user.key1",
+        "customerAbc.tenant2.issuer2.keys.subkeys.key1",
+        "customerXyz.tenant2"
     ).map { PermissionedResource(it) }
 
 
@@ -253,13 +253,13 @@ fun main2() {
     }
 
     val alice = "alice" testUserOf listOf(
-        "NEOM.owner"
+        "customerAbc.owner"
     )
     val bob = "bob" testUserOf listOf(
-        "cheqd.tenant1.administrator",
-        "NEOM.tenant2.contractor"
+        "customerXyz.tenant1.administrator",
+        "customerAbc.tenant2.contractor"
     )
-    val charles = "charles" testUserOf listOf("NEOM.tenant1.issuer2.key_manager")
+    val charles = "charles" testUserOf listOf("customerAbc.tenant1.issuer2.key_manager")
 
     val users = listOf(alice, bob, charles)
 

@@ -8,7 +8,7 @@ import id.walt.authkit.methods.UserPass
 import id.walt.authkit.methods.data.AuthMethodStoredData
 import id.walt.authkit.sessions.AuthSession
 
-object ExampleAccountStore : AccountStoreInterface {
+object ExampleAccountStore : EditableAccountStore {
 
     // Account uuid -> account
     private val wip_accounts = HashMap<String, Account>()
@@ -19,20 +19,38 @@ object ExampleAccountStore : AccountStoreInterface {
     private val wip_account_ids = HashMap<AccountIdentifier, String>()
 
     // Account uuid -> auth mechanisms
-    private val wip_accountAuthMechanisms = HashMap<String, Map<AuthenticationMethod, AuthMethodStoredData>>()
+    private val wip_accountAuthMechanisms = HashMap<String, MutableMap<AuthenticationMethod, AuthMethodStoredData>>()
 
 
     init {
         val newAccount = Account("11111111-1111-1111-1111-000000000000", "Alice")
-        wip_accounts[newAccount.id] = newAccount
+        registerAccount(newAccount)
 
         val accountIdentifier = UsernameIdentifier("alice1")
-        wip_account_ids[accountIdentifier] = newAccount.id
+        addAccountIdentifierToAccount(newAccount, accountIdentifier)
 
-        wip_accountAuthMechanisms[newAccount.id] = hashMapOf(
-            UserPass to UserPass.UserPassStoredData("123456"),
-            TOTP to TOTP.TOTPStoredData("JBSWY3DPEHPK3PXP") // https://totp.danhersam.com/
-        )
+        addAccountStoredData(newAccount.id, UserPass to UserPass.UserPassStoredData("123456"))
+        addAccountStoredData(newAccount.id, TOTP to TOTP.TOTPStoredData("JBSWY3DPEHPK3PXP")) // https://totp.danhersam.com/
+    }
+
+    override fun registerAccount(newAccount: Account) {
+        wip_accounts[newAccount.id] = newAccount
+    }
+
+    override fun addAccountIdentifierToAccount(accountId: String, newAccountIdentifier: AccountIdentifier) {
+        wip_account_ids[newAccountIdentifier] = accountId
+    }
+
+    override fun addAccountStoredData(accountId: String, data: Pair<AuthenticationMethod, AuthMethodStoredData>) {
+        if (!wip_accountAuthMechanisms.containsKey(accountId)) {
+            wip_accountAuthMechanisms[accountId] = HashMap()
+        }
+
+        wip_accountAuthMechanisms[accountId]!![data.first] = data.second
+    }
+
+    override fun deleteAccountStoredData(accountId: String, dataFor: AuthenticationMethod) {
+        wip_accountAuthMechanisms[accountId]!!.remove(dataFor)
     }
 
     // TODO

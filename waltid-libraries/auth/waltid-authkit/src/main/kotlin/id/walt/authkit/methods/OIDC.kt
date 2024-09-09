@@ -104,12 +104,6 @@ object OIDC : AuthenticationMethod("oidc") {
         }
     }
 
-    val contextConfig = OidcAuthConfiguration(
-        openIdConfigurationUrl = "http://localhost:8080/.well-known/openid-configuration",
-        clientId = "user",
-        clientSecret = "pass",
-    )
-
     suspend fun resolveConfiguration(configUrl: String): OpenIdConfiguration {
         return http.get(configUrl).response<OpenIdConfiguration>()
     }
@@ -161,11 +155,11 @@ object OIDC : AuthenticationMethod("oidc") {
     val redirectUri = "http://localhost:8088/auth/oidc/callback"
 
     @OptIn(ExperimentalUuidApi::class)
-    fun createOidcSession(context: Unit): OidcAuthSession {
+    fun createOidcSession(context: Unit, config: OidcAuthConfiguration): OidcAuthSession {
         val newSessionId = Uuid.random().toString()
         val newState = Uuid.random().toString()
 
-        val authUrl = getOpenidProviderAuth(contextConfig, newState, redirectUri).toString()
+        val authUrl = getOpenidProviderAuth(config, newState, redirectUri).toString()
 
         val newSession = OidcAuthSession(
             id = newSessionId,
@@ -192,7 +186,7 @@ object OIDC : AuthenticationMethod("oidc") {
                 val session = getSession(authContext)
                 val config = session.lookupConfiguration<OidcAuthConfiguration>(this@OIDC)
 
-                val oidcAuthSession = createOidcSession(context = Unit)
+                val oidcAuthSession = createOidcSession(context = Unit, config)
                 context.respondRedirect(oidcAuthSession.authUrl)
             }
             get("callback") {
@@ -204,10 +198,10 @@ object OIDC : AuthenticationMethod("oidc") {
                 val state = params.getOrFail("state")
 
                 val oidcSession = oidcSessionState[state] ?: error("No session for state")
-                val tokenResponse = codeToToken(contextConfig, code)
+                val tokenResponse = codeToToken(config, code)
                 println(tokenResponse)
 
-                val user = userInfo(contextConfig.openIdConfiguration, tokenResponse.accessToken)
+                val user = userInfo(config.openIdConfiguration, tokenResponse.accessToken)
                 val sub = user["sub"]!!.jsonPrimitive.content
 
                 // TODO: better OIDC Identifier (make sure malicious cannot generate a clash per URL)

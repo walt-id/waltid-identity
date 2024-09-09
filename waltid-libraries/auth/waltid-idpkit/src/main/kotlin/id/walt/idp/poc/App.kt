@@ -1,7 +1,10 @@
-@file:OptIn(ExperimentalStdlibApi::class)
+package id.walt.idp.poc
 
-package id.walt
-
+import id.walt.idp.oidc.AuthorizeRequest
+import id.walt.idp.oidc.TokenResponse
+import id.walt.idp.utils.JsonUtils.toJsonObject
+import id.walt.idp.verifier.VerificationStatus
+import id.walt.idp.verifier.Verifier
 import io.klogging.Level
 import io.klogging.config.loggingConfiguration
 import io.klogging.rendering.RENDER_ANSI
@@ -22,11 +25,10 @@ import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 fun main() {
@@ -105,37 +107,7 @@ private fun Map<String, List<String>>.dropCommonHeaders(): Map<String, List<Stri
         )
     }
 
-@Serializable
-data class AuthorizeRequest(
-    /** CSRF protection */
-    val state: String? = null,
-    /** server-side relay protection */
-    val nonce: String? = null,
-    /** scope */
-    //val scope: List<String>,
-    val scope: String,
-    /** OIDC Provider will redirect here */
-    @SerialName("redirect_uri")
-    val redirectUri: String,
-    @SerialName("response_type")
-    val responseType: String = "code",
-    /** Relying Party identifier */
-    @SerialName("client_id")
-    val clientId: String,
-)
-
-@Serializable
-data class TokenResponse(
-    @SerialName("id_token")
-    val idToken: String,
-    @SerialName("access_token")
-    val accessToken: String,
-    @SerialName("token_type")
-    val tokenType: String,
-    @SerialName("expires_in")
-    val expiresIn: Int,
-)
-
+@OptIn(ExperimentalUuidApi::class)
 fun Application.test() {
     routing {
         // Step 0. (call by RP)
@@ -183,7 +155,7 @@ fun Application.test() {
             println("Saved req to authCache: $req")
 
 
-            val (url, token) = Verifier.verify("http://localhost:8080/login?state=${req.state!!}")
+            val (url, token) = Verifier.verify(redirectUrl = "http://localhost:8080/login?state=${req.state!!}")
             reqCache[req.state!!] = token
             urlCache[req.state!!] = url
 
@@ -247,6 +219,7 @@ fun Application.test() {
                         """.trimIndent(), ContentType.Text.Html
                     )
                 }
+
                 VerificationStatus.RESPONSE_RECEIVED ->
                     if (verificationResult.success == true) {
                         val generatedCode = Uuid.random().toString()
