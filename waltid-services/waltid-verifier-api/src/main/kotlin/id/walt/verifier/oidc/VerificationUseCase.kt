@@ -202,7 +202,10 @@ class VerificationUseCase(
         }
     }
 
-    fun getClientIdScheme(openId4VPProfile: OpenId4VPProfile, defaultClientIdScheme: ClientIdScheme): ClientIdScheme {
+    private fun getClientIdScheme(
+        openId4VPProfile: OpenId4VPProfile,
+        defaultClientIdScheme: ClientIdScheme
+    ): ClientIdScheme {
         return when (openId4VPProfile) {
             OpenId4VPProfile.ISO_18013_7_MDOC -> ClientIdScheme.X509SanDns
             else -> defaultClientIdScheme
