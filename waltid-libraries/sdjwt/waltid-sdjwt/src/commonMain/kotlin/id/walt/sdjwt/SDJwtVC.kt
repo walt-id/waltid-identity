@@ -88,6 +88,22 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       put("jwk", holderKeyJWK)
     }, issuerKeyId, vct, nbf, exp, status, additionalJwtHeader)
 
+    fun sign(
+      sdPayload: SDPayload,
+      jwtCryptoProvider: JWTCryptoProvider,
+      issuerDid: String,
+      holderDid: String?,
+      holderKeyJWK: JsonObject?,
+      issuerKeyId: String? = null,
+      vct: String, nbf: Long? = null, exp: Long? = null, status: String? = null,
+      /** Set additional options in the JWT header */
+      additionalJwtHeader: Map<String, Any> = emptyMap()
+    ): SDJwtVC = holderDid?.let {
+      sign(sdPayload, jwtCryptoProvider, issuerDid, it, issuerKeyId, vct, nbf, exp, status, additionalJwtHeader)
+    } ?: holderKeyJWK?.let {
+      sign(sdPayload, jwtCryptoProvider, issuerDid, it, issuerKeyId, vct, nbf, exp, status, additionalJwtHeader)
+    } ?: throw IllegalArgumentException("Either holderKey or holderDid must be given")
+
     private fun doSign(
       sdPayload: SDPayload,
       jwtCryptoProvider: JWTCryptoProvider,

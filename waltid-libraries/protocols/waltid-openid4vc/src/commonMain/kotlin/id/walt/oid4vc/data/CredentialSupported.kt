@@ -67,6 +67,7 @@ order: [...]
 data class CredentialSupported(
     val format: CredentialFormat,
     val scope: String? = null,
+    @SerialName("vct") val vct: String? = null,
     @SerialName("cryptographic_binding_methods_supported") val cryptographicBindingMethodsSupported: Set<String>? = null,
     @SerialName("credential_signing_alg_values_supported") val credentialSigningAlgValuesSupported: Set<String>? = null,
     @SerialName("proof_types_supported") val proofTypesSupported: Map<ProofType, ProofTypeMetadata>? = null,
