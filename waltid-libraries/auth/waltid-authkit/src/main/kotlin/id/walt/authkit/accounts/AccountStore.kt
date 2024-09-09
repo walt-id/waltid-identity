@@ -8,6 +8,7 @@ import id.walt.authkit.sessions.AuthSession
 interface AccountStore {
 
     fun lookupStoredMultiDataForAccount(session: AuthSession, method: AuthenticationMethod): AuthMethodStoredData?
+
     fun lookupStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): AuthMethodStoredData?
 
     fun lookupAccountUuid(identifier: AccountIdentifier): String
