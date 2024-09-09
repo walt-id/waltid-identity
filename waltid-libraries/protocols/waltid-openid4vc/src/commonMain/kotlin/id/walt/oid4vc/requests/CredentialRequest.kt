@@ -21,11 +21,11 @@ private val json = Json {
 data class CredentialRequest(
     val format: CredentialFormat,
     val proof: ProofOfPossession? = null,
-    val types: List<String>? = null,
+    @SerialName("vct") val vct: String? = null,
     @Serializable(ClaimDescriptorMapSerializer::class) val credentialSubject: Map<String, ClaimDescriptor>? = null,
     @SerialName("doctype") val docType: String? = null,
     @Serializable(ClaimDescriptorNamespacedMapSerializer::class) val claims: Map<String, Map<String, ClaimDescriptor>>? = null,
-    @SerialName("credential_definition") val credentialDefinition: JsonLDCredentialDefinition? = null,
+    @SerialName("credential_definition") val credentialDefinition: CredentialDefinition? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = json.encodeToJsonElement(CredentialRequestSerializer, this).jsonObject
@@ -38,7 +38,7 @@ data class CredentialRequest(
             CredentialRequest(
                 authorizationDetails.format!!,
                 proof,
-                authorizationDetails.types,
+                authorizationDetails.vct,
                 authorizationDetails.credentialSubject,
                 authorizationDetails.docType,
                 authorizationDetails.claims,
@@ -49,7 +49,7 @@ data class CredentialRequest(
        fun forOfferedCredential(offeredCredential: OfferedCredential, proof: ProofOfPossession?) = CredentialRequest(
            format = offeredCredential.format,
            proof = proof,
-           types = offeredCredential.types,
+           vct = offeredCredential.vct,
            credentialSubject = null,
            docType = offeredCredential.docType,
            claims = null,

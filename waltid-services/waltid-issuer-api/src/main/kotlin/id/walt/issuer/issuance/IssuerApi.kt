@@ -4,7 +4,10 @@ import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.did.dids.DidService
+import id.walt.issuer.issuance.OidcApi.getFormatByCredentialConfigurationId
+import id.walt.issuer.issuance.OidcApi.getVctByCredentialConfigurationId
 import id.walt.oid4vc.data.AuthenticationMethod
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -29,11 +32,15 @@ import kotlin.time.Duration.Companion.minutes
 private val logger = KotlinLogging.logger {}
 suspend fun createCredentialOfferUri(
     issuanceRequests: List<IssuanceRequest>,
-    issuanceType: IssuanceType,
+    credentialFormat: CredentialFormat,
     callbackUrl: String? = null,
     expiresIn: Duration = 5.minutes,
 ): String {
-    val overwrittenIssuanceRequests = issuanceRequests.map { it.copy(issuanceType = issuanceType) }
+    val overwrittenIssuanceRequests = issuanceRequests.map {
+        it.copy(
+            credentialFormat = credentialFormat,
+            vct = if (credentialFormat == CredentialFormat.sd_jwt_vc) getVctByCredentialConfigurationId(it.credentialConfigurationId) ?: throw IllegalArgumentException("VCT not found") else null)
+    }
 
     val credentialOfferBuilder =
         OidcIssuance.issuanceRequestsToCredentialOfferBuilder(overwrittenIssuanceRequests)
@@ -337,7 +344,7 @@ fun Application.issuerApi() {
                     }) {
                         runCatching {
                             val jwtIssuanceRequest = context.receive<IssuanceRequest>()
-                            val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest), IssuanceType.w3c, getCallbackUriHeader())
+                            val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest), getFormatByCredentialConfigurationId(jwtIssuanceRequest.credentialConfigurationId) ?: throw IllegalArgumentException("Invalid Credential Configuration Id"), getCallbackUriHeader())
                             context.respond(HttpStatusCode.OK, offerUri)
                         }.onFailure {
                             throwError(it)
@@ -375,12 +382,9 @@ fun Application.issuerApi() {
 
                         runCatching {
                             val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                            val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.w3c, getCallbackUriHeader())
+                            val offerUri = createCredentialOfferUri(issuanceRequests, getFormatByCredentialConfigurationId(issuanceRequests.first().credentialConfigurationId) ?: throw IllegalArgumentException("Invalid Credential Configuration Id"), getCallbackUriHeader())
                             logger.debug { "Offer URI: $offerUri" }
-
-                            context.respond(
-                                HttpStatusCode.OK, offerUri
-                            )
+                            context.respond(HttpStatusCode.OK, offerUri)
                         }.onFailure {
                             throwError(it)
                         }
@@ -400,6 +404,7 @@ fun Application.issuerApi() {
                                     "Pass the unsigned credential that you intend to issue in the body of the request."
                                 example("W3C SD-JWT example", IssuanceExamples.sdJwtW3CExample)
                                 example("SD-JWT-VC example", IssuanceExamples.sdJwtVCExample)
+                                example("SD-JWT-VC example featuring selectively disclosable sub and iat claims", IssuanceExamples.sdJwtVCExampleWithSDSub)
                                 example("SD-JWT-VC example with issuer DID", IssuanceExamples.sdJwtVCWithIssuerDidExample)
                                 required = true
                             }
@@ -419,8 +424,15 @@ fun Application.issuerApi() {
                     }) {
                         runCatching {
                             val sdJwtIssuanceRequest = context.receive<IssuanceRequest>()
-                            val offerUri = createCredentialOfferUri(listOf(sdJwtIssuanceRequest), IssuanceType.sdjwt, getCallbackUriHeader())
-                            context.respond(HttpStatusCode.OK, offerUri)
+                            val offerUri = createCredentialOfferUri(
+                                listOf(sdJwtIssuanceRequest),
+                                getFormatByCredentialConfigurationId(sdJwtIssuanceRequest.credentialConfigurationId) ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
+                                getCallbackUriHeader()
+                            )
+
+                            context.respond(
+                                HttpStatusCode.OK, offerUri
+                            )
                         }.onFailure {
                             throwError(it)
                         }
@@ -456,8 +468,14 @@ fun Application.issuerApi() {
 
 
                         runCatching {
-                            val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                            val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.sdjwt, getCallbackUriHeader())
+                            val sdJwtIssuanceRequests = context.receive<List<IssuanceRequest>>()
+                            val offerUri =
+                                createCredentialOfferUri(
+                                    sdJwtIssuanceRequests,
+                                    getFormatByCredentialConfigurationId(sdJwtIssuanceRequests.first().credentialConfigurationId) ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
+                                    getCallbackUriHeader()
+                                )
+
                             logger.debug { "Offer URI: $offerUri" }
 
                             context.respond(
@@ -484,7 +502,10 @@ fun Application.issuerApi() {
                         }
                     }) {
                         val mdocIssuanceRequest = context.receive<IssuanceRequest>()
-                        val offerUri = createCredentialOfferUri(listOf(mdocIssuanceRequest), IssuanceType.mdoc, getCallbackUriHeader())
+                        val offerUri = createCredentialOfferUri(
+                            listOf(mdocIssuanceRequest),
+                            getFormatByCredentialConfigurationId(mdocIssuanceRequest.credentialConfigurationId) ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
+                            getCallbackUriHeader())
 
                         context.respond(
                             HttpStatusCode.OK, offerUri
