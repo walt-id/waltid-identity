@@ -802,7 +802,6 @@ object IssuanceExamples {
                 "type": "jwk",
                 "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
             },
-            "issuerDid": "",
             "credentialConfigurationId": "identity_credential_vc+sd-jwt",
             "credentialData": $sdjwt_vc_identity_credential,
             "mdocData": null,
