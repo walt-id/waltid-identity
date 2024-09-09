@@ -115,7 +115,7 @@ class VerificationUseCase(
 
     fun verify(sessionId: String?, tokenResponseParameters: Map<String, List<String>>): Result<String> {
         logger.debug { "Verifying session $sessionId" }
-        val session = sessionId?.let { OIDCVerifierService.getSession(it) }!!
+        val session = OIDCVerifierService.getSession(sessionId.toString())
         val tokenResponse = when (TokenResponse.isDirectPostJWT(tokenResponseParameters)) {
             true -> TokenResponse.fromDirectPostJWT(
                 tokenResponseParameters,
