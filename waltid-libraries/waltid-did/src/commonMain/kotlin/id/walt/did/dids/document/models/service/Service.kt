@@ -1,4 +1,4 @@
-package id.walt.did.dids.models.service
+package id.walt.did.dids.document.models.service
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
