@@ -219,7 +219,7 @@
                     </div>
                 </div>
 
-                <div v-if="issuerName || issuerDid || credentialIssuerService">
+                <div v-if="issuerName || issuerDid || credentialIssuerService || issuerKid">
                     <hr class="my-5" />
                     <div class="text-gray-500 mb-4 font-bold">Issuer</div>
                     <div class="md:flex text-gray-500 mb-3 md:mb-1">
@@ -232,6 +232,12 @@
                             {{ issuerDid }}
                         </div>
                     </div>
+                  <div v-if="credential['format'] === 'vc+sd-jwt'" class="md:flex text-gray-500 mb-3 md:mb-1">
+                    <div class="min-w-[19vw]">KeyID</div>
+                    <div class="font-bold truncate hover:overflow-auto">
+                      {{ issuerKid }}
+                    </div>
+                  </div>
                     <div class="md:flex text-gray-500 mb-3 md:mb-1">
                         <div class="min-w-[19vw]">Service endpoint</div>
                         <NuxtLink class="font-bold truncate" :to="credentialIssuerService ?? ''" _blank>
@@ -384,7 +390,7 @@ const showCredentialManifest = ref(false);
 
 const { data: credential, pending, refresh, error } = await useLazyFetch<WalletCredential>(`/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`);
 refreshNuxtData();
-const { jwtJson, disclosures, issuerName, issuerDid, credentialIssuerService, issuanceDate, manifest, manifestClaims } = useCredential(credential);
+const { jwtJson, disclosures, issuerName, issuerDid, issuerKid, credentialIssuerService, issuanceDate, manifest, manifestClaims } = useCredential(credential);
 
 async function deleteCredential() {
     await $fetch(`/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`, {

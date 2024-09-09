@@ -1,7 +1,8 @@
 import { parseDisclosures } from "../composables/disclosures.ts";
 import { computedAsync } from "@vueuse/core";
 import { parseJwt } from "../utils/jwt.ts";
-import { type Ref, computed } from "vue";
+import { type Ref,  computed, ref, watchEffect } from "vue";
+import {useCurrentWallet} from "./accountWallet";
 
 export type WalletCredential = {
     wallet: string;
@@ -15,6 +16,7 @@ export type WalletCredential = {
 };
 
 export function useCredential(credential: Ref<WalletCredential | null>) {
+    const currentWallet = useCurrentWallet()
     const jwtJson = computedAsync(async () => {
         if (credential.value) {
             if (credential.value.parsedDocument) return credential.value.parsedDocument;
@@ -44,11 +46,40 @@ export function useCredential(credential: Ref<WalletCredential | null>) {
     const manifest = computed(() => (credential.value?.manifest && credential.value.manifest != "{}" ? (typeof credential.value.manifest === 'string' ? JSON.parse(credential.value.manifest) : credential.value.manifest) : null));
     const manifestClaims = computed(() => manifest.value?.display?.claims);
 
-    const titleTitelized = computed(() => manifest.value?.display?.title ?? jwtJson.value?.type?.at(-1).replace(/([a-z0-9])([A-Z])/g, "$1 $2") ?? jwtJson.value?.vct?.replace("_vc+sd-jwt", "").replace(/([a-z0-9])([A-Z])/g, "$1 $2") ?? jwtJson.value?.docType);
+    // Function to resolve VCT URL and fetch the name parameter
+    async function fetchVctName(vct: string): Promise<String> {
+        try {
+            const response = await fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolveVctUrl?vct=${vct}`);
+            const data = await response.json();
+            return data.name || null;
+        } catch (error) {
+            console.error('Error fetching VCT name:', error);
+            return null;
+        }
+    }
+
+    const titleTitelized = ref('');
+
+    watchEffect(async () => {
+        if (jwtJson.value?.vct) {
+            const vct = jwtJson.value.vct;
+            titleTitelized.value = await fetchVctName(vct)
+        } else {
+            // Fallback logic if there's no `vct`
+            titleTitelized.value = manifest.value?.display?.title
+                ?? jwtJson.value?.type?.at(-1)?.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+                ?? jwtJson.value?.vct?.replace("_vc+sd-jwt", "").replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+                ?? jwtJson.value?.docType;
+        }
+    });
+
     const credentialSubtitle = computed(() => manifest.value?.display?.card?.description ?? jwtJson.value?.name);
     const credentialImageUrl = computed(() => manifest.value?.display?.card?.logo?.uri ?? jwtJson.value?.issuer?.image?.id ?? jwtJson.value?.issuer?.image);
     const issuerName = computed(() => manifest.value?.display?.card?.issuedBy ?? jwtJson.value?.issuer?.name);
     const issuerDid = computed(() => manifest.value?.input?.issuer ?? jwtJson.value?.issuer?.id ?? jwtJson.value?.issuer);
+    const issuerKid = computed(() =>
+        credential.value.format === "vc+sd-jwt" ? jwtJson.value?.iss ?? null : null
+    );
     const credentialIssuerService = computed(() => manifest.value?.input?.credentialIssuer);
 
     const isNotExpired = computed(() => jwtJson.value?.expirationDate ? new Date(jwtJson.value?.expirationDate).getTime() > new Date().getTime() : jwtJson.value?.validUntil ? new Date(jwtJson.value?.validUntil).getTime() > new Date().getTime() : true);
@@ -81,6 +112,7 @@ export function useCredential(credential: Ref<WalletCredential | null>) {
         credentialImageUrl,
         issuerName,
         issuerDid,
+        issuerKid,
         credentialIssuerService,
         isNotExpired,
         issuanceDate,
