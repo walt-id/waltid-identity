@@ -85,7 +85,7 @@ data class IssuanceRequest(
     val issuerKey: JsonObject,
     val issuerDid: String,
     val credentialConfigurationId: String,
-    val credentialData: W3CVC?,
+    val credentialData: JsonObject?,
     val mdocData: Map<String, JsonObject>? = null,
     val mapping: JsonObject? = null,
     val selectiveDisclosure: SDMap? = null,
@@ -95,9 +95,20 @@ data class IssuanceRequest(
     val useJar: Boolean? = null,
     val x5Chain: List<String>? = null,
     val trustedRootCAs: List<String>? = null,
-
     var issuanceType: IssuanceType? = null
-)
+) {
+    constructor(
+        issuerKey: JsonObject, issuerDid: String, credentialConfigurationId: String, credentialData: JsonObject,
+        mapping: JsonObject? = null, selectiveDisclosure: SDMap? = null,
+        authenticationMethod: AuthenticationMethod? = AuthenticationMethod.PRE_AUTHORIZED, // "PWD" OR "ID_TOKEN" OR "VP_TOKEN" OR "PRE_AUTHORIZED" OR "NONE"
+        vpRequestValue: String? = null, vpProfile: OpenId4VPProfile? = null, useJar: Boolean? = null,
+        x5Chain: List<String>? = null, trustedRootCAs: List<String>? = null, issuanceType: IssuanceType? = null
+    ) : this(issuerKey, issuerDid, credentialConfigurationId,
+        credentialData, null,
+        mapping, selectiveDisclosure, authenticationMethod, vpRequestValue, vpProfile, useJar, x5Chain,
+        trustedRootCAs, issuanceType
+    )
+}
 
 @Serializable
 data class IssuerOnboardingResponse(

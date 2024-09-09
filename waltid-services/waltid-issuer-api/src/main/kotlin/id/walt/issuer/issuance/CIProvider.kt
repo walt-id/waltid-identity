@@ -7,8 +7,10 @@ import COSE.OneKey
 import cbor.Cbor
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
+import com.sksamuel.hoplite.ConfigException
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.ConfigurationException
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.credentials.issuance.Issuer.mergingJwtIssue
 import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
@@ -278,8 +280,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                         issuerKey = Json.parseToJsonElement(KeySerialization.serializeKey(exampleIssuerKey)).jsonObject,
                         issuerDid = exampleIssuerDid,
                         credentialConfigurationId = "OpenBadgeCredential_${credentialRequest.format.value}",
-                        credentialData = W3CVC.fromJson(IssuanceExamples.openBadgeCredentialData),
-                        mdocData = null
+                        credentialData = Json.parseToJsonElement(IssuanceExamples.openBadgeCredentialData).jsonObject
                     ),
                 )
             )
@@ -301,8 +302,12 @@ open class CIProvider : OpenIDCredentialIssuer(
                     issuerKid = issuerDid + "#" + issuerKey.key.getKeyId()
 
                 when (data.request.issuanceType) {
-                    IssuanceType.sdjwt -> sdJwtVc(JWKKey.importJWK(holderKey.toString()).getOrNull(), vc, holderDid)
-                    else -> nonSdJwtVc(vc, issuerKid, holderDid, holderKey)
+                    IssuanceType.sdjwt -> sdJwtVc(
+                        JWKKey.importJWK(holderKey.toString()).getOrNull(),
+                        W3CVC(vc),
+                        // TODO: SDPayload.createSDPayload(vc, data.request.selectiveDisclosure ?: SDMap(mapOf())),
+                        holderDid)
+                    else -> nonSdJwtVc(W3CVC(vc), issuerKid, holderDid, holderKey)
                 }
             }.also { log.debug { "Respond VC: $it" } }
         }))
@@ -456,7 +461,8 @@ open class CIProvider : OpenIDCredentialIssuer(
 
                             data.run {
                                 when (credentialRequest.format) {
-                                    CredentialFormat.sd_jwt_vc -> vc.mergingSdJwtIssue(
+                                    // TODO: update to SD-JWT-VC lib!
+                                    CredentialFormat.sd_jwt_vc -> W3CVC(vc).mergingSdJwtIssue(
                                         issuerKey = issuerKey.key,
                                         issuerDid = issuerDid,
                                         subjectDid = subjectDid,
@@ -474,13 +480,14 @@ open class CIProvider : OpenIDCredentialIssuer(
                                         })
                                     }
 
-                                    else -> vc.mergingJwtIssue(
+                                    else -> W3CVC(vc).mergingSdJwtIssue(
                                         issuerKey = issuerKey.key,
                                         issuerDid = issuerDid,
                                         subjectDid = subjectDid,
                                         mappings = request.mapping ?: JsonObject(emptyMap()),
-                                        additionalJwtHeader = emptyMap(),
+                                        additionalJwtHeaders = emptyMap(),
                                         additionalJwtOptions = emptyMap(),
+                                        disclosureMap = data.request.selectiveDisclosure ?: SDMap(mapOf())
                                     ).also {
                                         data.sendCallback("batch_jwt_issue", buildJsonObject {
                                             put("jwt", it)
@@ -579,14 +586,24 @@ open class CIProvider : OpenIDCredentialIssuer(
         holderKey: JWKKey?,
         vc: SDPayload,
         holderDid: String?,
-    ) = SDJwtVC.sign(
+    ): String = SDJwtVC.sign(
         sdPayload = vc,
         jwtCryptoProvider = jwtCryptoProvider,
         issuerDid = issuerDid.ifEmpty { issuerKey.key.getKeyId() },
-        holderDid = holderDid ?: holderKey?.getKeyId() ?: throw IllegalArgumentException("Either holderKey or holderDid must be given"),
+        holderDid = holderDid,
+        holderKeyJWK = holderKey?.exportJWKObject(),
         issuerKeyId = issuerKey.key.getKeyId(),
-        vct = TODO("continue here!")
-    )
+        vct = metadata.credentialConfigurationsSupported?.get(request.credentialConfigurationId)?.vct ?: throw ConfigurationException(
+            ConfigException("No vct configured for given credential configuration id: ${request.credentialConfigurationId}")
+        ),
+        additionalJwtHeader = request.x5Chain?.let {
+            mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
+        } ?: mapOf()
+    ).toString().also {
+        sendCallback("sdjwt_issue", buildJsonObject {
+            put("sdjwt", it)
+        })
+    }
 
     private suspend fun IssuanceSessionData.sdJwtVc(
         holderKey: JWKKey?,

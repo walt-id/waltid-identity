@@ -126,11 +126,10 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
             Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
             "",
             "identity_credential_vc+sd-jwt",
-            credentialData = W3CVC(buildJsonObject {
+            credentialData = buildJsonObject {
                 put("family_name", "Doe")
                 put("given_name", "John")
-            }),
-            null,
+            },
             x5Chain = listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT),
             trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT)
         )
