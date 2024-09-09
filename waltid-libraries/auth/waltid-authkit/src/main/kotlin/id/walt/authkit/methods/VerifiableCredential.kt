@@ -1,7 +1,9 @@
-package id.walt
+package id.walt.authkit.methods
 
 import com.nfeld.jsonpathkt.JsonPath
 import com.nfeld.jsonpathkt.kotlinx.resolveAsStringOrNull
+import id.walt.authkit.AuthContext
+import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -11,10 +13,27 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.application.*
+import io.ktor.server.routing.*
 import io.ktor.server.util.*
+import io.ktor.util.pipeline.*
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+
+class VerifiableCredential : AuthenticationMethod("vc") {
+
+
+    override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+        route("vc", {
+
+        }) {
+            get("x") {
+                val session = getSession(authContext)
+            }
+        }
+    }
+}
 
 enum class VerificationStatus {
     WAITING_FOR_SUBMISSION,
@@ -43,7 +62,7 @@ object Verifier {
             setBody(
                 mapOf(
                     "request_credentials" to listOf("OpenBadgeCredential")
-                ).toJsonObject()
+                )
             )
             header("successRedirectUri", redirectUrl)
         }

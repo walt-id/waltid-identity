@@ -95,15 +95,6 @@ const projects = [
     },
     {
         id: 3,
-        name: "howest.neom.walt-test.cloud",
-        href: "#",
-        status: "Complete",
-        issuedTo: "did:key:z6Mkipa1mwZTvUaTCPkHsdKGWNWteQbpEmvcr9HFed9gS4Ye",
-        dueDate: "May 03, 2023",
-        dueDateTime: "2023-05-03T00:00Z",
-    },
-    {
-        id: 4,
         name: "issuer.walt.id",
         href: "#",
         status: "Complete",
@@ -112,7 +103,7 @@ const projects = [
         dueDateTime: "2023-05-03T00:00Z",
     },
     {
-        id: 5,
+        id: 4,
         name: "issuer.walt-test.cloud",
         href: "#",
         status: "Archived",
