@@ -5,6 +5,10 @@ export default defineNuxtConfig({
     devtools: { enabled: true },
     srcDir: "src",
 
+    devServer: {
+        port: 7101
+    },
+
     modules: [
         "@vueuse/nuxt",
         ["@unocss/nuxt", { autoImport: false }],
