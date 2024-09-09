@@ -277,7 +277,7 @@ fun Application.verfierApi() {
                         }.onFailure {
                             processVerificationFailureResult(it, sessionId)
                         }.also {
-                            sessionId.run { verificationUseCase.notifySubscribers(this) }
+                            verificationUseCase.notifySubscribers(sessionId)
                         }
                 }.onFailure {
                     logger.error(it) { "Error in POST verify/state" }
