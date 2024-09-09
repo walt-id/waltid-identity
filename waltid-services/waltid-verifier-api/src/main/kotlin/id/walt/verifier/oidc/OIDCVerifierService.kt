@@ -43,6 +43,7 @@ import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.policies.PresentationDefinitionPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -125,6 +126,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
 
     override fun getSession(id: String) = presentationSessions[id]
+        ?: throw NotFoundException("Id parameter $id doesn't refer to an existing session, or session expired")
     override fun putSession(id: String, session: PresentationSession) = presentationSessions.put(id, session)
     override fun getSessionByAuthServerState(authServerState: String): PresentationSession? {
         TODO("Not yet implemented")
@@ -149,7 +151,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     // Simple cryptographic operations interface implementation
     override fun doVerify(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
         val policies = sessionVerificationInfos[session.id]
-            ?: throw IllegalArgumentException("Could not find policy listing for session: ${session.id}")
+            ?: throw NotFoundException("Policy listing for session: ${session.id} is missing. Please ensure that the session ID is correct and that the policies have been properly configured.")
 
         val vpToken = when (tokenResponse.idToken) {
             null -> when (tokenResponse.vpToken) {
@@ -208,7 +210,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val parsedDeviceResponse = DeviceResponse.fromCBORBase64URL(tokenResponse.vpToken!!.jsonPrimitive.content)
         val parsedMdoc = parsedDeviceResponse.documents[0]
         val deviceKey = OneKey(CBORObject.DecodeFromBytes(parsedMdoc.MSO!!.deviceKeyInfo.deviceKey.toCBOR()))
-        val issuerKey = parsedMdoc.issuerSigned.issuerAuth?.x5Chain?.let { X509CertUtils.parse(it) }?.publicKey ?: throw Exception("Issuer key not found in x5Chain header (33)")
+        val issuerKey = parsedMdoc.issuerSigned.issuerAuth?.x5Chain?.let { X509CertUtils.parse(it) }?.publicKey
+            ?: throw BadRequestException("Issuer's Public Key Missing: The x5c header in the JWT is either missing or does not contain the expected X.509 certificate chain. Please ensure that the x5c header is correctly formatted and includes the issuer’s public key")
         return parsedMdoc.verify(
             MDocVerificationParams(
                 VerificationType.forPresentation,
