@@ -205,7 +205,6 @@ fun Application.verfierApi() {
                     vpPoliciesJson = body["vp_policies"],
                     vcPoliciesJson = body["vc_policies"],
                     requestCredentialsJson = body["request_credentials"]!!,
-                    presentationDefinitionJson = body["presentation_definition"],
                     responseMode = responseMode,
                     successRedirectUri = successRedirectUri,
                     errorRedirectUri = errorRedirectUri,
@@ -430,11 +429,10 @@ fun Application.verfierApi() {
                     add("not-before")
                     add("revoked_status_list")
                 },
-                requestCredentialsJson = buildJsonArray {},
                 presentationDefinitionJson = when (scope.contains("openid ver_test:vp_token")) {
-                    true -> Json.parseToJsonElement(fixedPresentationDefinitionForEbsiConformanceTest)
+                    true -> Json.parseToJsonElement(fixedPresentationDefinitionForEbsiConformanceTest).jsonObject
                     else -> null
-                },
+                } ?: throw IllegalArgumentException(""),
                 responseMode = ResponseMode.direct_post,
                 successRedirectUri = null,
                 errorRedirectUri = null,
