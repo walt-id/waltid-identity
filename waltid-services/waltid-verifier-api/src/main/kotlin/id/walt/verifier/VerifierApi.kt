@@ -267,8 +267,8 @@ fun Application.verfierApi() {
                     }
                 }
             }) {
-                runCatching {
-                    logger.info { "POST verify/state" }
+
+            logger.info { "POST verify/state" }
                     val sessionId = call.parameters.getOrFail("state")
                     logger.info { "State: $sessionId" }
                     verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
@@ -279,10 +279,7 @@ fun Application.verfierApi() {
                         }.also {
                             verificationUseCase.notifySubscribers(sessionId)
                         }
-                }.onFailure {
-                    logger.error(it) { "Error in POST verify/state" }
-                    throw it
-                }
+
             }
             get("/session/{id}", {
                 tags = listOf("Credential Verification")
