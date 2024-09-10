@@ -14,7 +14,6 @@ import id.walt.webwallet.web.controllers.*
 import id.walt.webwallet.web.controllers.NotificationController.notifications
 import id.walt.webwallet.web.controllers.PushController.push
 import id.walt.webwallet.web.plugins.*
-import id.walt.webwallet.web.plugins.walletOpenApiPluginAmendment
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
 import org.bouncycastle.jce.provider.BouncyCastleProvider
@@ -58,6 +57,7 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     if (withPlugins) {
         configurePlugins()
     }
+
     auth()
     accounts();
     { push() } whenFeature FeatureCatalog.pushFeature
