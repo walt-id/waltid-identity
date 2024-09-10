@@ -1,8 +1,8 @@
 package id.walt.webwallet.db.models
 
-import kotlinx.uuid.exposed.KotlinxUUIDTable
+import org.jetbrains.exposed.dao.id.UUIDTable
 
-object WalletIssuers : KotlinxUUIDTable("wallet_issuers") {
+object WalletIssuers : UUIDTable("wallet_issuers") {
     val wallet = reference("wallet", Wallets)
     val did = varchar("did", 1024)
     val description = text("description").nullable().default("no description")

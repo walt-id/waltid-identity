@@ -97,7 +97,7 @@ node index.js
 This example creates and signs an SD-JWT, using the SimpleJWTCryptoProvider implementation, that's shipped with the waltid-sd-jwt library,
 which uses the `nimbus-jose-jwt` library for cryptographic operations.
 
-In this example we sign the JWT with the HS256 algorithm, and a UUID as a shared secret.
+In this example we sign the JWT with the HS256 algorithm, and a Uuid as a shared secret.
 
 Here we generate the SD payload, by comparing the full payload and the undisclosed payload (with selective fields removed).
 

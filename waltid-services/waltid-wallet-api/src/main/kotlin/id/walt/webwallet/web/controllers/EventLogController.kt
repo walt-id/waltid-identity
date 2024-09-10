@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.service.WalletServiceManager.eventFilterUseCase
@@ -11,6 +13,7 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.util.*
+import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.eventLogs() = walletRoute {
     route("eventlog", {

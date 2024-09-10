@@ -71,8 +71,8 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES_VERSION}")
 
-    // UUID
-    implementation("app.softwork:kotlinx-uuid-core:0.0.26")
+    // Uuid
+    implementation("app.softwork:kotlinx-uuid-core:0.1.2")
 
     /* -- Misc --*/
 

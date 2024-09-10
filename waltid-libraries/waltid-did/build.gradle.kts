@@ -89,7 +89,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -105,8 +105,8 @@ kotlin {
                 // Date
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
 
-                // UUID
-                implementation("app.softwork:kotlinx-uuid-core:0.0.26")
+                // Uuid
+                implementation("app.softwork:kotlinx-uuid-core:0.1.2")
 
                 // Crypto
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -141,7 +141,7 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
                 implementation(kotlin("test"))
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
                 implementation("io.ktor:ktor-server-test-host:$ktor_version")

@@ -58,7 +58,7 @@ dependencies {
     api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
 
     // -- Android --
     implementation("androidx.biometric:biometric:1.2.0-alpha05")

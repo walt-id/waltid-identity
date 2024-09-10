@@ -46,6 +46,12 @@ dependencies {
     implementation("com.nimbusds:oauth2-oidc-sdk:11.12")
     implementation("com.nimbusds:nimbus-jose-jwt:9.40")
 
+    // for Ed25519
+    implementation("com.google.crypto.tink:tink:1.14.0") {
+        exclude("org.slf4j.simple")
+    }
+
+
     // Logging
     implementation("io.klogging:klogging-jvm:0.7.0")
     implementation("io.klogging:slf4j-klogging:0.7.0")

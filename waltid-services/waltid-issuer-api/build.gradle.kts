@@ -5,7 +5,6 @@ import java.util.Properties
 object Versions {
     const val KTOR_VERSION = "2.3.12" // also change 1 plugin
     const val COROUTINES_VERSION = "1.8.1"
-    const val EXPOSED_VERSION = "0.43.0"
     const val HOPLITE_VERSION = "2.8.0.RC3"
 }
 

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 import E2ETestWebService.loadResource
 import E2ETestWebService.testBlock
 import id.walt.commons.config.ConfigManager
@@ -23,10 +25,12 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
+
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class E2ETest {
 
@@ -34,8 +38,8 @@ class E2ETest {
     fun e2e() = runTest(timeout = 5.minutes) {
         testBlock {
             var client = testHttpClient()
-            lateinit var accountId: UUID
-            lateinit var wallet: UUID
+            lateinit var accountId: Uuid
+            lateinit var wallet: Uuid
             var authApi = AuthApi(client)
 
             // the e2e http request tests here

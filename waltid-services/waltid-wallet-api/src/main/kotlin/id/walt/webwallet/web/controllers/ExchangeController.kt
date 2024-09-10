@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers
 
 import id.walt.oid4vc.data.CredentialOffer
@@ -17,6 +19,7 @@ import io.ktor.server.response.*
 import io.ktor.util.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.exchange() = walletRoute {
     route("exchange", {

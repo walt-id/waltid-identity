@@ -53,7 +53,7 @@ dependencies {
 
     // Persistence
     api("io.github.reactivecircus.cache4k:cache4k:0.13.0")
-    api("app.softwork:kotlinx-uuid-core:0.0.26")
+    api("app.softwork:kotlinx-uuid-core:0.1.2")
     api("redis.clients:jedis:5.2.0-beta4")
 
     // Testing

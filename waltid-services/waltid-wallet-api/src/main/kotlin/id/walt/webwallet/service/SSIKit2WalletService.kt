@@ -67,17 +67,21 @@ import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
+
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import kotlin.collections.set
 import kotlin.time.Duration.Companion.seconds
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
 
+@OptIn(ExperimentalUuidApi::class)
 class SSIKit2WalletService(
     tenant: String,
-    accountId: UUID,
-    walletId: UUID,
+    accountId: Uuid,
+    walletId: Uuid,
     private val categoryService: CategoryService,
     private val settingsService: SettingsService,
     private val eventUseCase: EventLogUseCase,
@@ -523,7 +527,7 @@ class SSIKit2WalletService(
 
     override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> =
         WalletOperationHistories.selectAll()
-            .where { WalletOperationHistories.wallet eq walletId }
+            .where { WalletOperationHistories.wallet eq walletId.toJavaUuid() }
             .orderBy(WalletOperationHistories.timestamp)
             .limit(10)
             .map { row -> WalletOperationHistory(row) }
@@ -533,7 +537,7 @@ class SSIKit2WalletService(
             WalletOperationHistories.insert {
                 it[tenant] = operationHistory.tenant
                 it[accountId] = operationHistory.account
-                it[wallet] = operationHistory.wallet
+                it[wallet] = operationHistory.wallet.toJavaUuid()
                 it[timestamp] = operationHistory.timestamp.toJavaInstant()
                 it[operation] = operationHistory.operation
                 it[data] = Json.encodeToString(operationHistory.data)
@@ -545,16 +549,16 @@ class SSIKit2WalletService(
         wallet: WalletDataTransferObject,
     ): LinkedWalletDataTransferObject = Web3WalletService.link(tenant, walletId, wallet)
 
-    override suspend fun unlinkWallet(wallet: UUID) =
+    override suspend fun unlinkWallet(wallet: Uuid) =
         Web3WalletService.unlink(tenant, walletId, wallet)
 
     override suspend fun getLinkedWallets(): List<LinkedWalletDataTransferObject> =
         Web3WalletService.getLinked(tenant, walletId)
 
-    override suspend fun connectWallet(walletId: UUID) =
+    override suspend fun connectWallet(walletId: Uuid) =
         Web3WalletService.connect(tenant, this.walletId, walletId)
 
-    override suspend fun disconnectWallet(wallet: UUID) =
+    override suspend fun disconnectWallet(wallet: Uuid) =
         Web3WalletService.disconnect(tenant, walletId, wallet)
 
     override fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential> {

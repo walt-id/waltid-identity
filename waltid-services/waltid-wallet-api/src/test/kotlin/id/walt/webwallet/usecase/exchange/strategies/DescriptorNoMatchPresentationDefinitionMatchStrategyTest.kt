@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.usecase.exchange.strategies
 
 import TestUtils
@@ -8,9 +10,11 @@ import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.usecase.exchange.TypeFilter
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
-import kotlinx.uuid.UUID
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class DescriptorNoMatchPresentationDefinitionMatchStrategyTest {
 
@@ -19,7 +23,7 @@ class DescriptorNoMatchPresentationDefinitionMatchStrategyTest {
         PresentationDefinition.fromJSON(Json.decodeFromString(TestUtils.loadResource("presentation-definition/definition.json")))
     private val credentials = listOf(
         WalletCredential(
-            wallet = UUID(),
+            wallet = Uuid.random(),
             id = "array-type",
             document = """
                 {

@@ -15,11 +15,16 @@ import id.walt.oid4vc.responses.*
 import id.walt.oid4vc.util.randomUUID
 import io.ktor.http.*
 import kotlinx.datetime.Clock
-import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 abstract class OpenIDProvider<S : AuthorizationSession>(
     val baseUrl: String,
 ) : ISessionCache<S>, ITokenProvider {
@@ -39,8 +44,12 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         requestUriParameterSupported = true,
         subjectTypesSupported = setOf(SubjectType.public),
         authorizationServer = baseUrl,
-        credentialIssuer =  baseUrl, // (EBSI) this should be just "$baseUrl"  https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-11.2.1
-        responseTypesSupported = setOf("code", "vp_token", "id_token"),  // (EBSI) this is required one  https://www.rfc-editor.org/rfc/rfc8414.html#section-2
+        credentialIssuer = baseUrl, // (EBSI) this should be just "$baseUrl"  https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-11.2.1
+        responseTypesSupported = setOf(
+            "code",
+            "vp_token",
+            "id_token"
+        ),  // (EBSI) this is required one  https://www.rfc-editor.org/rfc/rfc8414.html#section-2
         idTokenSigningAlgValuesSupported = setOf("ES256"), // (EBSI) https://openid.net/specs/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-
         codeChallengeMethodsSupported = listOf("S256")
     )
@@ -90,26 +99,30 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     protected open fun verifyAndParseIdToken(token: String): JsonObject? {
         // 1. Validate Header
         val header = parseTokenHeader(token)
-        if (!header.keys.containsAll(setOf(
-                JWTClaims.Header.type,
-                JWTClaims.Header.keyID,
-                JWTClaims.Header.algorithm,
+        if (!header.keys.containsAll(
+                setOf(
+                    JWTClaims.Header.type,
+                    JWTClaims.Header.keyID,
+                    JWTClaims.Header.algorithm,
+                )
             )
-            )){
-            throw IllegalStateException( "Invalid header in token")
+        ) {
+            throw IllegalStateException("Invalid header in token")
         }
 
         // 2. Validate Payload
         val payload = parseTokenPayload(token)
-        if (!payload.keys.containsAll(setOf(
-                JWTClaims.Payload.issuer,
-                JWTClaims.Payload.subject,
-                JWTClaims.Payload.audience,
-                JWTClaims.Payload.expirationTime,
-                JWTClaims.Payload.issuedAtTime,
-                JWTClaims.Payload.nonce,
+        if (!payload.keys.containsAll(
+                setOf(
+                    JWTClaims.Payload.issuer,
+                    JWTClaims.Payload.subject,
+                    JWTClaims.Payload.audience,
+                    JWTClaims.Payload.expirationTime,
+                    JWTClaims.Payload.issuedAtTime,
+                    JWTClaims.Payload.nonce,
+                )
             )
-            )){
+        ) {
             throw IllegalArgumentException("Invalid payload in token")
         }
 
@@ -119,7 +132,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         val kid = header[JWTClaims.Header.keyID]!!.jsonPrimitive.content
         val did = kid.substringBefore("#")
 
-        if (iss != sub || iss != did || sub != did){
+        if (iss != sub || iss != did || sub != did) {
             println("$sub $iss $did")
             throw IllegalArgumentException("Invalid payload in token. sub != iss != did")
         }
@@ -143,7 +156,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         // val key = DidService.resolveToKey(did).getOrThrow()
         // key.verifyJws(token).isSuccess
 
-        if (!verifyTokenSignature(TokenTarget.TOKEN,token))
+        if (!verifyTokenSignature(TokenTarget.TOKEN, token))
             throw IllegalArgumentException("Invalid token - cannot verify signature")
 
         return payload
@@ -151,7 +164,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
 
     protected abstract fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean
 
-    abstract fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration, authServerState: String? ): S
+    abstract fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration, authServerState: String?): S
 
     open fun processCodeFlowAuthorization(authorizationRequest: AuthorizationRequest): AuthorizationCodeResponse {
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
@@ -162,13 +175,13 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             )
         val authorizationSession = getOrInitAuthorizationSession(authorizationRequest)
         val code = generateAuthorizationCodeFor(authorizationSession)
-        return AuthorizationCodeResponse.success(code,  mapOf("state" to listOf(authorizationRequest.state ?: randomUUID())))
+        return AuthorizationCodeResponse.success(code, mapOf("state" to listOf(authorizationRequest.state ?: randomUUID())))
     }
 
-    open fun processDirectPost(state: String, tokenPayload: JsonObject) : AuthorizationCodeResponse {
+    open fun processDirectPost(state: String, tokenPayload: JsonObject): AuthorizationCodeResponse {
         // here we get the initial session to retrieve the state of the initial authorization request
         val session = getSessionByAuthServerState(state)
-            ?: throw IllegalStateException( "No authentication request found for given state")
+            ?: throw IllegalStateException("No authentication request found for given state")
 
         // Verify nonce - need to add Id token nonce session
         // if (payload[JWTClaims.Payload.nonce] != session.)
@@ -185,7 +198,14 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     // }
 
     // Create an ID or VP Token request using JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
-    open fun processCodeFlowAuthorizationWithAuthorizationRequest(authorizationRequest: AuthorizationRequest, keyId: String, privKey: Key, responseType: ResponseType, isJar: Boolean? = true, presentationDefinition: PresentationDefinition? = null):AuthorizationCodeWithAuthorizationRequestResponse {
+    open fun processCodeFlowAuthorizationWithAuthorizationRequest(
+        authorizationRequest: AuthorizationRequest,
+        keyId: String,
+        privKey: Key,
+        responseType: ResponseType,
+        isJar: Boolean? = true,
+        presentationDefinition: PresentationDefinition? = null,
+    ): AuthorizationCodeWithAuthorizationRequestResponse {
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
             throw AuthorizationError(
                 authorizationRequest,
@@ -194,8 +214,8 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             )
 
         // Bind authentication request with state
-        val authorizationRequestServerState = UUID().toString()
-        val authorizationRequestServerNonce = UUID().toString()
+        val authorizationRequestServerState = Uuid.random().toString()
+        val authorizationRequestServerNonce = Uuid.random().toString()
         val authorizationResponseServerMode = ResponseMode.direct_post
 
         val clientId = this.metadata.issuer!!
@@ -214,9 +234,9 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             scope = scope,
             nonce = authorizationRequestServerNonce,
             requestUri = null,
-            request = when(isJar){
+            request = when (isJar) {
                 // Create a jwt as request object as defined in JAR OAuth2.0 specification
-                true -> signToken (
+                true -> signToken(
                     TokenTarget.TOKEN,
                     buildJsonObject {
                         put(JWTClaims.Payload.issuer, metadata.issuer)
@@ -228,7 +248,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                         put("response_type", getResponseTypeString(responseType))
                         put("response_mode", authorizationResponseServerMode.name)
                         put("scope", "openid")
-                        when(responseType) {
+                        when (responseType) {
                             ResponseType.VpToken -> put("presentation_definition", presentationDefinition!!.toJSON())
                             else -> null
                         }
@@ -240,9 +260,10 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                     keyId,
                     privKey
                 )
+
                 else -> null
             },
-            presentationDefinition = when(responseType) {
+            presentationDefinition = when (responseType) {
                 ResponseType.VpToken -> presentationDefinition!!.toJSONString()
                 else -> null
             }
@@ -252,7 +273,8 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     open fun processImplicitFlowAuthorization(authorizationRequest: AuthorizationRequest): TokenResponse {
         println("> processImplicitFlowAuthorization for $authorizationRequest")
         if (!authorizationRequest.responseType.contains(ResponseType.Token) && !authorizationRequest.responseType.contains(ResponseType.VpToken)
-            && !authorizationRequest.responseType.contains(ResponseType.IdToken))
+            && !authorizationRequest.responseType.contains(ResponseType.IdToken)
+        )
             throw AuthorizationError(
                 authorizationRequest,
                 AuthorizationErrorCode.invalid_request,
@@ -326,7 +348,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         expiresIn = authorizationSession.expirationTimestamp - Clock.System.now()
     )
 
-    protected open fun getOrInitAuthorizationSession(authorizationRequest: AuthorizationRequest, authServerState: String?=null): S {
+    protected open fun getOrInitAuthorizationSession(authorizationRequest: AuthorizationRequest, authServerState: String? = null): S {
         return when (authorizationRequest.isReferenceToPAR) {
             true -> getPushedAuthorizationSession(authorizationRequest)
             false -> initializeAuthorization(authorizationRequest, 5.minutes, authServerState)

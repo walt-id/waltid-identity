@@ -40,7 +40,7 @@ public class AuthKitAuthenticationProvider internal constructor(
         val authHeader = call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")
 
         val effectiveToken = authKitHeader ?: cookie ?: authHeader
-        println(effectiveToken)
+        println("AuthKit effective token: $effectiveToken")
 
         if (effectiveToken == null) {
             fail(context, AuthenticationFailedCause.NoCredentials)

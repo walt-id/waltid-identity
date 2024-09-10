@@ -35,7 +35,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 private val SERVER_URL by lazy {
     runBlocking {
@@ -113,7 +114,7 @@ private const val fixedPresentationDefinitionForEbsiConformanceTest =
 
 private val verificationUseCase = VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
 
-@OptIn(ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class, ExperimentalUuidApi::class)
 fun Application.verfierApi() {
     routing {
 
@@ -268,7 +269,7 @@ fun Application.verfierApi() {
                         val session = verificationUseCase.getSession(sessionId!!)
                         if (session.walletInitiatedAuthState != null) {
                             val state = session.walletInitiatedAuthState
-                            val code = UUID().toString()
+                            val code = Uuid.random().toString()
                             context.respondRedirect("openid://?code=$code&state=$state")
                         } else {
                             call.respond(HttpStatusCode.OK, it)
@@ -421,7 +422,7 @@ fun Application.verfierApi() {
             val walletInitiatedAuthState = params["state"]?.jsonArray?.get(0)?.jsonPrimitive?.content
             val scope = params["scope"]?.jsonArray.toString().replace("\"", "").replace("[", "").replace("]", "")
 
-            val stateId = UUID().toString()
+            val stateId = Uuid.random().toString()
             val session = verificationUseCase.createSession(
                 vpPoliciesJson = null,
                 vcPoliciesJson = buildJsonArray {

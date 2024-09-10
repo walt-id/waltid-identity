@@ -104,7 +104,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation("dev.whyoleg.cryptography:cryptography-random:0.3.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
                 implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")

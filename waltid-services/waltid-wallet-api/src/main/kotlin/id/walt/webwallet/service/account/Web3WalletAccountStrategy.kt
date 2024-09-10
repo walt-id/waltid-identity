@@ -1,13 +1,5 @@
 package id.walt.webwallet.service.account
 
-import id.walt.webwallet.db.models.Accounts
-import id.walt.webwallet.db.models.Web3Wallets
-import id.walt.webwallet.web.model.AddressAccountRequest
-import kotlinx.datetime.Clock
-import kotlinx.datetime.toJavaInstant
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.transactions.transaction
-
 /*object Web3WalletAccountStrategy : PasswordlessAccountStrategy<AddressAccountRequest>() {
 
     override suspend fun register(tenant: String, request: AddressAccountRequest): Result<RegistrationResult> = runCatching {

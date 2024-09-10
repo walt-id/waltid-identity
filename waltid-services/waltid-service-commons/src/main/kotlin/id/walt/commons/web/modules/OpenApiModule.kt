@@ -65,7 +65,7 @@ object OpenApiModule {
         install(SwaggerUI) {
 
             examples {
-                example("UUID") {
+                example("Uuid") {
                     value = "12345678-abcd-9876-efgh-543210123456"
                 }
 
