@@ -206,7 +206,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
             contentType(ContentType.Application.Json)
             setBody(
                 buildJsonObject {
-                    put("request_credentials", JsonArray(listOf(RequestedCredential(format = VCFormat.sd_jwt_vc, vct = "identity_credential_vc+sd-jwt").let { Json.encodeToJsonElement(it) })))
+                    put("request_credentials", JsonArray(listOf(RequestedCredential(format = VCFormat.sd_jwt_vc, vct = "http://localhost:22222/identity_credential").let { Json.encodeToJsonElement(it) })))
                 })
         }
         assertEquals(200, createReqResponse.status.value)
