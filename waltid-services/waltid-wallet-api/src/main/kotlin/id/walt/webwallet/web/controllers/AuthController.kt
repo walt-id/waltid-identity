@@ -246,7 +246,7 @@ fun Application.auth() {
                     }
             }
 
-            authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
+            authenticate("authkit", "auth-session", "auth-bearer", "auth-bearer-alternative") {
                 get("user-info", {
                     summary = "Return user ID if logged in"
                     response {
