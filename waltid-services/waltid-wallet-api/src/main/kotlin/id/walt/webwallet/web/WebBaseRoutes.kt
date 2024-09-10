@@ -19,7 +19,7 @@ object WebBaseRoutes {
     }
 
     fun Application.authenticatedWebWalletRoute(block: Route.() -> Unit) = routing {
-        authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
+        authenticate("authkit", "auth-session", "auth-bearer", "auth-bearer-alternative") {
             routedWebWalletRoute(block)
         }
     }
