@@ -179,13 +179,13 @@ fun Application.verfierApi() {
                         example("Example with VP & global VC policies", VerifierApiExamples.vpGlobalVcPolicies)
                         example("Example with VP, VC & specific credential policies", VerifierApiExamples.vcVpIndividualPolicies)
                         example(
-                            "Example with VP, VC & specific policies, and explicit presentation_definition  (maximum example)",
+                            "Example with VP, VC & specific policies, and explicit input_descriptor(s)  (maximum example)",
                             VerifierApiExamples.maxExample
                         )
                         example("Example with presentation definition policy", VerifierApiExamples.presentationDefinitionPolicy)
                         example("Example with EBSI PDA1 Presentation Definition", VerifierApiExamples.EbsiVerifiablePDA1)
                         example("MDoc verification example", VerifierApiExamples.lspPotentialMdocExample)
-                        example("SD-JWT verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
+                        example("SD-JWT-VC verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
                     }
                 }
             }) {
