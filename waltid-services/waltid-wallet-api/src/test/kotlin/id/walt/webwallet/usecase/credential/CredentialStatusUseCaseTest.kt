@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.usecase.credential
 
 import id.walt.oid4vc.data.CredentialFormat
@@ -11,16 +13,18 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
-import kotlinx.uuid.UUID
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class CredentialStatusUseCaseTest {
 
     private val credentialServiceMock = mockk<CredentialsService>()
     private val statusFactoryMock = mockk<CredentialStatusServiceFactory>()
     private val sut = CredentialStatusUseCase(credentialServiceMock, statusFactoryMock)
-    private val wallet = UUID()
+    private val wallet = Uuid.random()
     private val credentialId = "credential-id"
     private val credentialSingleStatus = WalletCredential(
         wallet = wallet,

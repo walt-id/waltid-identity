@@ -25,7 +25,7 @@ dependencies {
     implementation(project(":waltid-services:waltid-verifier-api"))
     implementation(project(":waltid-services:waltid-wallet-api"))
 
-    testImplementation("app.softwork:kotlinx-uuid-core:0.0.26")
+    testImplementation("app.softwork:kotlinx-uuid-core:0.1.2")
     testImplementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
     testImplementation("com.augustcellars.cose:cose-java:1.1.0")
     // Multiplatform / Hashes

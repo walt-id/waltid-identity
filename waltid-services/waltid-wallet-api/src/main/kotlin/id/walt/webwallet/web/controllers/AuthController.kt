@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers
 
 import com.nimbusds.jose.JWSAlgorithm
@@ -49,13 +51,16 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
+
+
 import org.intellij.lang.annotations.Language
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.temporal.ChronoUnit
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
 
 private val logger = KotlinLogging.logger {}
 
@@ -259,7 +264,7 @@ fun Application.auth() {
                         val jwsObject = JWSObject.parse(this)
                         val uuid =
                             Json.parseToJsonElement(jwsObject.payload.toString()).jsonObject["sub"]?.jsonPrimitive?.content.toString()
-                        call.respond(AccountsService.get(UUID(uuid)))
+                        call.respond(AccountsService.get(Uuid.parse(uuid)))
                     } ?: call.respond(HttpStatusCode.BadRequest)
                 }
                 get("session", { summary = "Return session ID if logged in" }) {
@@ -395,7 +400,7 @@ suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
         val now = Clock.System.now().toJavaInstant()
         val tokenPayload = Json.encodeToString(
             AuthTokenPayload(
-                jti = UUID.generateUUID().toString(),
+                jti = Uuid.random().toString(),
                 sub = it.id.toString(),
                 iss = AuthKeys.issTokenClaim,
                 aud = AuthKeys.audTokenClaim.takeIf { !it.isNullOrEmpty() }
@@ -439,18 +444,18 @@ fun PipelineContext<Unit, ApplicationCall>.getUserId() =
         ?: throw UnauthorizedException("Could not find user authorization within request.")
 
 fun PipelineContext<Unit, ApplicationCall>.getUserUUID() =
-    runCatching { UUID(getUserId().name) }
+    runCatching { Uuid.parse(getUserId().name) }
         .getOrElse { throw IllegalArgumentException("Invalid user id: $it") }
 
 fun PipelineContext<Unit, ApplicationCall>.getWalletId() =
     runCatching {
-        UUID(call.parameters["wallet"] ?: throw IllegalArgumentException("No wallet ID provided"))
+        Uuid.parse(call.parameters["wallet"] ?: throw IllegalArgumentException("No wallet ID provided"))
     }.getOrElse { throw IllegalArgumentException("Invalid wallet ID provided: ${it.message}") }
         .also {
             ensurePermissionsForWallet(AccountWalletPermissions.READ_ONLY, walletId = it)
         }
 
-fun PipelineContext<Unit, ApplicationCall>.getWalletService(walletId: UUID) =
+fun PipelineContext<Unit, ApplicationCall>.getWalletService(walletId: Uuid) =
     WalletServiceManager.getWalletService("", getUserUUID(), walletId) // FIXME -> TENANT HERE
 
 fun PipelineContext<Unit, ApplicationCall>.getWalletService() =
@@ -463,17 +468,18 @@ fun PipelineContext<Unit, ApplicationCall>.getUsersSessionToken(): String? =
 fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(
     required: AccountWalletPermissions,
 
-    userId: UUID = getUserUUID(),
-    walletId: UUID = getWalletId(),
+    userId: Uuid = getUserUUID(),
+    walletId: Uuid = getWalletId(),
 ): Boolean {
 
+    val javaWalletId = walletId.toJavaUuid()
 
     val permissions = transaction {
         (AccountWalletMappings.selectAll()
             .where {
                 (AccountWalletMappings.tenant eq "") and // FIXME -> TENANT HERE
                         (AccountWalletMappings.accountId eq userId) and
-                        (AccountWalletMappings.wallet eq walletId)
+                        (AccountWalletMappings.wallet eq javaWalletId)
             }
             .firstOrNull()
             ?: throw ForbiddenException("This account does not have access to the specified wallet."))[

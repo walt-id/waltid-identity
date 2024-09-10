@@ -100,9 +100,9 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
-    // UUID
-    implementation("app.softwork:kotlinx-uuid-core:0.0.26")
-    implementation("app.softwork:kotlinx-uuid-exposed:0.0.26")
+    // Uuid
+    implementation("app.softwork:kotlinx-uuid-core:0.1.2")
+    //implementation("app.softwork:kotlinx-uuid-exposed:0.1.2")
 
     /* -- Security -- */
     // Bouncy Castle
@@ -142,11 +142,11 @@ dependencies {
     }
 
     // DB
-    implementation("org.jetbrains.exposed:exposed-core:0.52.0")
-    implementation("org.jetbrains.exposed:exposed-jdbc:0.52.0")
-    implementation("org.jetbrains.exposed:exposed-dao:0.52.0")
-    implementation("org.jetbrains.exposed:exposed-java-time:0.52.0")
-    implementation("org.jetbrains.exposed:exposed-json:0.52.0")
+    implementation("org.jetbrains.exposed:exposed-core:0.54.0")
+    implementation("org.jetbrains.exposed:exposed-jdbc:0.54.0")
+    implementation("org.jetbrains.exposed:exposed-dao:0.54.0")
+    implementation("org.jetbrains.exposed:exposed-java-time:0.54.0")
+    implementation("org.jetbrains.exposed:exposed-json:0.54.0")
     // drivers
     implementation("org.xerial:sqlite-jdbc:3.46.0.0")
     implementation("org.postgresql:postgresql:42.7.3")

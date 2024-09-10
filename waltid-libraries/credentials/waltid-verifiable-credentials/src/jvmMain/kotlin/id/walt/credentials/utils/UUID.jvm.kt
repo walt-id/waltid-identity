@@ -1,5 +1,7 @@
 package id.walt.credentials.utils
 
-import java.util.*
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
-actual fun randomUUID(): String = UUID.randomUUID().toString()
+@OptIn(ExperimentalUuidApi::class)
+actual fun randomUUID(): String = Uuid.random().toString()

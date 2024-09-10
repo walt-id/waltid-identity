@@ -88,7 +88,7 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
             }
         }

@@ -24,8 +24,9 @@ import io.ktor.server.util.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
 
 private val http = HttpClient {
     install(ContentNegotiation) {
@@ -72,6 +73,7 @@ data class EntraVerificationRequest(
     val credentials: List<EntraAcceptableCredential>,
 )
 
+@OptIn(ExperimentalUuidApi::class)
 object EntraVerifierApi {
     @Serializable
     private data class EntraCreatePresentationRequest(
@@ -123,14 +125,14 @@ object EntraVerifierApi {
         //@SerialName("request_credentials") val requestCredentials: JsonArray
     )
 
-    val callbackMapping = HashMap<UUID, MappedData>()
+    val callbackMapping = HashMap<Uuid, MappedData>()
 
     val config = ConfigManager.getConfig<EntraConfig>()
 
     val configuredCallbackUrl = config.callbackUrl
 
-    fun createCallbackMapping(data: MappedData): UUID {
-        val uuid = UUID.generateUUID()
+    fun createCallbackMapping(data: MappedData): Uuid {
+        val uuid = Uuid.random()
         callbackMapping[uuid] = data
 
         return uuid
@@ -168,7 +170,7 @@ object EntraVerifierApi {
 
 
     val policyStatusMapping =
-        HashMap<UUID, List<CredentialPolicyResults>>()
+        HashMap<Uuid, List<CredentialPolicyResults>>()
 }
 
 data class CredentialPolicyResults(
@@ -190,6 +192,7 @@ data class EntraVerifyResponse(
     val nonce: String,
 )
 
+@OptIn(ExperimentalUuidApi::class)
 fun Application.entraVerifierApi() {
     routing {
 
@@ -210,7 +213,7 @@ fun Application.entraVerifierApi() {
             post("verification-callback/{nonce}", {
                 tags = listOf("Entra")
             }) {
-                val nonce = context.parameters["nonce"]?.let { UUID(it) }
+                val nonce = context.parameters["nonce"]?.let { Uuid.parse(it) }
 
                 println("--- ENTRA CALLBACK ---")
                 println("Nonce: " + context.parameters["nonce"])
@@ -250,7 +253,7 @@ fun Application.entraVerifierApi() {
                 request { pathParameter<String>("nonce") }
                 response { HttpStatusCode.OK to { body<JsonArray>() } }
             }) {
-                val nonce = context.parameters["nonce"]?.let { UUID(it) }
+                val nonce = context.parameters["nonce"]?.let { Uuid.parse(it) }
 
                 val result =
                     EntraVerifierApi.policyStatusMapping[nonce]

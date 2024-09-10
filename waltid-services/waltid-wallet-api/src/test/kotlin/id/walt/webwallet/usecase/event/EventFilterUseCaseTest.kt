@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.usecase.event
 
 import id.walt.webwallet.service.events.*
@@ -11,18 +13,20 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class EventFilterUseCaseTest {
     private val eventServiceMock = mockk<EventService>()
     private val issuerNameResolutionMock = mockk<EntityNameResolutionUseCase>()
     private val verifierNameResolutionMock = mockk<EntityNameResolutionUseCase>()
     private val sut = EventFilterUseCase(eventServiceMock, issuerNameResolutionMock, verifierNameResolutionMock)
-    private val account = UUID()
-    private val wallet = UUID()
+    private val account = Uuid.random()
+    private val wallet = Uuid.random()
     private val issuerData = CredentialEventDataActor.Organization.Issuer(
         did = "String",
         name = null,

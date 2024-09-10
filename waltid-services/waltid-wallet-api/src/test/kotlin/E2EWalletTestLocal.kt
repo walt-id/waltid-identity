@@ -129,7 +129,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
          getTokenFor(user1)
          localWalletClient = newClient(token)
 
-         fun List<AccountWalletListing.WalletListing>.getUserWallet(): UUID {
+         fun List<AccountWalletListing.WalletListing>.getUserWallet(): Uuid {
              check(this.isNotEmpty()) { "No wallet found" }
              return this.first().id
          }

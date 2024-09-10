@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.db.models.AccountWalletListing
@@ -8,6 +10,7 @@ import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
+import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.accounts() {
     authenticatedWebWalletRoute {

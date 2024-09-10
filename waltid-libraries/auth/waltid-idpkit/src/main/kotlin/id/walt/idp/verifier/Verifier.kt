@@ -39,12 +39,10 @@ object Verifier {
         }
     }
 
-    suspend fun verify(redirectUrl: String): Pair<String, String> {
+    suspend fun verify(request: Map<String, Any>, redirectUrl: String): Pair<String, String> {
         val response: HttpResponse = client.post("http://localhost:7003/openid4vc/verify") {
             setBody(
-                mapOf(
-                    "request_credentials" to listOf("OpenBadgeCredential")
-                ).toJsonObject()
+                request.toJsonObject()
             )
             header("successRedirectUri", redirectUrl)
         }
@@ -56,7 +54,10 @@ object Verifier {
     }
 
     @OptIn(ExperimentalEncodingApi::class)
-    suspend fun getVerificationResult(id: String, requestedClaims: List<String>): VerificationResultStatus {
+    /**
+     * @param requestedClaims provide a map in the form of {claimName=JSON-path-to-attribute}
+     */
+    suspend fun getVerificationResult(id: String, requestedClaims: Map<String, String>): VerificationResultStatus {
         val resp = client.get("http://localhost:7003/openid4vc/session/$id").body<JsonObject>()
 
         if (resp["tokenResponse"] == null) {
@@ -86,8 +87,8 @@ object Verifier {
         val vc = credentials.first()
 
 
-        val claims = requestedClaims.map {
-            Pair(it, vc.resolveAsStringOrNull(JsonPath.compile(it)))
+        val claims = requestedClaims.map { (claimName, jsonPathSelector) ->
+            Pair(claimName, vc.resolveAsStringOrNull(JsonPath.compile(jsonPathSelector)))
         }.toMap().toMutableMap().apply {
             put("sub", did)
         }

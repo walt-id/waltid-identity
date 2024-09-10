@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.usecase.claim
 
 import id.walt.webwallet.db.models.WalletCredential
@@ -7,7 +9,9 @@ import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.usecase.event.EventLogUseCase
 import kotlinx.datetime.Clock
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
 
 class ExplicitClaimStrategy(
     private val issuanceService: IssuanceService,
@@ -15,7 +19,7 @@ class ExplicitClaimStrategy(
     private val eventUseCase: EventLogUseCase,
 ) {
     suspend fun claim(
-        tenant: String, account: UUID, wallet: UUID, did: String, offer: String, pending: Boolean = true,
+        tenant: String, account: Uuid, wallet: Uuid, did: String, offer: String, pending: Boolean = true,
     ): List<WalletCredential> = issuanceService.useOfferRequest(
         offer = offer,
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),

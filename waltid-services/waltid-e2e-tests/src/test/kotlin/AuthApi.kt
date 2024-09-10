@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 import E2ETestWebService.test
 import id.walt.webwallet.db.models.Account
 import id.walt.webwallet.db.models.AccountWalletListing
@@ -10,8 +12,10 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
+
 import kotlin.test.assertNotNull
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class AuthApi(private val client: HttpClient) {
     suspend fun userInfo(expectedStatus: HttpStatusCode, output: ((Account) -> Unit)? = null) =
@@ -45,7 +49,7 @@ class AuthApi(private val client: HttpClient) {
         client.get("/wallet-api/auth/session").expectSuccess()
     }
 
-    suspend fun userWallets(expectedAccountId: UUID, output: ((AccountWalletListing) -> Unit)? = null) =
+    suspend fun userWallets(expectedAccountId: Uuid, output: ((AccountWalletListing) -> Unit)? = null) =
         test("/wallet-api/wallet/accounts/wallets - get wallets") {
             client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().apply {
                 val listing = body<AccountWalletListing>()

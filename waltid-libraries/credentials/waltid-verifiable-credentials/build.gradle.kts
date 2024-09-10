@@ -89,7 +89,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
                 implementation("io.github.optimumcode:json-schema-validator:0.2.1")
 
                 // Ktor client
@@ -105,7 +105,7 @@ kotlin {
 
                 // Kotlinx
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
-                implementation("app.softwork:kotlinx-uuid-core:0.0.26")
+                implementation("app.softwork:kotlinx-uuid-core:0.1.2")
 
                 // Loggin
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
@@ -136,7 +136,7 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
                 implementation("org.slf4j:slf4j-simple:2.0.13")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
             }

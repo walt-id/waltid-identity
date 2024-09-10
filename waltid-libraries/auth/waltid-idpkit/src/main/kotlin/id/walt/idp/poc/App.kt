@@ -1,6 +1,14 @@
 package id.walt.idp.poc
 
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.JWSObject
+import com.nimbusds.jose.Payload
+import com.nimbusds.jose.crypto.Ed25519Signer
+import com.nimbusds.jose.jwk.JWK
 import id.walt.idp.oidc.AuthorizeRequest
+import id.walt.idp.oidc.CustomAccessToken
+import id.walt.idp.oidc.IdToken
 import id.walt.idp.oidc.TokenResponse
 import id.walt.idp.utils.JsonUtils.toJsonObject
 import id.walt.idp.verifier.VerificationStatus
@@ -11,6 +19,7 @@ import io.klogging.rendering.RENDER_ANSI
 import io.klogging.sending.STDERR
 import io.klogging.sending.STDOUT
 import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
@@ -24,10 +33,15 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.*
+import io.ktor.util.pipeline.*
+import io.ktor.utils.io.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.*
+import org.intellij.lang.annotations.Language
+import kotlin.time.Duration.Companion.days
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -78,9 +92,36 @@ fun main() {
                   
                   > Response:
                   ${call.response.status()} (${call.response.responseType?.type?.simpleName})
+                  Headers: ${call.response.headers.allValues().toMap().dropCommonHeaders()}
                   -^-^-^-
                 """.trimIndent()
             }
+        }
+
+        fun toLogString(subject: Any): String = when (subject) {
+            is TextContent -> subject.text
+            is OutputStreamContent -> {
+                val channel = ByteChannel(true)
+                runBlocking {
+                    subject.writeTo(channel)
+                    StringBuilder().apply {
+                        while (!channel.isClosedForRead) channel.readUTF8LineTo(this)
+                    }.toString()
+                }
+            }
+
+            else -> "???"
+        }
+
+        suspend fun PipelineContext<Unit, ApplicationCall>.logResponseBody(call: ApplicationCall) {
+            call.response.pipeline.intercept(ApplicationSendPipeline.Engine) { message ->
+                this@embeddedServer.log.debug("Response Body (${call.request.uri}): ${toLogString(message)}")
+            }
+        }
+
+        intercept(ApplicationCallPipeline.Call) {
+            println("CALL")
+            logResponseBody(call)
         }
 
         install(StatusPages) {
@@ -107,9 +148,44 @@ private fun Map<String, List<String>>.dropCommonHeaders(): Map<String, List<Stri
         )
     }
 
+@Language("JSON")
+val key = JWK.parse(
+    """
+    {
+        "kty": "OKP",
+        "d": "pCMQnXqseWk4n9qxKdZLt0sFtsHctpp8UxcWXLT-DWM",
+        "use": "sig",
+        "crv": "Ed25519",
+        "kid": "qdMPKNb3dnFU8ZE2AJ_Hh5BkCHnHW-Rid27wrGvFwrs",
+        "x": "0W7qYEubjsDFUEtmiY8e9oUj9pHHsFJpkW_QpFN93F4",
+        "alg": "EdDSA"
+    }
+""".trimIndent()
+).toOctetKeyPair()
+
+val signer = Ed25519Signer(key)
+
+
+fun signPayload(payload: JsonObject) = JWSObject(
+    JWSHeader.Builder(JWSAlgorithm.EdDSA)
+        .keyID(key.keyID).build(),
+    Payload(payload.toString())
+).apply {
+    sign(signer)
+}.serialize()
+
+
 @OptIn(ExperimentalUuidApi::class)
 fun Application.test() {
     routing {
+
+        get("/jwks") {
+            context.respond(mapOf(
+                "keys" to listOf(key).map { it.toPublicJWK().toJSONObject() }
+            ))
+        }
+
+
         // Step 0. (call by RP)
         get(".well-known/openid-configuration") {
             val issuer = "http://localhost:8080"
@@ -119,7 +195,7 @@ fun Application.test() {
                 "authorization_endpoint" to "$issuer/authorize",
                 "token_endpoint" to "$issuer/token",
                 "userinfo_endpoint" to "$issuer/userinfo",
-                "jwks_uri" to "$issuer/jwks",
+                //"jwks_uri" to "$issuer/jwks",
                 "response_types_supported" to listOf("code", "id_token", "token id_token"),
                 "subject_types_supported" to listOf("public"),
                 "id_token_signing_alg_values_supported" to listOf("RS256"),
@@ -154,8 +230,11 @@ fun Application.test() {
             authCache[req.state!!] = req
             println("Saved req to authCache: $req")
 
+            val verificationRequest = mapOf(
+                "request_credentials" to listOf("NaturalPersonVerifiableID")
+            )
 
-            val (url, token) = Verifier.verify(redirectUrl = "http://localhost:8080/login?state=${req.state!!}")
+            val (url, token) = Verifier.verify(verificationRequest, redirectUrl = "http://localhost:8080/login?state=${req.state!!}")
             reqCache[req.state!!] = token
             urlCache[req.state!!] = url
 
@@ -170,7 +249,10 @@ fun Application.test() {
                     <p>Present your credential: <code>$url</code></p>
                     <div id="qrcode"></div>
                     <p>
-                    <a href="/login?state=${req.state!!}"><button>Click here when presented</button></a> (just imagine real hard that this is automatic)
+                    <a href="/login?state=${req.state!!}"><button>Click here when presented</button></a> (todo: make automatic)
+                    </p>
+                    <p>
+                    <a href="/login?state=${req.state!!}&debug=autologin"><button>Debug autologin</button></a>
                     </p>
                     <p>
                     <a href="$walletUrl"><button>Present with web wallet</button></a>
@@ -187,20 +269,51 @@ fun Application.test() {
             )
         }
 
-        val codeCache = HashMap<String, String>()
+        @Serializable
+        data class LoginData(val code: String, val claims: Map<String, String?>, val time: Instant)
 
-        val verifyResultCache = HashMap<String, Map<String, String?>>()
+        val loginResultCache = HashMap<String, LoginData>()
 
         get("/login") {
             val state = call.request.queryParameters.getOrFail("state")
+            val debug = call.request.queryParameters["debug"]
 
             val authReq = authCache[state] ?: error("No such state: $state")
 
-            val requestedClaims = listOf(
-                "$.name",
+            /*"$.name",
                 "$.credentialSubject.achievement.description",
-                "$.credentialSubject.achievement.criteria.narrative"
+                "$.credentialSubject.achievement.criteria.narrative"*/
+            val requestedClaims = mapOf(
+                "id" to "$.credentialSubject.id",
+                "familyName" to "$.credentialSubject.familyName",
+                "firstName" to "$.credentialSubject.firstName",
+                "dateOfBirth" to "$.credentialSubject.dateOfBirth",
+                "personalIdentifier" to "$.credentialSubject.personalIdentifier",
+                "placeOfBirth" to "$.credentialSubject.placeOfBirth",
+                "currentAddress" to "$.credentialSubject.currentAddress",
+                "gender" to "$.credentialSubject.gender",
             )
+
+            val time = Clock.System.now()
+
+            if (debug == "autologin") {
+                val generatedCode = Uuid.random().toString()
+
+                loginResultCache[generatedCode] = LoginData(
+                    code = state,
+                    claims = mapOf(
+                        "sub" to "demo",
+//                        "name" to "Demo User",
+//                        "preferred_username" to "demo",
+//                        "email" to "demo@example.org",
+                        "debug" to "autologin",
+                    ),
+                    time = time
+                )
+
+                call.respondRedirect(authReq.redirectUri + "?code=$generatedCode&state=${authReq.state}")
+                return@get
+            }
 
             val verificationResult = Verifier.getVerificationResult(reqCache[state] ?: error("No req for state: $state"), requestedClaims)
 
@@ -224,8 +337,11 @@ fun Application.test() {
                     if (verificationResult.success == true) {
                         val generatedCode = Uuid.random().toString()
 
-                        codeCache[generatedCode] = state
-                        verifyResultCache[generatedCode] = verificationResult.claims!!
+                        loginResultCache[generatedCode] = LoginData(
+                            code = state,
+                            claims = verificationResult.claims!!,
+                            time = time
+                        )
 
                         call.respondRedirect(authReq.redirectUri + "?code=$generatedCode&state=${authReq.state}") // todo handle redirect URIs that already have parameters
                     } else {
@@ -263,20 +379,53 @@ fun Application.test() {
 
             println("grant type = $grantType")
 
-            val req = authCache[codeCache[code] ?: error("No such code: $code")] ?: error("No such req for state: ${codeCache[code]}")
+            val loginData = loginResultCache[code] ?: error("No such code: $code")
+            val req = authCache[loginData.code] ?: error("No such req for state: ${loginData.code}")
 
             check(req.redirectUri == redirectUri) { "Redirect uri does not match: ${req.redirectUri} - $redirectUri" }
 
+            //val accessToken = "access-idpkit_" + Uuid.random().toString() // should not have to be a JWT
+            val accessToken = signPayload(
+                Json.encodeToJsonElement(
+                    CustomAccessToken(
+                        iss = "http://localhost:8080",
+                        sub = "x",
+                        aud = listOf("my-client-id"), // TODO: OIDC client id
+                        exp = Clock.System.now().plus(365.days),
+                        iat = Clock.System.now(),
+                        nonce = req.nonce,
+                    )
+                ).jsonObject
+            )
 
-            val accessToken = "access-idpkit_" + Uuid.random().toString()
-
-
-            val claims = verifyResultCache[code]!!
+            val claims = loginData.claims
 
             tokenClaimCache[accessToken] = claims
 
+            /*val accessToken = signPayload(mapOf(
+                "iss" to "http://localhost:8080", // TODO: url here
+                "aud" to "my-client-id", // TODO: OIDC client id
+                "exp" to
+
+                "tokentype" to "access_token",
+                "sub" to "x"
+            ))*/
+
+            val idTokenData = IdToken(
+                iss = "http://localhost:8080",
+                sub = claims["sub"]!!,
+                aud = listOf("my-client-id"), // TODO: OIDC client id
+                exp = Clock.System.now().plus(365.days),
+                iat = Clock.System.now(),
+                auth_time = loginData.time,
+                nonce = req.nonce,
+            )
+            val idToken = signPayload(Json.encodeToJsonElement(idTokenData).jsonObject)
+            //"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwidHlwZSI6ImFjY2VzcyB0b2tlbiIsImlhdCI6MTUxNjIzOTAyMn0.85jA3wiQSdd6Vm_pCe4BXt6ALhrOX4-mmBrN5L7gGz4"
+
+
             val tokenResponse = TokenResponse(
-                idToken = "id token here",
+                idToken = idToken,
                 accessToken = accessToken,
                 tokenType = "Bearer",
                 expiresIn = 3600

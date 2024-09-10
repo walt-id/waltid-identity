@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.service.endpoint
 
 import io.ktor.client.*
@@ -6,7 +8,9 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
 
 class EntraServiceEndpointProvider(
     private val http: HttpClient,
@@ -15,7 +19,7 @@ class EntraServiceEndpointProvider(
         contentType(ContentType.Application.Json)
         setBody(
             IdentityHubRequest(
-                requestId = UUID().toString(),
+                requestId =  Uuid.random().toString(),
                 target = did,
                 messages = listOf(
                     IdentityHubRequest.Message(
