@@ -40,7 +40,7 @@ object JWT : AuthenticationMethod("jwt") {
             val jwt = context.receiveText()
             val id = auth(jwt, config)
 
-            context.handleAuthSuccess(session, session.accountId)
+            context.handleAuthSuccess(session, id.resolveToAccountId())
         }
     }
 
