@@ -49,14 +49,13 @@ object AccountsService {
     suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> = runCatching {
         when (request) {
             is EmailAccountRequest -> EmailAccountStrategy.register(tenant, request)
-            is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
+//            is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
             is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
-            is KeycloakAccountRequest -> KeycloakAccountStrategy.register(tenant, request)
+//            is KeycloakAccountRequest -> KeycloakAccountStrategy.register(tenant, request)
             is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.register(tenant, request)
-
+            else -> throw NotImplementedError("unknown auth method")
         }.fold(onSuccess = {
             initializeUserAccount(tenant, request.name, it)
-
         }, onFailure = {
             throw it
         })
@@ -66,10 +65,11 @@ object AccountsService {
     suspend fun authenticate(tenant: String, request: AccountRequest): Result<AuthenticatedUser> = runCatching {
         when (request) {
             is EmailAccountRequest -> EmailAccountStrategy.authenticate(tenant, request)
-            is AddressAccountRequest -> Web3WalletAccountStrategy.authenticate(tenant, request)
+//            is AddressAccountRequest -> Web3WalletAccountStrategy.authenticate(tenant, request)
             is OidcAccountRequest -> OidcAccountStrategy.authenticate(tenant, request)
             is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.authenticate(tenant, request)
-            is KeycloakAccountRequest -> KeycloakAccountStrategy.authenticate(tenant, request)
+//            is KeycloakAccountRequest -> KeycloakAccountStrategy.authenticate(tenant, request)
+            else -> throw NotImplementedError("unknown auth method")
 
         }
     }.fold(onSuccess = {

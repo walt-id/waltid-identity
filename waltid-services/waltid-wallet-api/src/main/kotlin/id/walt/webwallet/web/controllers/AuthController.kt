@@ -6,6 +6,10 @@ import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.Payload
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
+import id.walt.authkit.AuthContext
+import id.walt.authkit.flows.AuthFlow
+import id.walt.authkit.methods.UserPass
+import id.walt.authkit.methods.registerAuthenticationMethod
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.web.ForbiddenException
@@ -47,6 +51,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
+import org.intellij.lang.annotations.Language
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -82,17 +87,45 @@ object AuthKeys {
 fun Application.auth() {
     webWalletRoute {
         route("auth", { tags = listOf("Authentication") }) {
-            authenticate("auth-oauth") {
-                get(
-                    "oidc-login",
+
+
+            // --------- Auth Kit
+            route("global-implicit1") {
+                @Language("JSON")
+                val flowConfig = """
                     {
-                        description = "Redirect to OIDC provider for login"
-                        response { HttpStatusCode.Found }
-                    }) {
-                    call.respondRedirect("oidc-session")
+                        "method": "userpass",
+                        "ok": true
+                    }
+                """.trimIndent()
+                val authFlow = AuthFlow.fromConfig(flowConfig)
+
+
+                val contextFunction: PipelineContext<Unit, ApplicationCall>.() -> AuthContext = {
+                    AuthContext(
+                        tenant = call.request.host(),
+                        sessionId = call.parameters["sessionId"],
+                        implicitSessionGeneration = true,
+                        initialFlow = authFlow
+                    )
                 }
 
-                if (FeatureManager.isFeatureEnabled(FeatureCatalog.oidcAuthenticationFeature)) {
+                registerAuthenticationMethod(UserPass, contextFunction)
+            }
+            // --------- Auth Kit
+
+
+            if (FeatureManager.isFeatureEnabled(FeatureCatalog.oidcAuthenticationFeature)) {
+                authenticate("auth-oauth") {
+                    get(
+                        "oidc-login",
+                        {
+                            description = "Redirect to OIDC provider for login"
+                            response { HttpStatusCode.Found }
+                        }) {
+                        call.respondRedirect("oidc-session")
+                    }
+
                     authenticate("auth-oauth-jwt") {
                         get("oidc-session", { description = "Configure OIDC session" }) {
                             val principal: OAuthAccessTokenResponse.OAuth2 =
@@ -104,103 +137,99 @@ fun Application.auth() {
                         }
                     }
                 }
-            }
 
-            get("oidc-token", { description = "Returns OIDC token" }) {
-                val oidcSession = call.sessions.get<OidcTokenSession>() ?: error("No OIDC session")
+                get("oidc-token", { description = "Returns OIDC token" }) {
+                    val oidcSession = call.sessions.get<OidcTokenSession>() ?: error("No OIDC session")
 
-                call.respond(oidcSession.token)
+                    call.respond(oidcSession.token)
+                }
             }
 
             rateLimit(RateLimitName("login")) {
 
-                post(
-                    "login",
-                    {
-                        summary =
-                            "Login with [email + password] or [wallet address + ecosystem] or [oidc session]"
-                        request {
-                            body<AccountRequest> {
-                                example("E-mail + password") {
-                                    value = EmailAccountRequest(
-                                        email = "user@email.com",
-                                        password = "password"
-                                    )
-                                }
-                                example("Wallet address + ecosystem") {
-                                    value = AddressAccountRequest(
-                                        address = "0xABC",
-                                        ecosystem = "ecosystem"
-                                    )
-                                }
-                                example("OIDC") { value = OidcAccountRequest(token = "ey...") }
-                                example("Keycloak username + password") {
-                                    value = KeycloakAccountRequest(
-                                        username = "Max_Mustermann",
-                                        password = "password"
-                                    )
-                                }
-                                example("Keycloak username + Access Token ") {
-                                    value = KeycloakAccountRequest(
-                                        username = "Max_Mustermann",
-                                        token = "eyJhb..."
-                                    )
-                                }
-
-                                example("Keycloak user Access Token ") {
-                                    value = KeycloakAccountRequest(
-                                        token = "eyJhb..."
-                                    )
-                                }
-                            }
-                        }
-                        response {
-                            HttpStatusCode.OK to { description = "Login successful" }
-                            HttpStatusCode.Unauthorized to { description = "Login failed" }
-                            HttpStatusCode.BadRequest to { description = "Login failed" }
-                        }
-                    }) {
-                    doLogin()
-                }
-            }
-
-            post(
-                "create",
-                {
-                    summary = "Register with [email + password] or [wallet address + ecosystem]"
+                post("login", {
+                    summary =
+                        "Login with [email + password] or [wallet address + ecosystem] or [oidc session]"
                     request {
                         body<AccountRequest> {
                             example("E-mail + password") {
                                 value = EmailAccountRequest(
-                                    name = "Max Mustermann",
                                     email = "user@email.com",
                                     password = "password"
                                 )
                             }
                             example("Wallet address + ecosystem") {
-                                value = AddressAccountRequest(address = "0xABC", ecosystem = "ecosystem")
+                                value = AddressAccountRequest(
+                                    address = "0xABC",
+                                    ecosystem = "ecosystem"
+                                )
                             }
                             example("OIDC") { value = OidcAccountRequest(token = "ey...") }
-                            example("OIDC Unique Subject") {
-                                value = OidcUniqueSubjectRequest(token = "ey...")
-                            }
-                            example("Keycloak") { value = KeycloakAccountRequest() }
-                            example("Keycloak: username + email + password") {
+                            example("Keycloak username + password") {
                                 value = KeycloakAccountRequest(
                                     username = "Max_Mustermann",
-                                    email = "user@email.com",
-                                    password = "password",
+                                    password = "password"
+                                )
+                            }
+                            example("Keycloak username + Access Token ") {
+                                value = KeycloakAccountRequest(
+                                    username = "Max_Mustermann",
+                                    token = "eyJhb..."
+                                )
+                            }
+
+                            example("Keycloak user Access Token ") {
+                                value = KeycloakAccountRequest(
                                     token = "eyJhb..."
                                 )
                             }
                         }
                     }
                     response {
-                        HttpStatusCode.Created to { description = "Registration succeeded " }
-                        HttpStatusCode.BadRequest to { description = "Registration failed" }
-                        HttpStatusCode.Conflict to { description = "Account already exists!" }
+                        HttpStatusCode.OK to { description = "Login successful" }
+                        HttpStatusCode.Unauthorized to { description = "Login failed" }
+                        HttpStatusCode.BadRequest to { description = "Login failed" }
                     }
                 }) {
+                    doLogin()
+                }
+            }
+
+            post("create", {
+                summary = "Register with [email + password] or [wallet address + ecosystem]"
+                request {
+                    body<AccountRequest> {
+                        example("E-mail + password") {
+                            value = EmailAccountRequest(
+                                name = "Max Mustermann",
+                                email = "user@email.com",
+                                password = "password"
+                            )
+                        }
+                        example("Wallet address + ecosystem") {
+                            value = AddressAccountRequest(address = "0xABC", ecosystem = "ecosystem")
+                        }
+                        example("OIDC") { value = OidcAccountRequest(token = "ey...") }
+                        example("OIDC Unique Subject") {
+                            value = OidcUniqueSubjectRequest(token = "ey...")
+                        }
+                        example("Keycloak") { value = KeycloakAccountRequest() }
+                        example("Keycloak: username + email + password") {
+                            value = KeycloakAccountRequest(
+                                username = "Max_Mustermann",
+                                email = "user@email.com",
+                                password = "password",
+                                token = "eyJhb..."
+                            )
+                        }
+                    }
+                }
+                response {
+                    HttpStatusCode.Created to { description = "Registration succeeded " }
+                    HttpStatusCode.BadRequest to { description = "Registration failed" }
+                    HttpStatusCode.Conflict to { description = "Account already exists!" }
+                }
+            }) {
                 val jsonObject = call.receive<JsonObject>()
                 val type = jsonObject["type"]?.jsonPrimitive?.contentOrNull
                 if (type.isNullOrEmpty()) {
