@@ -276,8 +276,7 @@ object VerifierApiExamples {
     val lspPotentialSDJwtVCExample = jsonObjectValueExampleDescriptorDsl(
         """
             {
-                "request_credentials": [ { "format": "vc+sd-jwt", "vct": "identity_credential_vc+sd-jwt" } ],
-                "openid_profile": "HAIP"
+                "request_credentials": [ { "format": "vc+sd-jwt", "vct": "identity_credential_vc+sd-jwt" } ]
             }
 
         """.trimIndent()
