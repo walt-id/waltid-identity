@@ -38,6 +38,9 @@ dependencies {
     // TOTP/HOTP
     implementation("com.atlassian:onetime:2.1.1")
 
+    // JWT
+    implementation("com.nimbusds:nimbus-jose-jwt:9.40")
+
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm")
     implementation("io.ktor:ktor-server-auth-jvm")

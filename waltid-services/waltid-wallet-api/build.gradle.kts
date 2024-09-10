@@ -92,7 +92,7 @@ dependencies {
     /* -- Kotlin -- */
 
     // Kotlinx.serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
 
     // Date
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
@@ -112,7 +112,7 @@ dependencies {
     implementation("de.mkammerer:argon2-jvm:2.11")
 
 
-    // OIDC
+    // walt.id
     implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
     implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
     implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
@@ -120,6 +120,8 @@ dependencies {
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-oci"))
     implementation(project(":waltid-libraries:waltid-did"))
+
+    implementation(project(":waltid-libraries:auth:waltid-authkit"))
 
     testImplementation(project(":waltid-services:waltid-issuer-api"))
     testImplementation(project(":waltid-services:waltid-verifier-api"))
@@ -169,10 +171,10 @@ dependencies {
     implementation("io.klogging:slf4j-klogging:0.7.0")
 
     // Test
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.0.0")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.0.20")
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
     testImplementation("io.mockk:mockk:1.13.12")
-    testImplementation("io.klogging:klogging-jvm:0.6.1")
+    testImplementation("io.klogging:klogging-jvm:0.7.0")
 }
