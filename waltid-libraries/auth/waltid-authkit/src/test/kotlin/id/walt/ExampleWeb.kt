@@ -4,9 +4,10 @@ import id.walt.authkit.AuthContext
 import id.walt.authkit.auth.authKit
 import id.walt.authkit.auth.getAuthenticatedSession
 import id.walt.authkit.flows.AuthFlow
-import id.walt.authkit.methods.AuthenticationMethod
 import id.walt.authkit.methods.TOTP
 import id.walt.authkit.methods.UserPass
+import id.walt.authkit.methods.registerAuthenticationMethod
+import id.walt.authkit.methods.registerAuthenticationMethods
 import id.walt.authkit.sessions.SessionManager
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -179,23 +180,4 @@ fun Application.testApp() {
     }
 }
 
-fun Route.registerAuthenticationMethod(
-    method: AuthenticationMethod,
-    authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
 
-    ) {
-    method.apply {
-        register(authContext)
-    }
-}
-
-fun Route.registerAuthenticationMethods(
-    methods: List<AuthenticationMethod>,
-    authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
-) {
-    methods.forEach {
-        it.apply {
-            register(authContext)
-        }
-    }
-}
