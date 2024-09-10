@@ -10,6 +10,7 @@ import id.walt.authkit.AuthContext
 import id.walt.authkit.exceptions.authCheck
 import id.walt.authkit.methods.data.AuthMethodStoredData
 import id.walt.authkit.sessions.AuthSession
+import id.walt.authkit.sessions.AuthSessionInformation
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -43,6 +44,7 @@ object TOTP : AuthenticationMethod("totp") {
     override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
         post("totp", {
             request { body<TOTPCode>() }
+            response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
         }) {
             val session = getSession(authContext)
 

@@ -6,7 +6,9 @@ import id.walt.authkit.accounts.identifiers.UsernameIdentifier
 import id.walt.authkit.exceptions.authCheck
 import id.walt.authkit.methods.data.AuthMethodStoredData
 import id.walt.authkit.sessions.AuthSession
+import id.walt.authkit.sessions.AuthSessionInformation
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
@@ -35,9 +37,8 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
 
     override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
         post("userpass", {
-            request {
-                body<UserPassCredentials>()
-            }
+            request { body<UserPassCredentials>() }
+            response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
         }) {
             val session = getSession(authContext)
 
