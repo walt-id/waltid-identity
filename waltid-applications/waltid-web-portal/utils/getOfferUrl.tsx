@@ -35,7 +35,47 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
       credentialData: offer
     }
 
-    if (c.selectedFormat === "SD-JWT + VCDM") {
+    if (c.selectedFormat === "SD-JWT + W3C VC") {
+      payload.selectiveDisclosure = {
+        "fields": {
+          "credentialSubject": {
+            sd: false,
+            children: {
+              fields: {}
+            }
+          }
+        }
+      }
+      for (const key in offer.credentialSubject) {
+        if (typeof offer.credentialSubject[key] === 'string') {
+          payload.selectiveDisclosure.fields.credentialSubject.children.fields[key] = {
+            sd: true
+          }
+        }
+      }
+    }
+
+    if (c.selectedFormat === "SD-JWT + IETF SD-JWT VC"){
+
+      // Hack - remove the following fields as they used for w3c only
+      delete payload.credentialData["@context"];
+      delete payload.credentialData["type"];
+      delete payload.credentialData["validFrom"];
+      delete payload.credentialData["expirationDate"];
+      delete payload.credentialData["issuanceDate"];
+      delete payload.credentialData["issued"];
+      delete payload.credentialData["issuer"];
+
+      // Hack - replace the "mapping" object with the new one
+      // delete payload.mapping;
+
+      payload.mapping = {
+        id: "<uuid>",
+        iat: "<timestamp-seconds>",
+        nbf: "<timestamp-seconds>",
+        exp: "<timestamp-in-seconds:365d>"
+      };
+
       payload.credentialConfigurationId = Object.keys(credential_configurations_supported).find(key => key === c.id + "_vc+sd-jwt") as string;
       payload.selectiveDisclosure = {
         "fields": {
@@ -66,11 +106,18 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
     if (vpProfile) {
       payload.vpProfile = vpProfile;
     }
+
+    // If true, return the payload as is
+    if (credentials[0]?.selectedFormat === "SD-JWT + IETF SD-JWT VC") {
+      return payload;
+    }
+
+    // Otherwise, return the payload with mapping if mapping exists, or just payload
     return mapping ? { ...payload, mapping } : payload;
   }));
 
-  //TODO: throw error when credentials length is 0
-  const issueUrl = NEXT_PUBLIC_ISSUER + `/openid4vc/${credentials.length === 1 && credentials[0].selectedFormat === "SD-JWT + VCDM" ? "sdjwt" : "jwt"}/${(payload.length > 1 ? 'issueBatch' : 'issue')}`;
+
+  const issueUrl = NEXT_PUBLIC_ISSUER + `/openid4vc/${credentials.length === 1 && (credentials[0].selectedFormat === "SD-JWT + W3C VC" || credentials[0].selectedFormat === "SD-JWT + IETF SD-JWT VC") ? "sdjwt" : "jwt"}/${(payload.length > 1 ? 'issueBatch' : 'issue')}`;
   return axios.post(issueUrl, payload.length > 1 ? payload : payload[0]);
 }
 
