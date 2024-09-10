@@ -6,7 +6,9 @@ import id.walt.authkit.accounts.identifiers.LDAPIdentifier
 import id.walt.authkit.exceptions.authFailure
 import id.walt.authkit.methods.config.AuthMethodConfiguration
 import id.walt.authkit.sessions.AuthSession
+import id.walt.authkit.sessions.AuthSessionInformation
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
@@ -50,9 +52,8 @@ object LDAP : UserPassBasedAuthMethod("ldap") {
 
     override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
         post("ldap", {
-            request {
-                body<UserPassCredentials>()
-            }
+            request { body<UserPassCredentials>() }
+            response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
         }) {
             val session = getSession(authContext)
 
