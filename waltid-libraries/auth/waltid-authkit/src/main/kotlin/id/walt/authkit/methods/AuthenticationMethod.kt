@@ -54,3 +54,25 @@ abstract class AuthenticationMethod(open val id: String) {
         return session
     }
 }
+
+
+fun Route.registerAuthenticationMethod(
+    method: AuthenticationMethod,
+    authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+
+    ) {
+    method.apply {
+        register(authContext)
+    }
+}
+
+fun Route.registerAuthenticationMethods(
+    methods: List<AuthenticationMethod>,
+    authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+) {
+    methods.forEach {
+        it.apply {
+            register(authContext)
+        }
+    }
+}
