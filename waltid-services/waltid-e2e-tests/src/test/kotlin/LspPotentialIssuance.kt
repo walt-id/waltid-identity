@@ -264,7 +264,7 @@ class LspPotentialIssuance(val client: HttpClient) {
         println("Offered credentials: $offeredCredentials")
         val offeredCredential = offeredCredentials.first()
         assertEquals(CredentialFormat.sd_jwt_vc, offeredCredential.format)
-        assertEquals("identity_credential_vc+sd-jwt", offeredCredential.docType)
+        assertEquals("http://localhost:22222/identity_credential", offeredCredential.vct)
 
         // ### step 11: confirm issuance (nothing to do)
 
