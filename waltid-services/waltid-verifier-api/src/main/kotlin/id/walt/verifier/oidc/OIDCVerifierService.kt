@@ -153,7 +153,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val policies = sessionVerificationInfos[session.id]
             ?: throw NotFoundException("Policy listing for session: ${session.id} is missing. Please ensure that the session ID is correct and that the policies have been properly configured.")
 
-        val vpToken = when (tokenResponse.idToken) {
+        var vpToken = when (tokenResponse.idToken) {
             null -> when (tokenResponse.vpToken) {
                 is JsonObject -> tokenResponse.vpToken.toString()
                 is JsonPrimitive -> tokenResponse.vpToken!!.jsonPrimitive.content
@@ -176,9 +176,13 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         return when (session.openId4VPProfile) {
             OpenId4VPProfile.ISO_18013_7_MDOC -> verifyMdoc(tokenResponse, session)
             OpenId4VPProfile.HAIP -> runBlocking { verifySdJwtVC(tokenResponse, session) }
-            else -> if(SDJwtVC.isSdJwtVCPresentation(vpToken)) {
-                runBlocking { verifySdJwtVC(tokenResponse, session) }
-            } else {
+            else -> {
+                if(SDJwtVC.isSdJwtVCPresentation(vpToken)) {
+                    runBlocking {
+                        require(verifySdJwtVC(tokenResponse, session)) { "Invalid SD-JWT" }
+                        vpToken = vpToken.split("~")[0]
+                    }
+                }
                 val results = runBlocking {
                     Verifier.verifyPresentation(
                         vpTokenJwt = vpToken,
