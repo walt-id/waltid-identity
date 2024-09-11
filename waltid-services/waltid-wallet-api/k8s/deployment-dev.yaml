@@ -190,7 +190,7 @@ spec:
           env:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
               value: "https://wallet.walt-test.cloud"
-            - name: NUXT_PUBLIC_DEMO_WALLET_URL
+            - name: NUXT_PUBLIC_DEV_WALLET_URL
               value: "https://wallet-dev.walt-test.cloud"
             - name: NUXT_PUBLIC_CREDENTIALS_REPOSITORY_URL
               value: "https://vc-repo.walt-test.cloud"
@@ -239,9 +239,10 @@ spec:
   tls:
     - hosts:
         - wallet.walt-test.cloud
+      secretName: test-wallet-demo-tls-secret
     - hosts:
         - wallet-dev.walt-test.cloud
-      secretName: wallet-tls-secret
+      secretName: test-wallet-dev-tls-secret
   rules:
     - host: wallet-dev.walt-test.cloud
       http:
