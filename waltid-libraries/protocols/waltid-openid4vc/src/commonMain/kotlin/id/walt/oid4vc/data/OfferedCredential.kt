@@ -12,6 +12,7 @@ data class OfferedCredential(
     val format: CredentialFormat,
     val types: List<String>? = null,
     @SerialName("doctype") val docType: String? = null,
+    @SerialName("vct") val vct: String? = null,
     @SerialName("credential_definition") val credentialDefinition: JsonLDCredentialDefinition? = null,
     @SerialName("proof_types_supported") val proofTypesSupported: Map<ProofType, ProofTypeMetadata>? = null,
     @SerialName("cryptographic_binding_methods_supported") val cryptographicBindingMethodsSupported: Set<String>? = null,
@@ -24,7 +25,7 @@ data class OfferedCredential(
             Json.decodeFromJsonElement(OfferedCredentialSerializer, jsonObject)
 
         fun fromProviderMetadata(credential: CredentialSupported) = OfferedCredential(
-            credential.format, credential.types, credential.docType,
+            credential.format, credential.types, credential.docType, credential.vct,
             JsonLDCredentialDefinition(credential.context, credential.types),
             credential.proofTypesSupported,
             credential.cryptographicBindingMethodsSupported,

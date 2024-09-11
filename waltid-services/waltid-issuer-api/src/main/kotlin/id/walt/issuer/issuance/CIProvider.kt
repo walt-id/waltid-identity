@@ -261,7 +261,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             CredentialErrorCode.invalid_or_missing_proof,
             message = "Proof JWT header must contain kid or jwk claim"
         )
-        val holderDid = if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else holderKid
+        val holderDid = if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else null
         val nonce = proofPayload["nonce"]?.jsonPrimitive?.content ?: throw CredentialError(
             credentialRequest,
             CredentialErrorCode.invalid_or_missing_proof, message = "Proof must contain nonce"
@@ -300,12 +300,10 @@ open class CIProvider : OpenIDCredentialIssuer(
 
                 if (issuerDid.startsWith("did:ebsi"))
                     issuerKid = issuerDid + "#" + issuerKey.key.getKeyId()
-
                 when (data.request.issuanceType) {
                     IssuanceType.sdjwt -> sdJwtVc(
                         JWKKey.importJWK(holderKey.toString()).getOrNull(),
-                        W3CVC(vc),
-                        // TODO: SDPayload.createSDPayload(vc, data.request.selectiveDisclosure ?: SDMap(mapOf())),
+                        SDPayload.createSDPayload(vc, data.request.selectiveDisclosure ?: SDMap(mapOf())),
                         holderDid)
                     else -> nonSdJwtVc(W3CVC(vc), issuerKid, holderDid, holderKey)
                 }
@@ -581,8 +579,8 @@ open class CIProvider : OpenIDCredentialIssuer(
             })
         }
     }
-    // TODO: replace sdJwtVc function by this one
-    private suspend fun IssuanceSessionData.sdJwtVc2(
+
+    private suspend fun IssuanceSessionData.sdJwtVc(
         holderKey: JWKKey?,
         vc: SDPayload,
         holderDid: String?,
@@ -600,33 +598,6 @@ open class CIProvider : OpenIDCredentialIssuer(
             mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
         } ?: mapOf()
     ).toString().also {
-        sendCallback("sdjwt_issue", buildJsonObject {
-            put("sdjwt", it)
-        })
-    }
-
-    private suspend fun IssuanceSessionData.sdJwtVc(
-        holderKey: JWKKey?,
-        vc: W3CVC,
-        holderDid: String?,
-    ) = vc.mergingSdJwtIssue(
-        issuerKey = issuerKey.key,
-        issuerDid = issuerDid.ifEmpty { issuerKey.key.getKeyId() },
-        subjectDid = holderDid ?: holderKey?.getKeyId() ?: throw IllegalArgumentException("Either holderKey or holderDid must be given"),
-        mappings = request.mapping ?: JsonObject(emptyMap()),
-        type = SDJwtVC.SD_JWT_VC_TYPE_HEADER,
-        additionalJwtHeaders = request.x5Chain?.let {
-            mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
-        } ?: mapOf(),
-        additionalJwtOptions = SDJwtVC.defaultPayloadProperties(
-            issuerId = issuerDid.ifEmpty { issuerKey.key.getKeyId() },
-            cnf = JsonObject(holderKey?.let {
-                buildJsonObject { put("jwk", it.exportJWKObject()) }
-            } ?: buildJsonObject { put("kid", holderDid) }),
-            vct = request.credentialConfigurationId
-        ),
-        disclosureMap = request.selectiveDisclosure ?: SDMap(emptyMap())
-    ).also {
         sendCallback("sdjwt_issue", buildJsonObject {
             put("sdjwt", it)
         })

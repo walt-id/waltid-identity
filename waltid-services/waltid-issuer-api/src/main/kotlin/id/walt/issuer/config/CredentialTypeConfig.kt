@@ -57,8 +57,7 @@ data class CredentialTypeConfig(
                 format = CredentialFormat.sd_jwt_vc,
                 cryptographicBindingMethodsSupported = setOf("jwk"),
                 credentialSigningAlgValuesSupported = setOf("ES256"),
-                types = listOf("urn:eu.europa.ec.eudi:pid:1"),
-                docType = "urn:eu.europa.ec.eudi:pid:1"
+                vct = "https://credentials.example.com/eudi_pid_1"
             )
         ),
         "identity_credential_vc+sd-jwt" to vc(
@@ -66,8 +65,7 @@ data class CredentialTypeConfig(
                 format = CredentialFormat.sd_jwt_vc,
                 cryptographicBindingMethodsSupported = setOf("jwk"),
                 credentialSigningAlgValuesSupported = setOf("ES256"),
-                types = listOf("identity_credential_vc+sd-jwt"),
-                docType = "identity_credential_vc+sd-jwt"
+                vct = "https://credentials.example.com/identity_credential"
             )
         )
     ),
