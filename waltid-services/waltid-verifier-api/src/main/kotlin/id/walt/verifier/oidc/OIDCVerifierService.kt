@@ -11,6 +11,8 @@ import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.credentials.verification.VerificationPolicy
 import id.walt.credentials.verification.Verifier
 import id.walt.credentials.verification.models.PolicyRequest
+import id.walt.credentials.verification.models.PolicyResultSurrogate
+import id.walt.credentials.verification.models.PresentationResultEntrySurrogate
 import id.walt.credentials.verification.models.PresentationVerificationResponseSurrogate
 import id.walt.credentials.verification.policies.*
 import id.walt.credentials.verification.policies.vp.HolderBindingPolicy
@@ -18,6 +20,7 @@ import id.walt.credentials.verification.policies.vp.MaximumCredentialsPolicy
 import id.walt.credentials.verification.policies.vp.MinimumCredentialsPolicy
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.mdoc.COSECryptoProviderKeyInfo
@@ -153,7 +156,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val policies = sessionVerificationInfos[session.id]
             ?: throw NotFoundException("Policy listing for session: ${session.id} is missing. Please ensure that the session ID is correct and that the policies have been properly configured.")
 
-        var vpToken = when (tokenResponse.idToken) {
+        val vpToken = when (tokenResponse.idToken) {
             null -> when (tokenResponse.vpToken) {
                 is JsonObject -> tokenResponse.vpToken.toString()
                 is JsonPrimitive -> tokenResponse.vpToken!!.jsonPrimitive.content
@@ -175,14 +178,24 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
         return when (session.openId4VPProfile) {
             OpenId4VPProfile.ISO_18013_7_MDOC -> verifyMdoc(tokenResponse, session)
-            OpenId4VPProfile.HAIP -> runBlocking { verifySdJwtVC(tokenResponse, session) }
-            else -> {
-                if(SDJwtVC.isSdJwtVCPresentation(vpToken)) {
-                    runBlocking {
-                        require(verifySdJwtVC(tokenResponse, session)) { "Invalid SD-JWT" }
-                        vpToken = vpToken.split("~")[0]
-                    }
+            OpenId4VPProfile.HAIP ->  runBlocking { verifySdJwtVC(tokenResponse, session) }
+            else -> if(SDJwtVC.isSdJwtVCPresentation(vpToken)) {
+                val success = runBlocking {
+                     verifySdJwtVC(tokenResponse, session)
                 }
+                policyResults[session.id] = PresentationVerificationResponseSurrogate(
+                    results = listOf(
+                        PresentationResultEntrySurrogate(
+                            vpToken, listOf(
+                                PolicyResultSurrogate(
+                                    policy = "default", isSuccess = success, result = "success".toJsonElement()
+                                )
+                            )
+                        )
+                    ), time = Duration.ZERO, policiesRun = 1
+                )
+                success
+            } else {
                 val results = runBlocking {
                     Verifier.verifyPresentation(
                         vpTokenJwt = vpToken,
