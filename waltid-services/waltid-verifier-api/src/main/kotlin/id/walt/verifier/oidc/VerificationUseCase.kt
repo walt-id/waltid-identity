@@ -11,6 +11,7 @@ import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.OpenId4VPProfile
@@ -43,7 +44,6 @@ class VerificationUseCase(
         vpPoliciesJson: JsonElement?,
         vcPoliciesJson: JsonElement?,
         requestCredentialsJson: JsonElement,
-        presentationDefinitionJson: JsonElement?,
         responseMode: ResponseMode,
         responseType: ResponseType? = ResponseType.VpToken,
         successRedirectUri: String?,
@@ -59,19 +59,14 @@ class VerificationUseCase(
 
         val vcPolicies = vcPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
 
-        val requestCredentialsArr = requestCredentialsJson.jsonArray
-
-        val requestedTypes = requestCredentialsArr.map {
+        val requestedCredentials = requestCredentialsJson.jsonArray.map {
             when (it) {
-                is JsonPrimitive -> it.contentOrNull
-                is JsonObject -> it["credential"]?.jsonPrimitive?.contentOrNull
+                is JsonObject -> Json.decodeFromJsonElement<RequestedCredential>(it)
                 else -> throw IllegalArgumentException("Invalid JSON type for requested credential: $it")
-            } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
+            }
         }
 
-        val presentationDefinition =
-            (presentationDefinitionJson?.let { PresentationDefinition.fromJSON(it.jsonObject) })
-                ?: PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes, openId4VPProfile)
+        val presentationDefinition = PresentationDefinition(inputDescriptors = requestedCredentials.map { it.toInputDescriptor() })
 
         logger.debug { "Presentation definition: " + presentationDefinition.toJSON() }
 
@@ -88,10 +83,8 @@ class VerificationUseCase(
             trustedRootCAs = trustedRootCAs?.map { it.jsonPrimitive.content }
         )
 
-        val specificPolicies = requestCredentialsArr.filterIsInstance<JsonObject>().associate {
-            (it["credential"]
-                ?: throw BadRequestException("No `credential` name supplied in `request_credentials`.")).jsonPrimitive.content to (it["policies"]
-                ?: throw BadRequestException("No `policies` supplied in `request_credentials`.")).jsonArray.parsePolicyRequests()
+        val specificPolicies = requestedCredentials.filter { !it.policies.isNullOrEmpty() }.associate {
+            it.id to it.policies!!.parsePolicyRequests()
         }
 
         OIDCVerifierService.sessionVerificationInfos[session.id] = OIDCVerifierService.SessionVerificationInformation(
@@ -109,6 +102,29 @@ class VerificationUseCase(
             }
         )
         session
+    }
+
+    fun createSession(
+        vpPoliciesJson: JsonElement?,
+        vcPoliciesJson: JsonElement?,
+        presentationDefinitionJson: JsonObject,
+        responseMode: ResponseMode,
+        responseType: ResponseType? = ResponseType.VpToken,
+        successRedirectUri: String?,
+        errorRedirectUri: String?,
+        statusCallbackUri: String?,
+        statusCallbackApiKey: String?,
+        stateId: String?,
+        openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT,
+        walletInitiatedAuthState: String? = null,
+        trustedRootCAs: JsonArray? = null
+    ): PresentationSession {
+        return createSession(
+            vpPoliciesJson, vcPoliciesJson,
+            requestCredentialsJson = JsonArray(Json.decodeFromJsonElement<PresentationDefinition>(presentationDefinitionJson).inputDescriptors.map {
+            RequestedCredential(inputDescriptor = it, policies = null).toJsonElement()
+        }), responseMode, responseType, successRedirectUri, errorRedirectUri, statusCallbackUri, statusCallbackApiKey, stateId,
+            openId4VPProfile, walletInitiatedAuthState, trustedRootCAs)
     }
 
     fun getSession(sessionId: String): PresentationSession = sessionId.let { OIDCVerifierService.getSession(it) }
