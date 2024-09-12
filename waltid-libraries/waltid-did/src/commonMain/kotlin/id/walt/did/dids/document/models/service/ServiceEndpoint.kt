@@ -1,5 +1,6 @@
 package id.walt.did.dids.document.models.service
 
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -34,7 +35,7 @@ object ServiceEndpointURLSerializer : KSerializer<ServiceEndpointURL> {
     override val descriptor = JsonPrimitive.serializer().descriptor
 
     override fun serialize(encoder: Encoder, value: ServiceEndpointURL) =
-        encoder.encodeString(value.url)
+        encoder.encodeSerializableValue(JsonElement.serializer(), value.url.toJsonElement())
 
     override fun deserialize(decoder: Decoder): ServiceEndpointURL =
         ServiceEndpointURL(decoder.decodeString())
