@@ -78,7 +78,16 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
 
       payload.credentialConfigurationId = Object.keys(credential_configurations_supported).find(key => key === c.id + "_vc+sd-jwt") as string;
 
-      const selectiveDisclosure = {
+      interface SelectiveDisclosureField {
+        sd: boolean;
+        children: {
+          fields: Record<string, any>;
+        };
+      }
+
+      const selectiveDisclosure: {
+        fields: Record<string, SelectiveDisclosureField>;
+      } = {
         fields: {}
       };
 
