@@ -33,6 +33,7 @@ import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.oid4vc.OpenID4VP
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.providers.CredentialVerifierConfig
 import id.walt.oid4vc.providers.OpenIDCredentialVerifier
 import id.walt.oid4vc.providers.PresentationSession
@@ -175,21 +176,25 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
             OpenId4VPProfile.ISO_18013_7_MDOC -> verifyMdoc(tokenResponse, session)
             OpenId4VPProfile.HAIP -> runBlocking { verifySdJwtVC(tokenResponse, session) }
             else -> {
-                val results = runBlocking {
-                    Verifier.verifyPresentation(
-                        vpTokenJwt = vpToken,
-                        vpPolicies = policies.vpPolicies,
-                        globalVcPolicies = policies.vcPolicies,
-                        specificCredentialPolicies = policies.specificPolicies,
-                        presentationContext = mapOf(
-                            "presentationDefinition" to session.presentationDefinition, "challenge" to session.id
+                if(tokenResponse.presentationSubmission?.descriptorMap?.firstOrNull()?.format == VCFormat.sd_jwt_vc)
+                    runBlocking { verifySdJwtVC(tokenResponse, session) }
+                else {
+                    val results = runBlocking {
+                        Verifier.verifyPresentation(
+                            vpTokenJwt = vpToken,
+                            vpPolicies = policies.vpPolicies,
+                            globalVcPolicies = policies.vcPolicies,
+                            specificCredentialPolicies = policies.specificPolicies,
+                            presentationContext = mapOf(
+                                "presentationDefinition" to session.presentationDefinition, "challenge" to session.id
+                            )
                         )
-                    )
+                    }
+
+                    policyResults[session.id] = PresentationVerificationResponseSurrogate(results)
+
+                    results.overallSuccess()
                 }
-
-                policyResults[session.id] = PresentationVerificationResponseSurrogate(results)
-
-                results.overallSuccess()
             }
         }
     }
