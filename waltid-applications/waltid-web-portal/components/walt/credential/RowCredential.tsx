@@ -30,7 +30,9 @@ export default function RowCredential({ credentialToEdit, credentialsToIssue, se
 
           return updatedCredential;
         } else {
-          return credential;
+          let updatedCredential = { ...credential };
+          updatedCredential.selectedFormat = selectedFormat;
+          return updatedCredential;
         }
       })
     );
