@@ -39,16 +39,6 @@ object ServiceSerializer : KSerializer<Service> {
         )
 }
 
-//object ServiceBaseSerializer : JsonContentPolymorphicSerializer<Service>(Service::class) {
-//    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<Service> {
-//        return when (element) {
-//            is JsonObject -> ServiceBlock.serializer()
-//            is JsonArray -> ServiceBlockList.serializer()
-//            else -> throw SerializationException("Invalid Service type")
-//        }
-//    }
-//}
-
 private val reservedKeys = listOf(
     "id",
     "type",
@@ -87,7 +77,9 @@ object ServiceBlockSerializer : KSerializer<ServiceBlock> {
             id = Json.decodeFromJsonElement(jsonObject["id"]!!),
             type = Json.decodeFromJsonElement(jsonObject["type"]!!),
             serviceEndpoint = Json.decodeFromJsonElement(jsonObject["serviceEndpoint"]!!),
-            customProperties = jsonObject.filterNot { reservedKeys.contains(it.key) },
+            customProperties = jsonObject.filterNot { reservedKeys.contains(it.key) }.let {
+                it.ifEmpty { null }
+            },
         )
     }
 
@@ -105,32 +97,3 @@ object ServiceBlockSerializer : KSerializer<ServiceBlock> {
         )
     }
 }
-
-//@OptIn(ExperimentalJsExport::class)
-//@JsExport
-//@Serializable(with = ServiceBlockListSerializer::class)
-//data class ServiceBlockList(val serviceBlocks: List<ServiceBlock>) : Service() {
-//
-//    init {
-//        require(serviceBlocks.isNotEmpty()) { "Service blocks cannot be empty" }
-//    }
-//}
-//
-//object ServiceBlockListSerializer : KSerializer<ServiceBlockList> {
-//    private val internalSerializer = ListSerializer(ServiceBlock.serializer())
-//    override val descriptor: SerialDescriptor = internalSerializer.descriptor
-//
-//    override fun serialize(encoder: Encoder, value: ServiceBlockList) =
-//        encoder.encodeSerializableValue(
-//            ListSerializer(ServiceBlock.serializer()),
-//            value.serviceBlocks,
-//        )
-//
-//
-//    override fun deserialize(decoder: Decoder): ServiceBlockList =
-//        ServiceBlockList(
-//            decoder.decodeSerializableValue(
-//                ListSerializer(ServiceBlock.serializer()),
-//            )
-//        )
-//}
