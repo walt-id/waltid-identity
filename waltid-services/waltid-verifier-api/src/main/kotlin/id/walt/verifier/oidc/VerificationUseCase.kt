@@ -127,7 +127,7 @@ class VerificationUseCase(
             openId4VPProfile, walletInitiatedAuthState, trustedRootCAs)
     }
 
-    fun getSession(sessionId: String): PresentationSession = sessionId.let { OIDCVerifierService.getSession(it) }!!
+    fun getSession(sessionId: String): PresentationSession = sessionId.let { OIDCVerifierService.getSession(it) }
 
     fun verify(sessionId: String, tokenResponseParameters: Map<String, List<String>>): Result<String> {
         logger.debug { "Verifying session $sessionId" }
