@@ -437,70 +437,9 @@ open class CIProvider : OpenIDCredentialIssuer(
 
         require(keyIdsDistinct.size < 2) { "More than one key id requested" }
 
-//        val keyId = keyIdsDistinct.first()
-
-
-        batchCredentialRequest.credentialRequests.first().let { credentialRequest ->
-
-            val (subjectDid, nonce) = parseFromJwt(
-                credentialRequest.proof?.jwt ?: throw IllegalArgumentException("No proof.jwt in credential request!")
-            )
-
-            log.debug { "RETRIEVING VC FROM TOKEN MAPPING: $nonce" }
-            val issuanceSessionData = tokenCredentialMapping[nonce]
-                ?: throw IllegalArgumentException("The issuanceIdCredentialMapping does not contain a mapping for: $nonce!")
-
-            val credentialResults = issuanceSessionData.map { data ->
-                CredentialResponse.success(
-                    format = credentialRequest.format,
-                    credential = JsonPrimitive(
-                        runBlocking {
-                            val vc = data.request.credentialData ?: throw MissingFieldException(listOf("credentialData"), "credentialData")
-
-                            data.run {
-                                when (credentialRequest.format) {
-                                    // TODO: update to SD-JWT-VC lib!
-                                    CredentialFormat.sd_jwt_vc -> W3CVC(vc).mergingSdJwtIssue(
-                                        issuerKey = issuerKey.key,
-                                        issuerDid = issuerDid,
-                                        subjectDid = subjectDid,
-                                        mappings = request.mapping ?: JsonObject(emptyMap()),
-                                        additionalJwtHeaders = emptyMap(),
-                                        additionalJwtOptions = emptyMap(),
-                                        disclosureMap = data.request.selectiveDisclosure
-                                            ?: SDMap.Companion.generateSDMap(
-                                                JsonObject(emptyMap()),
-                                                JsonObject(emptyMap())
-                                            )
-                                    ).also {
-                                        data.sendCallback("batch_sdjwt_issue", buildJsonObject {
-                                            put("sdjwt", it)
-                                        })
-                                    }
-
-                                    else -> W3CVC(vc).mergingSdJwtIssue(
-                                        issuerKey = issuerKey.key,
-                                        issuerDid = issuerDid,
-                                        subjectDid = subjectDid,
-                                        mappings = request.mapping ?: JsonObject(emptyMap()),
-                                        additionalJwtHeaders = emptyMap(),
-                                        additionalJwtOptions = emptyMap(),
-                                        disclosureMap = data.request.selectiveDisclosure ?: SDMap(mapOf())
-                                    ).also {
-                                        data.sendCallback("batch_jwt_issue", buildJsonObject {
-                                            put("jwt", it)
-                                        })
-                                    }
-                                }
-
-                            }.also { log.debug { "Respond VC: $it" } }
-                        }
-                    )
-                )
-            }
-
-            return BatchCredentialResponse.success(credentialResults, accessToken, 5.minutes)
-        }
+        return BatchCredentialResponse.success(
+            batchCredentialRequest.credentialRequests.map { generateCredentialResponse(it, accessToken) }
+        )
     }
 
 
