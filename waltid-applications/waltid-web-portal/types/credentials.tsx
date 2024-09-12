@@ -14,6 +14,19 @@ export const CredentialFormats = [
   // 'mdoc / mdl (IEC/ISO 18013-5) ',
 ];
 
+// Get Value
+export function mapFormat(format: string): string {
+  switch (format) {
+    case 'JWT + W3C VC':
+    case 'SD-JWT + W3C VC':
+      return 'jwt_vc_json';
+    case 'SD-JWT + IETF SD-JWT VC':
+      return 'vc+sd-jwt';
+    default:
+      throw new Error(`Unsupported format: ${format}`);
+  }
+}
+
 export const DIDMethods = [
   'did:jwk',
   'did:key',

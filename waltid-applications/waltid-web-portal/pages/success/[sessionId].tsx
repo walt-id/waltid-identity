@@ -10,6 +10,7 @@ import { EnvContext } from '@/pages/_app';
 export default function Success() {
   const env = useContext(EnvContext);
   const router = useRouter();
+  const [vctName, setVctName] = useState<string | null>(null);
 
   const [policyResults, setPolicyResults] = useState<Array<{
     policyResults: Array<{
@@ -19,6 +20,7 @@ export default function Success() {
   }>>([]);
   const [credentials, setCredentials] = useState<Array<{
     type: Array<string>;
+    vct: Array<string>;
     credentialSubject: {
       [key: string]: string;
     };
@@ -30,16 +32,33 @@ export default function Success() {
     return JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
   }
 
+  const fetchVctName = async (vctUrl: string) => {
+    try {
+      const response = await axios.get(vctUrl);
+      const bodyJson = response.data;
+      return bodyJson["name"];
+    } catch (error) {
+      console.error('Error fetching vct:', error);
+      return 'Unknown VCT'; // Fallback value if the request fails
+    }
+  };
+
   useEffect(() => {
     if (!router.isReady) return;
-
     axios
       .get(
         `${env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER}/openid4vc/session/${router.query.sessionId}`
       )
       .then((response) => {
-        let vcs = parseJwt(response.data.tokenResponse.vp_token).vp.verifiableCredential;
-        setCredentials(vcs.map((vc: string) => {
+        let parsedToken = parseJwt(response.data.tokenResponse.vp_token);
+        let containsVP = !!parsedToken.vp?.verifiableCredential;
+        let vcs = containsVP ? parsedToken.vp?.verifiableCredential : [response.data.tokenResponse.vp_token];
+
+        setCredentials(Array.isArray(vcs) ? vcs.map((vc: string) => {
+          if (typeof vc !== 'string') {
+            console.error("Invalid VC format: expected a string but got", vc);
+            return vc;
+          }
           let split = vc.split('~');
           let parsed = parseJwt(split[0]);
 
@@ -47,6 +66,10 @@ export default function Success() {
           else {
             let credentialWithSdJWTAttributes = { ...parsed };
             split.slice(1).forEach((item) => {
+
+              // If it is key binding jwt, skip
+              if (item.split('.').length === 3) return
+
               let parsedItem = JSON.parse(Buffer.from(item, 'base64').toString())
               credentialWithSdJWTAttributes.credentialSubject = {
                 [parsedItem[1]]: parsedItem[2],
@@ -61,8 +84,37 @@ export default function Success() {
             });
             return credentialWithSdJWTAttributes;
           }
-        }));
-        setPolicyResults(response.data.policyResults.results);
+        }) : []);
+
+        setPolicyResults(() => {
+          if (containsVP) {
+            return response.data.policyResults.results;
+          } else {
+            //add a new entry to the policy results, since its start index +1
+            return [
+              {
+                policyResults: [
+                  {
+                    policy: 'New Policy',
+                    is_success: true
+                  }
+                ]
+              },
+              ...response.data.policyResults.results
+            ];
+          }
+        });
+
+
+        if (!containsVP) {
+          const vct = parsedToken["vct"]
+          const vctUrl = new URL(vct);
+          const baseUrl = `${vctUrl.origin}`;
+          const pathParts = vctUrl.pathname.split('/');
+          const identifier = pathParts[pathParts.length - 1]; // BankId
+          const vctResolutionUrl = `${baseUrl}/.well-known/vct/${identifier}`
+          fetchVctName(vctResolutionUrl).then((name) => setVctName(name));
+        }
       });
   }, [router.isReady, env]);
 
@@ -114,7 +166,14 @@ export default function Success() {
                   </div>
                   <div className="mb-8 mt-12">
                     <h6 className={'text-2xl font-bold '}>
-                      {credentials[index]?.type[credentials[index]?.type.length - 1].replace(/([a-z0-9])([A-Z])/g, '$1 $2')}</h6>
+                      {
+                      credentials[index]?.type
+                          ? credentials[index]?.type[credentials[index].type.length - 1].replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+                          : credentials[index]?.vct
+                              ? vctName
+                              : credentials[index]?.vct
+                    }
+                    </h6>
                   </div>
                 </div>
               </div>

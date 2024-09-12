@@ -64,6 +64,7 @@ export default function VerificationSection() {
       params.append('vps', vps.join(','));
     }
 
+    params.append('format', (credentialsToIssue[0]?.selectedFormat ?? 'JWT + W3C VC') as string );
     router.push(`/verify?${params.toString()}`);
   }
 

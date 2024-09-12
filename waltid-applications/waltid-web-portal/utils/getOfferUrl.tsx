@@ -77,23 +77,34 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
       };
 
       payload.credentialConfigurationId = Object.keys(credential_configurations_supported).find(key => key === c.id + "_vc+sd-jwt") as string;
-      payload.selectiveDisclosure = {
-        "fields": {
-          "credentialSubject": {
-            sd: false,
-            children: {
-              fields: {}
-            }
-          }
-        }
+
+      interface SelectiveDisclosureField {
+        sd: boolean;
+        children: {
+          fields: Record<string, any>;
+        };
       }
+
+      const selectiveDisclosure: {
+        fields: Record<string, SelectiveDisclosureField>;
+      } = {
+        fields: {}
+      };
+
       for (const key in offer.credentialSubject) {
         if (typeof offer.credentialSubject[key] === 'string') {
-          payload.selectiveDisclosure.fields.credentialSubject.children.fields[key] = {
-            sd: true
-          }
+          // Add a field entry for each property in credentialSubject
+          selectiveDisclosure.fields[key] = {
+            sd: true, // Default selective disclosure state
+            children: {
+              fields: {} // Placeholder for potential future nested fields
+            }
+          };
         }
       }
+
+      payload.selectiveDisclosure = selectiveDisclosure
+
     }
     if (authenticationMethod) {
       payload.authenticationMethod = authenticationMethod;
@@ -109,7 +120,18 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
 
     // If true, return the payload as is
     if (credentials[0]?.selectedFormat === "SD-JWT + IETF SD-JWT VC") {
-      return payload;
+
+      const { credentialSubject, ...restOfCredentialData } = payload.credentialData; // Destructure credentialSubject and the rest
+
+      const updatedPayload = {
+        ...payload,                           // Keep the rest of the payload unchanged
+        credentialData: {
+          ...restOfCredentialData,            // Spread other fields from credentialData (e.g., id, issuer)
+          ...credentialSubject                // Spread fields from credentialSubject to the top level of credentialData
+        }
+      };
+
+      return updatedPayload
     }
 
     // Otherwise, return the payload with mapping if mapping exists, or just payload
