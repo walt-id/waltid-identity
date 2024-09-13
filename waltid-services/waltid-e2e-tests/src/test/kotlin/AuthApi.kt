@@ -192,7 +192,7 @@ class AuthApi(private val client: HttpClient) {
         )
         private val subjectJWKPrivateKey = PKIXUtils.javaPrivateKeyToJWKKey(subjectKeyPair.private)
 
-        private fun createX5CAccountRequest(key: JWKKey, cert: X509Certificate) = runBlocking {
+        private fun createX5CAccountRequest(key: JWKKey, cert: X509Certificate): AccountRequest = runBlocking {
             X5CAccountRequest(
                 null,
                 key.signJws(
