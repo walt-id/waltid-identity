@@ -19,35 +19,31 @@ class ServiceTest {
     private val svcBlockSingleURLNoCustom = ServiceBlock(
         id = "some-id",
         type = RegisteredServiceType.DIDCommMessaging,
-        serviceEndpoint = ServiceEndpointURL("some-url"),
+        serviceEndpoint = setOf(ServiceEndpointURL("some-url")),
     )
 
     private val svcBlockSingleURLCustom = ServiceBlock(
         id = "some-id",
         type = RegisteredServiceType.DIDCommMessaging,
-        serviceEndpoint = ServiceEndpointURL("some-url"),
+        serviceEndpoint = setOf(ServiceEndpointURL("some-url")),
         customProperties = customProperties,
     )
 
     private val svcBlockMultipleURLNoCustom = ServiceBlock(
         id = "some-id",
         type = RegisteredServiceType.DIDCommMessaging,
-        serviceEndpoint = ServiceEndpointList(
-            listOf(
-                ServiceEndpointURL("some-url1"),
-                ServiceEndpointURL("some-url2"),
-            )
+        serviceEndpoint = setOf(
+            ServiceEndpointURL("some-url1"),
+            ServiceEndpointURL("some-url2"),
         ),
     )
 
     private val svcBlockMultipleURLCustom = ServiceBlock(
         id = "some-id",
         type = RegisteredServiceType.DIDCommMessaging,
-        serviceEndpoint = ServiceEndpointList(
-            listOf(
-                ServiceEndpointURL("some-url1"),
-                ServiceEndpointURL("some-url2"),
-            )
+        serviceEndpoint = setOf(
+            ServiceEndpointURL("some-url1"),
+            ServiceEndpointURL("some-url2"),
         ),
         customProperties = customProperties,
     )
@@ -55,22 +51,26 @@ class ServiceTest {
     private val svcBlockSingleObjectNoCustom = ServiceBlock(
         id = "some-id",
         type = RegisteredServiceType.DIDCommMessaging,
-        serviceEndpoint = ServiceEndpointObject(
-            buildJsonObject {
-                put("some-url-property1", "url-value1".toJsonElement())
-                put("some-additional-property1", "some-value1".toJsonElement())
-            }
+        serviceEndpoint = setOf(
+            ServiceEndpointObject(
+                buildJsonObject {
+                    put("some-url-property1", "url-value1".toJsonElement())
+                    put("some-additional-property1", "some-value1".toJsonElement())
+                }
+            ),
         ),
     )
 
     private val svcBlockSingleObjectCustom = ServiceBlock(
         id = "some-id",
         type = RegisteredServiceType.DIDCommMessaging,
-        serviceEndpoint = ServiceEndpointObject(
-            buildJsonObject {
-                put("some-url-property1", "url-value1".toJsonElement())
-                put("some-additional-property1", "some-value1".toJsonElement())
-            }
+        serviceEndpoint = setOf(
+            ServiceEndpointObject(
+                buildJsonObject {
+                    put("some-url-property1", "url-value1".toJsonElement())
+                    put("some-additional-property1", "some-value1".toJsonElement())
+                }
+            ),
         ),
         customProperties = customProperties,
     )
@@ -78,42 +78,38 @@ class ServiceTest {
     private val svcBlockMultipleObjectNoCustom = ServiceBlock(
         id = "some-id",
         type = RegisteredServiceType.DIDCommMessaging,
-        serviceEndpoint = ServiceEndpointList(
-            listOf(
-                ServiceEndpointObject(
-                    buildJsonObject {
-                        put("some-url-property1", "url-value1".toJsonElement())
-                        put("some-additional-property1", "some-value1".toJsonElement())
-                    }
-                ),
-                ServiceEndpointObject(
-                    buildJsonObject {
-                        put("some-url-property2", "url-value2".toJsonElement())
-                        put("some-additional-property2", "some-value2".toJsonElement())
-                    }
-                ),
-            )
+        serviceEndpoint = setOf(
+            ServiceEndpointObject(
+                buildJsonObject {
+                    put("some-url-property1", "url-value1".toJsonElement())
+                    put("some-additional-property1", "some-value1".toJsonElement())
+                }
+            ),
+            ServiceEndpointObject(
+                buildJsonObject {
+                    put("some-url-property2", "url-value2".toJsonElement())
+                    put("some-additional-property2", "some-value2".toJsonElement())
+                }
+            ),
         ),
     )
 
     private val svcBlockMultipleObjectCustom = ServiceBlock(
         id = "some-id",
         type = RegisteredServiceType.DIDCommMessaging,
-        serviceEndpoint = ServiceEndpointList(
-            listOf(
-                ServiceEndpointObject(
-                    buildJsonObject {
-                        put("some-url-property1", "url-value1".toJsonElement())
-                        put("some-additional-property1", "some-value1".toJsonElement())
-                    }
-                ),
-                ServiceEndpointObject(
-                    buildJsonObject {
-                        put("some-url-property2", "url-value2".toJsonElement())
-                        put("some-additional-property2", "some-value2".toJsonElement())
-                    }
-                ),
-            )
+        serviceEndpoint = setOf(
+            ServiceEndpointObject(
+                buildJsonObject {
+                    put("some-url-property1", "url-value1".toJsonElement())
+                    put("some-additional-property1", "some-value1".toJsonElement())
+                }
+            ),
+            ServiceEndpointObject(
+                buildJsonObject {
+                    put("some-url-property2", "url-value2".toJsonElement())
+                    put("some-additional-property2", "some-value2".toJsonElement())
+                }
+            ),
         ),
         customProperties = customProperties,
     )
@@ -148,7 +144,8 @@ class ServiceTest {
     @Test
     fun testMultiServiceSerialization() = runTest {
         val svc = Service(svcBlockList)
-        val svcJsonString = """[{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":"some-url"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":"some-url","this":"that","tit":"tat"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":["some-url1","some-url2"]},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":["some-url1","some-url2"],"this":"that","tit":"tat"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":{"some-url-property1":"url-value1","some-additional-property1":"some-value1"}},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":{"some-url-property1":"url-value1","some-additional-property1":"some-value1"},"this":"that","tit":"tat"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":[{"some-url-property1":"url-value1","some-additional-property1":"some-value1"},{"some-url-property2":"url-value2","some-additional-property2":"some-value2"}]},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":[{"some-url-property1":"url-value1","some-additional-property1":"some-value1"},{"some-url-property2":"url-value2","some-additional-property2":"some-value2"}],"this":"that","tit":"tat"}]"""
+        val svcJsonString =
+            """[{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":"some-url"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":"some-url","this":"that","tit":"tat"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":["some-url1","some-url2"]},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":["some-url1","some-url2"],"this":"that","tit":"tat"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":{"some-url-property1":"url-value1","some-additional-property1":"some-value1"}},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":{"some-url-property1":"url-value1","some-additional-property1":"some-value1"},"this":"that","tit":"tat"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":[{"some-url-property1":"url-value1","some-additional-property1":"some-value1"},{"some-url-property2":"url-value2","some-additional-property2":"some-value2"}]},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":[{"some-url-property1":"url-value1","some-additional-property1":"some-value1"},{"some-url-property2":"url-value2","some-additional-property2":"some-value2"}],"this":"that","tit":"tat"}]"""
         assertEquals(
             expected = svcJsonString,
             actual = Json.encodeToString(svc),

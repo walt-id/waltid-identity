@@ -20,18 +20,10 @@ class ServiceEndpointTest {
             expected = svcJsonEncodedString,
             actual = Json.encodeToString(svcEndpoint.url),
         )
-        assertEquals(
-            expected = svcJsonEncodedString,
-            actual = Json.encodeToString(ServiceEndpointListSerializer, ServiceEndpointList(listOf(svcEndpoint))),
-        )
         //decoding single element
         assertEquals(
             expected = svcEndpoint,
             actual = Json.decodeFromString<ServiceEndpoint>(svcJsonEncodedString)
-        )
-        assertEquals(
-            expected = ServiceEndpointList(listOf(svcEndpoint)),
-            actual = Json.decodeFromString(ServiceEndpointListSerializer, "[\"${svcEndpoint.url}\"]")
         )
         val svcEndpointList = listOf(
             ServiceEndpointURL("something"),
@@ -47,10 +39,6 @@ class ServiceEndpointTest {
         assertEquals(
             expected = svcEndpointList,
             actual = Json.decodeFromString<List<ServiceEndpoint>>(svcListJsonEncodedString),
-        )
-        assertEquals(
-            expected = ServiceEndpointList(svcEndpointList),
-            actual = Json.decodeFromString(ServiceEndpointListSerializer, svcListJsonEncodedString),
         )
     }
 
@@ -72,10 +60,6 @@ class ServiceEndpointTest {
         assertEquals(
             expected = svcEndpointJsonObject,
             actual = Json.decodeFromString<ServiceEndpoint>(svcJsonEncodedString),
-        )
-        assertEquals(
-            expected = ServiceEndpointList(listOf(svcEndpointJsonObject)),
-            actual = Json.decodeFromString(ServiceEndpointListSerializer, "[${svcJsonEncodedString}]")
         )
         val svcEndpointList = listOf(
             ServiceEndpointObject(
@@ -103,10 +87,6 @@ class ServiceEndpointTest {
         assertEquals(
             expected = svcEndpointList,
             actual = Json.decodeFromString<List<ServiceEndpoint>>(svcListJsonEncodedString),
-        )
-        assertEquals(
-            expected = ServiceEndpointList(svcEndpointList),
-            actual = Json.decodeFromString(ServiceEndpointListSerializer, svcListJsonEncodedString),
         )
     }
 
@@ -140,10 +120,6 @@ class ServiceEndpointTest {
         assertEquals(
             expected = mixSvcEndpointList,
             actual = Json.decodeFromString<List<ServiceEndpoint>>(mixSvcJsonEncodedString),
-        )
-        assertEquals(
-            expected = ServiceEndpointList(mixSvcEndpointList),
-            actual = Json.decodeFromString(ServiceEndpointListSerializer, mixSvcJsonEncodedString)
         )
     }
 }

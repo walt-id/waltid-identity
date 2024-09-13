@@ -2,8 +2,6 @@ package id.walt.did.dids.document.models.service
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.*
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
@@ -20,7 +18,6 @@ object ServiceEndpointBaseSerializer : JsonContentPolymorphicSerializer<ServiceE
         return when {
             element is JsonPrimitive && element.isString -> ServiceEndpointURL.serializer()
             element is JsonObject -> ServiceEndpointObject.serializer()
-            element is JsonArray -> ServiceEndpointList.serializer()
             else -> throw SerializationException("Invalid ServiceEndpoint type")
         }
     }
@@ -55,44 +52,4 @@ object ServiceEndpointObjectSerializer : KSerializer<ServiceEndpointObject> {
 
     override fun deserialize(decoder: Decoder): ServiceEndpointObject =
         ServiceEndpointObject(decoder.decodeSerializableValue(JsonObject.serializer()))
-}
-
-@OptIn(ExperimentalJsExport::class)
-@JsExport
-@Serializable(with = ServiceEndpointListSerializer::class)
-data class ServiceEndpointList(val endpoints: List<ServiceEndpoint>) : ServiceEndpoint() {
-    init {
-        require(endpoints.isNotEmpty()) { "At least one service endpoint is required" }
-    }
-}
-
-object ServiceEndpointListSerializer : KSerializer<ServiceEndpointList> {
-    private val internalSerializer = ListSerializer(ServiceEndpoint.serializer())
-    override val descriptor: SerialDescriptor = internalSerializer.descriptor
-
-    override fun serialize(encoder: Encoder, value: ServiceEndpointList) {
-        when (value.endpoints.size) {
-            1 -> {
-                encoder.encodeSerializableValue(
-                    ServiceEndpoint.serializer(),
-                    value.endpoints.first(),
-                )
-            }
-
-            else -> {
-                encoder.encodeSerializableValue(
-                    ListSerializer(ServiceEndpoint.serializer()),
-                    value.endpoints,
-                )
-            }
-        }
-    }
-
-
-    override fun deserialize(decoder: Decoder): ServiceEndpointList =
-        ServiceEndpointList(
-            decoder.decodeSerializableValue(
-                ListSerializer(ServiceEndpoint.serializer()),
-            )
-        )
 }
