@@ -51,7 +51,7 @@ private val reservedKeys = listOf(
 data class ServiceBlock(
     val id: String,
     val type: RegisteredServiceType,
-    val serviceEndpoint: ServiceEndpoint,
+    val serviceEndpoint: Set<ServiceEndpoint>,
     val customProperties: Map<String, JsonElement>? = null,
 ) {
 
@@ -76,7 +76,18 @@ object ServiceBlockSerializer : KSerializer<ServiceBlock> {
         return ServiceBlock(
             id = Json.decodeFromJsonElement(jsonObject["id"]!!),
             type = Json.decodeFromJsonElement(jsonObject["type"]!!),
-            serviceEndpoint = Json.decodeFromJsonElement(jsonObject["serviceEndpoint"]!!),
+            serviceEndpoint = jsonObject["serviceEndpoint"]!!.let { element ->
+                when {
+                    (element is JsonPrimitive && element.isString) ||
+                            (element is JsonObject) -> {
+                        setOf(Json.decodeFromJsonElement<ServiceEndpoint>(element))
+                    }
+
+                    else -> {
+                        Json.decodeFromJsonElement<Set<ServiceEndpoint>>(element)
+                    }
+                }
+            },
             customProperties = jsonObject.filterNot { reservedKeys.contains(it.key) }.let {
                 it.ifEmpty { null }
             },
@@ -89,7 +100,15 @@ object ServiceBlockSerializer : KSerializer<ServiceBlock> {
             buildJsonObject {
                 put("id", value.id)
                 put("type", value.type.toString())
-                put("serviceEndpoint", Json.encodeToJsonElement(value.serviceEndpoint))
+                when (value.serviceEndpoint.size) {
+                    1 -> {
+                        put("serviceEndpoint", Json.encodeToJsonElement(value.serviceEndpoint.first()))
+                    }
+
+                    else -> {
+                        put("serviceEndpoint", Json.encodeToJsonElement(value.serviceEndpoint))
+                    }
+                }
                 value.customProperties?.forEach {
                     put(it.key, it.value)
                 }
