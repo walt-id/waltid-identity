@@ -25,7 +25,7 @@ class ServiceBlockTest {
         //with URL endpoint block and no custom properties
         val svcBlockWithURLEndpointNoCustom = ServiceBlock(
             id = "some-id",
-            type = RegisteredServiceType.DIDCommMessaging,
+            type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
             serviceEndpoint = setOf(ServiceEndpointURL("some-url"))
         )
         val svcBlockWithURLEndpointNoCustomJsonEncodedString =
@@ -55,7 +55,7 @@ class ServiceBlockTest {
         //with URL endpoint block and custom properties
         val svcBlockWithURLEndpointCustom = ServiceBlock(
             id = "some-id",
-            type = RegisteredServiceType.DIDCommMessaging,
+            type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
             serviceEndpoint = setOf(ServiceEndpointURL("some-url")),
             customProperties = customProperties,
         )
@@ -90,7 +90,7 @@ class ServiceBlockTest {
         //with object endpoint block and no custom properties
         val svcBlockWithObjectEndpointNoCustom = ServiceBlock(
             id = "some-id",
-            type = RegisteredServiceType.DIDCommMessaging,
+            type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
             serviceEndpoint = setOf(
                 ServiceEndpointObject(
                     buildJsonObject {
@@ -127,7 +127,7 @@ class ServiceBlockTest {
         //with object endpoint block and custom properties
         val svcBlockWithObjectEndpointCustom = ServiceBlock(
             id = "some-id",
-            type = RegisteredServiceType.DIDCommMessaging,
+            type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
             serviceEndpoint = setOf(
                 ServiceEndpointObject(
                     buildJsonObject {
@@ -168,7 +168,7 @@ class ServiceBlockTest {
     fun testServiceBlockWithSameEndpoints() = runTest {
         val svcBlockWithURLEndpoints = ServiceBlock(
             id = "some-id",
-            type = RegisteredServiceType.DIDCommMessaging,
+            type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
             serviceEndpoint = setOf(
                 ServiceEndpointURL("some-url"),
                 ServiceEndpointURL("some-url"),
@@ -189,7 +189,7 @@ class ServiceBlockTest {
         )
         val svcBlockWithObjectEndpoints = ServiceBlock(
             id = "some-id",
-            type = RegisteredServiceType.DIDCommMessaging,
+            type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
             serviceEndpoint = setOf(
                 ServiceEndpointObject(
                     buildJsonObject {
@@ -224,7 +224,7 @@ class ServiceBlockTest {
     fun testServiceBlockWithMixEndpoints() = runTest {
         val svcBlock = ServiceBlock(
             id = "some-id",
-            type = RegisteredServiceType.DIDCommMessaging,
+            type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
             serviceEndpoint = setOf(
                 ServiceEndpointURL("some-url"),
                 ServiceEndpointObject(
@@ -247,6 +247,33 @@ class ServiceBlockTest {
         assertEquals(
             expected = svcBlock,
             actual = Json.decodeFromString(svcBlockJsonEncodedString)
+        )
+    }
+
+    @Test
+    fun testServiceBlockMultipleTypes() = runTest {
+        val svcBlock = ServiceBlock(
+            id = "some-id",
+            type = setOf(
+                RegisteredServiceType.DIDCommMessaging.toString(),
+                "some-other-type",
+            ),
+            serviceEndpoint = setOf(
+                ServiceEndpointURL("some-url"),
+            )
+        )
+        assertTrue(svcBlock.type.size == 2)
+        val svcBlockJsonEncodedString =
+            """{"id":"some-id","type":["DIDCommMessaging","some-other-type"],"serviceEndpoint":"some-url"}"""
+        //encode
+        assertEquals(
+            expected = svcBlockJsonEncodedString,
+            actual = Json.encodeToString(svcBlock)
+        )
+        //decode
+        assertEquals(
+            expected = svcBlock,
+            actual = Json.decodeFromString(svcBlockJsonEncodedString),
         )
     }
 }
