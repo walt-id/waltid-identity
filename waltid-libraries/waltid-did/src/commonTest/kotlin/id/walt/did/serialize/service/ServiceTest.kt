@@ -114,7 +114,7 @@ class ServiceTest {
         customProperties = customProperties,
     )
 
-    private val svcBlockList = listOf(
+    private val svcBlockSet = setOf(
         svcBlockSingleURLNoCustom,
         svcBlockSingleURLCustom,
         svcBlockMultipleURLNoCustom,
@@ -127,8 +127,8 @@ class ServiceTest {
 
     @Test
     fun testSingleServiceSerialization() = runTest {
-        svcBlockList.forEach {
-            val svc = Service(listOf(it))
+        svcBlockSet.forEach {
+            val svc = Service(setOf(it))
             val svcJsonString = """[${Json.encodeToString(it)}]"""
             assertEquals(
                 expected = svcJsonString,
@@ -143,7 +143,7 @@ class ServiceTest {
 
     @Test
     fun testMultiServiceSerialization() = runTest {
-        val svc = Service(svcBlockList)
+        val svc = Service(svcBlockSet)
         val svcJsonString =
             """[{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":"some-url"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":"some-url","this":"that","tit":"tat"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":["some-url1","some-url2"]},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":["some-url1","some-url2"],"this":"that","tit":"tat"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":{"some-url-property1":"url-value1","some-additional-property1":"some-value1"}},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":{"some-url-property1":"url-value1","some-additional-property1":"some-value1"},"this":"that","tit":"tat"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":[{"some-url-property1":"url-value1","some-additional-property1":"some-value1"},{"some-url-property2":"url-value2","some-additional-property2":"some-value2"}]},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":[{"some-url-property1":"url-value1","some-additional-property1":"some-value1"},{"some-url-property2":"url-value2","some-additional-property2":"some-value2"}],"this":"that","tit":"tat"}]"""
         assertEquals(
