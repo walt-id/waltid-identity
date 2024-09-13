@@ -18,20 +18,20 @@ class ServiceTest {
 
     private val svcBlockSingleURLNoCustom = ServiceBlock(
         id = "some-id",
-        type = RegisteredServiceType.DIDCommMessaging,
+        type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(ServiceEndpointURL("some-url")),
     )
 
     private val svcBlockSingleURLCustom = ServiceBlock(
         id = "some-id",
-        type = RegisteredServiceType.DIDCommMessaging,
+        type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(ServiceEndpointURL("some-url")),
         customProperties = customProperties,
     )
 
     private val svcBlockMultipleURLNoCustom = ServiceBlock(
         id = "some-id",
-        type = RegisteredServiceType.DIDCommMessaging,
+        type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
             ServiceEndpointURL("some-url1"),
             ServiceEndpointURL("some-url2"),
@@ -40,7 +40,7 @@ class ServiceTest {
 
     private val svcBlockMultipleURLCustom = ServiceBlock(
         id = "some-id",
-        type = RegisteredServiceType.DIDCommMessaging,
+        type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
             ServiceEndpointURL("some-url1"),
             ServiceEndpointURL("some-url2"),
@@ -50,7 +50,7 @@ class ServiceTest {
 
     private val svcBlockSingleObjectNoCustom = ServiceBlock(
         id = "some-id",
-        type = RegisteredServiceType.DIDCommMessaging,
+        type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
             ServiceEndpointObject(
                 buildJsonObject {
@@ -63,7 +63,7 @@ class ServiceTest {
 
     private val svcBlockSingleObjectCustom = ServiceBlock(
         id = "some-id",
-        type = RegisteredServiceType.DIDCommMessaging,
+        type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
             ServiceEndpointObject(
                 buildJsonObject {
@@ -77,7 +77,7 @@ class ServiceTest {
 
     private val svcBlockMultipleObjectNoCustom = ServiceBlock(
         id = "some-id",
-        type = RegisteredServiceType.DIDCommMessaging,
+        type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
             ServiceEndpointObject(
                 buildJsonObject {
@@ -96,7 +96,7 @@ class ServiceTest {
 
     private val svcBlockMultipleObjectCustom = ServiceBlock(
         id = "some-id",
-        type = RegisteredServiceType.DIDCommMessaging,
+        type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
             ServiceEndpointObject(
                 buildJsonObject {

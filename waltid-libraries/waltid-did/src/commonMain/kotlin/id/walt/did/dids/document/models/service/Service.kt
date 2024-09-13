@@ -45,7 +45,7 @@ private val reservedKeys = listOf(
 @Serializable(with = ServiceBlockSerializer::class)
 data class ServiceBlock(
     val id: String,
-    val type: RegisteredServiceType,
+    val type: Set<String>,
     val serviceEndpoint: Set<ServiceEndpoint>,
     val customProperties: Map<String, JsonElement>? = null,
 ) {
@@ -70,7 +70,17 @@ object ServiceBlockSerializer : KSerializer<ServiceBlock> {
         }
         return ServiceBlock(
             id = Json.decodeFromJsonElement(jsonObject["id"]!!),
-            type = Json.decodeFromJsonElement(jsonObject["type"]!!),
+            type = jsonObject["type"]!!.let { element ->
+                when {
+                    element is JsonPrimitive && element.isString -> {
+                        setOf(Json.decodeFromJsonElement<String>(element))
+                    }
+                    else -> {
+                        Json.decodeFromJsonElement<Set<String>>(element)
+                    }
+                }
+
+            },
             serviceEndpoint = jsonObject["serviceEndpoint"]!!.let { element ->
                 when {
                     (element is JsonPrimitive && element.isString) ||
@@ -94,7 +104,15 @@ object ServiceBlockSerializer : KSerializer<ServiceBlock> {
             JsonObject.serializer(),
             buildJsonObject {
                 put("id", value.id)
-                put("type", value.type.toString())
+                when (value.type.size) {
+                    1 -> {
+                        put("type", value.type.first().toString())
+                    }
+
+                    else -> {
+                        put("type", Json.encodeToJsonElement(value.type))
+                    }
+                }
                 when (value.serviceEndpoint.size) {
                     1 -> {
                         put("serviceEndpoint", Json.encodeToJsonElement(value.serviceEndpoint.first()))
