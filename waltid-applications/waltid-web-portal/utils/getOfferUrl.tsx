@@ -12,23 +12,6 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
     c = { ...c, selectedFormat: c.selectedFormat ?? CredentialFormats[0], selectedDID: c.selectedDID ?? DIDMethods[0] };
 
     const offer = { ...c.offer, id: uuidv4() };
-    let mapping;
-    if (c.selectedFormat === "SD-JWT + IETF SD-JWT VC") {
-      mapping = {
-        id: "<uuid>",
-        iat: "<timestamp-seconds>",
-        nbf: "<timestamp-seconds>",
-        exp: "<timestamp-in-seconds:365d>"
-      };
-    }
-    else {
-      mapping = await (await fetch(`${NEXT_PUBLIC_VC_REPO}/api/mapping/${c.id}`).then(data => {
-        return data.json();
-      }).catch(err => {
-        return null;
-      }));
-    }
-
     let payload: {
       'issuerDid': string,
       'issuerKey': { "type": string, "jwk": object },
@@ -46,26 +29,14 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
       credentialData: offer
     }
 
-    if (c.selectedFormat === "SD-JWT + W3C VC" || c.selectedFormat === "SD-JWT + IETF SD-JWT VC") {
-      payload.selectiveDisclosure = {
-        "fields": {
-          "credentialSubject": {
-            sd: false,
-            children: {
-              fields: {}
-            }
-          }
-        }
-      }
-      for (const key in offer.credentialSubject) {
-        if (typeof offer.credentialSubject[key] === 'string') {
-          payload.selectiveDisclosure.fields.credentialSubject.children.fields[key] = {
-            sd: true
-          }
-        }
-      }
-    }
     if (c.selectedFormat === "SD-JWT + IETF SD-JWT VC") {
+      payload.mapping = {
+        id: "<uuid>",
+        iat: "<timestamp-seconds>",
+        nbf: "<timestamp-seconds>",
+        exp: "<timestamp-in-seconds:365d>"
+      };
+
       // Hack - remove the following fields as they used for w3c only
       delete payload.credentialData["@context"];
       delete payload.credentialData["type"];
@@ -76,6 +47,41 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
       delete payload.credentialData["issuer"];
 
       payload.credentialConfigurationId = Object.keys(credential_configurations_supported).find(key => key === c.id + "_vc+sd-jwt") as string;
+      payload.selectiveDisclosure = { "fields": {} }
+      for (const key in offer.credentialSubject) {
+        if (typeof offer.credentialSubject[key] === 'string') {
+          payload.selectiveDisclosure.fields[key] = {
+            sd: true
+          }
+        }
+      }
+    }
+    else {
+      payload.mapping = await (await fetch(`${NEXT_PUBLIC_VC_REPO}/api/mapping/${c.id}`).then(data => {
+        return data.json();
+      }).catch(err => {
+        return null;
+      }));
+
+      if (c.selectedFormat === "SD-JWT + W3C VC") {
+        payload.selectiveDisclosure = {
+          "fields": {
+            "credentialSubject": {
+              sd: false,
+              children: {
+                fields: {}
+              }
+            }
+          }
+        }
+        for (const key in offer.credentialSubject) {
+          if (typeof offer.credentialSubject[key] === 'string') {
+            payload.selectiveDisclosure.fields.credentialSubject.children.fields[key] = {
+              sd: true
+            }
+          }
+        }
+      }
     }
 
     if (authenticationMethod) {
@@ -88,8 +94,19 @@ const getOfferUrl = async (credentials: Array<AvailableCredential>, NEXT_PUBLIC_
       payload.vpProfile = vpProfile;
     }
 
-    // Otherwise, return the payload with mapping if mapping exists, or just payload
-    return mapping ? { ...payload, mapping } : payload;
+    if (c.selectedFormat === "SD-JWT + IETF SD-JWT VC") {
+      const { credentialSubject, ...restOfCredentialData } = payload.credentialData; // Destructure credentialSubject and the rest
+      return {
+        ...payload,                           // Keep the rest of the payload unchanged
+        credentialData: {
+          ...restOfCredentialData,            // Spread other fields from credentialData (e.g., id, issuer)
+          ...credentialSubject                // Spread fields from credentialSubject to the top level of credentialData
+        }
+      };
+    }
+    else {
+      return payload;
+    }
   }));
 
   const issueUrl = NEXT_PUBLIC_ISSUER + `/openid4vc/${credentials[0].selectedFormat === "SD-JWT + W3C VC" || credentials[0].selectedFormat === "SD-JWT + IETF SD-JWT VC" ? "sdjwt" : "jwt"}/${(payload.length > 1 ? 'issueBatch' : 'issue')}`;
