@@ -9,6 +9,7 @@ import axios from 'axios';
 import { sendToWebWallet } from '@/utils/sendToWebWallet';
 import nextConfig from '@/next.config';
 import BackButton from '@/components/walt/button/BackButton';
+import {CredentialFormats, mapFormat} from "@/types/credentials";
 
 const BUTTON_COPY_TEXT_DEFAULT = 'Copy offer URL';
 const BUTTON_COPY_TEXT_COPIED = 'Copied';
@@ -30,6 +31,7 @@ export default function Verification() {
     const getverifyURL = async () => {
       let vps = router.query.vps?.toString().split(',') ?? [];
       let ids = router.query.ids?.toString().split(',') ?? [];
+      let format = router.query.format?.toString() ?? CredentialFormats[0]
       let credentials = AvailableCredentials.filter((cred) => {
         for (const id of ids) {
           if (id.toString() == cred.id.toString()) {
@@ -38,14 +40,26 @@ export default function Verification() {
         }
         return false;
       });
-      const credentialType = credentials.map((credential) => {
-        return credential.offer.type[credential.offer.type.length - 1]
+
+      const request_credentials = credentials.map(credential => {
+        if (mapFormat(format) === 'vc+sd-jwt') {
+          let url = `${env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER}`
+          return {
+            vct: `${url}/${credential.offer.type[credential.offer.type.length - 1]}`,
+            format: mapFormat(format)
+          };
+        } else {
+          return {
+            type: credential.offer.type[credential.offer.type.length - 1],
+            format:  mapFormat(format)
+          };
+        }
       });
 
       const response = await axios.post(
         `${env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER}/openid4vc/verify`,
         {
-          "request_credentials": credentialType,
+          "request_credentials": request_credentials,
           "vc_policies": vps.map((vp) => {
             if (vp.includes('=')) {
               return {

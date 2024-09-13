@@ -181,13 +181,13 @@ fun Application.verfierApi() {
                         example("Example with VP & global VC policies", VerifierApiExamples.vpGlobalVcPolicies)
                         example("Example with VP, VC & specific credential policies", VerifierApiExamples.vcVpIndividualPolicies)
                         example(
-                            "Example with VP, VC & specific policies, and explicit presentation_definition  (maximum example)",
+                            "Example with VP, VC & specific policies, and explicit input_descriptor(s)  (maximum example)",
                             VerifierApiExamples.maxExample
                         )
                         example("Example with presentation definition policy", VerifierApiExamples.presentationDefinitionPolicy)
                         example("Example with EBSI PDA1 Presentation Definition", VerifierApiExamples.EbsiVerifiablePDA1)
                         example("MDoc verification example", VerifierApiExamples.lspPotentialMdocExample)
-                        example("SD-JWT verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
+                        example("SD-JWT-VC verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
                     }
                 }
 
@@ -206,23 +206,21 @@ fun Application.verfierApi() {
 
                     val body = context.receive<JsonObject>()
 
-                    val session = verificationUseCase.createSession(
-                        vpPoliciesJson = body["vp_policies"],
-                        vcPoliciesJson = body["vc_policies"],
-                        requestCredentialsJson = body["request_credentials"]
-                            ?: throw BadRequestException("Field request_credentials is required"),
-                        presentationDefinitionJson = body["presentation_definition"],
-                        responseMode = responseMode,
-                        successRedirectUri = successRedirectUri,
-                        errorRedirectUri = errorRedirectUri,
-                        statusCallbackUri = statusCallbackUri,
-                        statusCallbackApiKey = statusCallbackApiKey,
-                        stateId = stateId,
-                        openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull
-                            ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
-                            ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
-                        trustedRootCAs = body["trusted_root_cas"]?.jsonArray
-                    )
+                val session = verificationUseCase.createSession(
+                    vpPoliciesJson = body["vp_policies"],
+                    vcPoliciesJson = body["vc_policies"],
+                    requestCredentialsJson = body["request_credentials"]
+                      ?: throw BadRequestException("Field request_credentials is required"),
+                    responseMode = responseMode,
+                    successRedirectUri = successRedirectUri,
+                    errorRedirectUri = errorRedirectUri,
+                    statusCallbackUri = statusCallbackUri,
+                    statusCallbackApiKey = statusCallbackApiKey,
+                    stateId = stateId,
+                    openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
+                    ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
+                    trustedRootCAs = body["trusted_root_cas"]?.jsonArray
+                )
 
                 context.respond(
                     authorizeBaseUrl.plus("?").plus(
@@ -236,7 +234,7 @@ fun Application.verfierApi() {
                             else -> session.authorizationRequest!!.toHttpQueryString()
                         }
                     )
-                    )
+                )
             }
 
             post("/verify/{state}", {
@@ -421,11 +419,10 @@ fun Application.verfierApi() {
                     add("not-before")
                     add("revoked_status_list")
                 },
-                requestCredentialsJson = buildJsonArray {},
                 presentationDefinitionJson = when (scope.contains("openid ver_test:vp_token")) {
-                    true -> Json.parseToJsonElement(fixedPresentationDefinitionForEbsiConformanceTest)
+                    true -> Json.parseToJsonElement(fixedPresentationDefinitionForEbsiConformanceTest).jsonObject
                     else -> null
-                },
+                } ?: throw IllegalArgumentException(""),
                 responseMode = ResponseMode.direct_post,
                 successRedirectUri = null,
                 errorRedirectUri = null,

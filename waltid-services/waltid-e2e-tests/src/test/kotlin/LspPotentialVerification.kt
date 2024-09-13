@@ -12,6 +12,7 @@ import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.EncodedCBORElement
@@ -35,6 +36,7 @@ import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import id.walt.sdjwt.SimpleMultiKeyJWTCryptoProvider
 import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
+import id.walt.verifier.oidc.RequestedCredential
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -75,7 +77,7 @@ class LspPotentialVerification(private val client: HttpClient) {
         contentType(ContentType.Application.Json)
         setBody(
           buildJsonObject {
-            put("request_credentials", JsonArray(listOf(JsonPrimitive(MDocTypes.ISO_MDL))))
+            put("request_credentials", JsonArray(listOf(RequestedCredential(format = VCFormat.mso_mdoc, docType = MDocTypes.ISO_MDL).let { Json.encodeToJsonElement(it) })))
             put("trusted_root_cas", JsonArray(listOf(JsonPrimitive(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT))))
 
           })
@@ -179,7 +181,7 @@ class LspPotentialVerification(private val client: HttpClient) {
         contentType(ContentType.Application.Json)
         setBody(
           buildJsonObject {
-            put("request_credentials", JsonArray(listOf(JsonPrimitive("identity_credential_vc+sd-jwt"))))
+            put("request_credentials", JsonArray(listOf(RequestedCredential(format = VCFormat.sd_jwt_vc, vct = "identity_credential_vc+sd-jwt").let { Json.encodeToJsonElement(it) })))
           })
       }
       assertEquals(200, createReqResponse.status.value)
