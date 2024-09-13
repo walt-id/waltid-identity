@@ -8,7 +8,7 @@ import kotlin.js.JsExport
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
-enum class ServiceType {
+enum class RegisteredServiceType {
     LinkedDomains,
     LinkedVerifiablePresentation,
     DIDCommMessaging,

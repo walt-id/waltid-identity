@@ -50,7 +50,7 @@ private val reservedKeys = listOf(
 @Serializable(with = ServiceBlockSerializer::class)
 data class ServiceBlock(
     val id: String,
-    val type: ServiceType,
+    val type: RegisteredServiceType,
     val serviceEndpoint: ServiceEndpoint,
     val customProperties: Map<String, JsonElement>? = null,
 ) {
