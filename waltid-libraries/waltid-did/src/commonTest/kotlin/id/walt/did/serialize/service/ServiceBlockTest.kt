@@ -4,7 +4,7 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.document.models.service.ServiceBlock
 import id.walt.did.dids.document.models.service.ServiceEndpointObject
 import id.walt.did.dids.document.models.service.ServiceEndpointURL
-import id.walt.did.dids.document.models.service.ServiceType
+import id.walt.did.dids.document.models.service.RegisteredServiceType
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -24,7 +24,7 @@ class ServiceBlockTest {
         //with URL endpoint block and no custom properties
         val svcBlockWithURLEndpointNoCustom = ServiceBlock(
             id = "some-id",
-            type = ServiceType.DIDCommMessaging,
+            type = RegisteredServiceType.DIDCommMessaging,
             serviceEndpoint = ServiceEndpointURL("some-url")
         )
         val svcBlockWithURLEndpointNoCustomJsonEncodedString = """{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":"some-url"}"""
@@ -52,7 +52,7 @@ class ServiceBlockTest {
         //with URL endpoint block and custom properties
         val svcBlockWithURLEndpointCustom = ServiceBlock(
             id = "some-id",
-            type = ServiceType.DIDCommMessaging,
+            type = RegisteredServiceType.DIDCommMessaging,
             serviceEndpoint = ServiceEndpointURL("some-url"),
             customProperties = customProperties,
         )
@@ -85,7 +85,7 @@ class ServiceBlockTest {
         //with object endpoint block and no custom properties
         val svcBlockWithObjectEndpointNoCustom = ServiceBlock(
             id = "some-id",
-            type = ServiceType.DIDCommMessaging,
+            type = RegisteredServiceType.DIDCommMessaging,
             serviceEndpoint = ServiceEndpointObject(
                 buildJsonObject {
                     put("some-url-property", "url-value".toJsonElement())
@@ -119,7 +119,7 @@ class ServiceBlockTest {
         //with object endpoint block and custom properties
         val svcBlockWithObjectEndpointCustom = ServiceBlock(
             id = "some-id",
-            type = ServiceType.DIDCommMessaging,
+            type = RegisteredServiceType.DIDCommMessaging,
             serviceEndpoint = ServiceEndpointObject(
                 buildJsonObject {
                     put("some-url-property", "url-value".toJsonElement())
