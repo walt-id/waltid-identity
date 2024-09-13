@@ -162,7 +162,7 @@ spec:
             - name: NUXT_PUBLIC_DEMO_WALLET_URL
               value: "https://wallet.walt.id"
           ports:
-            - containerPort: 7101
+            - containerPort: 7104
               name: http-api
 ---
 kind: Service
@@ -200,7 +200,7 @@ spec:
           env:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
               value: "https://wallet.walt.id"
-            - name: NUXT_PUBLIC_DEMO_WALLET_URL
+            - name: NUXT_PUBLIC_DEV_WALLET_URL
               value: "https://wallet-dev.walt.id"
             - name: NUXT_PUBLIC_CREDENTIALS_REPOSITORY_URL
               value: "https://credentials.walt.id"
