@@ -1,6 +1,6 @@
 import RowCredential from '@/components/walt/credential/RowCredential';
 import Dropdown from '@/components/walt/forms/Dropdown';
-import {AuthenticationMethods, VpProfiles} from  '@/types/credentials'
+import { AuthenticationMethods, VpProfiles } from '@/types/credentials'
 import Checkbox from '@/components/walt/forms/Checkbox';
 import InputField from '@/components/walt/forms/Input';
 import Button from '@/components/walt/button/Button';
@@ -115,11 +115,11 @@ export default function IssueSection() {
             <span> Authentication Method</span>
           </div>
         </div>
-        <Dropdown 
-              values={AuthenticationMethods}
-              selected={selectedAuthenticationMethod}
-              setSelected={setSelectedAuthenticationMethod}
-            />
+        <Dropdown
+          values={AuthenticationMethods}
+          selected={selectedAuthenticationMethod}
+          setSelected={setSelectedAuthenticationMethod}
+        />
       </div>
       <div className="mt-3 flex flex-col sm:flex-row justify-between">
         <div className="">
@@ -155,16 +155,16 @@ export default function IssueSection() {
       </div>
 
       <div className="mt-1 flex flex-col sm:flex-row justify-between">
-       <div className="">
+        <div className="">
           <Checkbox value={requireVpProfile} onChange={setRequireVpProfile}>
             VP Token Requested Profile
           </Checkbox>
         </div>
-        <Dropdown 
-              values={VpProfiles}
-              selected={selectedVpProfile}
-              setSelected={setSelectedVpProfile}
-            />
+        <Dropdown
+          values={VpProfiles}
+          selected={selectedVpProfile}
+          setSelected={setSelectedVpProfile}
+        />
       </div>
 
       <hr className="my-5" />
@@ -173,7 +173,11 @@ export default function IssueSection() {
           Cancel
         </Button>
         <Button
-          disabled={!(credentialsToIssue.length > 0 && (credentialsToIssue.length < 2 || credentialsToIssue.filter((cred) => cred.selectedFormat === "SD-JWT + VCDM").length === 0))}
+          disabled={!(credentialsToIssue.length > 0 && (
+            credentialsToIssue.length < 2 ||
+            credentialsToIssue.filter((cred) => cred.selectedFormat === "SD-JWT + W3C VC" || cred.selectedFormat === "SD-JWT + IETF SD-JWT VC").length === credentialsToIssue.length ||
+            credentialsToIssue.filter((cred) => !cred.selectedFormat || cred.selectedFormat === "JWT + W3C VC").length === credentialsToIssue.length
+          ))}
           onClick={handleIssue}>Issue</Button>
       </div>
       <div className="flex flex-col items-center mt-12">
