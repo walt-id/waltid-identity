@@ -2,7 +2,7 @@ package id.walt.did.dids.document.models.service
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.SetSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
@@ -13,20 +13,15 @@ import kotlin.js.JsExport
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable(with = ServiceSerializer::class)
-data class Service(val serviceBlocks: List<ServiceBlock>) {
-
-    init {
-        require(serviceBlocks.isNotEmpty()) { "Service blocks cannot be empty" }
-    }
-}
+data class Service(val serviceBlocks: Set<ServiceBlock>)
 
 object ServiceSerializer : KSerializer<Service> {
-    private val internalSerializer = ListSerializer(ServiceBlock.serializer())
+    private val internalSerializer = SetSerializer(ServiceBlock.serializer())
     override val descriptor: SerialDescriptor = internalSerializer.descriptor
 
     override fun serialize(encoder: Encoder, value: Service) =
         encoder.encodeSerializableValue(
-            ListSerializer(ServiceBlock.serializer()),
+            SetSerializer(ServiceBlock.serializer()),
             value.serviceBlocks,
         )
 
@@ -34,7 +29,7 @@ object ServiceSerializer : KSerializer<Service> {
     override fun deserialize(decoder: Decoder): Service =
         Service(
             decoder.decodeSerializableValue(
-                ListSerializer(ServiceBlock.serializer()),
+                SetSerializer(ServiceBlock.serializer()),
             )
         )
 }
