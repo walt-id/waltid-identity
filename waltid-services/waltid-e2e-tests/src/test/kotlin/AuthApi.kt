@@ -192,7 +192,7 @@ class AuthApi(private val client: HttpClient) {
         )
         private val subjectJWKPrivateKey = PKIXUtils.javaPrivateKeyToJWKKey(subjectKeyPair.private)
 
-        private fun createX5CAccountRequest(key: JWKKey, cert: X509Certificate) = runBlocking {
+        private fun createX5CAccountRequest(key: JWKKey, cert: X509Certificate): AccountRequest = runBlocking {
             X5CAccountRequest(
                 null,
                 key.signJws(
@@ -204,6 +204,34 @@ class AuthApi(private val client: HttpClient) {
                     ),
                 )
             )
+        }
+
+        private suspend fun checkX5CLoginCreatesWallet() = test(
+            name = "/wallet-api/auth/x5c/login - validate wallet api x5c login with trustworthy subject certificate also creates wallet"
+        ) {
+            var tempClient = E2ETest.testHttpClient()
+            val keyPair = keyPairGenerator.generateKeyPair()
+            val dn = X500Name("CN=YeSubject")
+            val cert = PKIXUtils.generateSubjectCertificate(
+                rootCAPrivateKey,
+                keyPair.public,
+                nonExpiredValidFrom,
+                nonExpiredValidTo,
+                rootCADistinguishedName,
+                dn,
+            )
+            val jwkPrivateKey = PKIXUtils.javaPrivateKeyToJWKKey(keyPair.private)
+            Companion.login(
+                client = tempClient,
+                name = "/wallet-api/auth/x5c/login - wallet api x5c login with trustworthy subject certificate",
+                url = "/wallet-api/auth/x5c/login",
+                request = createX5CAccountRequest(jwkPrivateKey, cert)
+            ) {
+                tempClient = E2ETest.testHttpClient(token = it["token"]!!.jsonPrimitive.content)
+            }
+            val response = tempClient.get("/wallet-api/wallet/accounts/wallets").expectSuccess()
+            val accWalletListing = response.body<AccountWalletListing>()
+            assert( accWalletListing.wallets.isNotEmpty())
         }
 
         suspend fun executeTestCases() {
@@ -242,6 +270,7 @@ class AuthApi(private val client: HttpClient) {
                     setBody(createX5CAccountRequest(subjectJWKPrivateKey, nonTrustworthySubjectCert))
                 }.expectFailure()
             }
+            checkX5CLoginCreatesWallet()
         }
     }
 
