@@ -7,10 +7,12 @@ import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
 import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.SDMap
+import id.walt.verifier.oidc.RequestedCredential
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.ktor.client.*
@@ -93,7 +95,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
             contentType(ContentType.Application.Json)
             setBody(
                 buildJsonObject {
-                    put("request_credentials", JsonArray(listOf(JsonPrimitive("org.iso.18013.5.1.mDL"))))
+                    put("request_credentials", JsonArray(listOf(RequestedCredential(format = VCFormat.mso_mdoc, docType = "org.iso.18013.5.1.mDL").let { Json.encodeToJsonElement(it) })))
                     put("trusted_root_cas", JsonArray(listOf(JsonPrimitive(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT))))
                 })
         }
@@ -204,7 +206,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
             contentType(ContentType.Application.Json)
             setBody(
                 buildJsonObject {
-                    put("request_credentials", JsonArray(listOf(JsonPrimitive("identity_credential_vc+sd-jwt"))))
+                    put("request_credentials", JsonArray(listOf(RequestedCredential(format = VCFormat.sd_jwt_vc, vct = "http://localhost:22222/identity_credential").let { Json.encodeToJsonElement(it) })))
                 })
         }
         assertEquals(200, createReqResponse.status.value)
