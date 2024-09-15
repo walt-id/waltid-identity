@@ -1,4 +1,4 @@
-package id.walt.did.dids.registrar.dids.config
+package id.walt.did.dids.registrar.dids
 
 import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.models.service.ServiceEndpoint
