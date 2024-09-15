@@ -6,7 +6,13 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-class DidWebCreateOptions(domain: String, path: String = "", keyType: KeyType = KeyType.Ed25519) : DidCreateOptions(
+class DidWebCreateOptions(
+    domain: String,
+    path: String = "",
+    keyType: KeyType = KeyType.Ed25519,
+    didDocConfig: DidDocConfig? = null,
+) : DidCreateOptions(
     method = "web",
-    config = config("domain" to domain, "path" to path, "keyType" to keyType)
+    config = config("domain" to domain, "path" to path, "keyType" to keyType),
+    didDocConfig = didDocConfig,
 )
