@@ -6,18 +6,22 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 @Serializable(with = VerificationRelationshipSerializer::class)
 data class VerificationRelationship private constructor(
     val id: String?,
     val verificationMethod: VerificationMethod?,
 ) {
     companion object Builder {
-        fun build(id: String): VerificationRelationship {
+        fun buildFromId(id: String): VerificationRelationship {
             return VerificationRelationship(id, null)
         }
 
-        fun build(verificationMethod: VerificationMethod): VerificationRelationship {
+        fun buildFromVerificationMethod(verificationMethod: VerificationMethod): VerificationRelationship {
             return VerificationRelationship(null, verificationMethod)
         }
     }
@@ -32,10 +36,10 @@ object VerificationRelationshipSerializer : KSerializer<VerificationRelationship
             Json.decodeFromJsonElement<VerificationMethod>(value)
         }.fold(
             onSuccess = {
-                return VerificationRelationship.build(it)
+                return VerificationRelationship.buildFromVerificationMethod(it)
             },
             onFailure = {
-                return VerificationRelationship.build(
+                return VerificationRelationship.buildFromId(
                     value.jsonPrimitive.content,
                 )
             }
