@@ -13,6 +13,7 @@ data class PocIdpKitConfiguration(
      * request to walt.id verifier request
      */
     val verifierRequest: JsonObject,
+    val verifierUrl: String,
     /**
      * issuer URL
      */
