@@ -3,6 +3,7 @@ package id.walt.authkit.methods
 import com.nfeld.jsonpathkt.JsonPath
 import com.nfeld.jsonpathkt.kotlinx.resolveAsStringOrNull
 import id.walt.authkit.AuthContext
+import id.walt.authkit.methods.config.AuthMethodConfiguration
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -14,22 +15,46 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.request.*
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.pipeline.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
-class VerifiableCredential : AuthenticationMethod("vc") {
+object VerifiableCredential : AuthenticationMethod("vc") {
 
+    @Serializable
+    data class VerifiableCredentialAuthConfiguration(
+        val verification: Map<String, JsonElement>,
+        //val claimMappings: Map<String, String>? = null,
+        //val redirectUrl: String? = null,
+    ) : AuthMethodConfiguration
+
+    // TODO:
+    val verifierUrl = "http://localhost:7003"
 
     override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
         route("vc", {
 
         }) {
-            get("x") {
+            get("start-presentation") {
                 val session = getSession(authContext)
+                val config = session.lookupConfiguration<VerifiableCredentialAuthConfiguration>(this@VerifiableCredential)
+
+                val redirectUrl = context.request.uri.removeSuffix("/start-presentation") + "/callback"
+
+                val resp = Verifier.verify(verifierUrl, config.verification, redirectUrl)
+
+                context.respond(resp.presentationRequest)
+            }
+            get("callback") {
+                context.respond("handle further...")
+                //val session = getSession(authContext)
+                //context.handleAuthSuccess(session, )
             }
         }
     }
@@ -57,25 +82,31 @@ object Verifier {
         }
     }
 
-    suspend fun verify(redirectUrl: String): Pair<String, String> {
-        val response: HttpResponse = client.post("http://localhost:7003/openid4vc/verify") {
-            setBody(
-                mapOf(
-                    "request_credentials" to listOf("OpenBadgeCredential")
-                )
-            )
-            header("successRedirectUri", redirectUrl)
+    @Serializable
+    data class VerificationSessionResponse(
+        val presentationRequest: String,
+        val state: String,
+    )
+
+    suspend fun verify(verifierUrl: String, verificationRequest: Map<String, JsonElement>, redirectUrl: String? = null): VerificationSessionResponse {
+        val response: HttpResponse = client.post("$verifierUrl/openid4vc/verify") {
+            setBody(verificationRequest)
+
+            redirectUrl?.let {
+                header("successRedirectUri", redirectUrl)
+                header("errorRedirectUri", redirectUrl)
+            }
         }
 
         val presentationRequest = response.bodyAsText()
 
         val state = parseQueryString(presentationRequest).getOrFail("state")
-        return Pair(presentationRequest, state)
+        return VerificationSessionResponse(presentationRequest, state)
     }
 
     @OptIn(ExperimentalEncodingApi::class)
-    suspend fun getVerificationResult(id: String, requestedClaims: List<String>): VerificationResultStatus {
-        val resp = client.get("http://localhost:7003/openid4vc/session/$id").body<JsonObject>()
+    suspend fun getVerificationResult(verifierUrl: String, id: String, requestedClaims: List<String>): VerificationResultStatus {
+        val resp = client.get("$verifierUrl/openid4vc/session/$id").body<JsonObject>()
 
         if (resp["tokenResponse"] == null) {
             return VerificationResultStatus(VerificationStatus.WAITING_FOR_SUBMISSION)
@@ -90,7 +121,6 @@ object Verifier {
         val vp = Json.parseToJsonElement(payload).jsonObject
 
         val did = vp["sub"]!!.jsonPrimitive.content
-        println(did)
 
         val credentials = vp["vp"]!!.jsonObject["verifiableCredential"]!!.jsonArray.map {
             Json.parseToJsonElement(
@@ -99,7 +129,6 @@ object Verifier {
                 ).decodeToString()
             ).jsonObject["vc"]!!.jsonObject
         }
-        println(credentials)
 
         val vc = credentials.first()
 
@@ -109,7 +138,6 @@ object Verifier {
         }.toMap().toMutableMap().apply {
             put("sub", did)
         }
-        println("Claims: $claims")
 
         return VerificationResultStatus(VerificationStatus.RESPONSE_RECEIVED, overall, claims)
     }
