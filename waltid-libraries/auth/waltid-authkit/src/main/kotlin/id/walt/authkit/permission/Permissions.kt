@@ -1,7 +1,9 @@
 package id.walt.authkit.permission
 
+import id.walt.authkit.utils.times
 import kotlinx.serialization.Serializable
 import kotlin.random.Random
+import kotlin.time.measureTime
 
 /*
 
@@ -55,7 +57,7 @@ data class PermissionedResource(val id: String) {
  */
 @Serializable
 data class PermissionedResourceTarget(val id: String) {
-    private val path = id.split(".")
+    val path = id.split(".")
 
     override fun toString(): String {
         return path.joinToString(".")
@@ -89,7 +91,6 @@ enum class PermissionOperation(val symbol: Char) {
 @Serializable
 data class Permission(val target: PermissionedResourceTarget, val permission: String, val operation: PermissionOperation) {
 
-
     override fun toString(): String {
         return "$target${operation.symbol}$permission"
     }
@@ -112,12 +113,25 @@ data class Permission(val target: PermissionedResourceTarget, val permission: St
 
 
 @Serializable
-data class PermissionSet(val id: String, val permissions: List<Permission>) {
+data class PermissionSet(
+    val id: String,
+    val grantPermissions: List<Permission>,
+
+    ) {
     constructor(permissionStrings: List<String>, id: String) : this(
         id,
         permissionStrings.flatMap { Permission.parseFromPermissionString(it) })
 
-    override fun toString(): String = "[PermissionSet \"$id\": ${permissions.joinToString()}]"
+
+    /*
+    companion object {
+        fun fromPermissionList() {
+
+        }
+    }
+     */
+
+    override fun toString(): String = "[PermissionSet \"$id\": ${grantPermissions.joinToString()}]"
 }
 
 
@@ -127,7 +141,7 @@ data class TestUser(val name: String, val roles: List<PermissionSet>) {
     fun checkAccessTo(resource: String, operation: String): Boolean {
         val accessInsights = canAccessResourceInsights(roles, operation, PermissionedResource(resource))
         val accessInsightStr = accessInsights.map { (k, v) ->
-            "YES, due to permission(s) [${v.joinToString()}] of role \"${k.id}\" (${k.permissions})"
+            "YES, due to permission(s) [${v.joinToString()}] of role \"${k.id}\" (${k.grantPermissions})"
         }.let { if (it.isEmpty()) "NO" else it.joinToString() }
 
         println("\"$operation\" on \"$resource\":\n -> $accessInsightStr")
@@ -140,170 +154,375 @@ data class TestUser(val name: String, val roles: List<PermissionSet>) {
 private infix fun String.userWith(roles: List<PermissionSet>) = TestUser(this, roles).also { println("\n== user: $this ==") }
 
 
+/**
+ * A search tree data structure in the form of a compacted Trie (also called Patricia-Trie) for
+ * efficient permission lookup.
+ * Compacting the permissions is reached by having the full target be the search path, and use
+ *  separate tree for the operations.
+ */
+@Serializable
+class PermissionTrie(
+    val root: HashMap<String, PermissionTreeNode> = HashMap<String, PermissionTreeNode>(),
+) {
+
+    override fun toString(): String {
+        val sb = StringBuilder()
+        sb.append("[PermissionTrie]")
+        root.forEach { (_, node) ->
+            sb.append("\n$node")
+        }
+        return sb.toString()
+    }
+
+    @Serializable
+    data class PermissionTreeNode(
+        val thisName: String,
+
+        val permissionMethods: ArrayList<String>,
+        val children: HashMap<String, PermissionTreeNode>,
+    ) {
+        constructor(id: String) : this(id, ArrayList(), HashMap())
+
+        fun toString(index: Int): String {
+            val sb = StringBuilder()
+            sb.append("  " * index + "- $thisName: $permissionMethods")
+            if (children.isNotEmpty()) {
+                children.forEach {
+                    sb.append("\n" + "  " * index + it.value.toString(index + 2))
+                }
+            }
+            return sb.toString()
+        }
+
+        override fun toString(): String {
+            return toString(0)
+        }
+    }
+
+    fun getOrMakeRoot(id: String): PermissionTreeNode = root.getOrPut(id) { PermissionTreeNode(id) }
+
+    fun storePermission(target: PermissionedResourceTarget, permission: String) {
+        val targetPath = target.path
+        val root = getOrMakeRoot(targetPath[0])
+        val remainingTraversals = targetPath.drop(1)
+
+        var currentNode = root
+        remainingTraversals.forEach {
+            currentNode = currentNode.children.getOrPut(it) { PermissionTreeNode(it) }
+        }
+        currentNode.permissionMethods += permission
+    }
+
+    inline fun traverseMatching(
+        target: PermissionedResourceTarget,
+        permission: String,
+        nextTraversal: (String) -> Unit = {},
+        onMatch: () -> Unit,
+    ): Unit? {
+        val targetPath = target.path
+        val root = root[targetPath[0]] ?: return null
+        val remainingTraversals = targetPath.drop(1)
+
+        var currentNode = root
+        remainingTraversals.forEach {
+            if (currentNode.permissionMethods.contains(permission)) {
+                onMatch.invoke()
+            }
+            currentNode = currentNode.children[it] ?: currentNode.children["*"] ?: return null
+            nextTraversal.invoke(it)
+        }
+        if (currentNode.permissionMethods.contains(permission)) {
+            onMatch.invoke()
+        }
+        return Unit
+    }
+
+    fun hasAny2(target: PermissionedResourceTarget, permission: String): Boolean {
+        traverseMatching(target, permission) {
+            return true
+        }
+        return false
+    }
+
+    fun findAll2(target: PermissionedResourceTarget, permission: String): List<String>? {
+        val matching = ArrayList<String>()
+
+        var currentPath = target.path[0]
+        traverseMatching(target, permission, nextTraversal = { currentPath += ".$it" }) {
+            matching.add(currentPath)
+        }
+        return matching
+    }
+
+    /**
+     * @param target example: organization1.tenant1.resource1
+     * @param permission example: use
+     */
+    fun hasAnyMatching(target: PermissionedResourceTarget, permission: String): Boolean {
+        val targetPath = target.path
+        val root = root[targetPath[0]] ?: return false
+        val remainingTraversals = targetPath.drop(1)
+
+        var currentNode = root
+        remainingTraversals.forEach {
+            if (currentNode.permissionMethods.contains(permission)) return true
+            currentNode = currentNode.children[it] ?: currentNode.children["*"] ?: return false
+        }
+        return currentNode.permissionMethods.contains(permission)
+    }
+
+    fun findAllMatching(target: PermissionedResourceTarget, permission: String): List<String>? {
+        val targetPath = target.path
+        val root = root[targetPath[0]] ?: return null
+        val remainingTraversals = targetPath.drop(1)
+
+        val matching = ArrayList<String>()
+
+        var currentPath = targetPath[0]
+        var currentNode = root
+        remainingTraversals.forEach {
+            if (currentNode.permissionMethods.contains(permission)) matching.add(currentPath)
+            currentNode = currentNode.children[it] ?: currentNode.children["*"] ?: return matching
+            currentPath += ".$it"
+        }
+        if (currentNode.permissionMethods.contains(permission)) matching.add(currentPath)
+        return matching
+    }
+}
+
+class PermissionChecker() {
+
+    val allowTrie = PermissionTrie()
+    val denyTrie = PermissionTrie()
+
+
+}
+
+/*
+
+
+
+
+ */
+
 fun main() {
-    /*
-     * Alice is allowed to operate the diploma issuers of the
-     * - engineering sciences departments of University1,
-     * - colleges of ETH Lausanne
-     * - private (non-universitygroup) SBS University
-     */
+
+
+    val trie = PermissionTrie()
+
     ("alice" userWith listOf(
-        "universitygroup.university1.engineering_sciences.diploma_manager" permissions listOf(
-            "universitygroup.university1.departement_informatics.diploma_issuer1:+issue,+config",
-            "universitygroup.university1.departement_informatics.diploma_issuer2:+issue,+config",
-            "universitygroup.university1.departement_biosystems.diploma_issuer:+issue,+config",
-            "universitygroup.university1.departement_material_sc.diploma_issuer:+issue,+config",
-            "universitygroup.university1.departement_electrical_eng.diploma_issuer:+issue,+config",
-            "universitygroup.university1.departement_mechanical_eng.diploma_issuer:+issue,+config",
+        "a" permissions listOf(
+            "orgA.tenant1.resource1:+issue"
         ),
-        "universitygroup.university2.colleges_diploma_manager" permissions listOf(
-            "universitygroup.university2.college_humanities.diploma_issuer1:+issue,+config",
-            "universitygroup.university2.college_technology.diploma_issuer1:+issue,+config"
-        ),
-        "universityX.diploma_issuer" permissions listOf(
-            "universityX.diploma_issuer1:+issue",
-            "universityX.diploma_issuer2:+issue",
-            "universityX.diploma_issuer3:+issue",
+        "b" permissions listOf(
+            "orgB.tenant2.resource2:+issue"
         )
     )).apply {
-        checkAccessTo("universitygroup.university1.departement_informatics.diploma_issuer1", "issue") expect true
-        checkAccessTo("universitygroup.university2.college_humanities.diploma_issuer1", "config") expect true
-    }
-
-    /*
-     * Bob is allowed to:
-     * - operate the certificate courses issuer
-     */
-    ("bob" userWith listOf(
-        "universityX.user.bob" permissions listOf(
-            "universityX.certificate_courses.investment_banking.certificate_issuer:+issue",
-        )
-    )).apply {
-        checkAccessTo("universitygroup.university1.departement_informatics.diploma_issuer1", "issue") expect false
-
-        checkAccessTo("universityX.certificate_courses.commodities_hedging.certificate_issuer", "issue") expect false
-        checkAccessTo("universityX.certificate_courses.investment_banking.certificate_issuer", "issue") expect true
-    }
-
-    /*
-     * Charlie:
-     * -
-     */
-    ("charlie" userWith listOf(
-        "universityX.certificate_issuer" permissions listOf(
-            "universityX.certificate_courses.*.certificate_issuer:+issue"
-        )
-    )).apply {
-        checkAccessTo("universityX.certificate_courses.commodities_hedging.certificate_issuer", "issue") expect true
-        checkAccessTo("universityX.certificate_courses.investment_banking.certificate_issuer", "issue") expect true
-    }
-
-    /*
-     * Diana:
-     * - has full authority over all services belonging to Univerity2
-     * - view (read-only) configuration of the Informatics department of University1
-     */
-    ("diana" userWith listOf(
-        "universitygroup.university2.superadmin" permissions listOf(
-            "universitygroup.university2:+all"
-        ),
-        "universitygroup.university1.departement_informatics.config_guest" permissions listOf(
-            "universitygroup.university1.departement_informatics:+view"
-        )
-    )).apply {
-        checkAccessTo("universitygroup.university1.departement_informatics.diploma_issuer1", "issue") expect false
-        checkAccessTo("universitygroup.university1.departement_informatics.diploma_issuer1", "view") expect true
-
-
-        checkAccessTo("universitygroup.university2.tenant${Random.nextInt()}", "delete") expect true
-    }
-}
-
-
-fun main2() {
-    val globalRoles = listOf(
-        "customerAbc.owner" permissions listOf("customerAbc:+all,-download"),
-        "customerXyz.owner" permissions listOf("customerXyz:+all"),
-        "customerXyz.tenant1.administrator" permissions listOf("customerXyz.tenant1:+all"),
-        "customerAbc.tenant1.issuer2.key_manager" permissions listOf("customerAbc.tenant1.issuer2.keys:+all"),
-        "customerAbc.tenant2.contractor" permissions listOf("customerAbc.tenant2:+all", "customerAbc.tenant2.*.keys:-download")
-    )
-
-    globalRoles.forEach {
-        println(it)
-    }
-
-    val resources = listOf(
-        "customerAbc",
-        "customerXyz",
-        "customerAbc.tenant1",
-        "customerAbc.tenant1.issuer1",
-        "customerAbc.tenant1.issuer2",
-        "customerAbc.tenant2.issuer2.keys.key1",
-        "customerAbc.tenant2.issuer2.keys.key2",
-        "customerAbc.tenant2.issuer2.user.key1",
-        "customerAbc.tenant2.issuer2.keys.subkeys.key1",
-        "customerXyz.tenant2"
-    ).map { PermissionedResource(it) }
-
-
-    infix fun String.testUserOf(roles: List<String>): TestUser {
-        val effectiveRoles = roles.map { roleName -> globalRoles.first { it.id == roleName } }
-        return TestUser(this, effectiveRoles)
-    }
-
-    val alice = "alice" testUserOf listOf(
-        "customerAbc.owner"
-    )
-    val bob = "bob" testUserOf listOf(
-        "customerXyz.tenant1.administrator",
-        "customerAbc.tenant2.contractor"
-    )
-    val charles = "charles" testUserOf listOf("customerAbc.tenant1.issuer2.key_manager")
-
-    val users = listOf(alice, bob, charles)
-
-    users.forEach { user ->
-        println("== User ${user.name} ==")
-        user.roles.forEach { role -> println("- $role") }
-
-        resources.forEach { resource ->
-            val accessInsights = canAccessResourceInsights(user.roles, "view", resource)
-            val accessInsightStr = accessInsights.map { (k, v) ->
-                "YES, due to ${v.joinToString()} of ${k.id} (${k.permissions})"
-            }.let { if (it.isEmpty()) "NO" else it.joinToString() }
-
-            println("${user.name} on ${resource.id}: $accessInsightStr")
+        this.roles.forEach {
+            it.grantPermissions.forEach {
+                trie.storePermission(it.target, it.permission)
+            }
         }
     }
 
-}
+    trie.findAllMatching(PermissionedResourceTarget(""), "")
+    trie.findAll2(PermissionedResourceTarget(""), "")
 
-fun canAccessResourceInsights(
-    roles: List<PermissionSet>,
-    operation: String,
-    resource: PermissionedResource,
-): Map<PermissionSet, List<Permission>> {
-    val accessCause = roles.associateWith { role ->
-        role.permissions.filter { p ->
-            if (p.target.targets(resource)
-            //.also { println("Does ${p.target} target ${resource.id}? $it") }
-            ) {
-                p.permission == operation || p.permission == "all"
-            } else false
+    val checks1 = (1..10000).map {
+        PermissionedResourceTarget("org" + (1..99).random() + "." + "tenant" + (1..99).random() + ".resource" + (1..99).random())
+    }
+    val checks2 = (1..10000).map {
+        PermissionedResourceTarget("org" + (1..99).random() + "." + "tenant" + (1..99).random() + ".resource" + (1..99).random())
+    }
+
+    trie.findAllMatching(checks1.first(), "test")
+    trie.findAll2(checks1.first(), "test")
+    trie.hasAnyMatching(checks1.first(), "test")
+    trie.hasAny2(checks1.first(), "test")
+
+
+    println("X2: ${measureTime { checks2.forEach { trie.hasAny2(it, "abc") } }}")
+    println("X1: ${measureTime { checks1.forEach { trie.hasAnyMatching(it, "abc") } }}")
+
+    println("2: ${measureTime { checks2.forEach { trie.hasAny2(it, "abc") } }}")
+    println("1: ${measureTime { checks1.forEach { trie.hasAnyMatching(it, "abc") } }}")
+    println("2: ${measureTime { checks2.forEach { trie.findAll2(it, "abc") } }}")
+    println("1: ${measureTime { checks1.forEach { trie.findAllMatching(it, "abc") } }}")
+
+}
+    fun main3() {
+        /*
+         * Alice is allowed to operate the diploma issuers of the
+         * - engineering sciences departments of University1,
+         * - colleges of University2
+         * - private (non-universitygroup) UniversityX
+         */
+        ("alice" userWith listOf(
+            "universitygroup.university1.engineering_sciences.diploma_manager" permissions listOf(
+                "universitygroup.university1.departement_informatics.diploma_issuer1:+issue,+config",
+                "universitygroup.university1.departement_informatics.diploma_issuer2:+issue,+config",
+                "universitygroup.university1.departement_biosystems.diploma_issuer:+issue,+config",
+                "universitygroup.university1.departement_material_sc.diploma_issuer:+issue,+config",
+                "universitygroup.university1.departement_electrical_eng.diploma_issuer:+issue,+config",
+                "universitygroup.university1.departement_mechanical_eng.diploma_issuer:+issue,+config",
+            ),
+            "universitygroup.university2.colleges_diploma_manager" permissions listOf(
+                "universitygroup.university2.college_humanities.diploma_issuer1:+issue,+config",
+                "universitygroup.university2.college_technology.diploma_issuer1:+issue,+config"
+            ),
+            "universityX.diploma_issuer" permissions listOf(
+                "universityX.diploma_issuer1:+issue",
+                "universityX.diploma_issuer2:+issue",
+                "universityX.diploma_issuer3:+issue",
+            )
+        )).apply {
+            checkAccessTo("universitygroup.university1.departement_informatics.diploma_issuer1", "issue") expect true
+            checkAccessTo("universitygroup.university2.college_humanities.diploma_issuer1", "config") expect true
         }
-    }.filterValues { it.isNotEmpty() }
 
-    return accessCause
-}
+        /*
+         * Bob is allowed to:
+         * - operate the certificate courses issuer
+         */
+        ("bob" userWith listOf(
+            "universityX.user.bob" permissions listOf(
+                "universityX.certificate_courses.investment_banking.certificate_issuer:+issue",
+            )
+        )).apply {
+            checkAccessTo("universitygroup.university1.departement_informatics.diploma_issuer1", "issue") expect false
 
-fun canAccessResource(roles: List<PermissionSet>, operation: String, resource: PermissionedResource): Boolean {
-    return roles.any {
-        it.permissions.any {
-            if (it.target.targets(resource)) {
-                it.permission == operation || it.permission == "all"
-            } else false
+            checkAccessTo("universityX.certificate_courses.commodities_hedging.certificate_issuer", "issue") expect false
+            checkAccessTo("universityX.certificate_courses.investment_banking.certificate_issuer", "issue") expect true
+        }
+
+        /*
+         * Charlie:
+         * -
+         */
+        ("charlie" userWith listOf(
+            "universityX.certificate_issuer" permissions listOf(
+                "universityX.certificate_courses.*.certificate_issuer:+issue"
+            )
+        )).apply {
+            checkAccessTo("universityX.certificate_courses.commodities_hedging.certificate_issuer", "issue") expect true
+            checkAccessTo("universityX.certificate_courses.investment_banking.certificate_issuer", "issue") expect true
+        }
+
+
+        /*
+         Role to give:  [  Guest  ]
+         */
+
+
+        /*
+         * Diana:
+         * - has full authority over all services belonging to University2
+         * - view (read-only) configuration of the Informatics department of University1
+         */
+        ("diana" userWith listOf(
+            "universitygroup.university2.superadmin" permissions listOf(
+                "universitygroup.university2:+all"
+            ),
+            "universitygroup.!user.diana" permissions listOf(
+                "universitygroup:+xyz"
+            ),
+            "universitygroup.university1.departement_informatics.config_guest" permissions listOf(
+                "universitygroup.university1.departement_informatics:+view"
+            )
+        )).apply {
+            checkAccessTo("universitygroup.university1.departement_informatics.diploma_issuer1", "issue") expect false
+            checkAccessTo("universitygroup.university1.departement_informatics.diploma_issuer1", "view") expect true
+
+
+            checkAccessTo("universitygroup.university2.tenant${Random.nextInt()}", "delete") expect true
         }
     }
-}
+
+
+    fun main2() {
+        val globalRoles = listOf(
+            "customerAbc.owner" permissions listOf("customerAbc:+all,-download"),
+            "customerXyz.owner" permissions listOf("customerXyz:+all"),
+            "customerXyz.tenant1.administrator" permissions listOf("customerXyz.tenant1:+all"),
+            "customerAbc.tenant1.issuer2.key_manager" permissions listOf("customerAbc.tenant1.issuer2.keys:+all"),
+            "customerAbc.tenant2.contractor" permissions listOf("customerAbc.tenant2:+all", "customerAbc.tenant2.*.keys:-download")
+        )
+
+        globalRoles.forEach {
+            println(it)
+        }
+
+        val resources = listOf(
+            "customerAbc",
+            "customerXyz",
+            "customerAbc.tenant1",
+            "customerAbc.tenant1.issuer1",
+            "customerAbc.tenant1.issuer2",
+            "customerAbc.tenant2.issuer2.keys.key1",
+            "customerAbc.tenant2.issuer2.keys.key2",
+            "customerAbc.tenant2.issuer2.user.key1",
+            "customerAbc.tenant2.issuer2.keys.subkeys.key1",
+            "customerXyz.tenant2"
+        ).map { PermissionedResource(it) }
+
+
+        infix fun String.testUserOf(roles: List<String>): TestUser {
+            val effectiveRoles = roles.map { roleName -> globalRoles.first { it.id == roleName } }
+            return TestUser(this, effectiveRoles)
+        }
+
+        val alice = "alice" testUserOf listOf(
+            "customerAbc.owner"
+        )
+        val bob = "bob" testUserOf listOf(
+            "customerXyz.tenant1.administrator",
+            "customerAbc.tenant2.contractor"
+        )
+        val charles = "charles" testUserOf listOf("customerAbc.tenant1.issuer2.key_manager")
+
+        val users = listOf(alice, bob, charles)
+
+        users.forEach { user ->
+            println("== User ${user.name} ==")
+            user.roles.forEach { role -> println("- $role") }
+
+            resources.forEach { resource ->
+                val accessInsights = canAccessResourceInsights(user.roles, "view", resource)
+                val accessInsightStr = accessInsights.map { (k, v) ->
+                    "YES, due to ${v.joinToString()} of ${k.id} (${k.grantPermissions})"
+                }.let { if (it.isEmpty()) "NO" else it.joinToString() }
+
+                println("${user.name} on ${resource.id}: $accessInsightStr")
+            }
+        }
+
+    }
+
+    fun canAccessResourceInsights(
+        roles: List<PermissionSet>,
+        operation: String,
+        resource: PermissionedResource,
+    ): Map<PermissionSet, List<Permission>> {
+        val allowCause = roles.associateWith { role ->
+            role.grantPermissions.filter { p ->
+                if (p.target.targets(resource)
+                //.also { println("Does ${p.target} target ${resource.id}? $it") }
+                ) {
+                    p.permission == operation || p.permission == "all"
+                } else false
+            }
+        }.filterValues { it.isNotEmpty() }
+
+        return allowCause
+    }
+
+    fun canAccessResource(roles: List<PermissionSet>, operation: String, resource: PermissionedResource): Boolean {
+        return roles.any {
+            it.grantPermissions.any {
+                if (it.target.targets(resource)) {
+                    it.permission == operation || it.permission == "all"
+                } else false
+            }
+        }
+    }
 
