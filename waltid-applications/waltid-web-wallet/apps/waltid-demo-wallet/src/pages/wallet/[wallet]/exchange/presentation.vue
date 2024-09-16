@@ -30,7 +30,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                         </svg>
                     </button>
-                    <VerifiableCredentialCard :credential="{
+                    <VerifiableCredentialCard :key="index" :credential="{
                         document: matchedCredentials[index].document
                     }" class="sm:w-[400px]" />
                     <button v-if="matchedCredentials.length > 1" @click="index++"
