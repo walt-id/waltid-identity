@@ -273,23 +273,11 @@ fun Application.test() {
 
             val authReq = authCache[state] ?: error("No such state: $state")
 
-            /*"$.name",
-                "$.credentialSubject.achievement.description",
-                "$.credentialSubject.achievement.criteria.narrative"*/
-            val requestedClaims = mapOf(
-                "id" to "$.credentialSubject.id",
-                "familyName" to "$.credentialSubject.familyName",
-                "firstName" to "$.credentialSubject.firstName",
-                "dateOfBirth" to "$.credentialSubject.dateOfBirth",
-                "personalIdentifier" to "$.credentialSubject.personalIdentifier",
-                "placeOfBirth" to "$.credentialSubject.placeOfBirth",
-                "currentAddress" to "$.credentialSubject.currentAddress",
-                "gender" to "$.credentialSubject.gender",
-            )
+            val requestedClaims = config.claimMapping
 
             val time = Clock.System.now()
 
-            if (debug == "autologin") {
+            if (debug == "autologin" && config.enableDebug) {
                 val generatedCode = Uuid.random().toString()
 
                 loginResultCache[generatedCode] = LoginData(
