@@ -159,7 +159,7 @@ private fun Map<String, List<String>>.dropCommonHeaders(): Map<String, List<Stri
 
 val key by lazy { JWK.parse(config.key.trimIndent()).toOctetKeyPair() }
 
-val signer = Ed25519Signer(key)
+val signer by lazy { Ed25519Signer(key) }
 
 
 fun signPayload(payload: JsonObject) = JWSObject(
