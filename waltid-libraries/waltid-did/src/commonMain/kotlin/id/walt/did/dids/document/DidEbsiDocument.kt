@@ -1,5 +1,6 @@
 package id.walt.did.dids.document
 
+import id.walt.did.dids.DidUtils
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import kotlin.js.ExperimentalJsExport
@@ -10,7 +11,7 @@ import kotlin.js.JsName
 @OptIn(ExperimentalSerializationApi::class, ExperimentalJsExport::class)
 @Serializable
 data class DidEbsiDocument(
-    @EncodeDefault @SerialName("@context") val context: List<String> = DEFAULT_CONTEXT,
+    @EncodeDefault @SerialName("@context") val context: List<String> = DidUtils.DEFAULT_CONTEXT,
     val id: String, // did:ebsi:
     val controller: List<String>?,
     val verificationMethod: List<VerificationMethod>?,
@@ -21,8 +22,6 @@ data class DidEbsiDocument(
     val keyAgreement: List<String>?,
 ) {
     companion object {
-        private val DEFAULT_CONTEXT =
-            listOf("https://www.w3.org/ns/did/v1", "https://w3id.org/security/suites/jws-2020/v1")
         private val json = Json {
             explicitNulls = false
         }
@@ -40,7 +39,7 @@ data class DidEbsiDocument(
 
     @JsName("secondaryConstructor")
     constructor(didDoc: DidDocument) : this(
-        context = DEFAULT_CONTEXT,
+        context = DidUtils.DEFAULT_CONTEXT,
         id = didDoc["id"]!!.jsonPrimitive.content,
         controller = didDoc["controller"]?.jsonArray?.map {
             it.jsonPrimitive.content
