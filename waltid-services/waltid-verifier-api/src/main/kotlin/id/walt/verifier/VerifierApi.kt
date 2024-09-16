@@ -360,7 +360,7 @@ fun Application.verfierApi() {
                     call.respondText(it, ContentType.parse("application/oauth-authz-req+jwt"), HttpStatusCode.OK)
                 }.onFailure {
                     logger.debug(it) { "Cannot view request session ($it)" }
-                    throw NotFoundException(it.localizedMessage)
+                    throw NotFoundException(it.message)
                 }
             }
         }
@@ -441,7 +441,7 @@ fun Application.verfierApi() {
     }
 }
 
-private fun getErrorDescription(it: Throwable): String? = when (it.localizedMessage) {
+private fun getErrorDescription(it: Throwable): String? = when (it.message) {
     "Verification policies did not succeed: expired" ->
         "<\$presentation_submission.descriptor_map[x].id> is expired"
 
@@ -471,7 +471,7 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.processVerificationFa
     sessionId: String?
 ) {
     logger.debug(it) { "Verification failed ($it)" }
-    val errorDescription = it.localizedMessage
+    val errorDescription = it.message ?: "Verification failed"
     logger.error { "Error: $errorDescription" }
     if (sessionId != null) {
         processError(sessionId, it)
