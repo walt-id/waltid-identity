@@ -1,14 +1,21 @@
 package id.walt.webwallet.utils
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import java.io.InputStream
-import java.util.*
+import java.util.Base64
+import java.util.BitSet
 
 @OptIn(ExperimentalStdlibApi::class)
 object StringUtils {
     fun hexToInt(hex: String) = hex.removePrefix("0x").hexToInt()
     fun hexToByteArray(hex: String) = hex.removePrefix("0x").hexToByteArray()
     fun binToInt(bin: String) = bin.toInt(2)
+
+
+    fun String.couldBeJsonObject() = trim().let { s -> s.startsWith("{") && s.endsWith("}") }
+    fun String.parseAsJsonObject() = runCatching { Json.parseToJsonElement(this).jsonObject }
 }
 
 object HttpUtils {
