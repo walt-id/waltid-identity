@@ -39,9 +39,8 @@ data class DidDocConfig(
             "context",
             "id",
             "verificationMethod",
-            VerificationRelationshipType.entries.map { it.toString() },
             "service",
-        )
+        ) + VerificationRelationshipType.entries.map { it.toString() }
     }
 
     init {
