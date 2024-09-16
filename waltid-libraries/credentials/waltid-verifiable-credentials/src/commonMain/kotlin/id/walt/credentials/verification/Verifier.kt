@@ -6,6 +6,7 @@ import id.walt.credentials.verification.models.PresentationResultEntry
 import id.walt.credentials.verification.models.PresentationVerificationResponse
 import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -21,6 +22,8 @@ import kotlin.time.measureTime
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 object Verifier {
+
+    private val log = KotlinLogging.logger {  }
 
     private fun JsonObject.getW3CType() = (this["type"] ?: this["vc"]?.jsonObject?.get("type") ?: this["vp"]?.jsonObject?.get("type")
     ?: throw IllegalArgumentException("No `type` supplied: $this")).let {
