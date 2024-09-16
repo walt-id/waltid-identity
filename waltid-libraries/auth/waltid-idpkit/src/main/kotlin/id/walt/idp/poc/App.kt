@@ -156,19 +156,7 @@ private fun Map<String, List<String>>.dropCommonHeaders(): Map<String, List<Stri
     }
 
 @Language("JSON")
-val key = JWK.parse(
-    """
-    {
-        "kty": "OKP",
-        "d": "pCMQnXqseWk4n9qxKdZLt0sFtsHctpp8UxcWXLT-DWM",
-        "use": "sig",
-        "crv": "Ed25519",
-        "kid": "qdMPKNb3dnFU8ZE2AJ_Hh5BkCHnHW-Rid27wrGvFwrs",
-        "x": "0W7qYEubjsDFUEtmiY8e9oUj9pHHsFJpkW_QpFN93F4",
-        "alg": "EdDSA"
-    }
-""".trimIndent()
-).toOctetKeyPair()
+val key = JWK.parse(config.key.trimIndent()).toOctetKeyPair()
 
 val signer = Ed25519Signer(key)
 
@@ -195,7 +183,7 @@ fun Application.test() {
 
         // Step 0. (call by RP)
         get(".well-known/openid-configuration") {
-            val issuer = "http://localhost:8080"
+            val issuer = config.issuer
 
             val wellKnown = mapOf(
                 "issuer" to issuer,
@@ -393,7 +381,7 @@ fun Application.test() {
             val accessToken = signPayload(
                 Json.encodeToJsonElement(
                     CustomAccessToken(
-                        iss = "http://localhost:8080",
+                        iss = config.issuer,
                         sub = "x",
                         aud = listOf("my-client-id"), // TODO: OIDC client id
                         exp = Clock.System.now().plus(365.days),
@@ -408,7 +396,7 @@ fun Application.test() {
             tokenClaimCache[accessToken] = claims
 
             /*val accessToken = signPayload(mapOf(
-                "iss" to "http://localhost:8080", // TODO: url here
+                "iss" to config.issuer, // TODO: url here
                 "aud" to "my-client-id", // TODO: OIDC client id
                 "exp" to
 
@@ -417,7 +405,7 @@ fun Application.test() {
             ))*/
 
             val idTokenData = IdToken(
-                iss = "http://localhost:8080",
+                iss = config.issuer,
                 sub = claims["sub"]!!,
                 aud = listOf("my-client-id"), // TODO: OIDC client id
                 exp = Clock.System.now().plus(365.days),
