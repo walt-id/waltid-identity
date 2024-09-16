@@ -167,9 +167,9 @@ class TestCredentialWallet(
         println("=== GENERATING PRESENTATION FOR VP TOKEN - Session: $session")
 
         val selectedCredentials =
-            HACK_outsideMappedSelectedCredentialsPerSession[session.authorizationRequest!!.state + session.authorizationRequest.presentationDefinition]!!
+            HACK_outsideMappedSelectedCredentialsPerSession[session.authorizationRequest!!.state]!!
         val selectedDisclosures =
-            HACK_outsideMappedSelectedDisclosuresPerSession[session.authorizationRequest.state + session.authorizationRequest.presentationDefinition]
+            HACK_outsideMappedSelectedDisclosuresPerSession[session.authorizationRequest.state]
 
         println("Selected credentials: $selectedCredentials")
 //        val matchedCredentials = walletService.getCredentialsByIds(selectedCredentials)

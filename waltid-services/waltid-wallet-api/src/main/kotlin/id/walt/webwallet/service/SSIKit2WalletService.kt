@@ -195,10 +195,10 @@ class SSIKit2WalletService(
 
         logger.debug { "Using presentation request, selected credentials: ${parameter.selectedCredentials}" }
 
-        SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[authReq.state + authReq.presentationDefinition] =
+        SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[authReq.state!!] =
             parameter.selectedCredentials
         if (parameter.disclosures != null) {
-            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[authReq.state + authReq.presentationDefinition] =
+            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[authReq.state!!] =
                 parameter.disclosures
         }
 
