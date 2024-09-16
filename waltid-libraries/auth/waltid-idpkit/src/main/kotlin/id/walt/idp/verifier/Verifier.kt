@@ -2,6 +2,7 @@ package id.walt.idp.verifier
 
 import com.nfeld.jsonpathkt.JsonPath
 import com.nfeld.jsonpathkt.kotlinx.resolveAsStringOrNull
+import id.walt.idp.poc.config
 import id.walt.idp.utils.JsonUtils.toJsonObject
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -40,7 +41,7 @@ object Verifier {
     }
 
     suspend fun verify(request: Map<String, Any>, redirectUrl: String): Pair<String, String> {
-        val response: HttpResponse = client.post("http://localhost:7003/openid4vc/verify") {
+        val response: HttpResponse = client.post(config.verifierUrl + "/openid4vc/verify") {
             setBody(
                 request.toJsonObject()
             )
@@ -58,7 +59,7 @@ object Verifier {
      * @param requestedClaims provide a map in the form of {claimName=JSON-path-to-attribute}
      */
     suspend fun getVerificationResult(id: String, requestedClaims: Map<String, String>): VerificationResultStatus {
-        val resp = client.get("http://localhost:7003/openid4vc/session/$id").body<JsonObject>()
+        val resp = client.get(config.verifierUrl + "/openid4vc/session/$id").body<JsonObject>()
 
         if (resp["tokenResponse"] == null) {
             return VerificationResultStatus(VerificationStatus.WAITING_FOR_SUBMISSION)

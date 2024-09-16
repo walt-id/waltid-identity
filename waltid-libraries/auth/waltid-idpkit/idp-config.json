@@ -7,6 +7,7 @@
   "redirectUrl": "http://localhost:8080/login",
   "walletUrl": "http://localhost:7101/api/siop/initiatePresentation",
   "enableDebug": true,
+  "verifierUrl": "http://localhost:7003",
   "claimMapping": {
     "id": "$.credentialSubject.id",
     "familyName": "$.credentialSubject.familyName",
