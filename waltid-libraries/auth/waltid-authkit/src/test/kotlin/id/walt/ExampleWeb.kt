@@ -4,10 +4,7 @@ import id.walt.authkit.AuthContext
 import id.walt.authkit.auth.authKit
 import id.walt.authkit.auth.getAuthenticatedSession
 import id.walt.authkit.flows.AuthFlow
-import id.walt.authkit.methods.TOTP
-import id.walt.authkit.methods.UserPass
-import id.walt.authkit.methods.registerAuthenticationMethod
-import id.walt.authkit.methods.registerAuthenticationMethods
+import id.walt.authkit.methods.*
 import id.walt.authkit.sessions.SessionManager
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -74,7 +71,7 @@ fun Route.globalImplicitMultiStep() {
 }
 
 fun Route.globalExplicitMultiStep() {
-    route("flow-global2") {
+    route("global-explicit2") {
         val methods = listOf(UserPass, TOTP)
 
         val contextFunction: PipelineContext<Unit, ApplicationCall>.() -> AuthContext = {
@@ -105,6 +102,40 @@ fun Route.globalExplicitMultiStep() {
             context.respond(session.toInformation())
         }
     }
+}
+
+fun Route.globalImplicitVc() {
+    route("global-implicit-vc") {
+        @Language("JSON")
+        val flowConfig = """
+        {
+            "method": "vc",
+            "config": {
+                "verification": {
+                    "request_credentials": [
+                        "OpenBadgeCredential"
+                    ]
+                }
+            },
+            "ok": true
+        }
+    """.trimIndent()
+        val authFlow = AuthFlow.fromConfig(flowConfig)
+
+
+        val contextFunction: PipelineContext<Unit, ApplicationCall>.() -> AuthContext = {
+            AuthContext(
+                tenant = call.request.host(),
+                sessionId = call.parameters["sessionId"],
+                implicitSessionGeneration = true,
+                initialFlow = authFlow
+            )
+        }
+
+        registerAuthenticationMethod(VerifiableCredential, contextFunction)
+    }
+
+
 }
 
 /*fun Route.accountImplicitMultiStep() {
@@ -150,6 +181,8 @@ fun Route.authFlowRoutes() {
     globalImplicitSingleStep()
     globalImplicitMultiStep()
     globalExplicitMultiStep()
+
+    globalImplicitVc()
 
     // Account flows (account specifies flow)
     //accountImplicitMultiStep()
