@@ -157,8 +157,7 @@ private fun Map<String, List<String>>.dropCommonHeaders(): Map<String, List<Stri
         )
     }
 
-@Language("JSON")
-val key = JWK.parse(config.key.trimIndent()).toOctetKeyPair()
+val key by lazy { JWK.parse(config.key.trimIndent()).toOctetKeyPair() }
 
 val signer = Ed25519Signer(key)
 
