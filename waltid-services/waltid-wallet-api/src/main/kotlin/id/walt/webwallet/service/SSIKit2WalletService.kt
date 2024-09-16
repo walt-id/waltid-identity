@@ -52,6 +52,8 @@ import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.usecase.event.EventLogUseCase
+import id.walt.webwallet.utils.StringUtils.couldBeJsonObject
+import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
 import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -268,11 +270,11 @@ class SSIKit2WalletService(
                 Result.failure(
                     PresentationError(
                         message =
-                        if (httpResponseBody != null) {
-                            Json.parseToJsonElement(httpResponseBody).jsonObject["message"]?.jsonPrimitive?.content
+                        httpResponseBody?.let {
+                            if (it.couldBeJsonObject()) it.parseAsJsonObject().getOrNull()?.get("message")?.jsonPrimitive?.content
                                 ?: "Presentation failed"
-                        }
-                        else "Presentation failed",
+                            else it
+                        } ?: "Presentation failed",
                         redirectUri = ""
                     )
                 )
@@ -500,7 +502,7 @@ class SSIKit2WalletService(
                 is UnsupportedMediaTypeException -> throw throwable
                 is ConflictException -> throw throwable
                 is IllegalStateException -> throw throwable
-                else -> throw BadRequestException("Unexpected error occurred: ${throwable.localizedMessage}", throwable)
+                else -> throw BadRequestException("Unexpected error occurred: ${throwable.message}", throwable)
             }
         }
     }
