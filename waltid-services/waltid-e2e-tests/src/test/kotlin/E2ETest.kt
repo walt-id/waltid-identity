@@ -5,6 +5,7 @@ import id.walt.commons.web.plugins.httpJson
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.AccountWalletListing
@@ -232,7 +233,8 @@ class E2ETest {
             lspPotentialWallet.testMDocIssuance()
             lspPotentialWallet.testMdocPresentation()
             lspPotentialWallet.testSDJwtVCIssuance()
-            lspPotentialWallet.testSDJwtPresentation()
+            lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
+            lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
 
             //endregion -Exchange / presentation-
 
@@ -303,7 +305,8 @@ class E2ETest {
             lspPotentialWallet.testMdocPresentation()
 
             lspPotentialWallet.testSDJwtVCIssuance()
-            lspPotentialWallet.testSDJwtPresentation()
+            lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
+            lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
         }
     }
 

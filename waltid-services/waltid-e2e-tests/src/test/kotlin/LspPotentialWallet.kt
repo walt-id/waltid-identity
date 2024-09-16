@@ -6,10 +6,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
-import id.walt.oid4vc.data.AuthenticationMethod
-import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.data.CredentialOffer
-import id.walt.oid4vc.data.OpenIDProviderMetadata
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
@@ -170,10 +167,10 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         runBlocking { issuedSDJwtVCId = fetchedCredential.id }
     }
 
-    suspend fun testSDJwtPresentation() = E2ETestWebService.test("test sd-jwt-vc presentation") {
+    suspend fun testSDJwtPresentation(profile: OpenId4VPProfile) = E2ETestWebService.test("test sd-jwt-vc presentation") {
         val createReqResponse = client.post("/openid4vc/verify") {
             header("authorizeBaseUrl", "openid4vp://")
-            header("openId4VPProfile", "HAIP")
+            header("openId4VPProfile", profile.name)
             header("responseMode", "direct_post")
             contentType(ContentType.Application.Json)
             setBody(
