@@ -8,6 +8,8 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlin.reflect.jvm.jvmName
 
 enum class AuthSessionStatus(val value: String) {
@@ -36,7 +38,7 @@ data class AuthSession(
 ) {
     fun toInformation() = AuthSessionInformation(id, status, flows?.methods(), token)
     suspend fun progressFlow(method: AuthenticationMethod) {
-        check(flows!!.any { it.method == method.id }){ "Trying to progress flow with wrong authentication method. Allowed methods: ${flows!!.methods()}, tried method: ${method.id}" }
+        check(flows!!.any { it.method == method.id }) { "Trying to progress flow with wrong authentication method. Allowed methods: ${flows!!.methods()}, tried method: ${method.id}" }
 
         val currentFlow = flows!!.first { it.method == method.id }
 
@@ -64,10 +66,14 @@ data class AuthSession(
 
     inline fun <reified V : AuthMethodConfiguration> lookupConfiguration(method: AuthenticationMethod): V {
         val flow = flows?.firstOrNull { it.method == method.id } ?: error("No flow for method: ${method.id}")
-        val config = (flow.config as? V) ?: error("Invalid config for method ${method.id}, provided: ${flow.config}, requested: ${V::class.jvmName}")
+        val config: V =
+            flow.config?.let {
+                runCatching { Json.decodeFromJsonElement<V>(flow.config) }.getOrElse { throw IllegalArgumentException("Invalid config provided at auth method ${method.id}, required would have been: ${V::class.jvmName}", it)}
+            } ?: error("Authentication method ${method.id} requested config, but none is provided by authentication flow.")
 
         return config
-    }}
+    }
+}
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
