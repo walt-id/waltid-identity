@@ -11,9 +11,9 @@ import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.*
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
-import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerificationUseCase
+import id.walt.verifier.oidc.SwaggerPresentationSessionInfo
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
@@ -213,8 +213,9 @@ fun Application.verfierApi() {
                     statusCallbackUri = statusCallbackUri,
                     statusCallbackApiKey = statusCallbackApiKey,
                     stateId = stateId,
-                    openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
-                    ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
+                    openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull
+                        ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
+                        ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
                     trustedRootCAs = body["trusted_root_cas"]?.jsonArray
                 )
 
@@ -232,6 +233,8 @@ fun Application.verfierApi() {
                     )
                 )
             }
+
+
 
             post("/verify/{state}", {
                 tags = listOf("OIDC")
@@ -265,14 +268,16 @@ fun Application.verfierApi() {
                 val sessionId = call.parameters["state"]
                 logger.info { "State: $sessionId" }
                 verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
-                    .onSuccess {
+                    .onSuccess { redirectUri ->
                         val session = verificationUseCase.getSession(sessionId!!)
+
+                        logger.debug { "Verification successful. Wallet initiated auth state: ${session.walletInitiatedAuthState}" }
                         if (session.walletInitiatedAuthState != null) {
                             val state = session.walletInitiatedAuthState
                             val code = Uuid.random().toString()
                             context.respondRedirect("openid://?code=$code&state=$state")
                         } else {
-                            call.respond(HttpStatusCode.OK, it)
+                            call.respond(HttpStatusCode.OK, redirectUri)
                         }
                     }.onFailure {
                         logger.debug(it) { "Verification failed ($it)" }
@@ -302,6 +307,7 @@ fun Application.verfierApi() {
                         sessionId?.run { verificationUseCase.notifySubscribers(this) }
                     }
             }
+
             get("/session/{id}", {
                 tags = listOf("Credential Verification")
                 summary = "Get info about OIDC presentation session, that was previously initialized"
@@ -315,7 +321,8 @@ fun Application.verfierApi() {
                 }
                 response {
                     HttpStatusCode.OK to {
-                        body<PresentationSessionInfo> { // it's PresentationSessionInfo
+                        // body<PresentationSessionInfo> { // cannot encode duration
+                        body<SwaggerPresentationSessionInfo> {
                             description = "Session info"
                         }
                     }
@@ -329,6 +336,7 @@ fun Application.verfierApi() {
                     call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
+
             get("/pd/{id}", {
                 tags = listOf("OIDC")
                 summary = "Get presentation definition object by ID"
