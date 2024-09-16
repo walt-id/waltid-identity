@@ -79,7 +79,9 @@ fun main() {
         minDirectLogLevel(Level.TRACE)
     }
 
-    config = Json.decodeFromString(File("idp-config.json").readText())
+    val configFile = File("idp-config.json")
+    println("Loading config from $configFile...")
+    config = Json.decodeFromString(configFile.readText())
 
     embeddedServer(CIO, port = 8080) {
         install(ContentNegotiation) {
@@ -245,7 +247,7 @@ fun Application.test() {
                     <a href="/login?state=${req.state!!}"><button>Click here when presented</button></a> (todo: make automatic)
                     </p>
                     <p>
-                    <a href="/login?state=${req.state!!}&debug=autologin"><button>Debug autologin</button></a>
+                    <a href="/login?state=${req.state!!}&debug=autologin"><button>Debug autologin</button> (enabled=${config.enableDebug})</a>
                     </p>
                     <p>
                     <a href="$walletUrl"><button>Present with web wallet</button></a>
