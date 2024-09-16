@@ -41,9 +41,15 @@ import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import org.intellij.lang.annotations.Language
+import java.io.File
 import kotlin.time.Duration.Companion.days
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+
+/*
+ * TODO: switch to service-commons
+ */
+lateinit var config: PocIdpKitConfiguration
 
 fun main() {
     loggingConfiguration(true) {
@@ -72,6 +78,8 @@ fun main() {
         }
         minDirectLogLevel(Level.TRACE)
     }
+
+    config = Json.decodeFromString(File("idp-config.json").readText())
 
     embeddedServer(CIO, port = 8080) {
         install(ContentNegotiation) {
@@ -120,7 +128,6 @@ fun main() {
         }
 
         intercept(ApplicationCallPipeline.Call) {
-            println("CALL")
             logResponseBody(call)
         }
 
@@ -230,16 +237,14 @@ fun Application.test() {
             authCache[req.state!!] = req
             println("Saved req to authCache: $req")
 
-            val verificationRequest = mapOf(
-                "request_credentials" to listOf("NaturalPersonVerifiableID")
-            )
+            val verificationRequest = config.verifierRequest
 
-            val (url, token) = Verifier.verify(verificationRequest, redirectUrl = "http://localhost:8080/login?state=${req.state!!}")
+            val (url, token) = Verifier.verify(verificationRequest, redirectUrl = "${config.redirectUrl}?state=${req.state!!}")
             reqCache[req.state!!] = token
             urlCache[req.state!!] = url
 
 
-            val walletUrl = "http://localhost:7101/api/siop/initiatePresentation?" + url.substringAfter("?")
+            val walletUrl = config.walletUrl + "?" + url.substringAfter("?")
             println("Wallet url: $walletUrl")
 
             //language=HTML
