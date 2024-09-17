@@ -1,0 +1,7 @@
+{
+  "request_credentials":
+  [
+    { "type": "OpenBadgeCredential", "format": "jwt_vc_json" },
+    { "type": "UniversityDegreeCredential", "format": "jwt_vc_json" }
+  ]
+}

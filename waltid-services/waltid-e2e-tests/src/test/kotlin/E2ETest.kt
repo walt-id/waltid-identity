@@ -235,6 +235,8 @@ class E2ETest {
             lspPotentialWallet.testSDJwtVCIssuance()
             lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
             lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
+            lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
+            lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
 
             //endregion -Exchange / presentation-
 
@@ -256,7 +258,7 @@ class E2ETest {
     }
 
 
-    //@Test // enable to execute test selectively
+    // @Test // enable to execute test selectively
     fun lspIssuanceTests() = runTest(timeout = 5.minutes) {
         val client = testHttpClient(doFollowRedirects = false)
         testBlock {
@@ -306,6 +308,15 @@ class E2ETest {
 
             lspPotentialWallet.testSDJwtVCIssuance()
             lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
+            lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
+        }
+    }
+
+    //@Test // enable to execute test selectively
+    fun testSdJwtVCIssuanceWithIssuerDid() = runTest(timeout = 5.minutes) {
+        testBlock {
+            val lspPotentialWallet = setupTestWallet()
+            lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
             lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
         }
     }

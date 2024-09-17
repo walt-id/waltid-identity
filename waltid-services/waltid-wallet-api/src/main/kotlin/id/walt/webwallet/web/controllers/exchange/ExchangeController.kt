@@ -3,7 +3,7 @@ package id.walt.webwallet.web.controllers.exchange
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.CredentialOfferRequest
-import id.walt.webwallet.db.models.WalletCredential
+import id.walt.sdjwt.SDJWTVCTypeMetadata
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.WalletServiceManager
@@ -11,6 +11,7 @@ import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.web.controllers.auth.getUserUUID
 import id.walt.webwallet.web.controllers.auth.getWalletId
 import id.walt.webwallet.web.controllers.auth.getWalletService
+import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import id.walt.webwallet.web.controllers.walletRoute
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
@@ -34,13 +35,8 @@ fun Application.exchange() = walletRoute {
                     description = "The offer request to use"
                 }
             }
-            response {
-                HttpStatusCode.OK to {
-                    body<List<WalletCredential>> {
-                        description = "List of credentials"
-                    }
-                }
-            }
+
+            response(OpenAPICommons.useOfferRequestEndpointResponseParams())
         }) {
             val wallet = getWalletService()
 
@@ -234,6 +230,33 @@ fun Application.exchange() = walletRoute {
             val reqParams = Url(request).parameters.toMap()
             val parsedOffer = wallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams))
             context.respond(parsedOffer)
+        }
+        get("resolveVctUrl", {
+            summary = "Receive an verifiable credential type (VCT) URL and return resolved vct object as described in IETF SD-JWT VC"
+            request {
+                queryParameter<String>("vct") {
+                    description = "The value of the vct in URL format"
+                    example("Example") { value = "https://example.com/mycustomvct" }
+                    required = true
+                }
+            }
+            response {
+                HttpStatusCode.OK to {
+                    description = "Resolved VCT"
+                    body<SDJWTVCTypeMetadata>()
+                }
+            }
+        }) {
+            val vct = call.request.queryParameters["vct"] ?: throw IllegalArgumentException("VCT not set")
+            val wallet = getWalletService()
+            runCatching {
+                wallet.resolveVct(vct)
+            }.onSuccess {
+                context.respond(HttpStatusCode.OK, it.toJSON())
+            }.onFailure { error ->
+                error.printStackTrace()
+                context.respond(HttpStatusCode.BadRequest, error.message ?: "Unknown error")
+            }
         }
     }
 }

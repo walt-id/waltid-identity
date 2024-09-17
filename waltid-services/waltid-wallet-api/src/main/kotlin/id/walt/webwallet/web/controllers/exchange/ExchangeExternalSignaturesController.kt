@@ -9,8 +9,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.oid4vc.data.ResponseMode
-import id.walt.oid4vc.data.VpTokenParameter
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.data.dif.VCFormat
@@ -20,11 +19,14 @@ import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.webwallet.service.SSIKit2WalletService.Companion.getCredentialWallet
 import id.walt.webwallet.service.SSIKit2WalletService.PresentationError
+import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.WalletServiceManager.eventUseCase
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.EventDataNotAvailable
 import id.walt.webwallet.service.events.EventType
+import id.walt.webwallet.service.exchange.IssuanceService
+import id.walt.webwallet.service.exchange.ProofOfPossessionParameters
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.web.controllers.auth.getWalletService
 import id.walt.webwallet.web.controllers.walletRoute
@@ -120,14 +122,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
 
             val presentationId = "urn:uuid:" + UUID.generateUUID().toString().lowercase()
 
-            val authKeyId =
-                Json.decodeFromString<JsonObject>(walletDID.document)["authentication"]!!.jsonArray.first().let {
-                    if (it is JsonObject) {
-                        it.jsonObject["id"]!!.jsonPrimitive.content
-                    } else {
-                        it.jsonPrimitive.content
-                    }
-                }
+            val authKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document)
             logger.debug { "Resolved authorization keyId: $authKeyId" }
 
             val vpPayload = credentialWallet.getVpJson(
@@ -355,6 +350,176 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 }
             }
         }
+        post("external_signatures/offer/prepare", {
+            summary = "Preparation (first) step for an OID4VCI flow with externally provided signatures."
+
+            request {
+                body<PrepareOID4VCIRequest> {
+                }
+            }
+
+            response {
+                HttpStatusCode.OK to {
+                    description = "Collection of parameters that are necessary to invoke the respective submit endpoint. " +
+                            "For each offered credential, the client is expected to compute a signature based on the provided " +
+                            "proof of possession parameters."
+                    body<PrepareOID4VCIResponse> {
+                        required = true
+                        example("When proofType == cwt") {
+                            value = PrepareOID4VCIResponse(
+                                did = "did:web:walt.id",
+                                offerURL = "openid-credential-offer://?credential_offer=",
+                                offeredCredentialsProofRequests = listOf(
+                                    IssuanceService.OfferedCredentialProofOfPossessionParameters(
+                                        OfferedCredential(
+                                            format = CredentialFormat.mso_mdoc,
+                                        ),
+                                        ProofOfPossessionParameters(
+                                            ProofType.cwt,
+                                            "<<JSON-ENCODED BYTE ARRAY OF CBOR MAP>>".toJsonElement(),
+                                            "<<JSON-ENCODED BYTE ARRAY OF CBOR MAP>>".toJsonElement(),
+                                        )
+                                    )
+                                ),
+                                credentialIssuer = "https://issuer.portal.walt.id"
+                            )
+                        }
+                        example("When proofType == jwt") {
+                            value = PrepareOID4VCIResponse(
+                                did = "did:web:walt.id",
+                                offerURL = "openid-credential-offer://?credential_offer=",
+                                offeredCredentialsProofRequests = listOf(
+                                    IssuanceService.OfferedCredentialProofOfPossessionParameters(
+                                        OfferedCredential(
+                                            format = CredentialFormat.jwt_vc_json,
+                                        ),
+                                        ProofOfPossessionParameters(
+                                            ProofType.jwt,
+                                            "<<JWT HEADER SECTION>>".toJsonElement(),
+                                            "<<JWT CLAIMS SECTION>>".toJsonElement(),
+                                        )
+                                    )
+                                ),
+                                credentialIssuer = "https://issuer.portal.walt.id"
+                            )
+                        }
+                    }
+                }
+            }
+        }) {
+            val walletService = getWalletService()
+            val req = call.receive<PrepareOID4VCIRequest>()
+            val offer = req.offerURL
+            logger.debug { "Request: $req" }
+
+            val did = req.did ?: walletService.listDids().firstOrNull()?.did
+            ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
+
+            //this can't fail due to the above block
+            val walletDID = DidsService.get(walletService.walletId, did)!!
+            logger.debug { "Retrieved wallet DID: $walletDID" }
+            val authKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document)
+            logger.debug { "Resolved authorization keyId: $authKeyId" }
+
+            runCatching {
+                WalletServiceManager.externalSignatureClaimStrategy.prepareCredentialClaim(
+                    did = walletDID.did,
+                    keyId = authKeyId,
+                    offerURL = offer,
+                )
+            }.onSuccess { prepareClaimResult ->
+                val responsePayload = PrepareOID4VCIResponse(
+                    did = walletDID.did,
+                    offerURL = req.offerURL,
+                    accessToken = prepareClaimResult.accessToken,
+                    offeredCredentialsProofRequests = prepareClaimResult.offeredCredentialsProofRequests,
+                    credentialIssuer = prepareClaimResult.resolvedCredentialOffer.credentialIssuer,
+                )
+                context.respond(
+                    HttpStatusCode.OK,
+                    responsePayload,
+                )
+            }.onFailure { error ->
+                context.respond(
+                    HttpStatusCode.BadRequest,
+                    error.message ?: "Unknown error",
+                )
+            }
+        }
+
+        post("external_signatures/offer/submit", {
+            summary = "Submission (second) step for an OID4VCI flow with externally provided signatures."
+
+            request {
+                body<SubmitOID4VCIRequest> {
+                    required = true
+                    example("When proofType == cwt") {
+                        value = SubmitOID4VCIRequest(
+                            did = "did:web:walt.id",
+                            offerURL = "openid-credential-offer://?credential_offer=",
+                            offeredCredentialProofsOfPossession = listOf(
+                                IssuanceService.OfferedCredentialProofOfPossession(
+                                    OfferedCredential(
+                                        format = CredentialFormat.mso_mdoc,
+                                    ),
+                                    ProofType.cwt,
+                                    "<<BASE64URL-ENCODED SIGNED CWT>>",
+                                )
+                            ),
+                            credentialIssuer = "https://issuer.portal.walt.id"
+                        )
+                    }
+                    example("When proofType == jwt") {
+                        value = SubmitOID4VCIRequest(
+                            did = "did:web:walt.id",
+                            offerURL = "openid-credential-offer://?credential_offer=",
+                            offeredCredentialProofsOfPossession = listOf(
+                                IssuanceService.OfferedCredentialProofOfPossession(
+                                    OfferedCredential(
+                                        format = CredentialFormat.jwt_vc_json,
+                                    ),
+                                    ProofType.jwt,
+                                    "<<COMPACT-SERIALIZED SIGNED JWT>>",
+                                )
+                            ),
+                            credentialIssuer = "https://issuer.portal.walt.id"
+                        )
+                    }
+                }
+            }
+
+            response(OpenAPICommons.useOfferRequestEndpointResponseParams())
+        }) {
+            val walletService = getWalletService()
+            val req = call.receive<SubmitOID4VCIRequest>()
+            logger.debug { "Request: $req" }
+
+            val did = req.did ?: walletService.listDids().firstOrNull()?.did
+            ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
+
+            runCatching {
+                WalletServiceManager
+                    .externalSignatureClaimStrategy
+                    .submitCredentialClaim(
+                        tenantId = walletService.tenant,
+                        accountId = walletService.accountId,
+                        walletId = walletService.walletId,
+                        pending = req.requireUserInput ?: true,
+                        did = did,
+                        offerURL = req.offerURL,
+                        credentialIssuerURL = req.credentialIssuer,
+                        accessToken = req.accessToken,
+                        offeredCredentialProofsOfPossession = req.offeredCredentialProofsOfPossession,
+                    )
+            }.onSuccess { walletCredentialList ->
+                context.respond(HttpStatusCode.OK, walletCredentialList)
+            }.onFailure { error ->
+                context.respond(
+                    HttpStatusCode.BadRequest,
+                    error.message ?: "Unknown error",
+                )
+            }
+        }
     }
 }
 
@@ -390,4 +555,29 @@ data class SubmitOID4VPRequest(
     val resolvedAuthReq: AuthorizationRequest,
     val presentationSubmission: PresentationSubmission,
     val presentedCredentialIdList: List<String>,
+)
+
+@Serializable
+data class PrepareOID4VCIRequest(
+    val did: String? = null,
+    val offerURL: String,
+)
+
+@Serializable
+data class PrepareOID4VCIResponse(
+    val did: String? = null,
+    val offerURL: String,
+    val accessToken: String? = null,
+    val offeredCredentialsProofRequests: List<IssuanceService.OfferedCredentialProofOfPossessionParameters>,
+    val credentialIssuer: String,
+)
+
+@Serializable
+data class SubmitOID4VCIRequest(
+    val did: String? = null,
+    val offerURL: String,
+    val requireUserInput: Boolean? = false,
+    val accessToken: String? = null,
+    val offeredCredentialProofsOfPossession: List<IssuanceService.OfferedCredentialProofOfPossession>,
+    val credentialIssuer: String,
 )

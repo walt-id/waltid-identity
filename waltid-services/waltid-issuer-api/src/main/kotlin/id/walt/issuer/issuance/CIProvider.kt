@@ -29,7 +29,6 @@ import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDocBuilder
-import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
 import id.walt.oid4vc.data.*
@@ -278,9 +277,10 @@ open class CIProvider : OpenIDCredentialIssuer(
                     exampleIssuerDid,
                     IssuanceRequest(
                         issuerKey = Json.parseToJsonElement(KeySerialization.serializeKey(exampleIssuerKey)).jsonObject,
-                        issuerDid = exampleIssuerDid,
                         credentialConfigurationId = "OpenBadgeCredential_${credentialRequest.format.value}",
-                        credentialData = Json.parseToJsonElement(IssuanceExamples.openBadgeCredentialData).jsonObject
+                        credentialData = Json.parseToJsonElement(IssuanceExamples.openBadgeCredentialData).jsonObject,
+                        mdocData = null,
+                        issuerDid = exampleIssuerDid
                     ),
                 )
             )
@@ -294,19 +294,20 @@ open class CIProvider : OpenIDCredentialIssuer(
             val vc = data.request.credentialData ?: throw MissingFieldException(listOf("credentialData"), "credentialData")
 
             data.run {
-                var issuerKid = issuerDid
+              var issuerKid = issuerDid ?: data.issuerKey.key.getKeyId()
+              if(!issuerDid.isNullOrEmpty()) {
                 if (issuerDid.startsWith("did:key") && issuerDid.length == 186) // EBSI conformance corner case when issuer uses did:key instead of did:ebsi and no trust framework is defined
-                    issuerKid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
-
-                if (issuerDid.startsWith("did:ebsi"))
-                    issuerKid = issuerDid + "#" + issuerKey.key.getKeyId()
-                when (data.request.issuanceType) {
-                    IssuanceType.sdjwt -> sdJwtVc(
-                        JWKKey.importJWK(holderKey.toString()).getOrNull(),
-                        SDPayload.createSDPayload(vc, data.request.selectiveDisclosure ?: SDMap(mapOf())),
-                        holderDid)
-                    else -> nonSdJwtVc(W3CVC(vc), issuerKid, holderDid, holderKey)
-                }
+                  issuerKid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
+                else if (issuerDid.startsWith("did:ebsi"))
+                  issuerKid = issuerDid + "#" + issuerKey.key.getKeyId()
+              }
+              when (data.request.credentialFormat) {
+                  CredentialFormat.sd_jwt_vc -> sdJwtVc(
+                      JWKKey.importJWK(holderKey.toString()).getOrNull(),
+                      SDPayload.createSDPayload(vc, data.request.selectiveDisclosure ?: SDMap(mapOf())),
+                      holderDid, issuerKid)
+                  else -> nonSdJwtVc(W3CVC(vc), issuerKid, holderDid, holderKey)
+              }
             }.also { log.debug { "Respond VC: $it" } }
         }))
     }
@@ -447,14 +448,14 @@ open class CIProvider : OpenIDCredentialIssuer(
     data class IssuanceSessionData(
         val id: String,
         val issuerKey: DirectSerializedKey,
-        val issuerDid: String,
+        val issuerDid: String?,
         val request: IssuanceRequest,
         val callbackUrl: String? = null,
     ) {
         constructor(
             id: String,
             issuerKey: Key,
-            issuerDid: String,
+            issuerDid: String?,
             request: IssuanceRequest,
             callbackUrl: String? = null,
         ) : this(id, DirectSerializedKey(issuerKey), issuerDid, request, callbackUrl)
@@ -522,11 +523,11 @@ open class CIProvider : OpenIDCredentialIssuer(
     private suspend fun IssuanceSessionData.sdJwtVc(
         holderKey: JWKKey?,
         vc: SDPayload,
-        holderDid: String?,
+        holderDid: String?, issuerKid: String?
     ): String = SDJwtVC.sign(
         sdPayload = vc,
         jwtCryptoProvider = jwtCryptoProvider,
-        issuerDid = issuerDid.ifEmpty { issuerKey.key.getKeyId() },
+        issuerDid = (issuerDid ?: "").ifEmpty { issuerKey.key.getKeyId() },
         holderDid = holderDid,
         holderKeyJWK = holderKey?.exportJWKObject(),
         issuerKeyId = issuerKey.key.getKeyId(),
@@ -564,4 +565,47 @@ open class CIProvider : OpenIDCredentialIssuer(
             put("jwt", it)
         })
     }
+
+    suspend fun getJwksSessions() : JsonObject{
+        var jwksList = buildJsonObject {}
+        sessionCredentialPreMapping.getAll().forEach {
+            it.forEach {
+                jwksList = buildJsonObject {
+                    put("keys", buildJsonArray {
+                        val jwkWithKid = buildJsonObject {
+                            it.issuerKey.key.getPublicKey().exportJWKObject().forEach {
+                                put(it.key, it.value)
+                            }
+                            put("kid", it.issuerKey.key.getPublicKey().getKeyId())
+                        }
+                        add(jwkWithKid)
+                        jwksList.forEach { it.value.jsonArray.forEach {
+                                add(it)
+                            }
+                        }
+                    })
+                }
+            }
+        }
+        return jwksList
+    }
+
+    fun getVctByCredentialConfigurationId(credentialConfigurationId: String) = OidcApi.metadata.credentialConfigurationsSupported?.get(credentialConfigurationId)?.vct
+
+    fun getVctBySupportedCredentialConfiguration(
+        baseUrl: String,
+        credType: String
+    ): CredentialSupported {
+        val expectedVct = "$baseUrl/$credType"
+
+        metadata.credentialConfigurationsSupported?.entries?.forEach { entry ->
+            if (getVctByCredentialConfigurationId(entry.key) == expectedVct) {
+                return entry.value
+            }
+        }
+
+       throw IllegalArgumentException("Invalid type value: $credType. The $credType type is not supported")
+    }
+
+    fun getFormatByCredentialConfigurationId(id: String) = metadata.credentialConfigurationsSupported?.get(id)?.format
 }
