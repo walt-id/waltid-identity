@@ -455,6 +455,23 @@ private fun getErrorDescription(it: Throwable): String? = when (it.message) {
     else -> null
 }
 
+private suspend fun PipelineContext<Unit, ApplicationCall>.processError(
+    sessionId: String,
+    error: Throwable
+) {
+    val session = verificationUseCase.getSession(sessionId)
+    if (session.walletInitiatedAuthState != null) {
+        val state = session.walletInitiatedAuthState
+        context.respondRedirect(
+            "openid://?state=$state&error=invalid_request&error_description=${getErrorDescription(error)}"
+        )
+    } else if (error is VerificationUseCase.FailedVerificationException && error.redirectUrl != null) {
+        context.respond(HttpStatusCode.BadRequest, error.redirectUrl)
+    } else {
+        throw error
+    }
+}
+
 private suspend fun PipelineContext<Unit, ApplicationCall>.processVerificationFailureResult(
     sessionId: String?,
     error: Throwable,
@@ -463,17 +480,7 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.processVerificationFa
     val errorDescription = error.message ?: "Verification failed"
     logger.error { "Error: $errorDescription" }
     if (sessionId != null) {
-        val session = verificationUseCase.getSession(sessionId)
-        if (session.walletInitiatedAuthState != null) {
-            val state = session.walletInitiatedAuthState
-            context.respondRedirect(
-                "openid://?state=$state&error=invalid_request&error_description=${getErrorDescription(error)}"
-            )
-        } else if (error is VerificationUseCase.FailedVerificationException && error.redirectUrl != null) {
-            context.respond(HttpStatusCode.BadRequest, error.redirectUrl)
-        } else {
-            throw error
-        }
+        processError(sessionId, error)
     } else {
         logger.error(error) { "/verify error: $errorDescription" }
         call.respond(HttpStatusCode.BadRequest, errorDescription)
