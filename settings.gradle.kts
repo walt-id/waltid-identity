@@ -84,5 +84,3 @@ plugins {
 }
 
 rootProject.name = "waltid-identity"
-include("waltid-libraries:waltid-library-commons")
-findProject(":waltid-libraries:waltid-library-commons")?.name = "waltid-library-commons"
