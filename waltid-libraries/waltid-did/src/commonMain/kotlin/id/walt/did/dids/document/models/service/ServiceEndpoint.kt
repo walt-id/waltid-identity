@@ -31,7 +31,7 @@ object ServiceEndpointBaseSerializer : JsonContentPolymorphicSerializer<ServiceE
 
 /**
  * Service endpoint represented as a single URL.
- * @param url The URL of the service endpoint (cannot be empty)
+ * @property url The URL of the service endpoint (cannot be empty)
  */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -55,7 +55,7 @@ object ServiceEndpointURLSerializer : KSerializer<ServiceEndpointURL> {
 
 /**
  * Service endpoint represented as a single URL.
- * @param jsonObject User-defined JSON object representing a service endpoint
+ * @property jsonObject User-defined JSON object representing a service endpoint
  */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
