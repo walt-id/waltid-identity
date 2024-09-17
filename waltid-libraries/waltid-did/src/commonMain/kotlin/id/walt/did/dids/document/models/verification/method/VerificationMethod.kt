@@ -17,6 +17,16 @@ private val requiredKeys = listOf(
 
 private val reservedKeys = requiredKeys + VerificationMaterialType.entries.map { it.toString() }
 
+/**
+ * Class for representing a verification method of a DID Document according to the respective section of the [DID Core](https://www.w3.org/TR/did-core/#dfn-verificationmethod) specification
+ * @property id The identifier of this [VerificationMethod] instance (cannot be empty).
+ * @property type The type of this [VerificationMethod] instance. Refer to [VerificationMethodType] for more information.
+ * @property material The cryptographic material is represented as a JsonElement and is paired with its encoding.
+ * @property controller The identifier of the controller of this [VerificationMethod] instance (cannot be empty).
+ * @property customProperties Optional user-defined custom properties that can be included in this [VerificationMethod] instance.
+ * @see [VerificationMethodType]
+ * @see [VerificationMaterialType]
+ */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable(with = VerificationMethodSerializer::class)
