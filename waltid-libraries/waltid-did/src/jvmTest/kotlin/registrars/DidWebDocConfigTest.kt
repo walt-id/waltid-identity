@@ -6,7 +6,7 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.did.dids.registrar.dids.DidDocConfig
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
-import id.walt.did.dids.registrar.dids.VerificationConfiguration
+import id.walt.did.dids.registrar.dids.VerificationMethodConfiguration
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
 import id.walt.did.utils.randomUUID
 import kotlinx.coroutines.test.runTest
@@ -41,11 +41,11 @@ class DidWebDocConfigTest {
                     domain = domain,
                     path = path,
                     didDocConfig = DidDocConfig(
-                        keyMap = mapOf(privKey.getKeyId() to privKey),
+                        publicKeyMap = mapOf(privKey.getKeyId() to privKey),
                         verificationConfigurationMap = mapOf(
                             VerificationRelationshipType.Authentication to setOf(
-                                VerificationConfiguration(
-                                    keyId = privKey.getKeyId(),
+                                VerificationMethodConfiguration(
+                                    publicKeyId = privKey.getKeyId(),
                                 )
                             ),
                         ),
@@ -64,11 +64,11 @@ class DidWebDocConfigTest {
                     domain = domain,
                     path = path,
                     didDocConfig = DidDocConfig(
-                        keyMap = keyList.associateBy { it.getKeyId() },
+                        publicKeyMap = keyList.associateBy { it.getKeyId() },
                         verificationConfigurationMap = mapOf(
                             VerificationRelationshipType.Authentication to keyList.map {
-                                VerificationConfiguration(
-                                    keyId = it.getKeyId(),
+                                VerificationMethodConfiguration(
+                                    publicKeyId = it.getKeyId(),
                                 )
                             }.toSet(),
                         ),
@@ -87,11 +87,11 @@ class DidWebDocConfigTest {
                     domain = domain,
                     path = path,
                     didDocConfig = DidDocConfig(
-                        keyMap = mapOf(privKey.getKeyId() to privKey),
+                        publicKeyMap = mapOf(privKey.getKeyId() to privKey),
                         verificationConfigurationMap = mapOf(
                             VerificationRelationshipType.Authentication to setOf(
-                                VerificationConfiguration(
-                                    keyId = randomUUID(),
+                                VerificationMethodConfiguration(
+                                    publicKeyId = randomUUID(),
                                 )
                             ),
                         ),
@@ -110,13 +110,13 @@ class DidWebDocConfigTest {
                     domain = domain,
                     path = path,
                     didDocConfig = DidDocConfig(
-                        keyMap = keyList.associateBy { it.getKeyId() },
+                        publicKeyMap = keyList.associateBy { it.getKeyId() },
                         verificationConfigurationMap = mapOf(
                             VerificationRelationshipType.Authentication to keyList.map {
-                                VerificationConfiguration(
-                                    keyId = it.getKeyId(),
+                                VerificationMethodConfiguration(
+                                    publicKeyId = it.getKeyId(),
                                 )
-                            }.toSet() + VerificationConfiguration(randomUUID()),
+                            }.toSet() + VerificationMethodConfiguration(randomUUID()),
                         ),
                     ),
                 )
@@ -133,14 +133,14 @@ class DidWebDocConfigTest {
                 domain = domain,
                 path = path,
                 didDocConfig = DidDocConfig(
-                    keyMap = mapOf(pubKey.getKeyId() to pubKey),
+                    publicKeyMap = mapOf(pubKey.getKeyId() to pubKey),
                     verificationConfigurationMap = VerificationRelationshipType
                         .entries
                         .filterNot { it == VerificationRelationshipType.KeyAgreement }
                         .associateWith {
                             setOf(
-                                VerificationConfiguration(
-                                    keyId = pubKey.getKeyId(),
+                                VerificationMethodConfiguration(
+                                    publicKeyId = pubKey.getKeyId(),
                                 )
                             )
                         },
@@ -174,13 +174,13 @@ class DidWebDocConfigTest {
                     domain = domain,
                     path = path,
                     didDocConfig = DidDocConfig(
-                        keyMap = mapOf(pubKey.getKeyId() to pubKey),
+                        publicKeyMap = mapOf(pubKey.getKeyId() to pubKey),
                         verificationConfigurationMap = VerificationRelationshipType
                             .entries
                             .associateWith {
                                 setOf(
-                                    VerificationConfiguration(
-                                        keyId = pubKey.getKeyId(),
+                                    VerificationMethodConfiguration(
+                                        publicKeyId = pubKey.getKeyId(),
                                     )
                                 )
                             },
@@ -202,13 +202,13 @@ class DidWebDocConfigTest {
                         domain = domain,
                         path = path,
                         didDocConfig = DidDocConfig(
-                            keyMap = mapOf(pubKey.getKeyId() to pubKey),
+                            publicKeyMap = mapOf(pubKey.getKeyId() to pubKey),
                             verificationConfigurationMap = VerificationRelationshipType
                                 .entries
                                 .associateWith {
                                     setOf(
-                                        VerificationConfiguration(
-                                            keyId = pubKey.getKeyId(),
+                                        VerificationMethodConfiguration(
+                                            publicKeyId = pubKey.getKeyId(),
                                         )
                                     )
                                 },
@@ -227,11 +227,11 @@ class DidWebDocConfigTest {
                     domain = domain,
                     path = path,
                     didDocConfig = DidDocConfig(
-                        keyMap = mapOf(pubKey.getKeyId() to pubKey),
+                        publicKeyMap = mapOf(pubKey.getKeyId() to pubKey),
                         verificationConfigurationMap = mapOf(
                             verRelType to setOf(
-                                VerificationConfiguration(
-                                    keyId = pubKey.getKeyId(),
+                                VerificationMethodConfiguration(
+                                    publicKeyId = pubKey.getKeyId(),
                                 )
                             ),
                         ),
