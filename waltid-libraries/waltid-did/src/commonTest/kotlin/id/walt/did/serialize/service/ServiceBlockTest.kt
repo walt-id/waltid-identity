@@ -1,7 +1,7 @@
 package id.walt.did.serialize.service
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.did.dids.document.models.service.ServiceBlock
+import id.walt.did.dids.document.models.service.ServiceMap
 import id.walt.did.dids.document.models.service.ServiceEndpointObject
 import id.walt.did.dids.document.models.service.ServiceEndpointURL
 import id.walt.did.dids.document.models.service.RegisteredServiceType
@@ -23,7 +23,7 @@ class ServiceBlockTest {
     @Test
     fun testServiceBlockEndpointURLSerialization() = runTest {
         //with URL endpoint block and no custom properties
-        val svcBlockWithURLEndpointNoCustom = ServiceBlock(
+        val svcBlockWithURLEndpointNoCustom = ServiceMap(
             id = "some-id",
             type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
             serviceEndpoint = setOf(ServiceEndpointURL("some-url"))
@@ -53,7 +53,7 @@ class ServiceBlockTest {
             actual = Json.decodeFromString(svcBlockWithURLEndpointNoCustomListJsonEncodedString)
         )
         //with URL endpoint block and custom properties
-        val svcBlockWithURLEndpointCustom = ServiceBlock(
+        val svcBlockWithURLEndpointCustom = ServiceMap(
             id = "some-id",
             type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
             serviceEndpoint = setOf(ServiceEndpointURL("some-url")),
@@ -88,7 +88,7 @@ class ServiceBlockTest {
     @Test
     fun testServiceBlockEndpointObjectSerialization() = runTest {
         //with object endpoint block and no custom properties
-        val svcBlockWithObjectEndpointNoCustom = ServiceBlock(
+        val svcBlockWithObjectEndpointNoCustom = ServiceMap(
             id = "some-id",
             type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
             serviceEndpoint = setOf(
@@ -125,7 +125,7 @@ class ServiceBlockTest {
             actual = Json.decodeFromString(svcBlockWithObjectEndpointNoCustomListJsonEncodedString),
         )
         //with object endpoint block and custom properties
-        val svcBlockWithObjectEndpointCustom = ServiceBlock(
+        val svcBlockWithObjectEndpointCustom = ServiceMap(
             id = "some-id",
             type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
             serviceEndpoint = setOf(
@@ -166,7 +166,7 @@ class ServiceBlockTest {
 
     @Test
     fun testServiceBlockWithSameEndpoints() = runTest {
-        val svcBlockWithURLEndpoints = ServiceBlock(
+        val svcBlockWithURLEndpoints = ServiceMap(
             id = "some-id",
             type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
             serviceEndpoint = setOf(
@@ -187,7 +187,7 @@ class ServiceBlockTest {
             expected = svcBlockWithURLEndpoints,
             actual = Json.decodeFromString(svcBlockWithURLEndpointsJsonEncodedString)
         )
-        val svcBlockWithObjectEndpoints = ServiceBlock(
+        val svcBlockWithObjectEndpoints = ServiceMap(
             id = "some-id",
             type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
             serviceEndpoint = setOf(
@@ -222,7 +222,7 @@ class ServiceBlockTest {
 
     @Test
     fun testServiceBlockWithMixEndpoints() = runTest {
-        val svcBlock = ServiceBlock(
+        val svcBlock = ServiceMap(
             id = "some-id",
             type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
             serviceEndpoint = setOf(
@@ -252,7 +252,7 @@ class ServiceBlockTest {
 
     @Test
     fun testServiceBlockMultipleTypes() = runTest {
-        val svcBlock = ServiceBlock(
+        val svcBlock = ServiceMap(
             id = "some-id",
             type = setOf(
                 RegisteredServiceType.DIDCommMessaging.toString(),
