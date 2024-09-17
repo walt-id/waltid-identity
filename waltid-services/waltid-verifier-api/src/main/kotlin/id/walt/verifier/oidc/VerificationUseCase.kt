@@ -130,6 +130,8 @@ class VerificationUseCase(
 
     fun getSession(sessionId: String): PresentationSession = sessionId.let { OIDCVerifierService.getSession(it) }
 
+    data class FailedVerificationException(val redirectUrl: String?, override val cause: Throwable?, override val message: String = cause?.message ?: "Verification failed") : IllegalArgumentException()
+
     fun verify(sessionId: String, tokenResponseParameters: Map<String, List<String>>): Result<String> {
         logger.debug { "Verifying session $sessionId" }
         val session = OIDCVerifierService.getSession(sessionId)
@@ -164,16 +166,14 @@ class VerificationUseCase(
             val policyResults = OIDCVerifierService.policyResults[session.id]
             val redirectUri = sessionVerificationInfo.errorRedirectUri?.replace("\$id", session.id)
 
-            if (redirectUri != null) {
-                return Result.failure(Exception(redirectUri))
-            }
-
             return if (policyResults == null) {
-                Result.failure(Exception("Verification policies did not succeed"))
+                Result.failure(FailedVerificationException(redirectUri, IllegalArgumentException("Verification policies did not succeed")))
             } else {
                 val failedPolicies =
                     policyResults.results.flatMap { it.policyResults.map { it } }.filter { !it.isSuccess }
-                Result.failure(IllegalArgumentException("Verification policies did not succeed: ${failedPolicies.joinToString { it.policy + " (${it.error})" }}"))
+                val errorCause = IllegalArgumentException("Verification policies did not succeed: ${failedPolicies.joinToString { it.policy + " (${it.error})" }}")
+
+                Result.failure(FailedVerificationException(redirectUri, errorCause))
             }
         }
     }
