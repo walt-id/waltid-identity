@@ -8,6 +8,12 @@ import kotlinx.serialization.json.*
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+/**
+ * Base class for representing a service endpoint according to the DID Core specification.
+ * This can be either a URL (refer to [ServiceEndpointURL] ) or an arbitrary JSON object (refer to [ServiceEndpointObject]).
+ * @see ServiceEndpointURL
+ * @see ServiceEndpointObject
+ * */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable(with = ServiceEndpointBaseSerializer::class)
@@ -18,11 +24,15 @@ object ServiceEndpointBaseSerializer : JsonContentPolymorphicSerializer<ServiceE
         return when {
             element is JsonPrimitive && element.isString -> ServiceEndpointURL.serializer()
             element is JsonObject -> ServiceEndpointObject.serializer()
-            else -> throw SerializationException("Invalid ServiceEndpoint type")
+            else -> throw SerializationException("Invalid ServiceEndpoint encoded value, must be either a string or an object")
         }
     }
 }
 
+/**
+ * Service endpoint represented as a single URL.
+ * @param url The URL of the service endpoint
+ */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable(with = ServiceEndpointURLSerializer::class)
@@ -38,6 +48,10 @@ object ServiceEndpointURLSerializer : KSerializer<ServiceEndpointURL> {
         ServiceEndpointURL(decoder.decodeString())
 }
 
+/**
+ * Service endpoint represented as a single URL.
+ * @param jsonObject User-defined JSON object representing a service endpoint
+ */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable(with = ServiceEndpointObjectSerializer::class)
