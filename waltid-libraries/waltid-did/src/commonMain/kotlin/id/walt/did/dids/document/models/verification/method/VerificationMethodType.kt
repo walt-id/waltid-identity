@@ -4,7 +4,9 @@ import kotlinx.serialization.Serializable
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-//as defined in https://www.w3.org/TR/2024/NOTE-did-spec-registries-20240830/#verification-method-types
+/**
+ * Enumerated type representing verification method types that are registered in the [Decentralized Identifier Extensions](https://www.w3.org/TR/2024/NOTE-did-spec-registries-20240830/#verification-method-types) parameter registry.
+ */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
