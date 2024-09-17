@@ -3,14 +3,18 @@ package registrars
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.did.dids.document.models.service.RegisteredServiceType
+import id.walt.did.dids.document.models.service.ServiceEndpointURL
 import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.did.dids.registrar.dids.DidDocConfig
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
+import id.walt.did.dids.registrar.dids.ServiceConfiguration
 import id.walt.did.dids.registrar.dids.VerificationMethodConfiguration
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
 import id.walt.did.utils.randomUUID
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlin.test.*
 
 class DidWebDocConfigTest {
@@ -21,16 +25,60 @@ class DidWebDocConfigTest {
 
     @Test
     fun testEmptyDidDocConfig() = runTest {
-        val document = webRegistrar.register(
+        webRegistrar.register(
             DidWebCreateOptions(
                 domain = domain,
                 path = path,
                 didDocConfig = DidDocConfig(),
             )
-        ).didDocument
-        assertTrue(document.size == 2)
-        assertTrue(document.containsKey("context"))
-        assertTrue(document.containsKey("id"))
+        ).didDocument.let { document ->
+            val expectedKeys = listOf(
+                "context",
+                "id",
+            )
+            assertEquals(
+                expected = expectedKeys.size,
+                actual = document.size,
+            )
+            expectedKeys.forEach {
+                assertContains(
+                    map = document,
+                    key = it,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun testRootDocCustomProperties() = runTest {
+        val rootDocCustomProperties = mapOf(
+            "this" to "that".toJsonElement(),
+            "tit" to "tat".toJsonElement(),
+        )
+        webRegistrar.register(
+            DidWebCreateOptions(
+                domain = domain,
+                path = path,
+                didDocConfig = DidDocConfig(
+                    rootCustomProperties = rootDocCustomProperties,
+                ),
+            )
+        ).didDocument.let { document ->
+            val expectedKeys = listOf(
+                "context",
+                "id",
+            ) + rootDocCustomProperties.keys
+            assertEquals(
+                expected = expectedKeys.size,
+                actual = document.size,
+            )
+            expectedKeys.forEach {
+                assertContains(
+                    map = document,
+                    key = it,
+                )
+            }
+        }
     }
 
     @Test
@@ -279,6 +327,28 @@ class DidWebDocConfigTest {
 
     @Test
     fun testBuildFromPublicKeySet() = runTest {
+        webRegistrar.register(
+            DidWebCreateOptions(
+                domain = domain,
+                path = path,
+                didDocConfig = DidDocConfig.buildFromPublicKeySet(),
+            )
+        ).didDocument.let { document ->
+            val expectedKeys = listOf(
+                "context",
+                "id",
+            )
+            assertEquals(
+                expected = expectedKeys.size,
+                actual = document.keys.size,
+            )
+            expectedKeys.forEach {
+                assertContains(
+                    map = document,
+                    key = it,
+                )
+            }
+        }
         val publicKey = JWKKey.generate(KeyType.secp256r1).getPublicKey()
         webRegistrar.register(
             DidWebCreateOptions(
@@ -292,7 +362,7 @@ class DidWebDocConfigTest {
             val expectedKeys = listOf(
                 "context",
                 "id",
-                "verificationMethod"
+                "verificationMethod",
             ) + VerificationRelationshipType.entries.map { it.toString() }
             assertEquals(
                 expected = expectedKeys.size,
@@ -347,6 +417,25 @@ class DidWebDocConfigTest {
 
     @Test
     fun testBuildFromPublicKeySetVerificationConfiguration() = runTest {
+        webRegistrar.register(
+            DidWebCreateOptions(
+                domain = domain,
+                path = path,
+                didDocConfig = DidDocConfig.buildFromPublicKeySetVerificationConfiguration(),
+            )
+        ).didDocument.let { document ->
+            val expectedKeys = listOf("context", "id")
+            assertEquals(
+                expected = expectedKeys.size,
+                actual = document.keys.size,
+            )
+            expectedKeys.forEach {
+                assertContains(
+                    map = document,
+                    key = it,
+                )
+            }
+        }
         val verRelTypeList = listOf(
             VerificationRelationshipType.Authentication,
             VerificationRelationshipType.AssertionMethod,
@@ -440,7 +529,11 @@ class DidWebDocConfigTest {
                     )
             )
         ).didDocument.let { document ->
-            val expectedKeys = listOf("context", "id", "verificationMethod") + VerificationRelationshipType.entries.map { it.toString() }
+            val expectedKeys = listOf(
+                "context",
+                "id",
+                "verificationMethod"
+            ) + VerificationRelationshipType.entries.map { it.toString() }
             assertEquals(
                 expected = expectedKeys.size,
                 actual = document.keys.size,
@@ -555,7 +648,11 @@ class DidWebDocConfigTest {
                     )
             )
         ).didDocument.let { document ->
-            val expectedKeys = listOf("context", "id", "verificationMethod") + VerificationRelationshipType.entries.map { it.toString() }
+            val expectedKeys = listOf(
+                "context",
+                "id",
+                "verificationMethod"
+            ) + VerificationRelationshipType.entries.map { it.toString() }
             assertEquals(
                 expected = expectedKeys.size,
                 actual = document.keys.size,
@@ -576,7 +673,101 @@ class DidWebDocConfigTest {
                             (document[verRelType.toString()] as JsonArray).size == publicKeySet.size
                 )
             }
+        }
+    }
 
+    @Test
+    fun testServiceConfiguration() = runTest {
+        webRegistrar.register(
+            DidWebCreateOptions(
+                domain = domain,
+                path = path,
+                didDocConfig = DidDocConfig
+                    .buildFromPublicKeySet(
+                        serviceConfigurationSet = setOf(
+                            ServiceConfiguration(
+                                type = RegisteredServiceType.DIDCommMessaging.toString(),
+                                serviceEndpoint = setOf(
+                                    ServiceEndpointURL(
+                                        url = "http://some-url",
+                                    )
+                                )
+                            ),
+                        ),
+                    ),
+            )
+        ).didDocument.let { document ->
+            val expectedKeys = listOf(
+                "context",
+                "id",
+                "service",
+            )
+            assertEquals(
+                expected = expectedKeys.size,
+                actual = document.keys.size,
+            )
+            expectedKeys.forEach {
+                assertContains(
+                    map = document,
+                    key = it,
+                )
+            }
+            println(document.toString())
+            assertTrue(
+                document["service"] is JsonArray &&
+                        (document["service"] as JsonArray).size == 1
+            )
+        }
+        val customProperties = mapOf(
+            "this" to "that".toJsonElement()
+        )
+        //with custom properties
+        webRegistrar.register(
+            DidWebCreateOptions(
+                domain = domain,
+                path = path,
+                didDocConfig = DidDocConfig
+                    .buildFromPublicKeySet(
+                        serviceConfigurationSet = setOf(
+                            ServiceConfiguration(
+                                type = RegisteredServiceType.DIDCommMessaging.toString(),
+                                serviceEndpoint = setOf(
+                                    ServiceEndpointURL(
+                                        url = "http://some-other-url",
+                                    )
+                                ),
+                                customProperties = customProperties,
+                            ),
+                        ),
+                    ),
+            )
+        ).didDocument.let { document ->
+            val expectedKeys = listOf(
+                "context",
+                "id",
+                "service",
+            )
+            assertEquals(
+                expected = expectedKeys.size,
+                actual = document.keys.size,
+            )
+            expectedKeys.forEach {
+                assertContains(
+                    map = document,
+                    key = it,
+                )
+            }
+            println(document.toString())
+            assertTrue(
+                document["service"] is JsonArray &&
+                        (document["service"] as JsonArray).size == 1
+            )
+            customProperties.forEach { (key, value) ->
+                assertTrue(
+                    ((document["service"] as JsonArray)[0] as JsonObject).containsKey(key) &&
+                            ((document["service"] as JsonArray)[0] as JsonObject)[key] == value
+                )
+            }
         }
     }
 }
