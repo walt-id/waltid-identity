@@ -54,7 +54,7 @@ data class DidDocConfig(
         ) = DidDocConfig(
             context = context,
             publicKeyMap = publicKeySet.associateBy { it.getKeyId() },
-            verificationConfigurationMap = publicKeySet.takeIf{ it.isNotEmpty() }?.let{
+            verificationConfigurationMap = publicKeySet.takeIf { it.isNotEmpty() }?.let {
                 VerificationRelationshipType
                     .entries
                     .associateWith {
@@ -130,8 +130,10 @@ data class DidDocConfig(
     @JsExport.Ignore
     suspend fun toDidDocument(did: String): DidDocument {
 
-        val verificationMethod = verificationConfigurationMap.mapTo(mutableSetOf()) { (_, verConfSet) ->
-            verConfSet.map { verConf ->
+        val verificationMethod = verificationConfigurationMap
+            .values
+            .flatten()
+            .map { verConf ->
                 val key = publicKeyMap[verConf.publicKeyId]
                     ?: throw IllegalStateException(
                         "This exception should never happen, we have already checked " +
@@ -144,28 +146,31 @@ data class DidDocConfig(
                     controller = did,
                     customProperties = verConf.customProperties,
                 )
-            }
-        }.flatten().toSet()
+            }.toSet()
+
         val verificationRelationship = verificationConfigurationMap
-            .mapValues { (_, verConfSet) ->
-                verConfSet.map { verConf ->
+            .entries
+            .associate { (verRelType, verConfSet) ->
+                verRelType to verConfSet.map {
                     VerificationRelationship
                         .buildFromId(
-                            id = "$did#${verConf.publicKeyId}",
+                            id = "$did#${it.publicKeyId}",
                         )
                 }.toSet()
             }
 
-        val service = serviceConfigurationSet.mapTo(mutableSetOf()) {
-            ServiceBlock(
-                id = "$did#${randomUUID()}",
-                type = setOf(it.type),
-                serviceEndpoint = it.serviceEndpoint,
-                customProperties = it.customProperties,
-            )
-        }.let {
-            Service(it)
-        }
+        val service = serviceConfigurationSet
+            .map {
+                ServiceBlock(
+                    id = "$did#${randomUUID()}",
+                    type = setOf(it.type),
+                    serviceEndpoint = it.serviceEndpoint,
+                    customProperties = it.customProperties,
+                )
+            }.toSet().let {
+                Service(it)
+            }
+
         return DidDocument(buildMap {
             put("context", Json.encodeToJsonElement(context))
             put("id", Json.encodeToJsonElement(did))
