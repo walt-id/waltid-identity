@@ -30,7 +30,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.*
-import io.ktor.util.pipeline.PipelineContext
+import io.ktor.util.pipeline.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -193,32 +193,33 @@ fun Application.verfierApi() {
 
             }) {
 
-                    val authorizeBaseUrl = context.request.header("authorizeBaseUrl") ?: defaultAuthorizeBaseUrl
-                    val responseMode =
-                        context.request.header("responseMode")?.let { ResponseMode.fromString(it) }
-                            ?: ResponseMode.direct_post
-                    val successRedirectUri = context.request.header("successRedirectUri")
-                    val errorRedirectUri = context.request.header("errorRedirectUri")
-                    val statusCallbackUri = context.request.header("statusCallbackUri")
-                    val statusCallbackApiKey = context.request.header("statusCallbackApiKey")
-                    val stateId = context.request.header("stateId")
-                    val openId4VPProfile = context.request.header("openId4VPProfile")
+                val authorizeBaseUrl = context.request.header("authorizeBaseUrl") ?: defaultAuthorizeBaseUrl
+                val responseMode =
+                    context.request.header("responseMode")?.let { ResponseMode.fromString(it) }
+                        ?: ResponseMode.direct_post
+                val successRedirectUri = context.request.header("successRedirectUri")
+                val errorRedirectUri = context.request.header("errorRedirectUri")
+                val statusCallbackUri = context.request.header("statusCallbackUri")
+                val statusCallbackApiKey = context.request.header("statusCallbackApiKey")
+                val stateId = context.request.header("stateId")
+                val openId4VPProfile = context.request.header("openId4VPProfile")
 
-                    val body = context.receive<JsonObject>()
+                val body = context.receive<JsonObject>()
 
                 val session = verificationUseCase.createSession(
                     vpPoliciesJson = body["vp_policies"],
                     vcPoliciesJson = body["vc_policies"],
                     requestCredentialsJson = body["request_credentials"]
-                      ?: throw BadRequestException("Field request_credentials is required"),
+                        ?: throw BadRequestException("Field request_credentials is required"),
                     responseMode = responseMode,
                     successRedirectUri = successRedirectUri,
                     errorRedirectUri = errorRedirectUri,
                     statusCallbackUri = statusCallbackUri,
                     statusCallbackApiKey = statusCallbackApiKey,
                     stateId = stateId,
-                    openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
-                    ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
+                    openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull
+                        ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
+                        ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
                     trustedRootCAs = body["trusted_root_cas"]?.jsonArray
                 )
 
@@ -266,17 +267,17 @@ fun Application.verfierApi() {
                 }
             }) {
 
-            logger.info { "POST verify/state" }
-                    val sessionId = call.parameters.getOrFail("state")
-                    logger.info { "State: $sessionId" }
-                    verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
-                        .onSuccess {
-                            processVerificationSuccessResult(sessionId, it)
-                        }.onFailure {
-                            processVerificationFailureResult(it, sessionId)
-                        }.also {
-                            verificationUseCase.notifySubscribers(sessionId)
-                        }
+                logger.info { "POST verify/state" }
+                val sessionId = call.parameters.getOrFail("state")
+                logger.info { "State: $sessionId" }
+                verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
+                    .onSuccess {
+                        processVerificationSuccessResult(sessionId, it)
+                    }.onFailure {
+                        processVerificationFailureResult(sessionId, it)
+                    }.also {
+                        verificationUseCase.notifySubscribers(sessionId)
+                    }
 
             }
             get("/session/{id}", {
@@ -454,36 +455,34 @@ private fun getErrorDescription(it: Throwable): String? = when (it.message) {
     else -> null
 }
 
-private suspend fun PipelineContext<Unit, ApplicationCall>.processError(
-    sessionId: String, exception: Throwable
-) {
-    val session = verificationUseCase.getSession(sessionId)
-    if (session.walletInitiatedAuthState != null) {
-        val state = session.walletInitiatedAuthState
-        context.respondRedirect(
-            "openid://?state=$state&error=invalid_request&error_description=${getErrorDescription(exception)}"
-        )
-    }
-}
-
 private suspend fun PipelineContext<Unit, ApplicationCall>.processVerificationFailureResult(
-    it: Throwable,
-    sessionId: String?
+    sessionId: String?,
+    error: Throwable,
 ) {
-    logger.debug(it) { "Verification failed ($it)" }
-    val errorDescription = it.message ?: "Verification failed"
+    logger.debug(error) { "Verification failed ($error)" }
+    val errorDescription = error.message ?: "Verification failed"
     logger.error { "Error: $errorDescription" }
     if (sessionId != null) {
-        processError(sessionId, it)
+        val session = verificationUseCase.getSession(sessionId)
+        if (session.walletInitiatedAuthState != null) {
+            val state = session.walletInitiatedAuthState
+            context.respondRedirect(
+                "openid://?state=$state&error=invalid_request&error_description=${getErrorDescription(error)}"
+            )
+        } else if (error is VerificationUseCase.FailedVerificationException && error.redirectUrl != null) {
+            context.respond(HttpStatusCode.BadRequest, error.redirectUrl)
+        } else {
+            throw error
+        }
     } else {
-        logger.error(it) { "/verify error: $errorDescription" }
+        logger.error(error) { "/verify error: $errorDescription" }
         call.respond(HttpStatusCode.BadRequest, errorDescription)
     }
 }
 
 private suspend fun PipelineContext<Unit, ApplicationCall>.processVerificationSuccessResult(
     sessionId: String?,
-    it: String
+    redirectUrl: String,
 ) {
     val session = verificationUseCase.getSession(sessionId!!)
     if (session.walletInitiatedAuthState != null) {
@@ -491,6 +490,6 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.processVerificationSu
         val code = UUID().toString()
         context.respondRedirect("openid://?code=$code&state=$state")
     } else {
-        call.respond(HttpStatusCode.OK, it)
+        call.respond(HttpStatusCode.OK, redirectUrl)
     }
 }

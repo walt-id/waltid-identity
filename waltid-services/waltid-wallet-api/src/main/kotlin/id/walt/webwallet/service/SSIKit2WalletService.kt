@@ -258,6 +258,7 @@ class SSIKit2WalletService(
         } else if (resp.status.isSuccess()) {
             Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
         } else {
+            logger.debug { "Presentation failed, return = $httpResponseBody" }
             if (isResponseRedirectUrl) {
                 Result.failure(
                     PresentationError(
