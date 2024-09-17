@@ -54,15 +54,17 @@ data class DidDocConfig(
         ) = DidDocConfig(
             context = context,
             publicKeyMap = publicKeySet.associateBy { it.getKeyId() },
-            verificationConfigurationMap = VerificationRelationshipType
-                .entries
-                .associateWith { relType ->
-                    publicKeySet.map { publicKey ->
-                        VerificationMethodConfiguration(
-                            publicKeyId = publicKey.getKeyId(),
-                        )
-                    }.toSet()
-                },
+            verificationConfigurationMap = publicKeySet.takeIf{ it.isNotEmpty() }?.let{
+                VerificationRelationshipType
+                    .entries
+                    .associateWith {
+                        publicKeySet.map { publicKey ->
+                            VerificationMethodConfiguration(
+                                publicKeyId = publicKey.getKeyId(),
+                            )
+                        }.toSet()
+                    }
+            } ?: emptyMap(),
             serviceConfigurationSet = serviceConfigurationSet,
             rootCustomProperties = rootCustomProperties,
         )
@@ -73,7 +75,7 @@ data class DidDocConfig(
         @JsExport.Ignore
         suspend fun buildFromPublicKeySetVerificationConfiguration(
             context: List<String> = DidUtils.DEFAULT_CONTEXT,
-            verificationKeySetConfiguration: Map<VerificationRelationshipType, Set<Key>>,
+            verificationKeySetConfiguration: Map<VerificationRelationshipType, Set<Key>> = emptyMap(),
             serviceConfigurationSet: Set<ServiceConfiguration> = emptySet(),
             rootCustomProperties: Map<String, JsonElement>? = null,
         ) = verificationKeySetConfiguration.values.flatten().associateBy { it.getKeyId() }.let { publicKeyMap ->
@@ -82,6 +84,7 @@ data class DidDocConfig(
                 publicKeyMap = publicKeyMap,
                 verificationConfigurationMap = verificationKeySetConfiguration
                     .entries
+                    .filter { it.value.isNotEmpty() }
                     .associate { (verRelType, verRelPublicKeySet) ->
                         verRelType to verRelPublicKeySet.map { publicKey ->
                             VerificationMethodConfiguration(
@@ -127,7 +130,7 @@ data class DidDocConfig(
     @JsExport.Ignore
     suspend fun toDidDocument(did: String): DidDocument {
 
-        val verificationMethod = verificationConfigurationMap.mapTo(mutableSetOf()) { (verRelType, verConfSet) ->
+        val verificationMethod = verificationConfigurationMap.mapTo(mutableSetOf()) { (_, verConfSet) ->
             verConfSet.map { verConf ->
                 val key = publicKeyMap[verConf.publicKeyId]
                     ?: throw IllegalStateException(
@@ -144,7 +147,7 @@ data class DidDocConfig(
             }
         }.flatten().toSet()
         val verificationRelationship = verificationConfigurationMap
-            .mapValues { (verRelType, verConfSet) ->
+            .mapValues { (_, verConfSet) ->
                 verConfSet.map { verConf ->
                     VerificationRelationship
                         .buildFromId(
