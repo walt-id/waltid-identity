@@ -80,12 +80,12 @@ data class DidDocConfig(
             DidDocConfig(
                 context = context,
                 publicKeyMap = publicKeyMap,
-                verificationConfigurationMap = VerificationRelationshipType
+                verificationConfigurationMap = verificationKeySetConfiguration
                     .entries
-                    .associateWith { relType ->
-                        publicKeyMap.keys.map { publicKeyId ->
+                    .associate { (verRelType, verRelPublicKeySet) ->
+                        verRelType to verRelPublicKeySet.map { publicKey ->
                             VerificationMethodConfiguration(
-                                publicKeyId = publicKeyId,
+                                publicKeyId = publicKey.getKeyId(),
                             )
                         }.toSet()
                     },
