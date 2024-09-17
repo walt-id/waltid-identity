@@ -10,6 +10,7 @@ import id.walt.did.dids.registrar.dids.VerificationMethodConfiguration
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
 import id.walt.did.utils.randomUUID
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
 import kotlin.test.*
 
 class DidWebDocConfigTest {
@@ -273,6 +274,309 @@ class DidWebDocConfigTest {
                     )
                 )
             }
+        }
+    }
+
+    @Test
+    fun testBuildFromPublicKeySet() = runTest {
+        val publicKey = JWKKey.generate(KeyType.secp256r1).getPublicKey()
+        webRegistrar.register(
+            DidWebCreateOptions(
+                domain = domain,
+                path = path,
+                didDocConfig = DidDocConfig.buildFromPublicKeySet(
+                    publicKeySet = setOf(publicKey),
+                ),
+            )
+        ).didDocument.let { document ->
+            val expectedKeys = listOf(
+                "context",
+                "id",
+                "verificationMethod"
+            ) + VerificationRelationshipType.entries.map { it.toString() }
+            assertEquals(
+                expected = expectedKeys.size,
+                actual = document.keys.size,
+            )
+            expectedKeys.forEach {
+                assertContains(
+                    map = document,
+                    key = it,
+                )
+            }
+            assertTrue(
+                document["verificationMethod"] is JsonArray &&
+                        (document["verificationMethod"] as JsonArray).size == 1
+            )
+        }
+        val publicKeySet = setOf(
+            publicKey,
+            JWKKey.generate(KeyType.secp256k1).getPublicKey(),
+            JWKKey.generate(KeyType.RSA).getPublicKey(),
+        )
+        webRegistrar.register(
+            DidWebCreateOptions(
+                domain = domain,
+                path = path,
+                didDocConfig = DidDocConfig.buildFromPublicKeySet(
+                    publicKeySet = publicKeySet,
+                ),
+            )
+        ).didDocument.let { document ->
+            val expectedKeys = listOf(
+                "context",
+                "id",
+                "verificationMethod"
+            ) + VerificationRelationshipType.entries.map { it.toString() }
+            assertEquals(
+                expected = expectedKeys.size,
+                actual = document.keys.size,
+            )
+            expectedKeys.forEach {
+                assertContains(
+                    map = document,
+                    key = it,
+                )
+            }
+            assertTrue(
+                document["verificationMethod"] is JsonArray &&
+                        (document["verificationMethod"] as JsonArray).size == publicKeySet.size
+            )
+        }
+    }
+
+    @Test
+    fun testBuildFromPublicKeySetVerificationConfiguration() = runTest {
+        val verRelTypeList = listOf(
+            VerificationRelationshipType.Authentication,
+            VerificationRelationshipType.AssertionMethod,
+            VerificationRelationshipType.KeyAgreement,
+        )
+        val publicKey = JWKKey.generate(KeyType.secp256r1).getPublicKey()
+        //single key, one verification relationship at a time
+        VerificationRelationshipType.entries.forEach { verRelType ->
+            webRegistrar.register(
+                DidWebCreateOptions(
+                    domain = domain,
+                    path = path,
+                    didDocConfig = DidDocConfig
+                        .buildFromPublicKeySetVerificationConfiguration(
+                            verificationKeySetConfiguration = mapOf(
+                                verRelType to setOf(publicKey)
+                            )
+                        )
+                )
+            ).didDocument.let { document ->
+                val expectedKeys = listOf("context", "id", "verificationMethod", verRelType.toString())
+                assertEquals(
+                    expected = expectedKeys.size,
+                    actual = document.keys.size,
+                )
+                expectedKeys.forEach {
+                    assertContains(
+                        map = document,
+                        key = it,
+                    )
+                }
+                assertTrue(
+                    document["verificationMethod"] is JsonArray &&
+                            (document["verificationMethod"] as JsonArray).size == 1
+                )
+                assertTrue(
+                    document[verRelType.toString()] is JsonArray &&
+                            (document[verRelType.toString()] as JsonArray).size == 1
+                )
+            }
+        }
+        //single key, three verification relationships at a time
+        webRegistrar.register(
+            DidWebCreateOptions(
+                domain = domain,
+                path = path,
+                didDocConfig = DidDocConfig
+                    .buildFromPublicKeySetVerificationConfiguration(
+                        verificationKeySetConfiguration = verRelTypeList
+                            .associateWith {
+                                setOf(publicKey)
+                            },
+                    )
+            )
+        ).didDocument.let { document ->
+            val expectedKeys = listOf("context", "id", "verificationMethod") + verRelTypeList.map { it.toString() }
+            assertEquals(
+                expected = expectedKeys.size,
+                actual = document.keys.size,
+            )
+            expectedKeys.forEach {
+                assertContains(
+                    map = document,
+                    key = it,
+                )
+            }
+            assertTrue(
+                document["verificationMethod"] is JsonArray &&
+                        (document["verificationMethod"] as JsonArray).size == 1
+            )
+            verRelTypeList.forEach { verRelType ->
+                assertTrue(
+                    document[verRelType.toString()] is JsonArray &&
+                            (document[verRelType.toString()] as JsonArray).size == 1
+                )
+            }
+
+        }
+        //single key, all verification relationships
+        webRegistrar.register(
+            DidWebCreateOptions(
+                domain = domain,
+                path = path,
+                didDocConfig = DidDocConfig
+                    .buildFromPublicKeySetVerificationConfiguration(
+                        verificationKeySetConfiguration = VerificationRelationshipType
+                            .entries
+                            .associateWith {
+                                setOf(publicKey)
+                            },
+                    )
+            )
+        ).didDocument.let { document ->
+            val expectedKeys = listOf("context", "id", "verificationMethod") + VerificationRelationshipType.entries.map { it.toString() }
+            assertEquals(
+                expected = expectedKeys.size,
+                actual = document.keys.size,
+            )
+            expectedKeys.forEach {
+                assertContains(
+                    map = document,
+                    key = it,
+                )
+            }
+            assertTrue(
+                document["verificationMethod"] is JsonArray &&
+                        (document["verificationMethod"] as JsonArray).size == 1
+            )
+            verRelTypeList.forEach { verRelType ->
+                assertTrue(
+                    document[verRelType.toString()] is JsonArray &&
+                            (document[verRelType.toString()] as JsonArray).size == 1
+                )
+            }
+
+        }
+        val publicKeySet = setOf(
+            publicKey,
+            JWKKey.generate(KeyType.secp256k1).getPublicKey(),
+            JWKKey.generate(KeyType.RSA).getPublicKey(),
+        )
+        //multiple keys, one verification relationship at a time
+        VerificationRelationshipType.entries.forEach { verRelType ->
+            webRegistrar.register(
+                DidWebCreateOptions(
+                    domain = domain,
+                    path = path,
+                    didDocConfig = DidDocConfig
+                        .buildFromPublicKeySetVerificationConfiguration(
+                            verificationKeySetConfiguration = mapOf(
+                                verRelType to publicKeySet
+                            )
+                        )
+                )
+            ).didDocument.let { document ->
+                val expectedKeys = listOf("context", "id", "verificationMethod", verRelType.toString())
+                assertEquals(
+                    expected = expectedKeys.size,
+                    actual = document.keys.size,
+                )
+                expectedKeys.forEach {
+                    assertContains(
+                        map = document,
+                        key = it,
+                    )
+                }
+                assertTrue(
+                    document["verificationMethod"] is JsonArray &&
+                            (document["verificationMethod"] as JsonArray).size == publicKeySet.size
+                )
+                assertTrue(
+                    document[verRelType.toString()] is JsonArray &&
+                            (document[verRelType.toString()] as JsonArray).size == publicKeySet.size
+                )
+            }
+        }
+        //multiple keys, three verification relationships at a time
+        webRegistrar.register(
+            DidWebCreateOptions(
+                domain = domain,
+                path = path,
+                didDocConfig = DidDocConfig
+                    .buildFromPublicKeySetVerificationConfiguration(
+                        verificationKeySetConfiguration = verRelTypeList
+                            .associateWith {
+                                publicKeySet
+                            },
+                    )
+            )
+        ).didDocument.let { document ->
+            val expectedKeys = listOf("context", "id", "verificationMethod") + verRelTypeList.map { it.toString() }
+            assertEquals(
+                expected = expectedKeys.size,
+                actual = document.keys.size,
+            )
+            expectedKeys.forEach {
+                assertContains(
+                    map = document,
+                    key = it,
+                )
+            }
+            assertTrue(
+                document["verificationMethod"] is JsonArray &&
+                        (document["verificationMethod"] as JsonArray).size == publicKeySet.size
+            )
+            verRelTypeList.forEach { verRelType ->
+                assertTrue(
+                    document[verRelType.toString()] is JsonArray &&
+                            (document[verRelType.toString()] as JsonArray).size == publicKeySet.size
+                )
+            }
+
+        }
+        //multiple keys, all verification relationships
+        webRegistrar.register(
+            DidWebCreateOptions(
+                domain = domain,
+                path = path,
+                didDocConfig = DidDocConfig
+                    .buildFromPublicKeySetVerificationConfiguration(
+                        verificationKeySetConfiguration = VerificationRelationshipType
+                            .entries
+                            .associateWith {
+                                publicKeySet
+                            },
+                    )
+            )
+        ).didDocument.let { document ->
+            val expectedKeys = listOf("context", "id", "verificationMethod") + VerificationRelationshipType.entries.map { it.toString() }
+            assertEquals(
+                expected = expectedKeys.size,
+                actual = document.keys.size,
+            )
+            expectedKeys.forEach {
+                assertContains(
+                    map = document,
+                    key = it,
+                )
+            }
+            assertTrue(
+                document["verificationMethod"] is JsonArray &&
+                        (document["verificationMethod"] as JsonArray).size == publicKeySet.size
+            )
+            verRelTypeList.forEach { verRelType ->
+                assertTrue(
+                    document[verRelType.toString()] is JsonArray &&
+                            (document[verRelType.toString()] as JsonArray).size == publicKeySet.size
+                )
+            }
+
         }
     }
 }
