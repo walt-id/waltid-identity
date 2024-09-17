@@ -28,8 +28,8 @@ import kotlin.js.JsExport
 @Serializable
 data class DidDocConfig(
     val context: List<String> = DidUtils.DEFAULT_CONTEXT,
-    val keyMap: Map<String, Key> = emptyMap(),
-    val verificationConfigurationMap: Map<VerificationRelationshipType, Set<VerificationConfiguration>> = emptyMap(),
+    val publicKeyMap: Map<String, Key> = emptyMap(),
+    val verificationConfigurationMap: Map<VerificationRelationshipType, Set<VerificationMethodConfiguration>> = emptyMap(),
     val serviceConfigurationSet: Set<ServiceConfiguration> = emptySet(),
     val rootCustomProperties: Map<String, JsonElement>? = null,
 ) {
@@ -41,6 +41,58 @@ data class DidDocConfig(
             "verificationMethod",
             "service",
         ) + VerificationRelationshipType.entries.map { it.toString() }
+
+        @JvmBlocking
+        @JvmAsync
+        @JsPromise
+        @JsExport.Ignore
+        suspend fun buildFromPublicKeySet(
+            context: List<String> = DidUtils.DEFAULT_CONTEXT,
+            publicKeySet: Set<Key> = emptySet(),
+            serviceConfigurationSet: Set<ServiceConfiguration> = emptySet(),
+            rootCustomProperties: Map<String, JsonElement>? = null,
+        ) = DidDocConfig(
+            context = context,
+            publicKeyMap = publicKeySet.associateBy { it.getKeyId() },
+            verificationConfigurationMap = VerificationRelationshipType
+                .entries
+                .associateWith { relType ->
+                    publicKeySet.map { publicKey ->
+                        VerificationMethodConfiguration(
+                            publicKeyId = publicKey.getKeyId(),
+                        )
+                    }.toSet()
+                },
+            serviceConfigurationSet = serviceConfigurationSet,
+            rootCustomProperties = rootCustomProperties,
+        )
+
+        @JvmBlocking
+        @JvmAsync
+        @JsPromise
+        @JsExport.Ignore
+        suspend fun buildFromPublicKeySetVerificationConfiguration(
+            context: List<String> = DidUtils.DEFAULT_CONTEXT,
+            verificationKeySetConfiguration: Map<VerificationRelationshipType, Set<Key>>,
+            serviceConfigurationSet: Set<ServiceConfiguration> = emptySet(),
+            rootCustomProperties: Map<String, JsonElement>? = null,
+        ) = verificationKeySetConfiguration.values.flatten().associateBy { it.getKeyId() }.let { publicKeyMap ->
+            DidDocConfig(
+                context = context,
+                publicKeyMap = publicKeyMap,
+                verificationConfigurationMap = VerificationRelationshipType
+                    .entries
+                    .associateWith { relType ->
+                        publicKeyMap.keys.map { publicKeyId ->
+                            VerificationMethodConfiguration(
+                                publicKeyId = publicKeyId,
+                            )
+                        }.toSet()
+                    },
+                serviceConfigurationSet = serviceConfigurationSet,
+                rootCustomProperties = rootCustomProperties,
+            )
+        }
     }
 
     init {
@@ -49,17 +101,17 @@ data class DidDocConfig(
                 "Invalid attempt to override reserved root did document property with key ${it.key} via rootCustomProperties map"
             }
         }
-        keyMap.values.forEach {
+        publicKeyMap.values.forEach {
             require(!it.hasPrivateKey) { "The key map must contain only public keys" }
         }
-        if (verificationConfigurationMap.isNotEmpty()) require(keyMap.isNotEmpty()) {
+        if (verificationConfigurationMap.isNotEmpty()) require(publicKeyMap.isNotEmpty()) {
             "Key map cannot be empty when verification configuration map is not empty"
         }
         verificationConfigurationMap.forEach { (type, configSet) ->
             configSet.forEach { config ->
-                require(keyMap.containsKey(config.keyId))
-                val key = keyMap[config.keyId] ?: throw IllegalArgumentException(
-                    "Key ID ${config.keyId} is missing from key map but is defined " +
+                require(publicKeyMap.containsKey(config.publicKeyId))
+                val key = publicKeyMap[config.publicKeyId] ?: throw IllegalArgumentException(
+                    "Key ID ${config.publicKeyId} is missing from key map but is defined " +
                             "in verification configuration $config of type $type"
                 )
                 if (type == VerificationRelationshipType.KeyAgreement) {
@@ -77,13 +129,13 @@ data class DidDocConfig(
 
         val verificationMethod = verificationConfigurationMap.mapTo(mutableSetOf()) { (verRelType, verConfSet) ->
             verConfSet.map { verConf ->
-                val key = keyMap[verConf.keyId]
+                val key = publicKeyMap[verConf.publicKeyId]
                     ?: throw IllegalStateException(
                         "This exception should never happen, we have already checked " +
                                 "that all verification keys exist in the key map"
                     )
                 VerificationMethod(
-                    id = "$did#${verConf.keyId}",
+                    id = "$did#${verConf.publicKeyId}",
                     type = VerificationMethodType.JsonWebKey2020,
                     material = VerificationMaterialType.PublicKeyJwk to key.exportJWKObject(),
                     controller = did,
@@ -96,7 +148,7 @@ data class DidDocConfig(
                 verConfSet.map { verConf ->
                     VerificationRelationship
                         .buildFromId(
-                            id = "$did#${verConf.keyId}",
+                            id = "$did#${verConf.publicKeyId}",
                         )
                 }.toSet()
             }
@@ -104,7 +156,7 @@ data class DidDocConfig(
         val service = serviceConfigurationSet.mapTo(mutableSetOf()) {
             ServiceBlock(
                 id = "$did#${randomUUID()}",
-                type = it.type,
+                type = setOf(it.type),
                 serviceEndpoint = it.serviceEndpoint,
                 customProperties = it.customProperties,
             )
@@ -131,8 +183,8 @@ data class DidDocConfig(
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
-data class VerificationConfiguration(
-    val keyId: String,
+data class VerificationMethodConfiguration(
+    val publicKeyId: String,
     val customProperties: Map<String, JsonElement>? = null,
 )
 
@@ -140,7 +192,7 @@ data class VerificationConfiguration(
 @JsExport
 @Serializable
 data class ServiceConfiguration(
-    val type: Set<String>,
+    val type: String,
     val serviceEndpoint: Set<ServiceEndpoint>,
     val customProperties: Map<String, JsonElement>? = null,
 )
