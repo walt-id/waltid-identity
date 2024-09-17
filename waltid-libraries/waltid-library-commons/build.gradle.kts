@@ -11,9 +11,20 @@ repositories {
     mavenLocal()
     mavenCentral()
 }
+object Versions {
+    const val KTOR_VERSION = "2.3.12" // also change 1 plugin
+}
 
 dependencies {
     testImplementation(kotlin("test"))
+    // Ktor
+    api("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
+    api("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
+    api("io.ktor:ktor-server-status-pages-jvm:${Versions.KTOR_VERSION}")
+    api("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
+    api("io.ktor:ktor-serialization-kotlinx-json-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-auth-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
     // Logging
     api("io.klogging:klogging-jvm:0.7.0") // JVM + ~JS
