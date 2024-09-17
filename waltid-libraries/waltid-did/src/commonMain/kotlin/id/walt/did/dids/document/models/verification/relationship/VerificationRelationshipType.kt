@@ -4,6 +4,9 @@ import kotlinx.serialization.*
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+/**
+ * Enumerated type representing verification relationship types according to the respective section [DID Core](https://www.w3.org/TR/did-core/#verification-relationships) specification
+ */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
