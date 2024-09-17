@@ -16,20 +16,20 @@ class ServiceTest {
         "tit" to "tat".toJsonElement(),
     )
 
-    private val svcBlockSingleURLNoCustom = ServiceBlock(
+    private val svcBlockSingleURLNoCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(ServiceEndpointURL("some-url")),
     )
 
-    private val svcBlockSingleURLCustom = ServiceBlock(
+    private val svcBlockSingleURLCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(ServiceEndpointURL("some-url")),
         customProperties = customProperties,
     )
 
-    private val svcBlockMultipleURLNoCustom = ServiceBlock(
+    private val svcBlockMultipleURLNoCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
@@ -38,7 +38,7 @@ class ServiceTest {
         ),
     )
 
-    private val svcBlockMultipleURLCustom = ServiceBlock(
+    private val svcBlockMultipleURLCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
@@ -48,7 +48,7 @@ class ServiceTest {
         customProperties = customProperties,
     )
 
-    private val svcBlockSingleObjectNoCustom = ServiceBlock(
+    private val svcBlockSingleObjectNoCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
@@ -61,7 +61,7 @@ class ServiceTest {
         ),
     )
 
-    private val svcBlockSingleObjectCustom = ServiceBlock(
+    private val svcBlockSingleObjectCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
@@ -75,7 +75,7 @@ class ServiceTest {
         customProperties = customProperties,
     )
 
-    private val svcBlockMultipleObjectNoCustom = ServiceBlock(
+    private val svcBlockMultipleObjectNoCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
@@ -94,7 +94,7 @@ class ServiceTest {
         ),
     )
 
-    private val svcBlockMultipleObjectCustom = ServiceBlock(
+    private val svcBlockMultipleObjectCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(

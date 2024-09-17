@@ -5,7 +5,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.document.models.service.Service
-import id.walt.did.dids.document.models.service.ServiceBlock
+import id.walt.did.dids.document.models.service.ServiceMap
 import id.walt.did.dids.document.models.service.ServiceEndpoint
 import id.walt.did.dids.document.models.verification.method.VerificationMaterialType
 import id.walt.did.dids.document.models.verification.method.VerificationMethod
@@ -161,7 +161,7 @@ data class DidDocConfig(
 
         val service = serviceConfigurationSet
             .map {
-                ServiceBlock(
+                ServiceMap(
                     id = "$did#${randomUUID()}",
                     type = setOf(it.type),
                     serviceEndpoint = it.serviceEndpoint,
@@ -180,7 +180,7 @@ data class DidDocConfig(
                     put(verRelType.toString(), Json.encodeToJsonElement(verRelValue))
                 }
             }
-            if (service.serviceBlocks.isNotEmpty()) put("service", Json.encodeToJsonElement(service))
+            if (service.serviceMaps.isNotEmpty()) put("service", Json.encodeToJsonElement(service))
             rootCustomProperties?.forEach {
                 put(it.key, it.value)
             }

@@ -10,26 +10,31 @@ import kotlinx.serialization.json.*
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+/**
+ * Class for representing the service property of a DID document according to the respective section of the [DID Core](https://www.w3.org/TR/did-core/#services) specification
+ * @param serviceMaps A set of [ServiceMap] object instances.
+ * @see ServiceMap
+ */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable(with = ServiceSerializer::class)
-data class Service(val serviceBlocks: Set<ServiceBlock>)
+data class Service(val serviceMaps: Set<ServiceMap>)
 
 object ServiceSerializer : KSerializer<Service> {
-    private val internalSerializer = SetSerializer(ServiceBlock.serializer())
+    private val internalSerializer = SetSerializer(ServiceMap.serializer())
     override val descriptor: SerialDescriptor = internalSerializer.descriptor
 
     override fun serialize(encoder: Encoder, value: Service) =
         encoder.encodeSerializableValue(
-            SetSerializer(ServiceBlock.serializer()),
-            value.serviceBlocks,
+            SetSerializer(ServiceMap.serializer()),
+            value.serviceMaps,
         )
 
 
     override fun deserialize(decoder: Decoder): Service =
         Service(
             decoder.decodeSerializableValue(
-                SetSerializer(ServiceBlock.serializer()),
+                SetSerializer(ServiceMap.serializer()),
             )
         )
 }
@@ -40,10 +45,19 @@ private val reservedKeys = listOf(
     "serviceEndpoint",
 )
 
+/**
+ * Class for representing a service map of a DID Document's service property according to the respective section of the [DID Core](https://www.w3.org/TR/did-core/#services:~:text=is%20described%20below%3A-,service,-The%20service%20property) specification
+ * @param id The identifier of this [ServiceMap] instance
+ * @param type A set of strings that reflect the type(s) of this [ServiceMap]. Use of the [RegisteredServiceType] entries is recommended for the sake of interoperability, however, users are free to introduce their own custom types.
+ * @param serviceEndpoint A set of [ServiceEndpoint] instances with which this [ServiceMap] instance is associated.
+ * @param customProperties Optional user-defined custom properties that can be included in this [ServiceMap] instance.
+ * @see ServiceEndpoint
+ * @see RegisteredServiceType
+ */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable(with = ServiceBlockSerializer::class)
-data class ServiceBlock(
+data class ServiceMap(
     val id: String,
     val type: Set<String>,
     val serviceEndpoint: Set<ServiceEndpoint>,
@@ -60,15 +74,15 @@ data class ServiceBlock(
     }
 }
 
-object ServiceBlockSerializer : KSerializer<ServiceBlock> {
+object ServiceBlockSerializer : KSerializer<ServiceMap> {
     override val descriptor = JsonObject.serializer().descriptor
 
-    override fun deserialize(decoder: Decoder): ServiceBlock {
+    override fun deserialize(decoder: Decoder): ServiceMap {
         val jsonObject = decoder.decodeSerializableValue(JsonObject.serializer())
         reservedKeys.forEach {
             require(jsonObject.contains(it))
         }
-        return ServiceBlock(
+        return ServiceMap(
             id = Json.decodeFromJsonElement(jsonObject["id"]!!),
             type = jsonObject["type"]!!.let { element ->
                 when {
@@ -99,7 +113,7 @@ object ServiceBlockSerializer : KSerializer<ServiceBlock> {
         )
     }
 
-    override fun serialize(encoder: Encoder, value: ServiceBlock) {
+    override fun serialize(encoder: Encoder, value: ServiceMap) {
         encoder.encodeSerializableValue(
             JsonObject.serializer(),
             buildJsonObject {

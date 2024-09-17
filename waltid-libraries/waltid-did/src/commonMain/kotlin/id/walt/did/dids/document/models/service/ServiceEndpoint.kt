@@ -9,7 +9,7 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
 /**
- * Base class for representing a service endpoint according to the DID Core specification.
+ * Base class for representing a service endpoint according to the respective section of the [DID Core](https://www.w3.org/TR/did-core/#dfn-serviceendpoint) specification.
  * This can be either a URL (refer to [ServiceEndpointURL] ) or an arbitrary JSON object (refer to [ServiceEndpointObject]).
  * @see ServiceEndpointURL
  * @see ServiceEndpointObject
