@@ -47,6 +47,7 @@ val modules = listOf(
 
     "$libraries:waltid-did",
     "$libraries:waltid-java-compat",
+    "$libraries:waltid-library-commons",
 
     // Service commons
     "$services:waltid-service-commons",
@@ -83,3 +84,5 @@ plugins {
 }
 
 rootProject.name = "waltid-identity"
+include("waltid-libraries:waltid-library-commons")
+findProject(":waltid-libraries:waltid-library-commons")?.name = "waltid-library-commons"
