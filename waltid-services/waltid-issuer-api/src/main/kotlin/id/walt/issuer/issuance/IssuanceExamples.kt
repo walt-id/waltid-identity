@@ -157,6 +157,16 @@ object IssuanceExamples {
           }
     """.trimIndent()
 
+    private val ietfSdJwtmapping = """
+        {
+            "id":"<uuid>",
+            "iat": "<timestamp-seconds>",
+            "nbf": "<timestamp-seconds>",
+            "exp": "<timestamp-in-seconds:365d>"
+          }
+    """.trimIndent()
+
+
     // language=json
     val openBadgeCredentialIssuance = """
         {
@@ -377,7 +387,7 @@ object IssuanceExamples {
             {
                 "issuerKey": $issuerKey,
                 "issuerDid": $issuerDid,
-                "credentialConfigurationId": "OpenBadgeCredential_${VCFormat.jwt_vc.value}",
+                "credentialConfigurationId": "OpenBadgeCredential_${VCFormat.jwt_vc_json.value}",
                 "credentialData": $openBadgeCredentialData,
                 "mdocData": null,
                 "mapping": $mapping,
@@ -707,7 +717,6 @@ object IssuanceExamples {
     // language=json
     private val sdjwt_vc_identity_credential = """
     {
-     "vct": "identity_credential_vc+sd-jwt",
      "given_name": "John",
      "family_name": "Doe",
      "email": "johndoe@example.com",
@@ -732,11 +741,10 @@ object IssuanceExamples {
                 "type": "jwk",
                 "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
             },
-            "issuerDid": "",
             "credentialConfigurationId": "identity_credential_vc+sd-jwt",
             "credentialData": $sdjwt_vc_identity_credential,
             "mdocData": null,
-            "mapping": $mapping,
+            "mapping": $ietfSdJwtmapping,
             "selectiveDisclosure":
             {
                 "fields":
@@ -757,4 +765,70 @@ object IssuanceExamples {
     """.trimIndent()
 
     val sdJwtVCExample = typedValueExampleDescriptorDsl<IssuanceRequest>(sdJwtVCData)
+
+    val sdJwtVCDataWithIssuerDid = """
+        {
+            "issuerKey": { 
+                "type": "jwk",
+                "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
+            },
+            "credentialConfigurationId": "identity_credential_vc+sd-jwt",
+            "credentialData": $sdjwt_vc_identity_credential,
+            "mdocData": null,
+            "mapping": $ietfSdJwtmapping,
+            "selectiveDisclosure":
+            {
+                "fields":
+                {
+                    "birthdate":
+                    {
+                        "sd": true
+                    },
+                    "family_name":
+                    {
+                        "sd": false
+                    }
+                }
+            },
+            "issuerDid": "${LspPotentialIssuanceInterop.ISSUER_DID}"
+        }
+    """.trimIndent()
+
+    val sdJwtVCWithIssuerDidExample = typedValueExampleDescriptorDsl<IssuanceRequest>(sdJwtVCDataWithIssuerDid)
+
+    val sdJwtVCDataWithSDSub = """
+        {
+            "issuerKey": { 
+                "type": "jwk",
+                "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
+            },
+            "credentialConfigurationId": "identity_credential_vc+sd-jwt",
+            "credentialData": $sdjwt_vc_identity_credential,
+            "mdocData": null,
+            "mapping": $ietfSdJwtmapping,
+            "selectiveDisclosure":
+            {
+                "fields":
+                {
+                    "birthdate":
+                    {
+                        "sd": true
+                    },
+                    "sub":
+                    {
+                        "sd": true
+                    },
+                    "iat":
+                    {
+                        "sd": true
+                    }
+                }
+            },
+            "x5Chain": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ISSUER_CERT) }},
+            "trustedRootCAs": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT) }}
+        }
+    """.trimIndent()
+
+    val sdJwtVCExampleWithSDSub = typedValueExampleDescriptorDsl<IssuanceRequest>(sdJwtVCDataWithSDSub)
+
 }

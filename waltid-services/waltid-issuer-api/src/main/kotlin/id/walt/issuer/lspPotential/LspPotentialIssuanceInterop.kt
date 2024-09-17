@@ -3,11 +3,13 @@ package id.walt.issuer.lspPotential
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.commons.interop.LspPotentialInterop
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.did.dids.registrar.dids.DidCreateOptions
+import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
-import id.walt.issuer.issuance.IssuanceType
 import id.walt.issuer.issuance.createCredentialOfferUri
 import id.walt.oid4vc.data.AuthenticationMethod
+import id.walt.oid4vc.data.CredentialFormat
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
@@ -24,12 +26,23 @@ object LspPotentialIssuanceInterop {
                 .toJSONString()
         ).getOrThrow()
     }
+    val ISSUER_DID = runBlocking {
+        DidJwkRegistrar().registerByKey(POTENTIAL_ISSUER_JWK_KEY, DidCreateOptions("jwk", mapOf())).did
+    }
 
-    fun createInteropSampleCredentialOfferUri(issuanceRequestExample: String): String = runBlocking {
+    fun createInteropSampleCredentialOfferUrimDL(issuanceRequestExample: String): String = runBlocking {
         createCredentialOfferUri(
             listOf(
                 Json.decodeFromString<IssuanceRequest>(issuanceRequestExample).copy(authenticationMethod = AuthenticationMethod.NONE)
-            ), IssuanceType.sdjwt
+            ), CredentialFormat.mso_mdoc
+        )
+    }
+
+    fun createInteropSampleCredentialOfferUriSdJwt(issuanceRequestExample: String): String = runBlocking {
+        createCredentialOfferUri(
+            listOf(
+                Json.decodeFromString<IssuanceRequest>(issuanceRequestExample).copy(authenticationMethod = AuthenticationMethod.NONE)
+            ), CredentialFormat.sd_jwt_vc
         )
     }
 }
@@ -40,7 +53,7 @@ fun Application.lspPotentialIssuanceTestApi() {
             tags = listOf("LSP Potential Interop test endpoints")
         }) {
             get("lspPotentialCredentialOfferT1") {
-                val offerUri = LspPotentialIssuanceInterop.createInteropSampleCredentialOfferUri(
+                val offerUri = LspPotentialIssuanceInterop.createInteropSampleCredentialOfferUrimDL(
                     IssuanceExamples.mDLCredentialIssuanceData
                 )
                 context.respond(
@@ -48,7 +61,7 @@ fun Application.lspPotentialIssuanceTestApi() {
                 )
             }
             get("lspPotentialCredentialOfferT2") {
-                val offerUri = LspPotentialIssuanceInterop.createInteropSampleCredentialOfferUri(
+                val offerUri = LspPotentialIssuanceInterop.createInteropSampleCredentialOfferUriSdJwt(
                     IssuanceExamples.sdJwtVCData
                 )
                 context.respond(

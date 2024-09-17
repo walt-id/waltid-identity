@@ -195,18 +195,18 @@ class SSIKit2WalletService(
 
         logger.debug { "Using presentation request, selected credentials: ${parameter.selectedCredentials}" }
 
-        SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[authReq.state!!] =
-            parameter.selectedCredentials
-        if (parameter.disclosures != null) {
-            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[authReq.state!!] =
-                parameter.disclosures
-        }
-
         val presentationSession =
             credentialWallet.initializeAuthorization(authReq, 60.seconds, parameter.selectedCredentials.toSet())
         logger.debug { "Initialized authorization (VPPresentationSession): $presentationSession" }
 
         logger.debug { "Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}" }
+
+        SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
+            parameter.selectedCredentials
+        if (parameter.disclosures != null) {
+            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
+                parameter.disclosures
+        }
 
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest!!)
         val submitFormParams = getFormParameters(presentationSession.authorizationRequest, tokenResponse, presentationSession)
@@ -268,7 +268,10 @@ class SSIKit2WalletService(
                 Result.failure(
                     PresentationError(
                         message =
-                        if (httpResponseBody != null) "Presentation failed:\n $httpResponseBody"
+                        if (httpResponseBody != null) {
+                            Json.parseToJsonElement(httpResponseBody).jsonObject["message"]?.jsonPrimitive?.content
+                                ?: "Presentation failed"
+                        }
                         else "Presentation failed",
                         redirectUri = ""
                     )
@@ -321,6 +324,8 @@ class SSIKit2WalletService(
         )
         return addableCredentials
     }
+
+    override suspend fun resolveVct(vct: String) = IssuanceService.resolveVct(vct)
 
     override suspend fun resolveCredentialOffer(
         offerRequest: CredentialOfferRequest,

@@ -52,9 +52,25 @@ export async function useIssuance(query: any) {
 
     let credentialTypes: String[] = [];
     for (let credentialListElement of credentialList) {
-        const typeList = credentialListElement["types"] as Array<String>;
-        const lastType = typeList[typeList.length - 1] as String;
-        credentialTypes.push(lastType);
+
+        if (typeof credentialListElement["credential_definition"] !== 'undefined') {
+            const typeList = credentialListElement["credential_definition"]["type"] as Array<String>;
+            const lastType = typeList[typeList.length - 1] as String;
+            credentialTypes.push(lastType);
+        }
+
+        if (typeof credentialListElement["vct"] !== 'undefined') {
+
+            const response = await fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolveVctUrl?vct=${credentialListElement["vct"]}`);
+
+            if (response.status < 200 || response.status >= 300) {
+                throw new Error(`VCT URL returns error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const nameOrDescription = data.name ?? data.description ?? data.vct ?? null
+            credentialTypes.push(nameOrDescription);
+        }
     }
     const credentialCount = credentialTypes.length;
 

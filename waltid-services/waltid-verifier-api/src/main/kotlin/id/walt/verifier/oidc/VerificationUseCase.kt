@@ -11,6 +11,7 @@ import id.walt.credentials.verification.policies.JwtSignaturePolicy
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.OpenId4VPProfile
@@ -25,6 +26,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import java.security.KeyFactory
@@ -32,8 +34,7 @@ import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
-import java.util.Base64
-import kotlin.collections.set
+import java.util.*
 
 class VerificationUseCase(
     val http: HttpClient, cryptoProvider: JWTCryptoProvider,
@@ -43,7 +44,6 @@ class VerificationUseCase(
         vpPoliciesJson: JsonElement?,
         vcPoliciesJson: JsonElement?,
         requestCredentialsJson: JsonElement,
-        presentationDefinitionJson: JsonElement?,
         responseMode: ResponseMode,
         responseType: ResponseType? = ResponseType.VpToken,
         successRedirectUri: String?,
@@ -59,19 +59,14 @@ class VerificationUseCase(
 
         val vcPolicies = vcPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
 
-        val requestCredentialsArr = requestCredentialsJson.jsonArray
-
-        val requestedTypes = requestCredentialsArr.map {
+        val requestedCredentials = requestCredentialsJson.jsonArray.map {
             when (it) {
-                is JsonPrimitive -> it.contentOrNull
-                is JsonObject -> it["credential"]?.jsonPrimitive?.contentOrNull
+                is JsonObject -> Json.decodeFromJsonElement<RequestedCredential>(it)
                 else -> throw IllegalArgumentException("Invalid JSON type for requested credential: $it")
-            } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
+            }
         }
 
-        val presentationDefinition =
-            (presentationDefinitionJson?.let { PresentationDefinition.fromJSON(it.jsonObject) })
-                ?: PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes, openId4VPProfile)
+        val presentationDefinition = PresentationDefinition(inputDescriptors = requestedCredentials.map { it.toInputDescriptor() })
 
         logger.debug { "Presentation definition: " + presentationDefinition.toJSON() }
 
@@ -88,10 +83,8 @@ class VerificationUseCase(
             trustedRootCAs = trustedRootCAs?.map { it.jsonPrimitive.content }
         )
 
-        val specificPolicies = requestCredentialsArr.filterIsInstance<JsonObject>().associate {
-            (it["credential"]
-                ?: throw IllegalArgumentException("No `credential` name supplied, in `request_credentials`.")).jsonPrimitive.content to (it["policies"]
-                ?: throw IllegalArgumentException("No `policies` supplied, in `request_credentials`.")).jsonArray.parsePolicyRequests()
+        val specificPolicies = requestedCredentials.filter { !it.policies.isNullOrEmpty() }.associate {
+            it.id to it.policies!!.parsePolicyRequests()
         }
 
         OIDCVerifierService.sessionVerificationInfos[session.id] = OIDCVerifierService.SessionVerificationInformation(
@@ -111,12 +104,34 @@ class VerificationUseCase(
         session
     }
 
-    fun getSession(sessionId: String): PresentationSession = sessionId.let { OIDCVerifierService.getSession(it) }!!
+    fun createSession(
+        vpPoliciesJson: JsonElement?,
+        vcPoliciesJson: JsonElement?,
+        presentationDefinitionJson: JsonObject,
+        responseMode: ResponseMode,
+        responseType: ResponseType? = ResponseType.VpToken,
+        successRedirectUri: String?,
+        errorRedirectUri: String?,
+        statusCallbackUri: String?,
+        statusCallbackApiKey: String?,
+        stateId: String?,
+        openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT,
+        walletInitiatedAuthState: String? = null,
+        trustedRootCAs: JsonArray? = null
+    ): PresentationSession {
+        return createSession(
+            vpPoliciesJson, vcPoliciesJson,
+            requestCredentialsJson = JsonArray(Json.decodeFromJsonElement<PresentationDefinition>(presentationDefinitionJson).inputDescriptors.map {
+            RequestedCredential(inputDescriptor = it, policies = null).toJsonElement()
+        }), responseMode, responseType, successRedirectUri, errorRedirectUri, statusCallbackUri, statusCallbackApiKey, stateId,
+            openId4VPProfile, walletInitiatedAuthState, trustedRootCAs)
+    }
 
-    fun verify(sessionId: String?, tokenResponseParameters: Map<String, List<String>>): Result<String> {
+    fun getSession(sessionId: String): PresentationSession = sessionId.let { OIDCVerifierService.getSession(it) }
+
+    fun verify(sessionId: String, tokenResponseParameters: Map<String, List<String>>): Result<String> {
         logger.debug { "Verifying session $sessionId" }
-        val session = sessionId?.let { OIDCVerifierService.getSession(it) }
-            ?: return Result.failure(Exception("State parameter doesn't refer to an existing session, or session expired"))
+        val session = OIDCVerifierService.getSession(sessionId)
         val tokenResponse = when (TokenResponse.isDirectPostJWT(tokenResponseParameters)) {
             true -> TokenResponse.fromDirectPostJWT(
                 tokenResponseParameters,
@@ -126,7 +141,7 @@ class VerificationUseCase(
             else -> TokenResponse.fromHttpParameters(tokenResponseParameters)
         }
         val sessionVerificationInfo = OIDCVerifierService.sessionVerificationInfos[session.id] ?: return Result.failure(
-            IllegalStateException("No session verification information found for session id!")
+            NotFoundException("No session verification information found for session id: ${session.id}")
         )
 
         val maybePresentationSessionResult = runCatching { OIDCVerifierService.verify(tokenResponse, session) }
@@ -164,7 +179,6 @@ class VerificationUseCase(
 
     fun getResult(sessionId: String): Result<PresentationSessionInfo> {
         val session = OIDCVerifierService.getSession(sessionId)
-            ?: return Result.failure(IllegalArgumentException("Invalid id provided (expired?): $sessionId"))
 
         val policyResults = OIDCVerifierService.policyResults[session.id]?.let { Json.encodeToJsonElement(it).jsonObject }
 
@@ -177,14 +191,20 @@ class VerificationUseCase(
     }
 
     fun getPresentationDefinition(sessionId: String): Result<PresentationDefinition> =
-        OIDCVerifierService.getSession(sessionId)?.presentationDefinition?.let {
+        OIDCVerifierService.getSession(sessionId).presentationDefinition.let {
             Result.success(it)
-        } ?: Result.failure(IllegalArgumentException("Invalid id provided (expired?): $sessionId"))
+        }
 
-    fun getSignedAuthorizationRequestObject(sessionId: String): Result<String> =
-        OIDCVerifierService.getSession(sessionId)?.authorizationRequest?.let {
-            Result.success(it.toRequestObject(RequestSigningCryptoProvider, RequestSigningCryptoProvider.signingKey.keyID.orEmpty()))
-        } ?: Result.failure(IllegalArgumentException("Invalid id provided (expired?): $sessionId"))
+
+    fun getSignedAuthorizationRequestObject(sessionId: String): Result<String> = runCatching {
+        checkNotNull(OIDCVerifierService.getSession(sessionId).authorizationRequest) {
+            "No authorization request found for session id: $sessionId"
+        }
+        OIDCVerifierService.getSession(sessionId).authorizationRequest!!.toRequestObject(
+            RequestSigningCryptoProvider, RequestSigningCryptoProvider.signingKey.keyID.orEmpty()
+        )
+    }
+
 
     suspend fun notifySubscribers(sessionId: String) = runCatching {
         OIDCVerifierService.sessionVerificationInfos[sessionId]?.statusCallback?.let {
@@ -198,7 +218,10 @@ class VerificationUseCase(
         }
     }
 
-    fun getClientIdScheme(openId4VPProfile: OpenId4VPProfile, defaultClientIdScheme: ClientIdScheme): ClientIdScheme {
+    private fun getClientIdScheme(
+        openId4VPProfile: OpenId4VPProfile,
+        defaultClientIdScheme: ClientIdScheme
+    ): ClientIdScheme {
         return when (openId4VPProfile) {
             OpenId4VPProfile.ISO_18013_7_MDOC -> ClientIdScheme.X509SanDns
             else -> defaultClientIdScheme

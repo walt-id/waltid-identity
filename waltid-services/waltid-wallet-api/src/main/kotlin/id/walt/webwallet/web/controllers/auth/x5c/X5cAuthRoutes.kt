@@ -7,7 +7,7 @@ const val x5cAuthPath = "auth/x5c"
 val x5cAuthTags = listOf("X5C Authentication")
 
 fun Application.x5cAuthRoutes() = webWalletRoute {
-    X5CLoginController().routes("login").invoke(this)
+    X5CLoginController().routes("login")(this)
     X5CRegisterController().routes("register")(this)
     X5CLogoutController().routes("logout")(this)
 }
