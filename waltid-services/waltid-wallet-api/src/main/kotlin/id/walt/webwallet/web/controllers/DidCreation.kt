@@ -33,12 +33,6 @@ object DidCreation {
 
         post(DidJwkMethodName, {
             summary = "Create a did:jwk"
-            request {
-                queryParameter<String?>("keyId") {
-                    description = "Optionally set key ID"
-                    required = false
-                }
-            }
         }) {
             getWalletService().createDid(
                 DidJwkMethodName, extractDidCreateParameters(DidJwkMethodName, context.request.queryParameters)
