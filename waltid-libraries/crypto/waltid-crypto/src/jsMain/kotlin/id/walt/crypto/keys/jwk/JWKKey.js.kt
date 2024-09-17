@@ -135,6 +135,7 @@ actual class JWKKey actual constructor(
         return crypto.sign(
             when (keyType) {
                 KeyType.Ed25519 -> null
+                KeyType.X25519 -> throw IllegalArgumentException("Type $keyType cannot be used for signing.")
                 else -> "sha256"
             },
             plaintext,
@@ -169,6 +170,7 @@ actual class JWKKey actual constructor(
             val verified = crypto.verify(
                 when (keyType) {
                     KeyType.Ed25519 -> null
+                    KeyType.X25519 -> throw IllegalArgumentException("Type $keyType cannot be used for signing.")
                     else -> "sha256"
                 },
                 detachedPlaintext ?: signed,
@@ -252,8 +254,8 @@ actual class JWKKey actual constructor(
                         }
 
                         "ed25519" -> KeyType.Ed25519
-
-                        "x448", "x25519", "ed448" -> TODO("Unsupported asymmetricKeyType: ${k.asymmetricKeyType}")
+                        "x25519" -> KeyType.X25519
+                        "x448", "ed448" -> TODO("Unsupported asymmetricKeyType: ${k.asymmetricKeyType}")
                         else -> throw IllegalArgumentException("Unknown asymmetricKeyType: ${k.asymmetricKeyType}")
                     }
                 }

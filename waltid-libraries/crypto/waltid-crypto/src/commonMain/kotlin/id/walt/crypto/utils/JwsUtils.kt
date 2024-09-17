@@ -19,6 +19,7 @@ object JwsUtils {
 
     fun KeyType.jwsAlg() = when (this) {
         KeyType.Ed25519 -> "EdDSA"
+        KeyType.X25519 -> throw IllegalArgumentException("Not supported type: $this")
         KeyType.secp256r1 -> "ES256"
         KeyType.secp256k1 -> "ES256K"
         KeyType.RSA -> "RS256" // TODO: RS384 RS512

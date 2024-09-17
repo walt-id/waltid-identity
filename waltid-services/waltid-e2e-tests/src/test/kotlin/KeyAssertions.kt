@@ -11,6 +11,7 @@ fun assertKeyComponents(document: JsonElement, keyId: String, type: KeyType, isP
     assertNotNull(document.tryGetData("kty")?.jsonPrimitive?.content) { "Missing _kty_ component!" }
     when (type) {
         KeyType.Ed25519 -> assertEd25519KeyComponents(document, isPrivate)
+        KeyType.X25519 -> assertX25519KeyComponents(document, isPrivate)
         KeyType.secp256k1 -> assertSecp256k1KeyComponents(document, isPrivate)
         KeyType.secp256r1 -> assertSecp256r1KeyComponents(document, isPrivate)
         KeyType.RSA -> assertRSAKeyComponents(document, isPrivate)
@@ -21,6 +22,15 @@ fun assertEd25519KeyComponents(document: JsonElement, isPrivate: Boolean) {
     assert(document.tryGetData("kty")?.jsonPrimitive?.content == "OKP") { "Wrong _kty_ value!" }
     assertNotNull(document.tryGetData("crv")?.jsonPrimitive?.content) { "Missing _crv_ component!" }
     assert(document.tryGetData("crv")?.jsonPrimitive?.content == "Ed25519") { "Wrong _crv_ value!" }
+    assertNotNull(document.tryGetData("x")?.jsonPrimitive?.content) { "Missing _x_ component!" }
+    if (isPrivate) assertNotNull(document.tryGetData("d")?.jsonPrimitive?.content) { "Missing _d_ component!" }
+}
+
+
+fun assertX25519KeyComponents(document: JsonElement, isPrivate: Boolean) {
+    assert(document.tryGetData("kty")?.jsonPrimitive?.content == "OKP") { "Wrong _kty_ value!" }
+    assertNotNull(document.tryGetData("crv")?.jsonPrimitive?.content) { "Missing _crv_ component!" }
+    assert(document.tryGetData("crv")?.jsonPrimitive?.content == "X25519") { "Wrong _crv_ value!" }
     assertNotNull(document.tryGetData("x")?.jsonPrimitive?.content) { "Missing _x_ component!" }
     if (isPrivate) assertNotNull(document.tryGetData("d")?.jsonPrimitive?.content) { "Missing _d_ component!" }
 }

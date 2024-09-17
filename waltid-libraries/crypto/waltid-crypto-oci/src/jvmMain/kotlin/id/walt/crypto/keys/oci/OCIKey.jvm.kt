@@ -123,6 +123,7 @@ actual class OCIKey actual constructor(
     private val _internalJwsAlgorithm by lazy {
         when (keyType) {
             KeyType.Ed25519 -> JWSAlgorithm.EdDSA
+            KeyType.X25519 -> throw IllegalArgumentException("trying to sign a non-signable key of type $keyType")
             KeyType.secp256k1 -> JWSAlgorithm.ES256K
             KeyType.secp256r1 -> JWSAlgorithm.ES256
             KeyType.RSA -> JWSAlgorithm.RS256 // TODO: RS384 RS512
@@ -226,8 +227,10 @@ actual class OCIKey actual constructor(
         private fun keyTypeToOciKeyMapping(type: KeyType) = when (type) {
             KeyType.secp256r1 -> "ECDSA"
             KeyType.RSA -> "RSA"
+
             KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")
             KeyType.Ed25519 -> throw IllegalArgumentException("Not supported: $type")
+            KeyType.X25519 -> throw IllegalArgumentException("Not supported: $type")
         }
 
         private fun ociKeyToKeyTypeMapping(type: String) = when (type) {

@@ -409,6 +409,11 @@ object IssuanceExamples {
         onboardingRequestWithKey(KeyType.Ed25519)
     )
 
+
+    val issuerOnboardingRequestDefaultX25519Example = typedValueExampleDescriptorDsl<OnboardingRequest>(
+        onboardingRequestWithKey(KeyType.X25519)
+    )
+
     val issuerOnboardingRequestDefaultSecp256r1Example = typedValueExampleDescriptorDsl<OnboardingRequest>(
         onboardingRequestWithKey(KeyType.secp256r1)
     )

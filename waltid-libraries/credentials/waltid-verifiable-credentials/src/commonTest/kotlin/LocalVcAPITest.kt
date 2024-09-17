@@ -10,7 +10,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 
-val keysToTest = listOf(KeyType.Ed25519, KeyType.secp256r1, KeyType.secp256k1, KeyType.RSA)
+val keysToTest = listOf(KeyType.Ed25519, KeyType.X25519, KeyType.secp256r1, KeyType.secp256k1, KeyType.RSA)
 
 private suspend fun init(didMethodsToTest: List<String>) {
     DidService.minimalInit()
@@ -47,7 +47,7 @@ private suspend fun testCreateSignCredential(didMethodsToTest: List<String>, key
 }
 
 private suspend fun testDidMethod(didMethod: String, key: JWKKey) {
-    if (didMethod == "cheqd" && key.keyType != KeyType.Ed25519) {
+    if (didMethod == "cheqd" && key.keyType != KeyType.Ed25519 && key.keyType != KeyType.X25519) {
         return
     }
     println("REGISTER $didMethod, KEY $key ")
@@ -56,24 +56,26 @@ private suspend fun testDidMethod(didMethod: String, key: JWKKey) {
     assertNotNull(vc)
     testIssuerDid(vc["issuer"], "did:$didMethod")
 
-    // Sign VC with did method (JWS)
-    val jws = vc.signJws(
-        issuerKey = key,
-        issuerDid = did,
-        subjectDid = did
-    )
-    assertNotNull(jws)
-    println("did:$didMethod (JWT) SIGNATURE = $jws")
+    if (key.keyType != KeyType.X25519) {
+        // Sign VC with did method (JWS)
+        val jws = vc.signJws(
+            issuerKey = key,
+            issuerDid = did,
+            subjectDid = did
+        )
+        assertNotNull(jws)
+        println("did:$didMethod (JWT) SIGNATURE = $jws")
 
-    // Sign VC with did method (SD-JWT)
-    val sdJwt = vc.signSdJwt(
-        issuerKey = key,
-        issuerKeyId = did,
-        subjectDid = did,
-        SDMap(emptyMap()) // empty selective disclosure map, we'll test this elsewhere
-    )
-    assertNotNull(sdJwt)
-    println("did:$didMethod (SD-JWT) SIGNATURE = $sdJwt")
+        // Sign VC with did method (SD-JWT)
+        val sdJwt = vc.signSdJwt(
+            issuerKey = key,
+            issuerKeyId = did,
+            subjectDid = did,
+            SDMap(emptyMap()) // empty selective disclosure map, we'll test this elsewhere
+        )
+        assertNotNull(sdJwt)
+        println("did:$didMethod (SD-JWT) SIGNATURE = $sdJwt")
+    }
 }
 
 private fun testIssuerDid(did: JsonElement?, key: String) {
@@ -99,30 +101,32 @@ private suspend fun testWeb(key: JWKKey) {
     val vc = createVC(didWebResult.did)
     assertNotNull(vc)
     testIssuerDid(vc["issuer"], "did:web")
-    // Sign VC with WEB
-    val jws = vc.signJws(
-        issuerKey = key,
-        issuerDid = didWebResult.did,
-        subjectDid = didWebResult.did
-    )
+    // Sign VC with WEB for non-X25519 keys
+    if (key.keyType != KeyType.X25519) {
+        val jws = vc.signJws(
+            issuerKey = key,
+            issuerDid = didWebResult.did,
+            subjectDid = didWebResult.did
+        )
 
-    assertNotNull(jws)
-    println("did:web (JWT) SIGNATURE = $jws")
+        assertNotNull(jws)
+        println("did:web (JWT) SIGNATURE = $jws")
 
-    // Sign VC with WEB (SD-JWT)
-    val sdJwt = vc.signSdJwt(
-        issuerKey = key,
-        issuerKeyId = didWebResult.did,
-        subjectDid = didWebResult.did,
-        SDMap(emptyMap()) // empty selective disclosure map, we'll test this elsewhere
-    )
-    assertNotNull(sdJwt)
-    println("did:web (SD-JWT) SIGNATURE = $sdJwt")
+        // Sign VC with WEB (SD-JWT)
+        val sdJwt = vc.signSdJwt(
+            issuerKey = key,
+            issuerKeyId = didWebResult.did,
+            subjectDid = didWebResult.did,
+            SDMap(emptyMap()) // empty selective disclosure map, we'll test this elsewhere
+        )
+        assertNotNull(sdJwt)
+        println("did:web (SD-JWT) SIGNATURE = $sdJwt")
+    }
 }
 
 
 suspend fun testCheqd(key: JWKKey) {
-    if (key.keyType != KeyType.Ed25519) {
+    if (key.keyType != KeyType.Ed25519 && key.keyType != KeyType.X25519) {
         return
     }
     val cheqdid = DidService.registerByKey("cheqd", key).did

@@ -28,6 +28,7 @@ object JvmJWKKeyCreator : JWKKeyCreator {
     override suspend fun generate(type: KeyType, metadata: JwkKeyMeta?): JWKKey {
         val keyGenerator: JWKGenerator<out JWK> = when (type) {
             KeyType.Ed25519 -> OctetKeyPairGenerator(Curve.Ed25519)
+            KeyType.X25519 -> OctetKeyPairGenerator(Curve.X25519)
             KeyType.secp256r1 -> ECKeyGenerator(Curve.P_256)
             KeyType.secp256k1 -> ECKeyGenerator(Curve.SECP256K1)
             KeyType.RSA -> RSAKeyGenerator(metadata?.keySize ?: 2048)
@@ -46,6 +47,7 @@ object JvmJWKKeyCreator : JWKKeyCreator {
         JWKKey(
             when (type) {
                 KeyType.Ed25519 -> OctetKeyPair.Builder(Curve.Ed25519, Base64URL.encode(rawPublicKey)).build()
+                KeyType.X25519 -> OctetKeyPair.Builder(Curve.X25519, Base64URL.encode(rawPublicKey)).build()
                 KeyType.secp256k1 -> ecRawToJwk(rawPublicKey, Curve.SECP256K1)
                 KeyType.secp256r1 -> ecRawToJwk(rawPublicKey, Curve.P_256)
                 KeyType.RSA -> rawRsaToJwk(rawPublicKey)

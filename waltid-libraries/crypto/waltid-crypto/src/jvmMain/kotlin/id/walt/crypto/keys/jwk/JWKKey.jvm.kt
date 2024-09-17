@@ -73,6 +73,7 @@ actual class JWKKey actual constructor(
 
     actual override suspend fun getPublicKeyRepresentation(): ByteArray = when (keyType) {
         KeyType.Ed25519 -> _internalJwk.toOctetKeyPair().decodedX
+        KeyType.X25519 -> _internalJwk.toOctetKeyPair().decodedX
         KeyType.RSA -> getRsaPublicKeyBytes(_internalJwk.toRSAKey().toPublicKey())
         KeyType.secp256k1, KeyType.secp256r1 ->  getECPublicKeyBytes(_internalJwk.toECKey().toECPublicKey())
     }
@@ -103,6 +104,7 @@ actual class JWKKey actual constructor(
             }
 
             KeyType.Ed25519 -> throw NotImplementedError("Ed25519 keys cannot be exported as PEM yet.")
+            KeyType.X25519 -> throw NotImplementedError("X25519 keys cannot be exported as PEM yet.")
 
             KeyType.RSA -> _internalJwk.toRSAKey().let {
                 if (hasPrivateKey) {
@@ -133,6 +135,7 @@ actual class JWKKey actual constructor(
     private val _internalSigner: JWSSigner by lazy {
         when (keyType) {
             KeyType.Ed25519 -> Ed25519Signer(_internalJwk as OctetKeyPair)
+            KeyType.X25519 -> throw IllegalArgumentException("Cannot sign type $keyType")
 
             KeyType.secp256k1 -> ECDSASigner(_internalJwk as ECKey).apply {
                 jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
@@ -147,7 +150,7 @@ actual class JWKKey actual constructor(
     private val _internalVerifier: JWSVerifier by lazy {
         when (keyType) {
             KeyType.Ed25519 -> Ed25519Verifier((_internalJwk as OctetKeyPair).toPublicJWK())
-
+            KeyType.X25519 -> throw IllegalArgumentException("Cannot sign type $keyType")
             KeyType.secp256k1 -> ECDSAVerifier(_internalJwk as ECKey).apply {
                 jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
             }
@@ -161,6 +164,7 @@ actual class JWKKey actual constructor(
     private val _internalJwsAlgorithm by lazy {
         when (keyType) {
             KeyType.Ed25519 -> JWSAlgorithm.EdDSA
+            KeyType.X25519 -> throw IllegalArgumentException("cannot sign type $keyType")
             KeyType.secp256k1 -> JWSAlgorithm.ES256K
             KeyType.secp256r1 -> JWSAlgorithm.ES256
             KeyType.RSA -> JWSAlgorithm.RS256 // TODO: RS384 RS512
@@ -317,6 +321,7 @@ actual class JWKKey actual constructor(
             com.nimbusds.jose.jwk.KeyType.OKP -> {
                 when (_internalJwk.toOctetKeyPair().curve) {
                     Curve.Ed25519 -> KeyType.Ed25519
+                    Curve.X25519 -> KeyType.X25519
                     else -> throw IllegalArgumentException("OKP key with curve ${_internalJwk.toOctetKeyPair().curve} not supported")
                 }
             }
@@ -348,6 +353,7 @@ actual class JWKKey actual constructor(
     private fun getPrivateKey() = when (keyType) {
         KeyType.secp256r1, KeyType.secp256k1 -> _internalJwk.toECKey().toPrivateKey()
         KeyType.Ed25519 -> decodeEd25519RawPrivateKey(_internalJwk.toOctetKeyPair().d.toString())
+        KeyType.X25519 -> decodeX25519RawPrivateKey(_internalJwk.toOctetKeyPair().d.toString())
         KeyType.RSA -> _internalJwk.toRSAKey().toPrivateKey()
     }
 
@@ -363,6 +369,7 @@ actual class JWKKey actual constructor(
         KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC") // Legacy SunEC curve disabled
         KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
         KeyType.Ed25519 -> Signature.getInstance("Ed25519")
+        KeyType.X25519 -> Signature.getInstance("X25519")
         KeyType.RSA -> Signature.getInstance("SHA256withRSA")
     }
 
@@ -372,6 +379,18 @@ actual class JWKKey actual constructor(
         val privKeyInfo =
             PrivateKeyInfo(
                 AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519),
+                DEROctetString(Base64URL.from(base64).decode())
+            )
+
+        val pkcs8KeySpec = PKCS8EncodedKeySpec(privKeyInfo.encoded)
+        return keyFactory.generatePrivate(pkcs8KeySpec)
+    }
+    private fun decodeX25519RawPrivateKey(base64: String): PrivateKey {
+        val keyFactory = KeyFactory.getInstance("ECDH")
+
+        val privKeyInfo =
+            PrivateKeyInfo(
+                AlgorithmIdentifier(EdECObjectIdentifiers.id_X25519),
                 DEROctetString(Base64URL.from(base64).decode())
             )
 

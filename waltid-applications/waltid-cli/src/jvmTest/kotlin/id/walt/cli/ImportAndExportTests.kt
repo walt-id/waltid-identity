@@ -26,6 +26,13 @@ class ImportAndExportTests {
     }
 
     @Test
+    @Ignore
+    fun testX25519() {
+        // kotlin.NotImplementedError: X25519 keys cannot be exported as PEM yet.
+        testBidirectionalConversion(KeyType.X25519)
+    }
+
+    @Test
     fun testSecp256k1() {
         testBidirectionalConversion(KeyType.secp256k1)
     }

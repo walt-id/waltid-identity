@@ -1,0 +1,13 @@
+{
+  "type": "jwk",
+  "jwk":
+  {
+    "kty": "OKP",
+    "d": "cCOCiOs536gNoBQKBU6bpkjWr4NELBoIQpl09f19gn0",
+    "use": "enc",
+    "crv": "X25519",
+    "kid": "x_ZEW1hRRChLk2tlSu5eaDyiDRLmft1S1HXNEjur5DU",
+    "x": "9H1B0xx8Lk0yVeDFR66RVkJUefVauXA3R8Wb-Yk1cH8",
+    "alg": "ECDH-ES"
+  }
+}

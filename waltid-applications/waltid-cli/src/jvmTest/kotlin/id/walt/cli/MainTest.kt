@@ -33,6 +33,14 @@ class MainTest {
         """"x": ".*?""""
     )
 
+    val x25519JWKKeyPattern: List<String> = listOf(
+        """"kty": "OKP"""",
+        """"d": ".*?"""",
+        """"crv": "X25519"""",
+        """"kid": ".*?"""",
+        """"x": ".*?""""
+    )
+
     val secp256k1JWKKeyPattern: List<String> = listOf(
         """"kty": "EC"""",
         """"d": ".*?"""",
@@ -65,6 +73,7 @@ class MainTest {
 
     val jwkKeyPatterns = mapOf(
         KeyType.Ed25519 to ed25519JWKKeyPattern,
+        KeyType.X25519 to x25519JWKKeyPattern,
         KeyType.secp256k1 to secp256k1JWKKeyPattern,
         KeyType.secp256r1 to secp256r1JWKKeyPattern,
         KeyType.RSA to rsaJWKKeyPattern
@@ -182,6 +191,13 @@ class MainTest {
     fun `should generate an Ed25519 key in the specified file when 'key generate --keyType=Ed25519 -o myEd25519Key' is executed`() {
         val keyType = KeyType.Ed25519
         val outputFileName = "myEd25519Key.json"
+        testKeyGenerate(keyType, outputFileName, jwkKeyPatterns[keyType])
+    }
+
+    @Test
+    fun `should generate an X25519 key in the specified file when 'key generate --keyType=X25519 -o myX25519Key' is executed`() {
+        val keyType = KeyType.X25519
+        val outputFileName = "myX25519Key.json"
         testKeyGenerate(keyType, outputFileName, jwkKeyPatterns[keyType])
     }
 

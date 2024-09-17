@@ -14,6 +14,7 @@ class JWKKeyAndDidManagementTest {
 
     private val keyTypeMap = mapOf(
         KeyType.Ed25519 to "OKP",
+        KeyType.X25519 to "OKP",
         KeyType.secp256k1 to "EC",
         KeyType.secp256r1 to "EC",
         KeyType.RSA to "RSA"
@@ -53,9 +54,11 @@ class JWKKeyAndDidManagementTest {
             assertNotNull(kid)
             assertNotNull(x)
 
-            // use the generated key to sign using JWS and RAW signature types
-            signJws(serialized)
-            signRaw(serialized)
+            if(it != KeyType.X25519) {
+                // use the generated key to sign using JWS and RAW signature types
+                signJws(serialized)
+                signRaw(serialized)
+            }
 
             // export the key as JWK or JSON
             exportJwk(serialized)

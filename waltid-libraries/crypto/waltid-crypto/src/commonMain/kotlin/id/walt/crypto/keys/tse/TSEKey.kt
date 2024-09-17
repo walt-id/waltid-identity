@@ -303,6 +303,7 @@ class TSEKey(
 
         private fun keyTypeToTseKeyMapping(type: KeyType) = when (type) {
             KeyType.Ed25519 -> "ed25519"
+            KeyType.X25519 -> throw IllegalArgumentException("Not supported: $type")
             KeyType.secp256r1 -> "ecdsa-p256"
             KeyType.RSA -> "rsa-2048"
             KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")

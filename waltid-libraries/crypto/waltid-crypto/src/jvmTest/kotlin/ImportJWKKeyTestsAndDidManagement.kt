@@ -81,6 +81,8 @@ class ImportJWKKeyTestsAndDidManagement {
             Stream.of(
                 // ed25519
                 arguments(loadJwkLocal("ed25519.private.json"), KeyType.Ed25519, true),
+                // X25519
+                arguments(loadJwkLocal("x25519.private.json"), KeyType.X25519, true),
                 // secp256k1
                 arguments(loadJwkLocal("secp256k1.private.json"), KeyType.secp256k1, true),
                 // secp256r1
@@ -90,6 +92,8 @@ class ImportJWKKeyTestsAndDidManagement {
                 // public
                 // ed25519
                 arguments(loadJwkLocal("ed25519.public.json"), KeyType.Ed25519, false),
+                // ed25519
+                arguments(loadJwkLocal("x25519.public.json"), KeyType.X25519, false),
                 // secp256k1
                 arguments(loadJwkLocal("secp256k1.public.json"), KeyType.secp256k1, false),
                 // secp256r1
@@ -128,6 +132,7 @@ class ImportJWKKeyTestsAndDidManagement {
         fun `given raw string, when imported then the import succeeds having the correct key type, key id and hasPrivate values`(): Stream<Arguments> =
             Stream.of(
                 arguments(loadResourceBytes("public-bytes/ed25519.bin"), KeyType.Ed25519, false),
+                arguments(loadResourceBytes("public-bytes/x25519.bin"), KeyType.X25519, false),
 
                 arguments(loadResourceBase64("public-bytes/ed25519-vault.base64"), KeyType.Ed25519, false),
 

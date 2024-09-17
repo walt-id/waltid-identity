@@ -99,6 +99,10 @@ fun Application.issuerApi() {
                             IssuanceExamples.issuerOnboardingRequestDefaultEd25519Example
                         )
                         example(
+                            "did:jwk + JWK key (X25519)",
+                            IssuanceExamples.issuerOnboardingRequestDefaultX25519Example
+                        )
+                        example(
                             "did:jwk + JWK key (secp256r1)",
                             IssuanceExamples.issuerOnboardingRequestDefaultSecp256r1Example
                         )

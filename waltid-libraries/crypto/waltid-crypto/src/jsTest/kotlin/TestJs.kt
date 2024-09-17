@@ -36,21 +36,23 @@ class TestJs {
         println("  Checking for changes...")
         assertEquals(exportedJwk, key.exportJWK())
 
-        println("  Signing...")
-        val signed = key.signJws(Json.encodeToString(plaintext).encodeToByteArray())
-        println("  Signed: $signed")
+        if (keyType != KeyType.X25519) {
+            println("  Signing...")
+            val signed = key.signJws(Json.encodeToString(plaintext).encodeToByteArray())
+            println("  Signed: $signed")
 
-        println("  Verifying...")
-        val check1 = key.verifyJws(signed)
-        assertTrue(check1.isSuccess)
-        assertEquals(plaintext, check1.getOrThrow())
+            println("  Verifying...")
+            val check1 = key.verifyJws(signed)
+            assertTrue(check1.isSuccess)
+            assertEquals(plaintext, check1.getOrThrow())
 
-        assertEquals(plaintext, check1.getOrThrow())
-        println("  Private key: ${check1.getOrNull()}")
+            assertEquals(plaintext, check1.getOrThrow())
+            println("  Private key: ${check1.getOrNull()}")
 
-        val check2 = key.getPublicKey().verifyJws(signed)
-        assertEquals(plaintext, check2.getOrThrow())
-        println("  Public key: ${check2.getOrNull()}")
+            val check2 = key.getPublicKey().verifyJws(signed)
+            assertEquals(plaintext, check2.getOrThrow())
+            println("  Public key: ${check2.getOrNull()}")
+        }
     }
 
     @Test

@@ -14,6 +14,7 @@ class JWKKeyAndDidManagementTest {
 
     private val keyTypeMap = mapOf(
         KeyType.Ed25519 to "OKP",
+        KeyType.X25519 to "OKP",
         KeyType.secp256k1 to "EC",
         KeyType.secp256r1 to "EC",
         KeyType.RSA to "RSA"
@@ -27,56 +28,59 @@ class JWKKeyAndDidManagementTest {
 
     @Test
     fun jwkKeyGenerationTest() = runTest {
-        KeyType.values().forEach {
-            println("Generate key for key type $it")
-            val generatedKey = JWKKey.generate(it)
+        KeyType.values().filter { KeyType.X25519 != it }.forEach {
 
-            println("Serializing key: $generatedKey")
-            val serialized = KeySerialization.serializeKey(generatedKey)
+                println("Generate key for key type $it")
+                val generatedKey = JWKKey.generate(it)
 
-            println("Decoding serialized key: $serialized")
-            val decoded = Json.parseToJsonElement(serialized).jsonObject
-            println("Decoded $serialized as $decoded")
+                println("Serializing key: $generatedKey")
+                val serialized = KeySerialization.serializeKey(generatedKey)
 
-            println("Checking if type=local")
-            assertEquals("jwk", decoded["type"]!!.jsonPrimitive.content)
+                println("Decoding serialized key: $serialized")
+                val decoded = Json.parseToJsonElement(serialized).jsonObject
+                println("Decoded $serialized as $decoded")
 
-            println("Parsing JWK...")
-            val jwk = decoded["jwk"]!!.jsonObject
-            println("JWK is: $jwk")
+                println("Checking if type=local")
+                assertEquals("jwk", decoded["type"]!!.jsonPrimitive.content)
 
-            println("Getting kty, d, crv, kid, x...")
-            val kty = jwk["kty"].toString().removeSurrounding("\"")
-            val d = jwk["d"].toString().removeSurrounding("\"")
-            val crv = jwk["crv"].toString().removeSurrounding("\"")
-            val kid = jwk["kid"].toString().removeSurrounding("\"")
-            val x = jwk["x"].toString().removeSurrounding("\"")
+                println("Parsing JWK...")
+                val jwk = decoded["jwk"]!!.jsonObject
+                println("JWK is: $jwk")
 
-            println("Checking kty, d, crv, kid, x...")
-            assertEquals(kty, getKeyTypeMap(it))
-            assertNotNull(d)
-            assertNotNull(crv)
-            assertNotNull(kid)
-            assertNotNull(x)
+                println("Getting kty, d, crv, kid, x...")
+                val kty = jwk["kty"].toString().removeSurrounding("\"")
+                val d = jwk["d"].toString().removeSurrounding("\"")
+                val crv = jwk["crv"].toString().removeSurrounding("\"")
+                val kid = jwk["kid"].toString().removeSurrounding("\"")
+                val x = jwk["x"].toString().removeSurrounding("\"")
 
-            println("use the generated key to sign using JWS and RAW signature types")
+                println("Checking kty, d, crv, kid, x...")
+                assertEquals(kty, getKeyTypeMap(it))
+                assertNotNull(d)
+                assertNotNull(crv)
+                assertNotNull(kid)
+                assertNotNull(x)
 
-            println("Signing JWS...")
-            signJws(serialized)
+                println("use the generated key to sign using JWS and RAW signature types")
 
-            println("Signing raw...")
+                println("Signing JWS...")
+                signJws(serialized)
 
-            try {
-                signRaw(serialized)
-            } catch (e: NotImplementedError) {
-                println("Raw signatures not implemented on this platform!")
+
+                println("Signing raw...")
+
+                try {
+                    signRaw(serialized)
+                } catch (e: NotImplementedError) {
+                    println("Raw signatures not implemented on this platform!")
+                }
+                println("export the key as JWK or JSON")
+
+                exportJwk(serialized)
+                exportJson(serialized)
             }
-
-            println("export the key as JWK or JSON")
-            exportJwk(serialized)
-            exportJson(serialized)
         }
-    }
+
 
     private suspend fun signJws(serializedKey: String) {
         val testObjJson = Json.encodeToString(testObj)

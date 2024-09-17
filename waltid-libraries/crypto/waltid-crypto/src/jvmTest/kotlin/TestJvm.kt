@@ -26,13 +26,15 @@ class TestJvm {
 
     @Test
     fun apiTestAll() = runTest {
-        KeyType.entries.forEach { exampleKeyCompleteFlow(it) }
+        KeyType.entries.filter{ KeyType.X25519 != it }.forEach { exampleKeyCompleteFlow(it) }
     }
 
     @OptIn(DelicateCoroutinesApi::class)
     @Test
     fun signatureSpeedTestAll() = runTest(timeout = 5.minutes) {
-        KeyType.entries.forEach { keyType ->
+
+        KeyType.entries.filter { KeyType.X25519 != it }.forEach { keyType ->
+
             val key = JWKKey.generate(keyType)
             key.signJws("abc".encodeToByteArray())
 

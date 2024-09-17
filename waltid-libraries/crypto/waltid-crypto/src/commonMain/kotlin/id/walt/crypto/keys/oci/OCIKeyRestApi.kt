@@ -275,6 +275,7 @@ class OCIKeyRestApi(
             KeyType.RSA -> "RSA"
             KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")
             KeyType.Ed25519 -> throw IllegalArgumentException("Not supported: $type")
+            KeyType.X25519 -> throw IllegalArgumentException("Not supported: $type")
         }
 
         private fun ociKeyToKeyTypeMapping(type: String) = when (type) {
@@ -294,6 +295,7 @@ class OCIKeyRestApi(
                 val host = config.managementEndpoint
                 val length = when (type) {
                     KeyType.Ed25519 -> throw IllegalArgumentException("Not supported: $type")
+                    KeyType.X25519 -> throw IllegalArgumentException("Not supported: $type")
                     KeyType.secp256r1 -> 32
                     KeyType.RSA -> 256
                     KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")

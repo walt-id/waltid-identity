@@ -141,11 +141,13 @@ class LocalJWKKeyAndDidManagementTest {
         @JvmStatic
         fun getPublicKeyRepresentation(): Stream<Arguments> = Stream.of(
             arguments(loadSerializedLocal("ed25519.private.json"), loadResourceBytes("public-bytes/ed25519.bin")),
+            arguments(loadSerializedLocal("x25519.private.json"), loadResourceBytes("public-bytes/x25519.bin")),
             arguments(loadSerializedLocal("secp256k1.private.json"), loadResourceBytes("public-bytes/secp256k1.bin")),
             arguments(loadSerializedLocal("secp256r1.private.json"), loadResourceBytes("public-bytes/secp256r1.bin")),
             arguments(loadSerializedLocal("rsa.private.json"), loadResourceBytes("public-bytes/rsa.bin")),
             // public
             arguments(loadSerializedLocal("ed25519.public.json"), loadResourceBytes("public-bytes/ed25519.bin")),
+            arguments(loadSerializedLocal("x25519.public.json"), loadResourceBytes("public-bytes/x25519.bin")),
             arguments(loadSerializedLocal("secp256k1.public.json"), loadResourceBytes("public-bytes/secp256k1.bin")),
             arguments(loadSerializedLocal("secp256r1.public.json"), loadResourceBytes("public-bytes/secp256r1.bin")),
             arguments(loadSerializedLocal("rsa.public.json"), loadResourceBytes("public-bytes/rsa.bin")),
@@ -154,11 +156,13 @@ class LocalJWKKeyAndDidManagementTest {
         @JvmStatic
         fun getPublicKey(): Stream<Arguments> = Stream.of(
             arguments(loadSerializedLocal("ed25519.private.json"), loadSerializedLocal("ed25519.public.json")),
+            arguments(loadSerializedLocal("x25519.private.json"), loadSerializedLocal("x25519.public.json")),
             arguments(loadSerializedLocal("secp256k1.private.json"), loadSerializedLocal("secp256k1.public.json")),
             arguments(loadSerializedLocal("secp256r1.private.json"), loadSerializedLocal("secp256r1.public.json")),
             arguments(loadSerializedLocal("rsa.private.json"), loadSerializedLocal("rsa.public.json")),
             // public
             arguments(loadSerializedLocal("ed25519.public.json"), loadSerializedLocal("ed25519.public.json")),
+            arguments(loadSerializedLocal("x25519.public.json"), loadSerializedLocal("x25519.public.json")),
             arguments(loadSerializedLocal("secp256k1.public.json"), loadSerializedLocal("secp256k1.public.json")),
             arguments(loadSerializedLocal("secp256r1.public.json"), loadSerializedLocal("secp256r1.public.json")),
             arguments(loadSerializedLocal("rsa.public.json"), loadSerializedLocal("rsa.public.json")),
@@ -167,11 +171,13 @@ class LocalJWKKeyAndDidManagementTest {
         @JvmStatic
         fun getKeyType(): Stream<Arguments> = Stream.of(
             arguments(loadSerializedLocal("ed25519.private.json"), KeyType.Ed25519),
+            arguments(loadSerializedLocal("x25519.private.json"), KeyType.X25519),
             arguments(loadSerializedLocal("secp256k1.private.json"), KeyType.secp256k1),
             arguments(loadSerializedLocal("secp256r1.private.json"), KeyType.secp256r1),
             arguments(loadSerializedLocal("rsa.private.json"), KeyType.RSA),
             // public
             arguments(loadSerializedLocal("ed25519.public.json"), KeyType.Ed25519),
+            arguments(loadSerializedLocal("x25519.public.json"), KeyType.X25519),
             arguments(loadSerializedLocal("secp256k1.public.json"), KeyType.secp256k1),
             arguments(loadSerializedLocal("secp256r1.public.json"), KeyType.secp256r1),
             arguments(loadSerializedLocal("rsa.public.json"), KeyType.RSA),
@@ -180,11 +186,13 @@ class LocalJWKKeyAndDidManagementTest {
         @JvmStatic
         fun getHasPrivateKey(): Stream<Arguments> = Stream.of(
             arguments(loadSerializedLocal("ed25519.private.json"), true),
+            arguments(loadSerializedLocal("x25519.private.json"), true),
             arguments(loadSerializedLocal("secp256k1.private.json"), true),
             arguments(loadSerializedLocal("secp256r1.private.json"), true),
             arguments(loadSerializedLocal("rsa.private.json"), true),
             // public
             arguments(loadSerializedLocal("ed25519.public.json"), false),
+            arguments(loadSerializedLocal("x25519.public.json"), false),
             arguments(loadSerializedLocal("secp256k1.public.json"), false),
             arguments(loadSerializedLocal("secp256r1.public.json"), false),
             arguments(loadSerializedLocal("rsa.public.json"), false),
@@ -193,6 +201,7 @@ class LocalJWKKeyAndDidManagementTest {
         @JvmStatic
         fun getKeyId(): Stream<Arguments> = Stream.of(
             arguments(loadSerializedLocal("ed25519.private.json"), "DJ-kT9JRDYwlJfYjhmJgNwIcuaU6RcSuR8eHIwbsnHQ"),
+            arguments(loadSerializedLocal("x25519.private.json"), "x_ZEW1hRRChLk2tlSu5eaDyiDRLmft1S1HXNEjur5DU"),
             arguments(loadSerializedLocal("secp256k1.private.json"), "PIv-EHegS0qL__8D4t36kULI8vzBsH4yBshhmY036yA"),
             arguments(loadSerializedLocal("secp256r1.private.json"), "LtObdob_k1-dw59-MwdA7auJUJCsqGQ7x2-ufXcB6gY"),
             arguments(loadSerializedLocal("rsa.private.json"), "288WlRQvku-zrHFmvcAW86jnTF3qsMoEUKEbteI2K4A"),
@@ -214,6 +223,7 @@ class LocalJWKKeyAndDidManagementTest {
         @JvmStatic
         fun exportJWK(): Stream<Arguments> = Stream.of(
             arguments(loadSerializedLocal("ed25519.private.json"), loadJwkLocal("ed25519.private.json")),
+            arguments(loadSerializedLocal("x25519.private.json"), loadJwkLocal("x25519.private.json")),
             arguments(loadSerializedLocal("secp256k1.private.json"), loadJwkLocal("secp256k1.private.json")),
             arguments(loadSerializedLocal("secp256r1.private.json"), loadJwkLocal("secp256r1.private.json")),
             arguments(loadSerializedLocal("rsa.private.json"), loadJwkLocal("rsa.private.json")),
@@ -227,11 +237,12 @@ class LocalJWKKeyAndDidManagementTest {
         @JvmStatic
         fun exportJWKObject(): Stream<Arguments> = Stream.of(
             arguments(loadSerializedLocal("ed25519.private.json"), loadJwkLocal("ed25519.private.json")),
+            arguments(loadSerializedLocal("x25519.private.json"), loadJwkLocal("x25519.private.json")),
             arguments(loadSerializedLocal("secp256k1.private.json"), loadJwkLocal("secp256k1.private.json")),
             arguments(loadSerializedLocal("secp256r1.private.json"), loadJwkLocal("secp256r1.private.json")),
             arguments(loadSerializedLocal("rsa.private.json"), loadJwkLocal("rsa.private.json")),
             // public
-            arguments(loadSerializedLocal("ed25519.public.json"), loadJwkLocal("ed25519.public.json")),
+            arguments(loadSerializedLocal("x25519.public.json"), loadJwkLocal("x25519.public.json")),
             arguments(loadSerializedLocal("secp256k1.public.json"), loadJwkLocal("secp256k1.public.json")),
             arguments(loadSerializedLocal("secp256r1.public.json"), loadJwkLocal("secp256r1.public.json")),
             arguments(loadSerializedLocal("rsa.public.json"), loadJwkLocal("rsa.public.json")),
@@ -240,11 +251,13 @@ class LocalJWKKeyAndDidManagementTest {
         @JvmStatic
         fun exportPEM(): Stream<Arguments> = Stream.of(
             arguments(loadSerializedLocal("ed25519.private.json"), loadPemLocal("ed25519.private.pem")),
+            arguments(loadSerializedLocal("x25519.private.json"), loadPemLocal("x25519.private.pem")),
             arguments(loadSerializedLocal("secp256k1.private.json"), loadPemLocal("secp256k1.private.pem")),
             arguments(loadSerializedLocal("secp256r1.private.json"), loadPemLocal("secp256r1.private.pem")),
             arguments(loadSerializedLocal("rsa.private.json"), loadPemLocal("rsa.private.pem")),
             // public
             arguments(loadSerializedLocal("ed25519.public.json"), loadPemLocal("ed25519.public.pem")),
+            arguments(loadSerializedLocal("x25519.public.json"), loadPemLocal("x25519.public.pem")),
             arguments(loadSerializedLocal("secp256k1.public.json"), loadPemLocal("secp256k1.public.pem")),
             arguments(loadSerializedLocal("secp256r1.public.json"), loadPemLocal("secp256r1.public.pem")),
             arguments(loadSerializedLocal("rsa.public.json"), loadPemLocal("rsa.public.pem")),

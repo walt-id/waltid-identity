@@ -15,6 +15,9 @@ enum class KeyType {
     // EdDSA
     Ed25519, // EdDSA + Curve25519
 
+    // ECDH
+    X25519,  // ECDH-ES + Curve25519
+
     // ECC
     secp256k1, // ECDSA + SECG curve secp256k1 (Koblitz curve as used in Bitcoin)
     secp256r1, // ECDSA + SECG curve secp256r1 ("NIST P-256")
@@ -28,7 +31,8 @@ enum class KeyType {
 enum class KeyCategory {
     RSA,
     ECC,
-    EdDSA
+    EdDSA,
+    ECDH
 }
 
 /*
