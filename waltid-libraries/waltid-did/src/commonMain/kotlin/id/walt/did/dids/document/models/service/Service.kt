@@ -47,10 +47,10 @@ private val reservedKeys = listOf(
 
 /**
  * Class for representing a service map of a DID Document's service property according to the respective section of the [DID Core](https://www.w3.org/TR/did-core/#services:~:text=is%20described%20below%3A-,service,-The%20service%20property) specification
- * @param id The identifier of this [ServiceMap] instance
- * @param type A set of strings that reflect the type(s) of this [ServiceMap]. Use of the [RegisteredServiceType] entries is recommended for the sake of interoperability, however, users are free to introduce their own custom types.
- * @param serviceEndpoint A set of [ServiceEndpoint] instances with which this [ServiceMap] instance is associated.
- * @param customProperties Optional user-defined custom properties that can be included in this [ServiceMap] instance.
+ * @property id The identifier of this [ServiceMap] instance (cannot be empty).
+ * @property type A set of (non-empty) strings that reflect the type(s) of this [ServiceMap]. Use of the [RegisteredServiceType] entries is recommended for the sake of interoperability, however, users are free to introduce their own custom types.
+ * @property serviceEndpoint A set of [ServiceEndpoint] instances with which this [ServiceMap] instance is associated.
+ * @property customProperties Optional user-defined custom properties that can be included in this [ServiceMap] instance.
  * @see ServiceEndpoint
  * @see RegisteredServiceType
  */
@@ -66,6 +66,10 @@ data class ServiceMap(
 
     init {
         require(id.isNotBlank()) { "Service property id cannot be blank" }
+        type.forEach {
+            require( it.isNotBlank() ) { "Service type strings cannot be blank"}
+        }
+        require( serviceEndpoint.isNotEmpty() ) { "Service endpoint set cannot be empty" }
         customProperties?.forEach {
             require(!reservedKeys.contains(it.key)) {
                 "Invalid attempt to override reserved Service property with key ${it.key} via customProperties map"

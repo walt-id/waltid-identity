@@ -31,12 +31,17 @@ object ServiceEndpointBaseSerializer : JsonContentPolymorphicSerializer<ServiceE
 
 /**
  * Service endpoint represented as a single URL.
- * @param url The URL of the service endpoint
+ * @param url The URL of the service endpoint (cannot be empty)
  */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable(with = ServiceEndpointURLSerializer::class)
-data class ServiceEndpointURL(val url: String) : ServiceEndpoint()
+data class ServiceEndpointURL(val url: String) : ServiceEndpoint() {
+
+    init {
+        require( url.isNotBlank() ) { "Service endpoint URL cannot be blank." }
+    }
+}
 
 object ServiceEndpointURLSerializer : KSerializer<ServiceEndpointURL> {
     override val descriptor = JsonPrimitive.serializer().descriptor
