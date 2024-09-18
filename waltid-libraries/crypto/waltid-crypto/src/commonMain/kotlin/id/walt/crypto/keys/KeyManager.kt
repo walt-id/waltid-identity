@@ -1,5 +1,7 @@
 package id.walt.crypto.keys
 
+import id.walt.commons.exceptions.KeyBackendNotSupportedException
+import id.walt.commons.exceptions.KeyTypeNotSupportedException
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.oci.OCIKeyRestApi
 import id.walt.crypto.keys.tse.TSEKey
@@ -17,7 +19,7 @@ object KeyManager {
     val types = HashMap<String, KType>()
     val keyTypeGeneration = HashMap<String, suspend (KeyGenerationRequest) -> Key>()
 
-    fun getRegisteredKeyType(type: String): KType = types[type] ?: error("Unknown key type: $type")
+    fun getRegisteredKeyType(type: String): KType = types[type] ?: throw KeyTypeNotSupportedException(type)
 
     init {
         register<JWKKey>("jwk") { generateRequest: KeyGenerationRequest -> JWKKey.generate(generateRequest.keyType) }
@@ -47,7 +49,7 @@ object KeyManager {
     }
 
     suspend fun createKey(generationRequest: KeyGenerationRequest): Key {
-        val function = keyTypeGeneration[generationRequest.backend] ?: error("No such key backend registered: ${generationRequest.backend}")
+        val function = keyTypeGeneration[generationRequest.backend] ?:throw KeyBackendNotSupportedException(generationRequest.backend)
         log.debug { "Creating key with generation request: $generationRequest" }
 
         return function.invoke(generationRequest)
