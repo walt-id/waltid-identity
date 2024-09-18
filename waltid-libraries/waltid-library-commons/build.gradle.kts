@@ -1,85 +1,207 @@
-import org.gradle.kotlin.dsl.invoke
+import love.forte.plugin.suspendtrans.ClassInfo
+import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
+import love.forte.plugin.suspendtrans.TargetPlatform
+import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
+import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+import org.gradle.kotlin.dsl.kotlin
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 
 plugins {
-    kotlin("jvm")
+    kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
+    id("com.github.ben-manes.versions")
+    id("love.forte.plugin.suspend-transform") version "2.0.20-0.9.2"
 }
 
 group = "id.walt"
-version = "1.0.0-SNAPSHOT"
 
 repositories {
-    mavenLocal()
     mavenCentral()
+    mavenLocal()
+    maven("https://jitpack.io")
 }
-object Versions {
-    const val KTOR_VERSION = "2.3.12" // also change 1 plugin
+
+suspendTransform {
+    enabled = true
+    includeRuntime = true
+    useDefault()
+
+    includeAnnotation = false // Required in the current version to avoid "compileOnly" warning
+}
+
+tasks.withType<ProcessResources> {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_15
+    targetCompatibility = JavaVersion.VERSION_15
 }
 
 kotlin {
     jvmToolchain(17)
 }
 
-dependencies {
-    testImplementation(kotlin("test"))
-    // Ktor
-    api("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
-    api("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
-    api("io.ktor:ktor-server-status-pages-jvm:${Versions.KTOR_VERSION}")
-    api("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
-    api("io.ktor:ktor-serialization-kotlinx-json-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-auth-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
-
-    // Logging
-    api("io.klogging:klogging-jvm:0.7.0") // JVM + ~JS
-    implementation("io.klogging:slf4j-klogging:0.7.0")
-    implementation("org.slf4j:jul-to-slf4j:2.0.13")
-
-    // Kotlinx.serialization
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
-}
-
-tasks.test {
-    useJUnitPlatform()
-}
-
-
-publishing {
-    publications {
-        create<MavenPublication>("mavenJava") {
-            pom {
-                name.set("walt.id library-commons")
-                description.set(
-                    """
-                    Kotlin/Java library for the walt.id library-commons
-                    """.trimIndent()
-                )
-                url.set("https://walt.id")
+kotlin {
+    targets.configureEach {
+        compilations.configureEach {
+            compileTaskProvider.configure {
+                compilerOptions {
+                    freeCompilerArgs.add("-Xexpect-actual-classes")
+                }
             }
-            from(components["java"])
-        }
-    }
-
-    repositories {
-        maven {
-            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
-            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
-            val envUsername = System.getenv("MAVEN_USERNAME")
-            val envPassword = System.getenv("MAVEN_PASSWORD")
-
-            val usernameFile = File("secret_maven_username.txt")
-            val passwordFile = File("secret_maven_password.txt")
-
-            val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-            val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
-
-            credentials {
-                username = secretMavenUsername
-                password = secretMavenPassword
+            compileTaskProvider.configure {
+                compilerOptions {
+                    freeCompilerArgs.add("-Xexpect-actual-classes")
+                }
             }
         }
     }
+
+    jvm {
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        compilerOptions {
+            jvmTarget = JvmTarget.JVM_15 // JVM got Ed25519 at version 15
+        }
+        tasks.withType<Test>().configureEach {
+            useJUnitPlatform()
+        }
+    }
+    js(IR) {
+        moduleName = "library-commons"/*browser {
+            commonWebpackConfig {
+                cssSupport {
+                    enabled.set(true)
+                }
+            }
+        }*/
+        nodejs {
+            generateTypeScriptDefinitions()
+            testTask {
+                useMocha()
+            }
+        }
+        binaries.library()
+    }
+
+
+
+    val ktor_version = "2.3.12"
+
+    sourceSets {
+
+        all {
+            languageSettings.optIn("kotlinx.cinterop.BetaInteropApi")
+
+        }
+        val commonMain by getting {
+            dependencies {
+
+                // Ktor client
+                implementation("io.ktor:ktor-client-core:$ktor_version")
+                implementation("io.ktor:ktor-client-serialization:$ktor_version")
+                implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
+                implementation("io.ktor:ktor-client-json:$ktor_version")
+                implementation("io.ktor:ktor-client-logging:$ktor_version")
+
+
+                // suspend-transform plugin annotations (required in the current version to avoid "compileOnly" warning)
+                implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
+
+
+            }
+        }
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test-common"))
+                implementation(kotlin("test-annotations-common"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+            }
+        }
+        val jvmMain by getting {
+            dependencies {
+
+            }
+        }
+        val jvmTest by getting {
+            dependencies {
+
+            }
+        }
+        val jsMain by getting {
+            dependencies {
+
+            }
+        }
+        val jsTest by getting {
+            dependencies {
+                implementation(kotlin("test-js"))
+            }
+        }
+//        val androidMain by getting {
+//            dependencies {
+//                implementation("io.ktor:ktor-client-android:2.3.10")
+//            }
+//        }
+//        val androidUnitTest by getting {
+//            dependencies {
+//                implementation(kotlin("test"))
+//            }
+//        }
+
+
+        publishing {
+            repositories {
+                maven {
+                    val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+                    val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+                    url = uri(
+                        if (version.toString()
+                                .endsWith("SNAPSHOT")
+                        ) snapshotsRepoUrl else releasesRepoUrl
+                    )
+
+                    val envUsername = System.getenv("MAVEN_USERNAME")
+                    val envPassword = System.getenv("MAVEN_PASSWORD")
+
+                    val usernameFile = File("$rootDir/secret_maven_username.txt")
+                    val passwordFile = File("$rootDir/secret_maven_password.txt")
+
+                    val secretMavenUsername = envUsername ?: usernameFile.let {
+                        if (it.isFile) it.readLines().first() else ""
+                    }
+                    //println("Deploy username length: ${secretMavenUsername.length}")
+                    val secretMavenPassword = envPassword ?: passwordFile.let {
+                        if (it.isFile) it.readLines().first() else ""
+                    }
+
+                    //if (secretMavenPassword.isBlank()) {
+                    //   println("WARNING: Password is blank!")
+                    //}
+
+                    credentials {
+                        username = secretMavenUsername
+                        password = secretMavenPassword
+                    }
+                }
+            }
+        }
+        all {
+            languageSettings.enableLanguageFeature("InlineClasses")
+        }
+    }
+}
+
+extensions.getByType<SuspendTransformGradleExtension>().apply {
+    transformers[TargetPlatform.JS] = mutableListOf(
+        SuspendTransformConfiguration.jsPromiseTransformer.copy(
+            copyAnnotationExcludes = listOf(
+                ClassInfo("kotlin.js", "JsExport.Ignore")
+            )
+        )
+    )
 }
