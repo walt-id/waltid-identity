@@ -85,10 +85,10 @@ services:
     depends_on:
       - caddy
     environment:
-      NEXT_PUBLIC_VC_REPO: "http://localhost:$VC_REPO_PORT"
-      NEXT_PUBLIC_ISSUER: "http://localhost:$ISSUER_API_PORT"
-      NEXT_PUBLIC_VERIFIER: "http://localhost:$VERIFIER_API_PORT"
-      NEXT_PUBLIC_WALLET: "http://localhost:$DEMO_WALLET_FRONTEND_PORT"
+      NEXT_PUBLIC_VC_REPO: "http://host.docker.internal:$VC_REPO_PORT"
+      NEXT_PUBLIC_ISSUER: "http://host.docker.internal:$ISSUER_API_PORT"
+      NEXT_PUBLIC_VERIFIER: "http://host.docker.internal:$VERIFIER_API_PORT"
+      NEXT_PUBLIC_WALLET: "http://host.docker.internal:$DEMO_WALLET_FRONTEND_PORT"
       PORT: $WEB_PORTAL_PORT
 
   vc-repo:
