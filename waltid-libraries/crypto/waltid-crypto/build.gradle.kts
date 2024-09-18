@@ -132,6 +132,9 @@ kotlin {
 
                 // suspend-transform plugin annotations (required in the current version to avoid "compileOnly" warning)
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
+
+                api(project(":waltid-libraries:waltid-library-commons"))
+
             }
         }
         val commonTest by getting {
