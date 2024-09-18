@@ -1,4 +1,4 @@
-package id.walt.authkit.utils
+package id.walt.authkit.permissions.utils
 
 /**
  * Multiply a string (repeat it a number of times)
