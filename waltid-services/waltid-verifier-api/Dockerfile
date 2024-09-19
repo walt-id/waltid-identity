@@ -23,6 +23,7 @@ COPY waltid-libraries/waltid-did/. /work/waltid-libraries/waltid-did
 COPY waltid-libraries/protocols/waltid-openid4vc/. /work/waltid-libraries/protocols/waltid-openid4vc
 COPY waltid-libraries/sdjwt/waltid-sdjwt/. /work/waltid-libraries/sdjwt/waltid-sdjwt
 COPY waltid-libraries/credentials/waltid-mdoc-credentials/. /work/waltid-libraries/credentials/waltid-mdoc-credentials
+COPY waltid-libraries/waltid-library-commons/. /work/waltid-libraries/waltid-library-commons
 
 COPY waltid-services/waltid-service-commons/. /work/waltid-services/waltid-service-commons
 COPY waltid-services/waltid-verifier-api/. /work/waltid-services/waltid-verifier-api
