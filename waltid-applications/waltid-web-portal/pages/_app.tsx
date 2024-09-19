@@ -15,25 +15,27 @@ export default function App({ Component, pageProps }: AppProps) {
   const [env, setEnv] = React.useState({} as { [key: string]: string });
 
   React.useEffect(() => {
-    if (env.hasOwnProperty('NEXT_PUBLIC_VC_REPO')) {
-      axios.get(`${env.NEXT_PUBLIC_VC_REPO}/api/list`).then((response) => {
-        response.data.forEach((credential: string) => {
-          axios.get(`${env.NEXT_PUBLIC_VC_REPO}/api/vc/${credential}`).then((data) => {
-            setAvailableCredentials((prev) => [...prev, {
-              id: credential,
-              title: credential,
-              offer: data.data,
-            }]);
+    axios.get('/api/env').then((response) => {
+      if (response.data.hasOwnProperty('NEXT_PUBLIC_VC_REPO')) {
+        setEnv(response.data);
+
+        axios.get(`${response.data.NEXT_PUBLIC_VC_REPO}/api/list`).then((credentials) => {
+          credentials.data.forEach((credential: string) => {
+            axios.get(`${response.data.NEXT_PUBLIC_VC_REPO}/api/vc/${credential}`).then((data) => {
+              setAvailableCredentials((prev) => [...prev, {
+                id: credential,
+                title: credential,
+                offer: data.data,
+              }]);
+            });
           });
         });
-      });
-    }
-    else {
-      axios.get('/api/env').then((response) => {
-        setEnv(response.data);
-      });
-    }
-  }, [env]);
+      }
+      else {
+        throw new Error("Env variables not found");
+      }
+    });
+  }, []);
 
   return (
     <EnvContext.Provider value={env}>
