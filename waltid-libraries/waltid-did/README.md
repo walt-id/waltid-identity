@@ -324,6 +324,10 @@ represented as **_walt.id crypto_** `Key`.
     </tbody>
 </table>
 
+- &check; implemented
+- &cross; not implemented
+- &dash; not available
+
 (*) The did:key implementation defaults to W3C CCG https://w3c-ccg.github.io/did-method-key/. By setting _useJwkJcsPub_ to `true` the EBSI
 implementation (jwk_jcs-pub encoding) according https://hub.ebsi.eu/tools/libraries/key-did-resolver is performed.
 
