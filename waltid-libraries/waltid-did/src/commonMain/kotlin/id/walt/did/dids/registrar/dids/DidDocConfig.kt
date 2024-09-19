@@ -23,6 +23,26 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+/**
+ * The purpose of this class is to provide users of the did library more control over the did documents that are produced when interfacing
+ * with subclasses of [id.walt.did.dids.registrar.LocalRegistrar].
+ *
+ * **Supported subclasses**: [id.walt.did.dids.registrar.local.web.DidWebRegistrar]
+ *
+ * The default constructor for this class is, arguably, verbose. For more simplified ways of building object of this class, refer to the documentation of the [buildFromPublicKeySet] and [buildFromPublicKeySetVerificationConfiguration] methods.
+ * @constructor This is the primary constructor.
+ * @property context A list of JSON-LD context IRIs, defaults to the values specified in the respective section of the [DID Core](https://www.w3.org/TR/did-core/#json-ld) specification.
+ * @property publicKeyMap An associative array of user-defined public key identifiers (not necessarily `kid` of a JWK) to **public key** instances of the [Key] class. Do not assign private keys as that will lead to an exception being thrown. The public keys provided here form the basis of generating the various verification methods of the did document. Refer to the [verificationConfigurationMap] property for additional information.
+ * @property verificationConfigurationMap An associative array of [VerificationRelationshipType] (as defined in the DID Core specification) to a set of [VerificationMethodConfiguration] which, in short, defines the identifier of the public [Key] (must be contained in the [publicKeyMap] property) that will be used to generate a [VerificationMethod] in the resulting did document, along with one, or more, user-defined custom properties via the [VerificationMethodConfiguration.customProperties] map. If this map is empty, the did document that will be produced will **not** have any [VerificationMethod] defined. Note that it is perfectly valid from a specification perspective (albeit, not so useful).
+ * @property serviceConfigurationSet This optional property is related with the service property of the did document, as defined in the respective section of the [DID Core](https://www.w3.org/TR/did-core/#services) specification. The input is a set of [ServiceConfiguration] instances, each of which relates to a [ServiceMap] of the did document. For each entry of this set, the user defines the type of the service (we encourage the use of the [id.walt.did.dids.document.models.service.RegisteredServiceType] for the purpose of interoperability), a set of one or more [ServiceEndpoint] subclasses (i.e., [id.walt.did.dids.document.models.service.ServiceEndpointURL] or [id.walt.did.dids.document.models.service.ServiceEndpointObject]) and optional user-defined custom properties that can be added to each [ServiceMap] via the [ServiceConfiguration.customProperties] parameter. If this set is empty, the resulting did document will **not** contain a service property.
+ * @property rootCustomProperties Optional user-defined custom properties that can be included in the root portion of the did document that will be produced.
+ * @see [VerificationMethodConfiguration]
+ * @see [ServiceConfiguration]
+ * @see [id.walt.did.dids.registrar.LocalRegistrar]
+ * @see [DidWebCreateOptions]
+ * @see [id.walt.did.dids.registrar.local.web.DidWebRegistrar]
+ *
+ */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
@@ -42,6 +62,13 @@ data class DidDocConfig(
             "service",
         ) + VerificationRelationshipType.entries.map { it.toString() }
 
+        /**
+         * This is (probably) the simplest way of building instances of the [DidDocConfig] class. The [publicKeySet] parameter will be used as a basis to create [VerificationMethod] entries in the did document for all entries of [VerificationRelationshipType].
+         * @param context Refer to the [DidDocConfig.context] property.
+         * @param publicKeySet A set of public [Key] class instances that will be used to populate the did document's verification methods (the `kid` property will be used to assign a value to the fragment of the respective [VerificationMethod] entry that will be produced). Do not assign private keys as that will lead to an exception being thrown.
+         * @param serviceConfigurationSet Refer to the [DidDocConfig.serviceConfigurationSet] property.
+         * @param rootCustomProperties Refer to the [DidDocConfig.rootCustomProperties] property.
+         */
         @JvmBlocking
         @JvmAsync
         @JsPromise
@@ -69,6 +96,13 @@ data class DidDocConfig(
             rootCustomProperties = rootCustomProperties,
         )
 
+        /**
+         * This is (probably) the *middle way* (complexity-wise) of building instances of the [DidDocConfig] class (compared to the more simple [buildFromPublicKeySet] and the more verbose constructor of this class). This builder function provides users with more flexibility regarding the associations of [VerificationMethod] and [VerificationRelationshipType] in the did document that will be produced. This function allows users to specify which set of public [Key] instances will be associated with specific [VerificationRelationshipType] properties of the did document via the [verificationKeySetConfiguration] parameter.
+         * @param context Refer to the [DidDocConfig.context] property.
+         * @param verificationKeySetConfiguration A more simplified version of the main constructor's parameter [verificationConfigurationMap] that provides users with more fine-grained control over which public [Key] instances will be used to associate specific [VerificationRelationshipType] instances with [VerificationMethod] properties in the did document that will be produced. One minor limitation here is that custom properties on each produced [VerificationMethod] cannot be defined.
+         * @param serviceConfigurationSet Refer to the [DidDocConfig.serviceConfigurationSet] property.
+         * @param rootCustomProperties Refer to the [DidDocConfig.rootCustomProperties] property.
+         */
         @JvmBlocking
         @JvmAsync
         @JsPromise
@@ -124,6 +158,11 @@ data class DidDocConfig(
         }
     }
 
+    /**
+     * This function constructs the did document based on the provided configuration parameters and the did method specific identifier.
+     * @param did The did method specific identifier that is required to produce the final did document.
+     * @return [DidDocument] The produced did document.
+     */
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -188,6 +227,11 @@ data class DidDocConfig(
     }
 }
 
+/**
+ * This class allows users to configure the verificationMethod property of the did document that will be produced.
+ * @property publicKeyId The identifier of a public [Key] that is associated with [Key] entries in the [DidDocConfig.publicKeyMap] property.
+ * @property customProperties Optional user-defined custom properties that can be included in the respective [VerificationMethod] entry of the did document that will be produced.
+ */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
@@ -196,6 +240,12 @@ data class VerificationMethodConfiguration(
     val customProperties: Map<String, JsonElement>? = null,
 )
 
+/**
+ * This class allows users to configure the service property of the did document that will be produced.
+ * @property type The type of the service (we encourage the use of the [id.walt.did.dids.document.models.service.RegisteredServiceType] for the purpose of interoperability) that corresponds to the value that will be assigned to [ServiceMap.type] property in the did document that will be produced.
+ * @property serviceEndpoint A set of one or more [ServiceEndpoint] subclasses (i.e., [id.walt.did.dids.document.models.service.ServiceEndpointURL] or [id.walt.did.dids.document.models.service.ServiceEndpointObject]) that will be assigned to the [ServiceMap.serviceEndpoint] property in the did document that will be produced.
+ * @property customProperties Optional user-defined custom properties that can be included in the respective [ServiceMap] entry of the did document that will be produced.
+ */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
