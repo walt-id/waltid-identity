@@ -12,7 +12,7 @@ import kotlin.js.JsExport
 
 /**
  * Class for representing the service property of a DID document according to the respective section of the [DID Core](https://www.w3.org/TR/did-core/#services) specification
- * @param serviceMaps A set of [ServiceMap] object instances.
+ * @property serviceMaps A set of [ServiceMap] object instances.
  * @see ServiceMap
  */
 @OptIn(ExperimentalJsExport::class)
