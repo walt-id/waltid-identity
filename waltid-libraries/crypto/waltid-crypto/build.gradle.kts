@@ -162,6 +162,9 @@ kotlin {
 
                 // Multibase
 //                implementation("com.github.multiformats:java-multibase:v1.1.1")
+
+                implementation(project(":waltid-libraries:waltid-library-commons"))
+
             }
         }
         val jvmTest by getting {
