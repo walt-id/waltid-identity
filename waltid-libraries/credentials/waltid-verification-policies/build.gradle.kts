@@ -6,7 +6,7 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
     id("dev.petuska.npm.publish") version "3.4.3"
-    // id("love.forte.plugin.suspend-transform") version "2.0.20-0.9.2"
+    id("love.forte.plugin.suspend-transform") version "2.0.20-0.9.2"
     id("com.github.ben-manes.versions")
 }
 
@@ -37,7 +37,7 @@ kotlin {
         }
         binaries.library()
     }
-
+    val ktor_version = "2.3.12"
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -47,6 +47,23 @@ kotlin {
                 implementation("io.github.optimumcode:json-schema-validator:0.2.2")
 
                 implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+
+                // Kotlinx
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
+
+                // Ktor client
+                implementation("io.ktor:ktor-client-core:$ktor_version")
+                implementation("io.ktor:ktor-client-serialization:$ktor_version")
+                implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
+                implementation("io.ktor:ktor-client-json:$ktor_version")
+                implementation("io.ktor:ktor-client-logging:$ktor_version")
+
+                // Loggin
+                implementation("io.github.oshai:kotlin-logging:7.0.0")
+
+                // Coroutines
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
             }
         }
         val commonTest by getting {

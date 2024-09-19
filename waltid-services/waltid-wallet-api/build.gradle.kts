@@ -121,6 +121,7 @@ dependencies {
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-oci"))
     implementation(project(":waltid-libraries:waltid-did"))
+    implementation(project(":waltid-libraries:credentials:waltid-verification-policies"))
 
     testImplementation(project(":waltid-services:waltid-issuer-api"))
     testImplementation(project(":waltid-services:waltid-verifier-api"))

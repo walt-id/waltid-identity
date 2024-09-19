@@ -1,7 +1,7 @@
 package id.walt.verifier.policies
 
 import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
-import id.walt.credentials.verification.PresentationDefinitionException
+import id.walt.policies.PresentationDefinitionException
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -38,7 +38,13 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
             log.debug { "Requested types: $requestedTypes" }
             log.debug { "Presented types: $presentedTypes" }
 
-            Result.failure(PresentationDefinitionException(missingCredentialTypes = requestedTypes.minus(presentedTypes.toSet())))
+            Result.failure(
+              id.walt.policies.PresentationDefinitionException(
+                missingCredentialTypes = requestedTypes.minus(
+                  presentedTypes.toSet()
+                )
+              )
+            )
         }
     }
 }

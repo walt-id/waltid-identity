@@ -296,7 +296,7 @@ class VPVerifyCmd : CliktCommand(
     private fun handleFailure(it: PolicyResult) {
         when (val exception = it.result.exceptionOrNull()) {
 
-            is JsonSchemaVerificationException -> {
+            is id.walt.policies.JsonSchemaVerificationException -> {
                 exception.validationErrors.forEach { err ->
                     print.dim("${it.request.policy.name}: ", false)
                     print.red("Fail! ", false)
