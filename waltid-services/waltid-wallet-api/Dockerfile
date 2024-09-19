@@ -25,6 +25,7 @@ COPY waltid-libraries/crypto/waltid-crypto-oci/. /work/waltid-libraries/crypto/w
 COPY waltid-libraries/waltid-did/. /work/waltid-libraries/waltid-did
 COPY waltid-libraries/credentials/waltid-mdoc-credentials/. /work/waltid-libraries/credentials/waltid-mdoc-credentials
 COPY waltid-libraries/credentials/waltid-verifiable-credentials/. /work/waltid-libraries/credentials/waltid-verifiable-credentials
+COPY waltid-libraries/waltid-library-commons/. /work/waltid-libraries/waltid-library-commons
 
 COPY waltid-services/waltid-service-commons/. /work/waltid-services/waltid-service-commons
 COPY waltid-services/waltid-wallet-api/src/ /work/waltid-services/waltid-wallet-api/src
