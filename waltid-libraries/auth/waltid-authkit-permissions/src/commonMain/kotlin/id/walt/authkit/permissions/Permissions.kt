@@ -1,13 +1,15 @@
 package id.walt.authkit.permissions
 
 import id.walt.authkit.permissions.Permission.MinimalPermission
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.serialization.Serializable
 
 
 private infix fun String.permissions(permissions: List<String>) =
     FlowPermissionSet.fromPermissionStringsFlow(this, permissions.asFlow())
+
 private infix fun String.permissions(permissions: Flow<String>) =
     FlowPermissionSet.fromPermissionStringsFlow(this, permissions)
 
@@ -47,12 +49,11 @@ class PermissionChecker {
             when (it.operation) {
                 PermissionOperation.ADD -> {
                     allowTrie.storePermission(it.target, it.action)
-                    delay(1000)
                     println("ALLOW-TRIE added $it")
                 }
+
                 PermissionOperation.REMOVE -> {
                     denyTrie.storePermission(it.target, it.action)
-                    delay(1000)
                     println("DENY-TRIE added $it")
                 }
             }
