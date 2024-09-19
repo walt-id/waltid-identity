@@ -19,7 +19,7 @@ import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
 
-object X5CAccountStrategy: PasswordlessAccountStrategy<X5CAccountRequest>() {
+object X5CAccountStrategy : PasswordlessAccountStrategy<X5CAccountRequest>() {
 
     private val x5cValidator = X5CValidator(ConfigManager.getConfig<TrustedCAConfig>().certificates)
 
@@ -40,9 +40,8 @@ object X5CAccountStrategy: PasswordlessAccountStrategy<X5CAccountRequest>() {
     override suspend fun authenticate(tenant: String, request: X5CAccountRequest): AuthenticatedUser {
         val thumbprint = validate(request.token)
 
-        val registeredUserId = AccountsService.getAccountByX5CId(tenant, thumbprint)?.id ?: transaction {
-            addAccount(tenant, thumbprint)
-        }
+        val registeredUserId = AccountsService.getAccountByX5CId(tenant, thumbprint)?.id ?:
+        AccountsService.register(tenant, request).getOrThrow().id
 
         return X5CAuthenticatedUser(registeredUserId)
     }

@@ -40,7 +40,7 @@
                                     d="M15 19l-7-7 7-7" />
                             </svg>
                         </button>
-                        <VerifiableCredentialCard :credential="{
+                        <VerifiableCredentialCard :key="index" :credential="{
                             parsedDocument: {
                                 type: [credentialTypes[index]],
                                 issuer: {
