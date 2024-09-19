@@ -2,7 +2,8 @@ package id.walt
 
 import id.walt.authkit.AuthContext
 import id.walt.authkit.auth.authKit
-import id.walt.authkit.auth.getAuthenticatedSession
+import id.walt.authkit.auth.getAuthToken
+import id.walt.authkit.auth.getAuthenticatedAccount
 import id.walt.authkit.flows.AuthFlow
 import id.walt.authkit.methods.*
 import id.walt.authkit.sessions.SessionManager
@@ -205,8 +206,9 @@ fun Application.testApp() {
 
         authenticate("authkit") {
             get("/protected") {
-                val session = getAuthenticatedSession()
-                call.respondText("Hello token ${session.token}, you are ${session.accountId}")
+                val token = getAuthToken()
+                val accountId = getAuthenticatedAccount()
+                call.respondText("Hello token ${token}, you are $accountId")
             }
         }
 

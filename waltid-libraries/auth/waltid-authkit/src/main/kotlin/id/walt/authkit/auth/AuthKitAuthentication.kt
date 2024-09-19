@@ -15,7 +15,7 @@ import io.ktor.util.pipeline.*
  * @property name is the name of the provider, or `null` for a default provider.
  */
 public class AuthKitAuthenticationProvider internal constructor(
-    config: Config
+    config: Config,
 ) : AuthenticationProvider(config) {
 
 //    private val challengeFunction: FormAuthChallengeFunction = config.challengeFunction
@@ -47,7 +47,7 @@ public class AuthKitAuthenticationProvider internal constructor(
             return
         }
 
-        val principal = if (AuthKitManager.tokenStore.validateToken(effectiveToken))
+        val principal = if (AuthKitManager.tokenHandler.validateToken(effectiveToken))
             UserIdPrincipal(effectiveToken)
         else null
 
@@ -74,15 +74,29 @@ public class AuthKitAuthenticationProvider internal constructor(
  */
 public fun AuthenticationConfig.authKit(
     name: String? = null,
-    configure: AuthKitAuthenticationProvider.Config.() -> Unit
+    configure: AuthKitAuthenticationProvider.Config.() -> Unit,
 ) {
     val provider = AuthKitAuthenticationProvider(AuthKitAuthenticationProvider.Config(name).apply(configure))
     register(provider)
 }
 
-fun PipelineContext<Unit, ApplicationCall>.getAuthenticatedSession(): AuthSession {
+fun PipelineContext<Unit, ApplicationCall>.getAuthToken(): String {
     val token = call.principal<UserIdPrincipal>()?.name
-    check(token != null) { "No token for authenticated session" }
+    check(token != null) { "No token for request principal" }
 
-    return AuthKitManager.tokenStore.resolveTokenToSession(token)
+    return token
+}
+
+// TODO: switch to @OptIn instead of @Deprecated
+@Deprecated("Externally provided JWT token cannot resolve to authenticated session")
+suspend fun PipelineContext<Unit, ApplicationCall>.getAuthenticatedSession(): AuthSession {
+    val token = getAuthToken()
+
+    return AuthKitManager.tokenHandler.resolveTokenToSession(token)
+}
+
+suspend fun PipelineContext<Unit, ApplicationCall>.getAuthenticatedAccount(): String {
+    val token = getAuthToken()
+
+    return AuthKitManager.tokenHandler.getTokenAccountId(token)
 }

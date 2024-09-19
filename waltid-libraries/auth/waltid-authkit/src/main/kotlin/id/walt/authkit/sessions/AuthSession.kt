@@ -1,5 +1,6 @@
 package id.walt.authkit.sessions
 
+import id.walt.authkit.AuthKitManager
 import id.walt.authkit.flows.AuthFlow
 import id.walt.authkit.flows.methods
 import id.walt.authkit.methods.AuthenticationMethod
@@ -49,7 +50,7 @@ data class AuthSession(
             flows = null
             status = AuthSessionStatus.OK
 
-            token = TokenManager.supplyNewToken(this)
+            token = AuthKitManager.tokenHandler.generateToken(this)
         } else {
             throw IllegalStateException("Cannot process flow: No next step defined but current step is not end step!")
         }
@@ -57,10 +58,10 @@ data class AuthSession(
         SessionManager.updateSession(this)
     }
 
-    fun logout() {
+    suspend fun logout() {
         check(token != null) { "Cannot logout, as no token yet exists (session is not even authenticated yet). You can drop the session without invoking the logout procedure." }
 
-        TokenManager.dropToken(token!!)
+        AuthKitManager.tokenHandler.dropToken(token!!)
         SessionManager.removeSession(this)
     }
 

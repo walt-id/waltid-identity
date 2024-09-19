@@ -1,6 +1,6 @@
-package id.walt.authkit.sessions
+package id.walt.authkit.tokens.authkittoken
 
-class InMemoryTokenStore: TokenStore {
+class InMemoryAuthKitTokenStore: AuthKitTokenStore {
 
     val tokens = HashMap<String, String>()
 

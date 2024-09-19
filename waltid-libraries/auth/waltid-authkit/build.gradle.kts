@@ -39,6 +39,7 @@ dependencies {
     implementation("com.atlassian:onetime:2.1.1")
 
     // JWT
+    implementation(project(":waltid-libraries:crypto:waltid-crypto"))
     implementation("com.nimbusds:nimbus-jose-jwt:9.40")
 
     // Ktor server
