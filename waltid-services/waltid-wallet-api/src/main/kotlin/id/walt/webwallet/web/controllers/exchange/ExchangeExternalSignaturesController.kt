@@ -122,7 +122,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
 
             val presentationId = "urn:uuid:" + UUID.generateUUID().toString().lowercase()
 
-            val authKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document)
+            val authKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()
             logger.debug { "Resolved authorization keyId: $authKeyId" }
 
             val vpPayload = credentialWallet.getVpJson(
@@ -418,10 +418,10 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             //this can't fail due to the above block
             val walletDID = DidsService.get(walletService.walletId, did)!!
             logger.debug { "Retrieved wallet DID: $walletDID" }
-            val authKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document)
-            logger.debug { "Resolved authorization keyId: $authKeyId" }
 
             runCatching {
+                val authKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()
+                logger.debug { "Resolved authorization keyId: $authKeyId" }
                 WalletServiceManager.externalSignatureClaimStrategy.prepareCredentialClaim(
                     did = walletDID.did,
                     keyId = authKeyId,
