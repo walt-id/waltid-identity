@@ -7,9 +7,9 @@ import io.ktor.http.*
 import kotlinx.serialization.json.JsonObject
 
 object OpenAPICommons {
-    const val rootPath = "exchange"
+    const val exchangeRootPath = "exchange"
 
-    fun route(): OpenApiRoute.() -> Unit = {
+    fun exchangeRoute(): OpenApiRoute.() -> Unit = {
         tags = listOf("Credential exchange")
     }
 
