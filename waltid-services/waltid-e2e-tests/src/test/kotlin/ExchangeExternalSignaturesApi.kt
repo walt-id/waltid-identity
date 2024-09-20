@@ -16,7 +16,7 @@ import id.walt.oid4vc.data.ProofType
 import id.walt.sdjwt.utils.Base64Utils.encodeToBase64Url
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
-import id.walt.webwallet.service.exchange.IssuanceService
+import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.web.controllers.exchange.*
 import id.walt.webwallet.web.model.EmailAccountRequest
@@ -207,10 +207,10 @@ class ExchangeExternalSignatures {
 
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun computeProofOfPossessionFromProofRequest(
-        proofReq: IssuanceService.OfferedCredentialProofOfPossessionParameters,
-    ): IssuanceService.OfferedCredentialProofOfPossession {
+        proofReq: IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossessionParameters,
+    ): IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession {
         return if (proofReq.proofOfPossessionParameters.proofType == ProofType.jwt) {
-            IssuanceService.OfferedCredentialProofOfPossession(
+            IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession(
                 proofReq.offeredCredential,
                 ProofType.jwt,
                 holderKey.signJws(
@@ -234,7 +234,7 @@ class ExchangeExternalSignatures {
                 Json.decodeFromJsonElement<ByteArray>(proofReq.proofOfPossessionParameters.header)
             )
             val payload = Json.decodeFromJsonElement<ByteArray>(proofReq.proofOfPossessionParameters.payload)
-            IssuanceService.OfferedCredentialProofOfPossession(
+            IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession(
                 proofReq.offeredCredential,
                 ProofType.cwt,
                 cryptoProvider.sign1(

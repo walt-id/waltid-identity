@@ -3,7 +3,7 @@ package id.walt.webwallet.usecase.claim
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.events.EventType
-import id.walt.webwallet.service.exchange.IssuanceService
+import id.walt.webwallet.service.exchange.CredentialDataResult
 import id.walt.webwallet.usecase.event.EventLogUseCase
 import kotlinx.datetime.Clock
 import kotlinx.uuid.UUID
@@ -11,7 +11,7 @@ import kotlinx.uuid.UUID
 object ClaimCommons {
 
     fun convertCredentialDataResultToWalletCredential(
-        credentialDataResult: IssuanceService.CredentialDataResult,
+        credentialDataResult: CredentialDataResult,
         walletId: UUID,
         pending: Boolean,
     ) = WalletCredential(
