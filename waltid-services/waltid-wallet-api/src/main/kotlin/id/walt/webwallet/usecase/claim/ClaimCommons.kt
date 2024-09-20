@@ -33,8 +33,7 @@ object ClaimCommons {
         credential: WalletCredential,
         credentialType: String,
         eventUseCase: EventLogUseCase,
-    ) {
-        eventUseCase.log(
+    ) = eventUseCase.log(
             action = EventType.Credential.Receive,
             originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
             tenant = tenant,
@@ -48,7 +47,6 @@ object ClaimCommons {
             ),
             credentialId = credential.id,
         )
-    }
 
     fun storeWalletCredentials(
         wallet: UUID,
