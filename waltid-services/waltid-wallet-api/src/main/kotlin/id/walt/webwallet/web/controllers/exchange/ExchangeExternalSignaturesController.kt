@@ -49,8 +49,8 @@ import kotlinx.uuid.generateUUID
 fun Application.exchangeExternalSignatures() = walletRoute {
     val logger = KotlinLogging.logger { }
     route(
-        OpenAPICommons.rootPath,
-        OpenAPICommons.route(),
+        OpenAPICommons.exchangeRootPath,
+        OpenAPICommons.exchangeRoute(),
     ) {
         post("external_signatures/presentation/prepare", {
             summary = "Preparation (first) step for an OID4VP flow with externally provided signatures."
