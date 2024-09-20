@@ -2,13 +2,13 @@ package id.walt.webwallet.usecase.claim
 
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.credentials.CredentialsService
-import id.walt.webwallet.service.exchange.IssuanceService
-import id.walt.webwallet.service.exchange.IssuanceService.OfferedCredentialProofOfPossession
+import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession
+import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures
 import id.walt.webwallet.usecase.event.EventLogUseCase
 import kotlinx.uuid.UUID
 
 class ExternalSignatureClaimStrategy(
-    private val issuanceService: IssuanceService,
+    private val issuanceServiceExternalSignatures: IssuanceServiceExternalSignatures,
     private val credentialService: CredentialsService,
     private val eventUseCase: EventLogUseCase,
 ) {
@@ -17,7 +17,7 @@ class ExternalSignatureClaimStrategy(
         did: String,
         keyId: String,
         offerURL: String,
-    ) = issuanceService.prepareExternallySignedOfferRequest(
+    ) = issuanceServiceExternalSignatures.prepareExternallySignedOfferRequest(
         offerURL = offerURL,
         did = did,
         keyId = keyId,
@@ -34,7 +34,7 @@ class ExternalSignatureClaimStrategy(
         credentialIssuerURL: String,
         accessToken: String?,
         offeredCredentialProofsOfPossession: List<OfferedCredentialProofOfPossession>,
-    ) = issuanceService.submitExternallySignedOfferRequest(
+    ) = issuanceServiceExternalSignatures.submitExternallySignedOfferRequest(
         offerURL = offerURL,
         credentialIssuerURL = credentialIssuerURL,
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),

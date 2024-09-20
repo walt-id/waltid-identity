@@ -9,6 +9,7 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.Event
 import id.walt.webwallet.service.events.EventType
+import id.walt.webwallet.service.exchange.CredentialDataResult
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.trust.TrustValidationService
 import id.walt.webwallet.usecase.event.EventLogUseCase
@@ -89,7 +90,7 @@ class SilentClaimStrategy(
     }
 
     private fun prepareCredentialData(
-        did: String, data: IssuanceService.CredentialDataResult, issuerDid: String,
+        did: String, data: CredentialDataResult, issuerDid: String,
     ) = didService.getWalletsForDid(did).map {
         Pair(
             WalletCredential(

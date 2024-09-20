@@ -25,7 +25,7 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.EventDataNotAvailable
 import id.walt.webwallet.service.events.EventType
-import id.walt.webwallet.service.exchange.IssuanceService
+import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures
 import id.walt.webwallet.service.exchange.ProofOfPossessionParameters
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.web.controllers.auth.getWalletService
@@ -370,7 +370,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                                 did = "did:web:walt.id",
                                 offerURL = "openid-credential-offer://?credential_offer=",
                                 offeredCredentialsProofRequests = listOf(
-                                    IssuanceService.OfferedCredentialProofOfPossessionParameters(
+                                    IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossessionParameters(
                                         OfferedCredential(
                                             format = CredentialFormat.mso_mdoc,
                                         ),
@@ -389,7 +389,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                                 did = "did:web:walt.id",
                                 offerURL = "openid-credential-offer://?credential_offer=",
                                 offeredCredentialsProofRequests = listOf(
-                                    IssuanceService.OfferedCredentialProofOfPossessionParameters(
+                                    IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossessionParameters(
                                         OfferedCredential(
                                             format = CredentialFormat.jwt_vc_json,
                                         ),
@@ -458,7 +458,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                             did = "did:web:walt.id",
                             offerURL = "openid-credential-offer://?credential_offer=",
                             offeredCredentialProofsOfPossession = listOf(
-                                IssuanceService.OfferedCredentialProofOfPossession(
+                                IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession(
                                     OfferedCredential(
                                         format = CredentialFormat.mso_mdoc,
                                     ),
@@ -474,7 +474,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                             did = "did:web:walt.id",
                             offerURL = "openid-credential-offer://?credential_offer=",
                             offeredCredentialProofsOfPossession = listOf(
-                                IssuanceService.OfferedCredentialProofOfPossession(
+                                IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession(
                                     OfferedCredential(
                                         format = CredentialFormat.jwt_vc_json,
                                     ),
@@ -568,7 +568,7 @@ data class PrepareOID4VCIResponse(
     val did: String? = null,
     val offerURL: String,
     val accessToken: String? = null,
-    val offeredCredentialsProofRequests: List<IssuanceService.OfferedCredentialProofOfPossessionParameters>,
+    val offeredCredentialsProofRequests: List<IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossessionParameters>,
     val credentialIssuer: String,
 )
 
@@ -578,6 +578,6 @@ data class SubmitOID4VCIRequest(
     val offerURL: String,
     val requireUserInput: Boolean? = false,
     val accessToken: String? = null,
-    val offeredCredentialProofsOfPossession: List<IssuanceService.OfferedCredentialProofOfPossession>,
+    val offeredCredentialProofsOfPossession: List<IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession>,
     val credentialIssuer: String,
 )

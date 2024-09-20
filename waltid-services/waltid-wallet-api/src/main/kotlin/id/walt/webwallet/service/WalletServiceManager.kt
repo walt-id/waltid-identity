@@ -23,6 +23,7 @@ import id.walt.webwallet.service.endpoint.EntraServiceEndpointProvider
 import id.walt.webwallet.service.entity.DefaultNameResolutionService
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.exchange.IssuanceService
+import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.notifications.NotificationService
 import id.walt.webwallet.service.settings.SettingsService
@@ -139,7 +140,7 @@ object WalletServiceManager {
     )
     val externalSignatureClaimStrategy by lazy {
         ExternalSignatureClaimStrategy(
-            issuanceService = IssuanceService,
+            issuanceServiceExternalSignatures = IssuanceServiceExternalSignatures,
             credentialService = credentialService,
             eventUseCase = eventUseCase,
         )
@@ -202,7 +203,7 @@ object WalletServiceManager {
     @Deprecated(
         replaceWith = ReplaceWith(
             "AccountsService.getAccountWalletMappings(account)", "id.walt.service.account.AccountsService"
-        ), message = "depreacted"
+        ), message = "deprecated"
     )
     fun listWallets(tenant: String, account: UUID): List<UUID> =
         AccountWalletMappings.innerJoin(Wallets)
