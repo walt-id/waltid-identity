@@ -56,7 +56,7 @@ private val reservedKeys = listOf(
  */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-@Serializable(with = ServiceBlockSerializer::class)
+@Serializable(with = ServiceMapSerializer::class)
 data class ServiceMap(
     val id: String,
     val type: Set<String>,
@@ -67,9 +67,9 @@ data class ServiceMap(
     init {
         require(id.isNotBlank()) { "Service property id cannot be blank" }
         type.forEach {
-            require( it.isNotBlank() ) { "Service type strings cannot be blank"}
+            require(it.isNotBlank()) { "Service type strings cannot be blank" }
         }
-        require( serviceEndpoint.isNotEmpty() ) { "Service endpoint set cannot be empty" }
+        require(serviceEndpoint.isNotEmpty()) { "Service endpoint set cannot be empty" }
         customProperties?.forEach {
             require(!reservedKeys.contains(it.key)) {
                 "Invalid attempt to override reserved Service property with key ${it.key} via customProperties map"
@@ -78,7 +78,7 @@ data class ServiceMap(
     }
 }
 
-object ServiceBlockSerializer : KSerializer<ServiceMap> {
+object ServiceMapSerializer : KSerializer<ServiceMap> {
     override val descriptor = JsonObject.serializer().descriptor
 
     override fun deserialize(decoder: Decoder): ServiceMap {
@@ -88,62 +88,79 @@ object ServiceBlockSerializer : KSerializer<ServiceMap> {
         }
         return ServiceMap(
             id = Json.decodeFromJsonElement(jsonObject["id"]!!),
-            type = jsonObject["type"]!!.let { element ->
-                when {
-                    element is JsonPrimitive && element.isString -> {
-                        setOf(Json.decodeFromJsonElement<String>(element))
-                    }
-                    else -> {
-                        Json.decodeFromJsonElement<Set<String>>(element)
-                    }
-                }
-
-            },
-            serviceEndpoint = jsonObject["serviceEndpoint"]!!.let { element ->
-                when {
-                    (element is JsonPrimitive && element.isString) ||
-                            (element is JsonObject) -> {
-                        setOf(Json.decodeFromJsonElement<ServiceEndpoint>(element))
-                    }
-
-                    else -> {
-                        Json.decodeFromJsonElement<Set<ServiceEndpoint>>(element)
-                    }
-                }
-            },
-            customProperties = jsonObject.filterNot { reservedKeys.contains(it.key) }.let {
-                it.ifEmpty { null }
-            },
+            type = getType(jsonObject["type"]!!),
+            serviceEndpoint = getServiceEndpoint(jsonObject["serviceEndpoint"]!!),
+            customProperties = getCustomProperties(jsonObject),
         )
     }
+
+    private fun getType(element: JsonElement) = when {
+        element is JsonPrimitive && element.isString -> {
+            setOf(Json.decodeFromJsonElement<String>(element))
+        }
+
+        else -> {
+            Json.decodeFromJsonElement<Set<String>>(element)
+        }
+    }
+
+    private fun getServiceEndpoint(element: JsonElement) = when {
+        (element is JsonPrimitive && element.isString) ||
+                (element is JsonObject) -> {
+            setOf(Json.decodeFromJsonElement<ServiceEndpoint>(element))
+        }
+
+        else -> {
+            Json.decodeFromJsonElement<Set<ServiceEndpoint>>(element)
+        }
+    }
+
+    private fun getCustomProperties(jsonObject: JsonObject) = jsonObject
+        .filterNot {
+            reservedKeys.contains(it.key)
+        }.let {
+            it.ifEmpty { null }
+        }
 
     override fun serialize(encoder: Encoder, value: ServiceMap) {
         encoder.encodeSerializableValue(
             JsonObject.serializer(),
             buildJsonObject {
                 put("id", value.id)
-                when (value.type.size) {
-                    1 -> {
-                        put("type", value.type.first().toString())
-                    }
-
-                    else -> {
-                        put("type", Json.encodeToJsonElement(value.type))
-                    }
-                }
-                when (value.serviceEndpoint.size) {
-                    1 -> {
-                        put("serviceEndpoint", Json.encodeToJsonElement(value.serviceEndpoint.first()))
-                    }
-
-                    else -> {
-                        put("serviceEndpoint", Json.encodeToJsonElement(value.serviceEndpoint))
-                    }
-                }
-                value.customProperties?.forEach {
-                    put(it.key, it.value)
-                }
+                putType(value)
+                putEndpoint(value.serviceEndpoint)
+                putCustomProperties(value.customProperties)
             }
         )
+    }
+
+    private fun JsonObjectBuilder.putType(value: ServiceMap) =
+        when (value.type.size) {
+            1 -> {
+                Json.encodeToJsonElement(value.type.first())
+            }
+
+            else -> {
+                Json.encodeToJsonElement(value.type)
+            }
+        }.let {
+            put("type", it)
+        }
+
+    private fun JsonObjectBuilder.putEndpoint(value: Set<ServiceEndpoint>) =
+        when (value.size) {
+            1 -> {
+                Json.encodeToJsonElement(value.first())
+            }
+
+            else -> {
+                Json.encodeToJsonElement(value)
+            }
+        }.let {
+            put("serviceEndpoint", it)
+        }
+
+    private fun JsonObjectBuilder.putCustomProperties(value: Map<String, JsonElement>?) = value?.forEach {
+        put(it.key, it.value)
     }
 }
