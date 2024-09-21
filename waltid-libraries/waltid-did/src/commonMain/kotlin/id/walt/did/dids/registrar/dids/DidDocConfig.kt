@@ -133,30 +133,39 @@ data class DidDocConfig(
     }
 
     init {
-        rootCustomProperties?.forEach {
-            require(!reservedKeys.contains(it.key)) {
-                "Invalid attempt to override reserved root did document property with key ${it.key} via rootCustomProperties map"
+        validateRootCustomProperties()
+        validatePublicKeyMap()
+        validateVerificationConfigurationMap()
+    }
+
+    private fun validateRootCustomProperties() = rootCustomProperties?.forEach {
+        require(!reservedKeys.contains(it.key)) {
+            "Invalid attempt to override reserved root did document property with key ${it.key} via rootCustomProperties map"
+        }
+    }
+
+    private fun validatePublicKeyMap() = publicKeyMap.values.forEach {
+        require(!it.hasPrivateKey) { "The key map must contain only public keys" }
+    }
+
+    private fun validateVerificationConfigurationMap() =
+        verificationConfigurationMap.takeIf { it.isNotEmpty() }?.let {
+            require(publicKeyMap.isNotEmpty()) {
+                "Key map cannot be empty when verification configuration map is not empty"
             }
-        }
-        publicKeyMap.values.forEach {
-            require(!it.hasPrivateKey) { "The key map must contain only public keys" }
-        }
-        if (verificationConfigurationMap.isNotEmpty()) require(publicKeyMap.isNotEmpty()) {
-            "Key map cannot be empty when verification configuration map is not empty"
-        }
-        verificationConfigurationMap.forEach { (type, configSet) ->
-            configSet.forEach { config ->
-                require(publicKeyMap.containsKey(config.publicKeyId))
-                val key = publicKeyMap[config.publicKeyId] ?: throw IllegalArgumentException(
-                    "Key ID ${config.publicKeyId} is missing from key map but is defined " +
-                            "in verification configuration $config of type $type"
-                )
-                if (type == VerificationRelationshipType.KeyAgreement) {
-                    require(key.keyType != KeyType.Ed25519) { "Invalid key type ${key.keyType} specified for keyAgreement property." }
+            it.forEach { (type, configSet) ->
+                configSet.forEach { config ->
+                    require(publicKeyMap.containsKey(config.publicKeyId))
+                    val key = publicKeyMap[config.publicKeyId] ?: throw IllegalArgumentException(
+                        "Key ID ${config.publicKeyId} is missing from key map but is defined " +
+                                "in verification configuration $config of type $type"
+                    )
+                    if (type == VerificationRelationshipType.KeyAgreement) {
+                        require(key.keyType != KeyType.Ed25519) { "Invalid key type ${key.keyType} specified for keyAgreement property." }
+                    }
                 }
             }
         }
-    }
 
     /**
      * This function constructs the did document based on the provided configuration parameters and the did method specific identifier.
@@ -167,64 +176,64 @@ data class DidDocConfig(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun toDidDocument(did: String): DidDocument {
+    suspend fun toDidDocument(did: String) = DidDocument(buildMap {
+        put("context", Json.encodeToJsonElement(context))
+        put("id", Json.encodeToJsonElement(did))
+        createVerificationMethodSet(did).takeIf { it.isNotEmpty() }?.let {
+            put("verificationMethod", Json.encodeToJsonElement(it))
+            createVerificationRelationshipMap(did).forEach { (verRelType, verRelValue) ->
+                put(verRelType.toString(), Json.encodeToJsonElement(verRelValue))
 
-        val verificationMethod = verificationConfigurationMap
-            .values
-            .flatten()
-            .map { verConf ->
-                val key = publicKeyMap[verConf.publicKeyId]
-                    ?: throw IllegalStateException(
-                        "This exception should never happen, we have already checked " +
-                                "that all verification keys exist in the key map"
+            }
+        }
+        createService(did).takeIf { it.serviceMaps.isNotEmpty() }?.let {
+            put("service", Json.encodeToJsonElement(it))
+        }
+        rootCustomProperties?.forEach {
+            put(it.key, it.value)
+        }
+    })
+
+    private suspend fun createVerificationMethodSet(did: String) = verificationConfigurationMap
+        .values
+        .flatten()
+        .map { verConf ->
+            val key = publicKeyMap[verConf.publicKeyId]
+                ?: throw IllegalStateException(
+                    "This exception should never happen, we have already checked " +
+                            "that all verification keys exist in the key map"
+                )
+            VerificationMethod(
+                id = "$did#${verConf.publicKeyId}",
+                type = VerificationMethodType.JsonWebKey2020,
+                material = VerificationMaterialType.PublicKeyJwk to key.exportJWKObject(),
+                controller = did,
+                customProperties = verConf.customProperties,
+            )
+        }.toSet()
+
+    private fun createVerificationRelationshipMap(did: String) = verificationConfigurationMap
+        .entries
+        .associate { (verRelType, verConfSet) ->
+            verRelType to verConfSet.map {
+                VerificationRelationship
+                    .buildFromId(
+                        id = "$did#${it.publicKeyId}",
                     )
-                VerificationMethod(
-                    id = "$did#${verConf.publicKeyId}",
-                    type = VerificationMethodType.JsonWebKey2020,
-                    material = VerificationMaterialType.PublicKeyJwk to key.exportJWKObject(),
-                    controller = did,
-                    customProperties = verConf.customProperties,
-                )
             }.toSet()
+        }
 
-        val verificationRelationship = verificationConfigurationMap
-            .entries
-            .associate { (verRelType, verConfSet) ->
-                verRelType to verConfSet.map {
-                    VerificationRelationship
-                        .buildFromId(
-                            id = "$did#${it.publicKeyId}",
-                        )
-                }.toSet()
-            }
-
-        val service = serviceConfigurationSet
-            .map {
-                ServiceMap(
-                    id = "$did#${randomUUID()}",
-                    type = setOf(it.type),
-                    serviceEndpoint = it.serviceEndpoint,
-                    customProperties = it.customProperties,
-                )
-            }.toSet().let {
-                Service(it)
-            }
-
-        return DidDocument(buildMap {
-            put("context", Json.encodeToJsonElement(context))
-            put("id", Json.encodeToJsonElement(did))
-            if (verificationMethod.isNotEmpty()) {
-                put("verificationMethod", Json.encodeToJsonElement(verificationMethod))
-                verificationRelationship.forEach { (verRelType, verRelValue) ->
-                    put(verRelType.toString(), Json.encodeToJsonElement(verRelValue))
-                }
-            }
-            if (service.serviceMaps.isNotEmpty()) put("service", Json.encodeToJsonElement(service))
-            rootCustomProperties?.forEach {
-                put(it.key, it.value)
-            }
-        })
-    }
+    private fun createService(did: String) = serviceConfigurationSet
+        .map {
+            ServiceMap(
+                id = "$did#${randomUUID()}",
+                type = setOf(it.type),
+                serviceEndpoint = it.serviceEndpoint,
+                customProperties = it.customProperties,
+            )
+        }.toSet().let {
+            Service(it)
+        }
 }
 
 /**
