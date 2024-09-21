@@ -2,7 +2,6 @@ package id.walt.did.serialize.service
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.document.models.service.*
-import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -12,7 +11,7 @@ import kotlin.test.assertEquals
 class ServiceEndpointTest {
 
     @Test
-    fun testServiceEndpointURLSerialization() = runTest {
+    fun testServiceEndpointURLSerialization() {
         val svcEndpoint = ServiceEndpointURL("something")
         val svcJsonEncodedString = "\"${svcEndpoint.url}\""
         //encoding single element
@@ -43,7 +42,7 @@ class ServiceEndpointTest {
     }
 
     @Test
-    fun testServiceEndpointObjectSerialization() = runTest {
+    fun testServiceEndpointObjectSerialization() {
         val svcEndpointJsonObject = ServiceEndpointObject(
             buildJsonObject {
                 put("some-url-property", "url-value".toJsonElement())
@@ -91,7 +90,7 @@ class ServiceEndpointTest {
     }
 
     @Test
-    fun testServiceEndpointMixedSerialization() = runTest {
+    fun testServiceEndpointMixedSerialization() {
         val mixSvcEndpointList = listOf(
             ServiceEndpointObject(
                     buildJsonObject {
