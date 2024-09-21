@@ -2,7 +2,6 @@ package id.walt.did.serialize.service
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.document.models.service.*
-import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -16,20 +15,20 @@ class ServiceTest {
         "tit" to "tat".toJsonElement(),
     )
 
-    private val svcBlockSingleURLNoCustom = ServiceMap(
+    private val svcMapSingleURLNoCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(ServiceEndpointURL("some-url")),
     )
 
-    private val svcBlockSingleURLCustom = ServiceMap(
+    private val svcMapSingleURLCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(ServiceEndpointURL("some-url")),
         customProperties = customProperties,
     )
 
-    private val svcBlockMultipleURLNoCustom = ServiceMap(
+    private val svcMapMultipleURLNoCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
@@ -38,7 +37,7 @@ class ServiceTest {
         ),
     )
 
-    private val svcBlockMultipleURLCustom = ServiceMap(
+    private val svcMapMultipleURLCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
@@ -48,7 +47,7 @@ class ServiceTest {
         customProperties = customProperties,
     )
 
-    private val svcBlockSingleObjectNoCustom = ServiceMap(
+    private val svcMapSingleObjectNoCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
@@ -61,7 +60,7 @@ class ServiceTest {
         ),
     )
 
-    private val svcBlockSingleObjectCustom = ServiceMap(
+    private val svcMapSingleObjectCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
@@ -75,7 +74,7 @@ class ServiceTest {
         customProperties = customProperties,
     )
 
-    private val svcBlockMultipleObjectNoCustom = ServiceMap(
+    private val svcMapMultipleObjectNoCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
@@ -94,7 +93,7 @@ class ServiceTest {
         ),
     )
 
-    private val svcBlockMultipleObjectCustom = ServiceMap(
+    private val svcMapMultipleObjectCustom = ServiceMap(
         id = "some-id",
         type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
         serviceEndpoint = setOf(
@@ -114,20 +113,20 @@ class ServiceTest {
         customProperties = customProperties,
     )
 
-    private val svcBlockSet = setOf(
-        svcBlockSingleURLNoCustom,
-        svcBlockSingleURLCustom,
-        svcBlockMultipleURLNoCustom,
-        svcBlockMultipleURLCustom,
-        svcBlockSingleObjectNoCustom,
-        svcBlockSingleObjectCustom,
-        svcBlockMultipleObjectNoCustom,
-        svcBlockMultipleObjectCustom,
+    private val svcMapSet = setOf(
+        svcMapSingleURLNoCustom,
+        svcMapSingleURLCustom,
+        svcMapMultipleURLNoCustom,
+        svcMapMultipleURLCustom,
+        svcMapSingleObjectNoCustom,
+        svcMapSingleObjectCustom,
+        svcMapMultipleObjectNoCustom,
+        svcMapMultipleObjectCustom,
     )
 
     @Test
-    fun testSingleServiceSerialization() = runTest {
-        svcBlockSet.forEach {
+    fun testSingleServiceSerialization() {
+        svcMapSet.forEach {
             val svc = Service(setOf(it))
             val svcJsonString = """[${Json.encodeToString(it)}]"""
             assertEquals(
@@ -142,8 +141,8 @@ class ServiceTest {
     }
 
     @Test
-    fun testMultiServiceSerialization() = runTest {
-        val svc = Service(svcBlockSet)
+    fun testMultiServiceSerialization() {
+        val svc = Service(svcMapSet)
         val svcJsonString =
             """[{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":"some-url"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":"some-url","this":"that","tit":"tat"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":["some-url1","some-url2"]},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":["some-url1","some-url2"],"this":"that","tit":"tat"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":{"some-url-property1":"url-value1","some-additional-property1":"some-value1"}},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":{"some-url-property1":"url-value1","some-additional-property1":"some-value1"},"this":"that","tit":"tat"},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":[{"some-url-property1":"url-value1","some-additional-property1":"some-value1"},{"some-url-property2":"url-value2","some-additional-property2":"some-value2"}]},{"id":"some-id","type":"DIDCommMessaging","serviceEndpoint":[{"some-url-property1":"url-value1","some-additional-property1":"some-value1"},{"some-url-property2":"url-value2","some-additional-property2":"some-value2"}],"this":"that","tit":"tat"}]"""
         assertEquals(

@@ -5,7 +5,6 @@ import id.walt.did.dids.document.models.service.ServiceMap
 import id.walt.did.dids.document.models.service.ServiceEndpointObject
 import id.walt.did.dids.document.models.service.ServiceEndpointURL
 import id.walt.did.dids.document.models.service.RegisteredServiceType
-import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -13,7 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class ServiceBlockTest {
+class ServiceMapTest {
 
     private val customProperties = mapOf(
         "ckey1" to "cvalue1".toJsonElement(),
@@ -21,7 +20,7 @@ class ServiceBlockTest {
     )
 
     @Test
-    fun testServiceBlockEndpointURLSerialization() = runTest {
+    fun testServiceMapEndpointURLSerialization() {
         //with URL endpoint block and no custom properties
         val svcBlockWithURLEndpointNoCustom = ServiceMap(
             id = "some-id",
@@ -86,7 +85,7 @@ class ServiceBlockTest {
     }
 
     @Test
-    fun testServiceBlockEndpointObjectSerialization() = runTest {
+    fun testServiceMapEndpointObjectSerialization() {
         //with object endpoint block and no custom properties
         val svcBlockWithObjectEndpointNoCustom = ServiceMap(
             id = "some-id",
@@ -165,7 +164,7 @@ class ServiceBlockTest {
     }
 
     @Test
-    fun testServiceBlockWithSameEndpoints() = runTest {
+    fun testServiceMapWithSameEndpoints() {
         val svcBlockWithURLEndpoints = ServiceMap(
             id = "some-id",
             type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
@@ -221,7 +220,7 @@ class ServiceBlockTest {
     }
 
     @Test
-    fun testServiceBlockWithMixEndpoints() = runTest {
+    fun testServiceMapWithMixEndpoints() {
         val svcBlock = ServiceMap(
             id = "some-id",
             type = setOf(RegisteredServiceType.DIDCommMessaging.toString()),
@@ -251,7 +250,7 @@ class ServiceBlockTest {
     }
 
     @Test
-    fun testServiceBlockMultipleTypes() = runTest {
+    fun testServiceMapMultipleTypes() {
         val svcBlock = ServiceMap(
             id = "some-id",
             type = setOf(
