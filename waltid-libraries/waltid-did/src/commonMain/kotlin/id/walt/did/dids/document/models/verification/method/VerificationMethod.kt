@@ -60,36 +60,41 @@ object VerificationMethodSerializer : KSerializer<VerificationMethod> {
             requiredKeys.forEach {
                 require(jsonObject.contains(it))
             }
-            val id = Json.decodeFromJsonElement<String>(jsonObject["id"]!!)
-            val controller = Json.decodeFromJsonElement<String>(jsonObject["controller"]!!)
             val type = Json.decodeFromJsonElement<VerificationMethodType>(jsonObject["type"]!!)
-            val customProperties = jsonObject.filterNot { reservedKeys.contains(it.key) }.let {
-                it.ifEmpty { null }
-            }
-            val verificationMaterial = when (type) {
-                VerificationMethodType.JsonWebKey2020 -> {
-                    require(jsonObject.containsKey(VerificationMaterialType.PublicKeyJwk.toString()))
-                    jsonObject[VerificationMaterialType.PublicKeyJwk.toString()]!!
-                    Pair(VerificationMaterialType.PublicKeyJwk, jsonObject[VerificationMaterialType.PublicKeyJwk.toString()]!!)
-                }
-
-                else -> {
-                    require(jsonObject.containsKey(VerificationMaterialType.PublicKeyMultibase.toString()))
-                    jsonObject[VerificationMaterialType.PublicKeyMultibase.toString()]!!
-                    Pair(VerificationMaterialType.PublicKeyMultibase, jsonObject[VerificationMaterialType.PublicKeyMultibase.toString()]!!)
-                }
-            }
             VerificationMethod(
-                id = id,
+                id = Json.decodeFromJsonElement<String>(jsonObject["id"]!!),
                 type = type,
-                controller = controller,
-                material = verificationMaterial,
-                customProperties = customProperties,
+                controller = Json.decodeFromJsonElement<String>(jsonObject["controller"]!!),
+                material = getVerificationMaterial(jsonObject, type),
+                customProperties = getCustomProperties(jsonObject),
             )
         }
-
     }
 
+    private fun getVerificationMaterial(
+        methodValue: JsonObject,
+        type: VerificationMethodType,
+    ) = when (type) {
+        VerificationMethodType.JsonWebKey2020 -> {
+            require(methodValue.containsKey(VerificationMaterialType.PublicKeyJwk.toString()))
+            methodValue[VerificationMaterialType.PublicKeyJwk.toString()]!!
+            Pair(VerificationMaterialType.PublicKeyJwk, methodValue[VerificationMaterialType.PublicKeyJwk.toString()]!!)
+        }
+
+        else -> {
+            require(methodValue.containsKey(VerificationMaterialType.PublicKeyMultibase.toString()))
+            methodValue[VerificationMaterialType.PublicKeyMultibase.toString()]!!
+            Pair(
+                VerificationMaterialType.PublicKeyMultibase,
+                methodValue[VerificationMaterialType.PublicKeyMultibase.toString()]!!
+            )
+        }
+    }
+
+    private fun getCustomProperties(methodValue: JsonObject) =
+        methodValue.filterNot { reservedKeys.contains(it.key) }.let {
+            it.ifEmpty { null }
+        }
 
     override fun serialize(encoder: Encoder, value: VerificationMethod) {
         encoder.encodeSerializableValue(
@@ -98,11 +103,17 @@ object VerificationMethodSerializer : KSerializer<VerificationMethod> {
                 put("id", value.id.toJsonElement())
                 put("type", value.type.toJsonElement())
                 put("controller", value.controller.toJsonElement())
-                put(value.material.first.toString(), Json.encodeToJsonElement(value.material.second))
-                value.customProperties?.forEach {
-                    put(it.key, it.value)
-                }
+                putMaterial(value.material)
+                putCustomProperties(value.customProperties)
             }
         )
     }
+
+    private fun JsonObjectBuilder.putMaterial(value: Pair<VerificationMaterialType, JsonElement>) =
+        put(value.first.toString(), Json.encodeToJsonElement(value.second))
+
+    private fun JsonObjectBuilder.putCustomProperties(value: Map<String, JsonElement>?) =
+        value?.forEach {
+            put(it.key, it.value)
+        }
 }
