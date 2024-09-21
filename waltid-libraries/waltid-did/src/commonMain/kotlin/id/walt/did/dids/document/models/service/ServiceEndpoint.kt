@@ -54,7 +54,7 @@ object ServiceEndpointURLSerializer : KSerializer<ServiceEndpointURL> {
 }
 
 /**
- * Service endpoint represented as a single URL.
+ * Service endpoint represented as a JSON object.
  * @property jsonObject User-defined JSON object representing a service endpoint
  */
 @OptIn(ExperimentalJsExport::class)
