@@ -1,5 +1,10 @@
 package id.walt.crypto.keys.oci
 
+import id.walt.commons.exceptions.KeyNotFoundException
+import id.walt.commons.exceptions.KeyTypeNotSupportedException
+import id.walt.commons.exceptions.PublicKeyNotFoundException
+import id.walt.commons.exceptions.SigningException
+import id.walt.commons.exceptions.VerificationException
 import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
@@ -72,9 +77,9 @@ class OCIKeyRestApi(
     private suspend fun retrievePublicKey(): Key {
         val keyData = getKeys(vaultKeyId, config.managementEndpoint, config.tenancyOcid, config.signingKeyPem)
         val key =
-            keyData.firstOrNull { it["id"]?.jsonPrimitive?.content == id } ?: throw IllegalArgumentException("Key with id $id not found")
+            keyData.firstOrNull { it["id"]?.jsonPrimitive?.content == id } ?: throw KeyNotFoundException(id)
         val keyVersion = getKeyVersion(id, vaultKeyId, config.managementEndpoint, config.signingKeyPem)
-        val keyId = key["id"]?.jsonPrimitive?.content ?: ""
+        val keyId = key["id"]?.jsonPrimitive?.content ?: throw KeyNotFoundException(id)
 
         return getOCIPublicKey(
             keyId, vaultKeyId, config.managementEndpoint, keyVersion, config.signingKeyPem
@@ -119,7 +124,7 @@ class OCIKeyRestApi(
         when (keyType) {
             KeyType.secp256r1 -> "ECDSA_SHA_256"
             KeyType.RSA -> "SHA_256_RSA_PKCS_PSS"
-            else -> throw NotImplementedError("Keytype not yet implemented: $keyType")
+            else -> throw KeyTypeNotSupportedException(keyType.name)
         }
     }
 
@@ -154,7 +159,7 @@ class OCIKeyRestApi(
                 header("x-content-sha256", calculateSHA256(requestBody))
                 setBody(requestBody)
             }.ociJsonDataBody().jsonObject["signature"]?.jsonPrimitive?.content?.decodeFromBase64()
-            response ?: error("No signature returned from OCI.")
+            response ?: throw SigningException("No signature returned from OCI.")
         }
     }
 
@@ -217,7 +222,7 @@ class OCIKeyRestApi(
             setBody(requestBody)
         }.ociJsonDataBody().jsonObject["isSignatureValid"]?.jsonPrimitive?.boolean ?: false
         return if (response) Result.success(detachedPlaintext)
-        else Result.failure(Exception("Signature is not valid"))
+        else Result.failure(throw VerificationException("Signature is not valid"))
     }
 
     @JvmBlocking
@@ -273,14 +278,14 @@ class OCIKeyRestApi(
         private fun keyTypeToOciKeyMapping(type: KeyType) = when (type) {
             KeyType.secp256r1 -> "ECDSA"
             KeyType.RSA -> "RSA"
-            KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")
-            KeyType.Ed25519 -> throw IllegalArgumentException("Not supported: $type")
+            KeyType.secp256k1 -> throw KeyTypeNotSupportedException(type.name)
+            KeyType.Ed25519 -> throw KeyTypeNotSupportedException(type.name)
         }
 
         private fun ociKeyToKeyTypeMapping(type: String) = when (type) {
             "ECDSA" -> KeyType.secp256r1
             "RSA" -> KeyType.RSA
-            else -> throw IllegalArgumentException("Not supported: $type")
+            else -> throw KeyTypeNotSupportedException(type)
         }
 
         @JvmBlocking
@@ -293,10 +298,10 @@ class OCIKeyRestApi(
                 val vaultKeyId = "${config.tenancyOcid}/${config.userOcid}/${config.fingerprint}"
                 val host = config.managementEndpoint
                 val length = when (type) {
-                    KeyType.Ed25519 -> throw IllegalArgumentException("Not supported: $type")
+                    KeyType.Ed25519 -> throw KeyTypeNotSupportedException(type.name)
                     KeyType.secp256r1 -> 32
                     KeyType.RSA -> 256
-                    KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")
+                    KeyType.secp256k1 -> throw KeyTypeNotSupportedException(type.name)
                 }
                 val requestBody = JsonObject(
                     mapOf(
@@ -388,7 +393,8 @@ class OCIKeyRestApi(
                 else -> throw IllegalArgumentException("Unsupported HTTP method: $method")
             }
 
-            val privateOciApiKey = signingKey ?: error("No private key provided for OCI signing. Please provide a private key.")
+            val privateOciApiKey = signingKey
+                ?: throw SigningException("No private key provided for OCI signing. Please provide a private key.")
 
             return Base64.encode(sha256WithRsa(privateOciApiKey, signingString.encodeToByteArray()))
         }
@@ -438,7 +444,8 @@ class OCIKeyRestApi(
                 header("Host", host)
             }
 
-            val publicKeyPem = response.body<JsonObject>()["publicKey"]?.jsonPrimitive?.content ?: error("No public key returned from OCI.")
+            val publicKeyPem = response.body<JsonObject>()["publicKey"]?.jsonPrimitive?.content
+                ?: throw PublicKeyNotFoundException("No public key returned from OCI for key ID: $OCIDKeyID and version: $keyVersion")
             val publicKey = JWKKey.importPEM(publicKeyPem).getOrThrow()
 
             return publicKey
