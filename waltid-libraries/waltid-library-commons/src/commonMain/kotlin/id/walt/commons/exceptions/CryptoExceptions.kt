@@ -19,3 +19,9 @@ class KeyNotFoundException(id: String) : CryptoException(HttpStatusCode.NotFound
 class SigningException(message: String) : CryptoException(HttpStatusCode.InternalServerError, message)
 class VerificationException(message: String) : CryptoException(HttpStatusCode.InternalServerError, message)
 class PublicKeyNotFoundException(message: String) : CryptoException(HttpStatusCode.NotFound, message)
+class InvalidAuthenticationMethodException() : CryptoException(
+    HttpStatusCode.BadRequest,
+    "No valid authentication method passed! Provide either accessKey, roleId and secretId, or username and password."
+)
+
+class TSELoginException(message: String) : CryptoException(HttpStatusCode.InternalServerError, message)
