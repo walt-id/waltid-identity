@@ -58,7 +58,9 @@ class TSEKey(
 
     @Suppress("DEPRECATION")
     @Transient
-    private val effectiveAuth: TSEAuth = auth ?: TSEAuth(accessKey = accessKey ?: throw IllegalArgumentException("Either auth or accessKey must be provided"))
+    private val effectiveAuth: TSEAuth = auth ?: TSEAuth(
+        accessKey = accessKey ?: throw IllegalArgumentException("Either auth or accessKey must be provided")
+    )
 
     @OptIn(DelicateCoroutinesApi::class)
     private inline fun <T> lazySuspended(
@@ -69,7 +71,11 @@ class TSEKey(
     }
 
 
-    private suspend fun httpRequest(method: HttpMethod = HttpMethod.Get, url: String = "keys/$id", body: Any? = null): HttpResponse {
+    private suspend fun httpRequest(
+        method: HttpMethod = HttpMethod.Get,
+        url: String = "keys/$id",
+        body: Any? = null
+    ): HttpResponse {
         return http.request {
             this.url("$server/$url")
             this.method = method
@@ -175,8 +181,8 @@ class TSEKey(
         val signatureBase64 = httpRequest(HttpMethod.Post, "sign/$id", body)
             .tseJsonDataBody().jsonObject["signature"]?.jsonPrimitive?.content?.removePrefix("vault:v1:")
             ?: throw SigningException(
-            "No signature in data response"
-        )
+                "No signature in data response"
+            )
 
         return signatureBase64
     }

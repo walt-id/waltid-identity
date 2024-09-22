@@ -43,14 +43,19 @@ object KeyManager {
         keyTypeGeneration[typeId] = createFunction
     }
 
-    inline fun <reified T : Key> register(typeId: String, noinline createFunction: suspend (KeyGenerationRequest) -> T) {
+    inline fun <reified T : Key> register(
+        typeId: String,
+        noinline createFunction: suspend (KeyGenerationRequest) -> T
+    ) {
         keyManagerLogger().trace { "Registering key type \"$typeId\" to ${T::class.simpleName}..." }
         val type = typeOf<T>()
         registerByType(type, typeId, createFunction)
     }
 
     suspend fun createKey(generationRequest: KeyGenerationRequest): Key {
-        val function = keyTypeGeneration[generationRequest.backend] ?:throw KeyBackendNotSupportedException(generationRequest.backend)
+        val function = keyTypeGeneration[generationRequest.backend] ?: throw KeyBackendNotSupportedException(
+            generationRequest.backend
+        )
         log.debug { "Creating key with generation request: $generationRequest" }
 
         return function.invoke(generationRequest)
