@@ -1,5 +1,7 @@
 package id.walt.crypto.keys.tse
 
+import id.walt.commons.exceptions.InvalidAuthenticationMethodException
+import id.walt.commons.exceptions.TSELoginException
 import io.github.reactivecircus.cache4k.Cache
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -61,7 +63,7 @@ data class TSEAuth(
                     || (roleId != null && secretId != null)
                     || (username != null && password != null)
         ) {
-            "No valid authentication method passed!"
+            throw InvalidAuthenticationMethodException()
         }
     }
 
@@ -70,10 +72,11 @@ data class TSEAuth(
     private suspend fun HttpResponse.getClientToken() =
         body<JsonObject>().let {
             if (it.containsKey("errors")) {
-                error("Errors occurred at TSE login: " + it["errors"]!!.jsonArray.map { it.jsonPrimitive.content }.joinToString())
+                throw TSELoginException("Errors occurred at TSE login: " + it["errors"]!!.jsonArray.map { it.jsonPrimitive.content }
+                    .joinToString())
             }
             it["auth"]?.jsonObject?.get("client_token")?.jsonPrimitive?.contentOrNull
-                ?: error("Did not receive token after login!")
+                ?: throw TSELoginException("Did not receive token after login!")
         }
 
     private suspend fun loginAppRole(server: String): String =
@@ -104,7 +107,7 @@ data class TSEAuth(
             accessKey != null -> accessKey
             roleId != null -> loginAppRole(server)
             username != null -> loginUserPass(server)
-            else -> throw IllegalArgumentException("No valid authentication method passed!")
+            else -> throw InvalidAuthenticationMethodException()
         }
     }
 
