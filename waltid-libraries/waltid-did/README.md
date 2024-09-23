@@ -105,21 +105,20 @@ val didResult = DidService.registerByKey(
 Register a DID by having more fine-grained control over the contents of the DID Document that will be produced. This approach allows users to specify multiple keys (verification methods) for different purposes (verification relationships), define services and various use-case-specific (custom) properties.
 
 ```kotlin
-val publicKeys = listOf(
+val publicKeySet = setOf(
+  JWKKey.generate(KeyType.RSA).getPublicKey(),
   JWKKey.generate(KeyType.secp256k1).getPublicKey(),
   JWKKey.generate(KeyType.secp256r1).getPublicKey(),
-  JWKKey.generate(KeyType.RSA).getPublicKey()
 )
-val didDocConfig = DidDocConfig
-    .buildFromPublicKeySet(
-      publicKeys,
-    )
-val options = DidWebCreateOptions(domain = domain,
-  domain = "example.com",
-  path = "/path/to/did.json",
+val didDocConfig = DidDocConfig.buildFromPublicKeySet(
+  publicKeySet = publicKeySet,
+)
+var webCreateOptions = DidWebCreateOptions(
+  domain = "wallet.walt-test.cloud",
+  path = "/wallet-api/registry/1111",
   didDocConfig = didDocConfig,
 )
-val didResult = DidService.register(options = options)
+val didResult = DidService.register(webCreateOptions)
 ```
 For more information on the capabilities provided with this approach, refer to the documentation of the `DidDocConfig` class and its respective methods, as well as, our [waltid-examples](https://github.com/walt-id/waltid-examples) project.
 

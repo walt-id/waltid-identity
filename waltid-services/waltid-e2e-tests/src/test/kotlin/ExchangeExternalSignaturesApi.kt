@@ -9,7 +9,7 @@ import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
-import id.walt.mdoc.dataelement.*
+import id.walt.mdoc.dataelement.MapElement
 import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.ProofType
@@ -257,7 +257,7 @@ class ExchangeExternalSignatures {
         if (issuanceRequests.size == 1) {
             when (firstIssuanceRequest.credentialFormat) {
                 CredentialFormat.mso_mdoc -> {
-                    issuerApi.issueMDoc(
+                    issuerApi.mdoc(
                         firstIssuanceRequest,
                     ) {
                         offerURL = it
@@ -266,7 +266,7 @@ class ExchangeExternalSignatures {
                 }
 
                 CredentialFormat.sd_jwt_vc -> {
-                    issuerApi.issueSdJwt(
+                    issuerApi.sdjwt(
                         firstIssuanceRequest,
                     ) {
                         offerURL = it
@@ -275,7 +275,7 @@ class ExchangeExternalSignatures {
                 }
 
                 else -> {
-                    issuerApi.issue(
+                    issuerApi.jwt(
                         firstIssuanceRequest,
                     ) {
                         offerURL = it
