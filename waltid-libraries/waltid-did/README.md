@@ -74,6 +74,8 @@ DidService.init()
 
 ### Register DID
 
+#### Single Key
+
 Create the key and register the DID:
 
 ```kotlin
@@ -99,7 +101,33 @@ val didResult = DidService.registerByKey(
 )
 ```
 
-Both calls return a `DidResult` object:
+#### DID Document Configuration
+Register a DID by having more fine-grained control over the contents of the DID Document that will be produced. This approach allows users to specify multiple keys (verification methods) for different purposes (verification relationships), define services and various use-case-specific (custom) properties.
+
+```kotlin
+val publicKeys = listOf(
+  JWKKey.generate(KeyType.secp256k1).getPublicKey(),
+  JWKKey.generate(KeyType.secp256r1).getPublicKey(),
+  JWKKey.generate(KeyType.RSA).getPublicKey()
+)
+val didDocConfig = DidDocConfig
+    .buildFromPublicKeySet(
+      publicKeys,
+    )
+val options = DidWebCreateOptions(domain = domain,
+  domain = "example.com",
+  path = "/path/to/did.json",
+  didDocConfig = didDocConfig,
+)
+val didResult = DidService.register(options = options)
+```
+For more information on the capabilities provided with this approach, refer to the documentation of the `DidDocConfig` class and its respective methods, as well as, our [waltid-examples](https://github.com/walt-id/waltid-examples) project.
+
+**Note:** Support for this feature is currently limited to the `did:web` method.
+
+#### Result
+
+All calls return a `DidResult` object:
 
 ```kotlin
 data class DidResult(
@@ -146,6 +174,7 @@ represented as **_walt.id crypto_** `Key`.
             <td align="center" rowspan="2">Method</td>
             <td align="center" rowspan="2">Key</td>
             <td align="center" colspan="3">Feature</td>
+            <td align="center" rowspan="2">DID Document<br>Configuration</td>
         </tr>
         <!-- function sub-header -->
         <tr>
@@ -162,6 +191,7 @@ represented as **_walt.id crypto_** `Key`.
             <td align="center">&check;</td>
             <td align="center">&dash;</td>
             <td align="center">&check;</td>
+            <td align="center" rowspan="4">&dash;</td>
         </tr>
         <!-- secp256k1 -->
         <tr>
@@ -185,7 +215,7 @@ represented as **_walt.id crypto_** `Key`.
             <td align="center">&check;</td>
         </tr>
         <!-- end key -->
-        <tr><td colspan="5"></td></tr>
+        <tr><td colspan="6"></td></tr>
         <!-- jwk -->
         <!-- ed25519 -->
         <tr>
@@ -194,6 +224,7 @@ represented as **_walt.id crypto_** `Key`.
             <td align="center">&check;</td>
             <td align="center">&dash;</td>
             <td align="center">&check;</td>
+            <td align="center" rowspan="4">&dash;</td>
         </tr>
         <!-- secp256k1 -->
         <tr>
@@ -226,6 +257,7 @@ represented as **_walt.id crypto_** `Key`.
             <td align="center">&check;</td>
             <td align="center">&cross;</td>
             <td align="center">&check;</td>
+            <td align="center" rowspan="4">&check;</td>
         </tr>
         <!-- secp256k1 -->
         <tr>
@@ -258,6 +290,7 @@ represented as **_walt.id crypto_** `Key`.
             <td align="center">&check;</td>
             <td align="center">&check;</td>
             <td align="center">&check;</td>
+            <td align="center">&cross;</td>
         </tr>
         <!-- end cheqd -->
         <tr><td colspan="5"></td></tr>
@@ -268,6 +301,7 @@ represented as **_walt.id crypto_** `Key`.
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
             <td align="center">&check;</td>
+            <td align="center" rowspan="2">&cross;</td>
         </tr>
         <tr>
             <td align="center">secp256k1</td>
@@ -284,10 +318,15 @@ represented as **_walt.id crypto_** `Key`.
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
         </tr>
         <!-- end iota -->
     </tbody>
 </table>
+
+- &check; implemented
+- &cross; not implemented
+- &dash; not available
 
 (*) The did:key implementation defaults to W3C CCG https://w3c-ccg.github.io/did-method-key/. By setting _useJwkJcsPub_ to `true` the EBSI
 implementation (jwk_jcs-pub encoding) according https://hub.ebsi.eu/tools/libraries/key-did-resolver is performed.
