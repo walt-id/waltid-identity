@@ -9,7 +9,6 @@ import com.github.ajalt.clikt.parameters.types.path
 import id.walt.cli.util.JsonUtils.toJsonPrimitive
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
-import id.walt.credentials.verification.*
 import id.walt.policies.models.PolicyRequest
 import id.walt.policies.models.PolicyResult
 import id.walt.policies.models.PresentationVerificationResponse
