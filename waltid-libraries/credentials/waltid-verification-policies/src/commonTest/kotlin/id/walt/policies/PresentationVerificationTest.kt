@@ -1,7 +1,8 @@
-import id.walt.credentials.verification.Verifier
-import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
+package id.walt.policies
+
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
+import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

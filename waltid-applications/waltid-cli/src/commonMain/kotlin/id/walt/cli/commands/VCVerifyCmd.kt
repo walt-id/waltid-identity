@@ -11,10 +11,10 @@ import com.github.ajalt.clikt.parameters.types.file
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.VCUtil
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
-import id.walt.credentials.verification.ExpirationDatePolicyException
+import id.walt.policies.ExpirationDatePolicyException
 import id.walt.policies.JsonSchemaVerificationException
-import id.walt.credentials.verification.NotBeforePolicyException
-import id.walt.credentials.verification.models.PolicyResult
+import id.walt.policies.NotBeforePolicyException
+import id.walt.policies.models.PolicyResult
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json

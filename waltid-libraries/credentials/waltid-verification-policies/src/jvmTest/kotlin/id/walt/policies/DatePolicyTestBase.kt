@@ -1,7 +1,6 @@
-package id.walt.credentials.verification.policies
+package id.walt.policies
 
 import id.walt.credentials.Claims
-import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*

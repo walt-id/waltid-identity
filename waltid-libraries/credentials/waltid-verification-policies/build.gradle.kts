@@ -85,13 +85,14 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                //implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
                 implementation("org.slf4j:slf4j-simple:2.0.13")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
             }
         }
     }
