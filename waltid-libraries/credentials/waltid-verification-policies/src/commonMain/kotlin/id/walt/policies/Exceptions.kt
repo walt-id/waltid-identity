@@ -2,7 +2,7 @@
 
 package id.walt.policies
 
-import id.walt.credentials.verification.policies.JsonSchemaPolicy
+import id.walt.policies.policies.JsonSchemaPolicy
 import kotlinx.datetime.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
