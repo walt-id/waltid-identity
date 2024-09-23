@@ -1,5 +1,6 @@
 package id.walt.did.dids.document
 
+import id.walt.did.dids.DidUtils
 import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.finished.DidDocument
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -17,7 +18,7 @@ import kotlin.js.JsName
 @OptIn(ExperimentalSerializationApi::class, ExperimentalJsExport::class)
 @Serializable
 data class DidCheqdDocument(
-    @EncodeDefault @SerialName("@context") val context: List<String> = DEFAULT_CONTEXT,
+    @EncodeDefault @SerialName("@context") val context: List<String> = DidUtils.DEFAULT_CONTEXT,
     val id: String, // did:cheqd:
 
     val verificationMethod: List<VerificationMethod>?,
@@ -27,10 +28,6 @@ data class DidCheqdDocument(
     val capabilityDelegation: List<String>?,
     val keyAgreement: List<String>?,
 ) {
-    companion object {
-        private val DEFAULT_CONTEXT =
-            listOf("https://www.w3.org/ns/did/v1", "https://w3id.org/security/suites/jws-2020/v1")
-    }
 
     @Serializable
     data class VerificationMethod(
@@ -44,7 +41,7 @@ data class DidCheqdDocument(
 
     @JsName("secondaryConstructor")
     constructor(didDoc: DidDocument, jwk: JsonObject? = null) : this(
-        context = DEFAULT_CONTEXT,
+        context = DidUtils.DEFAULT_CONTEXT,
         id = didDoc.id,
         //TODO: publicKeyMultibase
         verificationMethod = jwk?.let { key ->
