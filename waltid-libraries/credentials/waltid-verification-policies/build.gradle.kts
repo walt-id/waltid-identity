@@ -1,3 +1,8 @@
+import love.forte.plugin.suspendtrans.ClassInfo
+import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
+import love.forte.plugin.suspendtrans.TargetPlatform
+import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
+import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -14,6 +19,14 @@ group = "id.walt.policies"
 
 repositories {
     mavenCentral()
+}
+
+suspendTransform {
+    enabled = true
+    includeRuntime = true
+    useDefault()
+
+    includeAnnotation = false // Required in the current version to avoid "compileOnly" warning
 }
 
 kotlin {
@@ -64,6 +77,9 @@ kotlin {
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+
+                // suspend-transform plugin annotations (required in the current version to avoid "compileOnly" warning)
+                implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
             }
         }
         val commonTest by getting {
@@ -79,4 +95,14 @@ kotlin {
             }
         }
     }
+}
+
+extensions.getByType<SuspendTransformGradleExtension>().apply {
+    transformers[TargetPlatform.JS] = mutableListOf(
+        SuspendTransformConfiguration.jsPromiseTransformer.copy(
+            copyAnnotationExcludes = listOf(
+                ClassInfo("kotlin.js", "JsExport.Ignore")
+            )
+        )
+    )
 }
