@@ -5,9 +5,9 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
-import id.walt.credentials.verification.models.PolicyRequest
-import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
-import id.walt.credentials.verification.policies.JwtSignaturePolicy
+import id.walt.policies.models.PolicyRequest
+import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
+import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType

@@ -1,9 +1,8 @@
 package id.walt.verifier.policies
 
-import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
-import id.walt.policies.PresentationDefinitionException
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.policies.CredentialWrapperValidatorPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*

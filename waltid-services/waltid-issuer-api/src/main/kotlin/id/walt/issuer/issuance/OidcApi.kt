@@ -1,8 +1,8 @@
 package id.walt.issuer.issuance
 
 
-import id.walt.credentials.verification.Verifier
-import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
+import id.walt.policies.Verifier
+import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition

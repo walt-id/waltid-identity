@@ -1,7 +1,5 @@
 package id.walt.oid4vc
 
-import id.walt.credentials.verification.Verifier
-import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.crypto.keys.Key
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.ResponseType.Companion.getResponseTypeString
@@ -17,6 +15,8 @@ import id.walt.oid4vc.errors.TokenError
 import id.walt.oid4vc.responses.AuthorizationCodeWithAuthorizationRequestResponse
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.http
+import id.walt.policies.Verifier
+import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*

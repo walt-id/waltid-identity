@@ -1,6 +1,6 @@
 package id.walt.oid4vc
 
-import id.walt.credentials.verification.policies.JwtSignaturePolicy
+import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.*

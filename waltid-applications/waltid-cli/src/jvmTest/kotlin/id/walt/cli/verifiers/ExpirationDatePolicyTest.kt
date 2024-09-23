@@ -1,10 +1,10 @@
 package id.walt.cli.verifiers
 
-import id.walt.credentials.verification.ExpirationDatePolicyException
-import id.walt.credentials.verification.PolicyManager
-import id.walt.credentials.verification.Verifier
-import id.walt.credentials.verification.models.PolicyRequest
-import id.walt.credentials.verification.policies.ExpirationDatePolicy
+import id.walt.policies.ExpirationDatePolicyException
+import id.walt.policies.PolicyManager
+import id.walt.policies.Verifier
+import id.walt.policies.models.PolicyRequest
+import id.walt.policies.policies.ExpirationDatePolicy
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
