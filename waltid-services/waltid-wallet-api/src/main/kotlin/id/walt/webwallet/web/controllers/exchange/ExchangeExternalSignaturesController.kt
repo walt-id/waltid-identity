@@ -360,9 +360,10 @@ fun Application.exchangeExternalSignatures() = walletRoute {
 
             response {
                 HttpStatusCode.OK to {
-                    description = "Collection of parameters that are necessary to invoke the respective submit endpoint. " +
-                            "For each offered credential, the client is expected to compute a signature based on the provided " +
-                            "proof of possession parameters."
+                    description =
+                        "Collection of parameters that are necessary to invoke the respective submit endpoint. " +
+                                "For each offered credential, the client is expected to compute a signature based on the provided " +
+                                "proof of possession parameters."
                     body<PrepareOID4VCIResponse> {
                         required = true
                         example("When proofType == cwt") {
@@ -412,29 +413,28 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             val offer = req.offerURL
             logger.debug { "Request: $req" }
 
-            val did = req.did ?: walletService.listDids().firstOrNull()?.did
-            ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
-
-            //this can't fail due to the above block
-            val walletDID = DidsService.get(walletService.walletId, did)!!
-            logger.debug { "Retrieved wallet DID: $walletDID" }
-
             runCatching {
+                val walletDID = req.did?.let {
+                    DidsService.get(walletService.walletId, req.did)
+                } ?: walletService.listDids().firstOrNull()
+                ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
+                logger.debug { "Retrieved wallet DID: $walletDID" }
                 val authKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()
-                logger.debug { "Resolved authorization keyId: $authKeyId" }
+                logger.debug { "Resolved did authorization keyId: $authKeyId" }
                 WalletServiceManager.externalSignatureClaimStrategy.prepareCredentialClaim(
                     did = walletDID.did,
                     keyId = authKeyId,
                     offerURL = offer,
-                )
-            }.onSuccess { prepareClaimResult ->
-                val responsePayload = PrepareOID4VCIResponse(
-                    did = walletDID.did,
-                    offerURL = req.offerURL,
-                    accessToken = prepareClaimResult.accessToken,
-                    offeredCredentialsProofRequests = prepareClaimResult.offeredCredentialsProofRequests,
-                    credentialIssuer = prepareClaimResult.resolvedCredentialOffer.credentialIssuer,
-                )
+                ).let { prepareClaimResult ->
+                    PrepareOID4VCIResponse(
+                        did = walletDID.did,
+                        offerURL = req.offerURL,
+                        accessToken = prepareClaimResult.accessToken,
+                        offeredCredentialsProofRequests = prepareClaimResult.offeredCredentialsProofRequests,
+                        credentialIssuer = prepareClaimResult.resolvedCredentialOffer.credentialIssuer,
+                    )
+                }
+            }.onSuccess { responsePayload ->
                 context.respond(
                     HttpStatusCode.OK,
                     responsePayload,
