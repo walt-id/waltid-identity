@@ -1,4 +1,4 @@
-package id.walt.presentationexchange
+package id.walt.definitionparser
 
 import kotlinx.serialization.*
 

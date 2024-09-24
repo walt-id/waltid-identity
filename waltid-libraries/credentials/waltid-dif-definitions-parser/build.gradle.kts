@@ -10,7 +10,7 @@ plugins {
     id("com.github.ben-manes.versions")
 }
 
-group = "id.walt.dif-presentation-exchange"
+group = "id.walt.dif-definitions-parser"
 
 repositories {
     mavenCentral()
@@ -31,7 +31,7 @@ kotlin {
     }
 
     js(IR) {
-        moduleName = "presentation-exchange"
+        moduleName = "definitions-parser"
         nodejs {
             generateTypeScriptDefinitions()
         }
