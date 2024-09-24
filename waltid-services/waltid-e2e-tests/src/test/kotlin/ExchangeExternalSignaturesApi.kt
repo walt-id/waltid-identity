@@ -168,6 +168,9 @@ class ExchangeExternalSignatures {
         val openbadgeUniversityDegreePresentationRequest = loadResource(
             "presentation/batch-openbadge-universitydegree-presentation-request.json"
         )
+        val openbadgeSdJwtIssuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(E2ETest.sdjwtCredential).apply {
+            credentialFormat = CredentialFormat.sd_jwt_vc
+        }
         initializeWallet()
         testPreAuthorizedOID4VCI(
             issuanceRequests = listOf(openBadgeIssuanceRequest),
@@ -203,6 +206,12 @@ class ExchangeExternalSignatures {
         )
         testOID4VP(openbadgeUniversityDegreePresentationRequest)
         clearWalletCredentials()
+        testPreAuthorizedOID4VCI(
+            useOptionalParameters = false,
+            issuanceRequests = listOf(
+                openbadgeSdJwtIssuanceRequest,
+            ),
+        )
     }
 
     @OptIn(ExperimentalSerializationApi::class)
