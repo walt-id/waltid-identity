@@ -8,15 +8,14 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
 import kotlin.test.assertNotNull
 
-class DidsApi(private val client: HttpClient) {
+class DidsApi(private val client: HttpClient, val wallet: UUID) {
     private val didRegexPattern = "^^did:%s:\\S+\$"
     suspend fun list(
         wallet: UUID,
         expectedDefault: DefaultDidOption,
         size: Int? = null,
-        output: ((List<WalletDid>) -> Unit)? = null
+        output: ((List<WalletDid>) -> Unit)? = null,
     ) =
-        test("/wallet-api/wallet/{wallet}/dids - list DIDs") {
             client.get("/wallet-api/wallet/$wallet/dids").expectSuccess().apply {
                 val dids = body<List<WalletDid>>()
                 assert(dids.isNotEmpty()) { "Wallet has no DIDs!" }
@@ -26,39 +25,33 @@ class DidsApi(private val client: HttpClient) {
                 expectedDefault.whenSome { did -> assert(dids.single { it.did == did }.default) }
                 output?.invoke(dids)
             }
-        }
 
-    suspend fun get(wallet: UUID, did: String) = test("/wallet-api/wallet/{wallet}/dids/{did} - show specific DID") {
+    suspend fun get(did: String) =
         client.get("/wallet-api/wallet/$wallet/dids/$did").expectSuccess().apply {
             val response = body<JsonObject>()
             assert(response["id"]?.jsonPrimitive?.content == did)
             println("DID document: $response")
         }
-    }
 
-    suspend fun delete(wallet: UUID, did: String) = test("/wallet-api/wallet/{wallet}/dids/{did} - delete did") {
+    suspend fun delete(did: String) = test("/wallet-api/wallet/{wallet}/dids/{did} - delete did") {
         client.delete("/wallet-api/wallet/$wallet/dids/$did").expectSuccess()
     }
 
-    suspend fun default(wallet: UUID, did: String) =
-        test("/wallet-api/wallet/{wallet}/dids/default - set default did") {
+    suspend fun setDefault(did: String) =
             client.post("/wallet-api/wallet/$wallet/dids/default?did=$did").expectSuccess()
-        }
 
-    suspend fun create(wallet: UUID, payload: DidCreateRequest, output: ((String) -> Unit)? = null) =
-        test("/wallet-api/wallet/{wallet}/dids/create/${payload.method} - create did:${payload.method}") {
+    suspend fun create(payload: DidCreateRequest) =
             client.post("/wallet-api/wallet/$wallet/dids/create/${payload.method}") {
                 url {
                     payload.toMap().onEach {
                         parameters.append(it.key, it.value.toString())
                     }
                 }
-            }.expectSuccess().apply {
+            }.expectSuccess().run {
                 val did = body<String>()
                 assert(String.format(didRegexPattern, payload.method).toRegex().matches(did))
-                output?.invoke(did)
+                did
             }
-        }
 
     data class DidCreateRequest(
         val method: String,

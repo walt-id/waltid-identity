@@ -72,7 +72,6 @@ object E2ETestWebService {
             return TestStats(testResults.size, succeeded, failed)
         }
 
-
         ServiceMain(
             ServiceConfiguration("e2e-test"), ServiceInitialization(
                 features = listOf(FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
@@ -92,7 +91,7 @@ object E2ETestWebService {
 
         t.println("\n" + TextColors.magenta("Test results:"))
         testResults.forEachIndexed { index, result ->
-            val name = testNames[index]!!
+            val name = testNames[index] ?: throw IllegalStateException("Unknown test for index $idx! Last successful was ${testNames[idx-1]}")
             t.println(TextColors.magenta("$index. $name: ${result.toSuccessString()}"))
         }
 
@@ -114,7 +113,22 @@ object E2ETestWebService {
         TextColors.red("❌ FAILURE$res")
     }
 
-    suspend fun test(name: String, function: suspend () -> Any?) {
+    suspend fun testGroup(groupName: String, function: suspend () -> Any?) {
+        val startTestId = testResults.size + 1
+
+        t.println("\n${TextColors.brightCyan(TextStyles.bold("---=== Begin test group: $groupName === ---"))}")
+//        val result = runCatching { function.invoke() }
+        function.invoke()
+
+        val endTestId = testResults.size + 1
+
+        val testCount = endTestId - startTestId
+
+        t.println(TextStyles.bold(TextColors.brightCyan("---=== End of test group: $groupName (tests $startTestId - $endTestId) === ---")) + "\n")
+    }
+
+    @Suppress("REDUNDANT_INLINE_SUSPEND_FUNCTION_TYPE")
+    suspend inline fun <reified T> testWithResult(name: String, function: suspend () -> T): T {
         val id = numTests++
         testNames[id] = name
 
@@ -134,7 +148,21 @@ object E2ETestWebService {
         val failed = testResults.size - overallSuccess
         val failedStr = if (failed == 0) "none failed ✅" else TextColors.red("$failed failed")
         t.println(TextColors.magenta("Current test stats: ${testResults.size} overall | $overallSuccess succeeded | $failedStr\n"))
+
+        val resultValue = result.getOrNull()
+        return resultValue
+            ?: throw IllegalStateException("Cannot return test result for test $id: \"$name\", as the result is expected to be ${T::class.simpleName}, but the test evaluation failed due to ${result.exceptionOrNull()!!::class.simpleName}, and thus has no returned result.")
     }
+
+    suspend fun test(name: String, function: suspend () -> Any?) = testWithResult<Any?>(name, function)
+
+    @Suppress("REDUNDANT_INLINE_SUSPEND_FUNCTION_TYPE")
+    suspend inline infix fun <reified T> String.inlineTestWithResult(function: suspend () -> T): T =
+        testWithResult<T>(this, function)
+
+    suspend infix fun String.inlineTest(function: suspend () -> Any?) =
+        test(this, function)
+
 
     fun loadResource(relativePath: String): String =
         URLDecoder.decode(object {}.javaClass.getResource(relativePath)!!.path, "UTF-8").let { File(it).readText() }

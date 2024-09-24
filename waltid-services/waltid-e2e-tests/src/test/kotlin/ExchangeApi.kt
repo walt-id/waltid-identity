@@ -1,4 +1,3 @@
-import E2ETestWebService.test
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
@@ -20,12 +19,11 @@ class ExchangeApi(private val client: HttpClient) {
         }
 
     suspend fun useOfferRequest(
-        wallet: UUID,
         offerUrl: String,
         numberOfExpected: Int,
         requireUserInput: Boolean = false,
-        output: ((List<WalletCredential>) -> Unit)? = null
-    ) = test("/wallet-api/wallet/{wallet}/exchange/useOfferRequest - claim credential from issuer") {
+        output: ((List<WalletCredential>) -> Unit)? = null,
+    ) =
         client.post("/wallet-api/wallet/$wallet/exchange/useOfferRequest") {
             setBody(offerUrl)
         }.expectSuccess().apply {
@@ -33,13 +31,11 @@ class ExchangeApi(private val client: HttpClient) {
             assert(newCredentials.size == numberOfExpected) { "should have received a number of $numberOfExpected credential(s), but received ${newCredentials.size}" }
             output?.invoke(newCredentials)
         }
-    }
 
     suspend fun resolvePresentationRequest(
-        wallet: UUID,
         presentationRequestUrl: String,
-        output: ((String) -> Unit)? = null
-    ) = test("/wallet-api/wallet/{wallet}/exchange/resolvePresentationRequest - get presentation definition") {
+        output: ((String) -> Unit)? = null,
+    ) =
         client.post("/wallet-api/wallet/$wallet/exchange/resolvePresentationRequest") {
             contentType(ContentType.Text.Plain)
             setBody(presentationRequestUrl)
@@ -48,40 +44,33 @@ class ExchangeApi(private val client: HttpClient) {
             assert(resolvedPresentationOfferString.contains("presentation_definition="))
             output?.invoke(resolvedPresentationOfferString)
         }
-    }
 
     suspend fun matchCredentialsForPresentationDefinition(
-        wallet: UUID,
         presentationDefinition: String,
         expectedCredentialIds: List<String> = emptyList(),
-        output: ((List<WalletCredential>) -> Unit)? = null
+        output: ((List<WalletCredential>) -> Unit)? = null,
     ) =
-        test("/wallet-api/wallet/{wallet}/exchange/matchCredentialsForPresentationDefinition - should match OpenBadgeCredential in wallet") {
-            client.post("/wallet-api/wallet/$wallet/exchange/matchCredentialsForPresentationDefinition") {
-                setBody(presentationDefinition)
-            }.expectSuccess().apply {
-                val matched = body<List<WalletCredential>>()
-                assert(matched.size == expectedCredentialIds.size) { "presentation definition should match $expectedCredentialIds credential(s), but have ${matched.size}" }
-                assert(matched.map { it.id }
-                    .containsAll(expectedCredentialIds)) { "matched credentials does not contain all of the expected ones" }
-                output?.invoke(matched)
-            }
+        client.post("/wallet-api/wallet/$wallet/exchange/matchCredentialsForPresentationDefinition") {
+            setBody(presentationDefinition)
+        }.expectSuccess().apply {
+            val matched = body<List<WalletCredential>>()
+            assert(matched.size == expectedCredentialIds.size) { "presentation definition should match $expectedCredentialIds credential(s), but have ${matched.size}" }
+            assert(matched.map { it.id }
+                .containsAll(expectedCredentialIds)) { "matched credentials does not contain all of the expected ones" }
+            output?.invoke(matched)
         }
 
     suspend fun unmatchedCredentialsForPresentationDefinition(
-        wallet: UUID,
         presentationDefinition: String,
         expectedData: List<FilterData> = emptyList(),
-        output: ((List<FilterData>) -> Unit)? = null
+        output: ((List<FilterData>) -> Unit)? = null,
     ) =
-        test("/wallet-api/wallet/{wallet}/exchange/unmatchedCredentialsForPresentationDefinition - none should be missing") {
-            client.post("/wallet-api/wallet/$wallet/exchange/unmatchedCredentialsForPresentationDefinition") {
-                setBody(presentationDefinition)
-            }.expectSuccess().apply {
-                val unmatched = body<List<FilterData>>()
-                assert(unmatched.containsAll(expectedData)) { "the unmatched filters does not contain all of the expected filters" }
-                output?.invoke(unmatched)
-            }
+        client.post("/wallet-api/wallet/$wallet/exchange/unmatchedCredentialsForPresentationDefinition") {
+            setBody(presentationDefinition)
+        }.expectSuccess().apply {
+            val unmatched = body<List<FilterData>>()
+            assert(unmatched.containsAll(expectedData)) { "the unmatched filters does not contain all of the expected filters" }
+            output?.invoke(unmatched)
         }
 
     suspend fun usePresentationRequest(
