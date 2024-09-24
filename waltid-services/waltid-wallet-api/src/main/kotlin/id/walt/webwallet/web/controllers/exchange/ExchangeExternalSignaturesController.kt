@@ -6,13 +6,9 @@ import com.nimbusds.jose.util.Base64URL
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.oid4vc.data.*
-import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationSubmission
-import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
@@ -121,8 +117,8 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             val matchedCredentials = walletService.getCredentialsByIds(req.selectedCredentialIdList)
             logger.debug { "Matched credentials: $matchedCredentials" }
 
-            val jwtsPresented = CredentialFilterUtils.getJwtVcList(matchedCredentials, req.disclosures)
-            println("jwtsPresented: $jwtsPresented")
+            val jwtVcsPresented = CredentialFilterUtils.getJwtVcList(matchedCredentials, req.disclosures)
+            println("jwtsPresented: $jwtVcsPresented")
 
             val presentationId = "urn:uuid:" + UUID.generateUUID().toString().lowercase()
 
@@ -130,7 +126,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             logger.debug { "Resolved authorization keyId: $authKeyId" }
 
             val vpPayload = credentialWallet.getVpJson(
-                matchedCredentials.map { it.document },
+                jwtVcsPresented,
                 presentationId,
                 resolvedAuthReq.nonce,
                 resolvedAuthReq.clientId,
@@ -144,26 +140,16 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             logger.debug { "Generated vp token headers: $vpHeader" }
 
             val rootPathVP = "$"
+//            val rootPathMDoc = "$" + (if (presentations.size == 2) "[1]" else "")
             val presentationSubmission = PresentationSubmission(
                 id = presentationId,
                 definitionId = presentationId,
                 descriptorMap = matchedCredentials.mapIndexed { index, credential ->
-                    val vcJws = credential.document.base64UrlToBase64().decodeJws()
-                    val type =
-                        vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
-                            ?: "VerifiableCredential"
-                    val descriptorId = resolvedAuthReq.presentationDefinition?.inputDescriptors?.find {
-                        (it.name ?: it.id) == type
-                    }?.id
-                    DescriptorMapping(
-                        id = descriptorId,
-                        format = VCFormat.jwt_vp,
-                        path = rootPathVP,
-                        pathNested = DescriptorMapping(
-                            id = descriptorId,
-                            format = VCFormat.jwt_vc_json,
-                            path = "$rootPathVP.verifiableCredential[$index]",
-                        ),
+                    credentialWallet.buildDescriptorMappingJwtVP(
+                        resolvedAuthReq.presentationDefinition,
+                        index,
+                        credential.document,
+                        rootPathVP,
                     )
                 }
             )
