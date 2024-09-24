@@ -1,9 +1,9 @@
 package id.walt.cli.presexch.strategies
 
 import id.walt.cli.models.Credential
+import id.walt.cli.util.JsonUtils
 import id.walt.oid4vc.data.dif.InputDescriptor
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.cli.util.JsonUtils
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 

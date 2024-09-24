@@ -11,6 +11,7 @@ import kotlin.test.assertNotNull
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 class DidsApi(private val client: HttpClient) {
     private val didRegexPattern = "^^did:%s:\\S+\$"
     suspend fun list(

@@ -104,7 +104,7 @@ class VerificationUseCase(
         session
     }
 
-    fun createSession(
+    suspend fun createSession(
         vpPoliciesJson: JsonElement?,
         vcPoliciesJson: JsonElement?,
         presentationDefinitionJson: JsonObject,

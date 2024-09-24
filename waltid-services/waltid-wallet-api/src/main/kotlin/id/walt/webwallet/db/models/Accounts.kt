@@ -2,10 +2,10 @@
 
 package id.walt.webwallet.db.models
 
+import id.walt.commons.temp.UuidSerializer
 import id.walt.webwallet.db.kotlinxUuid
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
-import id.walt.commons.temp.UuidSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import org.jetbrains.exposed.sql.ResultRow

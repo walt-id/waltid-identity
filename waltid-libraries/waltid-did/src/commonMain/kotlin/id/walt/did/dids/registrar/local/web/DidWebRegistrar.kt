@@ -19,7 +19,7 @@ import kotlin.js.JsExport
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalJsExport::class)
+@OptIn(ExperimentalJsExport::class, ExperimentalUuidApi::class)
 @JsExport
 class DidWebRegistrar : LocalRegistrarMethod("web") {
     @JvmBlocking

@@ -1,7 +1,10 @@
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
-import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.ClientIdScheme
+import id.walt.oid4vc.data.OpenId4VPProfile
+import id.walt.oid4vc.data.ResponseMode
+import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.interfaces.ISessionCache
 import id.walt.oid4vc.requests.AuthorizationRequest

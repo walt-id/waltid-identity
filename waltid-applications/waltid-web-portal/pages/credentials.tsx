@@ -1,7 +1,5 @@
 import { useRouter } from 'next/router';
-import {
-  ViewfinderCircleIcon,
-} from '@heroicons/react/24/outline';
+import { ViewfinderCircleIcon } from '@heroicons/react/24/outline';
 import WaltIcon from '@/components/walt/logo/WaltIcon';
 import { useEffect, useState } from 'react';
 import SelectButton from '@/components/walt/forms/SelectButton';

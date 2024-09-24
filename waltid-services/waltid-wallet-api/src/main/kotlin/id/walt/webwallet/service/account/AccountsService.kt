@@ -15,14 +15,9 @@ import id.walt.webwallet.service.account.x5c.X5CAccountStrategy
 import id.walt.webwallet.service.events.AccountEventData
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
-import id.walt.webwallet.web.model.AccountRequest
-import id.walt.webwallet.web.model.EmailAccountRequest
-import id.walt.webwallet.web.model.OidcAccountRequest
-import id.walt.webwallet.web.model.OidcUniqueSubjectRequest
+import id.walt.webwallet.web.model.*
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
@@ -64,9 +59,9 @@ object AccountsService {
     suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> = runCatching {
         when (request) {
             is EmailAccountRequest -> EmailAccountStrategy.register(tenant, request)
-//            is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
+            // is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
             is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
-//            is KeycloakAccountRequest -> KeycloakAccountStrategy.register(tenant, request)
+            is KeycloakAccountRequest -> KeycloakAccountStrategy.register(tenant, request)
             is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.register(tenant, request)
             is X5CAccountRequest -> X5CAccountStrategy.register(tenant, request)
             else -> throw NotImplementedError("unknown auth method")

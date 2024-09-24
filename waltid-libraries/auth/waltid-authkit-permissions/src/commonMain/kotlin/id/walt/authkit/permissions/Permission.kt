@@ -2,7 +2,6 @@ package id.walt.authkit.permissions
 
 import id.walt.authkit.permissions.utils.FlowUtils.splitIntoFlow
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 

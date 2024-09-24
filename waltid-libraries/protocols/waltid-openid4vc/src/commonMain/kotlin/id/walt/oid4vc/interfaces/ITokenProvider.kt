@@ -1,9 +1,8 @@
 package id.walt.oid4vc.interfaces
 
 import id.walt.crypto.keys.Key
-import id.walt.crypto.utils.Base64Utils.base64UrlDecode
-import id.walt.mdoc.dataelement.MapElement
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.mdoc.dataelement.MapElement
 import id.walt.oid4vc.providers.TokenTarget
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject

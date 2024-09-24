@@ -17,10 +17,31 @@ kotlin {
     jvm {
 
     }
-    js {
+    js(IR) {
         moduleName = "waltid-authkit-permissions"
         browser {
             generateTypeScriptDefinitions()
+            testTask {
+                useKarma {
+                    fun hasProgram(program: String) =
+                        runCatching {
+                            ProcessBuilder(program, "--version").start().waitFor()
+                        }.getOrElse { -1 } == 0
+
+                    val testEngine = mapOf(
+                        "chromium" to { useChromiumHeadless() },
+                        "firefox" to { useFirefoxHeadless() },
+                        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" to { useChromeHeadless() }, // macOS
+                        "chrome" to { useChromeHeadless() },
+                        // what is it for Windows?
+                    ).entries.firstOrNull { hasProgram(it.key) }
+                    if (testEngine == null) println("No web test engine installed, please install chromium or firefox or chrome.")
+                    else {
+                        // println("Using web test engine: ${testEngine.key}")
+                        testEngine.value.invoke()
+                    }
+                }
+            }
         }
         binaries.library()
     }
