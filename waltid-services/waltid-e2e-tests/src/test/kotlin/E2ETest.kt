@@ -74,6 +74,10 @@ class E2ETest {
         }
     }
 
+//    @Test
+//    fun e2eTemp() = testBlock(defaultTestTimeout) {
+//        ExchangeExternalSignatures().onlySdJwtTestCases()
+//    }
 
     @Test
     fun e2e() = testBlock(defaultTestTimeout) {
