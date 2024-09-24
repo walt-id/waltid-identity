@@ -19,7 +19,7 @@ class RedisPersistence<V>(
         if (defaultExpiration != null)
             pool.setex("$discriminator:$id", defaultExpiration.inWholeSeconds, encoding.invoke(value))
         else
-            pool.set("$discriminator:$id", encoding.invoke(value))
+            pool["$discriminator:$id"] = encoding.invoke(value)
     }
 
     override fun remove(id: String) {
