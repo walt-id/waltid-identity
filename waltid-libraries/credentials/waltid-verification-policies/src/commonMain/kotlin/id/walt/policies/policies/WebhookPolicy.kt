@@ -1,5 +1,6 @@
 package id.walt.policies.policies
 
+import id.walt.credentials.utils.VCFormat
 import id.walt.policies.CredentialWrapperValidatorPolicy
 import id.walt.policies.WebhookPolicyException
 import io.ktor.client.*
@@ -27,6 +28,7 @@ class WebhookPolicy : CredentialWrapperValidatorPolicy(
     override val name = "webhook"
     override val description =
         "Sends the credential data to an webhook URL as HTTP POST, and returns the verified status based on the webhooks set status code (success = 200 - 299)."
+    override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc)
 
     companion object {
         private val http = HttpClient {

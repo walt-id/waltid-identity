@@ -1,5 +1,6 @@
 package id.walt.policies.policies.vp
 
+import id.walt.credentials.utils.VCFormat
 import id.walt.policies.CredentialWrapperValidatorPolicy
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -17,6 +18,7 @@ class MinimumCredentialsPolicy : CredentialWrapperValidatorPolicy(
 
     override val name = "minimum-credentials"
     override val description = "Verifies that a minimum number of credentials are included in the Verifiable Presentation"
+    override val supportedVCFormats = setOf(VCFormat.jwt_vp, VCFormat.jwt_vp_json)
 
     @JvmBlocking
     @JvmAsync

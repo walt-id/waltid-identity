@@ -1,6 +1,7 @@
 package id.walt.policies.policies.vp
 
 import id.walt.credentials.schemes.JwsSignatureScheme.JwsOption
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.policies.CredentialWrapperValidatorPolicy
 import kotlinx.serialization.Serializable
@@ -23,7 +24,7 @@ class HolderBindingPolicy : CredentialWrapperValidatorPolicy(
     override val name = "holder-binding"
     override val description =
         "Verifies that issuer of the Verifiable Presentation (presenter) is also the subject of all Verifiable Credentials contained within."
-
+    override val supportedVCFormats = setOf(VCFormat.jwt_vp, VCFormat.jwt_vp_json)
 
     @JvmBlocking
     @JvmAsync
