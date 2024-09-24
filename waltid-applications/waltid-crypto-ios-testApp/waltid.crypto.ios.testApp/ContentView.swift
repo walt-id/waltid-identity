@@ -10,6 +10,7 @@ import SwiftUI
 import waltid_crypto_ios
 
 struct ContentView: View {
+    let useSecureEnclave = false
     let input: String = """
     {
     "sub": "1234567890",
@@ -53,8 +54,8 @@ struct ContentView: View {
                     }
                     
                     do {
-                        _ = try IosKey.companion.create(options: .init(kid: keyId, keyType: .secp256r1, inSecureElement: true))
-                        p256Key = try IosKey.companion.load(options: .init(kid: keyId, keyType: .secp256r1, inSecureElement: true))
+                        _ = try IosKey.companion.create(options: .init(kid: keyId, keyType: .secp256r1, inSecureElement: useSecureEnclave))
+                        p256Key = try IosKey.companion.load(options: .init(kid: keyId, keyType: .secp256r1, inSecureElement: useSecureEnclave))
                     } catch {
                         print(error)
                     }
