@@ -29,15 +29,4 @@ data class IssuerDataTransferObject(
         configurationEndpoint = resultRow[WalletIssuers.configurationEndpoint],
         authorized = resultRow[WalletIssuers.authorized],
     )
-
-    companion object {
-        fun default(wallet: Uuid) = IssuerDataTransferObject(
-            wallet = wallet,
-            did = "did:web:walt.id",
-            description = "walt.id issuer portal",
-            uiEndpoint = "https://portal.walt.id/credentials?ids=",
-            configurationEndpoint = "https://issuer.portal.walt.id/.well-known/openid-credential-issuer",
-            authorized = false,
-        )
-    }
 }

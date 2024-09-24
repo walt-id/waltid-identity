@@ -52,7 +52,9 @@ import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.usecase.event.EventLogUseCase
-import id.walt.webwallet.web.controllers.PresentationRequestParameter
+import id.walt.webwallet.utils.StringUtils.couldBeJsonObject
+import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
+import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -199,18 +201,18 @@ class SSIKit2WalletService(
 
         logger.debug { "Using presentation request, selected credentials: ${parameter.selectedCredentials}" }
 
-        SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[authReq.state + authReq.presentationDefinition] =
-            parameter.selectedCredentials
-        if (parameter.disclosures != null) {
-            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[authReq.state + authReq.presentationDefinition] =
-                parameter.disclosures
-        }
-
         val presentationSession =
             credentialWallet.initializeAuthorization(authReq, 60.seconds, parameter.selectedCredentials.toSet())
         logger.debug { "Initialized authorization (VPPresentationSession): $presentationSession" }
 
         logger.debug { "Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}" }
+
+        SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition] =
+            parameter.selectedCredentials
+        if (parameter.disclosures != null) {
+            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition] =
+                parameter.disclosures
+        }
 
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest!!)
         val submitFormParams = getFormParameters(presentationSession.authorizationRequest, tokenResponse, presentationSession)
@@ -260,6 +262,7 @@ class SSIKit2WalletService(
         } else if (resp.status.isSuccess()) {
             Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
         } else {
+            logger.debug { "Presentation failed, return = $httpResponseBody" }
             if (isResponseRedirectUrl) {
                 Result.failure(
                     PresentationError(
@@ -272,8 +275,11 @@ class SSIKit2WalletService(
                 Result.failure(
                     PresentationError(
                         message =
-                        if (httpResponseBody != null) "Presentation failed:\n $httpResponseBody"
-                        else "Presentation failed",
+                        httpResponseBody?.let {
+                            if (it.couldBeJsonObject()) it.parseAsJsonObject().getOrNull()?.get("message")?.jsonPrimitive?.content
+                                ?: "Presentation failed"
+                            else it
+                        } ?: "Presentation failed",
                         redirectUri = ""
                     )
                 )
@@ -325,6 +331,8 @@ class SSIKit2WalletService(
         )
         return addableCredentials
     }
+
+    override suspend fun resolveVct(vct: String) = IssuanceService.resolveVct(vct)
 
     override suspend fun resolveCredentialOffer(
         offerRequest: CredentialOfferRequest,
@@ -499,7 +507,7 @@ class SSIKit2WalletService(
                 is UnsupportedMediaTypeException -> throw throwable
                 is ConflictException -> throw throwable
                 is IllegalStateException -> throw throwable
-                else -> throw BadRequestException("Unexpected error occurred: ${throwable.localizedMessage}", throwable)
+                else -> throw BadRequestException("Unexpected error occurred: ${throwable.message}", throwable)
             }
         }
     }

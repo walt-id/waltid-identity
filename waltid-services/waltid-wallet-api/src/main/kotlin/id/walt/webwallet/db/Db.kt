@@ -67,6 +67,7 @@ object Db {
         WalletCredentialCategoryMap,
 
         OidcLogins,
+        X5CLogins,
         WalletSettings,
         WalletNotifications,
         EntityNameResolutionCache,

@@ -190,15 +190,7 @@ class TestCredentialWallet(
             throw IllegalArgumentException("Could not resolve key to sign JWS to generate presentation for vp_token", it)
         } ?: error("No key was resolved when trying to resolve key to sign JWS to generate presentation for vp_token")
 
-        val jwtsPresented = matchedCredentials.filter {
-            setOf(CredentialFormat.jwt_vc, CredentialFormat.jwt_vc_json).contains(it.format)
-        }.map {
-            if (selectedDisclosures?.containsKey(it.id) == true) {
-                it.document + "~${selectedDisclosures[it.id]!!.joinToString("~")}"
-            } else {
-                it.document
-            }
-        }
+        val jwtsPresented = CredentialFilterUtils.getJwtVcList(matchedCredentials, selectedDisclosures)
         println("jwtsPresented: $jwtsPresented")
 
         val sdJwtVCsPresented = runBlocking {
@@ -366,7 +358,7 @@ class TestCredentialWallet(
         }
     }
 
-    private fun getVpJson(credentialsPresented: List<String>, presentationId: String, nonce: String?, aud: String): String? {
+    fun getVpJson(credentialsPresented: List<String>, presentationId: String, nonce: String?, aud: String): String {
         println("Credentials presented: $credentialsPresented")
         return Json.encodeToString(
             mapOf(

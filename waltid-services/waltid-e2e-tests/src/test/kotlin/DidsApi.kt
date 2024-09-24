@@ -7,7 +7,6 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
-
 import kotlin.test.assertNotNull
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -16,15 +15,15 @@ class DidsApi(private val client: HttpClient) {
     private val didRegexPattern = "^^did:%s:\\S+\$"
     suspend fun list(
         wallet: Uuid,
-        size: Int,
         expectedDefault: DefaultDidOption,
+        size: Int? = null,
         output: ((List<WalletDid>) -> Unit)? = null
     ) =
         test("/wallet-api/wallet/{wallet}/dids - list DIDs") {
             client.get("/wallet-api/wallet/$wallet/dids").expectSuccess().apply {
                 val dids = body<List<WalletDid>>()
                 assert(dids.isNotEmpty()) { "Wallet has no DIDs!" }
-                assert(dids.size == size) { "Wallet has invalid number of DIDs!" }
+                size?.let { assert(dids.size == it) { "Wallet has invalid number of DIDs!" } }
                 expectedDefault.whenNone { assert(dids.none { it.default }) }
                 expectedDefault.whenAny { assertNotNull(dids.single { it.default }) }
                 expectedDefault.whenSome { did -> assert(dids.single { it.did == did }.default) }

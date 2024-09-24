@@ -1,12 +1,14 @@
 package id.walt.webwallet.web.plugins
 
-import id.walt.authkit.auth.authKit
+import id.walt.commons.config.ConfigManager
+//import id.walt.authkit.auth.authKit
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.webwallet.FeatureCatalog
+import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.service.OidcLoginService
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
-import id.walt.webwallet.web.controllers.*
+import id.walt.webwallet.web.controllers.auth.*
 import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.web.model.KeycloakAccountRequest
 import io.ktor.client.*
@@ -29,13 +31,15 @@ import kotlin.time.Duration.Companion.seconds
 
 fun Application.configureSecurity() {
     install(Sessions) {
+        val config = ConfigManager.getConfig<AuthConfig>()
+        val tokenLifetime: Long = config.tokenLifetime.toLongOrNull() ?: 1
         cookie<LoginTokenSession>("login") {
             // cookie.encoding = CookieEncoding.BASE64_ENCODING
 
             // cookie.httpOnly = true
             cookie.httpOnly = false // FIXME
             // TODO cookie.secure = true
-            cookie.maxAge = 1.days
+            cookie.maxAge = tokenLifetime.days
             cookie.extensions["SameSite"] = "Strict"
             transform(SessionTransportTransformerEncrypt(AuthKeys.encryptionKey, AuthKeys.signKey))
         }
@@ -45,7 +49,7 @@ fun Application.configureSecurity() {
             // cookie.httpOnly = true
             cookie.httpOnly = false // FIXME
             // TODO cookie.secure = true
-            cookie.maxAge = 1.days
+            cookie.maxAge = tokenLifetime.days
             cookie.extensions["SameSite"] = "Strict"
             transform(SessionTransportTransformerEncrypt(AuthKeys.encryptionKey, AuthKeys.signKey))
         }
@@ -73,7 +77,7 @@ val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
     AuthenticationServiceModule.AuthenticationServiceConfig.apply {
         customAuthentication = {
 
-            authKit("authkit") {  }
+            // authKit("authkit") {  }
 
             oauth("auth-oauth") {
                 client = HttpClient()

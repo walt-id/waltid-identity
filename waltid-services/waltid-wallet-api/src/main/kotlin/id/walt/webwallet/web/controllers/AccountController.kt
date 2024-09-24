@@ -5,6 +5,7 @@ package id.walt.webwallet.web.controllers
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.web.WebBaseRoutes.authenticatedWebWalletRoute
+import id.walt.webwallet.web.controllers.auth.getUserUUID
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*

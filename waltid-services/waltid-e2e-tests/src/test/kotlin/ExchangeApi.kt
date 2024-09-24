@@ -3,7 +3,7 @@
 import E2ETestWebService.test
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.usecase.exchange.FilterData
-import id.walt.webwallet.web.controllers.UsePresentationRequest
+import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -66,7 +66,8 @@ class ExchangeApi(private val client: HttpClient) {
             }.expectSuccess().apply {
                 val matched = body<List<WalletCredential>>()
                 assert(matched.size == expectedCredentialIds.size) { "presentation definition should match $expectedCredentialIds credential(s), but have ${matched.size}" }
-                assert(matched.map { it.id }.containsAll(expectedCredentialIds)) { "matched credentials does not contain all of the expected ones" }
+                assert(matched.map { it.id }
+                    .containsAll(expectedCredentialIds)) { "matched credentials does not contain all of the expected ones" }
                 output?.invoke(matched)
             }
         }
@@ -89,18 +90,11 @@ class ExchangeApi(private val client: HttpClient) {
 
     suspend fun usePresentationRequest(
         wallet: Uuid,
-        did: String? = null,
-        presentationRequestUrl: String,
-        credentialIds: List<String>
+        request: UsePresentationRequest,
+        expectStatus: suspend HttpResponse.() -> HttpResponse = expectSuccess
     ) = test("/wallet-api/wallet/{wallet}/exchange/usePresentationRequest - present credentials") {
         client.post("/wallet-api/wallet/$wallet/exchange/usePresentationRequest") {
-            setBody(
-                UsePresentationRequest(
-                    did = did,
-                    presentationRequest = presentationRequestUrl,
-                    selectedCredentials = credentialIds,
-                )
-            )
-        }.expectSuccess()
+            setBody(request)
+        }.expectStatus()
     }
 }
