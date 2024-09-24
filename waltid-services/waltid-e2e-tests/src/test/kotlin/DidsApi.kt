@@ -10,7 +10,6 @@ import kotlin.test.assertNotNull
 class DidsApi(private val client: HttpClient, val wallet: UUID) {
     private val didRegexPattern = "^^did:%s:\\S+\$"
     suspend fun list(
-        wallet: UUID,
         expectedDefault: DefaultDidOption,
         size: Int? = null,
     ) =

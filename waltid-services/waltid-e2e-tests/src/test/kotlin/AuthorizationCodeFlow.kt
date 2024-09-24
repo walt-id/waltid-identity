@@ -29,10 +29,8 @@ class AuthorizationCodeFlow(private val client: HttpClient) {
         //
         val issuanceRequestIdToken =
             Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-id-token.json"))
-        issuerApi.jwt(issuanceRequestIdToken) {
-            offerUrl = it
-            println("offer: $offerUrl")
-        }
+        offerUrl = issuerApi.jwt(issuanceRequestIdToken)
+        println("offer: $offerUrl")
 
         var offerUrlParams = Url(offerUrl).parameters.toMap()
         var offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)
@@ -75,10 +73,8 @@ class AuthorizationCodeFlow(private val client: HttpClient) {
         //
         val issuanceRequestVpToken =
             Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-vp-token.json"))
-        issuerApi.jwt(issuanceRequestVpToken) {
-            offerUrl = it
-            println("offer: $offerUrl")
-        }
+        offerUrl = issuerApi.jwt(issuanceRequestVpToken)
+        println("offer: $offerUrl")
 
         offerUrlParams = Url(offerUrl).parameters.toMap()
         offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)
@@ -110,10 +106,8 @@ class AuthorizationCodeFlow(private val client: HttpClient) {
         //
         val issuanceRequestPwd =
             Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-pwd.json"))
-        issuerApi.jwt(issuanceRequestPwd) {
-            offerUrl = it
-            println("offer: $offerUrl")
-        }
+        offerUrl = issuerApi.jwt(issuanceRequestPwd)
+        println("offer: $offerUrl")
 
         offerUrlParams = Url(offerUrl).parameters.toMap()
         offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)

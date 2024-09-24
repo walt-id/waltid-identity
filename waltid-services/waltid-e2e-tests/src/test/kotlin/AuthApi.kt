@@ -6,7 +6,6 @@ import id.walt.webwallet.db.models.Account
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.utils.PKIXUtils
 import id.walt.webwallet.web.model.AccountRequest
-import id.walt.webwallet.web.model.KeycloakLogoutRequest
 import id.walt.webwallet.web.model.X5CAccountRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -33,24 +32,17 @@ class AuthApi(private val client: HttpClient) {
             if (status.isSuccess()) runCatching { body<Account>() }.getOrNull() else null
         }
 
-    suspend fun register(request: AccountRequest) = register(
+    suspend fun register(request: AccountRequest) = Companion.register(
         client = client,
-        name = "/wallet-api/auth/register - wallet-api register",
         url = "/wallet-api/auth/register",
         request = request
     )
 
-    suspend fun login(request: AccountRequest) = client.post("/wallet-api/auth/login") {
-        setBody(body = request)
-    }.expectSuccess().run {
-        body<JsonObject>().let { result ->
-            val token = result["token"]
-            assertNotNull(token)
-            val tokenContent = result["token"]!!.jsonPrimitive.content
-            tokenContent.expectLooksLikeJwt()
-            tokenContent
-        }
-    }
+    suspend fun login(request: AccountRequest) = Companion.login(
+        client = client,
+        url = "/wallet-api/auth/login",
+        request = request,
+    )
 
     suspend fun logout() =
         client.post("/wallet-api/auth/logout").expectSuccess()
@@ -197,7 +189,7 @@ class AuthApi(private val client: HttpClient) {
         private suspend fun checkX5CLoginCreatesWallet() = test(
             name = "/wallet-api/auth/x5c/login - validate wallet api x5c login with trustworthy subject certificate also creates wallet"
         ) {
-            var tempClient = E2ETest.testHttpClient()
+            var tempClient = testHttpClient()
             val keyPair = keyPairGenerator.generateKeyPair()
             val dn = X500Name("CN=YeSubject")
             val cert = PKIXUtils.generateSubjectCertificate(
@@ -209,14 +201,12 @@ class AuthApi(private val client: HttpClient) {
                 dn,
             )
             val jwkPrivateKey = PKIXUtils.javaPrivateKeyToJWKKey(keyPair.private)
-            Companion.login(
+            val token = Companion.login(
                 client = tempClient,
-                name = "/wallet-api/auth/x5c/login - wallet api x5c login with trustworthy subject certificate",
                 url = "/wallet-api/auth/x5c/login",
                 request = createX5CAccountRequest(jwkPrivateKey, cert)
-            ) {
-                tempClient = E2ETest.testHttpClient(token = it["token"]!!.jsonPrimitive.content)
-            }
+            )
+            tempClient = testHttpClient(token = token)
             val response = tempClient.get("/wallet-api/wallet/accounts/wallets").expectSuccess()
             val accWalletListing = response.body<AccountWalletListing>()
             assert(accWalletListing.wallets.isNotEmpty())
@@ -226,14 +216,12 @@ class AuthApi(private val client: HttpClient) {
             //register with a subject certificate that is signed by the trusted root CA
             Companion.register(
                 client = client,
-                name = "/wallet-api/auth/x5c/register - wallet api x5c registration with trustworthy subject certificate",
                 url = "/wallet-api/auth/x5c/register",
                 request = createX5CAccountRequest(subjectJWKPrivateKey, subjectCert)
             )
             //login with a subject certificate that is signed by the trusted root CA
             Companion.login(
                 client = client,
-                name = "/wallet-api/auth/x5c/login - wallet api x5c login with trustworthy subject certificate",
                 url = "/wallet-api/auth/x5c/login",
                 request = createX5CAccountRequest(subjectJWKPrivateKey, subjectCert)
             )
@@ -265,13 +253,26 @@ class AuthApi(private val client: HttpClient) {
     private companion object {
         suspend fun register(
             client: HttpClient,
-            name: String,
             url: String,
             request: AccountRequest,
-        ) = test(name) {
-            client.post(url) {
-                setBody(request)
-            }.expectSuccess()
+        ) = client.post(url) {
+            setBody(request)
+        }.expectSuccess()
+
+        suspend fun login(
+            client: HttpClient,
+            url: String,
+            request: AccountRequest,
+        ) = client.post(url) {
+            setBody(request)
+        }.expectSuccess().run{
+            body<JsonObject>().let { result ->
+                val token = result["token"]
+                assertNotNull(token)
+                val tokenContent = result["token"]!!.jsonPrimitive.content
+                tokenContent.expectLooksLikeJwt()
+                tokenContent
+            }
         }
     }
 }

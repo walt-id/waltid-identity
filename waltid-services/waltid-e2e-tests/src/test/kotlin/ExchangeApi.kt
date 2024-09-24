@@ -41,17 +41,15 @@ class ExchangeApi(private val client: HttpClient, val wallet: UUID) {
     suspend fun matchCredentialsForPresentationDefinition(
         presentationDefinition: String,
         expectedCredentialIds: List<String> = emptyList(),
-    ) = test("/wallet-api/wallet/{wallet}/exchange/matchCredentialsForPresentationDefinition - should match OpenBadgeCredential in wallet") {
-            client.post("/wallet-api/wallet/$wallet/exchange/matchCredentialsForPresentationDefinition") {
-                setBody(presentationDefinition)
-            }.expectSuccess().run {
-                val matched = body<List<WalletCredential>>()
-                assert(matched.size == expectedCredentialIds.size) { "presentation definition should match $expectedCredentialIds credential(s), but have ${matched.size}" }
-                assert(matched.map { it.id }
-                    .containsAll(expectedCredentialIds)) { "matched credentials does not contain all of the expected ones" }
-                matched
-            }
-        }
+    ) = client.post("/wallet-api/wallet/$wallet/exchange/matchCredentialsForPresentationDefinition") {
+        setBody(presentationDefinition)
+    }.expectSuccess().run {
+        val matched = body<List<WalletCredential>>()
+        assert(matched.size == expectedCredentialIds.size) { "presentation definition should match $expectedCredentialIds credential(s), but have ${matched.size}" }
+        assert(matched.map { it.id }
+            .containsAll(expectedCredentialIds)) { "matched credentials does not contain all of the expected ones" }
+        matched
+    }
 
     suspend fun unmatchedCredentialsForPresentationDefinition(
         presentationDefinition: String,
@@ -68,12 +66,9 @@ class ExchangeApi(private val client: HttpClient, val wallet: UUID) {
         }
 
     suspend fun usePresentationRequest(
-        wallet: UUID,
         request: UsePresentationRequest,
         expectStatus: suspend HttpResponse.() -> HttpResponse = expectSuccess
-    ) = test("/wallet-api/wallet/{wallet}/exchange/usePresentationRequest - present credentials") {
-        client.post("/wallet-api/wallet/$wallet/exchange/usePresentationRequest") {
-            setBody(request)
-        }.expectStatus()
-    }
+    ) = client.post("/wallet-api/wallet/$wallet/exchange/usePresentationRequest") {
+        setBody(request)
+    }.expectStatus()
 }

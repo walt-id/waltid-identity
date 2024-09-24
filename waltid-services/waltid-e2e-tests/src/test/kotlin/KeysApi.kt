@@ -1,6 +1,4 @@
-import id.walt.commons.config.ConfigManager
 import id.walt.crypto.keys.KeyGenerationRequest
-import id.walt.crypto.keys.KeyType
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -13,14 +11,12 @@ import kotlin.test.assertNotNull
 
 class KeysApi(private val client: HttpClient, val wallet: UUID) {
 
-    suspend fun list(wallet: UUID, expected: KeyGenerationRequest?) =
-        test("/wallet-api/wallet/{wallet}/keys - get keys") {
-            client.get("/wallet-api/wallet/$wallet/keys").expectSuccess().apply {
-                val listing = body<List<SingleKeyResponse>>()
-                when (expected) {
-                    null -> assertNoDefaultKey(listing)
-                    else -> assertDefaultKey(listing, expected)
-                }
+    suspend fun list(expected: KeyGenerationRequest?) =
+        client.get("/wallet-api/wallet/$wallet/keys").expectSuccess().apply {
+            val listing = body<List<SingleKeyResponse>>()
+            when (expected) {
+                null -> assertNoDefaultKey(listing)
+                else -> assertDefaultKey(listing, expected)
             }
         }
 

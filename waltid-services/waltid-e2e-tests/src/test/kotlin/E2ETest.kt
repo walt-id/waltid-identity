@@ -1,9 +1,3 @@
-import E2EResources.defaultEmailAccount
-import E2EResources.defaultTestTimeout
-import E2EResources.jwtCredential
-import E2EResources.nameFieldSchemaPresentationRequestPayload
-import E2EResources.sdjwtCredential
-import E2EResources.simplePresentationRequestPayload
 import E2ETestWebService.inlineTest
 import E2ETestWebService.inlineTestWithResult
 import E2ETestWebService.loadResource
@@ -11,12 +5,12 @@ import E2ETestWebService.test
 import E2ETestWebService.testBlock
 import E2ETestWebService.testGroup
 import E2ETestWebService.testWithResult
+import id.walt.commons.config.ConfigManager
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.webwallet.web.controllers.UsePresentationRequest
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
@@ -24,37 +18,24 @@ import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.util.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.TestInstance
 import kotlin.test.Test
 import kotlin.test.assertNotNull
+import kotlin.time.Duration.Companion.minutes
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class E2ETest {
-
-    var walletHttpPort: Int = 22222
-    // var walletHttpPort: Int = 7001
-    var issuerHttp: Int = 22222
-    // var issuerHttp: Int = 7002
-    var verifierHttp: Int = 22222
-    // var verifierHttp: Int = 7003
 
     companion object {
         val defaultTestTimeout = 5.minutes
         val defaultEmailAccount = EmailAccountRequest(
-            email = "user@email.com",
-            password = "password"
+            email = "user@email.com", password = "password"
         )
         val issuerKey = loadResource("issuance/key.json")
         val issuerDid = loadResource("issuance/did.txt")
@@ -68,6 +49,7 @@ class E2ETest {
             put("credentialData", Json.decodeFromString<JsonElement>(openBadgeCredentialData))
             put("mapping", Json.decodeFromString<JsonElement>(credentialMapping))
             put("selectiveDisclosure", Json.decodeFromString<JsonElement>(credentialDisclosure))
+            put("authenticationMethod", "PRE_AUTHORIZED")
         }
         val jwtCredential = JsonObject(sdjwtCredential.minus("selectiveDisclosure"))
         val simplePresentationRequestPayload =
@@ -75,35 +57,31 @@ class E2ETest {
         val nameFieldSchemaPresentationRequestPayload =
             loadResource("presentation/openbadgecredential-name-field-presentation-request.json")
 
-        fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
-            install(ContentNegotiation) {
-                json(httpJson)
-            }
-            install(DefaultRequest) {
-                contentType(ContentType.Application.Json)
-                host = "127.0.0.1"
-                port = 22222
-
-                if (token != null) bearerAuth(token)
-            }
-            install(Logging) {
-                level = LogLevel.ALL
-            }
-            followRedirects = doFollowRedirects
-        }
+        val walletHttpPort: Int = 22222
+        // val walletHttpPort: Int = 7001
+        val issuerHttpPort: Int = 22222
+        // val issuerHttp: Int = 7002
+        val verifierHttpPort: Int = 22222
+        // val verifierHttp: Int = 7003
     }
 
+    private lateinit var walletHttp: HttpClient
+    private lateinit var issuerHttp: HttpClient
+    private lateinit var verifierHttp: HttpClient
+
+
+    @BeforeAll
+    fun setup() {
+        walletHttp = testHttpClient(port = walletHttpPort)
+        issuerHttp = testHttpClient(port = issuerHttpPort)
+        verifierHttp = testHttpClient(port = verifierHttpPort)
+    }
 
     @Test
     fun e2e() = testBlock(defaultTestTimeout) {
-        var walletHttp = testHttpClient(port = walletHttpPort)
-        val issuerHttp = testHttpClient(port = issuerHttp)
-        val verifierHttp = testHttpClient(port = verifierHttp)
-
         lateinit var wallet: UUID
 
-        // E2E tests here:
-
+        // the e2e http request tests here
         testGroup("Authentication") {
             var authApi = AuthApi(walletHttp)
             with(authApi) {
@@ -127,29 +105,30 @@ class E2ETest {
                 }
             }
             ///sub-region -x5c-based authentication method test case scenarios-
-            AuthApi.X5c(client).executeTestCases()
+            AuthApi.X5c(walletHttp).executeTestCases()
             ///end sub-region -x5c-based authentication method test case scenarios-
         }
 
         testGroup("Keys") {
             val keysApi = KeysApi(walletHttp, wallet)
+            // requires registration-defaults to not be disabled in _features.conf
+            val defaultKeyConfig = ConfigManager.getConfig<RegistrationDefaultsConfig>().defaultKeyConfig
             with(keysApi) {
-                "Test key listing" inlineTest { keysApi.list() }
-                // requires registration-defaults to not be disabled in _features.confval defaultKeyConfig = ConfigManager.getConfig<RegistrationDefaultsConfig>().defaultKeyConfig    val keyGenRequest = KeyGenerationRequest("jwk", KeyType.Ed25519)
-                val generatedKeyId = "Test key generation" inlineTestWithResult { keysApi.generate(keyGenRequest) }
-                "Test key loading" inlineTest { keysApi.load(generatedKeyId, keyGenRequest) }
-                "Test key metadata" inlineTest { keysApi.meta(generatedKeyId, keyGenRequest) }
-                "Test key exporting" inlineTest { keysApi.export(generatedKeyId, "JWK", true, keyGenRequest) }
-                "Test key deletion" inlineTest { keysApi.delete(generatedKeyId) }
+                "Test key listing" inlineTest { list(defaultKeyConfig) }
+                val keyGenRequest = KeyGenerationRequest("jwk", KeyType.Ed25519)
+                val generatedKeyId = "Test key generation" inlineTestWithResult { generate(keyGenRequest) }
+                "Test key loading" inlineTest { load(generatedKeyId, keyGenRequest) }
+                "Test key metadata" inlineTest { meta(generatedKeyId, keyGenRequest) }
+                "Test key exporting" inlineTest { export(generatedKeyId, "JWK", true, keyGenRequest) }
+                "Test key deletion" inlineTest { delete(generatedKeyId) }
                 val rsaJwkImport = loadResource("keys/rsa.json")
-                "Test key import (RSA)" inlineTest { keysApi.import(rsaJwkImport) }
+                "Test key import (RSA)" inlineTest { import(rsaJwkImport) }
             }
         }
 
         lateinit var did: String
         testGroup("DIDs") {
             val didsApi = DidsApi(walletHttp, wallet)
-
             with(didsApi) {
                 test("Has default DID") {
                     val firstDid = list(DidsApi.DefaultDidOption.Any, 1).first()
@@ -157,25 +136,25 @@ class E2ETest {
                     did = firstDid.did
                     firstDid
                 }
-
+                //todo: test for optional registration defaults
                 val createdDids = listOf(
                     DidsApi.DidCreateRequest(method = "key", options = mapOf("useJwkJcsPub" to false)),
                     DidsApi.DidCreateRequest(method = "jwk"),
-                    DidsApi.DidCreateRequest(method = "web", options = mapOf("domain" to "domain", "path" to "path"))
+                    DidsApi.DidCreateRequest(method = "web", options = mapOf("domain" to "domain", "path" to "path")),
+                    //todo: DidCreateRequest(method = "iota")
+                    //todo: DidsApi.DidCreateRequest(method = "ebsi", options = mapOf("version" to 2, "bearerToken" to "token"))
+                    //todo: DidsApi.DidCreateRequest(method = "cheqd", options = mapOf("network" to "testnet")) // flaky test - sometimes works fine, sometimes responds with 400
                 ).map {
                     testWithResult("Create did:${it.method}") { create(it) }
                 }
-
                 test("Set default DID") {
                     setDefault(createdDids[0])
                     list(DidsApi.DefaultDidOption.Some(createdDids[0]), createdDids.size + 1)
                 }
-
                 test("Delete all created DIDs") {
                     createdDids.forEach { did -> delete(did) }
                     list(DidsApi.DefaultDidOption.None, 1)
                 }
-
                 test("Set default DID (again)") {
                     get(did)
                     setDefault(did)
@@ -184,21 +163,23 @@ class E2ETest {
             }
         }
 
-
         lateinit var offerUrl: String
+        val issuerApi = IssuerApi(issuerHttp)
         testGroup("Issuer / offer URL") {
-            val issuerApi = IssuerApi(issuerHttp)
             val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(jwtCredential)
             println("issuance-request: $issuanceRequest")
-
-            "Issue JWT" inlineTest { offerUrl = issuerApi.jwt(issuanceRequest); offerUrl }
+            with(issuerApi) {
+                "Issue JWT" inlineTest { offerUrl = jwt(issuanceRequest); offerUrl }
+            }
         }
 
         val exchangeApi = ExchangeApi(walletHttp, wallet)
         lateinit var newCredentialId: String
         testGroup("Claim credential") {
             "Resolve credential offer" inlineTest { exchangeApi.resolveCredentialOffer(offerUrl) }
-            "Use offer request" inlineTest { newCredentialId = exchangeApi.useOfferRequest(offerUrl, 1).first().id; newCredentialId }
+            "Use offer request" inlineTest {
+                newCredentialId = exchangeApi.useOfferRequest(offerUrl, 1).first().id; newCredentialId
+            }
 
             newCredentialId
         }
@@ -209,8 +190,8 @@ class E2ETest {
                 "List credentials" inlineTest { list(expectedSize = 1, expectedCredential = arrayOf(newCredentialId)) }
                 "View new credential" inlineTest { get(newCredentialId) }
                 "Accept the new credential" inlineTest { accept(newCredentialId) }
-                "(Temp-)Delete the new credential again " inlineTest { delete(newCredentialId) }
-                "Restore the deleted credential" inlineTest { restore(newCredentialId) }
+                "Soft-delete the new credential" inlineTest { delete(newCredentialId) }
+                "Restore the soft-deleted credential" inlineTest { restore(newCredentialId) }
                 "View credential status" inlineTest { status(newCredentialId) }
                 // reject(newCredentialId)
                 // delete(newCredentialId, true)
@@ -222,9 +203,10 @@ class E2ETest {
         val sessionApi = Verifier.SessionApi(verifierHttp)
         val verificationApi = Verifier.VerificationApi(verifierHttp)
         testGroup("Verifier / request url") {
-            "Start verification" inlineTest { verificationUrl = verificationApi.verify(simplePresentationRequestPayload); verificationUrl }
+            "Start verification" inlineTest {
+                verificationUrl = verificationApi.verify(simplePresentationRequestPayload); verificationUrl
+            }
             verificationId = Url(verificationUrl).parameters.getOrFail("state")
-
             verificationUrl
         }
 
@@ -232,23 +214,28 @@ class E2ETest {
             lateinit var resolvedPresentationOffer: String
             lateinit var presentationDefinition: String
             with(exchangeApi) {
-                "Resolve " inlineTest { resolvedPresentationOffer = resolvePresentationRequest(verificationUrl); resolvedPresentationOffer }
+                "Resolve " inlineTest {
+                    resolvedPresentationOffer = resolvePresentationRequest(verificationUrl); resolvedPresentationOffer
+                }
                 presentationDefinition = Url(resolvedPresentationOffer).parameters.getOrFail("presentation_definition")
-
                 var presentationSession = sessionApi.get(verificationId)
-                assert(presentationSession.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
-
+                assert(
+                    presentationSession.presentationDefinition == PresentationDefinition.fromJSONString(
+                        presentationDefinition
+                    )
+                )
                 matchCredentialsForPresentationDefinition(presentationDefinition, listOf(newCredentialId))
                 unmatchedCredentialsForPresentationDefinition(presentationDefinition)
-
                 test("Use presentation request") {
-                    usePresentationRequest(UsePresentationRequest(did, resolvedPresentationOffer, listOf(newCredentialId))).expectSuccess()
+                    usePresentationRequest(
+                        UsePresentationRequest(
+                            did, resolvedPresentationOffer, listOf(newCredentialId)
+                        )
+                    )
                 }
-
                 presentationSession = sessionApi.get(verificationId)
                 assert(presentationSession.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
                 assert(presentationSession.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
-
                 assert(presentationSession.verificationResult == true) { "overall verification should be valid" }
                 presentationSession.policyResults.let {
                     require(it != null) { "policyResults should be available after running policies" }
@@ -283,12 +270,11 @@ class E2ETest {
                     add(categoryName)
                     add(categoryNewName)
                 }
-            }
-
-            with(credentialsApi) {
-                test("Attach categories to credentials") {
-                    attachCategory(newCredentialId, categoryName, categoryNewName)
-                    detachCategory(newCredentialId, categoryName, categoryNewName)
+                with(credentialsApi) {
+                    test("Attach categories to credentials") {
+                        attachCategory(newCredentialId, categoryName, categoryNewName)
+                        detachCategory(newCredentialId, categoryName, categoryNewName)
+                    }
                 }
             }
         }
@@ -306,197 +292,94 @@ class E2ETest {
             credentialsApi.delete(newCredentialId, true)
         }
 
-        testGroup("SD-JWT") {
-            // todo: make this cleaner:
-            test("SD-JWT") {
+        val lspPotentialIssuance = LspPotentialIssuance(testHttpClient(doFollowRedirects = false))
+        lspPotentialIssuance.testTrack1()
+        lspPotentialIssuance.testTrack2()
+        val lspPotentialVerification = LspPotentialVerification(testHttpClient(doFollowRedirects = false))
+        lspPotentialVerification.testPotentialInteropTrack3()
+        lspPotentialVerification.testPotentialInteropTrack4()
+        val lspPotentialWallet = setupTestWallet()
+        lspPotentialWallet.testMDocIssuance()
+        lspPotentialWallet.testMdocPresentation()
+        lspPotentialWallet.testSDJwtVCIssuance()
+        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
+        lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
+        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
 
-                //region -Issuer / offer url-
-                val issuerApi = IssuerApi(issuerHttp)
-                val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(jwtCredential)
-                println("issuance-request:")
-                println(issuanceRequest)
-                val offerUrl = issuerApi.jwt(issuanceRequest)
-                //endregion -Issuer / offer url-
 
-                //region -Exchange / claim-
-                val exchangeApi = ExchangeApi(walletHttp, wallet)
-                exchangeApi.resolveCredentialOffer(offerUrl)
-                val newCredential = exchangeApi.useOfferRequest(offerUrl, 1).first()
-                //endregion -Exchange / claim-
+        // Test sdjwt-w3c issuance and presentation flows with credentialSubject.name disclosable property
+        testGroup("sd-jwt w3c issuance and presentation flows") {
+            with(E2ESdJwtTest(issuerApi, exchangeApi, sessionApi, verificationApi)) {
+                e2e(did)
+            }
+        }
 
-                //region -Credentials-
-            val credentialsApi = CredentialsApi(client)
-            credentialsApi.list(wallet, expectedSize = 1, expectedCredential = arrayOf(newCredentialId))
-            credentialsApi.get(wallet, newCredentialId)
-            credentialsApi.accept(wallet, newCredentialId)
-            credentialsApi.delete(wallet, newCredentialId)
-            credentialsApi.restore(wallet, newCredentialId)
-            credentialsApi.status(wallet, newCredentialId)
-            categoryApi.add(wallet, categoryName)
-            categoryApi.add(wallet, categoryNewName)
-            credentialsApi.attachCategory(wallet, newCredentialId, categoryName, categoryNewName)
-            credentialsApi.detachCategory(wallet, newCredentialId, categoryName, categoryNewName)
-//            credentialsApi.reject(wallet, newCredentialId)
-//            credentialsApi.delete(wallet, newCredentialId, true)
-            //endregion -Credentials-
+        // Test Authorization Code flow with available authentication methods in Issuer API
+        testGroup("authorization code flow with available authentication methods in issuer-api") {
+            with(AuthorizationCodeFlow(testHttpClient(doFollowRedirects = false))) {
+                testIssuerAPI()
+            }
+        }
 
-            //region -Verifier / request url-
-                val sessionApi = Verifier.SessionApi(verifierHttp)
-                val verificationApi = Verifier.VerificationApi(verifierHttp)
-                val verificationUrl: String = verificationApi.verify(simplePresentationRequestPayload)
-                val verificationId: String = Url(verificationUrl).parameters.getOrFail("state")
-                //endregion -Verifier / request url-
+        // test External Signature API Endpoints
+        testGroup("external signature api endpoints") {
+            with(ExchangeExternalSignatures()) {
+                executeTestCases()
+            }
+        }
+    }
 
-                //region -Exchange / presentation-
-                val resolvedPresentationOfferString: String = exchangeApi.resolvePresentationRequest(verificationUrl)
-                val presentationDefinition = Url(resolvedPresentationOfferString).parameters.getOrFail("presentation_definition")
+    //@Test // enable to execute test selectively
+    fun lspIssuanceTests() = testBlock(timeout = defaultTestTimeout) {
+        val client = testHttpClient(doFollowRedirects = false)
+        val lspPotentialIssuance = LspPotentialIssuance(client)
+        lspPotentialIssuance.testTrack1()
+        lspPotentialIssuance.testTrack2()
+    }
 
-                var presentationSession = sessionApi.get(verificationId)
-                assert(presentationSession.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
+    // @Test
+    fun lspVerifierTests() = testBlock(timeout = defaultTestTimeout) {
+        val client = testHttpClient(doFollowRedirects = false)
+        val lspPotentialVerification = LspPotentialVerification(client)
+        lspPotentialVerification.testPotentialInteropTrack3()
+        lspPotentialVerification.testPotentialInteropTrack4()
+    }
 
-                exchangeApi.matchCredentialsForPresentationDefinition(wallet, presentationDefinition, listOf(newCredentialId)
+    private suspend fun setupTestWallet(): LspPotentialWallet {
+        var client = testHttpClient()
+        client.post("/wallet-api/auth/login") {
+            setBody(
+                EmailAccountRequest(
+                    email = "user@email.com", password = "password"
+                ) as AccountRequest
             )
-                exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet,presentationDefinition)
-                exchangeApi.usePresentationRequest(
-                    request = UsePresentationRequest(
-                        did = did,
-                        presentationRequest = resolvedPresentationOfferString,
-                        selectedCredentials = listOf(newCredential.id),
-                        disclosures = newCredential.disclosures?.let { mapOf(newCredential.id to listOf(it)) },
-                    ),
-                ).expectFailure()
+        }.expectSuccess().apply {
+            body<JsonObject>().let { result ->
+                assertNotNull(result["token"])
+                val token = result["token"]!!.jsonPrimitive.content.expectLooksLikeJwt()
 
-                presentationSession = sessionApi.get(verificationId)
-                assert(presentationSession.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-                assert(presentationSession.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
-
-                assert(presentationSession.verificationResult == true) { "overall verification should be valid" }
-                presentationSession.policyResults.let {
-                    require(it != null) { "policyResults should be available after running policies" }
-                    assert(it.size > 1) { "no policies have run" }
-                }
-            }
-            val lspPotentialIssuance = LspPotentialIssuance(testHttpClient(doFollowRedirects = false))
-            lspPotentialIssuance.testTrack1()
-            lspPotentialIssuance.testTrack2()
-            val lspPotentialVerification = LspPotentialVerification(testHttpClient(doFollowRedirects = false))
-            lspPotentialVerification.testPotentialInteropTrack3()
-            lspPotentialVerification.testPotentialInteropTrack4()
-            val lspPotentialWallet = setupTestWallet()
-            lspPotentialWallet.testMDocIssuance()
-            lspPotentialWallet.testMdocPresentation()
-            lspPotentialWallet.testSDJwtVCIssuance()
-            lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
-            lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
-            lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
-
-            //endregion -Exchange / presentation-
-
-            //region -History-
-            val historyApi = HistoryApi(client)
-            historyApi.list(wallet) {
-                assert(it.size >= 2) { "missing history items" }
-                assert(it.any { it.operation == "useOfferRequest" } && it.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
-            }
-            //endregion -History-
-            val sdJwtTest = E2ESdJwtTest(issuerApi, exchangeApi, sessionApi, verificationApi)
-            //cleanup credentials
-            credentialsApi.delete(wallet, newCredentialId)
-            sdJwtTest.e2e(wallet, did)
-
-            // Test Authorization Code flow with available authentication methods in Issuer API
-            val authorizationCodeFlow = AuthorizationCodeFlow(testHttpClient(doFollowRedirects = false))
-            authorizationCodeFlow.testIssuerAPI()
-
-            // test External Signature API Endpoints
-            ExchangeExternalSignatures().executeTestCases()
-        }
-
-        //@Test // enable to execute test selectively
-        fun lspIssuanceTests() = testBlock(timeout = defaultTestTimeout) {
-            val client = testHttpClient(doFollowRedirects = false)
-            val lspPotentialIssuance = LspPotentialIssuance(client)
-            lspPotentialIssuance.testTrack1()
-            lspPotentialIssuance.testTrack2()
-        }
-
-        // @Test
-        fun lspVerifierTests() = testBlock(timeout = defaultTestTimeout) {
-            val client = testHttpClient(doFollowRedirects = false)
-            val lspPotentialVerification = LspPotentialVerification(client)
-            lspPotentialVerification.testPotentialInteropTrack3()
-            lspPotentialVerification.testPotentialInteropTrack4()
-        }
-
-        suspend fun setupTestWallet(): LspPotentialWallet {
-            var client = testHttpClient()
-            client.post("/wallet-api/auth/login") {
-                setBody(
-                    EmailAccountRequest(
-                        email = "user@email.com", password = "password"
-                    ) as AccountRequest
-                )
-            }.expectSuccess().apply {
-                body<JsonObject>().let { result ->
-                    assertNotNull(result["token"])
-                    val token = result["token"]!!.jsonPrimitive.content.expectLooksLikeJwt()
-
-                    client = testHttpClient(token = token)
-                }
-            }
-            val walletId = client.get("/wallet-api/wallet/accounts/wallets").expectSuccess()
-                .body<AccountWalletListing>().wallets.first().id.toString()
-            return LspPotentialWallet(client, walletId)
-        }
-
-        //@Test // enable to execute test selectively
-        fun lspWalletTests() = testBlock(timeout = defaultTestTimeout) {
-            val lspPotentialWallet = setupTestWallet()
-            lspPotentialWallet.testMDocIssuance()
-            lspPotentialWallet.testMdocPresentation()
-
-            lspPotentialWallet.testSDJwtVCIssuance()
-            lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
-        }
-
-        //@Test // enable to execute test selectively
-        fun testSdJwtVCIssuanceWithIssuerDid() = testBlock(timeout = defaultTestTimeout) {
-            val lspPotentialWallet = setupTestWallet()
-            lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
-            lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
-        }
-    }
-
-    fun String.expectLooksLikeJwt(): String =
-        also { assert(startsWith("ey") && count { it == '.' } == 2) { "Does not look like JWT" } }
-
-
-    val expectSuccess: suspend HttpResponse.() -> HttpResponse = {
-        assert(this.status.isSuccess()) { "HTTP status is non-successful for response: $this, body is ${this.bodyAsText()}" }; this
-    }
-
-    val expectRedirect: HttpResponse.() -> HttpResponse = {
-        assert(this.status == HttpStatusCode.Found) { "HTTP status is non-successful" }; this
-    }
-
-    val expectFailure: HttpResponse.() -> HttpResponse = {
-        assert(!status.isSuccess()) { "HTTP status is successful" }; this
-    }
-
-    fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {
-        var element: JsonElement? = this
-        for (i in it) {
-            element = when (element) {
-                is JsonObject -> element[i]
-                is JsonArray -> element.firstOrNull {
-                    it.jsonObject.containsKey(i)
-                }?.let {
-                    it.jsonObject[i]
-                }
-
-                else -> element?.jsonPrimitive
+                client = testHttpClient(token = token)
             }
         }
-        element
+        val walletId = client.get("/wallet-api/wallet/accounts/wallets").expectSuccess()
+            .body<AccountWalletListing>().wallets.first().id.toString()
+        return LspPotentialWallet(client, walletId)
+    }
+
+    //@Test // enable to execute test selectively
+    fun lspWalletTests() = testBlock(timeout = defaultTestTimeout) {
+        val lspPotentialWallet = setupTestWallet()
+        lspPotentialWallet.testMDocIssuance()
+        lspPotentialWallet.testMdocPresentation()
+
+        lspPotentialWallet.testSDJwtVCIssuance()
+        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
+    }
+
+    //@Test // enable to execute test selectively
+    fun testSdJwtVCIssuanceWithIssuerDid() = testBlock(timeout = defaultTestTimeout) {
+        val lspPotentialWallet = setupTestWallet()
+        lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
+        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
     }
 }

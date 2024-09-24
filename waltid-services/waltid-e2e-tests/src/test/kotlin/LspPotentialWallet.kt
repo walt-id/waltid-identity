@@ -37,13 +37,11 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
 
     init {
         // === create EC256 key and DID:JWK (did is not necessarily required, but currently needed for wallet initialization) ===
-        val keysApi = KeysApi(client)
+        val keysApi = KeysApi(client, UUID(walletId))
 
         runBlocking {
-            keysApi.generate(UUID(walletId), KeyGenerationRequest(keyType = KeyType.secp256r1)) { generatedKeyId = it }
-            DidsApi(client).create(UUID(walletId), DidsApi.DidCreateRequest("jwk", keyId = generatedKeyId)) {
-                generatedDid = it
-            }
+            generatedKeyId = keysApi.generate(KeyGenerationRequest(keyType = KeyType.secp256r1))
+            generatedDid = DidsApi(client, UUID(walletId)).create(DidsApi.DidCreateRequest("jwk", keyId = generatedKeyId))
         }
     }
 
@@ -68,9 +66,8 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         assertEquals("org.iso.18013.5.1.mDL", resolvedOffer.credentialConfigurationIds.first())
 
         // === resolve issuer metadata ===
-        val issuerMetadata = client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess().let {
-            it.body<OpenIDProviderMetadata>()
-        }
+        val issuerMetadata =
+            client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess().body<OpenIDProviderMetadata>()
         assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
         assertContains(issuerMetadata.credentialConfigurationsSupported!!.keys, resolvedOffer.credentialConfigurationIds.first())
 

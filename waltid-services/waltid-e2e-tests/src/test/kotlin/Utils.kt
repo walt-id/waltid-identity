@@ -13,13 +13,20 @@ import kotlinx.serialization.json.*
 fun String.expectLooksLikeJwt(): String =
     also { assert(startsWith("ey") && count { it == '.' } == 2) { "Does not look like JWT" } }
 
-suspend fun HttpResponse.expectSuccess(): HttpResponse = also {
-    assert(status.isSuccess()) { "HTTP response status is non-successful: ${bodyAsText()}" }
+suspend fun HttpResponse.expectSuccess(): HttpResponse = expectSuccess(this)
+
+suspend fun HttpResponse.expectFailure(): HttpResponse = expectFailure(this)
+
+val expectSuccess: suspend HttpResponse.() -> HttpResponse = {
+    assert(status.isSuccess()) { "HTTP reponse status is non-successful: ${bodyAsText()}" }; this
 }
 
-//todo: temporary
-fun HttpResponse.expectFailure(): HttpResponse = also {
-    assert(!status.isSuccess()) { "HTTP response status is successful, but should be failure" }
+val expectFailure: suspend HttpResponse.() -> HttpResponse = {
+    assert(!status.isSuccess()) { "HTTP response status is successful, but expecting failure: ${bodyAsText()}" }; this
+}
+
+val expectRedirect: suspend HttpResponse.() -> HttpResponse = {
+    assert(this.status == HttpStatusCode.Found) { "HTTP response status is non-successful: ${bodyAsText()}" }; this
 }
 
 fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {
@@ -39,7 +46,7 @@ fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {
     element
 }
 
-fun testHttpClient(token: String? = null, port: Int = 22222) = HttpClient(CIO) {
+fun testHttpClient(token: String? = null, port: Int = 22222, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
     install(ContentNegotiation) {
         json(httpJson)
     }
@@ -53,6 +60,7 @@ fun testHttpClient(token: String? = null, port: Int = 22222) = HttpClient(CIO) {
     install(Logging) {
         level = LogLevel.ALL
     }
+    followRedirects = doFollowRedirects
 }
 
 fun JsonObject.getString(key: String) = this[key]?.jsonPrimitive?.content

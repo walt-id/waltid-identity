@@ -11,7 +11,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
 
 class E2ESdJwtTest(
     private val issuerApi: IssuerApi,
@@ -20,71 +19,59 @@ class E2ESdJwtTest(
     private val verificationApi: Verifier.VerificationApi,
 ) {
 
-    fun e2e(wallet: UUID, did: String) = runTest {
+    fun e2e(did: String) = runTest {
         //region -Issuer / offer url-
         lateinit var offerUrl: String
         val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(sdjwtCredential)
         println("issuance-request:")
         println(issuanceRequest)
-        issuerApi.sdjwt(issuanceRequest) {
-            offerUrl = it
-            println("offer: $offerUrl")
-        }
+        offerUrl = issuerApi.sdjwt(issuanceRequest)
+        exchangeApi.resolveCredentialOffer(offerUrl)
         //endregion -Issuer / offer url-
 
         //region -Exchange / claim-
-        lateinit var newCredential: WalletCredential
-        exchangeApi.resolveCredentialOffer(wallet, offerUrl)
-        exchangeApi.useOfferRequest(wallet, offerUrl, 1) {
-            newCredential = it.first()
-        }
+        val newCredential: WalletCredential = exchangeApi.useOfferRequest(offerUrl, 1).first()
+        lateinit var verificationId: String
         //endregion -Exchange / claim-
 
         //region -Verifier / request url-
-        lateinit var verificationUrl: String
-        lateinit var verificationId: String
-        verificationApi.verify(nameFieldSchemaPresentationRequestPayload) {
-            verificationUrl = it
-            verificationId = Url(verificationUrl).parameters.getOrFail("state")
-        }
+        val verificationUrl: String = verificationApi.verify(nameFieldSchemaPresentationRequestPayload)
+        verificationId = Url(verificationUrl).parameters.getOrFail("state")
+        lateinit var presentationDefinition: String
         //endregion -Verifier / request url-
 
         //region -Exchange / presentation-
-        lateinit var resolvedPresentationOfferString: String
-        lateinit var presentationDefinition: String
-        exchangeApi.resolvePresentationRequest(wallet, verificationUrl) {
-            resolvedPresentationOfferString = it
-            presentationDefinition = Url(it).parameters.getOrFail("presentation_definition")
-        }
+        val resolvedPresentationOfferString: String = exchangeApi.resolvePresentationRequest(verificationUrl)
+        presentationDefinition = Url(resolvedPresentationOfferString).parameters.getOrFail("presentation_definition")
 
-        sessionApi.get(verificationId) {
-            assert(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
-        }
+        var presentationSession = sessionApi.get(verificationId)
+        assert(
+            presentationSession.presentationDefinition == PresentationDefinition.fromJSONString(
+                presentationDefinition
+            )
+        )
 
         exchangeApi.matchCredentialsForPresentationDefinition(
-            wallet, presentationDefinition, listOf(newCredential.id)
+            presentationDefinition, listOf(newCredential.id)
         )
-        exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet, presentationDefinition)
+        exchangeApi.unmatchedCredentialsForPresentationDefinition(presentationDefinition)
         exchangeApi.usePresentationRequest(
-            wallet = wallet,
             request = UsePresentationRequest(
                 did = did,
                 presentationRequest = resolvedPresentationOfferString,
                 selectedCredentials = listOf(newCredential.id),
                 disclosures = newCredential.disclosures?.let { mapOf(newCredential.id to listOf(it)) },
-            ),
-            expectStatus = expectFailure,
+            )
         )
 
-        sessionApi.get(verificationId) {
-            assert(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-            assert(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+        presentationSession = sessionApi.get(verificationId)
+        assert(presentationSession.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
+        assert(presentationSession.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
 
-            assert(it.verificationResult == false) { "overall verification should be valid" }
-            it.policyResults.let {
-                require(it != null) { "policyResults should be available after running policies" }
-                assert(it.size > 1) { "no policies have run" }
-            }
+        assert(presentationSession.verificationResult == true) { "overall verification should be valid" }
+        presentationSession.policyResults.let {
+            require(it != null) { "policyResults should be available after running policies" }
+            assert(it.isNotEmpty()) { "no policies have run" }
         }
         //endregion -Exchange / presentation-
     }
