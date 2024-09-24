@@ -2,8 +2,8 @@ package id.walt.crypto.keys.tse
 
 import id.walt.commons.exceptions.KeyNotFoundException
 import id.walt.commons.exceptions.KeyTypeNotSupportedException
-import id.walt.commons.exceptions.PublicKeyNotFoundException
-import id.walt.commons.exceptions.SigningException
+import id.walt.commons.exceptions.MissingSignatureException
+import id.walt.commons.exceptions.TSEError
 import id.walt.commons.exceptions.VerificationException
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
@@ -180,8 +180,8 @@ class TSEKey(
         val body = mapOf("input" to plaintext.encodeBase64())
         val signatureBase64 = httpRequest(HttpMethod.Post, "sign/$id", body)
             .tseJsonDataBody().jsonObject["signature"]?.jsonPrimitive?.content?.removePrefix("vault:v1:")
-            ?: throw SigningException(
-                "No signature in data response"
+            ?: throw MissingSignatureException(
+                "No signature returned from TSE server"
             )
 
         return signatureBase64
@@ -212,17 +212,6 @@ class TSEKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
-        /*val localPublicKey = when (keyType) {
-            KeyType.Ed25519 -> JWKKey.importRawPublicKey(
-                type = keyType,
-                rawPublicKey = getBackingPublicKey(),
-                metadata = JWKKeyMetadata() // todo: explicit `keySize`
-            )
-
-            KeyType.RSA, KeyType.secp256r1 -> JWKKey.importPEM(getEncodedPublicKey()).getOrThrow()
-            KeyType.secp256k1 -> throw IllegalArgumentException("Type not supported for TSE: $keyType")
-        }*/
-
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
         val body = mapOf(
@@ -230,10 +219,12 @@ class TSEKey(
         )
         val valid = httpRequest(HttpMethod.Post, "verify/$id", body)
             .tseJsonDataBody().jsonObject["valid"]?.jsonPrimitive?.boolean
-            ?: throw VerificationException("No signature returned from TSE server")
+            ?: throw MissingSignatureException(
+                "No signature returned from TSE server"
+            )
 
         return if (valid) Result.success(detachedPlaintext)
-        else Result.failure(SigningException("Signature failed"))
+        else Result.failure(VerificationException("Signature verification failed"))
     }
 
     @JvmBlocking
@@ -270,7 +261,7 @@ class TSEKey(
         lazyOf(
             httpRequest()
                 .tseJsonDataBody().jsonObject["keys"]?.jsonObject?.get("1")?.jsonObject?.get("public_key")?.jsonPrimitive?.content
-                ?: throw PublicKeyNotFoundException("No keys/1/public_key in data response")
+                ?: throw KeyNotFoundException("No keys/1/public_key in data response")
         ).value
 
     @JvmBlocking
@@ -327,6 +318,7 @@ class TSEKey(
             else -> throw KeyTypeNotSupportedException(type)
         }
 
+        @OptIn(InternalAPI::class)
         @JvmBlocking
         @JvmAsync
         @JsPromise
@@ -334,7 +326,7 @@ class TSEKey(
         suspend fun HttpResponse.tseJsonDataBody(): JsonObject {
             val baseMsg = { "TSE server (URL: ${this.request.url}) returned invalid response: " }
 
-            if (!status.isSuccess()) throw RuntimeException(baseMsg.invoke() + "non-success status: $status")
+            // if (!status.isSuccess()) throw RuntimeException(baseMsg.invoke() + "non-success status: $status")
 
             return runCatching { this.body<JsonObject>() }.getOrElse {
                 val bodyStr = this.bodyAsText()
@@ -361,10 +353,10 @@ class TSEKey(
                 throw RuntimeException("Invalid TSE server (${metadata.server}) response: $msg")
 
             val keyName = keyData["name"]?.jsonPrimitive?.content
-                ?: throw PublicKeyNotFoundException("no key name in key data: $keyData")
+                ?: throw TSEError.MissingKeyNameException()
 
             val publicKey = (keyData["keys"]
-                ?: throw PublicKeyNotFoundException("no keys array in key data: $keyData")).jsonObject["1"]!!.jsonObject["public_key"]!!.jsonPrimitive.content.decodeBase64Bytes()
+                ?: throw TSEError.MissingKeyDataException()).jsonObject["1"]!!.jsonObject["public_key"]!!.jsonPrimitive.content.decodeBase64Bytes()
 
             return TSEKey(
                 server = metadata.server,
