@@ -3,6 +3,7 @@ package id.walt.policies.policies
 import id.walt.credentials.Claims
 import id.walt.credentials.JwtClaims
 import id.walt.credentials.VcClaims
+import id.walt.credentials.utils.VCFormat
 import id.walt.policies.DatePolicyUtils.checkJwt
 import id.walt.policies.DatePolicyUtils.checkVc
 import id.walt.policies.DatePolicyUtils.policyUnavailable
@@ -30,6 +31,7 @@ class NotBeforeDatePolicy : CredentialWrapperValidatorPolicy(
     override val name = "not-before"
     override val description =
         "Verifies that the credentials not-before date (for JWT: `nbf`, if unavailable: `iat` - 1 min) is correctly exceeded."
+    override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc)
 
     companion object {
         private val vcClaims = listOf<Claims>(VcClaims.V2.NotBefore, VcClaims.V1.NotBefore)

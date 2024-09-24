@@ -1,5 +1,6 @@
 package id.walt.policies.policies.vp
 
+import id.walt.credentials.utils.VCFormat
 import id.walt.policies.CredentialWrapperValidatorPolicy
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -16,6 +17,7 @@ class MaximumCredentialsPolicy : CredentialWrapperValidatorPolicy(
 ) {
     override val name = "maximum-credentials"
     override val description = "Verifies that a maximum number of credentials in the Verifiable Presentation is not exceeded"
+    override val supportedVCFormats = setOf(VCFormat.jwt_vp, VCFormat.jwt_vp_json)
 
     @JvmBlocking
     @JvmAsync

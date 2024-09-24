@@ -1,6 +1,7 @@
 package id.walt.policies.policies
 
 import id.walt.credentials.schemes.JwsSignatureScheme
+import id.walt.credentials.utils.VCFormat
 import id.walt.policies.JwtVerificationPolicy
 import kotlinx.serialization.Serializable
 import love.forte.plugin.suspendtrans.annotation.JsPromise
@@ -17,6 +18,7 @@ class JwtSignaturePolicy : JwtVerificationPolicy(
     override val name = "signature"
     override val description =
         "Checks a JWT credential by verifying its cryptographic signature using the key referenced by the DID in `iss`."
+    override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc)
 
     @JvmBlocking
     @JvmAsync

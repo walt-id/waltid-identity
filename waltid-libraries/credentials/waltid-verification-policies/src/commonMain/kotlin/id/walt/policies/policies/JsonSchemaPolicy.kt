@@ -1,5 +1,6 @@
 package id.walt.policies.policies
 
+import id.walt.credentials.utils.VCFormat
 import id.walt.policies.CredentialDataValidatorPolicy
 import io.github.optimumcode.json.schema.JsonSchema
 import io.github.optimumcode.json.schema.ValidationError
@@ -21,6 +22,7 @@ class JsonSchemaPolicy : CredentialDataValidatorPolicy(
     override val name = "schema"
     override val description =
         "Verifies a credentials data against a JSON Schema (Draft 7 - see https://json-schema.org/specification-links#draft-7)."
+    override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc)
 
     @Serializable
     data class SerializableValidationError(

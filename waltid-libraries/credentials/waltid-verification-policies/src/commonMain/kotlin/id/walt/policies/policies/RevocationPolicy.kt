@@ -1,5 +1,6 @@
 package id.walt.policies.policies
 
+import id.walt.credentials.utils.VCFormat
 import id.walt.policies.CredentialWrapperValidatorPolicy
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -10,6 +11,7 @@ abstract class RevocationPolicyMp : CredentialWrapperValidatorPolicy(
 
     override val name = "revoked_status_list"
     override val description = "Verifies Credential Status"
+    override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc)
 
     abstract override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any>
 }
