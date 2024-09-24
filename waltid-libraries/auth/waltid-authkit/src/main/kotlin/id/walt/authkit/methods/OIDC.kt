@@ -216,7 +216,7 @@ object OIDC : AuthenticationMethod("oidc") {
 
 }
 
-public suspend inline fun <reified T> HttpResponse.response(): T {
+suspend inline fun <reified T> HttpResponse.response(): T {
     require(call.response.status.isSuccess()) { "Non successful call: ${call.request.url}, ${call.response.bodyAsText()}" }
 
     val json = call.body<JsonObject>()
