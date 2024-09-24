@@ -3,9 +3,36 @@ package id.walt.definitionparser
 import com.nfeld.jsonpathkt.JsonPath
 import com.nfeld.jsonpathkt.kotlinx.resolveOrNull
 import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.definitionparser.PresentationDefinition.InputDescriptor.Constraints.Field
 import io.github.optimumcode.json.schema.JsonSchema
-import io.github.optimumcode.json.schema.ValidationError
+import io.github.optimumcode.json.schema.OutputCollector
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+
+class JsonObjectEnquirer {
+
+    private val compiledJsonPaths = HashMap<String, JsonPath>()
+
+    private fun getJsonPath(path: String): JsonPath =
+        compiledJsonPaths.getOrPut(path) { JsonPath.compile(path) }
+
+
+    fun filterDocumentsByConstraints(documents: List<JsonObject>, constraints: List<Field>): List<JsonObject> =
+        documents.filter { document ->
+            constraints.all { field ->
+                val resolvedPath = field.path.firstNotNullOfOrNull { document.resolveOrNull(getJsonPath(it)) }
+
+                if (resolvedPath == null) {
+                    false
+                } else {
+                    if (field.filter != null) {
+                        val schema = JsonSchema.fromJsonElement(field.filter)
+                        schema.validate(resolvedPath, OutputCollector.flag()).valid
+                    } else true
+                }
+            }
+        }
+}
 
 object PresentationDefinitionParser {
 
@@ -13,29 +40,10 @@ object PresentationDefinitionParser {
 
         println("--- Checking descriptor ${inputDescriptor.name} --")
 
-        return credentials.filter { credential ->
-            println("\nChecking credential ${credential["type"]}")
-            inputDescriptor.constraints.fields!!.all { field ->
-                // println("Field: ${field.path} - ${field.filter}")
-                val credentialJson = credential.toJsonObject()
-                val resolvedPath = field.path.firstNotNullOfOrNull { credentialJson.resolveOrNull(JsonPath.compile(it)) }
+        val enquirer = JsonObjectEnquirer()
 
-                if (resolvedPath == null) {
-                    println("Stop - did not resolve any of ${field.path.joinToString()}")
-                    false
-                } else {
-                    if (field.filter != null) {
-                        val schema = JsonSchema.fromJsonElement(field.filter)
+        return enquirer.filterDocumentsByConstraints(credentials.map { it.toJsonObject() }, inputDescriptor.constraints.fields!!).map { W3CVC(it) }
 
-                        val errors = mutableListOf<ValidationError>()
-                        schema.validate(resolvedPath, errors::add)
-
-                        errors.isEmpty()
-                    }
-                    true
-                }
-            }
-        }
     }
 
     fun matchCredentialsForDefinition(credentials: List<W3CVC>, definition: PresentationDefinition) {
