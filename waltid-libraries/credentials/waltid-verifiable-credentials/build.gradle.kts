@@ -89,8 +89,8 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
-                implementation("io.github.optimumcode:json-schema-validator:0.2.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("io.github.optimumcode:json-schema-validator:0.2.3")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -101,10 +101,10 @@ kotlin {
                 implementation("io.ktor:ktor-client-logging:$ktor_version")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
                 // Kotlinx
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
                 implementation("app.softwork:kotlinx-uuid-core:0.1.2")
 
                 // Loggin
@@ -122,7 +122,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
             }
         }
         val jvmMain by getting {
@@ -136,9 +136,9 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
-                implementation("org.slf4j:slf4j-simple:2.0.13")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.slf4j:slf4j-simple:2.0.16")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0")
             }
         }
         val jsMain by getting {

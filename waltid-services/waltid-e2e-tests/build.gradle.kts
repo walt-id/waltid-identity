@@ -14,7 +14,7 @@ repositories {
 
 dependencies {
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.8.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.9.0")
     testImplementation("io.ktor:ktor-server-test-host:2.3.12")
     testImplementation("io.ktor:ktor-client-cio:2.3.12")
     testImplementation("io.ktor:ktor-client-content-negotiation:2.3.12")

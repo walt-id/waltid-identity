@@ -26,26 +26,26 @@ dependencies {
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
     // Logging
-    api("io.klogging:klogging-jvm:0.7.0") // JVM + ~JS
-    implementation("io.klogging:slf4j-klogging:0.7.0")
-    implementation("org.slf4j:jul-to-slf4j:2.0.13")
+    api("io.klogging:klogging-jvm:0.7.2") // JVM + ~JS
+    implementation("io.klogging:slf4j-klogging:0.7.2")
+    implementation("org.slf4j:jul-to-slf4j:2.0.16")
 
     // CLI
     api("com.github.ajalt.clikt:clikt:4.4.0")  // JVM
 
     // Config
-    api("com.sksamuel.hoplite:hoplite-core:2.8.0.RC3")
-    api("com.sksamuel.hoplite:hoplite-hocon:2.8.0.RC3")
-    api("com.sksamuel.hoplite:hoplite-hikaricp:2.8.0.RC3")
+    api("com.sksamuel.hoplite:hoplite-core:2.8.0")
+    api("com.sksamuel.hoplite:hoplite-hocon:2.8.0")
+    api("com.sksamuel.hoplite:hoplite-hikaricp:2.8.0")
 
     // Kotlinx.serialization
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // Health checks
     api("com.sksamuel.cohort:cohort-ktor:2.5.1")
 
     // OpenAPI
-    api("io.github.smiley4:ktor-swagger-ui:3.3.0")
+    api("io.github.smiley4:ktor-swagger-ui:3.4.0")
     implementation("io.github.smiley4:schema-kenerator-core:1.1.0")
     implementation("io.github.smiley4:schema-kenerator-serialization:1.0.1")
     implementation("io.github.smiley4:schema-kenerator-reflection:1.1.0")

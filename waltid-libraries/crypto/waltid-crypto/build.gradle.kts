@@ -105,7 +105,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -115,17 +115,17 @@ kotlin {
                 implementation("io.ktor:ktor-client-json:$ktor_version")
                 implementation("io.ktor:ktor-client-logging:$ktor_version")
 
-                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.5.1"))
+                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.5.3"))
                 implementation("org.kotlincrypto.hash:sha2")
 
                 // Date
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
 
                 // Cache
                 implementation("io.github.reactivecircus.cache4k:cache4k:0.13.0")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
@@ -138,12 +138,12 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
             }
         }
         val jvmMain by getting {
             dependencies {
-                implementation("com.google.crypto.tink:tink:1.14.0") // for JOSE using Ed25519
+                implementation("com.google.crypto.tink:tink:1.15.0") // for JOSE using Ed25519
 
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.6") // for secp256k1 (which was removed with Java 17)
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.6") // PEM import
@@ -152,10 +152,10 @@ kotlin {
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.9.0")
 
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:9.40")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
 
                 // Multibase
 //                implementation("com.github.multiformats:java-multibase:v1.1.1")
@@ -164,14 +164,14 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.13")
+                implementation("org.slf4j:slf4j-simple:2.0.16")
 
                 // Test
                 implementation(kotlin("test"))
 
-                implementation("org.junit.jupiter:junit-jupiter-api:5.11.0-M2")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.11.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0")
             }
         }
         val jsMain by getting {

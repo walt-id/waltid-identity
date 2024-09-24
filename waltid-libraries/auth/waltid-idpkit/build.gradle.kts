@@ -38,23 +38,23 @@ dependencies {
     implementation("io.ktor:ktor-client-content-negotiation")
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
     implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
     // OIDC
     implementation("com.nimbusds:oauth2-oidc-sdk:11.12")
-    implementation("com.nimbusds:nimbus-jose-jwt:9.40")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
 
     // for Ed25519
-    implementation("com.google.crypto.tink:tink:1.14.0") {
+    implementation("com.google.crypto.tink:tink:1.15.0") {
         exclude("org.slf4j.simple")
     }
 
 
     // Logging
-    implementation("io.klogging:klogging-jvm:0.7.0")
-    implementation("io.klogging:slf4j-klogging:0.7.0")
+    implementation("io.klogging:klogging-jvm:0.7.2")
+    implementation("io.klogging:slf4j-klogging:0.7.2")
 
     testImplementation("io.ktor:ktor-server-test-host-jvm")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
