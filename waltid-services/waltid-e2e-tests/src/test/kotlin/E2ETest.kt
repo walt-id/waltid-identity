@@ -10,12 +10,12 @@ import E2ETestWebService.loadResource
 import E2ETestWebService.test
 import E2ETestWebService.testBlock
 import E2ETestWebService.testGroup
+import E2ETestWebService.testWithResult
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.web.controllers.UsePresentationRequest
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.AccountWalletListing
@@ -141,30 +141,36 @@ class E2ETest {
             val didsApi = DidsApi(client, wallet)
 
             with(didsApi) {
-                list(DidsApi.DefaultDidOption.Any, 1) {
-                    assert(it.first().default)
-                    did = it.first().did
+                test("Has default DID") {
+                    val firstDid = list(DidsApi.DefaultDidOption.Any, 1).first()
+                    assert(firstDid.default)
+                    did = firstDid.did
+                    firstDid
                 }
-                val createdDids = listOf(
-                    create(DidsApi.DidCreateRequest(method = "key", options = mapOf("useJwkJcsPub" to false))),
-                    create(DidsApi.DidCreateRequest(method = "jwk")),
-                    create(
-                        DidsApi.DidCreateRequest(
-                            method = "web",
-                            options = mapOf("domain" to "domain", "path" to "path")
-                        )
-                    )
-                )
 
-                setDefault(createdDids[0])
-                list(DidsApi.DefaultDidOption.Some(createdDids[0]), createdDids.size + 1)
-                createdDids.forEach { did ->
-                    delete(did)
+                val createdDids = listOf(
+                    DidsApi.DidCreateRequest(method = "key", options = mapOf("useJwkJcsPub" to false)),
+                    DidsApi.DidCreateRequest(method = "jwk"),
+                    DidsApi.DidCreateRequest(method = "web", options = mapOf("domain" to "domain", "path" to "path"))
+                ).map {
+                    testWithResult("Create did:${it.method}") { create(it) }
                 }
-                list(DidsApi.DefaultDidOption.None, 1)
-                get(did)
-                setDefault(did)
-                list(DidsApi.DefaultDidOption.Some(did), 1)
+
+                test("Set default DID") {
+                    setDefault(createdDids[0])
+                    list(DidsApi.DefaultDidOption.Some(createdDids[0]), createdDids.size + 1)
+                }
+
+                test("Delete all created DIDs") {
+                    createdDids.forEach { did -> delete(did) }
+                    list(DidsApi.DefaultDidOption.None, 1)
+                }
+
+                test("Set default DID (again)") {
+                    get(did)
+                    setDefault(did)
+                    list(DidsApi.DefaultDidOption.Some(did), 1)
+                }
             }
         }
 
@@ -174,31 +180,28 @@ class E2ETest {
             val issuerApi = IssuerApi(client)
             val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(jwtCredential)
             println("issuance-request: $issuanceRequest")
-            issuerApi.jwt(issuanceRequest) {
-                offerUrl = it
-                println("offer: $offerUrl")
-            }
+
+            "Issue JWT" inlineTest { offerUrl = issuerApi.jwt(issuanceRequest); offerUrl }
         }
 
         val exchangeApi = ExchangeApi(client, wallet)
         lateinit var newCredentialId: String
         testGroup("Claim credential") {
-            exchangeApi.resolveCredentialOffer(offerUrl)
-            exchangeApi.useOfferRequest(offerUrl, 1) {
-                val cred = it.first()
-                newCredentialId = cred.id
-            }
+            "Resolve credential offer" inlineTest { exchangeApi.resolveCredentialOffer(offerUrl) }
+            "Use offer request" inlineTest { newCredentialId = exchangeApi.useOfferRequest(offerUrl, 1).first().id; newCredentialId }
+
+            newCredentialId
         }
 
         val credentialsApi = CredentialsApi(client, wallet)
         testGroup("Credentials") {
             with(credentialsApi) {
-                list(expectedSize = 1, expectedCredential = arrayOf(newCredentialId))
-                get(newCredentialId)
-                accept(newCredentialId)
-                delete(newCredentialId)
-                restore(newCredentialId)
-                status(newCredentialId)
+                "List credentials" inlineTest { list(expectedSize = 1, expectedCredential = arrayOf(newCredentialId)) }
+                "View new credential" inlineTest { get(newCredentialId) }
+                "Accept the new credential" inlineTest { accept(newCredentialId) }
+                "(Temp-)Delete the new credential again " inlineTest { delete(newCredentialId) }
+                "Restore the deleted credential" inlineTest { restore(newCredentialId) }
+                "View credential status" inlineTest { status(newCredentialId) }
                 // reject(newCredentialId)
                 // delete(newCredentialId, true)
             }
@@ -209,44 +212,37 @@ class E2ETest {
         val sessionApi = Verifier.SessionApi(client)
         val verificationApi = Verifier.VerificationApi(client)
         testGroup("Verifier / request url") {
-            verificationApi.verify(simplePresentationRequestPayload) {
-                verificationUrl = it
-                verificationId = Url(verificationUrl).parameters.getOrFail("state")
-            }
+            "Start verification" inlineTest { verificationUrl = verificationApi.verify(simplePresentationRequestPayload); verificationUrl }
+            verificationId = Url(verificationUrl).parameters.getOrFail("state")
+
+            verificationUrl
         }
 
         testGroup("Exchange / presentation") {
-            lateinit var resolvedPresentationOfferString: String
+            lateinit var resolvedPresentationOffer: String
             lateinit var presentationDefinition: String
             with(exchangeApi) {
-                resolvePresentationRequest(verificationUrl) {
-                    resolvedPresentationOfferString = it
-                    presentationDefinition = Url(it).parameters.getOrFail("presentation_definition")
-                }
+                "Resolve " inlineTest { resolvedPresentationOffer = resolvePresentationRequest(verificationUrl); resolvedPresentationOffer }
+                presentationDefinition = Url(resolvedPresentationOffer).parameters.getOrFail("presentation_definition")
 
-                sessionApi.get(verificationId) {
-                    assert(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
-                }
+                var presentationSession = sessionApi.get(verificationId)
+                assert(presentationSession.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
 
                 matchCredentialsForPresentationDefinition(presentationDefinition, listOf(newCredentialId))
                 unmatchedCredentialsForPresentationDefinition(presentationDefinition)
-                usePresentationRequest(
-                    UsePresentationRequest(
-                        did,
-                        resolvedPresentationOfferString,
-                        listOf(newCredentialId)
-                    )
-                )
 
-                sessionApi.get(verificationId) {
-                    assert(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-                    assert(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+                test("Use presentation request") {
+                    usePresentationRequest(UsePresentationRequest(did, resolvedPresentationOffer, listOf(newCredentialId)))
+                }
 
-                    assert(it.verificationResult == true) { "overall verification should be valid" }
-                    it.policyResults.let {
-                        require(it != null) { "policyResults should be available after running policies" }
-                        assert(it.size > 1) { "no policies have run" }
-                    }
+                presentationSession = sessionApi.get(verificationId)
+                assert(presentationSession.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
+                assert(presentationSession.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+
+                assert(presentationSession.verificationResult == true) { "overall verification should be valid" }
+                presentationSession.policyResults.let {
+                    require(it != null) { "policyResults should be available after running policies" }
+                    assert(it.size > 1) { "no policies have run" }
                 }
             }
         }
@@ -256,28 +252,43 @@ class E2ETest {
             val categoryName = "name#1"
             val categoryNewName = "name#2"
             with(categoryApi) {
-                list(0)
-                add(categoryName)
-                assertNotNull(list(1).single { it["name"].asString() == categoryName })
-                rename(categoryName, categoryNewName)
-                assertNotNull(list(1).single { it["name"].asString() == categoryNewName })
-                delete(categoryNewName)
+                "Check no categories by default" inlineTest { list(0) }
 
-                add(categoryName)
-                add(categoryNewName)
+                test("Add category") {
+                    add(categoryName)
+                    assertNotNull(list(1).single { it["name"].asString() == categoryName })
+                }
+
+                test("Rename category") {
+                    rename(categoryName, categoryNewName)
+                    assertNotNull(list(1).single { it["name"].asString() == categoryNewName })
+                }
+
+                test("Delete category") {
+                    delete(categoryNewName)
+                    list(0)
+                }
+
+                test("Add other categories") {
+                    add(categoryName)
+                    add(categoryNewName)
+                }
             }
 
             with(credentialsApi) {
-                attachCategory(newCredentialId, categoryName, categoryNewName)
-                detachCategory(newCredentialId, categoryName, categoryNewName)
+                test("Attach categories to credentials") {
+                    attachCategory(newCredentialId, categoryName, categoryNewName)
+                    detachCategory(newCredentialId, categoryName, categoryNewName)
+                }
             }
         }
 
         testGroup("History") {
-            val historyApi = HistoryApi(client)
-            historyApi.list(wallet) {
-                assert(it.size >= 2) { "missing history items" }
-                assert(it.any { it.operation == "useOfferRequest" } && it.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
+            test("Test history") {
+                HistoryApi(client).list(wallet).also { history ->
+                    assert(history.size >= 2) { "missing history items" }
+                    assert(history.any { it.operation == "useOfferRequest" } && history.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
+                }.last()
             }
         }
 
@@ -287,29 +298,23 @@ class E2ETest {
 
         testGroup("SD-JWT") {
             // todo: make this cleaner:
+            test("SD-JWT") {
 
-            //region -Issuer / offer url-
-            lateinit var offerUrl: String
-            val issuerApi = IssuerApi(client)
-            val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(jwtCredential)
-            println("issuance-request:")
-            println(issuanceRequest)
-            issuerApi.jwt(issuanceRequest) {
-                offerUrl = it
-                println("offer: $offerUrl")
-            }
-            //endregion -Issuer / offer url-
+                //region -Issuer / offer url-
+                val issuerApi = IssuerApi(client)
+                val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(jwtCredential)
+                println("issuance-request:")
+                println(issuanceRequest)
+                val offerUrl = issuerApi.jwt(issuanceRequest)
+                //endregion -Issuer / offer url-
 
-            //region -Exchange / claim-
-            val exchangeApi = ExchangeApi(client, wallet)
-            lateinit var newCredential: WalletCredential
-            exchangeApi.resolveCredentialOffer(offerUrl)
-            exchangeApi.useOfferRequest(offerUrl, 1) {
-                newCredential = it.first()
-            }
-            //endregion -Exchange / claim-
+                //region -Exchange / claim-
+                val exchangeApi = ExchangeApi(client, wallet)
+                exchangeApi.resolveCredentialOffer(offerUrl)
+                val newCredential = exchangeApi.useOfferRequest(offerUrl, 1).first()
+                //endregion -Exchange / claim-
 
-            //region -Credentials-
+                //region -Credentials-
             val credentialsApi = CredentialsApi(client)
             credentialsApi.list(wallet, expectedSize = 1, expectedCredential = arrayOf(newCredentialId))
             credentialsApi.get(wallet, newCredentialId)
@@ -326,42 +331,34 @@ class E2ETest {
             //endregion -Credentials-
 
             //region -Verifier / request url-
-            lateinit var verificationUrl: String
-            lateinit var verificationId: String
-            val sessionApi = Verifier.SessionApi(client)
-            val verificationApi = Verifier.VerificationApi(client)
-            verificationApi.verify(simplePresentationRequestPayload) {
-                verificationUrl = it
-                verificationId = Url(verificationUrl).parameters.getOrFail("state")
-            }
-            //endregion -Verifier / request url-
+                val sessionApi = Verifier.SessionApi(client)
+                val verificationApi = Verifier.VerificationApi(client)
+                val verificationUrl: String = verificationApi.verify(simplePresentationRequestPayload)
+                val verificationId: String = Url(verificationUrl).parameters.getOrFail("state")
+                //endregion -Verifier / request url-
 
-            //region -Exchange / presentation-
-            lateinit var resolvedPresentationOfferString: String
-            lateinit var presentationDefinition: String
-            exchangeApi.resolvePresentationRequest(verificationUrl) {
-                resolvedPresentationOfferString = it
-                presentationDefinition = Url(it).parameters.getOrFail("presentation_definition")
-            }
+                //region -Exchange / presentation-
+                val resolvedPresentationOfferString: String = exchangeApi.resolvePresentationRequest(verificationUrl)
+                val presentationDefinition = Url(resolvedPresentationOfferString).parameters.getOrFail("presentation_definition")
 
-            sessionApi.get(verificationId) {
-                assert(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
-            }
+                var presentationSession = sessionApi.get(verificationId)
+                assert(presentationSession.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
 
-            exchangeApi.matchCredentialsForPresentationDefinition(
-                wallet, presentationDefinition, listOf(newCredentialId)
+                exchangeApi.matchCredentialsForPresentationDefinition(wallet, presentationDefinition, listOf(newCredentialId)
             )
-            exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet, presentationDefinition)
-            exchangeApi.usePresentationRequest(
-                wallet, UsePresentationRequest(did, resolvedPresentationOfferString, listOf(newCredentialId))
-            )
+                exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet,presentationDefinition)
+                exchangeApi.usePresentationRequest(
+                    wallet, UsePresentationRequest(
+                        did , resolvedPresentationOfferString,
+                         listOf(newCredentialId))
+                )
 
-            sessionApi.get(verificationId) {
-                assert(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-                assert(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+                presentationSession = sessionApi.get(verificationId)
+                assert(presentationSession.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
+                assert(presentationSession.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
 
-                assert(it.verificationResult == true) { "overall verification should be valid" }
-                it.policyResults.let {
+                assert(presentationSession.verificationResult == true) { "overall verification should be valid" }
+                presentationSession.policyResults.let {
                     require(it != null) { "policyResults should be available after running policies" }
                     assert(it.size > 1) { "no policies have run" }
                 }

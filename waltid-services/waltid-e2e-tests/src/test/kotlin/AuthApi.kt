@@ -75,10 +75,9 @@ class AuthApi(private val client: HttpClient) {
     }*/
 
     /*class Keycloak(private val client: HttpClient) {
-        suspend fun token(output: ((String) -> Unit)? = null) =
-                client.get("/wallet-api/auth/keycloak/token").expectSuccess().apply {
-                    output?.invoke(bodyAsText())
-                }
+        suspend fun token() = client.get("/wallet-api/auth/keycloak/token").expectSuccess().run {
+            bodyAsText()
+        }
 
         suspend fun create(request: AccountRequest) = register(
             client = client,

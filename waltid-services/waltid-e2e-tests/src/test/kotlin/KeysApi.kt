@@ -24,7 +24,7 @@ class KeysApi(private val client: HttpClient, val wallet: UUID) {
             }
         }
 
-    suspend fun generate(request: KeyGenerationRequest, output: ((String) -> Unit)? = null) =
+    suspend fun generate(request: KeyGenerationRequest) =
         client.post("/wallet-api/wallet/$wallet/keys/generate") {
             setBody(request)
         }.expectSuccess().run {

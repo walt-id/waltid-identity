@@ -1,4 +1,3 @@
-import E2ETestWebService.test
 import id.walt.webwallet.db.models.WalletDid
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -14,17 +13,16 @@ class DidsApi(private val client: HttpClient, val wallet: UUID) {
         wallet: UUID,
         expectedDefault: DefaultDidOption,
         size: Int? = null,
-        output: ((List<WalletDid>) -> Unit)? = null,
     ) =
-            client.get("/wallet-api/wallet/$wallet/dids").expectSuccess().apply {
-                val dids = body<List<WalletDid>>()
-                assert(dids.isNotEmpty()) { "Wallet has no DIDs!" }
-                size?.let { assert(dids.size == it) { "Wallet has invalid number of DIDs!" } }
-                expectedDefault.whenNone { assert(dids.none { it.default }) }
-                expectedDefault.whenAny { assertNotNull(dids.single { it.default }) }
-                expectedDefault.whenSome { did -> assert(dids.single { it.did == did }.default) }
-                output?.invoke(dids)
-            }
+        client.get("/wallet-api/wallet/$wallet/dids").expectSuccess().run {
+            val dids = body<List<WalletDid>>()
+            assert(dids.isNotEmpty()) { "Wallet has no DIDs!" }
+            size?.let { assert(dids.size == it) { "Wallet has invalid number of DIDs!" } }
+            expectedDefault.whenNone { assert(dids.none { it.default }) }
+            expectedDefault.whenAny { assertNotNull(dids.single { it.default }) }
+            expectedDefault.whenSome { did -> assert(dids.single { it.did == did }.default) }
+            dids
+        }
 
     suspend fun get(did: String) =
         client.get("/wallet-api/wallet/$wallet/dids/$did").expectSuccess().apply {
@@ -33,25 +31,24 @@ class DidsApi(private val client: HttpClient, val wallet: UUID) {
             println("DID document: $response")
         }
 
-    suspend fun delete(did: String) = test("/wallet-api/wallet/{wallet}/dids/{did} - delete did") {
+    suspend fun delete(did: String) =
         client.delete("/wallet-api/wallet/$wallet/dids/$did").expectSuccess()
-    }
 
     suspend fun setDefault(did: String) =
-            client.post("/wallet-api/wallet/$wallet/dids/default?did=$did").expectSuccess()
+        client.post("/wallet-api/wallet/$wallet/dids/default?did=$did").expectSuccess()
 
     suspend fun create(payload: DidCreateRequest) =
-            client.post("/wallet-api/wallet/$wallet/dids/create/${payload.method}") {
-                url {
-                    payload.toMap().onEach {
-                        parameters.append(it.key, it.value.toString())
-                    }
+        client.post("/wallet-api/wallet/$wallet/dids/create/${payload.method}") {
+            url {
+                payload.toMap().onEach {
+                    parameters.append(it.key, it.value.toString())
                 }
-            }.expectSuccess().run {
-                val did = body<String>()
-                assert(String.format(didRegexPattern, payload.method).toRegex().matches(did))
-                did
             }
+        }.expectSuccess().run {
+            val did = body<String>()
+            assert(String.format(didRegexPattern, payload.method).toRegex().matches(did))
+            did
+        }
 
     data class DidCreateRequest(
         val method: String,

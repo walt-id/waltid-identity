@@ -91,7 +91,9 @@ object E2ETestWebService {
 
         t.println("\n" + TextColors.magenta("Test results:"))
         testResults.forEachIndexed { index, result ->
-            val name = testNames[index] ?: throw IllegalStateException("Unknown test for index $idx! Last successful was ${testNames[idx-1]}")
+            val idx = index + 1
+            val name = testNames[index]
+                ?: throw IllegalStateException("Unknown test for index $idx, last successful was ${testNames[idx - 1]}. Did you maybe embed the tests by accident?")
             t.println(TextColors.magenta("$index. $name: ${result.toSuccessString()}"))
         }
 
@@ -127,9 +129,12 @@ object E2ETestWebService {
         t.println(TextStyles.bold(TextColors.brightCyan("---=== End of test group: $groupName (tests $startTestId - $endTestId) === ---")) + "\n")
     }
 
+    var testCounter = 0
+
+
     @Suppress("REDUNDANT_INLINE_SUSPEND_FUNCTION_TYPE")
     suspend inline fun <reified T> testWithResult(name: String, function: suspend () -> T): T {
-        val id = numTests++
+        val id = ++testCounter
         testNames[id] = name
 
         t.println("\n${TextColors.cyan(TextStyles.bold("---=== Start $id. test: $name === ---"))}")
