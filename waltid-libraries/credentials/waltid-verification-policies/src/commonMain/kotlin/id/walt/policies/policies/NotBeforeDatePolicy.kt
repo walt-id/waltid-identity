@@ -58,10 +58,8 @@ class NotBeforeDatePolicy : CredentialWrapperValidatorPolicy(
     }
 
     private fun getIssuanceDateKeyValuePair(data: JsonObject): Pair<Claims, Instant>? =
-        checkVc(data["vc"]?.jsonObject, id.walt.policies.policies.NotBeforeDatePolicy.Companion.vcClaims) ?: checkVc(data,
-          id.walt.policies.policies.NotBeforeDatePolicy.Companion.vcClaims
-        )
-        ?: checkJwt(data, id.walt.policies.policies.NotBeforeDatePolicy.Companion.jwtClaims)
+        checkVc(data["vc"]?.jsonObject, vcClaims) ?: checkVc(data, vcClaims)
+        ?: checkJwt(data, jwtClaims)
 
     private fun buildFailureResult(
         now: Instant,
