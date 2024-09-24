@@ -5,11 +5,6 @@ import id.walt.authkit.accounts.ExampleAccountStore
 import id.walt.authkit.sessions.InMemorySessionStore
 import id.walt.authkit.tokens.TokenHandler
 import id.walt.authkit.tokens.authkittoken.AuthKitTokenHandler
-import id.walt.authkit.tokens.jwttoken.JwtTokenHandler
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
-import kotlinx.coroutines.runBlocking
-import kotlin.system.exitProcess
 
 object AuthKitManager {
 
