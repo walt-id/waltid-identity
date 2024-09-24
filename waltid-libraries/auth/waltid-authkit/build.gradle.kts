@@ -29,18 +29,18 @@ dependencies {
     // Auth methods
 
     // RADIUS
-    implementation("org.aaa4j.radius:aaa4j-radius-client:0.3.0")
+    implementation("org.aaa4j.radius:aaa4j-radius-client:0.3.1")
 
     // LDAP
     //implementation("org.apache.directory.server:apacheds-server-integ:2.0.0.AM27")
-    implementation("org.apache.directory.api:api-all:2.1.6")
+    implementation("org.apache.directory.api:api-all:2.1.7")
 
     // TOTP/HOTP
     implementation("com.atlassian:onetime:2.1.1")
 
     // JWT
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
-    implementation("com.nimbusds:nimbus-jose-jwt:9.40")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
 
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm")
@@ -71,16 +71,16 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
 
     // Ktor server external
-    implementation("io.github.smiley4:ktor-swagger-ui:3.3.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:3.4.0")
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
     implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
     // Logging
-    implementation("io.klogging:klogging-jvm:0.7.0")
-    implementation("io.klogging:slf4j-klogging:0.7.0")
+    implementation("io.klogging:klogging-jvm:0.7.2")
+    implementation("io.klogging:slf4j-klogging:0.7.2")
 
     /* --- Testing --- */
 

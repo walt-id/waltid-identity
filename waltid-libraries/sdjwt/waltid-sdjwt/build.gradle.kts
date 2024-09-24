@@ -104,9 +104,9 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation("dev.whyoleg.cryptography:cryptography-random:0.3.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.2")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
                 implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
             }
         }
@@ -117,14 +117,14 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                implementation("com.nimbusds:nimbus-jose-jwt:9.40")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
             }
         }
         val jvmTest by getting {
             dependencies {
 //              implementation("io.mockk:mockk:1.13.2")
-                implementation("org.slf4j:slf4j-simple:2.0.13")
+                implementation("org.slf4j:slf4j-simple:2.0.16")
             }
         }
         val jsMain by getting {
