@@ -52,7 +52,7 @@ data class AuthSession(
 
             token = AuthKitManager.tokenHandler.generateToken(this)
         } else {
-            throw IllegalStateException("Cannot process flow: No next step defined but current step is not end step!")
+            error("Cannot process flow: No next step defined but current step is not end step!")
         }
 
         SessionManager.updateSession(this)
