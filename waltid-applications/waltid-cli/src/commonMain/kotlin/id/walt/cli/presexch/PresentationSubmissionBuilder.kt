@@ -1,6 +1,7 @@
 package id.walt.cli.presexch
 
 import id.walt.cli.models.Credential
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.oid4vc.data.dif.*
 import kotlinx.serialization.json.*

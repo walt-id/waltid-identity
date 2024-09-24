@@ -3,6 +3,7 @@ package id.walt.webwallet.web.controllers.exchange
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64URL
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -12,7 +13,6 @@ import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationSubmission
-import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
