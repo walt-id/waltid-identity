@@ -4,6 +4,6 @@ package id.walt.authkit.accounts.identifiers
 class JWTIdentifier(val subject: String) : AccountIdentifier("jwt") {
     override fun getString() = subject
 
-    override fun hashCode(): Int = 31 * subject.hashCode()
+    override fun hashCode(): Int = subject.hashCode()
 
 }
