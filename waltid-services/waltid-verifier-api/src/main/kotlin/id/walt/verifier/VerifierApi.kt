@@ -2,6 +2,7 @@ package id.walt.verifier
 
 import com.nimbusds.jose.JWSAlgorithm
 import id.walt.commons.config.ConfigManager
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.oid4vc.data.OpenId4VPProfile
