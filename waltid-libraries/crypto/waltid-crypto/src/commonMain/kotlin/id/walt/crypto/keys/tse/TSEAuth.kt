@@ -1,7 +1,6 @@
 package id.walt.crypto.keys.tse
 
-import id.walt.commons.exceptions.InvalidAuthenticationMethodException
-import id.walt.commons.exceptions.TSELoginException
+import id.walt.commons.exceptions.TSEError
 import io.github.reactivecircus.cache4k.Cache
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -58,12 +57,25 @@ data class TSEAuth(
     }
 
     init {
-        require(
-            accessKey != null
-                    || (roleId != null && secretId != null)
-                    || (username != null && password != null)
-        ) {
-            throw InvalidAuthenticationMethodException()
+        requireAuthenticationMethod()
+    }
+
+    private fun requireAuthenticationMethod() {
+        val usingAccessKey = accessKey != null
+        val usingRoleIdAndSecret = roleId != null || secretId != null
+        val usingUsernameAndPassword = username != null || password != null
+        require(usingAccessKey || usingRoleIdAndSecret || usingUsernameAndPassword) {
+            throw TSEError.InvalidAuthenticationMethod.MissingAuthenticationMethodException()
+        }
+        if (usingRoleIdAndSecret) {
+            require(roleId != null && secretId != null) {
+                throw TSEError.InvalidAuthenticationMethod.IncompleteRoleAuthenticationMethodException()
+            }
+        }
+        if (usingUsernameAndPassword) {
+            require(username != null && password != null) {
+                throw TSEError.InvalidAuthenticationMethod.IncompleteUserAuthenticationMethodException()
+            }
         }
     }
 
@@ -71,13 +83,15 @@ data class TSEAuth(
 
     private suspend fun HttpResponse.getClientToken() =
         body<JsonObject>().let {
-            if (it.containsKey("errors")) {
-                throw TSELoginException("Errors occurred at TSE login: " + it["errors"]!!.jsonArray.map { it.jsonPrimitive.content }
-                    .joinToString())
-            }
+            checkNoErrors(it)
             it["auth"]?.jsonObject?.get("client_token")?.jsonPrimitive?.contentOrNull
-                ?: throw TSELoginException("Did not receive token after login!")
+                ?: throw TSEError.MissingAuthTokenException()
         }
+
+    private fun checkNoErrors(json: JsonObject) = json["errors"]?.let {
+        throw TSEError.LoginException(it.jsonArray.map { it.jsonPrimitive.content })
+    }
+
 
     private suspend fun loginAppRole(server: String): String =
         http.post("$server/auth/approle/login") {
@@ -107,7 +121,7 @@ data class TSEAuth(
             accessKey != null -> accessKey
             roleId != null -> loginAppRole(server)
             username != null -> loginUserPass(server)
-            else -> throw InvalidAuthenticationMethodException()
+            else -> throw TSEError.InvalidAuthenticationMethod.MissingAuthenticationMethodException()
         }
     }
 
