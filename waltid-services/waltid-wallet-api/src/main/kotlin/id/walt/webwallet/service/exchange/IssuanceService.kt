@@ -102,15 +102,10 @@ object IssuanceService: IssuanceServiceBase() {
                     ) ?: ""
                 }"
             )
-            // Use key proof if supported cryptographic binding method is not empty, doesn't contain did and contains cose_key or jwk
-            val useKeyProof = (offeredCredential.cryptographicBindingMethodsSupported != null &&
-                    (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
-                            offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
-                    !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did") || (offeredCredential.format.value == "vc+sd-jwt"))
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
                 proof = ProofOfPossessionFactory.new(
-                    useKeyProof,
+                    isKeyProofRequiredForOfferedCredential(offeredCredential),
                     credentialWallet,
                     offeredCredential,
                     credentialOffer,
