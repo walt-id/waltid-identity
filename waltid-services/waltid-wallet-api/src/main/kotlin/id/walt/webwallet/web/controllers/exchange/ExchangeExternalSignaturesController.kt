@@ -494,10 +494,9 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             val req = call.receive<SubmitOID4VCIRequest>()
             logger.debug { "Request: $req" }
 
-            val did = req.did ?: walletService.listDids().firstOrNull()?.did
-            ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
-
             runCatching {
+                val did = req.did ?: walletService.listDids().firstOrNull()?.did
+                ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
                 WalletServiceManager
                     .externalSignatureClaimStrategy
                     .submitCredentialClaim(
@@ -512,7 +511,10 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         offeredCredentialProofsOfPossession = req.offeredCredentialProofsOfPossession,
                     )
             }.onSuccess { walletCredentialList ->
-                context.respond(HttpStatusCode.OK, walletCredentialList)
+                context.respond(
+                    HttpStatusCode.OK,
+                    walletCredentialList,
+                )
             }.onFailure { error ->
                 context.respond(
                     HttpStatusCode.BadRequest,
