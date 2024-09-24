@@ -1,4 +1,4 @@
-package id.walt.presentationexchange
+package id.walt.definitionparser
 
 import com.nfeld.jsonpathkt.JsonPath
 import com.nfeld.jsonpathkt.kotlinx.resolveOrNull
