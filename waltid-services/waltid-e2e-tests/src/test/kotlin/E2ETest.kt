@@ -242,7 +242,7 @@ class E2ETest {
                 unmatchedCredentialsForPresentationDefinition(presentationDefinition)
 
                 test("Use presentation request") {
-                    usePresentationRequest(UsePresentationRequest(did, resolvedPresentationOffer, listOf(newCredentialId)))
+                    usePresentationRequest(UsePresentationRequest(did, resolvedPresentationOffer, listOf(newCredentialId))).expectSuccess()
                 }
 
                 presentationSession = sessionApi.get(verificationId)
@@ -358,10 +358,13 @@ class E2ETest {
             )
                 exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet,presentationDefinition)
                 exchangeApi.usePresentationRequest(
-                    wallet, UsePresentationRequest(
-                        did , resolvedPresentationOfferString,
-                         listOf(newCredentialId))
-                )
+                    request = UsePresentationRequest(
+                        did = did,
+                        presentationRequest = resolvedPresentationOfferString,
+                        selectedCredentials = listOf(newCredential.id),
+                        disclosures = newCredential.disclosures?.let { mapOf(newCredential.id to listOf(it)) },
+                    ),
+                ).expectFailure()
 
                 presentationSession = sessionApi.get(verificationId)
                 assert(presentationSession.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
