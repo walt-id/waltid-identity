@@ -343,7 +343,7 @@ class ExchangeExternalSignatures {
             )
         }.expectSuccess()
         val credList = response.body<List<WalletCredential>>()
-        assert(credList.size == issuanceRequests.size) { "There should as many credentials in the wallet as requested" }
+        assert(credList.size == issuanceRequests.size) { "There should be as many credentials in the wallet as requested" }
     }
 
     private suspend fun testOID4VP(

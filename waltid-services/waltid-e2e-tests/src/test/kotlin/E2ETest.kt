@@ -292,7 +292,10 @@ class E2ETest {
         val authorizationCodeFlow = AuthorizationCodeFlow(testHttpClient(doFollowRedirects = false))
         authorizationCodeFlow.testIssuerAPI()
 
-        // test External Signature API Endpoints
+        // Test External Signature API Endpoints
+        //In the context of these test cases, a new wallet is created and initialized
+        //accordingly, i.e., the default wallet that is employed by all the other test
+        //cases is not used here.
         ExchangeExternalSignatures().executeTestCases()
     }
 
