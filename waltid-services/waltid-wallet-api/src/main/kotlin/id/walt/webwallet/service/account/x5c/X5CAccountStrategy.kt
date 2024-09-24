@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.service.account.x5c
 
 import id.walt.commons.config.ConfigManager
@@ -14,10 +16,11 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
 
 object X5CAccountStrategy : PasswordlessAccountStrategy<X5CAccountRequest>() {
 
@@ -73,17 +76,17 @@ object X5CAccountStrategy : PasswordlessAccountStrategy<X5CAccountRequest>() {
         return JWKKey.importPEM(pem).getOrThrow()
     }
 
-    private fun addAccount(tenant: String, thumbprint: String): UUID {
+    private fun addAccount(tenant: String, thumbprint: String): Uuid {
         // add accounts record
         val accountId = Accounts.insert {
             it[Accounts.tenant] = tenant
-            it[id] = UUID.generateUUID()
+            it[id] = Uuid.random()
             it[createdOn] = Clock.System.now().toJavaInstant()
         }[Accounts.id]
         // add x5c logins record
         X5CLogins.insert {
             it[X5CLogins.tenant] = tenant
-            it[X5CLogins.accountId] = accountId
+            it[X5CLogins.accountId] = accountId.toJavaUuid()
             it[x5cId] = thumbprint
         }
         return accountId

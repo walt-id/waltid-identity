@@ -1,5 +1,5 @@
 <template>
-    <DidCreationView method="iota" />
+  <DidCreationView method="iota" />
 </template>
 
 <script lang="ts" setup>

@@ -2,10 +2,9 @@
 
 package id.walt.webwallet.service.issuers
 
-import id.walt.webwallet.db.models.WalletIssuers
 import id.walt.commons.temp.UuidSerializer
+import id.walt.webwallet.db.models.WalletIssuers
 import kotlinx.serialization.Serializable
-
 import org.jetbrains.exposed.sql.ResultRow
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid

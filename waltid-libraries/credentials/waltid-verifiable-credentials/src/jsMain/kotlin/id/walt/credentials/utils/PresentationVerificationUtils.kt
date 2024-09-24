@@ -2,7 +2,9 @@ package id.walt.credentials.utils
 
 import id.walt.credentials.verification.models.PolicyRequest
 import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 
 @JsExport
 object PresentationVerificationUtils {

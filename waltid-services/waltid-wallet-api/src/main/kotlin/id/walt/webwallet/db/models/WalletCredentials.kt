@@ -2,6 +2,7 @@
 
 package id.walt.webwallet.db.models
 
+import id.walt.commons.temp.UuidSerializer
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.mdoc.dataelement.toJsonElement
 import id.walt.mdoc.doc.MDoc
@@ -10,12 +11,10 @@ import id.walt.webwallet.manifest.provider.ManifestProvider
 import id.walt.webwallet.utils.JsonUtils
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
-import id.walt.commons.temp.UuidSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
-
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.timestamp

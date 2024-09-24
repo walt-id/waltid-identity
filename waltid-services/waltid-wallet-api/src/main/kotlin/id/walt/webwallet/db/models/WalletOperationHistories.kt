@@ -1,12 +1,12 @@
 package id.walt.webwallet.db.models
 
+import id.walt.commons.temp.UuidSerializer
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.webwallet.db.kotlinxUuid
 import id.walt.webwallet.service.WalletService
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
-import id.walt.commons.temp.UuidSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject

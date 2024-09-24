@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.verifier
 
 import com.nimbusds.jose.JWSAlgorithm
@@ -116,7 +118,6 @@ private const val fixedPresentationDefinitionForEbsiConformanceTest =
 
 private val verificationUseCase = VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
 
-@OptIn(ExperimentalSerializationApi::class, ExperimentalUuidApi::class)
 fun Application.verfierApi() {
     routing {
 

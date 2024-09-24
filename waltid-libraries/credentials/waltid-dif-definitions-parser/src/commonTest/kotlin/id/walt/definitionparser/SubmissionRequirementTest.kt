@@ -1,6 +1,5 @@
 package id.walt.definitionparser
 
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 

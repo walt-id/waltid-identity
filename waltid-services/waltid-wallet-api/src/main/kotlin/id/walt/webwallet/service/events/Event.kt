@@ -2,17 +2,16 @@
 
 package id.walt.webwallet.service.events
 
+import id.walt.commons.temp.UuidSerializer
 import id.walt.webwallet.db.models.Events
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
-import id.walt.commons.temp.UuidSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
-
 import org.jetbrains.exposed.sql.ResultRow
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid

@@ -1,5 +1,5 @@
 import CustomCredentialModal from '@/components/walt/modal/CustomCredentialModal';
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import Credential from '@/components/walt/credential/Credential';
 import { AvailableCredential } from '@/types/credentials';
 import Button from '@/components/walt/button/Button';
@@ -18,14 +18,20 @@ export default function Home() {
   const [AvailableCredentials] = React.useContext(CredentialsContext);
   const router = useRouter();
 
-  const [credentialsToIssue, setCredentialsToIssue] = useState<CredentialToIssue[]>(prepareCredentialsToIssue);
+  const [credentialsToIssue, setCredentialsToIssue] = useState<
+    CredentialToIssue[]
+  >(prepareCredentialsToIssue);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [modalVisible, setModalVisible] = useState(false);
 
   const showButton = credentialsToIssue.some((cred) => cred.selected);
-  const credentials = !searchTerm ? credentialsToIssue : credentialsToIssue.filter(credential => {
-    return credential.title.toLowerCase().includes(searchTerm.toLowerCase());
-  })
+  const credentials = !searchTerm
+    ? credentialsToIssue
+    : credentialsToIssue.filter((credential) => {
+        return credential.title
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase());
+      });
 
   function prepareCredentialsToIssue(): CredentialToIssue[] {
     return AvailableCredentials.map((cred: AvailableCredential) => {
@@ -91,15 +97,23 @@ export default function Home() {
         </p>
       </div>
       <main className="flex flex-col items-center gap-5 justify-between mt-16 md:w-[740px] m-auto">
-        <div className='flex flex-row gap-5 w-full px-5'>
-          <div className='flex flex-row w-full border-b border-b-1 border-gray-200'>
-            <MagnifyingGlassIcon className='h-6 mt-3 text-gray-500' />
-            <input type="text" className='w-full mt-1 border-none outline-none focus:ring-0 bg-gray-50' onChange={handleSearchTermChange} />
+        <div className="flex flex-row gap-5 w-full px-5">
+          <div className="flex flex-row w-full border-b border-b-1 border-gray-200">
+            <MagnifyingGlassIcon className="h-6 mt-3 text-gray-500" />
+            <input
+              type="text"
+              className="w-full mt-1 border-none outline-none focus:ring-0 bg-gray-50"
+              onChange={handleSearchTermChange}
+            />
           </div>
           {/* Commented out for now, because of oidc credentialConfigurationId introduction */}
           {/* <Button size='sm' onClick={() => { setModalVisible(true); }}>Custom Credential</Button> */}
         </div>
-        {credentials.length === 0 && <div className='w-full mt-10 text-center'>No Credential with that name.</div>}
+        {credentials.length === 0 && (
+          <div className="w-full mt-10 text-center">
+            No Credential with that name.
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-y-10 gap-x-5 mt-10">
           {credentials.map(({ id, title, selected }) => (
             <Credential
@@ -113,14 +127,20 @@ export default function Home() {
         </div>
       </main>
       <Button
-        className={`transition-all duration-700 ease-in-out fixed ${!showButton && '-translate-y-20'
-          } top-5 right-5 left-0`}
+        className={`transition-all duration-700 ease-in-out fixed ${
+          !showButton && '-translate-y-20'
+        } top-5 right-5 left-0`}
         size="lg"
         onClick={handleStartIssuance}
       >
         Start
       </Button>
-      <CustomCredentialModal show={modalVisible} onClose={() => { setModalVisible(!modalVisible) }} />
+      <CustomCredentialModal
+        show={modalVisible}
+        onClose={() => {
+          setModalVisible(!modalVisible);
+        }}
+      />
     </div>
   );
 }

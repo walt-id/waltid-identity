@@ -2,11 +2,10 @@
 
 package id.walt.webwallet.db.models
 
+import id.walt.commons.temp.UuidSerializer
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
-import id.walt.commons.temp.UuidSerializer
 import kotlinx.serialization.Serializable
-
 import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.javatime.timestamp

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers.auth
 
 import com.nimbusds.jose.JWSObject
@@ -14,7 +16,8 @@ import io.ktor.server.response.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 const val defaultAuthPath = "auth"
 val defaultAuthTags = listOf("Authentication")
@@ -34,7 +37,7 @@ fun Application.defaultAuthRoutes() = webWalletRoute {
                     val jwsObject = JWSObject.parse(this)
                     val uuid =
                         Json.parseToJsonElement(jwsObject.payload.toString()).jsonObject["sub"]?.jsonPrimitive?.content.toString()
-                    call.respond(AccountsService.get(UUID(uuid)))
+                    call.respond(AccountsService.get(Uuid.parse(uuid)))
                 } ?: call.respond(HttpStatusCode.BadRequest)
             }
             get("session", { summary = "Return session ID if logged in" }) {

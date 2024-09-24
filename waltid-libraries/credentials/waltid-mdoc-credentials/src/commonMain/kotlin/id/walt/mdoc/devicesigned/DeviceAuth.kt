@@ -4,7 +4,10 @@ package id.walt.mdoc.devicesigned
 
 import id.walt.mdoc.cose.COSEMac0
 import id.walt.mdoc.cose.COSESign1
-import id.walt.mdoc.dataelement.*
+import id.walt.mdoc.dataelement.DataElementSerializer
+import id.walt.mdoc.dataelement.ListElement
+import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.MapKey
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
