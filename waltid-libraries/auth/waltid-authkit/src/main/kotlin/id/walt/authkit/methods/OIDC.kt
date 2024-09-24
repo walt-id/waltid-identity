@@ -222,9 +222,3 @@ public suspend inline fun <reified T> HttpResponse.response(): T {
     val json = call.body<JsonObject>()
     return Json.decodeFromJsonElement<T>(json)
 }
-
-suspend fun main() {
-
-//    println(OIDC.resolveConfiguration())
-
-}
