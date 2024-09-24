@@ -1,8 +1,8 @@
 package id.walt.crypto.keys
 
 import id.walt.commons.exceptions.KeyBackendNotSupportedException
+import id.walt.commons.exceptions.KeyTypeMissingException
 import id.walt.commons.exceptions.KeyTypeNotSupportedException
-import id.walt.commons.exceptions.MissingKeyTypeException
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.oci.OCIKeyRestApi
 import id.walt.crypto.keys.tse.TSEKey
@@ -69,7 +69,7 @@ object KeyManager {
         val type = getRegisteredKeyType(it)
         val fields = json.filterKeys { it != "type" }.mapValues { it.value }
         Json.decodeFromJsonElement(serializer(type), JsonObject(fields)) as Key
-    }?.apply { init() } ?: throw MissingKeyTypeException()
+    }?.apply { init() } ?: throw KeyTypeMissingException()
 
     fun resolveSerializedKeyBlocking(jsonString: String) =
         resolveSerializedKeyBlocking(json = Json.parseToJsonElement(jsonString).jsonObject)
