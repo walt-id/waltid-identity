@@ -98,14 +98,10 @@ object IssuanceServiceExternalSignatures: IssuanceServiceBase() {
         keyId: String,
         nonce: String?,
     ): ProofOfPossessionParameters {
-        val useKeyProof = (offeredCredential.cryptographicBindingMethodsSupported != null &&
-                (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
-                        offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
-                !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
         return ProofOfPossessionParameterFactory.new(
             did,
             keyId,
-            useKeyProof,
+            isKeyProofRequiredForOfferedCredential(offeredCredential),
             offeredCredential,
             credentialOffer,
             nonce,

@@ -7,6 +7,7 @@ import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.oid4vc.data.CredentialFormat
+import id.walt.oid4vc.data.OfferedCredential
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.TokenResponse
@@ -137,4 +138,11 @@ abstract class IssuanceServiceBase {
 
         return response.body<JsonObject>().let { SDJWTVCTypeMetadata.fromJSON(it) }
     }
+
+    fun isKeyProofRequiredForOfferedCredential(offeredCredential: OfferedCredential) =
+        // Use key proof if supported cryptographic binding method is not empty, doesn't contain did and contains cose_key or jwk
+        (offeredCredential.cryptographicBindingMethodsSupported != null &&
+                (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
+                        offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
+                !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did") || (offeredCredential.format.value == "vc+sd-jwt"))
 }
