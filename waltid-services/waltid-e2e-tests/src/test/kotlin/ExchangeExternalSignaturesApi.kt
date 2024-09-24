@@ -2,17 +2,23 @@ import COSE.AlgorithmID
 import E2ETestWebService.loadResource
 import cbor.Cbor
 import com.nimbusds.jose.jwk.ECKey
+import id.walt.commons.interop.LspPotentialInterop
+import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.utils.randomUUID
 import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.MapElement
 import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.ProofType
+import id.walt.sdjwt.SDField
+import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.utils.Base64Utils.encodeToBase64Url
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
@@ -145,7 +151,20 @@ class ExchangeExternalSignatures {
         }
     }
 
+    suspend fun onlySdJwtTestCases() {
+        initializeWallet()
+        w3cSdJwtVcTestCases()
+    }
+
     suspend fun executeTestCases() {
+        initializeWallet()
+        regularJwtVcJsonTestCases()
+        mDocTestCases()
+        w3cSdJwtVcTestCases()
+        ietfSdJwtVcTestCases()
+    }
+
+    private suspend fun regularJwtVcJsonTestCases() {
         val openBadgeIssuanceRequest = Json.decodeFromString<IssuanceRequest>(
             loadResource("issuance/openbadgecredential-issuance-request.json")
         ).apply {
@@ -156,22 +175,12 @@ class ExchangeExternalSignatures {
         ).apply {
             this.credentialFormat = CredentialFormat.jwt_vc_json
         }
-        val mDocIssuanceRequest = Json.decodeFromString<IssuanceRequest>(
-            IssuanceExamples.mDLCredentialIssuanceData
-        ).copy(
-            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
-            credentialFormat = CredentialFormat.mso_mdoc,
-        )
         val openbadgePresentationRequest = loadResource(
             "presentation/openbadgecredential-presentation-request.json"
         )
         val openbadgeUniversityDegreePresentationRequest = loadResource(
             "presentation/batch-openbadge-universitydegree-presentation-request.json"
         )
-        val openbadgeSdJwtIssuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(E2ETest.sdjwtCredential).apply {
-            credentialFormat = CredentialFormat.sd_jwt_vc
-        }
-        initializeWallet()
         testPreAuthorizedOID4VCI(
             issuanceRequests = listOf(openBadgeIssuanceRequest),
         )
@@ -182,11 +191,6 @@ class ExchangeExternalSignatures {
             issuanceRequests = listOf(openBadgeIssuanceRequest),
         )
         testOID4VP(openbadgePresentationRequest)
-        clearWalletCredentials()
-        testPreAuthorizedOID4VCI(
-            useOptionalParameters = false,
-            issuanceRequests = listOf(mDocIssuanceRequest),
-        )
         clearWalletCredentials()
         testPreAuthorizedOID4VCI(
             useOptionalParameters = false,
@@ -206,12 +210,89 @@ class ExchangeExternalSignatures {
         )
         testOID4VP(openbadgeUniversityDegreePresentationRequest)
         clearWalletCredentials()
+    }
+
+    private suspend fun mDocTestCases() {
+        val mDocIssuanceRequest = Json.decodeFromString<IssuanceRequest>(
+            IssuanceExamples.mDLCredentialIssuanceData
+        ).copy(
+            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            credentialFormat = CredentialFormat.mso_mdoc,
+        )
+        testPreAuthorizedOID4VCI(
+            useOptionalParameters = false,
+            issuanceRequests = listOf(mDocIssuanceRequest),
+        )
+        clearWalletCredentials()
+    }
+
+    private suspend fun w3cSdJwtVcTestCases() {
+        val openbadgeSdJwtIssuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(E2ETest.sdjwtCredential).apply {
+            credentialFormat = CredentialFormat.sd_jwt_vc
+        }
+        val openbadgeSdJwtNameFieldSchemaPresentationRequest = loadResource(
+            "presentation/openbadgecredential-name-field-presentation-request.json"
+        )
         testPreAuthorizedOID4VCI(
             useOptionalParameters = false,
             issuanceRequests = listOf(
                 openbadgeSdJwtIssuanceRequest,
             ),
         )
+//        testOID4VP(openbadgeSdJwtNameFieldSchemaPresentationRequest)
+        clearWalletCredentials()
+    }
+
+    private suspend fun ietfSdJwtVcTestCases() {
+        val identityCredentialIETFSdJwtX5cIssuanceRequest = IssuanceRequest(
+            Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
+            "identity_credential_vc+sd-jwt",
+            credentialData = W3CVC(buildJsonObject {
+                put("family_name", "Doe")
+                put("given_name", "John")
+                put("birthdate", "1940-01-01")
+            }),
+            "identity_credential",
+            x5Chain = listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT),
+            trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT),
+            selectiveDisclosure = SDMap(
+                mapOf(
+                    "birthdate" to SDField(sd = true)
+                )
+            ),
+            credentialFormat = CredentialFormat.sd_jwt_vc
+        )
+        val identityCredentialIETFSdJwtDidIssuanceRequest = IssuanceRequest(
+            Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
+            "identity_credential_vc+sd-jwt",
+            credentialData = W3CVC(buildJsonObject {
+                put("family_name", "Doe")
+                put("given_name", "John")
+                put("birthdate", "1940-01-01")
+            }),
+            mdocData = null,
+            selectiveDisclosure = SDMap(
+                mapOf(
+                    "birthdate" to SDField(sd = true)
+                )
+            ),
+            issuerDid = LspPotentialIssuanceInterop.ISSUER_DID,
+            credentialFormat = CredentialFormat.sd_jwt_vc
+        )
+        testPreAuthorizedOID4VCI(
+            useOptionalParameters = false,
+            issuanceRequests = listOf(
+                identityCredentialIETFSdJwtX5cIssuanceRequest,
+            ),
+        )
+        clearWalletCredentials()
+        testPreAuthorizedOID4VCI(
+            useOptionalParameters = false,
+            issuanceRequests = listOf(
+                identityCredentialIETFSdJwtDidIssuanceRequest,
+            ),
+        )
+        clearWalletCredentials()
     }
 
     @OptIn(ExperimentalSerializationApi::class)

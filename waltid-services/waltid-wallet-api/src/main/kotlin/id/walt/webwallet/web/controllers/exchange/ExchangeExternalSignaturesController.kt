@@ -27,6 +27,7 @@ import id.walt.webwallet.service.events.EventDataNotAvailable
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures
 import id.walt.webwallet.service.exchange.ProofOfPossessionParameters
+import id.walt.webwallet.service.oidc4vc.CredentialFilterUtils
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.web.controllers.auth.getWalletService
 import id.walt.webwallet.web.controllers.walletRoute
@@ -119,6 +120,9 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             }
             val matchedCredentials = walletService.getCredentialsByIds(req.selectedCredentialIdList)
             logger.debug { "Matched credentials: $matchedCredentials" }
+
+            val jwtsPresented = CredentialFilterUtils.getJwtVcList(matchedCredentials, req.disclosures)
+            println("jwtsPresented: $jwtsPresented")
 
             val presentationId = "urn:uuid:" + UUID.generateUUID().toString().lowercase()
 
