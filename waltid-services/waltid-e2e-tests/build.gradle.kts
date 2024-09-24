@@ -28,6 +28,7 @@ dependencies {
     testImplementation("app.softwork:kotlinx-uuid-core:0.1.2")
     testImplementation("com.nimbusds:nimbus-jose-jwt:9.37.3")
     testImplementation("com.augustcellars.cose:cose-java:1.1.0")
+    testImplementation("org.bouncycastle:bcpkix-lts8on:2.73.6")
     // Multiplatform / Hashes
     testImplementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.4.0"))
     testImplementation("org.kotlincrypto.hash:sha2")

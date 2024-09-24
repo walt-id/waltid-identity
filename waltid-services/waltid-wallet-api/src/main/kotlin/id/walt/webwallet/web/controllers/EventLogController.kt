@@ -6,6 +6,8 @@ import id.walt.webwallet.service.WalletServiceManager.eventFilterUseCase
 import id.walt.webwallet.service.WalletServiceManager.eventUseCase
 import id.walt.webwallet.service.events.EventLogFilter
 import id.walt.webwallet.service.events.EventLogFilterResult
+import id.walt.webwallet.web.controllers.auth.getUserUUID
+import id.walt.webwallet.web.controllers.auth.getWalletId
 import io.github.smiley4.ktorswaggerui.dsl.routing.delete
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
