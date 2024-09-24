@@ -134,7 +134,7 @@ abstract class IssuanceServiceBase {
         val authority = Url(vct).protocolWithAuthority
         val response = http.get("$authority/.well-known/vct${vct.substringAfter(authority)}")
 
-        require(response.status.isSuccess()) {"VCT URL returns error: ${response.status}"}
+        require(response.status.isSuccess()) { "VCT URL returns error: ${response.status}" }
 
         return response.body<JsonObject>().let { SDJWTVCTypeMetadata.fromJSON(it) }
     }
@@ -144,5 +144,5 @@ abstract class IssuanceServiceBase {
         (offeredCredential.cryptographicBindingMethodsSupported != null &&
                 (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
                         offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
-                !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did") || (offeredCredential.format.value == "vc+sd-jwt"))
+                !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
 }
