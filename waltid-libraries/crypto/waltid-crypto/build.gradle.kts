@@ -72,13 +72,7 @@ kotlin {
         }
     }
     js(IR) {
-        moduleName = "crypto"/*browser {
-            commonWebpackConfig {
-                cssSupport {
-                    enabled.set(true)
-                }
-            }
-        }*/
+        moduleName = "crypto"
         nodejs {
             generateTypeScriptDefinitions()
             testTask {
@@ -87,8 +81,6 @@ kotlin {
         }
         binaries.library()
     }
-//    androidTarget()
-
     if (enableIosBuild) {
         iosArm64()
         iosSimulatorArm64()
@@ -130,7 +122,6 @@ kotlin {
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
 
-                // suspend-transform plugin annotations (required in the current version to avoid "compileOnly" warning)
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
 
                 implementation(project(":waltid-libraries:waltid-library-commons"))
@@ -160,9 +151,6 @@ kotlin {
                 // JOSE
                 implementation("com.nimbusds:nimbus-jose-jwt:9.40")
 
-                // Multibase
-//                implementation("com.github.multiformats:java-multibase:v1.1.1")
-
             }
         }
         val jvmTest by getting {
@@ -183,8 +171,6 @@ kotlin {
                 // JOSE
                 implementation(npm("jose", "5.2.3"))
 
-                // Multibase
-                // implementation(npm("multiformats", "12.1.2"))
             }
         }
         val jsTest by getting {
@@ -192,17 +178,6 @@ kotlin {
                 implementation(kotlin("test-js"))
             }
         }
-//        val androidMain by getting {
-//            dependencies {
-//                implementation("io.ktor:ktor-client-android:2.3.10")
-//            }
-//        }
-//        val androidUnitTest by getting {
-//            dependencies {
-//                implementation(kotlin("test"))
-//            }
-//        }
-
         if (enableIosBuild) {
             val iosArm64Main by getting
             val iosSimulatorArm64Main by getting
@@ -246,15 +221,9 @@ kotlin {
                     val secretMavenUsername = envUsername ?: usernameFile.let {
                         if (it.isFile) it.readLines().first() else ""
                     }
-                    //println("Deploy username length: ${secretMavenUsername.length}")
                     val secretMavenPassword = envPassword ?: passwordFile.let {
                         if (it.isFile) it.readLines().first() else ""
                     }
-
-                    //if (secretMavenPassword.isBlank()) {
-                    //   println("WARNING: Password is blank!")
-                    //}
-
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword
