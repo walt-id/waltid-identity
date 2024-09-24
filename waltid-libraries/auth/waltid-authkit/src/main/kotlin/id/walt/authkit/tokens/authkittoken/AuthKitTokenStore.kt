@@ -1,7 +1,5 @@
 package id.walt.authkit.tokens.authkittoken
 
-import id.walt.authkit.AuthKitManager
-
 interface AuthKitTokenStore {
 
     /**
