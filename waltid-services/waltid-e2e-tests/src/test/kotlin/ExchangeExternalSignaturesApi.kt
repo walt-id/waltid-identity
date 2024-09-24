@@ -228,10 +228,10 @@ class ExchangeExternalSignatures {
 
     private suspend fun w3cSdJwtVcTestCases() {
         val openbadgeSdJwtIssuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(E2ETest.sdjwtCredential).apply {
-            credentialFormat = CredentialFormat.sd_jwt_vc
+            credentialFormat = CredentialFormat.jwt_vc_json
         }
-        val openbadgeSdJwtNameFieldSchemaPresentationRequest = loadResource(
-            "presentation/openbadgecredential-name-field-presentation-request.json"
+        val openbadgePresentationRequest = loadResource(
+            "presentation/openbadgecredential-presentation-request.json"
         )
         testPreAuthorizedOID4VCI(
             useOptionalParameters = false,
@@ -239,7 +239,7 @@ class ExchangeExternalSignatures {
                 openbadgeSdJwtIssuanceRequest,
             ),
         )
-//        testOID4VP(openbadgeSdJwtNameFieldSchemaPresentationRequest)
+        testOID4VP(openbadgePresentationRequest)
         clearWalletCredentials()
     }
 
@@ -438,6 +438,7 @@ class ExchangeExternalSignatures {
 
     private suspend fun testOID4VP(
         presentationRequest: String,
+        addDisclosures: Boolean = false,
     ) {
         lateinit var presentationRequestURL: String
         lateinit var verificationID: String
@@ -466,14 +467,19 @@ class ExchangeExternalSignatures {
         ) {
             matchedCredentialList = it
         }
+        val prepareRequest = PrepareOID4VPRequest(
+            did = holderDID,
+            presentationRequest = presentationRequestURL,
+            selectedCredentialIdList = matchedCredentialList.map { it.id },
+            disclosures = if (addDisclosures) matchedCredentialList
+                .filter { it.disclosures != null }
+                .associate {
+                    Pair(it.id, listOf(it.disclosures!!))
+                } else null,
+        )
+        println(prepareRequest)
         response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/prepare") {
-            setBody(
-                PrepareOID4VPRequest(
-                    did = holderDID,
-                    presentationRequestURL,
-                    matchedCredentialList.map { it.id },
-                )
-            )
+            setBody(prepareRequest)
         }.expectSuccess()
         val prepareResponse = response.body<PrepareOID4VPResponse>()
         //client computes the externally provided signature value
@@ -494,12 +500,12 @@ class ExchangeExternalSignatures {
                     )
             )
         }.expectSuccess()
-        verifierSessionApi.get(verificationID) {
-            assert(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-            assert(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+        verifierSessionApi.get(verificationID) { sessionInfo ->
+            assert(sessionInfo.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
+            assert(sessionInfo.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
 
-            assert(it.verificationResult == true) { "overall verification should be valid" }
-            it.policyResults.let {
+            assert(sessionInfo.verificationResult == true) { "overall verification should be valid" }
+            sessionInfo.policyResults.let {
                 require(it != null) { "policyResults should be available after running policies" }
                 assert(it.size > 1) { "no policies have run" }
             }
