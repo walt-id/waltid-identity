@@ -306,7 +306,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                       JWKKey.importJWK(holderKey.toString()).getOrNull(),
                       SDPayload.createSDPayload(vc, data.request.selectiveDisclosure ?: SDMap(mapOf())),
                       holderDid, issuerKid)
-                  else -> w3cSdJwtVc(W3CVC(vc), issuerKid, holderDid, holderKey, data.request.selectiveDisclosure)
+                  else -> w3cSdJwtVc(W3CVC(vc), issuerKid, holderDid, holderKey)
               }
             }.also { log.debug { "Respond VC: $it" } }
         }))
@@ -547,9 +547,8 @@ open class CIProvider : OpenIDCredentialIssuer(
         vc: W3CVC,
         issuerKid: String,
         holderDid: String?,
-        holderKey: JsonObject?,
-        sdMap: SDMap? = null
-    ) = when(sdMap.isNullOrEmpty()) {
+        holderKey: JsonObject?
+    ) = when(request.selectiveDisclosure.isNullOrEmpty()) {
         true -> vc.mergingJwtIssue(
             issuerKey = issuerKey.key,
             issuerDid = issuerDid,
@@ -570,7 +569,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             mappings = request.mapping ?: JsonObject(emptyMap()),
             additionalJwtHeaders = emptyMap(),
             additionalJwtOptions = emptyMap(),
-            disclosureMap = sdMap
+            disclosureMap = request.selectiveDisclosure
         )
     }.also {
         sendCallback("jwt_issue", buildJsonObject {
