@@ -71,13 +71,7 @@ kotlin {
         }
     }
     js(IR) {
-        moduleName = "library-commons"/*browser {
-            commonWebpackConfig {
-                cssSupport {
-                    enabled.set(true)
-                }
-            }
-        }*/
+        moduleName = "library-commons"
         nodejs {
             generateTypeScriptDefinitions()
             testTask {
@@ -142,16 +136,7 @@ kotlin {
                 implementation(kotlin("test-js"))
             }
         }
-//        val androidMain by getting {
-//            dependencies {
-//                implementation("io.ktor:ktor-client-android:2.3.10")
-//            }
-//        }
-//        val androidUnitTest by getting {
-//            dependencies {
-//                implementation(kotlin("test"))
-//            }
-//        }
+
 
 
         publishing {
@@ -174,14 +159,9 @@ kotlin {
                     val secretMavenUsername = envUsername ?: usernameFile.let {
                         if (it.isFile) it.readLines().first() else ""
                     }
-                    //println("Deploy username length: ${secretMavenUsername.length}")
                     val secretMavenPassword = envPassword ?: passwordFile.let {
                         if (it.isFile) it.readLines().first() else ""
                     }
-
-                    //if (secretMavenPassword.isBlank()) {
-                    //   println("WARNING: Password is blank!")
-                    //}
 
                     credentials {
                         username = secretMavenUsername
