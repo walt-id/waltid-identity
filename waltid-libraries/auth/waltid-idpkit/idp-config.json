@@ -1,9 +1,14 @@
 {
   "key": "{\"kty\":\"OKP\",\"d\":\"pCMQnXqseWk4n9qxKdZLt0sFtsHctpp8UxcWXLT-DWM\",\"use\":\"sig\",\"crv\":\"Ed25519\",\"kid\":\"qdMPKNb3dnFU8ZE2AJ_Hh5BkCHnHW-Rid27wrGvFwrs\",\"x\":\"0W7qYEubjsDFUEtmiY8e9oUj9pHHsFJpkW_QpFN93F4\",\"alg\":\"EdDSA\"}",
   "verifierRequest": {
-    "request_credentials": ["NaturalPersonVerifiableID"]
+    "request_credentials": [
+      {
+        "format": "jwt_vc_json",
+        "type": "OpenBadgeCredential"
+      }
+    ]
   },
-  "issuer":"http://localhost:8080",
+  "issuer": "http://localhost:8080",
   "redirectUrl": "http://localhost:8080/login",
   "walletUrl": "http://localhost:7101/api/siop/initiatePresentation",
   "enableDebug": true,
