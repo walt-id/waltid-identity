@@ -6,12 +6,10 @@ import id.walt.webwallet.db.models.Account
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.utils.PKIXUtils
 import id.walt.webwallet.web.model.AccountRequest
-import id.walt.webwallet.web.model.KeycloakLogoutRequest
 import id.walt.webwallet.web.model.X5CAccountRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -27,68 +25,51 @@ import kotlin.test.assertNotNull
 
 
 class AuthApi(private val client: HttpClient) {
-    suspend fun userInfo(expectedStatus: HttpStatusCode, output: ((Account) -> Unit)? = null) =
-        test("/wallet-api/auth/user-info - wallet-api user-info") {
-            client.get("/wallet-api/auth/user-info").apply {
-                assert(status == expectedStatus) { "Expected status: $expectedStatus, but had $status" }
-                output?.invoke(body<Account>())
-            }
+
+    suspend fun userInfo(expectedStatus: HttpStatusCode): Account? =
+        client.get("/wallet-api/auth/user-info").run {
+            assert(status == expectedStatus) { "Expected status: $expectedStatus, but had $status" }
+            if (status.isSuccess()) runCatching { body<Account>() }.getOrNull() else null
         }
 
-    suspend fun register(request: AccountRequest) = register(
+    suspend fun register(request: AccountRequest) = Companion.register(
         client = client,
-        name = "/wallet-api/auth/register - wallet-api register",
         url = "/wallet-api/auth/register",
         request = request
     )
 
-    suspend fun login(request: AccountRequest, output: ((JsonObject) -> Unit)? = null) = login(
+    suspend fun login(request: AccountRequest) = Companion.login(
         client = client,
-        name = "/wallet-api/auth/login - wallet-api login",
         url = "/wallet-api/auth/login",
         request = request,
-        output = output
     )
 
-    suspend fun logout() = test("/wallet-api/auth/logout - wallet-api logout") {
+    suspend fun logout() =
         client.post("/wallet-api/auth/logout").expectSuccess()
-    }
 
-    suspend fun userSession() = test("/wallet-api/auth/session - logged in after login") {
+    suspend fun userSession() =
         client.get("/wallet-api/auth/session").expectSuccess()
-    }
 
-    suspend fun userWallets(expectedAccountId: UUID, output: ((AccountWalletListing) -> Unit)? = null) =
-        test("/wallet-api/wallet/accounts/wallets - get wallets") {
-            client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().apply {
-                val listing = body<AccountWalletListing>()
-                assert(expectedAccountId == listing.account) { "Wallet listing is for wrong account!" }
-                assert(listing.wallets.isNotEmpty()) { "No wallets available!" }
-                output?.invoke(listing)
-            }
+    suspend fun userWallets(expectedAccountId: UUID) =
+        client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().run {
+            val listing = body<AccountWalletListing>()
+            assert(expectedAccountId == listing.account) { "Wallet listing is for wrong account!" }
+            assert(listing.wallets.isNotEmpty()) { "No wallets available!" }
+            listing.wallets
         }
 
-    class Oidc(private val client: HttpClient) {
-        suspend fun oidcToken() = test("/wallet-api/auth/oidc-token - wallet-api oidc token") {
-            client.get("/wallet-api/auth/oidc-token").expectSuccess()
-        }
+    /*class Oidc(private val client: HttpClient) {
+        suspend fun oidcToken() = client.get("/wallet-api/auth/oidc-token").expectSuccess()
 
-        suspend fun oidcLogin() = test("/wallet-api/auth/oidc-login - wallet-api oidc login") {
-            client.get("/wallet-api/auth/oidc-login").expectSuccess()
-        }
+        suspend fun oidcLogin() = client.get("/wallet-api/auth/oidc-login").expectSuccess()
 
-        suspend fun oidcLogout() = test("/wallet-api/auth/logout-oidc - wallet-api oidc logout") {
-            client.get("/wallet-api/auth/oidc-logout").expectSuccess()
-        }
-    }
+        suspend fun oidcLogout() = client.get("/wallet-api/auth/oidc-logout").expectSuccess()
+    }*/
 
-    class Keycloak(private val client: HttpClient) {
-        suspend fun token(output: ((String) -> Unit)? = null) =
-            test("/wallet-api/auth/keycloak/token - wallet-api keycloak token") {
-                client.get("/wallet-api/auth/keycloak/token").expectSuccess().apply {
-                    output?.invoke(bodyAsText())
-                }
-            }
+    /*class Keycloak(private val client: HttpClient) {
+        suspend fun token() = client.get("/wallet-api/auth/keycloak/token").expectSuccess().run {
+            bodyAsText()
+        }
 
         suspend fun create(request: AccountRequest) = register(
             client = client,
@@ -97,25 +78,23 @@ class AuthApi(private val client: HttpClient) {
             request = request
         )
 
-        suspend fun login(request: AccountRequest, output: ((JsonObject) -> Unit)? = null) = login(
+        suspend fun login(request: AccountRequest) = login(
             client = client,
             name = "/wallet-api/auth/keycloak/login - wallet-api keycloak login",
             url = "/wallet-api/auth/keycloak/login",
             request = request,
-            output = output
         )
 
-        suspend fun logout(request: KeycloakLogoutRequest) =
-            test("/wallet-api/auth/keycloak/logout - wallet-api keycloak logout") {
-                client.post("/wallet-api/auth/keycloak/logout") {
+        suspend fun logout(request: KeycloakLogoutRequest) = client.post("/wallet-api/auth/keycloak/logout") {
                     setBody(request)
                 }.expectSuccess()
             }
-    }
+    }*/
 
     class X5c(private val client: HttpClient) {
 
-        private val rootCAPrivateKey = PKIXUtils.pemDecodeJavaPrivateKey("""
+        private val rootCAPrivateKey = PKIXUtils.pemDecodeJavaPrivateKey(
+            """
             -----BEGIN PRIVATE KEY-----
             MIIJQQIBADANBgkqhkiG9w0BAQEFAASCCSswggknAgEAAoICAQCpvw7JISG1BoTy
             hyqJneOEV3iIKUrQ829vDVJFm+g6mW+tHO4dYkgGroi6cL9VRZdGHCi9boQnYPxJ
@@ -168,7 +147,8 @@ class AuthApi(private val client: HttpClient) {
             9OO3zWyf0OmuUO6eblDMSODqyQKJ1/rEchbMKPeGbAtKuMUtvv1Wmy/FwUk8ZZEy
             Hlz/QYm+jw2iRfidZxwx9tY+dWjB
             -----END PRIVATE KEY-----
-        """.trimIndent())
+        """.trimIndent()
+        )
         private val rootCADistinguishedName = X500Name("CN=RootCA")
 
         //we don't care about the bit size of the key, it's a test case (as long as it's bigger than 512)
@@ -209,7 +189,7 @@ class AuthApi(private val client: HttpClient) {
         private suspend fun checkX5CLoginCreatesWallet() = test(
             name = "/wallet-api/auth/x5c/login - validate wallet api x5c login with trustworthy subject certificate also creates wallet"
         ) {
-            var tempClient = E2ETest.testHttpClient()
+            var tempClient = testHttpClient()
             val keyPair = keyPairGenerator.generateKeyPair()
             val dn = X500Name("CN=YeSubject")
             val cert = PKIXUtils.generateSubjectCertificate(
@@ -221,31 +201,27 @@ class AuthApi(private val client: HttpClient) {
                 dn,
             )
             val jwkPrivateKey = PKIXUtils.javaPrivateKeyToJWKKey(keyPair.private)
-            Companion.login(
+            val token = Companion.login(
                 client = tempClient,
-                name = "/wallet-api/auth/x5c/login - wallet api x5c login with trustworthy subject certificate",
                 url = "/wallet-api/auth/x5c/login",
                 request = createX5CAccountRequest(jwkPrivateKey, cert)
-            ) {
-                tempClient = E2ETest.testHttpClient(token = it["token"]!!.jsonPrimitive.content)
-            }
+            )
+            tempClient = testHttpClient(token = token)
             val response = tempClient.get("/wallet-api/wallet/accounts/wallets").expectSuccess()
             val accWalletListing = response.body<AccountWalletListing>()
-            assert( accWalletListing.wallets.isNotEmpty())
+            assert(accWalletListing.wallets.isNotEmpty())
         }
 
         suspend fun executeTestCases() {
             //register with a subject certificate that is signed by the trusted root CA
             Companion.register(
                 client = client,
-                name = "/wallet-api/auth/x5c/register - wallet api x5c registration with trustworthy subject certificate",
                 url = "/wallet-api/auth/x5c/register",
                 request = createX5CAccountRequest(subjectJWKPrivateKey, subjectCert)
             )
             //login with a subject certificate that is signed by the trusted root CA
             Companion.login(
                 client = client,
-                name = "/wallet-api/auth/x5c/login - wallet api x5c login with trustworthy subject certificate",
                 url = "/wallet-api/auth/x5c/login",
                 request = createX5CAccountRequest(subjectJWKPrivateKey, subjectCert)
             )
@@ -277,30 +253,25 @@ class AuthApi(private val client: HttpClient) {
     private companion object {
         suspend fun register(
             client: HttpClient,
-            name: String,
             url: String,
             request: AccountRequest,
-        ) = test(name) {
-            client.post(url) {
-                setBody(request)
-            }.expectSuccess()
-        }
+        ) = client.post(url) {
+            setBody(request)
+        }.expectSuccess()
 
         suspend fun login(
             client: HttpClient,
-            name: String,
             url: String,
             request: AccountRequest,
-            output: ((JsonObject) -> Unit)? = null,
-        ) = test(name) {
-            client.post(url) {
-                setBody(request)
-            }.expectSuccess().apply {
-                body<JsonObject>().let { result ->
-                    assertNotNull(result["token"])
-                    result["token"]!!.jsonPrimitive.content.expectLooksLikeJwt()
-                    output?.invoke(result)
-                }
+        ) = client.post(url) {
+            setBody(request)
+        }.expectSuccess().run{
+            body<JsonObject>().let { result ->
+                val token = result["token"]
+                assertNotNull(token)
+                val tokenContent = result["token"]!!.jsonPrimitive.content
+                tokenContent.expectLooksLikeJwt()
+                tokenContent
             }
         }
     }

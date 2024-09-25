@@ -1,4 +1,3 @@
-import E2ETestWebService.test
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import io.ktor.client.*
@@ -10,58 +9,51 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.uuid.UUID
 import kotlin.test.assertNotNull
 
-class KeysApi(private val client: HttpClient) {
+class KeysApi(private val client: HttpClient, val wallet: UUID) {
 
-    suspend fun list(wallet: UUID, expected: KeyGenerationRequest?) =
-        test("/wallet-api/wallet/{wallet}/keys - get keys") {
-            client.get("/wallet-api/wallet/$wallet/keys").expectSuccess().apply {
-                val listing = body<List<SingleKeyResponse>>()
-                when (expected) {
-                    null -> assertNoDefaultKey(listing)
-                    else -> assertDefaultKey(listing, expected)
-                }
+    suspend fun list(expected: KeyGenerationRequest?) =
+        client.get("/wallet-api/wallet/$wallet/keys").expectSuccess().apply {
+            val listing = body<List<SingleKeyResponse>>()
+            when (expected) {
+                null -> assertNoDefaultKey(listing)
+                else -> assertDefaultKey(listing, expected)
             }
         }
 
-    suspend fun generate(wallet: UUID, request: KeyGenerationRequest, output: ((String) -> Unit)? = null) =
-        test("/wallet-api/wallet/{wallet}/keys/generate - generate key") {
-            client.post("/wallet-api/wallet/$wallet/keys/generate") {
-                setBody(request)
-            }.expectSuccess().apply {
-                val generatedKeyId = body<String>()
-                assert(generatedKeyId.isNotEmpty()) { "Empty key id is returned!" }
-                output?.invoke(generatedKeyId)
-            }
+    suspend fun generate(request: KeyGenerationRequest) =
+        client.post("/wallet-api/wallet/$wallet/keys/generate") {
+            setBody(request)
+        }.expectSuccess().run {
+            val generatedKeyId = body<String>()
+            assert(generatedKeyId.isNotEmpty()) { "Empty key id is returned!" }
+
+            generatedKeyId
         }
 
-    suspend fun load(wallet: UUID, keyId: String, expected: KeyGenerationRequest) =
-        test("/wallet-api/wallet/{wallet}/keys/{keyId}/load - load key") {
-            client.get("/wallet-api/wallet/$wallet/keys/$keyId/load").expectSuccess().apply {
-                val response = body<JsonElement>()
-                assertKeyComponents(response, keyId, expected.keyType, true)
-            }
+    suspend fun load(keyId: String, expected: KeyGenerationRequest) =
+        client.get("/wallet-api/wallet/$wallet/keys/$keyId/load").expectSuccess().apply {
+            val response = body<JsonElement>()
+            assertKeyComponents(response, keyId, expected.keyType, true)
         }
 
-    suspend fun meta(wallet: UUID, keyId: String, expected: KeyGenerationRequest) =
-        test("/wallet-api/wallet/{wallet}/keys/{keyId}/meta - key meta") {
-            client.get("/wallet-api/wallet/$wallet/keys/$keyId/meta").expectSuccess().apply {
-                val response = body<JsonElement>()
-                assertNotNull(response.tryGetData("keyId")?.jsonPrimitive?.content) { "Missing _keyId_ component!" }
-                assert(response.tryGetData("keyId")?.jsonPrimitive?.content == keyId) { "Wrong _keyId_ value!" }
-                assertNotNull(response.tryGetData("type")?.jsonPrimitive?.content) { "Missing _type_ component!" }
-                when (expected.backend) {
-                    "jwt" -> assert(response.tryGetData("type")!!.jsonPrimitive.content.endsWith("JwkKeyMeta")) { "Missing _type_ component!" }
-                    "tse" -> TODO()
-                    "oci" -> TODO()
-                    "oci-rest-api" -> TODO()
-                    else -> Unit
-                }
+    suspend fun meta(keyId: String, expected: KeyGenerationRequest) =
+        client.get("/wallet-api/wallet/$wallet/keys/$keyId/meta").expectSuccess().apply {
+            val response = body<JsonElement>()
+            assertNotNull(response.tryGetData("keyId")?.jsonPrimitive?.content) { "Missing _keyId_ component!" }
+            assert(response.tryGetData("keyId")?.jsonPrimitive?.content == keyId) { "Wrong _keyId_ value!" }
+            assertNotNull(response.tryGetData("type")?.jsonPrimitive?.content) { "Missing _type_ component!" }
+            when (expected.backend) {
+                "jwt" -> assert(response.tryGetData("type")!!.jsonPrimitive.content.endsWith("JwkKeyMeta")) { "Missing _type_ component!" }
+                "tse" -> TODO()
+                "oci" -> TODO()
+                "oci-rest-api" -> TODO()
+                else -> Unit
             }
         }
 
     suspend fun export(
-        wallet: UUID, keyId: String, format: String, isPrivate: Boolean, expected: KeyGenerationRequest
-    ) = test("/wallet-api/wallet/{wallet}/keys/{keyId}/export - export key") {
+        keyId: String, format: String, isPrivate: Boolean, expected: KeyGenerationRequest,
+    ) =
         client.get("/wallet-api/wallet/$wallet/keys/$keyId/export") {
             url {
                 parameters.append("format", format)
@@ -71,15 +63,12 @@ class KeysApi(private val client: HttpClient) {
             val response = Json.decodeFromString<JsonElement>(body<String>())
             assertKeyComponents(response, keyId, expected.keyType, isPrivate)
         }
-    }
 
-    suspend fun delete(wallet: UUID, keyId: String) = test("/wallet-api/wallet/{wallet}/keys/{keyId} - delete key") {
+    suspend fun delete(keyId: String) =
         client.delete("/wallet-api/wallet/$wallet/keys/$keyId").expectSuccess()
-    }
 
-    suspend fun import(wallet: UUID, payload: String) = test("/wallet-api/wallet/{wallet}/keys/import - import key") {
+    suspend fun import(payload: String) =
         client.post("/wallet-api/wallet/$wallet/keys/import") {
             setBody(payload)
         }.expectSuccess()
-    }
 }

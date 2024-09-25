@@ -60,40 +60,36 @@ class ExchangeExternalSignatures {
 
     private suspend fun registerAccountAndLogin() {
         authApi.register(accountRequest)
-        authApi.login(
+        val token = authApi.login(
             accountRequest,
-        ) {
-            client = E2ETest.testHttpClient(token = it["token"]!!.jsonPrimitive.content)
-            authApi = AuthApi(client)
-        }
-        authApi.userInfo(HttpStatusCode.OK) {
-            accountId = it.id
-        }
+        )
+        client = testHttpClient(token = token)
+        authApi = AuthApi(client)
+        accountId = authApi.userInfo(HttpStatusCode.OK)!!.id
+        authApi.userInfo(HttpStatusCode.OK)
         authApi.userSession()
-        authApi.userWallets(accountId) {
-            walletId = it.wallets.first().id
-            println("Selected wallet: $walletId")
-        }
+        walletId = authApi.userWallets(accountId).first().id
+        println("Selected wallet: $walletId")
     }
 
     private fun prepareApis() {
-        keysApi = KeysApi(client)
-        didsApi = DidsApi(client)
+        keysApi = KeysApi(client, walletId)
+        didsApi = DidsApi(client, walletId)
         issuerApi = IssuerApi(client)
-        exchangeApi = ExchangeApi(client)
-        credentialsApi = CredentialsApi(client)
+        exchangeApi = ExchangeApi(client, walletId)
+        credentialsApi = CredentialsApi(client, walletId)
     }
 
     private suspend fun cleanWallet() {
         var response = client.get("/wallet-api/wallet/$walletId/keys").expectSuccess()
         val keyList = response.body<List<SingleKeyResponse>>()
         for (key in keyList) {
-            keysApi.delete(walletId, key.keyId.id)
+            keysApi.delete(key.keyId.id)
         }
         response = client.get("/wallet-api/wallet/$walletId/dids").expectSuccess()
         val didList = response.body<List<WalletDid>>()
         for (did in didList) {
-            didsApi.delete(walletId, did.did)
+            didsApi.delete(did.did)
         }
     }
 
@@ -101,17 +97,13 @@ class ExchangeExternalSignatures {
         val response = client.get("/wallet-api/wallet/$walletId/credentials").expectSuccess()
         val credsList = response.body<List<WalletCredential>>()
         credsList.forEach {
-            credentialsApi.delete(
-                walletId,
-                it.id,
-                true,
-            )
+            credentialsApi.delete(it.id, true)
         }
     }
 
     private suspend fun initializeWallet() {
         //import the holder's public key to the wallet API
-        keysApi.import(walletId, holderKey.getPublicKey().exportJWK())
+        keysApi.import(holderKey.getPublicKey().exportJWK())
         //check that it's the only key in the wallet
         var response = client.get("/wallet-api/wallet/$walletId/keys").expectSuccess()
         val keyList = response.body<List<SingleKeyResponse>>()
@@ -119,7 +111,6 @@ class ExchangeExternalSignatures {
         assert(keyList[0].keyId.id == holderKey.getPublicKey().getKeyId()) { "keyId mismatch" }
         //generate a DID
         didsApi.create(
-            walletId,
             DidsApi.DidCreateRequest(
                 method = "jwk",
                 holderKey.getPublicKey().getKeyId(),
@@ -133,7 +124,7 @@ class ExchangeExternalSignatures {
     }
 
     init {
-        client = E2ETest.testHttpClient()
+        client = testHttpClient()
         verifierSessionApi = Verifier.SessionApi(client)
         verifierVerificationApi = Verifier.VerificationApi(client)
         authApi = AuthApi(client)
@@ -257,30 +248,23 @@ class ExchangeExternalSignatures {
         if (issuanceRequests.size == 1) {
             when (firstIssuanceRequest.credentialFormat) {
                 CredentialFormat.mso_mdoc -> {
-                    issuerApi.mdoc(
+                    offerURL = issuerApi.mdoc(
                         firstIssuanceRequest,
-                    ) {
-                        offerURL = it
-                        println("offer: $it")
-                    }
+                    )
+                    println("offer: $offerURL")
                 }
 
                 CredentialFormat.sd_jwt_vc -> {
                     issuerApi.sdjwt(
                         firstIssuanceRequest,
-                    ) {
-                        offerURL = it
-                        println("offer: $it")
-                    }
+                    )
                 }
 
                 else -> {
-                    issuerApi.jwt(
+                    offerURL = issuerApi.jwt(
                         firstIssuanceRequest,
-                    ) {
-                        offerURL = it
-                        println("offer: $it")
-                    }
+                    )
+                    println("offer: $offerURL")
                 }
             }
         } else {
@@ -291,23 +275,18 @@ class ExchangeExternalSignatures {
             )
             when (firstIssuanceRequest.credentialFormat) {
                 CredentialFormat.jwt_vc_json -> {
-                    issuerApi.issueJwtBatch(
+                    offerURL = issuerApi.issueJwtBatch(
                         issuanceRequests,
-                    ) {
-                        offerURL = it
-                        println("offer: $it")
-                    }
+                    )
                 }
 
                 else -> {
-                    issuerApi.issueSdJwtBatch(
+                    offerURL = issuerApi.issueSdJwtBatch(
                         issuanceRequests,
-                    ) {
-                        offerURL = it
-                        println("offer: $it")
-                    }
+                    )
                 }
             }
+            println("offer: $offerURL")
         }
         return offerURL
     }
@@ -356,26 +335,16 @@ class ExchangeExternalSignatures {
         lateinit var matchedCredentialList: List<WalletCredential>
         var response = client.get("/wallet-api/wallet/$walletId/credentials").expectSuccess()
         val walletCredentialList = response.body<List<WalletCredential>>()
-        verifierVerificationApi.verify(presentationRequest) {
-            presentationRequestURL = it
-            assert(presentationRequestURL.contains("presentation_definition_uri="))
-            assert(!presentationRequestURL.contains("presentation_definition="))
-            verificationID = Url(presentationRequestURL).parameters.getOrFail("state")
-        }
-        exchangeApi.resolvePresentationRequest(
-            walletId,
-            presentationRequestURL
-        ) {
-            resolvedPresentationRequestURL = it
-            presentationDefinition = Url(resolvedPresentationRequestURL).parameters.getOrFail("presentation_definition")
-        }
-        exchangeApi.matchCredentialsForPresentationDefinition(
-            walletId,
+        presentationRequestURL = verifierVerificationApi.verify(presentationRequest)
+        assert(presentationRequestURL.contains("presentation_definition_uri="))
+        assert(!presentationRequestURL.contains("presentation_definition="))
+        verificationID = Url(presentationRequestURL).parameters.getOrFail("state")
+        resolvedPresentationRequestURL = exchangeApi.resolvePresentationRequest(presentationRequestURL)
+        presentationDefinition = Url(resolvedPresentationRequestURL).parameters.getOrFail("presentation_definition")
+        matchedCredentialList = exchangeApi.matchCredentialsForPresentationDefinition(
             presentationDefinition,
             walletCredentialList.map { it.id },
-        ) {
-            matchedCredentialList = it
-        }
+        )
         response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/prepare") {
             setBody(
                 PrepareOID4VPRequest(
@@ -404,15 +373,13 @@ class ExchangeExternalSignatures {
                     )
             )
         }.expectSuccess()
-        verifierSessionApi.get(verificationID) {
-            assert(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-            assert(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
-
-            assert(it.verificationResult == true) { "overall verification should be valid" }
-            it.policyResults.let {
-                require(it != null) { "policyResults should be available after running policies" }
-                assert(it.size > 1) { "no policies have run" }
-            }
+        val presentationSession = verifierSessionApi.get(verificationID)
+        assert(presentationSession.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
+        assert(presentationSession.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+        assert(presentationSession.verificationResult == true) { "overall verification should be valid" }
+        presentationSession.policyResults.let {
+            require(it != null) { "policyResults should be available after running policies" }
+            assert(it.size > 1) { "no policies have run" }
         }
     }
 }

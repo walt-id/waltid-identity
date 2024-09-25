@@ -13,12 +13,12 @@ import id.walt.credentials.verification.PolicyManager
 import id.walt.did.helpers.WaltidServices
 import id.walt.issuer.FeatureCatalog
 import id.walt.issuer.issuerModule
-import id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment
 import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.policies.PresentationDefinitionPolicy
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.db.Db
+import id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment
 import id.walt.webwallet.webWalletModule
 import id.walt.webwallet.webWalletSetup
 import io.ktor.server.application.*
@@ -27,7 +27,6 @@ import io.ktor.server.engine.*
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import java.net.URLDecoder
-import java.time.Duration
 
 object E2ETestWebService {
 
@@ -72,7 +71,6 @@ object E2ETestWebService {
             return TestStats(testResults.size, succeeded, failed)
         }
 
-
         ServiceMain(
             ServiceConfiguration("e2e-test"), ServiceInitialization(
                 features = listOf(FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
@@ -92,7 +90,9 @@ object E2ETestWebService {
 
         t.println("\n" + TextColors.magenta("Test results:"))
         testResults.forEachIndexed { index, result ->
-            val name = testNames[index]!!
+            val idx = index + 1
+            val name = testNames[index]
+                ?: t.println("Unknown test for index $idx, last successful was ${testNames[idx - 1]}. Did you maybe embed the tests by accident?")//todo: check for throw
             t.println(TextColors.magenta("$index. $name: ${result.toSuccessString()}"))
         }
 
@@ -114,8 +114,26 @@ object E2ETestWebService {
         TextColors.red("❌ FAILURE$res")
     }
 
-    suspend fun test(name: String, function: suspend () -> Any?) {
-        val id = numTests++
+    suspend fun testGroup(groupName: String, function: suspend () -> Any?) {
+        val startTestId = testResults.size + 1
+
+        t.println("\n${TextColors.brightCyan(TextStyles.bold("---=== Begin test group: $groupName === ---"))}")
+//        val result = runCatching { function.invoke() }
+        function.invoke()
+
+        val endTestId = testResults.size + 1
+
+        val testCount = endTestId - startTestId
+
+        t.println(TextStyles.bold(TextColors.brightCyan("---=== End of test group: $groupName (tests $startTestId - $endTestId) === ---")) + "\n")
+    }
+
+    var testCounter = 0
+
+
+    @Suppress("REDUNDANT_INLINE_SUSPEND_FUNCTION_TYPE")
+    suspend inline fun <reified T> testWithResult(name: String, function: suspend () -> T): T {
+        val id = ++testCounter
         testNames[id] = name
 
         t.println("\n${TextColors.cyan(TextStyles.bold("---=== Start $id. test: $name === ---"))}")
@@ -134,7 +152,21 @@ object E2ETestWebService {
         val failed = testResults.size - overallSuccess
         val failedStr = if (failed == 0) "none failed ✅" else TextColors.red("$failed failed")
         t.println(TextColors.magenta("Current test stats: ${testResults.size} overall | $overallSuccess succeeded | $failedStr\n"))
+
+        val resultValue = result.getOrNull()
+        return resultValue
+            ?: throw IllegalStateException("Cannot return test result for test $id: \"$name\", as the result is expected to be ${T::class.simpleName}, but the test evaluation failed due to ${result.exceptionOrNull()!!::class.simpleName}, and thus has no returned result.")
     }
+
+    suspend fun test(name: String, function: suspend () -> Any?) = testWithResult<Any?>(name, function)
+
+    @Suppress("REDUNDANT_INLINE_SUSPEND_FUNCTION_TYPE")
+    suspend inline infix fun <reified T> String.inlineTestWithResult(function: suspend () -> T): T =
+        testWithResult<T>(this, function)
+
+    suspend infix fun String.inlineTest(function: suspend () -> Any?) =
+        test(this, function)
+
 
     fun loadResource(relativePath: String): String =
         URLDecoder.decode(object {}.javaClass.getResource(relativePath)!!.path, "UTF-8").let { File(it).readText() }
