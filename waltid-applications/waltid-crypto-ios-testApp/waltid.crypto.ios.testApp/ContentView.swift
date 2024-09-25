@@ -10,6 +10,7 @@ import SwiftUI
 import waltid_crypto_ios
 
 struct ContentView: View {
+    let useSecureEnclave = false
     let input: String = """
     {
     "sub": "1234567890",
@@ -53,8 +54,8 @@ struct ContentView: View {
                     }
 
                     do {
-                        _ = try IosKey.companion.create(kid: keyId, type: .secp256r1)
-                        p256Key = try IosKey.companion.load(kid: keyId, type: .secp256r1)
+                        _ = try IosKey.companion.create(options: .init(kid: keyId, keyType: .secp256r1, inSecureElement: useSecureEnclave))
+                        p256Key = try IosKey.companion.load(options: .init(kid: keyId, keyType: .secp256r1, inSecureElement: useSecureEnclave))
                     } catch {
                         print(error)
                     }
@@ -275,8 +276,8 @@ struct ContentView: View {
                     }
 
                     do {
-                        _ = try IosKey.companion.create(kid: keyId, type: .ed25519)
-                        edKey = try IosKey.companion.load(kid: keyId, type: .ed25519)
+                        _ = try IosKey.companion.create(options: .init(kid: keyId, keyType: .ed25519, inSecureElement: false))
+                        edKey = try IosKey.companion.load(options: .init(kid: keyId, keyType: .ed25519, inSecureElement: false))
                     } catch {
                         print(error)
                     }
@@ -497,8 +498,8 @@ struct ContentView: View {
                     }
 
                     do {
-                        _ = try IosKey.companion.create(kid: keyId, type: .rsa)
-                        rsaKey = try IosKey.companion.load(kid: keyId, type: .rsa)
+                        _ = try IosKey.companion.create(options: .init(kid: keyId, keyType: .rsa, inSecureElement: false))
+                        rsaKey = try IosKey.companion.load(options: .init(kid: keyId, keyType: .rsa, inSecureElement: false))
                     } catch {
                         print(error)
                     }

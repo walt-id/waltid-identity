@@ -11,18 +11,18 @@ import kotlinx.serialization.json.jsonObject
 import platform.Security.SecKeyRef
 
 sealed class P256 {
-    sealed class PrivateKey : KeyRepresentation, Signing {
+    sealed class PrivateKey(val kid: String, protected val inSecureEnclave: Boolean) : KeyRepresentation, Signing {
         companion object {
 
-            fun createInKeychain(kid: String): PrivateKey {
+            fun createInKeychain(kid: String, inSecureEnclave: Boolean): PrivateKey {
                 deleteFromKeychain(kid)
-                KeychainOperations.P256.create(kid)
-                return P256KeychainPrivateKey(kid)
+                KeychainOperations.P256.create(kid, inSecureEnclave)
+                return P256KeychainPrivateKey(kid, inSecureEnclave)
             }
 
-            fun loadFromKeychain(kid: String): PrivateKey {
-                KeychainOperations.P256.load(kid)
-                return P256KeychainPrivateKey(kid)
+            fun loadFromKeychain(kid: String, inSecureEnclave: Boolean): PrivateKey {
+                KeychainOperations.P256.load(kid, inSecureEnclave)
+                return P256KeychainPrivateKey(kid, inSecureEnclave)
             }
 
             fun deleteFromKeychain(kid: String) {
@@ -30,7 +30,54 @@ sealed class P256 {
             }
         }
 
-        abstract fun publicKey(): PublicKey
+        fun publicKey(): PublicKey = P256KeychainPublicKey(kid, inSecureEnclave)
+
+        abstract fun <T> loadPrivateSecKey(kid: String, block: (privateSecKey: SecKeyRef?) -> T)
+
+        override fun jwk(): JsonObject {
+            return KeychainOperations.P256.withPrivateKey(kid, inSecureEnclave) { privateKey ->
+                ECKeyUtils.exportJwkWithPrivateKey(privateKey, null)!!
+            }.let { Json.parseToJsonElement(it).jsonObject }
+        }
+
+        override fun thumbprint(): String {
+            return KeychainOperations.P256.withPrivateKey(kid, inSecureEnclave) { privateKey ->
+                ECKeyUtils.thumbprintWithPrivateKey(privateKey, null)!!
+            }
+        }
+
+        override fun pem(): String {
+            return KeychainOperations.P256.withPrivateKey(kid, inSecureEnclave) { privateKey ->
+                KeychainOperations.keyExternalRepresentation(privateKey)
+            }.let { ECKeyUtils.pemWithPrivateKeyRepresentation(it.toNSData()) }
+        }
+
+        override fun kid(): String = kid
+        override fun externalRepresentation(): ByteArray {
+            return KeychainOperations.P256.withPrivateKey(kid(), inSecureEnclave) { privateKey ->
+                KeychainOperations.keyExternalRepresentation(privateKey)
+            }
+        }
+
+        override fun signJws(plainText: ByteArray, headers: Map<String, JsonElement>): String {
+            return KeychainOperations.P256.withPrivateKey(kid, inSecureEnclave) { privateKey ->
+                val result = DS_Operations.signWithBody(
+                    plainText.toNSData(),
+                    "ES256",
+                    privateKey,
+                    headersData = JsonObject(headers).toString().toNSData()
+                )
+
+                check(result.success()) {
+                    result.errorMessage()!!
+                }
+
+                result.data()!!
+            }
+        }
+
+        override fun signRaw(plainText: ByteArray): ByteArray =
+            KeychainOperations.P256.signRaw(kid, plainText)
     }
 
     sealed class PublicKey : KeyRepresentation, Verification {
@@ -67,10 +114,10 @@ sealed class P256 {
                     result.errorMessage()!!
                 }
 
-                result.isValidData()!!.toByteArray().let {
-                    Json.parseToJsonElement(it.decodeToString())
-                }.let {
-                    Result.success(it.jsonObject)
+                result.isValidData()!!.toByteArray().let { resultByteArray ->
+                    Json.parseToJsonElement(resultByteArray.decodeToString())
+                }.let { resultByteArray ->
+                    Result.success(resultByteArray.jsonObject)
                 }
             }
         }
@@ -112,61 +159,25 @@ internal class P256JwkPublicKey(private val jwk: String) : P256.PublicKey() {
     }
 }
 
-internal class P256KeychainPublicKey(private val kid: String) : P256.PublicKey() {
-    override fun jwk(): JsonObject = KeychainOperations.P256.withPublicKey(kid) { privateKey ->
-        ECKeyUtils.exportJwkWithPublicKey(privateKey, null)!!
+internal class P256KeychainPublicKey(private val kid: String, private val inSecureEnclave: Boolean) : P256.PublicKey() {
+    override fun jwk(): JsonObject = KeychainOperations.P256.withPublicKey(kid, inSecureEnclave) { publicKey ->
+        ECKeyUtils.exportJwkWithPublicKey(publicKey, null)!!
     }.let { Json.parseToJsonElement(it).jsonObject }
 
     override fun <T> publicSecKey(block: (SecKeyRef?) -> T): T =
-        KeychainOperations.P256.withPublicKey(kid) {
+        KeychainOperations.P256.withPublicKey(kid, inSecureEnclave) {
             block(it)
         }
 
     override fun kid(): String = kid
 }
 
-internal class P256KeychainPrivateKey(private val kid: String) : P256.PrivateKey() {
-    override fun publicKey(): P256.PublicKey = P256KeychainPublicKey(kid)
 
-    override fun jwk(): JsonObject {
-        return KeychainOperations.P256.withPrivateKey(kid) { privateKey ->
-            ECKeyUtils.exportJwkWithPrivateKey(privateKey, null)!!
-        }.let { Json.parseToJsonElement(it).jsonObject }
-    }
 
-    override fun thumbprint(): String {
-        return KeychainOperations.P256.withPrivateKey(kid) { privateKey ->
-            ECKeyUtils.thumbprintWithPrivateKey(privateKey, null)!!
+internal class P256KeychainPrivateKey(kid: String, inSecureEnclave: Boolean) : P256.PrivateKey(kid, inSecureEnclave) {
+    override fun <T> loadPrivateSecKey(kid: String, block: (privateSecKey: SecKeyRef?) -> T) {
+        KeychainOperations.P256.withPrivateKey(kid, inSecureEnclave) { key ->
+            block(key)
         }
     }
-
-    override fun pem(): String {
-        return KeychainOperations.P256.withPrivateKey(kid) { privateKey ->
-            KeychainOperations.keyExternalRepresentation(privateKey)
-        }.let { ECKeyUtils.pemWithPrivateKeyRepresentation(it.toNSData()) }
-    }
-
-    override fun kid(): String = kid
-    override fun externalRepresentation(): ByteArray {
-        return KeychainOperations.P256.withPrivateKey(kid()) { privateKey ->
-            KeychainOperations.keyExternalRepresentation(privateKey)
-        }
-    }
-
-    override fun signJws(plainText: ByteArray, headers: Map<String, JsonElement>): String {
-        return KeychainOperations.P256.withPrivateKey(kid) { privateKey ->
-            val result = DS_Operations.signWithBody(
-                plainText.toNSData(), "ES256", privateKey, headersData = JsonObject(headers).toString().toNSData()
-            )
-
-            check(result.success()) {
-                result.errorMessage()!!
-            }
-
-            result.data()!!
-        }
-    }
-
-    override fun signRaw(plainText: ByteArray): ByteArray =
-        KeychainOperations.P256.signRaw(kid, plainText)
 }
