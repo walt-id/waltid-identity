@@ -13,7 +13,10 @@ import io.ktor.server.cio.*
 import io.ktor.server.engine.*
 
 fun main() {
+    startExample()
+}
 
+fun startExample(wait: Boolean = true) {
     loggingConfiguration(true) {
         sink("stdout", RENDER_ANSI, STDOUT)
         sink("stderr", RENDER_ANSI, STDERR)
@@ -42,7 +45,7 @@ fun main() {
     }
 
     embeddedServer(CIO, port = 8088, host = "0.0.0.0", module = Application::module)
-        .start(wait = true)
+        .start(wait = wait)
 }
 
 fun Application.module() {
