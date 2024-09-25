@@ -1,5 +1,9 @@
 package id.walt.did.dids.document.models.service
 
+import id.walt.commons.exceptions.EmptyServiceEndpointException
+import id.walt.commons.exceptions.InvalidServiceIdException
+import id.walt.commons.exceptions.InvalidServiceTypeException
+import id.walt.commons.exceptions.ReservedKeyOverrideException
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.SetSerializer
@@ -65,14 +69,14 @@ data class ServiceMap(
 ) {
 
     init {
-        require(id.isNotBlank()) { "Service property id cannot be blank" }
+        require(id.isNotBlank()) { throw InvalidServiceIdException("Service property id cannot be blank") }
         type.forEach {
-            require(it.isNotBlank()) { "Service type strings cannot be blank" }
+            require(it.isNotBlank()) { throw InvalidServiceTypeException("Service type strings cannot be blank") }
         }
-        require(serviceEndpoint.isNotEmpty()) { "Service endpoint set cannot be empty" }
+        require(serviceEndpoint.isNotEmpty()) { throw EmptyServiceEndpointException("Service endpoint set cannot be empty") }
         customProperties?.forEach {
             require(!reservedKeys.contains(it.key)) {
-                "Invalid attempt to override reserved Service property with key ${it.key} via customProperties map"
+                throw ReservedKeyOverrideException("Invalid attempt to override reserved Service property with key ${it.key} via customProperties map")
             }
         }
     }
