@@ -940,7 +940,7 @@ class CI_JVM_Test {
             } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
         }
 
-        val presentationDefinition = PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes, vpProfile)
+        val presentationDefinition = PresentationDefinition.defaultGenerationFromVcTypesForProfile(requestedTypes, vpProfile)
 
         // Issuer Client creates state and nonce for the vp_token authorization request
         authReqIssuerState = "secured_state_issuer_vptoken"

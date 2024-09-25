@@ -1,10 +1,7 @@
 package id.walt.oid4vc.data.dif
 
-import id.walt.oid4vc.data.JsonDataObject
-import id.walt.oid4vc.data.JsonDataObjectFactory
-import id.walt.oid4vc.data.JsonDataObjectSerializer
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.util.ShortIdUtils
-import id.walt.oid4vc.data.OpenId4VPProfile
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -40,12 +37,22 @@ data class PresentationDefinition(
         override fun fromJSON(jsonObject: JsonObject) =
             Json.decodeFromJsonElement(PresentationDefinitionSerializer, jsonObject)
 
-        fun primitiveGenerationFromVcTypes(types: List<String>, openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT): PresentationDefinition {
+        fun defaultGenerationFromVcTypesForProfile(types: List<String>, openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT): PresentationDefinition {
             return PresentationDefinition(inputDescriptors = types.map { type ->
                 when(openId4VPProfile) {
                     OpenId4VPProfile.HAIP -> generateDefaultSDJwtVCInputDescriptor(type)
                     OpenId4VPProfile.ISO_18013_7_MDOC -> generateDefaultMDOCInputDescriptor(type)
                     OpenId4VPProfile.EBSIV3 -> generateDefaultEBSIV3InputDescriptor(type)
+                    else -> generateDefaultW3CInputDescriptor(type)
+                }
+            })
+        }
+
+        fun defaultGenerationFromVcTypesForCredentialFormat(types: List<String>, format: CredentialFormat): PresentationDefinition {
+            return PresentationDefinition(inputDescriptors = types.map { type ->
+                when(format) {
+                    CredentialFormat.sd_jwt_vc -> generateDefaultSDJwtVCInputDescriptor(type)
+                    CredentialFormat.mso_mdoc -> generateDefaultMDOCInputDescriptor(type)
                     else -> generateDefaultW3CInputDescriptor(type)
                 }
             })
