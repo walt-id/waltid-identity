@@ -12,6 +12,7 @@ COPY waltid-libraries/credentials/waltid-mdoc-credentials/build.gradle.kts /work
 COPY waltid-libraries/credentials/waltid-verifiable-credentials//build.gradle.kts /work/waltid-libraries/credentials/waltid-verifiable-credentials/
 COPY waltid-libraries/auth/waltid-ktor-authnz/build.gradle.kts /work/waltid-libraries/auth/waltid-ktor-authnz/
 COPY waltid-libraries/auth/waltid-permissions/build.gradle.kts /work/waltid-libraries/auth/waltid-permissions/
+COPY waltid-libraries/waltid-library-commons/build.gradle.kts /work/waltid-libraries/waltid-library-commons/
 
 COPY waltid-services/waltid-service-commons/build.gradle.kts /work/waltid-services/waltid-service-commons/
 COPY waltid-services/waltid-wallet-api/build.gradle.kts /work/waltid-services/waltid-wallet-api/
@@ -28,6 +29,7 @@ COPY waltid-libraries/credentials/waltid-mdoc-credentials/. /work/waltid-librari
 COPY waltid-libraries/credentials/waltid-verifiable-credentials/. /work/waltid-libraries/credentials/waltid-verifiable-credentials
 COPY waltid-libraries/auth/waltid-ktor-authnz/. /work/waltid-libraries/auth/waltid-ktor-authnz
 COPY waltid-libraries/auth/waltid-permissions/. /work/waltid-libraries/auth/waltid-permissions
+COPY waltid-libraries/waltid-library-commons/. /work/waltid-libraries/waltid-library-commons
 
 COPY waltid-services/waltid-service-commons/. /work/waltid-services/waltid-service-commons
 COPY waltid-services/waltid-wallet-api/src/ /work/waltid-services/waltid-wallet-api/src
