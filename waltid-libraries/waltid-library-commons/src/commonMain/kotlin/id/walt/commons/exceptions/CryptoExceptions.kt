@@ -32,8 +32,8 @@ object TSEError {
     class MissingAuthTokenException :
         CryptoException(HttpStatusCode.InternalServerError, "Did not receive token after login!")
 
-    class MissingKeyNameException : CryptoException(HttpStatusCode.BadRequest, "Key name is missing in the request!")
-    class MissingKeyDataException : CryptoException(HttpStatusCode.BadRequest, "Key data is missing in the request!")
+    class MissingKeyNameException : CryptoException(HttpStatusCode.BadRequest, "Key name is missing from the request!")
+    class MissingKeyDataException : CryptoException(HttpStatusCode.BadRequest, "Key data is missing from the request!")
     object InvalidAuthenticationMethod {
         abstract class BaseAuthenticationMethodException(reason: String) : CryptoException(
             HttpStatusCode.BadRequest,
