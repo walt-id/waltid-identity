@@ -6,6 +6,7 @@ import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.errors.*
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -252,12 +253,14 @@ object OidcApi : CIProvider() {
                     } else {
                         val vpToken = params["vp_token"]?.get(0)!!
                         val presSub = params["presentation_submission"]?.get(0)!!
+                        val presentationFormat = PresentationSubmission.fromJSONString(presSub).descriptorMap.firstOrNull()?.format ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
 
                         // Verify and Parse VP Token
                         val policies = Json.parseToJsonElement("""["signature", "expired", "not-before"]""").jsonArray.parsePolicyRequests()
 
                         Verifier.verifyPresentation(
-                            vpTokenJwt = vpToken,
+                            presentationFormat,
+                            vpToken = vpToken,
                             vpPolicies = policies,
                             globalVcPolicies = policies,
                             specificCredentialPolicies = emptyMap(),
