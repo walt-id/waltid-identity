@@ -16,6 +16,7 @@ object Versions {
 }
 
 dependencies {
+    api(project(":waltid-libraries:waltid-library-commons"))
     // Ktor
     api("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
     api("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
