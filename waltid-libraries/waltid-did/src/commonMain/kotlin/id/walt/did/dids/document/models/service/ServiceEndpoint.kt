@@ -1,5 +1,6 @@
 package id.walt.did.dids.document.models.service
 
+import id.walt.commons.exceptions.EmptyServiceEndpointException
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.*
 import kotlinx.serialization.encoding.Decoder
@@ -39,7 +40,9 @@ object ServiceEndpointBaseSerializer : JsonContentPolymorphicSerializer<ServiceE
 data class ServiceEndpointURL(val url: String) : ServiceEndpoint() {
 
     init {
-        require( url.isNotBlank() ) { "Service endpoint URL cannot be blank." }
+        require(url.isNotBlank()) {
+            throw EmptyServiceEndpointException("Service endpoint set cannot be empty")
+        }
     }
 }
 
