@@ -135,7 +135,15 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
             trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT),
             selectiveDisclosure = SDMap(mapOf(
                 "birthdate" to SDField(sd = true)
-            ))
+            )),
+            mapping = Json.parseToJsonElement("""
+              {
+                "id":"<uuid>",
+                "iat": "<timestamp-seconds>",
+                "nbf": "<timestamp-seconds>",
+                "exp": "<timestamp-in-seconds:365d>"
+              }
+            """.trimIndent()).jsonObject
         )
     )
 
