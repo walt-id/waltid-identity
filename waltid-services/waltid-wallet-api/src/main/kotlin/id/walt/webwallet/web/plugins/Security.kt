@@ -1,7 +1,6 @@
 package id.walt.webwallet.web.plugins
 
 import id.walt.commons.config.ConfigManager
-//import id.walt.authkit.auth.authKit
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.webwallet.FeatureCatalog
@@ -77,7 +76,7 @@ val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
     AuthenticationServiceModule.AuthenticationServiceConfig.apply {
         customAuthentication = {
 
-            // authKit("authkit") {  }
+            // ktorAuthnz("ktor-authnz") {  }
 
             oauth("auth-oauth") {
                 client = HttpClient()
