@@ -7,7 +7,6 @@ import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.errors.AuthorizationError
@@ -15,9 +14,6 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.sdjwt.KeyBindingJwt.Companion.getSdHash
-import id.walt.sdjwt.SDJwt
-import id.walt.sdjwt.SDJwtVC
-import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import id.walt.webwallet.service.SSIKit2WalletService.Companion.getCredentialWallet
 import id.walt.webwallet.service.SSIKit2WalletService.PresentationError
 import id.walt.webwallet.service.WalletServiceManager
@@ -28,7 +24,6 @@ import id.walt.webwallet.service.events.EventDataNotAvailable
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures
 import id.walt.webwallet.service.exchange.ProofOfPossessionParameters
-import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.oidc4vc.CredentialFilterUtils
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.web.controllers.auth.getWalletService
@@ -143,27 +138,36 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             //sd_jwt_vc
             val sdJwtVcsPresented = matchedCredentials.filter { it.format == CredentialFormat.sd_jwt_vc }.map {
                 // TODO: adopt selective disclosure selection (doesn't work with jwts other than sd_jwt anyway, like above)
-                val documentWithDisclosures = if (req.disclosures?.containsKey(it.id) == true) {
-                    it.document + "~${req.disclosures[it.id]!!.joinToString("~")}"
-                } else {
-                    it.document
-                }
-                val sdjwtvc = SDJwtVC.parse(documentWithDisclosures)
-                val katiSdJwt = sdjwtvc.present(true).toString()
+//                val documentWithDisclosures = if (req.disclosures?.containsKey(it.id) == true) {
+//                    it.document + "~${req.disclosures[it.id]!!.joinToString("~")}"
+//                } else {
+//                    it.document
+//                }
+//                val sdJwtString = if (req.disclosures?.containsKey(it.id) == true) {
+//                    it.document + "~${req.disclosures[it.id]!!.joinToString("~")}"
+//                } else {
+//                    "${it.document}"
+//                }
+                //auto douleuei otan pernoume xima OLA TA DISCLOSURES APO MONOI MAS
+//                val credentialOla = it.document + (if (it.disclosures != null) "~${it.disclosures}~" else "~")
+                ////
+                val credentialOla = it.document + (if (req.disclosures?.containsKey(it.id) == true) "~${req.disclosures[it.id]!!.joinToString("~")}~" else "~")
+//                val sdjwtvc = SDJwtVC.parse(documentWithDisclosures)
+//                val katiSdJwt = sdjwtvc.present(true).toString()
                 val payload = buildJsonObject {
                     put("iat", JsonPrimitive(Clock.System.now().epochSeconds))
                     put("aud", resolvedAuthReq.clientId)
                     put("nonce", resolvedAuthReq.nonce ?: "")
-                    put("sd_hash", getSdHash(katiSdJwt))
+                    put("sd_hash", getSdHash(credentialOla))
                 }
-                val headers = mapOf(
+                val header = mapOf(
                     "kid" to authKeyId.toJsonElement(),
-                    "typ" to "JWT".toJsonElement()
+                    "typ" to "kb+jwt".toJsonElement()
                 )
                 TokenParams(
-                    it.id,
-                    headers,
-                    payload,
+                    credentialId = it.id,
+                    header = header,
+                    payload = payload,
                 )
 
 
@@ -186,7 +190,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 )
                 val vpHeader = mapOf(
                     "kid" to authKeyId.toJsonElement(),
-                    "typ" to "kb+jwt".toJsonElement()
+                    "typ" to "JWT".toJsonElement()
                 )
                 val vpTokenParams = TokenParams(
                     header = vpHeader,
@@ -231,6 +235,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 resolvedAuthReq,
                 presentationSubmission,
                 req.selectedCredentialIdList,
+                req.disclosures,
                 tokenParamsList,
             )
             logger.debug { "Response payload: $responsePayload" }
@@ -263,19 +268,22 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     "No response_uri or redirect_uri found on authorization request"
                 )
             logger.debug { "Authorization response URL: $authResponseURL" }
-
             val presentationSubmission = req.presentationSubmission
             val presentedCredentialIdList = req.presentedCredentialIdList
-
             val katiTransformed = req.signedTokens.map { signedToken ->
-                if(signedToken.credentialId != null) {
+                if (signedToken.credentialId != null) {
                     val credential = walletService.getCredential(signedToken.credentialId)
                     if (credential.format == CredentialFormat.sd_jwt_vc) {
-                        credential.document + credential.disclosures?.let {
-                            "~${credential.disclosures}"
-                        } + "~${signedToken.signedToken}"
+                        //auto douleuei otan pernoume xima OLA TA DISCLOSURES APO MONOI MAS
+//                        credential.document +
+//                                (if (credential.disclosures != null) "~${credential.disclosures}~" else "~") +
+//                                signedToken.signedToken
+                        //
+                        credential.document +
+                                (if (req.disclosures?.containsKey(credential.id) == true) "~${req.disclosures[credential.id]!!.joinToString("~")}~" else "~") +
+                                signedToken.signedToken
                     } else {
-                        credential.document + "~${signedToken.signedToken}"
+                        signedToken.signedToken
                     }
                 } else {
                     signedToken.signedToken
@@ -301,7 +309,8 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     state = authReq.state,
                 )
             }
-
+            println("kati: $katiTransformed")
+            println("token response: $tokenResponse")
             val formParams =
                 if (authReq.responseMode == ResponseMode.direct_post_jwt) {
                     val encKey =
@@ -625,6 +634,7 @@ data class PrepareOID4VPResponse(
     val resolvedAuthReq: AuthorizationRequest,
     val presentationSubmission: PresentationSubmission,
     val presentedCredentialIdList: List<String>,
+    val disclosures: Map<String, List<String>>? = null,
     val tokenParams: List<TokenParams>,
 //    val vpTokenParams: UnsignedVPTokenParameters,
 )
@@ -643,6 +653,7 @@ data class SubmitOID4VPRequest(
     val resolvedAuthReq: AuthorizationRequest,
     val presentationSubmission: PresentationSubmission,
     val presentedCredentialIdList: List<String>,
+    val disclosures: Map<String, List<String>>? = null,
 )
 
 @Serializable
