@@ -1,11 +1,16 @@
 package id.walt.crypto.keys.tse
 
+import id.walt.commons.exceptions.KeyNotFoundException
+import id.walt.commons.exceptions.KeyTypeNotSupportedException
+import id.walt.commons.exceptions.MissingSignatureException
+import id.walt.commons.exceptions.TSEError
+import id.walt.commons.exceptions.VerificationException
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.TseKeyMeta
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.jwsAlg
@@ -53,7 +58,9 @@ class TSEKey(
 
     @Suppress("DEPRECATION")
     @Transient
-    private val effectiveAuth: TSEAuth = auth ?: TSEAuth(accessKey = accessKey ?: throw IllegalArgumentException("Either auth or accessKey must be provided"))
+    private val effectiveAuth: TSEAuth = auth ?: TSEAuth(
+        accessKey = accessKey ?: throw IllegalArgumentException("Either auth or accessKey must be provided")
+    )
 
     @OptIn(DelicateCoroutinesApi::class)
     private inline fun <T> lazySuspended(
@@ -64,7 +71,11 @@ class TSEKey(
     }
 
 
-    private suspend fun httpRequest(method: HttpMethod = HttpMethod.Get, url: String = "keys/$id", body: Any? = null): HttpResponse {
+    private suspend fun httpRequest(
+        method: HttpMethod = HttpMethod.Get,
+        url: String = "keys/$id",
+        body: Any? = null
+    ): HttpResponse {
         return http.request {
             this.url("$server/$url")
             this.method = method
@@ -108,11 +119,11 @@ class TSEKey(
     private suspend fun retrievePublicKey(): ByteArray {
         logger.debug { "Retrieving public key: ${this.id}" }
         val keyData = httpRequest(HttpMethod.Get, "keys/$id")
-            .tseJsonDataBody().jsonObject["keys"]?.jsonObject ?: throwTSEError("No keys in data response")
+            .tseJsonDataBody().jsonObject["keys"]?.jsonObject ?: throw KeyNotFoundException(id)
 
         // TO\\DO: try this
         val keyStr = keyData["1"]?.jsonObject?.get("public_key")?.jsonPrimitive?.content
-            ?: throwTSEError("No data/keys/1/publicKey returned: $keyData")
+            ?: throw KeyNotFoundException("$keyData")
 
         logger.debug { "Key string is: $keyStr" }
 
@@ -168,9 +179,10 @@ class TSEKey(
     override suspend fun signRaw(plaintext: ByteArray): Any {
         val body = mapOf("input" to plaintext.encodeBase64())
         val signatureBase64 = httpRequest(HttpMethod.Post, "sign/$id", body)
-            .tseJsonDataBody().jsonObject["signature"]?.jsonPrimitive?.content?.removePrefix("vault:v1:") ?: throwTSEError(
-            "No signature in data response"
-        )
+            .tseJsonDataBody().jsonObject["signature"]?.jsonPrimitive?.content?.removePrefix("vault:v1:")
+            ?: throw MissingSignatureException(
+                "No signature returned from TSE server"
+            )
 
         return signatureBase64
     }
@@ -200,17 +212,6 @@ class TSEKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
-        /*val localPublicKey = when (keyType) {
-            KeyType.Ed25519 -> JWKKey.importRawPublicKey(
-                type = keyType,
-                rawPublicKey = getBackingPublicKey(),
-                metadata = JWKKeyMetadata() // todo: explicit `keySize`
-            )
-
-            KeyType.RSA, KeyType.secp256r1 -> JWKKey.importPEM(getEncodedPublicKey()).getOrThrow()
-            KeyType.secp256k1 -> throw IllegalArgumentException("Type not supported for TSE: $keyType")
-        }*/
-
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
         val body = mapOf(
@@ -218,10 +219,12 @@ class TSEKey(
         )
         val valid = httpRequest(HttpMethod.Post, "verify/$id", body)
             .tseJsonDataBody().jsonObject["valid"]?.jsonPrimitive?.boolean
-            ?: throwTSEError("No (verification) valid response in data response")
+            ?: throw MissingSignatureException(
+                "No signature returned from TSE server"
+            )
 
         return if (valid) Result.success(detachedPlaintext)
-        else Result.failure(IllegalArgumentException("Signature failed"))
+        else Result.failure(VerificationException("Signature verification failed"))
     }
 
     @JvmBlocking
@@ -258,7 +261,7 @@ class TSEKey(
         lazyOf(
             httpRequest()
                 .tseJsonDataBody().jsonObject["keys"]?.jsonObject?.get("1")?.jsonObject?.get("public_key")?.jsonPrimitive?.content
-                ?: throwTSEError("No keys/1/public_key in data response")
+                ?: throw KeyNotFoundException("No keys/1/public_key in data response")
         ).value
 
     @JvmBlocking
@@ -305,16 +308,17 @@ class TSEKey(
             KeyType.Ed25519 -> "ed25519"
             KeyType.secp256r1 -> "ecdsa-p256"
             KeyType.RSA -> "rsa-2048"
-            KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")
+            KeyType.secp256k1 -> throw KeyTypeNotSupportedException(type.name)
         }
 
         private fun tseKeyToKeyTypeMapping(type: String) = when (type) {
             "ed25519" -> KeyType.Ed25519
             "ecdsa-p256" -> KeyType.secp256r1
             "rsa-2048" -> KeyType.RSA
-            else -> throw IllegalArgumentException("Not supported: $type")
+            else -> throw KeyTypeNotSupportedException(type)
         }
 
+        @OptIn(InternalAPI::class)
         @JvmBlocking
         @JvmAsync
         @JsPromise
@@ -322,7 +326,7 @@ class TSEKey(
         suspend fun HttpResponse.tseJsonDataBody(): JsonObject {
             val baseMsg = { "TSE server (URL: ${this.request.url}) returned invalid response: " }
 
-            if (!status.isSuccess()) throw RuntimeException(baseMsg.invoke() + "non-success status: $status")
+            // if (!status.isSuccess()) throw RuntimeException(baseMsg.invoke() + "non-success status: $status")
 
             return runCatching { this.body<JsonObject>() }.getOrElse {
                 val bodyStr = this.bodyAsText()
@@ -348,10 +352,11 @@ class TSEKey(
             fun throwTSEError(msg: String): Nothing =
                 throw RuntimeException("Invalid TSE server (${metadata.server}) response: $msg")
 
-            val keyName = keyData["name"]?.jsonPrimitive?.content ?: throwTSEError("no key name in key data: $keyData")
+            val keyName = keyData["name"]?.jsonPrimitive?.content
+                ?: throw TSEError.MissingKeyNameException()
 
             val publicKey = (keyData["keys"]
-                ?: throwTSEError("no keys array in key data: $keyData")).jsonObject["1"]!!.jsonObject["public_key"]!!.jsonPrimitive.content.decodeBase64Bytes()
+                ?: throw TSEError.MissingKeyDataException()).jsonObject["1"]!!.jsonObject["public_key"]!!.jsonPrimitive.content.decodeBase64Bytes()
 
             return TSEKey(
                 server = metadata.server,
