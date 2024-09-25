@@ -416,7 +416,7 @@ class TestCredentialWallet(
         )
     }
 
-    private fun buildDescriptorMappingMDoc(
+    fun buildDescriptorMappingMDoc(
         presentationDefinition: PresentationDefinition?,
         index: Int,
         mdoc: String,
@@ -437,7 +437,7 @@ class TestCredentialWallet(
         )
     }
 
-    private fun buildDescriptorMappingSDJwtVC(
+    fun buildDescriptorMappingSDJwtVC(
         presentationDefinition: PresentationDefinition?,
         index: Int,
         vcJwsStr: String,
