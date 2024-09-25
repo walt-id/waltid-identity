@@ -16,7 +16,7 @@ plugins {
     id("love.forte.plugin.suspend-transform") version "2.0.20-0.9.2"
 }
 
-group = "id.walt"
+group = "id.walt.library-commons"
 
 repositories {
     mavenCentral()
