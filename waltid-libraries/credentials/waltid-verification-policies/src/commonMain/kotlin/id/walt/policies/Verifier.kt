@@ -1,5 +1,6 @@
 package id.walt.policies
 
+import id.walt.credentials.utils.VCFormat
 import id.walt.policies.models.PolicyRequest
 import id.walt.policies.models.PolicyResult
 import id.walt.policies.models.PresentationResultEntry
@@ -128,13 +129,14 @@ object Verifier {
     @JsPromise
     @JsExport.Ignore
     suspend fun verifyPresentation(
-        vpTokenJwt: String,
+        format: VCFormat,
+        vpToken: String,
         vpPolicies: List<PolicyRequest>,
         globalVcPolicies: List<PolicyRequest>,
         specificCredentialPolicies: Map<String, List<PolicyRequest>>,
         presentationContext: Map<String, Any> = emptyMap(),
     ): PresentationVerificationResponse {
-        val providedJws = vpTokenJwt.decodeJws() // usually VP
+        val providedJws = vpToken.decodeJws() // usually VP
         val payload = providedJws.payload
         val vpType = when (payload.contains("vp")) {
             true -> payload.getW3CType()
@@ -177,13 +179,13 @@ object Verifier {
                 when (payload.contains("vp")) {
                     true -> {
                         val vpIdx = addResultEntryFor(vpType)
-                        runPolicyRequests(vpIdx, vpTokenJwt, vpPolicies)
+                        runPolicyRequests(vpIdx, vpToken, vpPolicies)
                     }
 
                     else -> {
                         val vpIdx = 0
-                        results.add(PresentationResultEntry(vpTokenJwt))
-                        runPolicyRequests(vpIdx, vpTokenJwt, vpPolicies)
+                        results.add(PresentationResultEntry(vpToken))
+                        runPolicyRequests(vpIdx, vpToken, vpPolicies)
                     }
                 }
 

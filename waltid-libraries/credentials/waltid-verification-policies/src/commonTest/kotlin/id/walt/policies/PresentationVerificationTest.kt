@@ -1,5 +1,6 @@
 package id.walt.policies
 
+import id.walt.credentials.utils.VCFormat
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
@@ -72,7 +73,8 @@ class PresentationVerificationTest {
         println("SP Policies: $specificPolicies")
 
         val r = Verifier.verifyPresentation(
-            vpTokenJwt = vpToken, vpPolicies = vpPolicies, globalVcPolicies = vcPolicies, specificCredentialPolicies = specificPolicies, mapOf(
+          VCFormat.jwt_vp_json,
+            vpToken = vpToken, vpPolicies = vpPolicies, globalVcPolicies = vcPolicies, specificCredentialPolicies = specificPolicies, mapOf(
                 "presentationSubmission" to JsonObject(emptyMap()), "challenge" to "abc"
             )
         )

@@ -266,8 +266,10 @@ class VPVerifyCmd : CliktCommand(
     private fun verify(params: VpVerifyParameters): PresentationVerificationResponse {
         try {
             return runBlocking {
+                val presentationFormat = params.presentationSubmission.descriptorMap.firstOrNull()?.format ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
                 Verifier.verifyPresentation(
-                    vpTokenJwt = params.vp,
+                    presentationFormat,
+                    vpToken = params.vp,
                     vpPolicies = params.vpPolicyRequests,
                     globalVcPolicies = params.globalVcPolicyRequests,
                     specificCredentialPolicies = emptyMap(),

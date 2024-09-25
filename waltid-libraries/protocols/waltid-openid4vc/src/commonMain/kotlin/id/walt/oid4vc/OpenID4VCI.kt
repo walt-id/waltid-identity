@@ -1,5 +1,6 @@
 package id.walt.oid4vc
 
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.Key
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.ResponseType.Companion.getResponseTypeString
@@ -248,8 +249,10 @@ object OpenID4VCI {
         // 4. Verify VP or ID Token
         val policies =
             Json.parseToJsonElement("""["signature", "expired", "not-before"]""").jsonArray.parsePolicyRequests()
+        val presentationFormat = presentationSubmission?.descriptorMap?.firstOrNull()?.format ?: VCFormat.jwt
         Verifier.verifyPresentation(
-            vpTokenJwt = token,
+            presentationFormat,
+            vpToken = token,
             vpPolicies = policies,
             globalVcPolicies = policies,
             specificCredentialPolicies = emptyMap(),

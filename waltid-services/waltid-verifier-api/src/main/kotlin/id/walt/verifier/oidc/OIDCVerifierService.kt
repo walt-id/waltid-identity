@@ -8,6 +8,7 @@ import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.persistence.ConfiguredPersistence
+import id.walt.credentials.utils.VCFormat
 import id.walt.policies.VerificationPolicy
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest
@@ -172,9 +173,11 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         }
 
         if (tokenResponse.vpToken is JsonObject) TODO("Token response is jsonobject - not yet handled")
+        val presentationFormat = tokenResponse.presentationSubmission?.descriptorMap?.firstOrNull()?.format ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
 
         logger.debug { "VP token: $vpToken" }
         logger.info { "OpenID4VP profile: ${session.openId4VPProfile}" }
+        logger.info { "Presentation format: $presentationFormat" }
 
         return when (session.openId4VPProfile) {
             OpenId4VPProfile.ISO_18013_7_MDOC -> verifyMdoc(tokenResponse, session)
@@ -198,7 +201,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
             } else {
                 val results = runBlocking {
                     Verifier.verifyPresentation(
-                        vpTokenJwt = vpToken,
+                        presentationFormat,
+                        vpToken = vpToken,
                         vpPolicies = policies.vpPolicies,
                         globalVcPolicies = policies.vcPolicies,
                         specificCredentialPolicies = policies.specificPolicies,
