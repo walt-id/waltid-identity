@@ -9,7 +9,9 @@ import kotlinx.serialization.Serializable
 data class Permission(val target: PermissionedResourceTarget, val action: String, val operation: PermissionOperation) {
 
     @Serializable
-    data class MinimalPermission(val target: String, val action: String)
+    data class MinimalPermission(val target: String, val action: String) {
+        override fun toString() = "[$action on $target]"
+    }
 
     override fun toString(): String {
         return "$target${operation.symbol}$action"
@@ -25,7 +27,6 @@ data class Permission(val target: PermissionedResourceTarget, val action: String
             // val permissions = permissionStrings.splitToSequence(",")
             val permissions = permissionStrings.splitIntoFlow(",")
                 .map { permissionString ->
-                    println("Parsed permission ${permissionString[0]}${permissionString.drop(1)} from $string")
                     Permission(target, permissionString.drop(1), PermissionOperation.from(permissionString[0]))
                 }
 

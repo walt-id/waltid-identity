@@ -146,8 +146,13 @@ class PermissionTrie(
                 matching.add(MinimalPermission(currentPath, it))
             }
 
-            currentNode = currentNode.children[it] ?: currentNode.children["*"] ?: return matching
-            currentPath += ".$it"
+            val selector = when {
+                currentNode.children[it] != null -> it
+                currentNode.children["*"] != null -> "*"
+                else -> return matching
+            }
+            currentNode = currentNode.children[selector]!!
+            currentPath += ".$selector"
         }
         currentNode.getAllMatchingActionPermission(permission).forEach {
             matching.add(MinimalPermission(currentPath, it))
