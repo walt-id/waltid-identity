@@ -53,6 +53,7 @@ val modules = listOf(
 
     "$libraries:waltid-did",
     "$libraries:waltid-java-compat",
+    "$libraries:waltid-library-commons",
 
     // Service commons
     "$services:waltid-service-commons",
