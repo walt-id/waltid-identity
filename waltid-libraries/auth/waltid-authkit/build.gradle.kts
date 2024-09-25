@@ -83,6 +83,8 @@ dependencies {
     implementation("io.klogging:slf4j-klogging:0.7.2")
 
     /* --- Testing --- */
+    testImplementation("io.ktor:ktor-client-logging")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 
     // Ktor
     testImplementation("io.ktor:ktor-server-cio-jvm")
