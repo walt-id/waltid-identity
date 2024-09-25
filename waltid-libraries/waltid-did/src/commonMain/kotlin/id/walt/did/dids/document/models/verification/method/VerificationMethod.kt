@@ -1,5 +1,8 @@
 package id.walt.did.dids.document.models.verification.method
 
+import id.walt.commons.exceptions.InvalidServiceControllerException
+import id.walt.commons.exceptions.InvalidServiceIdException
+import id.walt.commons.exceptions.ReservedKeyOverrideException
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -39,11 +42,14 @@ data class VerificationMethod(
 ) {
 
     init {
-        require(id.isNotBlank()) { "id property of VerificationMethod must not be an empty string" }
-        require(controller.isNotBlank()) { "controller property of VerificationMethod must not be an empty string" }
+        require(id.isNotBlank()) { throw InvalidServiceIdException("Service property id cannot be blank") }
+        require(controller.isNotBlank()) {
+            throw InvalidServiceControllerException("Service property controller cannot be blank")
+        }
         customProperties?.forEach {
             require(!reservedKeys.contains(it.key)) {
-                "Invalid attempt to override reserved VerificationMethod property with key ${it.key} via customProperties map"
+                throw ReservedKeyOverrideException("Invalid attempt to override reserved Service property with key ${it.key} via customProperties map")
+
             }
         }
     }
