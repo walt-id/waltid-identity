@@ -8,13 +8,16 @@ import id.walt.webwallet.web.controllers.auth.ByteLoginRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
+
+
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 object EmailAccountStrategy : PasswordAccountStrategy<EmailAccountRequest>() {
 
     override suspend fun register(tenant: String, request: EmailAccountRequest): Result<RegistrationResult> = runCatching {
@@ -32,7 +35,7 @@ object EmailAccountStrategy : PasswordAccountStrategy<EmailAccountRequest>() {
         val createdAccountId = transaction {
             Accounts.insert {
                 it[Accounts.tenant] = tenant
-                it[id] = UUID.generateUUID()
+                it[id] = Uuid.random()
                 it[Accounts.name] = name
                 it[Accounts.email] = email
                 it[password] = hash
@@ -44,7 +47,7 @@ object EmailAccountStrategy : PasswordAccountStrategy<EmailAccountRequest>() {
     }
 
 
-    //override suspend fun authenticate(tenant: String, request: EmailAccountRequest): AuthenticatedUser = UsernameAuthenticatedUser(UUID("a218913e-b8ec-4ef4-a945-7e9ada448ff9"), request.email)
+    //override suspend fun authenticate(tenant: String, request: EmailAccountRequest): AuthenticatedUser = UsernameAuthenticatedUser(Uuid("a218913e-b8ec-4ef4-a945-7e9ada448ff9"), request.email)
     override suspend fun authenticate(tenant: String, request: EmailAccountRequest): AuthenticatedUser =
         ByteLoginRequest(request).let { req ->
             val email = request.email

@@ -22,7 +22,7 @@ import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.SimpleJWTCryptoProvider
-import io.github.oshai.kotlinlogging.KotlinLogging
+import io.klogging.logger
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -39,8 +39,8 @@ import java.util.Base64
 class VerificationUseCase(
     val http: HttpClient, cryptoProvider: JWTCryptoProvider,
 ) {
-    private val logger = KotlinLogging.logger {}
-    fun createSession(
+    private val logger = logger("Verification")
+    suspend fun createSession(
         vpPoliciesJson: JsonElement?,
         vcPoliciesJson: JsonElement?,
         requestCredentialsJson: JsonElement,
@@ -104,7 +104,7 @@ class VerificationUseCase(
         session
     }
 
-    fun createSession(
+    suspend fun createSession(
         vpPoliciesJson: JsonElement?,
         vcPoliciesJson: JsonElement?,
         presentationDefinitionJson: JsonObject,
@@ -132,7 +132,7 @@ class VerificationUseCase(
 
     data class FailedVerificationException(val redirectUrl: String?, override val cause: Throwable?, override val message: String = cause?.message ?: "Verification failed") : IllegalArgumentException()
 
-    fun verify(sessionId: String, tokenResponseParameters: Map<String, List<String>>): Result<String> {
+    suspend fun verify(sessionId: String, tokenResponseParameters: Map<String, List<String>>): Result<String> {
         logger.debug { "Verifying session $sessionId" }
         val session = OIDCVerifierService.getSession(sessionId)
         val tokenResponse = when (TokenResponse.isDirectPostJWT(tokenResponseParameters)) {
@@ -161,10 +161,17 @@ class VerificationUseCase(
         val presentationSession = maybePresentationSessionResult.getOrThrow()
         if (presentationSession.verificationResult == true) {
             val redirectUri = sessionVerificationInfo.successRedirectUri?.replace("\$id", session.id) ?: ""
+            logger.debug { "Presentation is successful, redirecting to: $redirectUri" }
             return Result.success(redirectUri)
         } else {
             val policyResults = OIDCVerifierService.policyResults[session.id]
             val redirectUri = sessionVerificationInfo.errorRedirectUri?.replace("\$id", session.id)
+
+            logger.debug { "Presentation failed, redirecting to: $redirectUri" }
+
+            if (redirectUri != null) {
+                return Result.failure(Exception(redirectUri))
+            }
 
             return if (policyResults == null) {
                 Result.failure(FailedVerificationException(redirectUri, IllegalArgumentException("Verification policies did not succeed")))

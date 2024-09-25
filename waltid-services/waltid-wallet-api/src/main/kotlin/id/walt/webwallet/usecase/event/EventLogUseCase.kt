@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.usecase.event
 
 import id.walt.crypto.keys.Key
@@ -8,7 +10,9 @@ import id.walt.webwallet.service.events.*
 import id.walt.webwallet.utils.JsonUtils
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
 
 class EventLogUseCase(
     private val eventService: EventService,
@@ -18,8 +22,8 @@ class EventLogUseCase(
         action: EventType.Action,
         originator: String,
         tenant: String,
-        accountId: UUID,
-        walletId: UUID,
+        accountId: Uuid,
+        walletId: Uuid,
         data: EventData,
         credentialId: String? = null,
         note: String? = null,
@@ -38,7 +42,7 @@ class EventLogUseCase(
 
     fun log(vararg event: Event) = eventService.add(event.toList())
 
-    fun count(walletId: UUID, dataFilter: Map<String, List<String>>) = eventService.count(walletId, dataFilter)
+    fun count(walletId: Uuid, dataFilter: Map<String, List<String>>) = eventService.count(walletId, dataFilter)
 
     fun get(parameter: EventFilterParameter) = eventService.get(
         accountId = parameter.accountId,
@@ -109,8 +113,8 @@ class EventLogUseCase(
     )
 
     data class EventFilterParameter(
-        val accountId: UUID,
-        val walletId: UUID,
+        val accountId: Uuid,
+        val walletId: Uuid,
         val offset: Long,
         val logFilter: EventLogFilter,
     )

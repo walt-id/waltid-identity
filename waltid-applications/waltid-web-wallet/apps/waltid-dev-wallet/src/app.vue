@@ -1,25 +1,25 @@
 <template>
-    <Html :lang="locale" class="h-full">
-
+  <Html :lang="locale" class="h-full">
     <Head>
-        <Link :href="logoImg" rel="icon" type="text/xml" />
+      <Link :href="logoImg" rel="icon" type="text/xml" />
     </Head>
     <!--<head>
           <link rel="icon" type="text/xml" href="/svg/walt-s.svg">
         </head>-->
 
-    <Body class="bg-white text-gray-800 antialiased transition-colors duration-300 h-full">
-        <!-- dark:bg-gray-900 dark:text-gray-200 -->
-        <ModalBase />
-        <VitePwaManifest />
-        <NuxtLoadingIndicator />
-        <!--            {{ tenant }}-->
-        <NuxtLayout class="h-full">
-            <NuxtPage class="h-full" />
-        </NuxtLayout>
+    <Body
+      class="bg-white text-gray-800 antialiased transition-colors duration-300 h-full"
+    >
+      <!-- dark:bg-gray-900 dark:text-gray-200 -->
+      <ModalBase />
+      <VitePwaManifest />
+      <NuxtLoadingIndicator />
+      <!--            {{ tenant }}-->
+      <NuxtLayout class="h-full">
+        <NuxtPage class="h-full" />
+      </NuxtLayout>
     </Body>
-
-    </Html>
+  </Html>
 </template>
 
 <script lang="ts" setup>
@@ -30,9 +30,9 @@ import ModalBase from "@waltid-web-wallet/components/modals/ModalBase.vue";
 
 const locale = useState<string>("locale.i18n");
 
-const tenant = await (useTenant()).value
-const name = tenant?.name
-const logoImg = tenant?.logoImage
+const tenant = await useTenant().value;
+const name = tenant?.name;
+const logoImg = tenant?.logoImage;
 </script>
 
 <style lang="postcss">
@@ -45,6 +45,6 @@ const logoImg = tenant?.logoImage
 }
 */
 #__nuxt {
-    height: 100%;
+  height: 100%;
 }
 </style>

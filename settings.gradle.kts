@@ -27,7 +27,7 @@ val modules = listOf(
     * "$libraries:credentials".group(
         "waltid-verifiable-credentials",
         "waltid-mdoc-credentials",
-        "waltid-dif-presentation-exchange"
+        "waltid-dif-definitions-parser"
     ),
 
     * "$libraries:protocols".group(
@@ -37,6 +37,12 @@ val modules = listOf(
     * "$libraries:sdjwt".group(
         "waltid-sdjwt",
         "waltid-sdjwt-ios" whenEnabled enableIosBuild,
+    ),
+
+    * "$libraries:auth".group(
+        "waltid-ktor-authnz",
+        "waltid-permissions",
+        "waltid-idpkit"
     ),
 
     /*

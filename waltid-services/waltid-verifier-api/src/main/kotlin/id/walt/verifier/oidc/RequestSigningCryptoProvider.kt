@@ -18,24 +18,27 @@ import id.walt.sdjwt.JwtVerificationResult
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
+
+
 import java.io.File
 import java.io.FileReader
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 object RequestSigningCryptoProvider : JWTCryptoProvider {
     val signingKey: ECKey = ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningKeyFile?.let {
         runBlocking {
             if (File(it).exists())
                 ECKey.Builder(Curve.P_256, (ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey().toECPublicKey()))
                     .privateKey(ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey().toECPrivateKey())
-                    .keyID(UUID.generateUUID().toString())
+                    .keyID(Uuid.random().toString())
                     .build()
             else
                 null
         }
     }
-        ?: ECKeyGenerator(Curve.P_256).keyUse(KeyUse.SIGNATURE).keyID(UUID.generateUUID().toString()).generate()
+        ?: ECKeyGenerator(Curve.P_256).keyUse(KeyUse.SIGNATURE).keyID(Uuid.random().toString()).generate()
 
     val certificateChain: String? = ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningCertFile?.let {
         runBlocking {

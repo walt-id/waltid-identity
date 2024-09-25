@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 import id.walt.commons.interop.LspPotentialInterop
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyGenerationRequest
@@ -23,11 +25,13 @@ import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
+
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class LspPotentialWallet(val client: HttpClient, val walletId: String) {
     private var issuedMdocId: String = ""
@@ -40,8 +44,8 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         val keysApi = KeysApi(client)
 
         runBlocking {
-            keysApi.generate(UUID(walletId), KeyGenerationRequest(keyType = KeyType.secp256r1)) { generatedKeyId = it }
-            DidsApi(client).create(UUID(walletId), DidsApi.DidCreateRequest("jwk", keyId = generatedKeyId)) {
+            keysApi.generate(Uuid.parse(walletId), KeyGenerationRequest(keyType = KeyType.secp256r1)) { generatedKeyId = it }
+            DidsApi(client).create(Uuid.parse(walletId), DidsApi.DidCreateRequest("jwk", keyId = generatedKeyId)) {
                 generatedDid = it
             }
         }

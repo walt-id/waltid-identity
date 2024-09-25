@@ -3,7 +3,6 @@ package id.walt.cli
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.subcommands
-import com.github.ajalt.clikt.output.Localization
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import id.walt.cli.commands.*
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage

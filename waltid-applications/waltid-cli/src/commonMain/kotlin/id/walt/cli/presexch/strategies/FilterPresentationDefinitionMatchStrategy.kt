@@ -1,9 +1,9 @@
 package id.walt.cli.presexch.strategies
 
 import id.walt.cli.models.Credential
+import id.walt.cli.presexch.FilterData
 import id.walt.cli.presexch.PresentationDefinitionFilterParser
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.cli.presexch.FilterData
 
 class FilterPresentationDefinitionMatchStrategy(
     private val filterParser: PresentationDefinitionFilterParser,

@@ -92,17 +92,17 @@ dependencies {
     /* -- Kotlin -- */
 
     // Kotlinx.serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // Date
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
-    // UUID
-    implementation("app.softwork:kotlinx-uuid-core:0.0.26")
-    implementation("app.softwork:kotlinx-uuid-exposed:0.0.26")
+    // Uuid
+    implementation("app.softwork:kotlinx-uuid-core:0.1.2")
+    //implementation("app.softwork:kotlinx-uuid-exposed:0.1.2")
 
     /* -- Security -- */
     // Bouncy Castle
@@ -113,7 +113,7 @@ dependencies {
     implementation("de.mkammerer:argon2-jvm:2.11")
 
 
-    // OIDC
+    // walt.id
     implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
     implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
     implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
@@ -122,10 +122,12 @@ dependencies {
     implementation(project(":waltid-libraries:crypto:waltid-crypto-oci"))
     implementation(project(":waltid-libraries:waltid-did"))
 
+    implementation(project(":waltid-libraries:auth:waltid-ktor-authnz"))
+
     testImplementation(project(":waltid-services:waltid-issuer-api"))
     testImplementation(project(":waltid-services:waltid-verifier-api"))
 
-    implementation("com.nimbusds:nimbus-jose-jwt:9.40")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
     implementation("com.augustcellars.cose:cose-java:1.1.0")
 
     implementation("io.ktor:ktor-client-java:$ktor_version")
@@ -136,44 +138,44 @@ dependencies {
     implementation("io.github.reactivecircus.cache4k:cache4k:0.13.0")
 
     // Webauthn
-    implementation("com.webauthn4j:webauthn4j-core:0.25.0.RELEASE") {
+    implementation("com.webauthn4j:webauthn4j-core:0.26.0.RELEASE") {
         exclude("ch.qos.logback")
     }
 
     // DB
-    implementation("org.jetbrains.exposed:exposed-core:0.52.0")
-    implementation("org.jetbrains.exposed:exposed-jdbc:0.52.0")
-    implementation("org.jetbrains.exposed:exposed-dao:0.52.0")
-    implementation("org.jetbrains.exposed:exposed-java-time:0.52.0")
-    implementation("org.jetbrains.exposed:exposed-json:0.52.0")
+    implementation("org.jetbrains.exposed:exposed-core:0.54.0")
+    implementation("org.jetbrains.exposed:exposed-jdbc:0.54.0")
+    implementation("org.jetbrains.exposed:exposed-dao:0.54.0")
+    implementation("org.jetbrains.exposed:exposed-java-time:0.54.0")
+    implementation("org.jetbrains.exposed:exposed-json:0.54.0")
     // drivers
-    implementation("org.xerial:sqlite-jdbc:3.46.0.0")
-    implementation("org.postgresql:postgresql:42.7.3")
-    implementation("mysql:mysql-connector-java:8.0.33")
-    implementation("com.microsoft.sqlserver:mssql-jdbc:12.7.0.jre8-preview")
+    implementation("org.xerial:sqlite-jdbc:3.46.1.0")
+    implementation("org.postgresql:postgresql:42.7.4")
+    implementation("com.mysql:mysql-connector-j:9.0.0")
+    implementation("com.microsoft.sqlserver:mssql-jdbc:12.8.1.jre11")
 
     // Web push
     // implementation("dev.blanke.webpush:webpush:6.1.1") // alternative
     implementation("com.interaso:webpush:1.2.0")
 
     // Config
-    implementation("com.sksamuel.hoplite:hoplite-core:2.8.0.RC3")
-    implementation("com.sksamuel.hoplite:hoplite-hocon:2.8.0.RC3")
-    implementation("com.sksamuel.hoplite:hoplite-yaml:2.8.0.RC3")
-    implementation("com.sksamuel.hoplite:hoplite-hikaricp:2.8.0.RC3")
+    implementation("com.sksamuel.hoplite:hoplite-core:2.8.0")
+    implementation("com.sksamuel.hoplite:hoplite-hocon:2.8.0")
+    implementation("com.sksamuel.hoplite:hoplite-yaml:2.8.0")
+    implementation("com.sksamuel.hoplite:hoplite-hikaricp:2.8.0")
     implementation("com.zaxxer:HikariCP:5.1.0")
 
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.0")
-    implementation("org.slf4j:jul-to-slf4j:2.0.13")
-    implementation("io.klogging:klogging-jvm:0.7.0")
-    implementation("io.klogging:slf4j-klogging:0.7.0")
+    implementation("org.slf4j:jul-to-slf4j:2.0.16")
+    implementation("io.klogging:klogging-jvm:0.7.2")
+    implementation("io.klogging:slf4j-klogging:0.7.2")
 
     // Test
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.0.0")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.0.20")
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
     testImplementation("io.mockk:mockk:1.13.12")
-    testImplementation("io.klogging:klogging-jvm:0.6.1")
+    testImplementation("io.klogging:klogging-jvm:0.7.2")
 }

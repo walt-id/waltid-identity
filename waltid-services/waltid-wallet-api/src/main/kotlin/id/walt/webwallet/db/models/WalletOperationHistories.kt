@@ -1,6 +1,8 @@
 package id.walt.webwallet.db.models
 
+import id.walt.commons.temp.UuidSerializer
 import id.walt.crypto.utils.JsonUtils.toJsonObject
+import id.walt.webwallet.db.kotlinxUuid
 import id.walt.webwallet.service.WalletService
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -9,16 +11,17 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import kotlinx.uuid.UUID
-import kotlinx.uuid.exposed.KotlinxUUIDTable
-import kotlinx.uuid.exposed.kotlinxUUID
-import kotlinx.uuid.generateUUID
+import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.javatime.timestamp
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+import kotlin.uuid.toKotlinUuid
 
-object WalletOperationHistories : KotlinxUUIDTable("wallet_operation_histories") {
+@OptIn(ExperimentalUuidApi::class)
+object WalletOperationHistories : UUIDTable("wallet_operation_histories") {
     val tenant = varchar("tenant", 128).default("")
-    val accountId = kotlinxUUID("accountId")
+    val accountId = kotlinxUuid("accountId")
     val wallet = reference("wallet", Wallets)
     val timestamp = timestamp("timestamp")
     val operation = varchar("operation", 48)
@@ -30,21 +33,25 @@ object WalletOperationHistories : KotlinxUUIDTable("wallet_operation_histories")
     }
 }
 
+@OptIn(ExperimentalUuidApi::class)
 @Serializable
 data class WalletOperationHistory(
     val tenant: String,
-    val id: UUID? = UUID.generateUUID(),
-    val account: UUID,
-    val wallet: UUID,
+    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    val id: Uuid? = Uuid.random(),
+    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    val account: Uuid,
+    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    val wallet: Uuid,
     val timestamp: Instant,
     val operation: String,
     val data: JsonObject,
 ) {
     constructor(result: ResultRow) : this(
         tenant = result[WalletOperationHistories.tenant],
-        id = result[WalletOperationHistories.id].value,
+        id = result[WalletOperationHistories.id].value.toKotlinUuid(),
         account = result[WalletOperationHistories.accountId],
-        wallet = result[WalletOperationHistories.wallet].value,
+        wallet = result[WalletOperationHistories.wallet].value.toKotlinUuid(),
         timestamp = result[WalletOperationHistories.timestamp].toKotlinInstant(),
         operation = result[WalletOperationHistories.operation],
         data = Json.parseToJsonElement(result[WalletOperationHistories.data]).jsonObject,

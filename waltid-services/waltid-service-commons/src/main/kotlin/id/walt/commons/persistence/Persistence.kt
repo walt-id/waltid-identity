@@ -5,7 +5,7 @@ import kotlin.time.Duration
 
 abstract class Persistence<V>(
     val discriminator: String,
-    val defaultExpiration: Duration,
+    val defaultExpiration: Duration? = null,
 ) {
 
     abstract operator fun get(id: String): V?
