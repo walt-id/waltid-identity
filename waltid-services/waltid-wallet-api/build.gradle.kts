@@ -122,7 +122,7 @@ dependencies {
     implementation(project(":waltid-libraries:crypto:waltid-crypto-oci"))
     implementation(project(":waltid-libraries:waltid-did"))
 
-    implementation(project(":waltid-libraries:auth:waltid-authkit"))
+    implementation(project(":waltid-libraries:auth:waltid-ktor-authnz"))
 
     testImplementation(project(":waltid-services:waltid-issuer-api"))
     testImplementation(project(":waltid-services:waltid-verifier-api"))

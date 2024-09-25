@@ -40,8 +40,8 @@ val modules = listOf(
     ),
 
     * "$libraries:auth".group(
-        "waltid-authkit",
-        "waltid-authkit-permissions",
+        "waltid-ktor-authnz",
+        "waltid-permissions",
         "waltid-idpkit"
     ),
 
