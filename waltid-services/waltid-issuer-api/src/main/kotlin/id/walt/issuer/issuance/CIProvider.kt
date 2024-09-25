@@ -306,7 +306,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                       JWKKey.importJWK(holderKey.toString()).getOrNull(),
                       SDPayload.createSDPayload(vc, data.request.selectiveDisclosure ?: SDMap(mapOf())),
                       holderDid, issuerKid)
-                  else -> nonSdJwtVc(W3CVC(vc), issuerKid, holderDid, holderKey)
+                  else -> w3cSdJwtVc(W3CVC(vc), issuerKid, holderDid, holderKey, data.request.selectiveDisclosure)
               }
             }.also { log.debug { "Respond VC: $it" } }
         }))
@@ -543,24 +543,36 @@ open class CIProvider : OpenIDCredentialIssuer(
         })
     }
 
-    private suspend fun IssuanceSessionData.nonSdJwtVc(
+    private suspend fun IssuanceSessionData.w3cSdJwtVc(
         vc: W3CVC,
         issuerKid: String,
         holderDid: String?,
         holderKey: JsonObject?,
-    ) = vc.mergingJwtIssue(
-        issuerKey = issuerKey.key,
-        issuerDid = issuerDid,
-        issuerKid = issuerKid,
-        subjectDid = holderDid ?: "",
-        mappings = request.mapping ?: JsonObject(emptyMap()),
-        additionalJwtHeader = emptyMap(),
-        additionalJwtOptions = holderKey?.let {
-            mapOf(
-                "cnf" to buildJsonObject { put("jwk", it) }
-            )
-        } ?: emptyMap(),
-    ).also {
+        sdMap: SDMap? = null
+    ) = when(sdMap.isNullOrEmpty()) {
+        true -> vc.mergingJwtIssue(
+            issuerKey = issuerKey.key,
+            issuerDid = issuerDid,
+            issuerKid = issuerKid,
+            subjectDid = holderDid ?: "",
+            mappings = request.mapping ?: JsonObject(emptyMap()),
+            additionalJwtHeader = emptyMap(),
+            additionalJwtOptions = holderKey?.let {
+                mapOf(
+                    "cnf" to buildJsonObject { put("jwk", it) }
+                )
+            } ?: emptyMap(),
+        )
+        else -> vc.mergingSdJwtIssue(
+            issuerKey = issuerKey.key,
+            issuerDid = issuerDid,
+            subjectDid = holderDid ?: "",
+            mappings = request.mapping ?: JsonObject(emptyMap()),
+            additionalJwtHeaders = emptyMap(),
+            additionalJwtOptions = emptyMap(),
+            disclosureMap = sdMap
+        )
+    }.also {
         sendCallback("jwt_issue", buildJsonObject {
             put("jwt", it)
         })
