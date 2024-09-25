@@ -1,6 +1,7 @@
 package id.walt.commons.web.plugins
 
 import id.walt.commons.exceptions.CryptoException
+import id.walt.commons.exceptions.DidExceptions
 import id.walt.commons.web.WebException
 import io.klogging.logger
 import io.ktor.http.*
@@ -36,6 +37,7 @@ private fun statusCodeForException(cause: Throwable) = when (cause) {
     is BadRequestException -> HttpStatusCode.BadRequest
     is IllegalStateException -> HttpStatusCode.InternalServerError
     is CryptoException -> cause.status
+    is DidExceptions -> cause.status
     is WebException -> cause.status
 
     else -> HttpStatusCode.InternalServerError
