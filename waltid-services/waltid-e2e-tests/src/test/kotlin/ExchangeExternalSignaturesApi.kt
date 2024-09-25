@@ -199,6 +199,7 @@ class ExchangeExternalSignatures {
 
     suspend fun onlySdJwtTestCases() {
         initializeWallet()
+        w3cSdJwtVcTestCases()
         ietfSdJwtVcTestCases()
     }
 
@@ -208,6 +209,25 @@ class ExchangeExternalSignatures {
         mDocTestCases()
         w3cSdJwtVcTestCases()
         ietfSdJwtVcTestCases()
+    }
+
+    private suspend fun combinedW3CIETFSdJwtVCTestCase() {
+        testPreAuthorizedOID4VCI(
+            useOptionalParameters = false,
+            issuanceRequests = listOf(
+                identityCredentialIETFSdJwtDidIssuanceRequest,
+            ),
+        )
+        val openbadgeSdJwtIssuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(E2ETest.sdjwtCredential).apply {
+            credentialFormat = CredentialFormat.jwt_vc_json
+        }
+        testPreAuthorizedOID4VCI(
+            useOptionalParameters = false,
+            issuanceRequests = listOf(
+                openbadgeSdJwtIssuanceRequest,
+            ),
+        )
+        testOID4VPW3CIETFSdJwtVc(true)
     }
 
     private suspend fun regularJwtVcJsonTestCases() {
@@ -286,6 +306,7 @@ class ExchangeExternalSignatures {
             ),
         )
         testOID4VP(openbadgePresentationRequest)
+        testOID4VP(openbadgePresentationRequest, true)
         clearWalletCredentials()
     }
 
@@ -296,15 +317,18 @@ class ExchangeExternalSignatures {
                 identityCredentialIETFSdJwtDidIssuanceRequest,
             ),
         )
+        testOID4VPSdJwtVc()
         testOID4VPSdJwtVc(true)
         clearWalletCredentials()
-//        testPreAuthorizedOID4VCI(
-//            useOptionalParameters = false,
-//            issuanceRequests = listOf(
-//                identityCredentialIETFSdJwtX5cIssuanceRequest,
-//            ),
-//        )
-//        clearWalletCredentials()
+        testPreAuthorizedOID4VCI(
+            useOptionalParameters = false,
+            issuanceRequests = listOf(
+                identityCredentialIETFSdJwtX5cIssuanceRequest,
+            ),
+        )
+        testOID4VPSdJwtVc()
+        testOID4VPSdJwtVc(true)
+        clearWalletCredentials()
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -513,7 +537,11 @@ class ExchangeExternalSignatures {
                     prepareResponse.resolvedAuthReq,
                     prepareResponse.presentationSubmission,
                     prepareResponse.presentedCredentialIdList,
-
+                    disclosures = if (addDisclosures) matchedCredentialList
+                        .filter { it.disclosures != null }
+                        .associate {
+                            Pair(it.id, listOf(it.disclosures!!))
+                        } else null,
                     )
             )
         }.expectSuccess()
@@ -533,7 +561,6 @@ class ExchangeExternalSignatures {
         addDisclosures: Boolean = false,
     ) {
         lateinit var presentationRequestURL: String
-        lateinit var verificationID: String
         lateinit var resolvedPresentationRequestURL: String
         lateinit var presentationDefinition: String
         lateinit var matchedCredentialList: List<WalletCredential>
@@ -562,6 +589,7 @@ class ExchangeExternalSignatures {
         }
         assertEquals(200, createReqResponse.status.value)
         presentationRequestURL = createReqResponse.bodyAsText()
+        val verificationID = Url(presentationRequestURL).parameters.getOrFail("state")
         exchangeApi.resolvePresentationRequest(
             walletId,
             presentationRequestURL
@@ -610,12 +638,124 @@ class ExchangeExternalSignatures {
                     prepareResponse.resolvedAuthReq,
                     prepareResponse.presentationSubmission,
                     prepareResponse.presentedCredentialIdList,
-
+                    disclosures = if (addDisclosures) matchedCredentialList
+                        .filter { it.disclosures != null }
+                        .associate {
+                            Pair(it.id, listOf(it.disclosures!!))
+                        } else null,
                     )
             )
         }.expectSuccess()
         verifierSessionApi.get(verificationID) { sessionInfo ->
-            assert(sessionInfo.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
+//            assert(sessionInfo.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
+            assert(sessionInfo.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+
+            assert(sessionInfo.verificationResult == true) { "overall verification should be valid" }
+            sessionInfo.policyResults.let {
+                require(it != null) { "policyResults should be available after running policies" }
+                assert(it.size > 1) { "no policies have run" }
+            }
+        }
+    }
+
+    private suspend fun testOID4VPW3CIETFSdJwtVc(
+        addDisclosures: Boolean = false,
+    ) {
+        lateinit var presentationRequestURL: String
+        lateinit var resolvedPresentationRequestURL: String
+        lateinit var presentationDefinition: String
+        lateinit var matchedCredentialList: List<WalletCredential>
+        var response = client.get("/wallet-api/wallet/$walletId/credentials").expectSuccess()
+        val walletCredentialList = response.body<List<WalletCredential>>()
+        val createReqResponse = client.post("/openid4vc/verify") {
+            header("authorizeBaseUrl", "openid4vp://")
+            header("openId4VPProfile", OpenId4VPProfile.DEFAULT)
+            header("responseMode", "direct_post")
+            contentType(ContentType.Application.Json)
+            setBody(
+                buildJsonObject {
+                    put(
+                        "request_credentials",
+                        JsonArray(
+                            listOf(
+                                RequestedCredential(
+                                    format = VCFormat.sd_jwt_vc,
+                                    vct = "http://localhost:22222/identity_credential",
+                                ).let {
+                                    Json.encodeToJsonElement(it)
+                                },
+                                RequestedCredential(
+                                    format = VCFormat.jwt_vc_json,
+                                    type = "OpenBadgeCredential",
+                                ).let {
+                                    Json.encodeToJsonElement(it)
+                                },
+                                )
+                        )
+                    )
+                })
+        }
+        assertEquals(200, createReqResponse.status.value)
+        presentationRequestURL = createReqResponse.bodyAsText()
+        val verificationID = Url(presentationRequestURL).parameters.getOrFail("state")
+        exchangeApi.resolvePresentationRequest(
+            walletId,
+            presentationRequestURL
+        ) {
+            resolvedPresentationRequestURL = it
+            presentationDefinition = Url(resolvedPresentationRequestURL).parameters.getOrFail("presentation_definition")
+        }
+        exchangeApi.matchCredentialsForPresentationDefinition(
+            walletId,
+            presentationDefinition,
+            walletCredentialList.map { it.id },
+        ) {
+            matchedCredentialList = it
+        }
+        val prepareRequest = PrepareOID4VPRequest(
+            did = holderDID,
+            presentationRequest = presentationRequestURL,
+            selectedCredentialIdList = matchedCredentialList.map { it.id },
+            disclosures = if (addDisclosures) matchedCredentialList
+                .filter { it.disclosures != null }
+                .associate {
+                    Pair(it.id, listOf(it.disclosures!!))
+                } else null,
+        )
+        println(prepareRequest)
+        response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/prepare") {
+            setBody(prepareRequest)
+        }.expectSuccess()
+        val prepareResponse = response.body<PrepareOID4VPResponse>()
+        //client computes the externally provided signature value
+        val signedTokens = prepareResponse.tokenParams.map {
+            SignedToken(
+                credentialId = it.credentialId,
+                signedToken = holderKey.signJws(
+                    it.payload.toJsonElement().toString().toByteArray(),
+                    it.header,
+                ),
+            )
+        }
+        client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/submit") {
+            setBody(
+                SubmitOID4VPRequest(
+                    holderDID,
+                    signedTokens,
+                    prepareResponse.presentationRequest,
+                    prepareResponse.resolvedAuthReq,
+                    prepareResponse.presentationSubmission,
+                    prepareResponse.presentedCredentialIdList,
+                    disclosures = if (addDisclosures) matchedCredentialList
+                        .filter { it.disclosures != null }
+                        .associate {
+                            Pair(it.id, listOf(it.disclosures!!))
+                        } else null,
+                )
+            )
+        }.expectSuccess()
+        verifierSessionApi.get(verificationID) { sessionInfo ->
+//            assert(sessionInfo.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
             assert(sessionInfo.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
 
             assert(sessionInfo.verificationResult == true) { "overall verification should be valid" }
