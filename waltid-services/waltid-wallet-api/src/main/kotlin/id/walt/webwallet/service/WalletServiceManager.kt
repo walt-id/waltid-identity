@@ -50,17 +50,21 @@ import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
-import kotlinx.uuid.UUID
+
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+import kotlin.uuid.toKotlinUuid
 
+@OptIn(ExperimentalUuidApi::class)
 object WalletServiceManager {
 
     private val logger = KotlinLogging.logger { }
 
-    private val walletServices = ConcurrentHashMap<Pair<UUID, UUID>, WalletService>()
+    private val walletServices = ConcurrentHashMap<Pair<Uuid, Uuid>, WalletService>()
     private val categoryService = CategoryServiceImpl
     private val settingsService = SettingsService
     private val httpClient = getHttpClient()
@@ -149,7 +153,7 @@ object WalletServiceManager {
         credentialStatusServiceFactory = credentialStatusServiceFactory,
     )
 
-    fun getWalletService(tenant: String, account: UUID, wallet: UUID): WalletService =
+    fun getWalletService(tenant: String, account: Uuid, wallet: Uuid): WalletService =
         walletServices.getOrPut(Pair(account, wallet)) {
             SSIKit2WalletService(
                 tenant = tenant,
@@ -162,7 +166,7 @@ object WalletServiceManager {
             )
         }
 
-    fun createWallet(tenant: String, forAccount: UUID): UUID {
+    fun createWallet(tenant: String, forAccount: Uuid): Uuid {
         val accountName = AccountsService.get(forAccount).email ?: "wallet name not defined"
 
         // TODO: remove testing code / lock behind dev-mode
@@ -196,7 +200,7 @@ object WalletServiceManager {
             it[addedOn] = Clock.System.now().toJavaInstant()
         }
 
-        return walletId
+        return walletId.toKotlinUuid()
     }
 
     @Deprecated(
@@ -204,9 +208,9 @@ object WalletServiceManager {
             "AccountsService.getAccountWalletMappings(account)", "id.walt.service.account.AccountsService"
         ), message = "depreacted"
     )
-    fun listWallets(tenant: String, account: UUID): List<UUID> =
+    fun listWallets(tenant: String, account: Uuid): List<Uuid> =
         AccountWalletMappings.innerJoin(Wallets)
             .selectAll().where { (AccountWalletMappings.tenant eq tenant) and (AccountWalletMappings.accountId eq account) }.map {
-                it[Wallets.id].value
+                it[Wallets.id].value.toKotlinUuid()
             }
 }

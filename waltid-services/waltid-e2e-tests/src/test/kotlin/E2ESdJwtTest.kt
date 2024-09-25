@@ -11,8 +11,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 class E2ESdJwtTest(
     private val issuerApi: IssuerApi,
     private val exchangeApi: ExchangeApi,
@@ -20,7 +22,7 @@ class E2ESdJwtTest(
     private val verificationApi: Verifier.VerificationApi,
 ) {
 
-    fun e2e(wallet: UUID, did: String) = runTest {
+    fun e2e(wallet: Uuid, did: String) = runTest {
         //region -Issuer / offer url-
         lateinit var offerUrl: String
         val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(sdjwtCredential)

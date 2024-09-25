@@ -1,6 +1,9 @@
 package id.walt.webwallet.web.controllers.auth
 
-import id.walt.webwallet.web.model.*
+import id.walt.webwallet.web.model.AccountRequest
+import id.walt.webwallet.web.model.AddressAccountRequest
+import id.walt.webwallet.web.model.EmailAccountRequest
+import id.walt.webwallet.web.model.OidcAccountRequest
 import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRoute
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route

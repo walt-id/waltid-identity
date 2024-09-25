@@ -1,5 +1,5 @@
 <template>
-    <DidCreationView method="jwk" />
+  <DidCreationView method="jwk" />
 </template>
 
 <script lang="ts" setup>

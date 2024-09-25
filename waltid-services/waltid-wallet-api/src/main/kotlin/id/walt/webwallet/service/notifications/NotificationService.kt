@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.service.notifications
 
 import id.walt.webwallet.db.models.Notification
@@ -6,16 +8,20 @@ import id.walt.webwallet.db.models.serialize
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toJavaLocalDate
-import kotlinx.uuid.UUID
+
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.javatime.date
 import org.jetbrains.exposed.sql.javatime.dateParam
 import org.jetbrains.exposed.sql.transactions.transaction
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
 object NotificationService {
     fun list(
-        wallet: UUID,
+        wallet: Uuid,
         type: String? = null,
         addedOn: String? = null,
         isRead: Boolean? = null,
@@ -26,18 +32,18 @@ object NotificationService {
         }
     }
 
-    fun get(id: UUID): Result<Notification> = transaction {
-        WalletNotifications.selectAll().where { WalletNotifications.id eq id }.singleOrNull()?.let {
+    fun get(id: Uuid): Result<Notification> = transaction {
+        WalletNotifications.selectAll().where { WalletNotifications.id eq id.toJavaUuid() }.singleOrNull()?.let {
             Result.success(Notification(it))
         } ?: Result.failure(Throwable("Notification not found for id: $id"))
     }
 
-    fun add(notifications: List<Notification>): List<UUID> = transaction {
+    fun add(notifications: List<Notification>): List<Uuid> = transaction {
         insert(*notifications.toTypedArray())
     }
 
-    fun delete(vararg ids: UUID): Int = transaction {
-        WalletNotifications.deleteWhere { WalletNotifications.id inList ids.toList() }
+    fun delete(vararg ids: Uuid): Int = transaction {
+        WalletNotifications.deleteWhere { WalletNotifications.id inList ids.map { it.toJavaUuid() } }
     }
 
     fun update(vararg notification: Notification): Int = transaction {
@@ -47,9 +53,9 @@ object NotificationService {
     }
 
     private fun filterAll(
-        wallet: UUID, type: String?, isRead: Boolean?, addedOn: String?, ascending: Boolean?,
+        wallet: Uuid, type: String?, isRead: Boolean?, addedOn: String?, ascending: Boolean?,
     ) = WalletNotifications.selectAll().where {
-        WalletNotifications.wallet eq wallet
+        WalletNotifications.wallet eq wallet.toJavaUuid()
     }.andWhere {
         isRead?.let { WalletNotifications.isRead eq it } ?: Op.TRUE
     }.andWhere {
@@ -60,26 +66,26 @@ object NotificationService {
     }.orderBy(column = WalletNotifications.addedOn,
         order = ascending?.takeIf { it }?.let { SortOrder.ASC } ?: SortOrder.DESC)
 
-    private fun insert(vararg notifications: Notification): List<UUID> = WalletNotifications.batchInsert(
+    private fun insert(vararg notifications: Notification): List<Uuid> = WalletNotifications.batchInsert(
         data = notifications.toList()
     ) {
-        it.id?.let { UUID(it) }?.let {
-            this[WalletNotifications.id] = it
+        it.id?.let { Uuid.parse(it) }?.let {
+            this[WalletNotifications.id] = it.toJavaUuid()
         } //TODO: converted back and forth (see silent exchange controller)
-        this[WalletNotifications.account] = UUID(it.account)
-        this[WalletNotifications.wallet] = UUID(it.wallet)
+        this[WalletNotifications.account] = Uuid.parse(it.account)
+        this[WalletNotifications.wallet] = Uuid.parse(it.wallet).toJavaUuid()
         this[WalletNotifications.type] = it.type
         this[WalletNotifications.isRead] = it.status
         this[WalletNotifications.addedOn] = it.addedOn.toJavaInstant()
         this[WalletNotifications.data] = it.data.serialize()
-    }.map { it[WalletNotifications.id].value }
+    }.map { it[WalletNotifications.id].value.toKotlinUuid() }
 
     private fun update(notification: Notification) = notification.id?.let {
-        UUID(it)
+        Uuid.parse(it)
     }?.let {
-        WalletNotifications.update({ WalletNotifications.id eq it }) {
-            it[this.account] = UUID(notification.account)
-            it[this.wallet] = UUID(notification.wallet)
+        WalletNotifications.update({ WalletNotifications.id eq it.toJavaUuid() }) {
+            it[this.account] = Uuid.parse(notification.account)
+            it[this.wallet] = Uuid.parse(notification.wallet).toJavaUuid()
             it[this.type] = notification.type
             it[this.isRead] = notification.status
             it[this.addedOn] = notification.addedOn.toJavaInstant()

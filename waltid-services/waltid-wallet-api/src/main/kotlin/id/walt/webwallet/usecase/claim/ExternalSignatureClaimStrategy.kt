@@ -5,8 +5,10 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.exchange.IssuanceService.OfferedCredentialProofOfPossession
 import id.walt.webwallet.usecase.event.EventLogUseCase
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 class ExternalSignatureClaimStrategy(
     private val issuanceService: IssuanceService,
     private val credentialService: CredentialsService,
@@ -26,8 +28,8 @@ class ExternalSignatureClaimStrategy(
 
     suspend fun submitCredentialClaim(
         tenantId: String,
-        accountId: UUID,
-        walletId: UUID,
+        accountId: Uuid,
+        walletId: Uuid,
         pending: Boolean = true,
         did: String,
         offerURL: String,

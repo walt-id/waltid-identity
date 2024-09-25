@@ -75,6 +75,9 @@ fun Application.configureSecurity() {
 val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
     AuthenticationServiceModule.AuthenticationServiceConfig.apply {
         customAuthentication = {
+
+            // ktorAuthnz("ktor-authnz") {  }
+
             oauth("auth-oauth") {
                 client = HttpClient()
                 providerLookup = {

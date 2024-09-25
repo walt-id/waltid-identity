@@ -1,6 +1,10 @@
 import RowCredential from '@/components/walt/credential/RowCredential';
 import Dropdown from '@/components/walt/forms/Dropdown';
-import { AuthenticationMethods, VpProfiles } from '@/types/credentials'
+import {
+  AuthenticationMethods,
+  AvailableCredential,
+  VpProfiles,
+} from '@/types/credentials';
 import Checkbox from '@/components/walt/forms/Checkbox';
 import InputField from '@/components/walt/forms/Input';
 import Button from '@/components/walt/button/Button';
@@ -11,37 +15,47 @@ import { useRouter } from 'next/router';
 import { getOfferUrl } from '@/utils/getOfferUrl';
 import { sendToWebWallet } from '@/utils/sendToWebWallet';
 import nextConfig from '@/next.config';
-import { AvailableCredential } from '@/types/credentials';
 import { LockClosedIcon } from '@heroicons/react/24/outline';
 
 export default function IssueSection() {
   const env = React.useContext(EnvContext);
   const [AvailableCredentials] = React.useContext(CredentialsContext);
 
-  const [selectedAuthenticationMethod, setSelectedAuthenticationMethod] = React.useState(AuthenticationMethods[0]);
+  const [selectedAuthenticationMethod, setSelectedAuthenticationMethod] =
+    React.useState(AuthenticationMethods[0]);
   const [requirePin, setRequirePin] = useState<boolean>(false);
   const [pin, setPin] = useState<string>('0235');
-  const [requireVpRequestValue, setRequireVpRequestValue] = useState<boolean>(false);
-  const [vpRequestValue, setVpRequestValue] = useState<string>('NaturalPersonVerifiableID');
+  const [requireVpRequestValue, setRequireVpRequestValue] =
+    useState<boolean>(false);
+  const [vpRequestValue, setVpRequestValue] = useState<string>(
+    'NaturalPersonVerifiableID'
+  );
   const [requireVpProfile, setRequireVpProfile] = useState<boolean>(false);
-  const [selectedVpProfile, setSelectedVpProfile] = React.useState(VpProfiles[0]);
+  const [selectedVpProfile, setSelectedVpProfile] = React.useState(
+    VpProfiles[0]
+  );
 
   const router = useRouter();
   const params = router.query;
 
-  const idsToIssue = (params as unknown as { ids: string }).ids?.split(',') ? (params as unknown as { ids: string }).ids?.split(',') : [(params as unknown as { ids: string }).ids];
-  const [credentialsToIssue, setCredentialsToIssue] = useState<AvailableCredential[]>([]);
+  const idsToIssue = (params as unknown as { ids: string }).ids?.split(',')
+    ? (params as unknown as { ids: string }).ids?.split(',')
+    : [(params as unknown as { ids: string }).ids];
+  const [credentialsToIssue, setCredentialsToIssue] = useState<
+    AvailableCredential[]
+  >([]);
 
   React.useEffect(() => {
-    setCredentialsToIssue(AvailableCredentials.filter((cred) => {
-      for (const id of idsToIssue) {
-        if (id.toString() == cred.id.toString()) {
-          return true;
+    setCredentialsToIssue(
+      AvailableCredentials.filter((cred) => {
+        for (const id of idsToIssue) {
+          if (id.toString() == cred.id.toString()) {
+            return true;
+          }
         }
-      }
-      return false;
-    }
-    ));
+        return false;
+      })
+    );
   }, [AvailableCredentials]);
 
   function handleCancel() {
@@ -50,10 +64,20 @@ export default function IssueSection() {
 
   async function handleIssue() {
     if (checkCallbackUrlParameter()) {
-      const offer = await getOfferUrl(credentialsToIssue, env.NEXT_PUBLIC_VC_REPO ?? nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VC_REPO, env.NEXT_PUBLIC_ISSUER ?? nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER);
-      sendToWebWallet(decodeURI(params.callback!.toString()), 'api/siop/initiateIssuance', offer.data);
+      const offer = await getOfferUrl(
+        credentialsToIssue,
+        env.NEXT_PUBLIC_VC_REPO ??
+          nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VC_REPO,
+        env.NEXT_PUBLIC_ISSUER ??
+          nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER
+      );
+      sendToWebWallet(
+        decodeURI(params.callback!.toString()),
+        'api/siop/initiateIssuance',
+        offer.data
+      );
     } else {
-      console.log("show qr-offer");
+      console.log('show qr-offer');
       localStorage.setItem('offer', JSON.stringify(credentialsToIssue));
       let url = `/offer?ids=${idsToIssue.join(',')}`;
       url = url + `&authenticationMethod=${selectedAuthenticationMethod}`;
@@ -70,7 +94,7 @@ export default function IssueSection() {
 
   function checkCallbackUrlParameter(): Boolean {
     const callback = params.callback;
-    return !(callback === undefined || callback === null || callback === "");
+    return !(callback === undefined || callback === null || callback === '');
   }
 
   if (params.ids === undefined) {
@@ -139,7 +163,10 @@ export default function IssueSection() {
       </div>
       <div className="mt-1 flex flex-col sm:flex-row justify-between">
         <div className="">
-          <Checkbox value={requireVpRequestValue} onChange={setRequireVpRequestValue}>
+          <Checkbox
+            value={requireVpRequestValue}
+            onChange={setRequireVpRequestValue}
+          >
             VP Token Requested Value
           </Checkbox>
         </div>
@@ -173,12 +200,26 @@ export default function IssueSection() {
           Cancel
         </Button>
         <Button
-          disabled={!(credentialsToIssue.length > 0 && (
-            credentialsToIssue.length < 2 ||
-            credentialsToIssue.filter((cred) => cred.selectedFormat === "SD-JWT + W3C VC" || cred.selectedFormat === "SD-JWT + IETF SD-JWT VC").length === credentialsToIssue.length ||
-            credentialsToIssue.filter((cred) => !cred.selectedFormat || cred.selectedFormat === "JWT + W3C VC").length === credentialsToIssue.length
-          ))}
-          onClick={handleIssue}>Issue</Button>
+          disabled={
+            !(
+              credentialsToIssue.length > 0 &&
+              (credentialsToIssue.length < 2 ||
+                credentialsToIssue.filter(
+                  (cred) =>
+                    cred.selectedFormat === 'SD-JWT + W3C VC' ||
+                    cred.selectedFormat === 'SD-JWT + IETF SD-JWT VC'
+                ).length === credentialsToIssue.length ||
+                credentialsToIssue.filter(
+                  (cred) =>
+                    !cred.selectedFormat ||
+                    cred.selectedFormat === 'JWT + W3C VC'
+                ).length === credentialsToIssue.length)
+            )
+          }
+          onClick={handleIssue}
+        >
+          Issue
+        </Button>
       </div>
       <div className="flex flex-col items-center mt-12">
         <div className="flex flex-row gap-2 items-center content-center text-sm text-center text-gray-500">
