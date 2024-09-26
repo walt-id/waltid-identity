@@ -94,13 +94,6 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     ?: throw IllegalArgumentException("did ${req.did} not found in wallet")
                 logger.debug { "Retrieved wallet DID: $walletDID" }
 
-                val credentialWallet = getCredentialWallet(walletDID.did)
-                val presentationId = "urn:uuid:" + UUID.generateUUID().toString().lowercase()
-                val authKeyId = walletDID.keyId
-                logger.debug { "Resolved authorization keyId: $authKeyId" }
-                val didAuthKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()
-                logger.debug { "Resolved authorization keyId: $didAuthKeyId" }
-
                 val authReq = AuthorizationRequest
                     .fromHttpParametersAuto(
                         parseQueryString(
@@ -110,9 +103,15 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         ).toMap()
                     )
                 logger.debug { "Auth req: $authReq" }
+                authReq.responseUri ?: authReq.redirectUri ?: throw AuthorizationError(
+                    authReq,
+                    AuthorizationErrorCode.invalid_request,
+                    "No response_uri or redirect_uri found on authorization request"
+                )
 
                 logger.debug { "Selected credentials for presentation request: ${req.selectedCredentialIdList}" }
 
+                val credentialWallet = getCredentialWallet(walletDID.did)
                 val resolvedAuthReq = credentialWallet.resolveVPAuthorizationParameters(authReq)
                 logger.debug { "Resolved Auth req: $resolvedAuthReq" }
 
@@ -126,7 +125,12 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 val matchedCredentials = walletService.getCredentialsByIds(req.selectedCredentialIdList)
                 logger.debug { "Matched credentials: $matchedCredentials" }
 
-                //NEW CODE
+                val presentationId = "urn:uuid:" + UUID.generateUUID().toString().lowercase()
+                val authKeyId = walletDID.keyId
+                logger.debug { "Resolved authorization keyId: $authKeyId" }
+                val didAuthKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()
+                logger.debug { "Resolved authorization keyId: $didAuthKeyId" }
+
                 val w3cJwtVpTokenParams = ExchangeUtils.getW3cJwtVpProofParametersFromWalletCredentials(
                     walletDID.did,
                     didAuthKeyId,
