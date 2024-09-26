@@ -1,6 +1,16 @@
 package id.walt.webwallet.web.controllers.exchange
 
+import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.oid4vc.data.CredentialFormat
+import id.walt.sdjwt.KeyBindingJwt
+import id.walt.sdjwt.KeyBindingJwt.Companion.getSdHash
+import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.service.oidc4vc.CredentialFilterUtils
+import id.walt.webwallet.web.controllers.exchange.models.oid4vp.IETFSdJwtVpProofParameters
+import id.walt.webwallet.web.controllers.exchange.models.oid4vp.W3cJwtVpProofParameters
+import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
+import kotlin.time.Duration.Companion.minutes
 
 object ExchangeUtils {
 
@@ -36,4 +46,70 @@ object ExchangeUtils {
     }.onFailure {
         throw it
     }
+
+    fun getW3cJwtVpProofParametersFromWalletCredentials(
+        did: String,
+        didAuthKeyId: String,
+        presentationId: String,
+        audience: String,
+        nonce: String?,
+        credentials: List<WalletCredential>,
+        disclosures: Map<String, List<String>>?,
+    ) = CredentialFilterUtils.getJwtVcList(
+        credentials,
+        disclosures,
+    ).takeIf { it.isNotEmpty() }?.let { jwtVcList ->
+        W3cJwtVpProofParameters(
+            header = mapOf(
+                "kid" to didAuthKeyId.toJsonElement(),
+                "typ" to "JWT".toJsonElement(),
+            ),
+            payload = mapOf(
+                "sub" to did.toJsonElement(),
+                "nbf" to Clock.System.now().minus(1.minutes).epochSeconds.toJsonElement(),
+                "iat" to Clock.System.now().epochSeconds.toJsonElement(),
+                "jti" to presentationId.toJsonElement(),
+                "iss" to did.toJsonElement(),
+                "aud" to audience.toJsonElement(),
+                "nonce" to (nonce ?: "").toJsonElement(),
+                "vp" to mapOf(
+                    "@context" to listOf("https://www.w3.org/2018/credentials/v1").toJsonElement(),
+                    "type" to listOf("VerifiablePresentation").toJsonElement(),
+                    "id" to presentationId.toJsonElement(),
+                    "holder" to did.toJsonElement(),
+                    "verifiableCredential" to jwtVcList.toJsonElement()
+                ).toJsonElement(),
+            ).filterValues { it.toString().isNotBlank() },
+        )
+    }
+
+    fun getIETFJwtVpProofParametersFromWalletCredentials(
+        keyId: String,
+        audience: String,
+        nonce: String?,
+        credentials: List<WalletCredential>,
+        disclosures: Map<String, List<String>>?,
+    ) = credentials.filter { it.format == CredentialFormat.sd_jwt_vc }.map { credential ->
+        val serializedVcWithDisclosures = listOf(
+            credential.document
+        ).plus(
+            if (disclosures?.containsKey(credential.id) == true) {
+                "~${disclosures[credential.id]!!.joinToString("~")}~"
+            } else "~"
+        ).joinToString(separator = "")
+        IETFSdJwtVpProofParameters(
+            credentialId = credential.id,
+            ietfSdJwtVc = serializedVcWithDisclosures,
+            header = mapOf(
+                "kid" to keyId.toJsonElement(),
+                "typ" to KeyBindingJwt.KB_JWT_TYPE.toJsonElement(),
+            ),
+            payload = mapOf(
+                "iat" to Clock.System.now().epochSeconds.toJsonElement(),
+                "aud" to audience.toJsonElement(),
+                "nonce" to (nonce ?: "").toJsonElement(),
+                "sd_hash" to getSdHash(serializedVcWithDisclosures).toJsonElement(),
+            ).filterValues { it.toString().isNotBlank() },
+        )
+    }.takeIf { it.isNotEmpty() }
 }
