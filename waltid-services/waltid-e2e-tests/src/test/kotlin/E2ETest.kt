@@ -303,8 +303,8 @@ class E2ETest {
     fun lspWalletTests() = runTest(timeout = 5.minutes) {
         testBlock {
             val lspPotentialWallet = setupTestWallet()
-//            lspPotentialWallet.testMDocIssuance()
-//            lspPotentialWallet.testMdocPresentation()
+            lspPotentialWallet.testMDocIssuance()
+            lspPotentialWallet.testMdocPresentation()
 
             lspPotentialWallet.testSDJwtVCIssuance()
             lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
