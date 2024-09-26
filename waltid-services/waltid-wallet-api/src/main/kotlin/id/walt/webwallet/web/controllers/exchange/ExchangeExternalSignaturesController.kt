@@ -83,115 +83,123 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             }
         }) {
             val walletService = getWalletService()
+            runCatching {
+                val req = call.receive<PrepareOID4VPRequest>()
+                logger.debug { "Request: $req" }
 
-            val req = call.receive<PrepareOID4VPRequest>()
-            logger.debug { "Request: $req" }
+                if (req.selectedCredentialIdList.isEmpty())
+                    throw IllegalArgumentException("Unable to prepare oid4vp parameters with no input credential identifiers")
 
-            if (req.selectedCredentialIdList.isEmpty())
-                throw IllegalArgumentException("Unable to prepare oid4vp parameters with no input credential identifiers")
+                val walletDID = DidsService.get(walletService.walletId, req.did)
+                    ?: throw IllegalArgumentException("did ${req.did} not found in wallet")
+                logger.debug { "Retrieved wallet DID: $walletDID" }
 
-            val walletDID = DidsService.get(walletService.walletId, req.did)
-                ?: throw IllegalArgumentException("did ${req.did} not found in wallet")
-            logger.debug { "Retrieved wallet DID: $walletDID" }
+                val credentialWallet = getCredentialWallet(walletDID.did)
+                val presentationId = "urn:uuid:" + UUID.generateUUID().toString().lowercase()
+                val authKeyId = walletDID.keyId
+                logger.debug { "Resolved authorization keyId: $authKeyId" }
+                val didAuthKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()
+                logger.debug { "Resolved authorization keyId: $didAuthKeyId" }
 
-            val credentialWallet = getCredentialWallet(walletDID.did)
-            val presentationId = "urn:uuid:" + UUID.generateUUID().toString().lowercase()
-            val authKeyId = walletDID.keyId
-            logger.debug { "Resolved authorization keyId: $authKeyId" }
-            val didAuthKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()
-            logger.debug { "Resolved authorization keyId: $didAuthKeyId" }
+                val authReq = AuthorizationRequest
+                    .fromHttpParametersAuto(
+                        parseQueryString(
+                            Url(
+                                req.presentationRequest,
+                            ).encodedQuery,
+                        ).toMap()
+                    )
+                logger.debug { "Auth req: $authReq" }
 
-            val authReq = AuthorizationRequest
-                .fromHttpParametersAuto(
-                    parseQueryString(
-                        Url(
-                            req.presentationRequest,
-                        ).encodedQuery,
-                    ).toMap()
+                logger.debug { "Selected credentials for presentation request: ${req.selectedCredentialIdList}" }
+
+                val resolvedAuthReq = credentialWallet.resolveVPAuthorizationParameters(authReq)
+                logger.debug { "Resolved Auth req: $resolvedAuthReq" }
+
+                if (!credentialWallet.validateAuthorizationRequest(resolvedAuthReq)) {
+                    throw AuthorizationError(
+                        resolvedAuthReq,
+                        AuthorizationErrorCode.invalid_request,
+                        message = "Invalid VP authorization request"
+                    )
+                }
+                val matchedCredentials = walletService.getCredentialsByIds(req.selectedCredentialIdList)
+                logger.debug { "Matched credentials: $matchedCredentials" }
+
+                //NEW CODE
+                val w3cJwtVpTokenParams = ExchangeUtils.getW3cJwtVpProofParametersFromWalletCredentials(
+                    walletDID.did,
+                    didAuthKeyId,
+                    presentationId,
+                    resolvedAuthReq.clientId,
+                    resolvedAuthReq.nonce,
+                    matchedCredentials,
+                    req.disclosures,
                 )
-            logger.debug { "Auth req: $authReq" }
-
-            logger.debug { "Selected credentials for presentation request: ${req.selectedCredentialIdList}" }
-
-            val resolvedAuthReq = credentialWallet.resolveVPAuthorizationParameters(authReq)
-            logger.debug { "Resolved Auth req: $resolvedAuthReq" }
-
-            if (!credentialWallet.validateAuthorizationRequest(resolvedAuthReq)) {
-                throw AuthorizationError(
-                    resolvedAuthReq,
-                    AuthorizationErrorCode.invalid_request,
-                    message = "Invalid VP authorization request"
+                val ietfVpTokenParams = ExchangeUtils.getIETFJwtVpProofParametersFromWalletCredentials(
+                    authKeyId,
+                    resolvedAuthReq.clientId,
+                    resolvedAuthReq.nonce,
+                    matchedCredentials,
+                    req.disclosures,
                 )
-            }
-            val matchedCredentials = walletService.getCredentialsByIds(req.selectedCredentialIdList)
-            logger.debug { "Matched credentials: $matchedCredentials" }
 
-            //NEW CODE
-            val w3cJwtVpTokenParams = ExchangeUtils.getW3cJwtVpProofParametersFromWalletCredentials(
-                walletDID.did,
-                didAuthKeyId,
-                presentationId,
-                resolvedAuthReq.clientId,
-                resolvedAuthReq.nonce,
-                matchedCredentials,
-                req.disclosures,
-            )
-            val ietfVpTokenParams = ExchangeUtils.getIETFJwtVpProofParametersFromWalletCredentials(
-                authKeyId,
-                resolvedAuthReq.clientId,
-                resolvedAuthReq.nonce,
-                matchedCredentials,
-                req.disclosures,
-            )
+                val (rootPathVP, rootPathMDoc) = if (ietfVpTokenParams != null && w3cJwtVpTokenParams == null) {
+                    Pair("$", "$[0]")
+                } else if (ietfVpTokenParams != null) {
+                    Pair("$[0]", "$[1]")
+                } else {
+                    Pair("$", "$[0]")
+                }
+                val presentationSubmission = PresentationSubmission(
+                    id = presentationId,
+                    definitionId = presentationId,
+                    descriptorMap = matchedCredentials.mapIndexed { index, credential ->
+                        when (credential.format) {
+                            CredentialFormat.sd_jwt_vc -> {
+                                credentialWallet.buildDescriptorMappingSDJwtVC(
+                                    resolvedAuthReq.presentationDefinition,
+                                    index,
+                                    credential.document,
+                                    "$",
+                                )
+                            }
 
-            val (rootPathVP, rootPathMDoc) = if( ietfVpTokenParams != null && w3cJwtVpTokenParams == null) {
-                Pair("$", "$[0]")
-            } else if (ietfVpTokenParams != null && w3cJwtVpTokenParams != null) {
-                Pair("$[0]", "$[1]")
-            } else {
-                Pair("$", "$[0]")
-            }
-            val presentationSubmission = PresentationSubmission(
-                id = presentationId,
-                definitionId = presentationId,
-                descriptorMap = matchedCredentials.mapIndexed { index, credential ->
-                    when (credential.format) {
-                        CredentialFormat.sd_jwt_vc -> {
-                            credentialWallet.buildDescriptorMappingSDJwtVC(
-                                resolvedAuthReq.presentationDefinition,
-                                index,
-                                credential.document,
-                                "$",
-                            )
-                        }
-
-                        else -> {
-                            credentialWallet.buildDescriptorMappingJwtVP(
-                                resolvedAuthReq.presentationDefinition,
-                                index,
-                                credential.document,
-                                rootPathVP,
-                            )
+                            else -> {
+                                credentialWallet.buildDescriptorMappingJwtVP(
+                                    resolvedAuthReq.presentationDefinition,
+                                    index,
+                                    credential.document,
+                                    rootPathVP,
+                                )
+                            }
                         }
                     }
-                }
-            )
-            logger.debug { "Generated presentation submission: $presentationSubmission" }
+                )
+                logger.debug { "Generated presentation submission: $presentationSubmission" }
+                PrepareOID4VPResponse(
+                    walletDID.did,
+                    req.presentationRequest,
+                    req.selectedCredentialIdList,
+                    presentationSubmission,
+                    w3CJwtVpProofParameters = w3cJwtVpTokenParams,
+                    ietfSdJwtVpProofParameters = ietfVpTokenParams,
+                )
 
-            val responsePayload = PrepareOID4VPResponse(
-                walletDID.did,
-                req.presentationRequest,
-                req.selectedCredentialIdList,
-                presentationSubmission,
-                w3CJwtVpProofParameters = w3cJwtVpTokenParams,
-                ietfSdJwtVpProofParameters = ietfVpTokenParams,
-            )
-            logger.debug { "Response payload: $responsePayload" }
+            }.onSuccess { responsePayload ->
+                logger.debug { "Response payload: $responsePayload" }
+                context.respond(
+                    HttpStatusCode.OK,
+                    responsePayload,
+                )
 
-            context.respond(
-                HttpStatusCode.OK,
-                responsePayload,
-            )
+            }.onFailure { error ->
+                logger.debug { "error: $error" }
+                context.respond(
+                    HttpStatusCode.BadRequest,
+                    error.message ?: "Unknown error",
+                )
+            }
         }
 
         post("external_signatures/presentation/submit", {
@@ -205,159 +213,163 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             response(OpenAPICommons.usePresentationRequestResponse())
         }) {
             val walletService = getWalletService()
-            val req = call.receive<SubmitOID4VPRequest>()
-            logger.debug { "Request: $req" }
 
-            val authReq = AuthorizationRequest
-                .fromHttpParametersAuto(
-                    parseQueryString(
-                        Url(
-                            req.presentationRequest,
-                        ).encodedQuery,
-                    ).toMap()
-                )
-            logger.debug { "Auth req: $authReq" }
-            val authResponseURL = authReq.responseUri
-                ?: authReq.redirectUri ?: throw AuthorizationError(
-                    authReq,
-                    AuthorizationErrorCode.invalid_request,
-                    "No response_uri or redirect_uri found on authorization request"
-                )
-            logger.debug { "Authorization response URL: $authResponseURL" }
-            val presentationSubmission = req.presentationSubmission
-            val presentedCredentialIdList = req.presentedCredentialIdList
+            runCatching {
+                val req = call.receive<SubmitOID4VPRequest>()
+                logger.debug { "Request: $req" }
 
-            val vpTokenProofs = (if (req.ietfSdJwtVpProofs != null) {
-                req.ietfSdJwtVpProofs.map { ietfVpProof ->
-                    ietfVpProof.sdJwtVc + ietfVpProof.vpTokenProof
+                val authReq = AuthorizationRequest
+                    .fromHttpParametersAuto(
+                        parseQueryString(
+                            Url(
+                                req.presentationRequest,
+                            ).encodedQuery,
+                        ).toMap()
+                    )
+                logger.debug { "Auth req: $authReq" }
+                val authResponseURL = authReq.responseUri
+                    ?: authReq.redirectUri ?: throw AuthorizationError(
+                        authReq,
+                        AuthorizationErrorCode.invalid_request,
+                        "No response_uri or redirect_uri found on authorization request"
+                    )
+                logger.debug { "Authorization response URL: $authResponseURL" }
+                val presentationSubmission = req.presentationSubmission
+                val presentedCredentialIdList = req.presentedCredentialIdList
+
+                val vpTokenProofs = (if (req.ietfSdJwtVpProofs != null) {
+                    req.ietfSdJwtVpProofs.map { ietfVpProof ->
+                        ietfVpProof.sdJwtVc + ietfVpProof.vpTokenProof
+                    }
+                } else {
+                    listOf("")
+                }).plus(req.w3cJwtVpProof ?: "").filter { it.isNotEmpty() }
+                println("vpTokenProofs: $vpTokenProofs")
+
+                val tokenResponse = if (vpTokenProofs.size == 1) {
+                    TokenResponse.success(
+                        vpToken = VpTokenParameter.fromJsonElement(vpTokenProofs.first().toJsonElement()),
+                        presentationSubmission = presentationSubmission,
+                        idToken = null,
+                        state = authReq.state,
+                    )
+                } else {
+                    TokenResponse.success(
+                        vpToken = JsonArray(vpTokenProofs.map { it.toJsonElement() }).let {
+                            VpTokenParameter.fromJsonElement(
+                                it
+                            )
+                        },
+                        presentationSubmission = presentationSubmission,
+                        idToken = null,
+                        state = authReq.state,
+                    )
                 }
-            } else {
-                listOf("")
-            }).plus(req.w3cJwtVpProof ?: "").filter { it.isNotEmpty() }
-            println("vpTokenProofs: $vpTokenProofs")
 
-            val tokenResponse = if (vpTokenProofs.size == 1) {
-                TokenResponse.success(
-                    vpToken = VpTokenParameter.fromJsonElement(vpTokenProofs.first().toJsonElement()),
-                    presentationSubmission = presentationSubmission,
-                    idToken = null,
-                    state = authReq.state,
-                )
-            } else {
-                TokenResponse.success(
-                    vpToken = JsonArray(vpTokenProofs.map { it.toJsonElement() }).let {
-                        VpTokenParameter.fromJsonElement(
-                            it
-                        )
-                    },
-                    presentationSubmission = presentationSubmission,
-                    idToken = null,
-                    state = authReq.state,
-                )
-            }
-
-            println("token response: $tokenResponse")
-            val formParams =
-                if (authReq.responseMode == ResponseMode.direct_post_jwt) {
-                    val encKey =
-                        authReq.clientMetadata?.jwks?.get("keys")?.jsonArray?.first { jwk ->
-                            JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false
-                        }?.jsonObject ?: throw Exception("No ephemeral reader key found")
-                    val ephemeralWalletKey =
-                        runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
-                    tokenResponse.toDirecPostJWTParameters(
-                        encKey,
-                        alg = authReq.clientMetadata!!.authorizationEncryptedResponseAlg!!,
-                        enc = authReq.clientMetadata!!.authorizationEncryptedResponseEnc!!,
-                        mapOf(
-                            "epk" to runBlocking { ephemeralWalletKey.getPublicKey().exportJWKObject() },
-                            "apu" to JsonPrimitive(Base64URL.encode(authReq.nonce).toString()),
-                            "apv" to JsonPrimitive(
-                                Base64URL.encode(authReq.nonce!!).toString()
+                println("token response: $tokenResponse")
+                val formParams =
+                    if (authReq.responseMode == ResponseMode.direct_post_jwt) {
+                        val encKey =
+                            authReq.clientMetadata?.jwks?.get("keys")?.jsonArray?.first { jwk ->
+                                JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false
+                            }?.jsonObject ?: throw Exception("No ephemeral reader key found")
+                        val ephemeralWalletKey =
+                            runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
+                        tokenResponse.toDirecPostJWTParameters(
+                            encKey,
+                            alg = authReq.clientMetadata!!.authorizationEncryptedResponseAlg!!,
+                            enc = authReq.clientMetadata!!.authorizationEncryptedResponseEnc!!,
+                            mapOf(
+                                "epk" to runBlocking { ephemeralWalletKey.getPublicKey().exportJWKObject() },
+                                "apu" to JsonPrimitive(Base64URL.encode(authReq.nonce).toString()),
+                                "apv" to JsonPrimitive(
+                                    Base64URL.encode(authReq.nonce!!).toString()
+                                )
                             )
                         )
-                    )
-                } else tokenResponse.toHttpParameters()
-            logger.debug { "Authorization response parameters: $formParams" }
+                    } else tokenResponse.toHttpParameters()
+                logger.debug { "Authorization response parameters: $formParams" }
 
-            val httpClient = WalletHttpClients.getHttpClient()
-            val resp = httpClient.submitForm(
-                authResponseURL,
-                parameters {
-                    formParams.forEach { entry ->
-                        entry.value.forEach { append(entry.key, it) }
+                val httpClient = WalletHttpClients.getHttpClient()
+                val resp = httpClient.submitForm(
+                    authResponseURL,
+                    parameters {
+                        formParams.forEach { entry ->
+                            entry.value.forEach { append(entry.key, it) }
+                        }
+                    })
+
+                val responseBody = resp.bodyAsText()
+                val isResponseRedirectUrl = responseBody.contains("redirect_uri")
+                logger.debug { "HTTP Response: $resp, body: $responseBody" }
+
+                val credentialService = CredentialsService()
+                presentedCredentialIdList.forEach {
+                    credentialService.get(walletService.walletId, it)?.run {
+                        eventUseCase.log(
+                            action = EventType.Credential.Present,
+                            originator = authReq.clientMetadata?.clientName
+                                ?: EventDataNotAvailable,
+                            tenant = walletService.tenant,
+                            accountId = walletService.accountId,
+                            walletId = walletService.walletId,
+                            data = eventUseCase.credentialEventData(
+                                credential = this,
+                                subject = eventUseCase.subjectData(this),
+                                organization = eventUseCase.verifierData(authReq),
+                                type = null
+                            ),
+                            credentialId = this.id,
+                        )
                     }
-                })
-
-            val responseBody = runCatching { resp.bodyAsText() }.getOrNull()
-            val isResponseRedirectUrl = responseBody != null && responseBody.take(10).lowercase().let {
-                @Suppress("HttpUrlsUsage")
-                it.startsWith("http://") || it.startsWith("https://")
-            }
-            logger.debug { "HTTP Response: $resp, body: $responseBody" }
-
-            val credentialService = CredentialsService()
-            presentedCredentialIdList.forEach {
-                credentialService.get(walletService.walletId, it)?.run {
-                    eventUseCase.log(
-                        action = EventType.Credential.Present,
-                        originator = authReq.clientMetadata?.clientName
-                            ?: EventDataNotAvailable,
-                        tenant = walletService.tenant,
-                        accountId = walletService.accountId,
-                        walletId = walletService.walletId,
-                        data = eventUseCase.credentialEventData(
-                            credential = this,
-                            subject = eventUseCase.subjectData(this),
-                            organization = eventUseCase.verifierData(authReq),
-                            type = null
-                        ),
-                        credentialId = this.id,
-                    )
                 }
-            }
 
-            val result = if (resp.status.value == 302 && !resp.headers["location"].toString().contains("error")) {
-                Result.success(if (isResponseRedirectUrl) responseBody else null)
-            } else if (resp.status.isSuccess()) {
-                Result.success(if (isResponseRedirectUrl) responseBody else null)
-            } else {
-                if (isResponseRedirectUrl) {
-                    Result.failure(
-                        PresentationError(
+                if ((resp.status.value == 302 && !resp.headers["location"].toString().contains("error")) ||
+                    resp.status.isSuccess()
+                ) {
+                    responseBody
+                } else {
+                    //this logic is incorrect....
+                    if (isResponseRedirectUrl) {
+                        throw PresentationError(
                             message = "Presentation failed - redirecting to error page",
                             redirectUri = responseBody
                         )
-                    )
-                } else {
-                    logger.debug { "Response body: $responseBody" }
-                    Result.failure(
-                        PresentationError(
+                    } else {
+                        throw PresentationError(
                             message =
-                            if (responseBody != null) "Presentation failed:\n $responseBody"
+                            if (responseBody.isNotBlank()) "Presentation failed:\n $responseBody"
                             else "Presentation failed",
                             redirectUri = ""
                         )
-                    )
+                    }
                 }
-            }
-
-            if (result.isSuccess) {
-                context.respond(HttpStatusCode.OK, mapOf("redirectUri" to result.getOrThrow()))
-            } else {
-                val err = result.exceptionOrNull()
-                logger.debug { "Presentation failed: $err" }
-                when (err) {
+            }.onSuccess {
+                context.respond(
+                    HttpStatusCode.OK,
+                    it,
+                )
+            }.onFailure { error ->
+                logger.debug { "error: $error" }
+                when (error) {
                     is PresentationError -> {
                         context.respond(
-                            HttpStatusCode.BadRequest, mapOf(
-                                "redirectUri" to err.redirectUri,
-                                "errorMessage" to err.message
-                            )
+                            HttpStatusCode.BadRequest,
+                            mapOf(
+                                "redirectUri" to error.redirectUri,
+                                "errorMessage" to error.message,
+                            ),
                         )
                     }
 
-                    else -> context.respond(HttpStatusCode.BadRequest, mapOf("errorMessage" to err?.message))
+                    else -> {
+                        context.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf(
+                                "errorMessage" to error.message
+                            ),
+                        )
+                    }
                 }
             }
         }
