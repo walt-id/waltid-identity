@@ -124,7 +124,6 @@ kotlin {
 
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
 
-                implementation(project(":waltid-libraries:waltid-library-commons"))
 
             }
         }
