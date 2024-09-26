@@ -11,4 +11,22 @@ data class SubmitOID4VCIRequest(
     val accessToken: String? = null,
     val offeredCredentialProofsOfPossession: List<IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession>,
     val credentialIssuer: String,
-)
+) {
+
+    companion object {
+
+        fun build(
+            response: PrepareOID4VCIResponse,
+            offeredCredentialProofsOfPossession: List<IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession>,
+            credentialIssuer: String,
+            requireUserInput: Boolean? = false,
+        ) = SubmitOID4VCIRequest(
+            did = response.did,
+            offerURL = response.offerURL,
+            requireUserInput = requireUserInput,
+            accessToken = response.accessToken,
+            offeredCredentialProofsOfPossession = offeredCredentialProofsOfPossession,
+            credentialIssuer = credentialIssuer,
+        )
+    }
+}

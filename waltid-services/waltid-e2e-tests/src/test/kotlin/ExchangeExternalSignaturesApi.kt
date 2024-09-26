@@ -88,10 +88,12 @@ class ExchangeExternalSignatures {
     ).apply {
         this.credentialFormat = CredentialFormat.jwt_vc_json
     }
+
     //w3c jwt_vc_json - with disclosures
-    private val openbadgeSdJwtIssuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(E2ETest.sdjwtCredential).apply {
-        credentialFormat = CredentialFormat.jwt_vc_json
-    }
+    private val openbadgeSdJwtIssuanceRequest =
+        Json.decodeFromJsonElement<IssuanceRequest>(E2ETest.sdjwtCredential).apply {
+            credentialFormat = CredentialFormat.jwt_vc_json
+        }
     //ietf sd_jwt_vc - with disclosures
 
     //mDoc
@@ -101,6 +103,7 @@ class ExchangeExternalSignatures {
         authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
         credentialFormat = CredentialFormat.mso_mdoc,
     )
+
     //presentation requests
     //w3c jwt_vc_json
     private val openbadgePresentationRequest = loadResource(
@@ -109,6 +112,7 @@ class ExchangeExternalSignatures {
     private val openbadgeUniversityDegreePresentationRequest = loadResource(
         "presentation/batch-openbadge-universitydegree-presentation-request.json"
     )
+
     //ietf sd_jwt_vc
     private val identityCredentialIETFSdJwtX5cIssuanceRequest = IssuanceRequest(
         Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
@@ -468,12 +472,10 @@ class ExchangeExternalSignatures {
         assertNotNull(prepareResponse.accessToken) { "There should be an access token in the response of the prepare endpoint" }
         response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/offer/submit") {
             setBody(
-                SubmitOID4VCIRequest(
-                    did = if (useOptionalParameters) holderDID else null,
-                    offerURL = offerURL,
+                SubmitOID4VCIRequest.build(
+                    prepareResponse,
                     credentialIssuer = prepareResponse.credentialIssuer,
                     offeredCredentialProofsOfPossession = offeredCredentialProofsOfPossession,
-                    accessToken = prepareResponse.accessToken,
                 )
             )
         }.expectSuccess()
