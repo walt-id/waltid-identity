@@ -31,7 +31,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
     var message: String = ""
     return VCVerificationResult(
       this, verify(jwtCryptoProvider, header["kid"]?.jsonPrimitive?.content ?: issuer),
-(notBefore?.let { Clock.System.now().epochSeconds > it } ?: true).also {
+(notBefore?.let { Clock.System.now().epochSeconds >= it } ?: true).also {
         if(!it) message = "$message, VC is not valid before $notBefore"
       } &&
       (expiration?.let { Clock.System.now().epochSeconds < it } ?: true).also {
@@ -42,7 +42,8 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       } &&
       verifyHolderKeyBinding(jwtCryptoProvider, requiresHolderKeyBinding, audience, nonce).also {
         if(!it) message = "$message, holder key binding could not be verified"
-      }
+      },
+      message
     )
   }
 
@@ -118,7 +119,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       subject: String? = null
     ): SDJwtVC {
       val undisclosedPayload = sdPayload.undisclosedPayload.plus(
-        defaultPayloadProperties(issuerDid, cnf, vct, nbf, exp, status,subject)
+        defaultPayloadProperties(issuerDid, cnf, vct, nbf , exp, status,subject)
       ).let { JsonObject(it) }
 
       val finalSdPayload = SDPayload(undisclosedPayload, sdPayload.digestedDisclosures)

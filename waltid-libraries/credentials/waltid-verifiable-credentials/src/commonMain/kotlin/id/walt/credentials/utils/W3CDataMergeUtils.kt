@@ -1,6 +1,7 @@
 package id.walt.credentials.utils
 
 import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.crypto.utils.JsonUtils.toJsonObject
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
@@ -122,6 +123,7 @@ object W3CDataMergeUtils {
 
 
     data class MergeResult(val vc: W3CVC, val results: Map<String, JsonElement>)
+    data class JsonMergeResult(val vc: JsonObject, val results: Map<String, JsonElement>)
 
 
     data class FunctionCall(
@@ -157,5 +159,28 @@ object W3CDataMergeUtils {
             }
         }
         return MergeResult(W3CVC(vcm), results)
+    }
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    suspend fun JsonObject.mergeSDJwtVCPayloadWithMapping(
+        mapping: JsonObject,
+        context: Map<String, JsonElement>,
+        data: Map<String, suspend (FunctionCall) -> JsonElement>
+    ): JsonObject {
+        val vcm = this.toMutableMap()
+
+        val functionHistory = HashMap<String, JsonElement>()
+
+        mapping.forEach { (k, v) ->
+            if (!k.startsWith("jwt:")) {
+                vcm.patch(k, v, data, context, functionHistory)
+            } else {
+                vcm[k.removePrefix("jwt:")] = getTemplateData(v.jsonPrimitive.content, data, context, functionHistory)
+            }
+        }
+        return vcm.toJsonObject()
     }
 }

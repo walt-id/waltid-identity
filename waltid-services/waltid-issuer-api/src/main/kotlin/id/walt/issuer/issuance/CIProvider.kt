@@ -14,6 +14,8 @@ import id.walt.commons.config.ConfigurationException
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.credentials.issuance.Issuer.mergingJwtIssue
 import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
+import id.walt.credentials.issuance.dataFunctions
+import id.walt.credentials.utils.W3CDataMergeUtils.mergeSDJwtVCPayloadWithMapping
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
@@ -304,7 +306,7 @@ open class CIProvider : OpenIDCredentialIssuer(
               when (data.request.credentialFormat) {
                   CredentialFormat.sd_jwt_vc -> sdJwtVc(
                       JWKKey.importJWK(holderKey.toString()).getOrNull(),
-                      SDPayload.createSDPayload(vc, data.request.selectiveDisclosure ?: SDMap(mapOf())),
+                      vc,
                       holderDid, issuerKid)
                   else -> w3cSdJwtVc(W3CVC(vc), issuerKid, holderDid, holderKey)
               }
@@ -522,10 +524,20 @@ open class CIProvider : OpenIDCredentialIssuer(
 
     private suspend fun IssuanceSessionData.sdJwtVc(
         holderKey: JWKKey?,
-        vc: SDPayload,
+        vc: JsonObject,
         holderDid: String?, issuerKid: String?
     ): String = SDJwtVC.sign(
-        sdPayload = vc,
+        sdPayload = SDPayload.createSDPayload(
+            vc.mergeSDJwtVCPayloadWithMapping(
+                mapping = request.mapping ?: JsonObject(emptyMap()),
+                context = mapOf(
+                    "issuerDid" to issuerDid,
+                    "subjectDid" to holderDid
+                ).filterValues { !it.isNullOrEmpty() }.mapValues { JsonPrimitive(it.value) },
+                dataFunctions
+            ),
+            request.selectiveDisclosure ?: SDMap(mapOf())
+        ),
         jwtCryptoProvider = jwtCryptoProvider,
         issuerDid = (issuerDid ?: "").ifEmpty { issuerKey.key.getKeyId() },
         holderDid = holderDid,
