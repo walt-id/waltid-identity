@@ -391,7 +391,9 @@ class OCIKeyRestApi(
             }
 
             val privateOciApiKey = signingKey
-                ?: throw KeyNotFoundException("No private key provided for OCI signing. Please provide a private key.")
+                ?: throw KeyNotFoundException(
+                    message = "No private key provided for OCI signing. Please provide a private key."
+                )
 
             return Base64.encode(sha256WithRsa(privateOciApiKey, signingString.encodeToByteArray()))
         }

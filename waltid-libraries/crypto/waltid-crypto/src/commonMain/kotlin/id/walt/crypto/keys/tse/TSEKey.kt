@@ -119,11 +119,11 @@ class TSEKey(
     private suspend fun retrievePublicKey(): ByteArray {
         logger.debug { "Retrieving public key: ${this.id}" }
         val keyData = httpRequest(HttpMethod.Get, "keys/$id")
-            .tseJsonDataBody().jsonObject["keys"]?.jsonObject ?: throw KeyNotFoundException(id)
+            .tseJsonDataBody().jsonObject["keys"]?.jsonObject ?: throw KeyNotFoundException(id = id)
 
         // TO\\DO: try this
         val keyStr = keyData["1"]?.jsonObject?.get("public_key")?.jsonPrimitive?.content
-            ?: throw KeyNotFoundException("$keyData")
+            ?: throw KeyNotFoundException(id = id)
 
         logger.debug { "Key string is: $keyStr" }
 
@@ -261,7 +261,7 @@ class TSEKey(
         lazyOf(
             httpRequest()
                 .tseJsonDataBody().jsonObject["keys"]?.jsonObject?.get("1")?.jsonObject?.get("public_key")?.jsonPrimitive?.content
-                ?: throw KeyNotFoundException("No keys/1/public_key in data response")
+                ?: throw KeyNotFoundException(message = "No keys/1/public_key in data response")
         ).value
 
     @JvmBlocking
@@ -326,7 +326,7 @@ class TSEKey(
         suspend fun HttpResponse.tseJsonDataBody(): JsonObject {
             val baseMsg = { "TSE server (URL: ${this.request.url}) returned invalid response: " }
 
-            // if (!status.isSuccess()) throw RuntimeException(baseMsg.invoke() + "non-success status: $status")
+            if (!status.isSuccess()) throw RuntimeException(baseMsg.invoke() + "non-success status: $status")
 
             return runCatching { this.body<JsonObject>() }.getOrElse {
                 val bodyStr = this.bodyAsText()
