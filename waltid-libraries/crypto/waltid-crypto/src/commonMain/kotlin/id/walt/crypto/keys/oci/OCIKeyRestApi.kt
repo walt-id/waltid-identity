@@ -1,9 +1,9 @@
 package id.walt.crypto.keys.oci
 
-import id.walt.commons.exceptions.KeyNotFoundException
-import id.walt.commons.exceptions.KeyTypeNotSupportedException
-import id.walt.commons.exceptions.SigningException
-import id.walt.commons.exceptions.VerificationException
+import id.walt.crypto.exceptions.KeyNotFoundException
+import id.walt.crypto.exceptions.KeyTypeNotSupportedException
+import id.walt.crypto.exceptions.SigningException
+import id.walt.crypto.exceptions.VerificationException
 import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType

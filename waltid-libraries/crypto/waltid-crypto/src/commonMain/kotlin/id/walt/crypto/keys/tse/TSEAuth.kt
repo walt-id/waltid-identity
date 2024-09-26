@@ -1,6 +1,6 @@
 package id.walt.crypto.keys.tse
 
-import id.walt.commons.exceptions.TSEError
+import id.walt.crypto.exceptions.TSEError
 import io.github.reactivecircus.cache4k.Cache
 import io.ktor.client.*
 import io.ktor.client.call.*
