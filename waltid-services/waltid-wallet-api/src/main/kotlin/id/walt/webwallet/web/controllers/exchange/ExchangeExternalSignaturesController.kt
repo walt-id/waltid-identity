@@ -248,7 +248,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 } else {
                     listOf("")
                 }).plus(req.w3cJwtVpProof ?: "").filter { it.isNotEmpty() }
-                println("vpTokenProofs: $vpTokenProofs")
+                logger.debug { "vpTokenProofs: $vpTokenProofs" }
 
                 val tokenResponse = if (vpTokenProofs.size == 1) {
                     TokenResponse.success(
@@ -270,7 +270,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     )
                 }
 
-                println("token response: $tokenResponse")
+                logger.debug { "token response: $tokenResponse" }
                 val formParams =
                     if (authReq.responseMode == ResponseMode.direct_post_jwt) {
                         val encKey =
