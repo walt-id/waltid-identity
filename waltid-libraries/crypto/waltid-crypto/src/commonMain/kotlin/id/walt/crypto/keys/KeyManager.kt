@@ -1,8 +1,8 @@
 package id.walt.crypto.keys
 
-import id.walt.commons.exceptions.KeyBackendNotSupportedException
-import id.walt.commons.exceptions.KeyTypeMissingException
-import id.walt.commons.exceptions.KeyTypeNotSupportedException
+import id.walt.crypto.exceptions.KeyBackendNotSupportedException
+import id.walt.crypto.exceptions.KeyTypeMissingException
+import id.walt.crypto.exceptions.KeyTypeNotSupportedException
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.oci.OCIKeyRestApi
 import id.walt.crypto.keys.tse.TSEKey
