@@ -165,6 +165,10 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                                 )
                             }
 
+                            CredentialFormat.mso_mdoc -> {
+                                throw IllegalStateException("mDocs are not supported yet")
+                            }
+
                             else -> {
                                 credentialWallet.buildDescriptorMappingJwtVP(
                                     resolvedAuthReq.presentationDefinition,
