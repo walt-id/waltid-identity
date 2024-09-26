@@ -14,7 +14,7 @@ class KeyTypeMissingException() :
     CryptoArgumentException("The key type is missing from the serialized key. Please include the key type.")
 
 class KeyNotFoundException(
-    id: String,
+    id: String = "",
     message: String = "The key with ID '$id' could not be found. Please verify the ID and try again."
 ) : CryptoArgumentException(message)
 
