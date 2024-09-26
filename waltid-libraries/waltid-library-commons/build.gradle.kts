@@ -7,6 +7,9 @@ import org.gradle.kotlin.dsl.kotlin
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableAndroidBuild = getSetting("enableAndroidBuild")
+val enableIosBuild = getSetting("enableIosBuild")
 
 plugins {
     kotlin("multiplatform")
@@ -81,7 +84,10 @@ kotlin {
         binaries.library()
     }
 
-
+    if (enableIosBuild) {
+        iosArm64()
+        iosSimulatorArm64()
+    }
 
     val ktor_version = "2.3.12"
 
