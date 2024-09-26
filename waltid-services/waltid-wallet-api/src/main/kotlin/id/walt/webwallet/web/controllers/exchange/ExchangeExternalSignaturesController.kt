@@ -13,7 +13,6 @@ import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.sdjwt.KeyBindingJwt.Companion.getSdHash
 import id.walt.webwallet.service.SSIKit2WalletService.Companion.getCredentialWallet
 import id.walt.webwallet.service.SSIKit2WalletService.PresentationError
 import id.walt.webwallet.service.WalletServiceManager
@@ -24,9 +23,14 @@ import id.walt.webwallet.service.events.EventDataNotAvailable
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures
 import id.walt.webwallet.service.exchange.ProofOfPossessionParameters
-import id.walt.webwallet.service.oidc4vc.CredentialFilterUtils
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.web.controllers.auth.getWalletService
+import id.walt.webwallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIRequest
+import id.walt.webwallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIResponse
+import id.walt.webwallet.web.controllers.exchange.models.oid4vci.SubmitOID4VCIRequest
+import id.walt.webwallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPRequest
+import id.walt.webwallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPResponse
+import id.walt.webwallet.web.controllers.exchange.models.oid4vp.SubmitOID4VPRequest
 import id.walt.webwallet.web.controllers.walletRoute
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
@@ -39,8 +43,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlinx.uuid.UUID
 import kotlinx.uuid.generateUUID
@@ -93,18 +95,11 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             logger.debug { "Retrieved wallet DID: $walletDID" }
 
             val credentialWallet = getCredentialWallet(walletDID.did)
-
-//            val authKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()
-//            val key = runBlocking {
-//                runCatching {
-//                    DidService.resolveToKey(walletDID.did).getOrThrow().let { KeysService.get(it.getKeyId()) }
-//                        ?.let { KeyManager.resolveSerializedKey(it.document) }
-//                }
-//            }.getOrElse {
-//                throw IllegalArgumentException("Could not resolve key to sign JWS to generate presentation for vp_token", it)
-//            } ?: error("No key was resolved when trying to resolve key to sign JWS to generate presentation for vp_token")
+            val presentationId = "urn:uuid:" + UUID.generateUUID().toString().lowercase()
             val authKeyId = walletDID.keyId
             logger.debug { "Resolved authorization keyId: $authKeyId" }
+            val didAuthKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()
+            logger.debug { "Resolved authorization keyId: $didAuthKeyId" }
 
             val authReq = AuthorizationRequest
                 .fromHttpParametersAuto(
@@ -131,77 +126,31 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             val matchedCredentials = walletService.getCredentialsByIds(req.selectedCredentialIdList)
             logger.debug { "Matched credentials: $matchedCredentials" }
 
-            val jwtVcsPresented = CredentialFilterUtils.getJwtVcList(matchedCredentials, req.disclosures)
-            println("jwtsPresented: $jwtVcsPresented")
-            var tokenParamsList = mutableListOf<TokenParams>()
+            //NEW CODE
+            val w3cJwtVpTokenParams = ExchangeUtils.getW3cJwtVpProofParametersFromWalletCredentials(
+                walletDID.did,
+                didAuthKeyId,
+                presentationId,
+                resolvedAuthReq.clientId,
+                resolvedAuthReq.nonce,
+                matchedCredentials,
+                req.disclosures,
+            )
+            val ietfVpTokenParams = ExchangeUtils.getIETFJwtVpProofParametersFromWalletCredentials(
+                authKeyId,
+                resolvedAuthReq.clientId,
+                resolvedAuthReq.nonce,
+                matchedCredentials,
+                req.disclosures,
+            )
 
-            //sd_jwt_vc
-            val sdJwtVcsPresented = matchedCredentials.filter { it.format == CredentialFormat.sd_jwt_vc }.map {
-                // TODO: adopt selective disclosure selection (doesn't work with jwts other than sd_jwt anyway, like above)
-//                val documentWithDisclosures = if (req.disclosures?.containsKey(it.id) == true) {
-//                    it.document + "~${req.disclosures[it.id]!!.joinToString("~")}"
-//                } else {
-//                    it.document
-//                }
-//                val sdJwtString = if (req.disclosures?.containsKey(it.id) == true) {
-//                    it.document + "~${req.disclosures[it.id]!!.joinToString("~")}"
-//                } else {
-//                    "${it.document}"
-//                }
-                //auto douleuei otan pernoume xima OLA TA DISCLOSURES APO MONOI MAS
-//                val credentialOla = it.document + (if (it.disclosures != null) "~${it.disclosures}~" else "~")
-                ////
-                val credentialOla = it.document + (if (req.disclosures?.containsKey(it.id) == true) "~${req.disclosures[it.id]!!.joinToString("~")}~" else "~")
-//                val sdjwtvc = SDJwtVC.parse(documentWithDisclosures)
-//                val katiSdJwt = sdjwtvc.present(true).toString()
-                val payload = buildJsonObject {
-                    put("iat", JsonPrimitive(Clock.System.now().epochSeconds))
-                    put("aud", resolvedAuthReq.clientId)
-                    put("nonce", resolvedAuthReq.nonce ?: "")
-                    put("sd_hash", getSdHash(credentialOla))
-                }
-                val header = mapOf(
-                    "kid" to authKeyId.toJsonElement(),
-                    "typ" to "kb+jwt".toJsonElement()
-                )
-                TokenParams(
-                    credentialId = it.id,
-                    header = header,
-                    payload = payload,
-                )
-
-
-//                SDJwtVC.parse(documentWithDisclosures).present(
-//                    true, audience = session.authorizationRequest.clientId, nonce = session.nonce ?: "",
-//                    WaltIdJWTCryptoProvider(mapOf(key.getKeyId() to key)), key.getKeyId()
-//                )
+            val (rootPathVP, rootPathMDoc) = if( ietfVpTokenParams != null && w3cJwtVpTokenParams == null) {
+                Pair("$", "$[0]")
+            } else if (ietfVpTokenParams != null && w3cJwtVpTokenParams != null) {
+                Pair("$[0]", "$[1]")
+            } else {
+                Pair("$", "$[0]")
             }
-            println("sdJwtVCsPresented: $sdJwtVcsPresented")
-            tokenParamsList.addAll(sdJwtVcsPresented)
-            //
-
-            val presentationId = "urn:uuid:" + UUID.generateUUID().toString().lowercase()
-            if (jwtVcsPresented.isNotEmpty()) {
-                val vpPayload = credentialWallet.getVpJson(
-                    jwtVcsPresented,
-                    presentationId,
-                    resolvedAuthReq.nonce,
-                    resolvedAuthReq.clientId,
-                )
-                val vpHeader = mapOf(
-                    "kid" to authKeyId.toJsonElement(),
-                    "typ" to "JWT".toJsonElement()
-                )
-                val vpTokenParams = TokenParams(
-                    header = vpHeader,
-                    payload = Json.decodeFromString<Map<String, JsonElement>>(vpPayload),
-                )
-                logger.debug { "Generated vp token params: $vpTokenParams" }
-                tokenParamsList.add(vpTokenParams)
-            }
-
-            val rootPathVP = "$" + (if (tokenParamsList.size == 2) "[0]" else "")
-//            val rootPathMDoc = "$" + (if (presentations.size == 2) "[1]" else "")
             val presentationSubmission = PresentationSubmission(
                 id = presentationId,
                 definitionId = presentationId,
@@ -232,11 +181,10 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             val responsePayload = PrepareOID4VPResponse(
                 walletDID.did,
                 req.presentationRequest,
-                resolvedAuthReq,
-                presentationSubmission,
                 req.selectedCredentialIdList,
-                req.disclosures,
-                tokenParamsList,
+                presentationSubmission,
+                w3CJwtVpProofParameters = w3cJwtVpTokenParams,
+                ietfSdJwtVpProofParameters = ietfVpTokenParams,
             )
             logger.debug { "Response payload: $responsePayload" }
 
@@ -260,7 +208,15 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             val req = call.receive<SubmitOID4VPRequest>()
             logger.debug { "Request: $req" }
 
-            val authReq = req.resolvedAuthReq
+            val authReq = AuthorizationRequest
+                .fromHttpParametersAuto(
+                    parseQueryString(
+                        Url(
+                            req.presentationRequest,
+                        ).encodedQuery,
+                    ).toMap()
+                )
+            logger.debug { "Auth req: $authReq" }
             val authResponseURL = authReq.responseUri
                 ?: authReq.redirectUri ?: throw AuthorizationError(
                     authReq,
@@ -270,36 +226,26 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             logger.debug { "Authorization response URL: $authResponseURL" }
             val presentationSubmission = req.presentationSubmission
             val presentedCredentialIdList = req.presentedCredentialIdList
-            val katiTransformed = req.signedTokens.map { signedToken ->
-                if (signedToken.credentialId != null) {
-                    val credential = walletService.getCredential(signedToken.credentialId)
-                    if (credential.format == CredentialFormat.sd_jwt_vc) {
-                        //auto douleuei otan pernoume xima OLA TA DISCLOSURES APO MONOI MAS
-//                        credential.document +
-//                                (if (credential.disclosures != null) "~${credential.disclosures}~" else "~") +
-//                                signedToken.signedToken
-                        //
-                        credential.document +
-                                (if (req.disclosures?.containsKey(credential.id) == true) "~${req.disclosures[credential.id]!!.joinToString("~")}~" else "~") +
-                                signedToken.signedToken
-                    } else {
-                        signedToken.signedToken
-                    }
-                } else {
-                    signedToken.signedToken
-                }
-            }
 
-            val tokenResponse = if (katiTransformed.size == 1) {
+            val vpTokenProofs = (if (req.ietfSdJwtVpProofs != null) {
+                req.ietfSdJwtVpProofs.map { ietfVpProof ->
+                    ietfVpProof.sdJwtVc + ietfVpProof.vpTokenProof
+                }
+            } else {
+                listOf("")
+            }).plus(req.w3cJwtVpProof ?: "").filter { it.isNotEmpty() }
+            println("vpTokenProofs: $vpTokenProofs")
+
+            val tokenResponse = if (vpTokenProofs.size == 1) {
                 TokenResponse.success(
-                    vpToken = VpTokenParameter.fromJsonElement(katiTransformed.first().toJsonElement()),
+                    vpToken = VpTokenParameter.fromJsonElement(vpTokenProofs.first().toJsonElement()),
                     presentationSubmission = presentationSubmission,
                     idToken = null,
                     state = authReq.state,
                 )
             } else {
                 TokenResponse.success(
-                    vpToken = JsonArray(katiTransformed.map { it.toJsonElement() }).let {
+                    vpToken = JsonArray(vpTokenProofs.map { it.toJsonElement() }).let {
                         VpTokenParameter.fromJsonElement(
                             it
                         )
@@ -309,7 +255,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     state = authReq.state,
                 )
             }
-            println("kati: $katiTransformed")
+
             println("token response: $tokenResponse")
             val formParams =
                 if (authReq.responseMode == ResponseMode.direct_post_jwt) {
@@ -397,39 +343,10 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             }
 
             if (result.isSuccess) {
-//                wallet.addOperationHistory(
-//                    WalletOperationHistory.new(
-//                        tenant = wallet.tenant,
-//                        wallet = wallet,
-//                        "external_signatures",
-//                        mapOf(
-//                            "did" to req.prepareOid4vpResponse.did,
-//                            "request" to request,
-//                            "selected-credentials" to selectedCredentialIds.joinToString(),
-//                            "success" to "true",
-//                            "redirect" to result.getOrThrow()
-//                        ) // change string true to bool
-//                    )
-//                )
-
                 context.respond(HttpStatusCode.OK, mapOf("redirectUri" to result.getOrThrow()))
             } else {
                 val err = result.exceptionOrNull()
                 logger.debug { "Presentation failed: $err" }
-
-//                wallet.addOperationHistory(
-//                    WalletOperationHistory.new(
-//                        tenant = wallet.tenant,
-//                        wallet = wallet,
-//                        "usePresentationRequest",
-//                        mapOf(
-//                            "did" to did,
-//                            "request" to request,
-//                            "success" to "false",
-//                            //"redirect" to ""
-//                        ) // change string false to bool
-//                    )
-//                )
                 when (err) {
                     is PresentationError -> {
                         context.respond(
@@ -618,78 +535,3 @@ fun Application.exchangeExternalSignatures() = walletRoute {
         }
     }
 }
-
-@Serializable
-data class PrepareOID4VPRequest(
-    val did: String,
-    val presentationRequest: String,
-    val selectedCredentialIdList: List<String>,
-    val disclosures: Map<String, List<String>>? = null,
-)
-
-@Serializable
-data class PrepareOID4VPResponse(
-    val did: String,
-    val presentationRequest: String,
-    val resolvedAuthReq: AuthorizationRequest,
-    val presentationSubmission: PresentationSubmission,
-    val presentedCredentialIdList: List<String>,
-    val disclosures: Map<String, List<String>>? = null,
-    val tokenParams: List<TokenParams>,
-//    val vpTokenParams: UnsignedVPTokenParameters,
-)
-
-@Serializable
-data class UnsignedVPTokenParameters(
-    val header: Map<String, JsonElement>,
-    val payload: String,
-)
-
-@Serializable
-data class SubmitOID4VPRequest(
-    val did: String,
-    val signedTokens: List<SignedToken>,
-    val presentationRequest: String,
-    val resolvedAuthReq: AuthorizationRequest,
-    val presentationSubmission: PresentationSubmission,
-    val presentedCredentialIdList: List<String>,
-    val disclosures: Map<String, List<String>>? = null,
-)
-
-@Serializable
-data class PrepareOID4VCIRequest(
-    val did: String? = null,
-    val offerURL: String,
-)
-
-@Serializable
-data class PrepareOID4VCIResponse(
-    val did: String? = null,
-    val offerURL: String,
-    val accessToken: String? = null,
-    val offeredCredentialsProofRequests: List<IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossessionParameters>,
-    val credentialIssuer: String,
-)
-
-@Serializable
-data class SubmitOID4VCIRequest(
-    val did: String? = null,
-    val offerURL: String,
-    val requireUserInput: Boolean? = false,
-    val accessToken: String? = null,
-    val offeredCredentialProofsOfPossession: List<IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession>,
-    val credentialIssuer: String,
-)
-
-@Serializable
-data class TokenParams(
-    val credentialId: String? = null,
-    val header: Map<String, JsonElement>,
-    val payload: Map<String, JsonElement>,
-)
-
-@Serializable
-data class SignedToken(
-    val credentialId: String? = null,
-    val signedToken: String,
-)

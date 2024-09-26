@@ -74,28 +74,6 @@ class E2ETest {
         }
     }
 
-//    @Test
-//    fun e2eTemp() = testBlock(defaultTestTimeout) {
-//        ExchangeExternalSignatures().executeTestCases()
-//    }
-
-//    @Test
-//    fun e2eMonoLSP() = testBlock(defaultTestTimeout) {
-//        val lspPotentialIssuance = LspPotentialIssuance(testHttpClient(doFollowRedirects = false))
-//        lspPotentialIssuance.testTrack1()
-//        lspPotentialIssuance.testTrack2()
-//        val lspPotentialVerification = LspPotentialVerification(testHttpClient(doFollowRedirects = false))
-//        lspPotentialVerification.testPotentialInteropTrack3()
-//        lspPotentialVerification.testPotentialInteropTrack4()
-//        val lspPotentialWallet = setupTestWallet()
-//        lspPotentialWallet.testMDocIssuance()
-//        lspPotentialWallet.testMdocPresentation()
-//        lspPotentialWallet.testSDJwtVCIssuance()
-//        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
-//        lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
-//        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
-//    }
-
     @Test
     fun e2e() = testBlock(defaultTestTimeout) {
         var client = testHttpClient()
