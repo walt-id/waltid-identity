@@ -529,11 +529,8 @@ class ExchangeExternalSignatures {
         val prepareResponse = response.body<PrepareOID4VPResponse>()
         client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/submit") {
             setBody(
-                SubmitOID4VPRequest(
-                    holderDID,
-                    prepareResponse.presentationRequest,
-                    prepareResponse.presentationSubmission,
-                    prepareResponse.selectedCredentialIdList,
+                SubmitOID4VPRequest.build(
+                    prepareResponse,
                     disclosures = if (addDisclosures) matchedCredentialList
                         .filter { it.disclosures != null }
                         .associate {
@@ -634,13 +631,8 @@ class ExchangeExternalSignatures {
         val prepareResponse = response.body<PrepareOID4VPResponse>()
         client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/submit") {
             setBody(
-                SubmitOID4VPRequest(
-                    holderDID,
-//                    signedTokens,
-                    prepareResponse.presentationRequest,
-//                    prepareResponse.resolvedAuthReq,
-                    prepareResponse.presentationSubmission,
-                    prepareResponse.selectedCredentialIdList,
+                SubmitOID4VPRequest.build(
+                    prepareResponse,
                     disclosures = if (addDisclosures) matchedCredentialList
                         .filter { it.disclosures != null }
                         .associate {
@@ -748,11 +740,8 @@ class ExchangeExternalSignatures {
         val prepareResponse = response.body<PrepareOID4VPResponse>()
         client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/submit") {
             setBody(
-                SubmitOID4VPRequest(
-                    holderDID,
-                    prepareResponse.presentationRequest,
-                    prepareResponse.presentationSubmission,
-                    prepareResponse.selectedCredentialIdList,
+                SubmitOID4VPRequest.build(
+                    prepareResponse,
                     disclosures = if (addDisclosures) matchedCredentialList
                         .filter { it.disclosures != null }
                         .associate {

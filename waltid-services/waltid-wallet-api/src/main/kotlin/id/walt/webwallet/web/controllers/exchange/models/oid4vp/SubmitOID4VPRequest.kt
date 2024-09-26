@@ -12,4 +12,24 @@ data class SubmitOID4VPRequest(
     val disclosures: Map<String, List<String>>? = null,
     val w3cJwtVpProof: String? = null,
     val ietfSdJwtVpProofs: List<IETFSdJwtVpTokenProof>? = null,
-)
+) {
+
+    companion object {
+
+        fun build(
+            response: PrepareOID4VPResponse,
+            disclosures: Map<String, List<String>>? = null,
+            w3cJwtVpProof: String? = null,
+            ietfSdJwtVpProofs: List<IETFSdJwtVpTokenProof>? = null,
+        ) =
+            SubmitOID4VPRequest(
+                did = response.did,
+                presentationRequest = response.presentationRequest,
+                presentationSubmission = response.presentationSubmission,
+                presentedCredentialIdList = response.selectedCredentialIdList,
+                disclosures = disclosures,
+                w3cJwtVpProof = w3cJwtVpProof,
+                ietfSdJwtVpProofs = ietfSdJwtVpProofs,
+            )
+    }
+}
