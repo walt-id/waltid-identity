@@ -181,10 +181,8 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     }
                 )
                 logger.debug { "Generated presentation submission: $presentationSubmission" }
-                PrepareOID4VPResponse(
-                    walletDID.did,
-                    req.presentationRequest,
-                    req.selectedCredentialIdList,
+                PrepareOID4VPResponse.build(
+                    req,
                     presentationSubmission,
                     w3CJwtVpProofParameters = w3cJwtVpTokenParams,
                     ietfSdJwtVpProofParameters = ietfVpTokenParams,

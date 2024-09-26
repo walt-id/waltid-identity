@@ -11,4 +11,23 @@ data class PrepareOID4VPResponse(
     val presentationSubmission: PresentationSubmission,
     val w3CJwtVpProofParameters: W3cJwtVpProofParameters? = null,
     val ietfSdJwtVpProofParameters: List<IETFSdJwtVpProofParameters>? = null,
-)
+) {
+
+    companion object {
+
+        fun build(
+            request: PrepareOID4VPRequest,
+            presentationSubmission: PresentationSubmission,
+            w3CJwtVpProofParameters: W3cJwtVpProofParameters? = null,
+            ietfSdJwtVpProofParameters: List<IETFSdJwtVpProofParameters>? = null
+        ) =
+            PrepareOID4VPResponse(
+                did = request.did,
+                presentationRequest = request.presentationRequest,
+                selectedCredentialIdList = request.selectedCredentialIdList,
+                presentationSubmission = presentationSubmission,
+                w3CJwtVpProofParameters = w3CJwtVpProofParameters,
+                ietfSdJwtVpProofParameters = ietfSdJwtVpProofParameters,
+            )
+    }
+}
