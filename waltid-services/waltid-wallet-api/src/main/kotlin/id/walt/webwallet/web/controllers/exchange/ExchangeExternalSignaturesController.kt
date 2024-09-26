@@ -438,11 +438,12 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             }
         }) {
             val walletService = getWalletService()
-            val req = call.receive<PrepareOID4VCIRequest>()
-            val offer = req.offerURL
-            logger.debug { "Request: $req" }
 
             runCatching {
+                val req = call.receive<PrepareOID4VCIRequest>()
+                val offer = req.offerURL
+                logger.debug { "Request: $req" }
+
                 val walletDID = req.did?.let {
                     DidsService.get(walletService.walletId, req.did)
                 } ?: walletService.listDids().firstOrNull()
@@ -520,10 +521,11 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             response(OpenAPICommons.useOfferRequestEndpointResponseParams())
         }) {
             val walletService = getWalletService()
-            val req = call.receive<SubmitOID4VCIRequest>()
-            logger.debug { "Request: $req" }
 
             runCatching {
+                val req = call.receive<SubmitOID4VCIRequest>()
+                logger.debug { "Request: $req" }
+
                 val did = req.did ?: walletService.listDids().firstOrNull()?.did
                 ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
                 WalletServiceManager
