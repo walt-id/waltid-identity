@@ -3,6 +3,7 @@ package id.walt.webwallet.service.exchange
 import COSE.OneKey
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.OfferedCredential
@@ -45,8 +46,8 @@ object ProofOfPossessionParameterFactory {
                 ).let {
                     ProofOfPossessionParameters(
                         ProofType.cwt,
-                        Json.encodeToJsonElement(it.headers.toCBOR()),
-                        Json.encodeToJsonElement(it.payload.toCBOR()),
+                        Json.encodeToJsonElement(it.headers.toCBOR().encodeToBase64()),
+                        Json.encodeToJsonElement(it.payload.toCBOR().encodeToBase64()),
                     )
                 }
             }
@@ -83,8 +84,8 @@ object ProofOfPossessionParameterFactory {
                 ).let {
                     ProofOfPossessionParameters(
                         ProofType.cwt,
-                        Json.encodeToJsonElement(it.headers.toCBOR()),
-                        Json.encodeToJsonElement(it.payload.toCBOR()),
+                        Json.encodeToJsonElement(it.headers.toCBOR().encodeToBase64()),
+                        Json.encodeToJsonElement(it.payload.toCBOR().encodeToBase64()),
                     )
                 }
             }

@@ -21,8 +21,6 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.EventDataNotAvailable
 import id.walt.webwallet.service.events.EventType
-import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures
-import id.walt.webwallet.service.exchange.ProofOfPossessionParameters
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.web.controllers.auth.getWalletService
@@ -32,6 +30,8 @@ import id.walt.webwallet.web.controllers.exchange.models.oid4vci.SubmitOID4VCIRe
 import id.walt.webwallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPRequest
 import id.walt.webwallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPResponse
 import id.walt.webwallet.web.controllers.exchange.models.oid4vp.SubmitOID4VPRequest
+import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeOpenApiCommons
+import id.walt.webwallet.web.controllers.exchange.openapi.examples.ExchangeExternalSignaturesExamples
 import id.walt.webwallet.web.controllers.walletRoute
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
@@ -52,8 +52,8 @@ import kotlinx.uuid.generateUUID
 fun Application.exchangeExternalSignatures() = walletRoute {
     val logger = KotlinLogging.logger { }
     route(
-        OpenAPICommons.exchangeRootPath,
-        OpenAPICommons.exchangeRoute(),
+        ExchangeOpenApiCommons.EXCHANGE_ROOT_PATH,
+        ExchangeOpenApiCommons.exchangeRoute(),
     ) {
         post("external_signatures/presentation/prepare", {
             summary = "Preparation (first) step for an OID4VP flow with externally provided signatures."
@@ -61,18 +61,21 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             request {
                 body<PrepareOID4VPRequest> {
                     required = true
-                    example("default") {
-                        value = PrepareOID4VPRequest(
-                            "did:web:walt.id",
-                            "oid4vp://authorize?response_type=...",
-                            listOf(
-                                "56d2449b-c40e-4091-8edf-5fb4920b08a3",
-                                "a9df4e9c-3982-4ed2-999d-5b08603381c7",
-                            ),
-                        )
-                    }
+                    example(
+                        "W3C Verifiable Credential",
+                        ExchangeExternalSignaturesExamples.prepareOid4vpRequestW3CVCExample(),
+                    )
+                    example(
+                        "W3C SD-JWT Verifiable Credential",
+                        ExchangeExternalSignaturesExamples.prepareOid4vpRequestW3CSDJWTVCExample(),
+                    )
+                    example(
+                        "IETF SD-JWT Verifiable Credential",
+                        ExchangeExternalSignaturesExamples.prepareOid4vpRequestIETFSDJWTVCExample(),
+                    )
                 }
             }
+
             response {
                 HttpStatusCode.OK to {
                     description = "Collection of parameters that are necessary to invoke the submit endpoint. " +
@@ -80,6 +83,18 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                             "vpTokenParams object that is contained within."
                     body<PrepareOID4VPResponse> {
                         required = true
+                        example(
+                            "W3C Verifiable Credential",
+                            ExchangeExternalSignaturesExamples.prepareOid4vpResponseW3CVCExample(),
+                        )
+                        example(
+                            "W3C SD-JWT Verifiable Credential",
+                            ExchangeExternalSignaturesExamples.prepareOid4vpResponseW3CSDJWTVCExample(),
+                        )
+                        example(
+                            "IETF SD-JWT Verifiable Credential",
+                            ExchangeExternalSignaturesExamples.prepareOid4vpResponseIETFSDJWTVCExample(),
+                        )
                     }
                 }
             }
@@ -218,9 +233,23 @@ fun Application.exchangeExternalSignatures() = walletRoute {
 
             request {
                 body<SubmitOID4VPRequest> {
+                    required = true
+                    example(
+                        "W3C Verifiable Credential",
+                        ExchangeExternalSignaturesExamples.submitOid4vpRequestW3CVCExample(),
+                    )
+                    example(
+                        "W3C SD-JWT Verifiable Credential",
+                        ExchangeExternalSignaturesExamples.submitOid4vpRequestW3CSDJWTVCExample(),
+                    )
+                    example(
+                        "IETF SD-JWT Verifiable Credential",
+                        ExchangeExternalSignaturesExamples.submitOid4vpRequestIETFSDJWTVCExample(),
+                    )
                 }
             }
-            response(OpenAPICommons.usePresentationRequestResponse())
+
+            response(ExchangeOpenApiCommons.usePresentationRequestResponse())
         }) {
             val walletService = getWalletService()
 
@@ -388,6 +417,11 @@ fun Application.exchangeExternalSignatures() = walletRoute {
 
             request {
                 body<PrepareOID4VCIRequest> {
+                    required = true
+                    example(
+                        "default",
+                        ExchangeExternalSignaturesExamples.prepareOid4vciRequestDefaultExample(),
+                    )
                 }
             }
 
@@ -399,44 +433,18 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                                 "proof of possession parameters."
                     body<PrepareOID4VCIResponse> {
                         required = true
-                        example("When proofType == cwt") {
-                            value = PrepareOID4VCIResponse(
-                                did = "did:web:walt.id",
-                                offerURL = "openid-credential-offer://?credential_offer=",
-                                offeredCredentialsProofRequests = listOf(
-                                    IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossessionParameters(
-                                        OfferedCredential(
-                                            format = CredentialFormat.mso_mdoc,
-                                        ),
-                                        ProofOfPossessionParameters(
-                                            ProofType.cwt,
-                                            "<<JSON-ENCODED BYTE ARRAY OF CBOR MAP>>".toJsonElement(),
-                                            "<<JSON-ENCODED BYTE ARRAY OF CBOR MAP>>".toJsonElement(),
-                                        )
-                                    )
-                                ),
-                                credentialIssuer = "https://issuer.portal.walt.id"
-                            )
-                        }
-                        example("When proofType == jwt") {
-                            value = PrepareOID4VCIResponse(
-                                did = "did:web:walt.id",
-                                offerURL = "openid-credential-offer://?credential_offer=",
-                                offeredCredentialsProofRequests = listOf(
-                                    IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossessionParameters(
-                                        OfferedCredential(
-                                            format = CredentialFormat.jwt_vc_json,
-                                        ),
-                                        ProofOfPossessionParameters(
-                                            ProofType.jwt,
-                                            "<<JWT HEADER SECTION>>".toJsonElement(),
-                                            "<<JWT CLAIMS SECTION>>".toJsonElement(),
-                                        )
-                                    )
-                                ),
-                                credentialIssuer = "https://issuer.portal.walt.id"
-                            )
-                        }
+                        example(
+                            "W3C Verifiable Credential",
+                            ExchangeExternalSignaturesExamples.prepareOid4vciResponseW3CVCExample(),
+                        )
+                        example(
+                            "IETF SD-JWT Verifiable Credential",
+                            ExchangeExternalSignaturesExamples.prepareOid4vciResponseIETFSDJWTVCExample(),
+                        )
+                        example(
+                            "mDoc Verifiable Credential",
+                            ExchangeExternalSignaturesExamples.prepareOid4vciResponseMDocVCExample(),
+                        )
                     }
                 }
             }
@@ -505,42 +513,22 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             request {
                 body<SubmitOID4VCIRequest> {
                     required = true
-                    example("When proofType == cwt") {
-                        value = SubmitOID4VCIRequest(
-                            did = "did:web:walt.id",
-                            offerURL = "openid-credential-offer://?credential_offer=",
-                            offeredCredentialProofsOfPossession = listOf(
-                                IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession(
-                                    OfferedCredential(
-                                        format = CredentialFormat.mso_mdoc,
-                                    ),
-                                    ProofType.cwt,
-                                    "<<BASE64URL-ENCODED SIGNED CWT>>",
-                                )
-                            ),
-                            credentialIssuer = "https://issuer.portal.walt.id"
-                        )
-                    }
-                    example("When proofType == jwt") {
-                        value = SubmitOID4VCIRequest(
-                            did = "did:web:walt.id",
-                            offerURL = "openid-credential-offer://?credential_offer=",
-                            offeredCredentialProofsOfPossession = listOf(
-                                IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession(
-                                    OfferedCredential(
-                                        format = CredentialFormat.jwt_vc_json,
-                                    ),
-                                    ProofType.jwt,
-                                    "<<COMPACT-SERIALIZED SIGNED JWT>>",
-                                )
-                            ),
-                            credentialIssuer = "https://issuer.portal.walt.id"
-                        )
-                    }
+                    example(
+                        "W3C Verifiable Credential",
+                        ExchangeExternalSignaturesExamples.submitOid4vciRequestW3CVCExample(),
+                    )
+                    example(
+                        "IETF SD-JWT Verifiable Credential",
+                        ExchangeExternalSignaturesExamples.submitOid4vciRequestIETFSDJWTVCExample(),
+                    )
+                    example(
+                        "mDoc Verifiable Credential",
+                        ExchangeExternalSignaturesExamples.submitOid4vciRequestMDocVCExample(),
+                    )
                 }
             }
 
-            response(OpenAPICommons.useOfferRequestEndpointResponseParams())
+            response(ExchangeOpenApiCommons.useOfferRequestEndpointResponseParams())
         }) {
             val walletService = getWalletService()
 

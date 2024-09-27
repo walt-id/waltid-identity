@@ -11,6 +11,7 @@ import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.web.controllers.auth.getUserUUID
 import id.walt.webwallet.web.controllers.auth.getWalletId
 import id.walt.webwallet.web.controllers.auth.getWalletService
+import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeOpenApiCommons
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import id.walt.webwallet.web.controllers.walletRoute
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
@@ -24,7 +25,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 fun Application.exchange() = walletRoute {
-    route(OpenAPICommons.exchangeRootPath, OpenAPICommons.exchangeRoute()) {
+    route(ExchangeOpenApiCommons.EXCHANGE_ROOT_PATH, ExchangeOpenApiCommons.exchangeRoute()) {
         post("useOfferRequest", {
             summary = "Claim credential(s) from an issuer"
 
@@ -36,7 +37,7 @@ fun Application.exchange() = walletRoute {
                 }
             }
 
-            response(OpenAPICommons.useOfferRequestEndpointResponseParams())
+            response(ExchangeOpenApiCommons.useOfferRequestEndpointResponseParams())
         }) {
             val wallet = getWalletService()
 
@@ -119,7 +120,7 @@ fun Application.exchange() = walletRoute {
             request {
                 body<UsePresentationRequest>()
             }
-            response(OpenAPICommons.usePresentationRequestResponse())
+            response(ExchangeOpenApiCommons.usePresentationRequestResponse())
         }) {
             val wallet = getWalletService()
 

@@ -97,10 +97,9 @@ class E2ETest {
             wallet = it.wallets.first().id
             println("Selected wallet: $wallet")
         }
-        ///sub-region -x5c-based authentication method test case scenarios-
+        //region -Auth X5c-
         AuthApi.X5c(client).executeTestCases()
-        ///end sub-region -x5c-based authentication method test case scenarios-
-
+        //endregion -Auth X5c-
         //endregion -Auth-
 
         //region -Keys-
@@ -295,7 +294,9 @@ class E2ETest {
         //In the context of these test cases, a new wallet is created and initialized
         //accordingly, i.e., the default wallet that is employed by all the other test
         //cases is not used here.
+        //region -External Signatures-
         ExchangeExternalSignatures().executeTestCases()
+        //endregion -External Signatures-
     }
 
     //@Test // enable to execute test selectively
