@@ -1,5 +1,6 @@
 package id.walt.webwallet.usecase.claim
 
+import id.walt.crypto.keys.Key
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession
@@ -15,12 +16,14 @@ class ExternalSignatureClaimStrategy(
 
     suspend fun prepareCredentialClaim(
         did: String,
-        keyId: String,
+        didAuthKeyId: String,
+        publicKey: Key,
         offerURL: String,
     ) = issuanceServiceExternalSignatures.prepareExternallySignedOfferRequest(
         offerURL = offerURL,
         did = did,
-        keyId = keyId,
+        didAuthKeyId = didAuthKeyId,
+        publicKey = publicKey,
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
     )
 

@@ -23,6 +23,7 @@ import id.walt.webwallet.service.events.EventDataNotAvailable
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures
 import id.walt.webwallet.service.exchange.ProofOfPossessionParameters
+import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.web.controllers.auth.getWalletService
 import id.walt.webwallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIRequest
@@ -39,6 +40,7 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.util.*
@@ -126,14 +128,16 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 logger.debug { "Matched credentials: $matchedCredentials" }
 
                 val presentationId = "urn:uuid:" + UUID.generateUUID().toString().lowercase()
-                val authKeyId = walletDID.keyId
-                logger.debug { "Resolved authorization keyId: $authKeyId" }
-                val didAuthKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()
-                logger.debug { "Resolved authorization keyId: $didAuthKeyId" }
+                val keyId = walletDID.keyId
+                logger.debug { "keyId: $keyId" }
+                val didFirstAuthKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()
+                logger.debug { "Resolved first did authentication keyId: $didFirstAuthKeyId" }
 
+                //this is not really correct, we need to actually compute the proof parameters
+                //based on the Verifier's client metadata, but...
                 val w3cJwtVpTokenParams = ExchangeUtils.getW3cJwtVpProofParametersFromWalletCredentials(
                     walletDID.did,
-                    didAuthKeyId,
+                    didFirstAuthKeyId,
                     presentationId,
                     resolvedAuthReq.clientId,
                     resolvedAuthReq.nonce,
@@ -141,7 +145,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     req.disclosures,
                 )
                 val ietfVpTokenParams = ExchangeUtils.getIETFJwtVpProofParametersFromWalletCredentials(
-                    authKeyId,
+                    keyId,
                     resolvedAuthReq.clientId,
                     resolvedAuthReq.nonce,
                     matchedCredentials,
@@ -449,11 +453,29 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 } ?: walletService.listDids().firstOrNull()
                 ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
                 logger.debug { "Retrieved wallet DID: $walletDID" }
-                val authKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()
-                logger.debug { "Resolved did authorization keyId: $authKeyId" }
+                val didFirstAuthKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()
+                logger.debug { "Resolved first did authentication keyId: $didFirstAuthKeyId" }
+                val authPublicKey = KeysService.get(walletService.walletId, walletDID.keyId)?.let {
+                    runCatching {
+                        KeyManager.resolveSerializedKey(it.document).getPublicKey()
+                    }.fold(
+                        onSuccess = {
+                            it.getPublicKey()
+                        },
+                        onFailure = { error ->
+                            throw IllegalStateException(
+                                "Failed to parse wallet's ${walletService.walletId} " +
+                                        "serialized key ${walletDID.keyId}: ${error.message}"
+                            )
+                        }
+                    )
+                }
+                    ?: throw NotFoundException("Unable to retrieve/find key ${walletDID.keyId} from wallet ${walletService.walletId}")
+                logger.debug { "Retrieved auth public key: $authPublicKey" }
                 WalletServiceManager.externalSignatureClaimStrategy.prepareCredentialClaim(
                     did = walletDID.did,
-                    keyId = authKeyId,
+                    didAuthKeyId = didFirstAuthKeyId,
+                    publicKey = authPublicKey,
                     offerURL = offer,
                 ).let { prepareClaimResult ->
                     PrepareOID4VCIResponse(

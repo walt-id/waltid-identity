@@ -1,5 +1,6 @@
 package id.walt.webwallet.service.exchange
 
+import id.walt.crypto.keys.Key
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.requests.CredentialOfferRequest
@@ -11,15 +12,16 @@ import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
 import io.klogging.logger
 import kotlinx.serialization.Serializable
 
-object IssuanceServiceExternalSignatures: IssuanceServiceBase() {
+object IssuanceServiceExternalSignatures : IssuanceServiceBase() {
 
     override val logger = logger<IssuanceServiceExternalSignatures>()
 
     suspend fun prepareExternallySignedOfferRequest(
         offerURL: String,
         credentialWallet: TestCredentialWallet,
-        keyId: String,
+        publicKey: Key,
         did: String,
+        didAuthKeyId: String,
     ): PrepareExternalClaimResult {
         logger.debug { "// -------- WALLET: PREPARE STEP FOR OID4VCI WITH EXTERNAL SIGNATURES ----------" }
         logger.debug { "// parse credential URI" }
@@ -35,7 +37,8 @@ object IssuanceServiceExternalSignatures: IssuanceServiceBase() {
                 credentialWallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams)),
                 credentialWallet,
                 did,
-                keyId,
+                didAuthKeyId,
+                publicKey,
             )
         }
     }
@@ -44,7 +47,8 @@ object IssuanceServiceExternalSignatures: IssuanceServiceBase() {
         credentialOffer: CredentialOffer,
         credentialWallet: TestCredentialWallet,
         did: String,
-        keyId: String,
+        didAuthKeyId: String,
+        publicKey: Key,
     ): PrepareExternalClaimResult {
         val providerMetadata = getCredentialIssuerOpenIDMetadata(
             credentialOffer.credentialIssuer,
@@ -78,8 +82,8 @@ object IssuanceServiceExternalSignatures: IssuanceServiceBase() {
                 getOfferedCredentialProofOfPossessionParameters(
                     credentialOffer,
                     offeredCredential,
-                    did,
-                    keyId,
+                    didAuthKeyId,
+                    publicKey,
                     tokenResp.cNonce,
                 ),
             )
@@ -94,13 +98,13 @@ object IssuanceServiceExternalSignatures: IssuanceServiceBase() {
     private suspend fun getOfferedCredentialProofOfPossessionParameters(
         credentialOffer: CredentialOffer,
         offeredCredential: OfferedCredential,
-        did: String,
-        keyId: String,
+        didAuthKeyId: String,
+        publicKey: Key,
         nonce: String?,
     ): ProofOfPossessionParameters {
         return ProofOfPossessionParameterFactory.new(
-            did,
-            keyId,
+            didAuthKeyId,
+            publicKey,
             isKeyProofRequiredForOfferedCredential(offeredCredential),
             offeredCredential,
             credentialOffer,
@@ -189,10 +193,11 @@ object IssuanceServiceExternalSignatures: IssuanceServiceBase() {
         val proofType: ProofType,
         val signedProofOfPossession: String,
     ) {
-        fun toProofOfPossession() = when(proofType) {
+        fun toProofOfPossession() = when (proofType) {
             ProofType.cwt -> {
                 ProofOfPossession.CWTProofBuilder("").build(signedProofOfPossession)
             }
+
             ProofType.ldp_vp -> TODO("ldp_vp proof not yet implemented")
             else -> {
                 ProofOfPossession.JWTProofBuilder("").build(signedProofOfPossession)
