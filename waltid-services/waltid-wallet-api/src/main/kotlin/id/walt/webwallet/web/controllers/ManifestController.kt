@@ -13,6 +13,8 @@ import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.util.*
 import kotlinx.serialization.json.JsonObject
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 fun Application.manifest() = walletRoute {
     route("manifest", {
@@ -155,10 +157,11 @@ internal suspend fun callManifest(parameters: Parameters, method: suspend (Param
     }
 }
 
+@OptIn(ExperimentalUuidApi::class)
 internal fun getManifest(parameters: Parameters, credentialsService: CredentialsService): JsonObject? {
     val walletId = parameters.getOrFail("walletId")
     val credentialId = parameters.getOrFail("credentialId")
-    return credentialsService.get(kotlinx.uuid.UUID(walletId), credentialId)?.parsedManifest
+    return credentialsService.get(Uuid.parse(walletId), credentialId)?.parsedManifest
 }
 
 internal suspend fun extractManifest(parameters: Parameters): JsonObject? {

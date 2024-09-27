@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.usecase.claim
 
 import TestUtils
@@ -18,11 +20,13 @@ import id.walt.webwallet.usecase.notification.NotificationUseCase
 import io.mockk.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
+
+
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class SilentClaimStrategyTest {
     private val json = Json { ignoreUnknownKeys = true }
@@ -51,8 +55,8 @@ class SilentClaimStrategyTest {
     )
     private val did = "did:my:test"
     private val offer = "openid-credential-offer://my-offer-uri"
-    private val account = UUID("bd698a0f-1703-4565-aab3-747c374152dd")
-    private val wallet = UUID("bd698a0f-1703-4565-aab3-747c374152dd")
+    private val account = Uuid.parse("bd698a0f-1703-4565-aab3-747c374152dd")
+    private val wallet = Uuid.parse("bd698a0f-1703-4565-aab3-747c374152dd")
     private val issuerData = IssuerDataTransferObject(
         wallet = wallet,
         did = "name",
@@ -85,7 +89,7 @@ class SilentClaimStrategyTest {
             "keyType",
         )
         every { eventUseCase.log(any()) } just Runs
-        every { notificationUseCase.add(any()) } returns listOf(UUID.generateUUID())
+        every { notificationUseCase.add(any()) } returns listOf(Uuid.random())
         coEvery { notificationDispatchUseCaseMock.send(any()) } just Runs
         coEvery { issuerNameResolutionUseCase.resolve(any()) } returns "test"
     }

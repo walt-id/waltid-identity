@@ -1,24 +1,29 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.service.issuers
 
 import id.walt.webwallet.db.models.WalletIssuers
-import kotlinx.uuid.UUID
+
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.statements.UpdateStatement
 import org.jetbrains.exposed.sql.transactions.transaction
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
 
 object IssuersService {
-    fun get(wallet: UUID, did: String): IssuerDataTransferObject? = transaction {
+    fun get(wallet: Uuid, did: String): IssuerDataTransferObject? = transaction {
         queryIssuer(wallet, did)
     }
 
-    fun list(wallet: UUID): List<IssuerDataTransferObject> = transaction {
-        WalletIssuers.selectAll().where { WalletIssuers.wallet eq wallet }.map {
+    fun list(wallet: Uuid): List<IssuerDataTransferObject> = transaction {
+        WalletIssuers.selectAll().where { WalletIssuers.wallet eq wallet.toJavaUuid() }.map {
             IssuerDataTransferObject(it)
         }
     }
 
     fun add(
-        wallet: UUID,
+        wallet: Uuid,
         did: String,
         description: String?,
         uiEndpoint: String,
@@ -28,20 +33,20 @@ object IssuersService {
         addToWalletQuery(wallet, did, description, uiEndpoint, configurationEndpoint, authorized)
     }.insertedCount
 
-    fun authorize(wallet: UUID, issuer: String) = transaction {
+    fun authorize(wallet: Uuid, issuer: String) = transaction {
         updateColumn(wallet, issuer) {
             it[WalletIssuers.authorized] = true
         }
     }
 
-    private fun queryIssuer(wallet: UUID, did: String) =
-        WalletIssuers.selectAll().where { WalletIssuers.wallet eq wallet and (WalletIssuers.did eq did) }
+    private fun queryIssuer(wallet: Uuid, did: String) =
+        WalletIssuers.selectAll().where { WalletIssuers.wallet eq wallet.toJavaUuid() and (WalletIssuers.did eq did) }
             .singleOrNull()?.let {
                 IssuerDataTransferObject(it)
             }
 
     private fun addToWalletQuery(
-        wallet: UUID,
+        wallet: Uuid,
         did: String,
         description: String?,
         uiEndpoint: String,
@@ -58,7 +63,7 @@ object IssuersService {
             it
         }
     ) {
-        it[this.wallet] = wallet
+        it[this.wallet] = wallet.toJavaUuid()
         it[this.did] = did
         it[this.description] = description
         it[this.uiEndpoint] = uiEndpoint
@@ -67,8 +72,8 @@ object IssuersService {
     }
 
     //TODO: copied from CredentialsService
-    private fun updateColumn(wallet: UUID, issuer: String, update: (statement: UpdateStatement) -> Unit): Int =
-        WalletIssuers.update({ WalletIssuers.wallet eq wallet and (WalletIssuers.did eq issuer) }) {
+    private fun updateColumn(wallet: Uuid, issuer: String, update: (statement: UpdateStatement) -> Unit): Int =
+        WalletIssuers.update({ WalletIssuers.wallet eq wallet.toJavaUuid() and (WalletIssuers.did eq issuer) }) {
             update(it)
         }
 }

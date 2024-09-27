@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.service.settings
 
 import id.walt.webwallet.db.models.WalletSettings
@@ -5,28 +7,31 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.uuid.UUID
+
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.upsert
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
 
 object SettingsService {
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun get(wallet: UUID) = transaction {
+    fun get(wallet: Uuid) = transaction {
         tryParseSettings(getQuery(wallet).singleOrNull()?.get(WalletSettings.settings))
     }
 
-    fun set(wallet: UUID, setting: JsonObject) = transaction {
+    fun set(wallet: Uuid, setting: JsonObject) = transaction {
         upsertQuery(wallet, setting)
     }.insertedCount
 
-    private fun getQuery(wallet: UUID) = WalletSettings.selectAll().where { WalletSettings.wallet eq wallet }
+    private fun getQuery(wallet: Uuid) = WalletSettings.selectAll().where { WalletSettings.wallet eq wallet.toJavaUuid() }
 
-    private fun upsertQuery(wallet: UUID, setting: JsonObject) = WalletSettings.upsert(
+    private fun upsertQuery(wallet: Uuid, setting: JsonObject) = WalletSettings.upsert(
         WalletSettings.wallet
     ) {
-        it[WalletSettings.wallet] = wallet
+        it[WalletSettings.wallet] = wallet.toJavaUuid()
         it[settings] = json.encodeToString(setting)
     }
 

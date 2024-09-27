@@ -1,8 +1,9 @@
 package id.walt.oid4vc.util
 
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 fun randomUUID(): String {
-    return UUID.generateUUID().toString()
+    return Uuid.random().toString()
 }

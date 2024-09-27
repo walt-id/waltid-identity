@@ -1,3 +1,4 @@
+@file:OptIn(ExperimentalUuidApi::class)
 
 import E2ETestWebService.test
 import id.walt.crypto.keys.jwk.JWKKey
@@ -18,12 +19,13 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
 import org.bouncycastle.asn1.x500.X500Name
 import java.security.KeyPairGenerator
 import java.security.cert.X509Certificate
 import java.util.*
 import kotlin.test.assertNotNull
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 
 class AuthApi(private val client: HttpClient) {
@@ -58,7 +60,7 @@ class AuthApi(private val client: HttpClient) {
         client.get("/wallet-api/auth/session").expectSuccess()
     }
 
-    suspend fun userWallets(expectedAccountId: UUID, output: ((AccountWalletListing) -> Unit)? = null) =
+    suspend fun userWallets(expectedAccountId: Uuid, output: ((AccountWalletListing) -> Unit)? = null) =
         test("/wallet-api/wallet/accounts/wallets - get wallets") {
             client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().apply {
                 val listing = body<AccountWalletListing>()
