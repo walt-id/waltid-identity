@@ -3,6 +3,7 @@ package id.walt.policies.policies
 import id.walt.credentials.schemes.JwsSignatureScheme
 import id.walt.credentials.utils.VCFormat
 import id.walt.policies.JwtVerificationPolicy
+import id.walt.sdjwt.SDJwtVC
 import kotlinx.serialization.Serializable
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync

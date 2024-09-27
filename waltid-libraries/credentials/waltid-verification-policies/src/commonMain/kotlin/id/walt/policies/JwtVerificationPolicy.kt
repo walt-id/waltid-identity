@@ -1,5 +1,6 @@
 package id.walt.policies
 
+import id.walt.sdjwt.SDJwtVC
 import kotlinx.serialization.Serializable
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
