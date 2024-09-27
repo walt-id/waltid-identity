@@ -6,13 +6,15 @@ import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.usecase.event.EventLogUseCase
 import kotlinx.datetime.Clock
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 object ClaimCommons {
 
     fun convertCredentialDataResultToWalletCredential(
         credentialDataResult: IssuanceService.CredentialDataResult,
-        walletId: UUID,
+        walletId: Uuid,
         pending: Boolean,
     ) = WalletCredential(
         wallet = walletId,
@@ -28,8 +30,8 @@ object ClaimCommons {
 
     fun addReceiveCredentialToUseCaseLog(
         tenant: String,
-        account: UUID,
-        wallet: UUID,
+        account: Uuid,
+        wallet: Uuid,
         credential: WalletCredential,
         credentialType: String,
         eventUseCase: EventLogUseCase,
@@ -51,7 +53,7 @@ object ClaimCommons {
     }
 
     fun storeWalletCredentials(
-        wallet: UUID,
+        wallet: Uuid,
         credentials: List<WalletCredential>,
         credentialService: CredentialsService,
     ) {

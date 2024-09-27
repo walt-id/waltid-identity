@@ -1,21 +1,25 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.service.events
 
 import id.walt.webwallet.db.models.Events
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.uuid.UUID
+
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.javatime.date
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.LocalDate
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class EventService {
 
     fun get(
-        accountId: UUID,
-        walletId: UUID,
+        accountId: Uuid,
+        walletId: Uuid,
         limit: Int?,
         offset: Long,
         sortOrder: String,
@@ -45,7 +49,7 @@ class EventService {
         }
     }
 
-    fun count(walletId: UUID, dataFilter: Map<String, List<String>>): Long = transaction {
+    fun count(walletId: Uuid, dataFilter: Map<String, List<String>>): Long = transaction {
         Events.selectAll().where { Events.wallet eq walletId }.addWhereClause(dataFilter).count()
     }
 
@@ -90,8 +94,8 @@ class EventService {
     }
 
     private fun getFilterQueryLimited(
-        accountId: UUID,
-        walletId: UUID,
+        accountId: Uuid,
+        walletId: Uuid,
         sortOrder: String,
         sortBy: String,
         dataFilter: Map<String, List<String>>,
@@ -106,8 +110,8 @@ class EventService {
     ).limit(n = limit, offset = offset)
 
     private fun getFilterQueryUnlimited(
-        accountId: UUID,
-        walletId: UUID,
+        accountId: Uuid,
+        walletId: Uuid,
         sortOrder: String,
         sortBy: String,
         dataFilter: Map<String, List<String>>,

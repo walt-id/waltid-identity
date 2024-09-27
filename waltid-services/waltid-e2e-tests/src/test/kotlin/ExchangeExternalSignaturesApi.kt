@@ -29,10 +29,12 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
+import kotlin.uuid.Uuid
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.uuid.ExperimentalUuidApi
 
+@OptIn(ExperimentalUuidApi::class)
 class ExchangeExternalSignatures {
 
     private var client: HttpClient
@@ -55,8 +57,8 @@ class ExchangeExternalSignatures {
         email = "${randomUUID()}@email.com",
         password = randomUUID(),
     )
-    private var accountId = UUID.NIL
-    private var walletId = UUID.NIL
+    private var accountId = Uuid.NIL
+    private var walletId = Uuid.NIL
 
     private suspend fun registerAccountAndLogin() {
         authApi.register(accountRequest)

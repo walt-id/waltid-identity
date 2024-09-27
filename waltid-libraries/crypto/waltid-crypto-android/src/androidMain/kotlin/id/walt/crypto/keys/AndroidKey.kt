@@ -18,7 +18,7 @@ import java.security.Signature
 import java.security.cert.Certificate
 import java.security.spec.ECPublicKeySpec
 import java.security.spec.RSAPublicKeySpec
-import java.util.UUID
+import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger { }
 
@@ -128,7 +128,7 @@ class AndroidKey() : Key() {
 
     override suspend fun verifyRaw(
         signed: ByteArray,
-        detachedPlaintext: ByteArray?
+        detachedPlaintext: ByteArray?,
     ): Result<ByteArray> {
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
@@ -181,7 +181,7 @@ class AndroidKey() : Key() {
             val keyPair = keyStore.getEntry(internalKeyId, null) as? KeyStore.PrivateKeyEntry
             checkNotNull(keyPair) { "This AndroidKey instance does not have a KeyPair!" }
 
-            val id = "$PUBLIC_KEY_ALIAS_PREFIX${UUID.randomUUID()}"
+            val id = "$PUBLIC_KEY_ALIAS_PREFIX${Uuid.random()}"
             keyStore.setCertificateEntry(id, keyPair.certificate)
             AndroidKey(KeyAlias(id), keyType)
         } else this

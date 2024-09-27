@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.service.oidc4vc
 
 import COSE.AlgorithmID
@@ -52,10 +54,12 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
+
+
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:$WALLET_PORT"
@@ -167,9 +171,9 @@ class TestCredentialWallet(
         println("=== GENERATING PRESENTATION FOR VP TOKEN - Session: $session")
 
         val selectedCredentials =
-            HACK_outsideMappedSelectedCredentialsPerSession[session.authorizationRequest!!.state + session.authorizationRequest.presentationDefinition]!!
+            HACK_outsideMappedSelectedCredentialsPerSession[session.authorizationRequest!!.state + session.authorizationRequest.presentationDefinition?.id]!!
         val selectedDisclosures =
-            HACK_outsideMappedSelectedDisclosuresPerSession[session.authorizationRequest.state + session.authorizationRequest.presentationDefinition]
+            HACK_outsideMappedSelectedDisclosuresPerSession[session.authorizationRequest.state + session.authorizationRequest.presentationDefinition?.id]
 
         println("Selected credentials: $selectedCredentials")
 //        val matchedCredentials = walletService.getCredentialsByIds(selectedCredentials)
@@ -241,7 +245,7 @@ class TestCredentialWallet(
         }
         println("mdocsPresented: $mdocsPresented")
 
-        val presentationId = (session.presentationDefinition?.id ?: "urn:uuid:${UUID.generateUUID().toString().lowercase()}")
+        val presentationId = (session.presentationDefinition?.id ?: "urn:uuid:${Uuid.random().toString().lowercase()}")
 
         val vp = if (jwtsPresented.isNotEmpty()) getVpJson(
             credentialsPresented = jwtsPresented,

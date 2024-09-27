@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 import E2ETestWebService.loadResource
 import E2ETestWebService.testBlock
 import id.walt.commons.config.ConfigManager
@@ -24,10 +26,12 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.util.*
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
+
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class E2ETest {
 
@@ -78,8 +82,8 @@ class E2ETest {
     @Test
     fun e2e() = testBlock(defaultTestTimeout) {
         var client = testHttpClient()
-        lateinit var accountId: UUID
-        lateinit var wallet: UUID
+            lateinit var accountId: Uuid
+            lateinit var wallet: Uuid
         var authApi = AuthApi(client)
 
         // the e2e http request tests here
@@ -271,6 +275,7 @@ class E2ETest {
         lspPotentialWallet.testMdocPresentation()
         lspPotentialWallet.testSDJwtVCIssuance()
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
+        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
         lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
 
@@ -341,6 +346,7 @@ class E2ETest {
 
         lspPotentialWallet.testSDJwtVCIssuance()
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
+        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
     }
 
     //@Test // enable to execute test selectively

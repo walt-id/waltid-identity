@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers.exchange
 
 import id.walt.oid4vc.data.CredentialOffer
@@ -11,8 +13,8 @@ import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.web.controllers.auth.getUserUUID
 import id.walt.webwallet.web.controllers.auth.getWalletId
 import id.walt.webwallet.web.controllers.auth.getWalletService
-import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import id.walt.webwallet.web.controllers.walletRoute
+import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
@@ -22,6 +24,7 @@ import io.ktor.server.response.*
 import io.ktor.util.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.exchange() = walletRoute {
     route(OpenAPICommons.rootPath, OpenAPICommons.route()) {

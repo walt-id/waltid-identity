@@ -17,7 +17,8 @@ val testCIClientConfig = OpenIDClientConfig("test-client", null, redirectUri = "
 internal lateinit var credentialWallet: TestCredentialWallet
 
 @Throws(Exception::class)
-suspend fun generateEcKey(kid: String) = IosKey.create(kid, KeyType.secp256r1).exportJWK()
+@Suppress("unused")
+suspend fun generateEcKey(kid: String) = IosKey.create(IosKey.Options(kid, KeyType.secp256r1)).exportJWK()
 
 @Throws(Exception::class)
 internal fun setupWallet(kid: String) {

@@ -1,11 +1,7 @@
 package id.walt.oid4vc.data.dif
 
-import id.walt.mdoc.doc.MDocTypes
-import id.walt.oid4vc.data.JsonDataObject
-import id.walt.oid4vc.data.JsonDataObjectFactory
-import id.walt.oid4vc.data.JsonDataObjectSerializer
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.util.ShortIdUtils
-import id.walt.oid4vc.data.OpenId4VPProfile
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -41,18 +37,17 @@ data class PresentationDefinition(
         override fun fromJSON(jsonObject: JsonObject) =
             Json.decodeFromJsonElement(PresentationDefinitionSerializer, jsonObject)
 
-        fun primitiveGenerationFromVcTypes(types: List<String>, openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT): PresentationDefinition {
+        fun defaultGenerationFromVcTypesForCredentialFormat(types: List<String>, format: CredentialFormat): PresentationDefinition {
             return PresentationDefinition(inputDescriptors = types.map { type ->
-                when(openId4VPProfile) {
-                    OpenId4VPProfile.HAIP -> generateDefaultHAIPInputDescriptor(type)
-                    OpenId4VPProfile.ISO_18013_7_MDOC -> generateDefaultMDOCInputDescriptor(type)
-                    OpenId4VPProfile.EBSIV3 -> generateDefaultEBSIV3InputDescriptor(type)
-                    else -> generateDefaultInputDescriptor(type)
+                when(format) {
+                    CredentialFormat.sd_jwt_vc -> generateDefaultSDJwtVCInputDescriptor(type)
+                    CredentialFormat.mso_mdoc -> generateDefaultMDOCInputDescriptor(type)
+                    else -> generateDefaultW3CInputDescriptor(type)
                 }
             })
         }
 
-        private fun generateDefaultInputDescriptor(type: String) = InputDescriptor(
+        fun generateDefaultW3CInputDescriptor(type: String) = InputDescriptor(
             id = type,
             format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(alg = setOf("EdDSA"))),
             constraints = InputDescriptorConstraints(
@@ -68,7 +63,7 @@ data class PresentationDefinition(
             )
         )
 
-        private fun generateDefaultHAIPInputDescriptor(type: String) = InputDescriptor(
+        fun generateDefaultSDJwtVCInputDescriptor(type: String) = InputDescriptor(
             id = type,
             format = mapOf(VCFormat.sd_jwt_vc to VCFormatDefinition()),
             constraints = InputDescriptorConstraints(
@@ -81,7 +76,7 @@ data class PresentationDefinition(
             )
         )
 
-        private fun generateDefaultMDOCInputDescriptor(type: String) = InputDescriptor(
+        fun generateDefaultMDOCInputDescriptor(type: String) = InputDescriptor(
             id = type,
             format = mapOf(VCFormat.mso_mdoc to VCFormatDefinition(setOf("EdDSA", "ES256"))),
             constraints = InputDescriptorConstraints(
@@ -100,7 +95,7 @@ data class PresentationDefinition(
             )
         )
 
-        private fun generateDefaultEBSIV3InputDescriptor(type: String) = InputDescriptor(
+        fun generateDefaultEBSIV3InputDescriptor(type: String) = InputDescriptor(
             id = type,
             format = mapOf(VCFormat.jwt_vc to VCFormatDefinition(alg = setOf("ES256"))),
             constraints = InputDescriptorConstraints(

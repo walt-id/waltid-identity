@@ -30,8 +30,8 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
                audience: String? = null, nonce: String? = null): VCVerificationResult {
     var message: String = ""
     return VCVerificationResult(
-      this, verify(jwtCryptoProvider, issuer ?: header["kid"]?.jsonPrimitive?.content),
-(notBefore?.let { Clock.System.now().epochSeconds > it } ?: true).also {
+      this, verify(jwtCryptoProvider, header["kid"]?.jsonPrimitive?.content ?: issuer),
+(notBefore?.let { Clock.System.now().epochSeconds >= it } ?: true).also {
         if(!it) message = "$message, VC is not valid before $notBefore"
       } &&
       (expiration?.let { Clock.System.now().epochSeconds < it } ?: true).also {
@@ -42,7 +42,8 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       } &&
       verifyHolderKeyBinding(jwtCryptoProvider, requiresHolderKeyBinding, audience, nonce).also {
         if(!it) message = "$message, holder key binding could not be verified"
-      }
+      },
+      message
     )
   }
 
@@ -90,6 +91,22 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       put("jwk", holderKeyJWK)
     }, issuerKeyId, vct, nbf, exp, status, additionalJwtHeader, subject)
 
+    fun sign(
+      sdPayload: SDPayload,
+      jwtCryptoProvider: JWTCryptoProvider,
+      issuerDid: String,
+      holderDid: String?,
+      holderKeyJWK: JsonObject?,
+      issuerKeyId: String? = null,
+      vct: String, nbf: Long? = null, exp: Long? = null, status: String? = null,
+      /** Set additional options in the JWT header */
+      additionalJwtHeader: Map<String, Any> = emptyMap()
+    ): SDJwtVC = holderDid?.let {
+      sign(sdPayload, jwtCryptoProvider, issuerDid, it, issuerKeyId, vct, nbf, exp, status, additionalJwtHeader)
+    } ?: holderKeyJWK?.let {
+      sign(sdPayload, jwtCryptoProvider, issuerDid, it, issuerKeyId, vct, nbf, exp, status, additionalJwtHeader)
+    } ?: throw IllegalArgumentException("Either holderKey or holderDid must be given")
+
     private fun doSign(
       sdPayload: SDPayload,
       jwtCryptoProvider: JWTCryptoProvider,
@@ -102,7 +119,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       subject: String? = null
     ): SDJwtVC {
       val undisclosedPayload = sdPayload.undisclosedPayload.plus(
-        defaultPayloadProperties(issuerDid, cnf, vct, nbf, exp, status,subject)
+        defaultPayloadProperties(issuerDid, cnf, vct, nbf , exp, status,subject)
       ).let { JsonObject(it) }
 
       val finalSdPayload = SDPayload(undisclosedPayload, sdPayload.digestedDisclosures)
