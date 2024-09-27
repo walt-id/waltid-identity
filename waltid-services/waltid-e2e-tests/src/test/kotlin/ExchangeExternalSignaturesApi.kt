@@ -7,6 +7,7 @@ import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.utils.randomUUID
 import id.walt.issuer.issuance.IssuanceExamples
@@ -370,9 +371,9 @@ class ExchangeExternalSignatures {
                 )
             )
             val headers = Cbor.decodeFromByteArray<MapElement>(
-                Json.decodeFromJsonElement<ByteArray>(proofReq.proofOfPossessionParameters.header)
+                Json.decodeFromJsonElement<String>(proofReq.proofOfPossessionParameters.header).decodeFromBase64()
             )
-            val payload = Json.decodeFromJsonElement<ByteArray>(proofReq.proofOfPossessionParameters.payload)
+            val payload = Json.decodeFromJsonElement<String>(proofReq.proofOfPossessionParameters.payload).decodeFromBase64()
             IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession(
                 proofReq.offeredCredential,
                 ProofType.cwt,
