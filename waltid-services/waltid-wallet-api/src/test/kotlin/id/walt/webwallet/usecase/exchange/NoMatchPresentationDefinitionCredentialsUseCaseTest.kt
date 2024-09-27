@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.usecase.exchange
 
 import TestUtils
@@ -12,9 +14,11 @@ import io.mockk.mockk
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.uuid.UUID
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class NoMatchPresentationDefinitionCredentialsUseCaseTest {
 
@@ -30,7 +34,7 @@ class NoMatchPresentationDefinitionCredentialsUseCaseTest {
         PresentationDefinition.fromJSON(JsonObject(mapOf("input_descriptors" to emptyArray<String>().toJsonElement())))
     private val credentials = listOf(
         WalletCredential(
-            wallet = UUID(),
+            wallet = Uuid.random(),
             id = "array-type",
             document = """
                 {
@@ -46,7 +50,7 @@ class NoMatchPresentationDefinitionCredentialsUseCaseTest {
             format = CredentialFormat.ldp_vc
         ),
     )
-    private val wallet = UUID()
+    private val wallet = Uuid.random()
 
     @Test
     fun `given single match strategy, when calling use-case, then the result is returned`() {

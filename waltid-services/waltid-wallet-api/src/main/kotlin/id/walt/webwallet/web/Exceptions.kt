@@ -4,7 +4,7 @@ import id.walt.webwallet.db.models.AccountWalletPermissions
 import io.ktor.http.*
 import kotlinx.serialization.SerialName
 
-sealed class WebException(val status: HttpStatusCode, message: String) : Exception(message)
+sealed class WebException(override val status: HttpStatusCode, message: String) : id.walt.commons.web.WebException(status, message)
 
 
 @SerialName("InsufficientPermissions")

@@ -34,6 +34,8 @@ import platform.Security.kSecAttrKeySizeInBits
 import platform.Security.kSecAttrKeyType
 import platform.Security.kSecAttrKeyTypeECSECPrimeRandom
 import platform.Security.kSecAttrKeyTypeRSA
+import platform.Security.kSecAttrTokenID
+import platform.Security.kSecAttrTokenIDSecureEnclave
 import platform.Security.kSecKeyAlgorithmECDSASignatureMessageX962SHA256
 import platform.Security.kSecKeyAlgorithmRSASignatureDigestPKCS1v15SHA256
 import platform.Security.kSecPrivateKeyAttrs
@@ -54,9 +56,9 @@ internal object KeychainOperations {
         }
     }
 
-    private fun loadFromKeychain(kid: String, keyType: CFStringRef?): String {
+    private fun loadFromKeychain(kid: String, keyType: CFStringRef?, inSecureEnclave: Boolean = false): String {
         return withSecKey(
-            kid, keyType, null
+            kid, keyType, null, inSecureEnclave
         ) {
             kid
         }
@@ -142,7 +144,7 @@ internal object KeychainOperations {
 
                 secKey = checkErrorResult { error ->
                     SecKeyCreateWithData(
-                        externalCf as CFDataRef, attributes, error
+                        externalCf as CFDataRef?, attributes, error
                     )
                 }
 
@@ -229,7 +231,7 @@ internal object KeychainOperations {
     object P256 {
         internal fun delete(kid: String) = deleteFromKeychain(kid, kSecAttrKeyTypeECSECPrimeRandom)
 
-        internal fun load(kid: String) = loadFromKeychain(kid, kSecAttrKeyTypeECSECPrimeRandom)
+        internal fun load(kid: String, inSecureEnclave: Boolean) = loadFromKeychain(kid, kSecAttrKeyTypeECSECPrimeRandom, inSecureEnclave)
 
         internal fun <T> createPrivateKeyFrom(
             externalRepresentation: ByteArray,
@@ -246,7 +248,7 @@ internal object KeychainOperations {
         }
 
 
-        internal fun create(kid: String): String {
+        internal fun create(kid: String, inSecureEnclave: Boolean): String {
             return cfRetain(kid.toNSData(), appId.toNSData()) { kidCf, appLabelCf ->
 
                 var privateKeyParams: CFMutableDictionaryRef? = null
@@ -267,7 +269,7 @@ internal object KeychainOperations {
 
                     generateKeyPairQuery = CFDictionaryCreateMutable(
                         kCFAllocatorDefault,
-                        3,
+                        4,
                         kCFTypeDictionaryKeyCallBacks.ptr,
                         kCFTypeDictionaryValueCallBacks.ptr
                     ).apply {
@@ -276,6 +278,9 @@ internal object KeychainOperations {
                         )
                         CFDictionaryAddValue(this, kSecAttrKeySizeInBits, size)
                         CFDictionaryAddValue(this, kSecPrivateKeyAttrs, privateKeyParams)
+                        if (inSecureEnclave) {
+                            CFDictionaryAddValue(this, kSecAttrTokenID, kSecAttrTokenIDSecureEnclave)
+                        }
                     }
 
                     val privateKey = checkErrorResult { error ->
@@ -295,14 +300,13 @@ internal object KeychainOperations {
             }
         }
 
-        internal inline fun <T> withPrivateKey(kid: String, block: MemScope.(SecKeyRef?) -> T) =
-            withSecKey(kid, kSecAttrKeyTypeECSECPrimeRandom, null) {
+        internal inline fun <T> withPrivateKey(kid: String, inSecureEnclave: Boolean, block: MemScope.(SecKeyRef?) -> T) =
+            withSecKey(kid, kSecAttrKeyTypeECSECPrimeRandom, null, inSecureEnclave) {
                 block(it)
             }
 
-
-        internal inline fun <T> withPublicKey(kid: String, block: MemScope.(SecKeyRef?) -> T) =
-            withPrivateKey(kid) { privateKey ->
+        internal inline fun <T> withPublicKey(kid: String, inSecureEnclave: Boolean, block: MemScope.(SecKeyRef?) -> T) =
+            withPrivateKey(kid, inSecureEnclave) { privateKey ->
                 usePublicKey(privateKey) { publicKey ->
                     block(publicKey)
                 }

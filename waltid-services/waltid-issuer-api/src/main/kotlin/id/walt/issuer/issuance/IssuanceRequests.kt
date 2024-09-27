@@ -79,7 +79,7 @@ data class NewIssuanceRequest(
 data class IssuanceRequest(
     val issuerKey: JsonObject,
     val credentialConfigurationId: String,
-    val credentialData: W3CVC?,
+    val credentialData: JsonObject?,
     val vct: String? = null,
     val mdocData: Map<String, JsonObject>? = null,
     val mapping: JsonObject? = null,
@@ -94,6 +94,18 @@ data class IssuanceRequest(
 
     var credentialFormat: CredentialFormat? = null
 ) {
+  constructor(
+    issuerKey: JsonObject, credentialConfigurationId: String, credentialData: JsonObject,
+    vct: String? = null,
+    mapping: JsonObject? = null, selectiveDisclosure: SDMap? = null,
+    authenticationMethod: AuthenticationMethod? = AuthenticationMethod.PRE_AUTHORIZED, // "PWD" OR "ID_TOKEN" OR "VP_TOKEN" OR "PRE_AUTHORIZED" OR "NONE"
+    vpRequestValue: String? = null, vpProfile: OpenId4VPProfile? = null, useJar: Boolean? = null, issuerDid: String,
+    x5Chain: List<String>? = null, trustedRootCAs: List<String>? = null, credentialFormat: CredentialFormat? = null
+  ) : this(issuerKey, credentialConfigurationId,
+    credentialData, vct, null,
+    mapping, selectiveDisclosure, authenticationMethod, vpRequestValue, vpProfile, useJar, issuerDid, x5Chain,
+    trustedRootCAs, credentialFormat
+  )
     init {
 
         credentialData?.let {

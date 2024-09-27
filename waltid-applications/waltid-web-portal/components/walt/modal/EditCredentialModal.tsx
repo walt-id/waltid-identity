@@ -9,7 +9,12 @@ type Props = {
   setCredentialSubject: (credentialSubject: JSON) => void;
 };
 
-export default function EditCredentialModal({ show, onClose, credentialSubject, setCredentialSubject }: Props) {
+export default function EditCredentialModal({
+  show,
+  onClose,
+  credentialSubject,
+  setCredentialSubject,
+}: Props) {
   const [subjectJson, setSubjectJson] = React.useState(credentialSubject);
 
   return (
@@ -33,10 +38,13 @@ export default function EditCredentialModal({ show, onClose, credentialSubject, 
           <Button onClick={onClose} style="link">
             Cancel
           </Button>
-          <Button onClick={() => {
-            setCredentialSubject(subjectJson);
-            onClose();
-          }} style="button">
+          <Button
+            onClick={() => {
+              setCredentialSubject(subjectJson);
+              onClose();
+            }}
+            style="button"
+          >
             Save
           </Button>
         </div>

@@ -10,16 +10,16 @@ import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.dids.DidDocConfig
 import id.walt.did.dids.registrar.local.LocalRegistrarMethod
 import id.walt.did.utils.ExtensionMethods.ensurePrefix
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import net.thauvin.erik.urlencoder.UrlEncoderUtil
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalJsExport::class)
+@OptIn(ExperimentalJsExport::class, ExperimentalUuidApi::class)
 @JsExport
 class DidWebRegistrar : LocalRegistrarMethod("web") {
     @JvmBlocking
@@ -32,7 +32,7 @@ class DidWebRegistrar : LocalRegistrarMethod("web") {
         registerByKey(JWKKey.generate(it), options)
     } ?: throw IllegalArgumentException("Option \"keyType\" not found.")
 
-
+    @OptIn(ExperimentalUuidApi::class)
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -71,7 +71,7 @@ class DidWebRegistrar : LocalRegistrarMethod("web") {
             ?: throw IllegalArgumentException("Option \"domain\" not found.")
 
     private fun getPath(options: DidCreateOptions) = options.get<String>("path")?.takeIf { it.isNotEmpty() }?.let {
-        it.replace("[random-uuid]", UUID.generateUUID().toString()).ensurePrefix("/").split("/")
+        it.replace("[random-uuid]", Uuid.random().toString()).ensurePrefix("/").split("/")
             .joinToString(":") { part -> UrlEncoderUtil.encode(part) }
     } ?: ""
 

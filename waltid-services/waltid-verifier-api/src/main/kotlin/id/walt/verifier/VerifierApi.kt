@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.verifier
 
 import com.nimbusds.jose.JWSAlgorithm
@@ -11,9 +13,9 @@ import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.*
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
-import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerificationUseCase
+import id.walt.verifier.oidc.SwaggerPresentationSessionInfo
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
@@ -37,7 +39,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 private val SERVER_URL by lazy {
     runBlocking {
@@ -115,7 +118,6 @@ private const val fixedPresentationDefinitionForEbsiConformanceTest =
 
 private val verificationUseCase = VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
 
-@OptIn(ExperimentalSerializationApi::class)
 fun Application.verfierApi() {
     routing {
 
@@ -238,6 +240,8 @@ fun Application.verfierApi() {
                 )
             }
 
+
+
             post("/verify/{state}", {
                 tags = listOf("OIDC")
                 summary = "Verify vp_token response, for a verification request identified by the state"
@@ -280,6 +284,7 @@ fun Application.verfierApi() {
                     }
 
             }
+
             get("/session/{id}", {
                 tags = listOf("Credential Verification")
                 summary = "Get info about OIDC presentation session, that was previously initialized"
@@ -293,7 +298,8 @@ fun Application.verfierApi() {
                 }
                 response {
                     HttpStatusCode.OK to {
-                        body<PresentationSessionInfo> {
+                        // body<PresentationSessionInfo> { // cannot encode duration
+                        body<SwaggerPresentationSessionInfo> {
                             description = "Session info"
                         }
                     }
@@ -314,6 +320,7 @@ fun Application.verfierApi() {
                     call.respond(HttpStatusCode.OK, it)
                 }
             }
+
             get("/pd/{id}", {
                 tags = listOf("OIDC")
                 summary = "Get presentation definition object by ID"
@@ -411,7 +418,7 @@ fun Application.verfierApi() {
             val walletInitiatedAuthState = params["state"]?.jsonArray?.get(0)?.jsonPrimitive?.content
             val scope = params["scope"]?.jsonArray.toString().replace("\"", "").replace("[", "").replace("]", "")
 
-            val stateId = UUID().toString()
+            val stateId = Uuid.random().toString()
             val session = verificationUseCase.createSession(
                 vpPoliciesJson = null,
                 vcPoliciesJson = buildJsonArray {
@@ -494,7 +501,7 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.processVerificationSu
     val session = verificationUseCase.getSession(sessionId!!)
     if (session.walletInitiatedAuthState != null) {
         val state = session.walletInitiatedAuthState
-        val code = UUID().toString()
+        val code = Uuid.random().toString()
         context.respondRedirect("openid://?code=$code&state=$state")
     } else {
         call.respond(HttpStatusCode.OK, redirectUrl)

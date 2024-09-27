@@ -1,11 +1,13 @@
 package id.walt.webwallet.db.models
 
-import kotlinx.uuid.exposed.kotlinxUUID
+import id.walt.webwallet.db.kotlinxUuid
 import org.jetbrains.exposed.sql.Table
+import kotlin.uuid.ExperimentalUuidApi
 
+@OptIn(ExperimentalUuidApi::class)
 object OidcLogins : Table("oidclogins") {
     val tenant = varchar("tenant", 128).default("")
-    val accountId = kotlinxUUID("accountId")
+    val accountId = kotlinxUuid("accountId")
 
     val oidcId = varchar("oidcId", 256).uniqueIndex()
 

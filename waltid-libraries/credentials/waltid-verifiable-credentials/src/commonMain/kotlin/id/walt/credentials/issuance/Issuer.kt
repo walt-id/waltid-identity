@@ -2,7 +2,7 @@ package id.walt.credentials.issuance
 
 import id.walt.credentials.JwtClaims
 import id.walt.credentials.VcClaims
-import id.walt.credentials.utils.W3CDataMergeUtils.mergeWithMapping
+import id.walt.credentials.utils.CredentialDataMergeUtils.mergeWithMapping
 import id.walt.credentials.utils.W3CVcUtils.overwrite
 import id.walt.credentials.utils.W3CVcUtils.update
 import id.walt.credentials.vc.vcs.W3CVC

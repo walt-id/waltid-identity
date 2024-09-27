@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.db.models.WalletCredential
@@ -14,6 +16,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.util.*
+import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.credentials() = walletRoute {
     route("credentials", {

@@ -38,7 +38,9 @@ export default function Credential({
           )}
         </div>
         <div className="mb-8 mt-12">
-          <h6 className={'text-2xl font-bold '}>{title.length > 20 ? title.substring(0, 20) + '...' : title}</h6>
+          <h6 className={'text-2xl font-bold '}>
+            {title.length > 20 ? title.substring(0, 20) + '...' : title}
+          </h6>
           <span>{description}</span>
         </div>
       </div>

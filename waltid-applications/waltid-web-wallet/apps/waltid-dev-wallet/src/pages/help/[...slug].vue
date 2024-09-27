@@ -1,19 +1,19 @@
 <template>
-    <CenterMain>
-        <ContentDoc />
-    </CenterMain>
+  <CenterMain>
+    <ContentDoc />
+  </CenterMain>
 </template>
 
 <script lang="ts" setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 
 definePageMeta({
-    layout: "default-reduced-nav",
-})
+  layout: "default-reduced-nav",
+});
 </script>
 
 <style scoped>
 h1 {
-    font-size: 40px;
+  font-size: 40px;
 }
 </style>

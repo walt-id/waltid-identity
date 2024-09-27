@@ -5,7 +5,6 @@ import android.security.keystore.KeyProperties
 import java.math.BigInteger
 import java.security.KeyPairGenerator
 import java.security.spec.ECGenParameterSpec
-import java.util.UUID
 import javax.security.auth.x500.X500Principal
 import kotlin.uuid.Uuid
 
@@ -18,7 +17,7 @@ object AndroidKeyGenerator : AndroidKeyCreator {
     // Create an instance using key type
     override suspend fun generate(type: KeyType, metadata: AndroidKeyParameters?): AndroidKey {
 
-        val alias = metadata?.keyId ?: "$KEY_PAIR_ALIAS_PREFIX${UUID.randomUUID()}"
+        val alias = metadata?.keyId ?: "$KEY_PAIR_ALIAS_PREFIX${Uuid.random()}"
         KeyPairGenerator.getInstance(getAlgorithmFor(type), ANDROID_KEYSTORE).apply {
             initialize(
                 KeyGenParameterSpec.Builder(

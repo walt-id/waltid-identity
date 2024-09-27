@@ -1,14 +1,19 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.service.report
 
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.events.EventType
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
 
 interface ReportService<T> {
     fun frequent(parameter: ReportRequestParameter): List<T>
 
+    @OptIn(ExperimentalUuidApi::class)
     class Credentials(private val credentialService: CredentialsService, private val eventService: EventService) :
         ReportService<WalletCredential> {
 
@@ -23,8 +28,8 @@ interface ReportService<T> {
                     }
             } ?: emptyList()
 
-        private fun frequent(walletId: UUID, action: EventType.Action, limit: Int?) = eventService.get(
-            accountId = UUID.NIL,
+        private fun frequent(walletId: Uuid, action: EventType.Action, limit: Int?) = eventService.get(
+            accountId = Uuid.NIL,
             walletId = walletId,
             limit = limit,
             offset = 0,
@@ -38,10 +43,10 @@ interface ReportService<T> {
 }
 
 abstract class ReportRequestParameter(
-    open val walletId: UUID,
+    open val walletId: Uuid,
     open val limit: Int?,
 )
 
 data class CredentialReportRequestParameter(
-    override val walletId: UUID, override val limit: Int?,
+    override val walletId: Uuid, override val limit: Int?,
 ) : ReportRequestParameter(walletId, limit)

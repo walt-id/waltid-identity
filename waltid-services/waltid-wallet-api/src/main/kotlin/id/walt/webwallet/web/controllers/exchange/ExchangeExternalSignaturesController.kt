@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers.exchange
 
 import com.nimbusds.jose.jwk.JWK
@@ -45,9 +47,10 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 fun Application.exchangeExternalSignatures() = walletRoute {
     val logger = KotlinLogging.logger { }
@@ -75,7 +78,6 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     )
                 }
             }
-
             response {
                 HttpStatusCode.OK to {
                     description = "Collection of parameters that are necessary to invoke the submit endpoint. " +
@@ -83,18 +85,6 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                             "vpTokenParams object that is contained within."
                     body<PrepareOID4VPResponse> {
                         required = true
-                        example(
-                            "W3C Verifiable Credential",
-                            ExchangeExternalSignaturesExamples.prepareOid4vpResponseW3CVCExample(),
-                        )
-                        example(
-                            "W3C SD-JWT Verifiable Credential",
-                            ExchangeExternalSignaturesExamples.prepareOid4vpResponseW3CSDJWTVCExample(),
-                        )
-                        example(
-                            "IETF SD-JWT Verifiable Credential",
-                            ExchangeExternalSignaturesExamples.prepareOid4vpResponseIETFSDJWTVCExample(),
-                        )
                     }
                 }
             }
@@ -142,7 +132,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 val matchedCredentials = walletService.getCredentialsByIds(req.selectedCredentialIdList)
                 logger.debug { "Matched credentials: $matchedCredentials" }
 
-                val presentationId = "urn:uuid:" + UUID.generateUUID().toString().lowercase()
+                val presentationId = "urn:uuid:" + Uuid.random().toString().lowercase()
                 val keyId = walletDID.keyId
                 logger.debug { "keyId: $keyId" }
                 val didFirstAuthKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.usecase.exchange
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -12,9 +14,11 @@ import io.mockk.verify
 import io.mockk.verifySequence
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.JsonObject
-import kotlinx.uuid.UUID
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class MatchPresentationDefinitionCredentialsUseCaseTest {
 
@@ -24,7 +28,7 @@ class MatchPresentationDefinitionCredentialsUseCaseTest {
         PresentationDefinition.fromJSON(JsonObject(mapOf("input_descriptors" to emptyArray<String>().toJsonElement())))
     private val credentials = listOf(
         WalletCredential(
-            wallet = UUID(),
+            wallet = Uuid.random(),
             id = "array-type",
             document = """
                 {
@@ -40,7 +44,7 @@ class MatchPresentationDefinitionCredentialsUseCaseTest {
             format = CredentialFormat.ldp_vc
         ),
         WalletCredential(
-            wallet = UUID(),
+            wallet = Uuid.random(),
             id = "primitive-type",
             document = """
                 {
@@ -56,7 +60,7 @@ class MatchPresentationDefinitionCredentialsUseCaseTest {
             format = CredentialFormat.ldp_vc
         ),
     )
-    val wallet = UUID()
+    val wallet = Uuid.random()
 
     @Test
     fun `full match`() {
