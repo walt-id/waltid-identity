@@ -241,7 +241,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     )
                 logger.debug { "Authorization response URL: $authResponseURL" }
                 val presentationSubmission = req.presentationSubmission
-                val presentedCredentialIdList = req.presentedCredentialIdList
+                val presentedCredentialIdList = req.selectedCredentialIdList
 
                 val vpTokenProofs = (if (req.ietfSdJwtVpProofs != null) {
                     req.ietfSdJwtVpProofs.map { ietfVpProof ->
