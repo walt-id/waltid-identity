@@ -1,9 +1,15 @@
 package id.walt.mdoc.dataretrieval
 
 import cbor.Cbor
-import id.walt.mdoc.dataelement.*
+import id.walt.mdoc.dataelement.ListElement
+import id.walt.mdoc.dataelement.MapKey
+import id.walt.mdoc.dataelement.StringElement
+import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.docrequest.MDocRequest
-import kotlinx.serialization.*
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.decodeFromHexString
 
 /**
  * Device request structure containing MDoc requests

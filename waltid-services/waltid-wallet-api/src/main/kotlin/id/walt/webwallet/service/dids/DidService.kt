@@ -5,37 +5,42 @@ import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.db.models.WalletDids
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
-import kotlinx.uuid.UUID
+
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
+@OptIn(ExperimentalUuidApi::class)
 object DidsService {
-    fun get(wallet: UUID, did: String): WalletDid? = transaction {
-        WalletDids.selectAll().where { (WalletDids.wallet eq wallet) and (WalletDids.did eq did.replace("%3A", ":")) }
+    fun get(wallet: Uuid, did: String): WalletDid? = transaction {
+        WalletDids.selectAll().where { (WalletDids.wallet eq wallet.toJavaUuid()) and (WalletDids.did eq did.replace("%3A", ":")) }
             .singleOrNull()?.let { WalletDid(it) }
     }
 
-    fun list(wallet: UUID): List<WalletDid> =
-        transaction { WalletDids.selectAll().where { WalletDids.wallet eq wallet }.map { WalletDid(it) } }
+    fun list(wallet: Uuid): List<WalletDid> =
+        transaction { WalletDids.selectAll().where { WalletDids.wallet eq wallet.toJavaUuid() }.map { WalletDid(it) } }
 
-    fun getWalletsForDid(did: String): List<UUID> = transaction {
+    fun getWalletsForDid(did: String): List<Uuid> = transaction {
         WalletDids.selectAll().where { WalletDids.did eq did }.map {
-            it[WalletDids.wallet].value
+            it[WalletDids.wallet].value.toKotlinUuid()
         }
     }
 
-    fun add(wallet: UUID, did: String, document: String, keyId: String, alias: String? = null) = transaction {
+    fun add(wallet: Uuid, did: String, document: String, keyId: String, alias: String? = null) = transaction {
         val now = Clock.System.now()
         val didExists = WalletDids.selectAll()
-            .where { (WalletDids.wallet eq wallet) and (WalletDids.did eq did.replace("%3A", ":")) }
+            .where { (WalletDids.wallet eq wallet.toJavaUuid()) and (WalletDids.did eq did.replace("%3A", ":")) }
             .count() > 0L
 
         if (didExists) {
             throw ConflictException("DID already exists")
         }
         WalletDids.insert {
-            it[WalletDids.wallet] = wallet
+            it[WalletDids.wallet] = wallet.toJavaUuid()
             it[WalletDids.did] = did.replace("%3A", ":").replace("%3D", "=")
             it[WalletDids.document] = document
             it[WalletDids.keyId] = keyId
@@ -44,24 +49,24 @@ object DidsService {
         }
     }.insertedCount
 
-    fun delete(wallet: UUID, did: String): Boolean =
-        transaction { WalletDids.deleteWhere { (WalletDids.wallet eq wallet) and (WalletDids.did eq did.replace("%3A", ":").replace("%3D", "=")) } } > 0
+    fun delete(wallet: Uuid, did: String): Boolean =
+        transaction { WalletDids.deleteWhere { (WalletDids.wallet eq wallet.toJavaUuid()) and (WalletDids.did eq did.replace("%3A", ":").replace("%3D", "=")) } } > 0
 
 
-    fun makeDidDefault(wallet: UUID, newDefaultDid: String) {
+    fun makeDidDefault(wallet: Uuid, newDefaultDid: String) {
         transaction {
-            WalletDids.update({ (WalletDids.wallet eq wallet) and (WalletDids.default eq true) }) {
+            WalletDids.update({ (WalletDids.wallet eq wallet.toJavaUuid()) and (WalletDids.default eq true) }) {
                 it[default] = false
             }
 
-            WalletDids.update({ (WalletDids.wallet eq wallet) and (WalletDids.did eq newDefaultDid.replace("%3A", ":")) }) {
+            WalletDids.update({ (WalletDids.wallet eq wallet.toJavaUuid()) and (WalletDids.did eq newDefaultDid.replace("%3A", ":")) }) {
                 it[default] = true
             }
         }
     }
 
-    fun renameDid(wallet: UUID, did: String, newName: String) =
-        WalletDids.update({ (WalletDids.wallet eq wallet) and (WalletDids.did eq did.replace("%3A", ":")) }) {
+    fun renameDid(wallet: Uuid, did: String, newName: String) =
+        WalletDids.update({ (WalletDids.wallet eq wallet.toJavaUuid()) and (WalletDids.did eq did.replace("%3A", ":")) }) {
             it[alias] = newName
         } > 0
 }

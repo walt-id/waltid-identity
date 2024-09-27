@@ -1,9 +1,11 @@
 package id.walt.oid4vc.util
 
-import kotlinx.uuid.SecureRandom
+import kotlin.random.Random
+
 
 object ShortIdUtils {
 
     private val squids = Sqids()
-    fun randomSessionId(): String = squids.encode(listOf(SecureRandom.nextLong(0, Long.MAX_VALUE)))
+    // todo: SecureRandom()
+    fun randomSessionId(): String = squids.encode(listOf(Random.nextLong(0, Long.MAX_VALUE)))
 }

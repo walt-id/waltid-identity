@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import WaltIcon from '@/components/walt/logo/WaltIcon';
 import Button from '@/components/walt/button/Button';
 import { CredentialsContext, EnvContext } from '@/pages/_app';
@@ -9,13 +9,13 @@ import axios from 'axios';
 import { sendToWebWallet } from '@/utils/sendToWebWallet';
 import nextConfig from '@/next.config';
 import BackButton from '@/components/walt/button/BackButton';
-import {CredentialFormats, mapFormat} from "@/types/credentials";
+import { CredentialFormats, mapFormat } from '@/types/credentials';
 
 const BUTTON_COPY_TEXT_DEFAULT = 'Copy offer URL';
 const BUTTON_COPY_TEXT_COPIED = 'Copied';
 
 export default function Verification() {
-  const env = useContext(EnvContext)
+  const env = useContext(EnvContext);
   const [AvailableCredentials] = useContext(CredentialsContext);
   const router = useRouter();
 
@@ -31,7 +31,7 @@ export default function Verification() {
     const getverifyURL = async () => {
       let vps = router.query.vps?.toString().split(',') ?? [];
       let ids = router.query.ids?.toString().split(',') ?? [];
-      let format = router.query.format?.toString() ?? CredentialFormats[0]
+      let format = router.query.format?.toString() ?? CredentialFormats[0];
       let credentials = AvailableCredentials.filter((cred) => {
         for (const id of ids) {
           if (id.toString() == cred.id.toString()) {
@@ -41,17 +41,17 @@ export default function Verification() {
         return false;
       });
 
-      const request_credentials = credentials.map(credential => {
+      const request_credentials = credentials.map((credential) => {
         if (mapFormat(format) === 'vc+sd-jwt') {
-          let url = `${env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER}`
+          let url = `${env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER}`;
           return {
             vct: `${url}/${credential.offer.type[credential.offer.type.length - 1]}`,
-            format: mapFormat(format)
+            format: mapFormat(format),
           };
         } else {
           return {
             type: credential.offer.type[credential.offer.type.length - 1],
-            format:  mapFormat(format)
+            format: mapFormat(format),
           };
         }
       });
@@ -59,22 +59,22 @@ export default function Verification() {
       const response = await axios.post(
         `${env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER}/openid4vc/verify`,
         {
-          "request_credentials": request_credentials,
-          "vc_policies": vps.map((vp) => {
+          request_credentials: request_credentials,
+          vc_policies: vps.map((vp) => {
             if (vp.includes('=')) {
               return {
-                "policy": vp.split('=')[0],
-                "args": vp.split('=')[1]
-              }
+                policy: vp.split('=')[0],
+                args: vp.split('=')[1],
+              };
             } else {
               return vp;
             }
-          })
+          }),
         },
         {
           headers: {
-            "successRedirectUri": `${window.location.origin}/success/$id`,
-            "errorRedirectUri": `${window.location.origin}/success/$id`,
+            successRedirectUri: `${window.location.origin}/success/$id`,
+            errorRedirectUri: `${window.location.origin}/success/$id`,
           },
         }
       );
@@ -99,7 +99,13 @@ export default function Verification() {
   }
 
   function openWebWallet() {
-    sendToWebWallet(env.NEXT_PUBLIC_WALLET ? env.NEXT_PUBLIC_WALLET : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_WALLET, 'api/siop/initiatePresentation', verifyURL);
+    sendToWebWallet(
+      env.NEXT_PUBLIC_WALLET
+        ? env.NEXT_PUBLIC_WALLET
+        : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_WALLET,
+      'api/siop/initiatePresentation',
+      verifyURL
+    );
   }
 
   return (
@@ -116,22 +122,23 @@ export default function Verification() {
           Scan to Verify
         </h1>
         <div className="flex justify-center">
-          {
-            loading ?
-              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 my-10"></div>
-              :
-              <QRCode
-                className="h-full max-h-[220px] my-10"
-                value={verifyURL}
-                viewBox={'0 0 256 256'}
-              />
-          }
+          {loading ? (
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 my-10"></div>
+          ) : (
+            <QRCode
+              className="h-full max-h-[220px] my-10"
+              value={verifyURL}
+              viewBox={'0 0 256 256'}
+            />
+          )}
         </div>
         <div className="sm:flex flex-row gap-5 justify-center">
           <Button style="link" onClick={copyCurrentURLToClipboard}>
             {copyText}
           </Button>
-          <Button onClick={openWebWallet} style="button">Open Web Wallet</Button>
+          <Button onClick={openWebWallet} style="button">
+            Open Web Wallet
+          </Button>
         </div>
         <div className="flex flex-col items-center mt-12">
           <div className="flex flex-row gap-2 items-center content-center text-sm text-center text-gray-500">

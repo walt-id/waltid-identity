@@ -1,16 +1,20 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.usecase.notification
 
 import id.walt.webwallet.db.models.Notification
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.notifications.NotificationService
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
 
 class NotificationFilterUseCase(
     private val notificationService: NotificationService,
     private val credentialService: CredentialsService,
     private val notificationFormatter: NotificationDataFormatter,
 ) {
-    suspend fun filter(wallet: UUID, parameter: NotificationFilterParameter) = notificationService.list(
+    suspend fun filter(wallet: Uuid, parameter: NotificationFilterParameter) = notificationService.list(
         wallet = wallet,
         type = parameter.type,
         addedOn = parameter.addedOn,

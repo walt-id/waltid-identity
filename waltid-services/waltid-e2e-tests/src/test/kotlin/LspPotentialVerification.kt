@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 import COSE.AlgorithmID
 import COSE.OneKey
 import com.nimbusds.jose.JWSAlgorithm
@@ -45,12 +47,14 @@ import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
+
+
 import java.security.PublicKey
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class LspPotentialVerification(private val client: HttpClient) {
 
@@ -94,7 +98,7 @@ class LspPotentialVerification(private val client: HttpClient) {
       assertEquals("A256GCM", presReq.clientMetadata!!.authorizationEncryptedResponseEnc!!)
 
       // Step 5: Create encrypted presentation response
-      val mdocNonce = UUID.generateUUID().toString()
+      val mdocNonce = Uuid.random().toString()
       val mdocHandover = OpenID4VP.generateMDocOID4VPHandover(presReq, mdocNonce)
       val holderKeyNimbus = ECKey.parse(holderKey.exportJWK())
       val deviceCryptoProvider = SimpleCOSECryptoProvider(listOf(

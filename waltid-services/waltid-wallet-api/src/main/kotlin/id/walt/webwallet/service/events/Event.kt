@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.service.events
 
+import id.walt.commons.temp.UuidSerializer
 import id.walt.webwallet.db.models.Events
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -9,8 +12,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
-import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.ResultRow
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 const val EventDataNotAvailable = "n/a"
 
@@ -22,8 +26,10 @@ data class Event(
     val timestamp: Instant = Clock.System.now(),
     val tenant: String,
     val originator: String? = null,
-    val account: UUID,
-    val wallet: UUID? = null,
+    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    val account: Uuid,
+    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    val wallet: Uuid? = null,
     val credentialId: String? = null,
     val data: JsonObject,
     val note: String? = null,
@@ -33,8 +39,8 @@ data class Event(
         action: EventType.Action,
         tenant: String,
         originator: String?,
-        account: UUID,
-        wallet: UUID?,
+        account: Uuid,
+        wallet: Uuid?,
         data: EventData,
         credentialId: String? = null,
         note: String? = null,

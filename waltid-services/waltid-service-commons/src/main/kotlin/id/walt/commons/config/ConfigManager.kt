@@ -47,7 +47,14 @@ object ConfigManager {
         }
 
         return runCatching {
-            ConfigLoaderBuilder.default()
+            ConfigLoaderBuilder.empty()
+                .addDefaultDecoders()
+                .addDefaultPreprocessors()
+                //.addDefaultNodeTransformers()
+                .addDefaultParamMappers()
+                .addDefaultPropertySources()
+                .addDefaultParsers()
+
                 .addDecoder(JsonElementDecoder())
                 .addCommandLineSource(args)
                 .addDefaultParsers()

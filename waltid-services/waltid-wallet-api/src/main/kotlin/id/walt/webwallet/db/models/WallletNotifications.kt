@@ -1,5 +1,6 @@
 package id.walt.webwallet.db.models
 
+import id.walt.webwallet.db.kotlinxUuid
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
@@ -8,14 +9,15 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
-import kotlinx.uuid.exposed.KotlinxUUIDTable
-import kotlinx.uuid.exposed.kotlinxUUID
+import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.javatime.timestamp
+import kotlin.uuid.ExperimentalUuidApi
 
-object WalletNotifications : KotlinxUUIDTable("notifications") {
+@OptIn(ExperimentalUuidApi::class)
+object WalletNotifications : UUIDTable("notifications") {
     //TODO: change to reference username
-    val account = kotlinxUUID("account")
+    val account = kotlinxUuid("account")
     val wallet = reference("wallet", Wallets)
     val isRead = bool("is_read").default(false)
     val type = varchar("type", 128)
@@ -23,6 +25,7 @@ object WalletNotifications : KotlinxUUIDTable("notifications") {
     val data = text("data")
 }
 
+@OptIn(ExperimentalUuidApi::class)
 @Serializable
 data class Notification(
     val id: String? = null,

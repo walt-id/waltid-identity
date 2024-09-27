@@ -1,8 +1,8 @@
 package id.walt.cli.presexch
 
 import id.walt.cli.models.Credential
-import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.cli.presexch.strategies.PresentationDefinitionMatchStrategy
+import id.walt.oid4vc.data.dif.PresentationDefinition
 
 class MatchPresentationDefinitionCredentialsUseCase(
     private val credentialList: List<Credential>,

@@ -1,4 +1,7 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.oid4vc
+
 
 import COSE.AlgorithmID
 import COSE.OneKey
@@ -36,8 +39,6 @@ import kotlinx.datetime.plus
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.BasicConstraints
 import org.bouncycastle.asn1.x509.Extension
@@ -57,10 +58,12 @@ import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
-import java.util.*
+import java.util.Date
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 
 class MDoc_Test: AnnotationSpec() {
@@ -242,7 +245,7 @@ class MDoc_Test: AnnotationSpec() {
           )
         )
       ), responseMode = ResponseMode.direct_post_jwt, responseTypes = setOf(ResponseType.VpToken), redirectOrResponseUri = "http://blank",
-      nonce = UUID.generateUUID().toString(), state = "test", clientId = "walt.id", clientIdScheme = ClientIdScheme.X509SanDns,
+      nonce = Uuid.random().toString(), state = "test", clientId = "walt.id", clientIdScheme = ClientIdScheme.X509SanDns,
       clientMetadataParameter = ClientMetadataParameter.fromClientMetadata(
         OpenIDClientMetadata(listOf("http://localhost"),
           jwks = buildJsonObject {
@@ -270,7 +273,7 @@ class MDoc_Test: AnnotationSpec() {
     } ?: throw Exception("No ephemeral reader key found")
 
     // 5) Create OID4VP presentation response (Wallet)
-    val mdocNonce = UUID.generateUUID().toString()
+    val mdocNonce = Uuid.random().toString()
     val presentedMdoc = mdoc.presentWithDeviceSignature(MDocRequestBuilder(mdoc.docType.value).also {
       parsedPresReq.presentationDefinition!!.inputDescriptors.forEach { inputDescriptor ->
         inputDescriptor.constraints!!.fields!!.forEach { field ->

@@ -2,7 +2,6 @@ package id.walt.webwallet.utils
 
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import java.security.SecureRandom
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 object RandomUtils {
 

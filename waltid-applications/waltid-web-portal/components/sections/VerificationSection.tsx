@@ -4,7 +4,7 @@ import { AvailableCredential } from '@/types/credentials';
 import WaltIcon from '@/components/walt/logo/WaltIcon';
 import InputField from '@/components/walt/forms/Input';
 import Button from '@/components/walt/button/Button';
-import React, { useState, useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { CredentialsContext } from '@/pages/_app';
 import { useRouter } from 'next/router';
 
@@ -24,19 +24,24 @@ export default function VerificationSection() {
 
   const params = router.query;
 
-  const idsToIssue = (params as unknown as { ids: string }).ids?.split(',') ? (params as unknown as { ids: string }).ids?.split(',') : [(params as unknown as { ids: string }).ids];
-  const [credentialsToIssue, setCredentialsToIssue] = useState<AvailableCredential[]>([]);
+  const idsToIssue = (params as unknown as { ids: string }).ids?.split(',')
+    ? (params as unknown as { ids: string }).ids?.split(',')
+    : [(params as unknown as { ids: string }).ids];
+  const [credentialsToIssue, setCredentialsToIssue] = useState<
+    AvailableCredential[]
+  >([]);
 
   React.useEffect(() => {
-    setCredentialsToIssue(AvailableCredentials.filter((cred) => {
-      for (const id of idsToIssue) {
-        if (id.toString() == cred.id.toString()) {
-          return true;
+    setCredentialsToIssue(
+      AvailableCredentials.filter((cred) => {
+        for (const id of idsToIssue) {
+          if (id.toString() == cred.id.toString()) {
+            return true;
+          }
         }
-      }
-      return false;
-    }
-    ));
+        return false;
+      })
+    );
   }, [AvailableCredentials]);
 
   function handleVerify() {
@@ -64,7 +69,10 @@ export default function VerificationSection() {
       params.append('vps', vps.join(','));
     }
 
-    params.append('format', (credentialsToIssue[0]?.selectedFormat ?? 'JWT + W3C VC') as string );
+    params.append(
+      'format',
+      (credentialsToIssue[0]?.selectedFormat ?? 'JWT + W3C VC') as string
+    );
     router.push(`/verify?${params.toString()}`);
   }
 
@@ -92,7 +100,8 @@ export default function VerificationSection() {
             credentialToEdit={credential}
             credentialsToIssue={credentialsToIssue}
             setCredentialsToIssue={setCredentialsToIssue}
-            key={credential.title} />
+            key={credential.title}
+          />
         ))}
       </div>
       {/*END*/}
@@ -118,7 +127,7 @@ export default function VerificationSection() {
             value={notBeforePolicy}
             onChange={setNotBeforePolicy}
           />
-          <div className='sm:flex justify-between'>
+          <div className="sm:flex justify-between">
             <PolicyListItem
               name="Webhook Policy"
               value={webhookPolicy}

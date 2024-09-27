@@ -75,7 +75,8 @@ internal sealed class DidMethod(val signingKeyInKeychainIdentifier: String) {
         DidMethod(signingKeyInKeychainIdentifier) {
         override fun resolveDid(): String {
             val encodedJwk = runBlocking {
-                IosKey.load(signingKeyInKeychainIdentifier, KeyType.secp256r1).getPublicKey()
+                IosKey.load(IosKey.Options(signingKeyInKeychainIdentifier, KeyType.secp256r1))
+                    .getPublicKey()
                     .exportJWK().encodeBase64()
                     ?: throw IllegalStateException("Loading key problem")
             }
@@ -98,7 +99,9 @@ internal class TestCredentialWallet(
 
                 val key = requireNotNull(
                     IosKey.load(
-                        kid, KeyType.secp256r1
+                        IosKey.Options(
+                            kid, KeyType.secp256r1
+                        )
                     )
                 ) { "Could not find key with kid in ios" }
 
@@ -153,7 +156,9 @@ internal class TestCredentialWallet(
                 runBlocking {
                     requireNotNull(
                         IosKey.load(
-                            didMethod.signingKeyInKeychainIdentifier, KeyType.secp256r1
+                            IosKey.Options(
+                                didMethod.signingKeyInKeychainIdentifier, KeyType.secp256r1
+                            )
                         )
                     ).run {
 
@@ -280,7 +285,9 @@ internal class TestCredentialWallet(
 
         val signKey = requireNotNull(
             IosKey.load(
-                didMethod.signingKeyInKeychainIdentifier, KeyType.secp256r1
+                IosKey.Options(
+                    didMethod.signingKeyInKeychainIdentifier, KeyType.secp256r1
+                )
             )
         ) { "Load key failed" }
 
@@ -306,27 +313,29 @@ internal class TestCredentialWallet(
             ?: throw IllegalArgumentException("VerifiablePresentation string does not contain `vp` attribute?")).jsonObject["verifiableCredential"]
             ?: throw IllegalArgumentException("VerifiablePresentation does not contain verifiableCredential list?")).jsonArray.map { it.jsonPrimitive.content }
 
-        return PresentationResult(listOf(JsonPrimitive(presentationJwtStr)), PresentationSubmission(
-            id = session.presentationDefinition!!.id,
-            definitionId = session.presentationDefinition!!.id,
-            descriptorMap = jwtCredentials.mapIndexed { index, vcJwsStr ->
+        return PresentationResult(
+            listOf(JsonPrimitive(presentationJwtStr)), PresentationSubmission(
+                id = session.presentationDefinition!!.id,
+                definitionId = session.presentationDefinition!!.id,
+                descriptorMap = jwtCredentials.mapIndexed { index, vcJwsStr ->
 
-                val vcJws = vcJwsStr.decodeJws()
-                val type =
-                    vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
-                        ?: "VerifiableCredential"
+                    val vcJws = vcJwsStr.decodeJws()
+                    val type =
+                        vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
+                            ?: "VerifiableCredential"
 
-                DescriptorMapping(
-                    id = session.presentationDefinition?.inputDescriptors?.get(index)?.id,
-                    format = VCFormat.jwt_vp,  // jwt_vp_json
-                    path = "$",
-                    pathNested = DescriptorMapping(
+                    DescriptorMapping(
                         id = session.presentationDefinition?.inputDescriptors?.get(index)?.id,
-                        format = VCFormat.jwt_vc,
-                        path = "$.verifiableCredential[0]",
+                        format = VCFormat.jwt_vp,  // jwt_vp_json
+                        path = "$",
+                        pathNested = DescriptorMapping(
+                            id = session.presentationDefinition?.inputDescriptors?.get(index)?.id,
+                            format = VCFormat.jwt_vc,
+                            path = "$.verifiableCredential[0]",
+                        )
                     )
-                )
-            }))
+                })
+        )
     }
 
 
@@ -359,6 +368,7 @@ internal class TestCredentialWallet(
     override fun putSession(id: String, session: SIOPSession): Unit {
         sessionCache[id] = session
     }
+
     override fun removeSession(id: String): Unit {
         sessionCache.remove(id)
     }
