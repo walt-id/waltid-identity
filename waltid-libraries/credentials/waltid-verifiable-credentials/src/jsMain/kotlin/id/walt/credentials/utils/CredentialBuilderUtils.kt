@@ -1,7 +1,9 @@
 package id.walt.credentials.utils
 
 import id.walt.crypto.utils.JsonUtils.toJsonObject
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 @JsExport
 object CredentialBuilderUtils {

@@ -7,11 +7,15 @@ import COSE.OneKey
 import cbor.Cbor
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
+import com.sksamuel.hoplite.ConfigException
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.ConfigurationException
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.credentials.issuance.Issuer.mergingJwtIssue
 import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
+import id.walt.credentials.issuance.dataFunctions
+import id.walt.credentials.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
@@ -42,10 +46,8 @@ import id.walt.oid4vc.requests.BatchCredentialRequest
 import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialErrorCode
-import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.util.randomUUID
-import id.walt.sdjwt.SDJwtVC
-import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.plugins.*
@@ -259,7 +261,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             CredentialErrorCode.invalid_or_missing_proof,
             message = "Proof JWT header must contain kid or jwk claim"
         )
-        val holderDid = if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else holderKid
+        val holderDid = if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else null
         val nonce = proofPayload["nonce"]?.jsonPrimitive?.content ?: throw CredentialError(
             credentialRequest,
             CredentialErrorCode.invalid_or_missing_proof, message = "Proof must contain nonce"
@@ -277,7 +279,7 @@ open class CIProvider : OpenIDCredentialIssuer(
                     IssuanceRequest(
                         issuerKey = Json.parseToJsonElement(KeySerialization.serializeKey(exampleIssuerKey)).jsonObject,
                         credentialConfigurationId = "OpenBadgeCredential_${credentialRequest.format.value}",
-                        credentialData = W3CVC.fromJson(IssuanceExamples.openBadgeCredentialData),
+                        credentialData = Json.parseToJsonElement(IssuanceExamples.openBadgeCredentialData).jsonObject,
                         mdocData = null,
                         issuerDid = exampleIssuerDid
                     ),
@@ -293,18 +295,20 @@ open class CIProvider : OpenIDCredentialIssuer(
             val vc = data.request.credentialData ?: throw MissingFieldException(listOf("credentialData"), "credentialData")
 
             data.run {
-                var issuerKid = issuerDid ?: data.issuerKey.key.getKeyId()
-                if(!issuerDid.isNullOrEmpty()) {
-                    if (issuerDid.startsWith("did:key") && issuerDid.length == 186) // EBSI conformance corner case when issuer uses did:key instead of did:ebsi and no trust framework is defined
-                        issuerKid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
-                    else if (issuerDid.startsWith("did:ebsi"))
-                        issuerKid = issuerDid + "#" + issuerKey.key.getKeyId()
-                }
-                val isSdJwtVc = data.request.credentialFormat == CredentialFormat.sd_jwt_vc || data.request.selectiveDisclosure != null
-                when {
-                    isSdJwtVc -> sdJwtVc(JWKKey.importJWK(holderKey.toString()).getOrNull(), vc, data, holderDid, credentialRequest.format)
-                    else -> nonSdJwtVc(vc, issuerKid, holderDid, holderKey)
-                }
+              var issuerKid = issuerDid ?: data.issuerKey.key.getKeyId()
+              if(!issuerDid.isNullOrEmpty()) {
+                if (issuerDid.startsWith("did:key") && issuerDid.length == 186) // EBSI conformance corner case when issuer uses did:key instead of did:ebsi and no trust framework is defined
+                  issuerKid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
+                else if (issuerDid.startsWith("did:ebsi"))
+                  issuerKid = issuerDid + "#" + issuerKey.key.getKeyId()
+              }
+              when (data.request.credentialFormat) {
+                  CredentialFormat.sd_jwt_vc -> sdJwtVc(
+                      JWKKey.importJWK(holderKey.toString()).getOrNull(),
+                      vc,
+                      holderDid, issuerKid)
+                  else -> w3cSdJwtVc(W3CVC(vc), issuerKid, holderDid, holderKey)
+              }
             }.also { log.debug { "Respond VC: $it" } }
         }))
     }
@@ -435,68 +439,9 @@ open class CIProvider : OpenIDCredentialIssuer(
 
         require(keyIdsDistinct.size < 2) { "More than one key id requested" }
 
-//        val keyId = keyIdsDistinct.first()
-
-
-        batchCredentialRequest.credentialRequests.first().let { credentialRequest ->
-
-            val (subjectDid, nonce) = parseFromJwt(
-                credentialRequest.proof?.jwt ?: throw IllegalArgumentException("No proof.jwt in credential request!")
-            )
-
-            log.debug { "RETRIEVING VC FROM TOKEN MAPPING: $nonce" }
-            val issuanceSessionData = tokenCredentialMapping[nonce]
-                ?: throw IllegalArgumentException("The issuanceIdCredentialMapping does not contain a mapping for: $nonce!")
-
-            val credentialResults = issuanceSessionData.map { data ->
-                CredentialResponse.success(
-                    format = credentialRequest.format,
-                    credential = JsonPrimitive(
-                        runBlocking {
-                            val vc = data.request.credentialData ?: throw MissingFieldException(listOf("credentialData"), "credentialData")
-
-                            data.run {
-                                when (credentialRequest.format) {
-                                    CredentialFormat.sd_jwt_vc -> vc.mergingSdJwtIssue(
-                                        issuerKey = issuerKey.key,
-                                        issuerDid = issuerDid,
-                                        subjectDid = subjectDid,
-                                        mappings = request.mapping ?: JsonObject(emptyMap()),
-                                        additionalJwtHeaders = emptyMap(),
-                                        additionalJwtOptions = emptyMap(),
-                                        disclosureMap = data.request.selectiveDisclosure
-                                            ?: SDMap.Companion.generateSDMap(
-                                                JsonObject(emptyMap()),
-                                                JsonObject(emptyMap())
-                                            )
-                                    ).also {
-                                        data.sendCallback("batch_sdjwt_issue", buildJsonObject {
-                                            put("sdjwt", it)
-                                        })
-                                    }
-
-                                    else -> vc.mergingJwtIssue(
-                                        issuerKey = issuerKey.key,
-                                        issuerDid = issuerDid,
-                                        subjectDid = subjectDid,
-                                        mappings = request.mapping ?: JsonObject(emptyMap()),
-                                        additionalJwtHeader = emptyMap(),
-                                        additionalJwtOptions = emptyMap(),
-                                    ).also {
-                                        data.sendCallback("batch_jwt_issue", buildJsonObject {
-                                            put("jwt", it)
-                                        })
-                                    }
-                                }
-
-                            }.also { log.debug { "Respond VC: $it" } }
-                        }
-                    )
-                )
-            }
-
-            return BatchCredentialResponse.success(credentialResults, accessToken, 5.minutes)
-        }
+        return BatchCredentialResponse.success(
+            batchCredentialRequest.credentialRequests.map { generateCredentialResponse(it, accessToken) }
+        )
     }
 
 
@@ -531,6 +476,9 @@ open class CIProvider : OpenIDCredentialIssuer(
                 }
             }
         }
+
+        val jwtCryptoProvider
+            get() = SingleKeyJWTCryptoProvider(issuerKey.key)
     }
 
     // TODO: Hack as this is non stateless because of oidc4vc lib API
@@ -575,58 +523,62 @@ open class CIProvider : OpenIDCredentialIssuer(
 
     private suspend fun IssuanceSessionData.sdJwtVc(
         holderKey: JWKKey?,
-        vc: W3CVC,
-        data: IssuanceSessionData,
-        holderDid: String?,
-        format: CredentialFormat,
-    ) = vc.mergingSdJwtIssue(
-        issuerKey = issuerKey.key,
-        issuerDid = issuerDid,
-        subjectDid = holderDid ?: holderKey?.getKeyId() ?: throw IllegalArgumentException("Either holderKey or holderDid must be given"),
-        mappings = request.mapping ?: JsonObject(emptyMap()),
-        type = format.value,
-        additionalJwtHeaders = when(format) {
-            CredentialFormat.sd_jwt_vc -> {request.x5Chain?.let {
-                mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }), "typ" to CredentialFormat.sd_jwt_vc.toJsonElement(), "cty" to "credential-claims-set+json".toJsonElement(), "kid" to  issuerDid?.ifEmpty { issuerKey.key.getKeyId() }.toJsonElement())
-            } ?: mapOf()}
-            else -> mapOf( "typ" to  format.toJsonElement(), "kid" to issuerDid?.ifEmpty { issuerKey.key.getKeyId() }.toJsonElement())
-        },
-        additionalJwtOptions = when(format) {
-            CredentialFormat.sd_jwt_vc -> {  SDJwtVC.defaultPayloadProperties(
-                issuerId = issuerDid ?: issuerKey.key.getKeyId(),
-                cnf = JsonObject(holderKey?.let {
-                    buildJsonObject { put("jwk", it.exportJWKObject().plus("kid" to holderKey.getKeyId()).toJsonElement())}
-                } ?: buildJsonObject { put("kid", holderDid) }),
-                vct = data.request.vct ?: throw IllegalArgumentException("Invalid VCT"),
-                subject =  holderDid ?: holderKey?.getKeyId()
-            )}
-            else -> emptyMap()
-        },
-        disclosureMap = request.selectiveDisclosure ?: SDMap(emptyMap())
-    ).also {
+        vc: JsonObject,
+        holderDid: String?, issuerKid: String?
+    ): String = SDJwtVC.sign(
+        sdPayload = SDPayload.createSDPayload(
+            vc.mergeSDJwtVCPayloadWithMapping(
+                mapping = request.mapping ?: JsonObject(emptyMap()),
+                context = mapOf(
+                    "issuerDid" to issuerDid,
+                    "subjectDid" to holderDid
+                ).filterValues { !it.isNullOrEmpty() }.mapValues { JsonPrimitive(it.value) },
+                dataFunctions
+            ),
+            request.selectiveDisclosure ?: SDMap(mapOf())
+        ),
+        jwtCryptoProvider = jwtCryptoProvider,
+        issuerDid = (issuerDid ?: "").ifEmpty { issuerKey.key.getKeyId() },
+        holderDid = holderDid,
+        holderKeyJWK = holderKey?.exportJWKObject(),
+        issuerKeyId = issuerKey.key.getKeyId(),
+        vct = metadata.credentialConfigurationsSupported?.get(request.credentialConfigurationId)?.vct ?: throw ConfigurationException(
+            ConfigException("No vct configured for given credential configuration id: ${request.credentialConfigurationId}")
+        ),
+        additionalJwtHeader = request.x5Chain?.let {
+            mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
+        } ?: mapOf()
+    ).toString().also {
         sendCallback("sdjwt_issue", buildJsonObject {
             put("sdjwt", it)
         })
     }
 
-    private suspend fun IssuanceSessionData.nonSdJwtVc(
+    private suspend fun IssuanceSessionData.w3cSdJwtVc(
         vc: W3CVC,
         issuerKid: String,
         holderDid: String?,
-        holderKey: JsonObject?,
-    ) = vc.mergingJwtIssue(
-        issuerKey = issuerKey.key,
-        issuerDid = issuerDid,
-        issuerKid = issuerKid,
-        subjectDid = holderDid ?: "",
-        mappings = request.mapping ?: JsonObject(emptyMap()),
-        additionalJwtHeader = emptyMap(),
-        additionalJwtOptions = holderKey?.let {
-            mapOf(
-                "cnf" to buildJsonObject { put("jwk", it) }
-            )
-        } ?: emptyMap(),
-    ).also {
+        holderKey: JsonObject?
+    ) = when(request.selectiveDisclosure.isNullOrEmpty()) {
+        true -> vc.mergingJwtIssue(
+            issuerKey = issuerKey.key,
+            issuerDid = issuerDid,
+            issuerKid = issuerKid,
+            subjectDid = holderDid ?: "",
+            mappings = request.mapping ?: JsonObject(emptyMap()),
+            additionalJwtHeader = emptyMap(),
+            additionalJwtOptions = emptyMap()
+        )
+        else -> vc.mergingSdJwtIssue(
+            issuerKey = issuerKey.key,
+            issuerDid = issuerDid,
+            subjectDid = holderDid ?: "",
+            mappings = request.mapping ?: JsonObject(emptyMap()),
+            additionalJwtHeaders = emptyMap(),
+            additionalJwtOptions = emptyMap(),
+            disclosureMap = request.selectiveDisclosure
+        )
+    }.also {
         sendCallback("jwt_issue", buildJsonObject {
             put("jwt", it)
         })

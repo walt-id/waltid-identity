@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.issuance.IssuanceExamples
@@ -14,11 +16,13 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
+
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 abstract class E2EWalletTestBase {
     private val didMethodsToTest = listOf("key", "jwk", "web")
@@ -27,7 +31,7 @@ abstract class E2EWalletTestBase {
 
     private val alphabet = ('a'..'z')
     protected lateinit var token: String
-    protected lateinit var walletId: UUID
+    protected lateinit var walletId: Uuid
     private lateinit var firstDid: String
 
 

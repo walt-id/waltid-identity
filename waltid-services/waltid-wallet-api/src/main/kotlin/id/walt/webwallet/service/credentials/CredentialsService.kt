@@ -7,14 +7,18 @@ import id.walt.webwallet.db.models.WalletCredentials
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.Serializable
-import kotlinx.uuid.UUID
+
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.statements.UpdateStatement
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
 
+@OptIn(ExperimentalUuidApi::class)
 class CredentialsService {
     val categoryService = CategoryService()
 
@@ -27,7 +31,7 @@ class CredentialsService {
      * @param credentialId credential id
      * @return [WalletCredential] or null, it not found
      */
-    fun get(wallet: UUID, credentialId: String): WalletCredential? =
+    fun get(wallet: Uuid, credentialId: String): WalletCredential? =
         transaction { getCredentialsQuery(wallet, true, credentialId).singleOrNull()?.let { WalletCredential(it) } }
 
     /**
@@ -47,7 +51,7 @@ class CredentialsService {
      * @param filter the credential filter
      * @return list of [WalletCredential] matching the filter conditions
      */
-    fun list(wallet: UUID, filter: CredentialFilterObject) = transaction {
+    fun list(wallet: Uuid, filter: CredentialFilterObject) = transaction {
         let {
             filter.categories?.let {
                 it.takeIf { it.isEmpty() }?.let {
@@ -65,7 +69,7 @@ class CredentialsService {
      * @param credentials the credential object
      * @return list of credential id
      */
-    fun add(wallet: UUID, vararg credentials: WalletCredential) = addAll(wallet, credentials.toList())
+    fun add(wallet: Uuid, vararg credentials: WalletCredential) = addAll(wallet, credentials.toList())
 
     /**
      * Deletes a credential
@@ -74,7 +78,7 @@ class CredentialsService {
      * @param permanent flag a permanent delete
      * @return True if deleted successfully, false - otherwise
      */
-    fun delete(wallet: UUID, credentialId: String, permanent: Boolean): Boolean = (permanent.takeIf {
+    fun delete(wallet: Uuid, credentialId: String, permanent: Boolean): Boolean = (permanent.takeIf {
         it
     }?.let {
         deleteCredential(wallet, credentialId)
@@ -86,16 +90,16 @@ class CredentialsService {
      * @param credentialId credential id
      * @return the [WalletCredential] object if restore succeeded, null otherwise
      */
-    fun restore(wallet: UUID, credentialId: String) = get(wallet, credentialId)?.also {
+    fun restore(wallet: Uuid, credentialId: String) = get(wallet, credentialId)?.also {
         updateDelete(wallet, credentialId, false)
     }
 
-    fun setPending(wallet: UUID, credentialId: String, pending: Boolean = true) =
+    fun setPending(wallet: Uuid, credentialId: String, pending: Boolean = true) =
         updatePending(wallet, credentialId, pending)
 
-    private fun addAll(wallet: UUID, credentials: List<WalletCredential>): List<String> = transaction {
+    private fun addAll(wallet: Uuid, credentials: List<WalletCredential>): List<String> = transaction {
         WalletCredentials.batchInsert(credentials) { credential: WalletCredential ->
-            this[WalletCredentials.wallet] = wallet
+            this[WalletCredentials.wallet] = wallet.toJavaUuid()
             this[WalletCredentials.id] = credential.id
             this[WalletCredentials.document] = credential.document
             this[WalletCredentials.disclosures] = credential.disclosures
@@ -106,60 +110,59 @@ class CredentialsService {
         }.map { it[WalletCredentials.id] }
     }
 
-    private fun getCredentialsQuery(wallet: UUID, includeDeleted: Boolean, vararg credentialId: String) =
+    private fun getCredentialsQuery(wallet: Uuid, includeDeleted: Boolean, vararg credentialId: String) =
         WalletCredentials.selectAll().where {
-            (WalletCredentials.wallet eq wallet) and (WalletCredentials.id inList credentialId.toList() and (notDeletedItemsCondition or (includeDeleted.takeIf { it }
+            (WalletCredentials.wallet eq wallet.toJavaUuid()) and (WalletCredentials.id inList credentialId.toList() and (notDeletedItemsCondition or (includeDeleted.takeIf { it }
                 ?.let { Op.TRUE } ?: Op.FALSE)))
         }
 
-    private fun updateDelete(wallet: UUID, credentialId: String, value: Boolean): Int = transaction {
+    private fun updateDelete(wallet: Uuid, credentialId: String, value: Boolean): Int = transaction {
         updateColumn(wallet, credentialId) {
             it[WalletCredentials.deletedOn] = value.takeIf { it }?.let { Instant.now() }
         }
     }
 
-    private fun updatePending(wallet: UUID, credentialId: String, value: Boolean): Int = transaction {
+    private fun updatePending(wallet: Uuid, credentialId: String, value: Boolean): Int = transaction {
         updateColumn(wallet, credentialId) {
             it[WalletCredentials.pending] = value
         }
     }
 
     //TODO: copied from IssuersService
-    private fun updateColumn(wallet: UUID, credentialId: String, update: (statement: UpdateStatement) -> Unit): Int =
-        WalletCredentials.update({ WalletCredentials.wallet eq wallet and (WalletCredentials.id eq credentialId) }) {
+    private fun updateColumn(wallet: Uuid, credentialId: String, update: (statement: UpdateStatement) -> Unit): Int =
+        WalletCredentials.update({ WalletCredentials.wallet eq wallet.toJavaUuid() and (WalletCredentials.id eq credentialId) }) {
             update(it)
         }
 
-    private fun deleteCredential(wallet: UUID, credentialId: String) =
-        transaction { WalletCredentials.deleteWhere { (WalletCredentials.wallet eq wallet) and (id eq credentialId) } }
+    private fun deleteCredential(wallet: Uuid, credentialId: String) =
+        transaction { WalletCredentials.deleteWhere { (WalletCredentials.wallet eq wallet.toJavaUuid()) and (id eq credentialId) } }
 
-    private fun categorizedQuery(wallet: UUID, deleted: Boolean?, pending: Boolean?, categories: List<String>) =
+    private fun categorizedQuery(wallet: Uuid, deleted: Boolean?, pending: Boolean?, categories: List<String>) =
         WalletCredentials.innerJoin(otherTable = WalletCredentialCategoryMap,
             onColumn = { id },
             otherColumn = { credential },
             additionalConstraint = {
-                WalletCredentials.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet) and deletedCondition(
+                WalletCredentials.wallet eq wallet.toJavaUuid() and (WalletCredentialCategoryMap.wallet eq wallet) and deletedCondition(
                     deleted
                 ) and pendingCondition(pending)
             }).innerJoin(otherTable = WalletCategory,
             onColumn = { WalletCredentialCategoryMap.category },
             otherColumn = { WalletCategory.id },
             additionalConstraint = {
-                WalletCategory.wallet eq wallet and (WalletCredentialCategoryMap.wallet eq wallet) and (WalletCategory.name inList (categories))
+                WalletCategory.wallet eq wallet.toJavaUuid() and (WalletCredentialCategoryMap.wallet eq wallet) and (WalletCategory.name inList (categories))
             }).selectAll()
 
-    private fun uncategorizedQuery(wallet: UUID, deleted: Boolean?, pending: Boolean?) =
+    private fun uncategorizedQuery(wallet: Uuid, deleted: Boolean?, pending: Boolean?) =
         WalletCredentials.selectAll().where {
-            WalletCredentials.wallet eq wallet and (WalletCredentials.id notInSubQuery (WalletCredentialCategoryMap.slice(
+            WalletCredentials.wallet eq wallet.toJavaUuid() and (WalletCredentials.id notInSubQuery (WalletCredentialCategoryMap.select(
                 WalletCredentialCategoryMap.credential
-            ).selectAll()
-                .where { WalletCredentialCategoryMap.wallet eq wallet })) and deletedCondition(deleted) and pendingCondition(
+            ).where { WalletCredentialCategoryMap.wallet eq wallet })) and deletedCondition(deleted) and pendingCondition(
                 pending
             )
         }
 
-    private fun allQuery(wallet: UUID, deleted: Boolean?, pending: Boolean?) = WalletCredentials.selectAll()
-        .where { WalletCredentials.wallet eq wallet and deletedCondition(deleted) and pendingCondition(pending) }
+    private fun allQuery(wallet: Uuid, deleted: Boolean?, pending: Boolean?) = WalletCredentials.selectAll()
+        .where { WalletCredentials.wallet eq wallet.toJavaUuid() and deletedCondition(deleted) and pendingCondition(pending) }
 
     private fun deletedCondition(deleted: Boolean?) = deleted?.let {
         it.takeIf { it }?.let { deletedItemsCondition } ?: notDeletedItemsCondition
@@ -168,7 +171,7 @@ class CredentialsService {
     private fun pendingCondition(pending: Boolean?) = pending?.let { WalletCredentials.pending eq it } ?: Op.TRUE
 
     class CategoryService {
-        fun add(wallet: UUID, credentialId: String, vararg category: String): Int = transaction {
+        fun add(wallet: Uuid, credentialId: String, vararg category: String): Int = transaction {
             WalletCredentialCategoryMap.batchUpsert(
                 getCategoryIds(wallet, category.toList()),
                 WalletCredentialCategoryMap.wallet,
@@ -181,7 +184,7 @@ class CredentialsService {
             }.count()
         }
 
-        fun delete(wallet: UUID, credentialId: String, vararg category: String): Int = transaction {
+        fun delete(wallet: Uuid, credentialId: String, vararg category: String): Int = transaction {
             WalletCredentialCategoryMap.deleteWhere {
                 WalletCredentialCategoryMap.wallet eq wallet and (credential eq credentialId) and (WalletCredentialCategoryMap.category inList (getCategoryIds(
                     wallet, category.toList()
@@ -189,9 +192,9 @@ class CredentialsService {
             }
         }
 
-        private fun getCategoryIds(wallet: UUID, category: List<String>): List<Int> = transaction {
+        private fun getCategoryIds(wallet: Uuid, category: List<String>): List<Int> = transaction {
             WalletCategory.selectAll()
-                .where { WalletCategory.wallet eq wallet and (WalletCategory.name inList category.toList()) }.map {
+                .where { WalletCategory.wallet eq wallet.toJavaUuid() and (WalletCategory.name inList category.toList()) }.map {
                     it[WalletCategory.id].value
                 }
         }

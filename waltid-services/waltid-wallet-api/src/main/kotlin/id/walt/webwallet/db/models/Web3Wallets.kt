@@ -1,14 +1,16 @@
 package id.walt.webwallet.db.models
 
-import kotlinx.uuid.exposed.autoGenerate
-import kotlinx.uuid.exposed.kotlinxUUID
+import id.walt.webwallet.db.autoGenerate
+import id.walt.webwallet.db.kotlinxUuid
 import org.jetbrains.exposed.sql.Table
+import kotlin.uuid.ExperimentalUuidApi
 
+@OptIn(ExperimentalUuidApi::class)
 object Web3Wallets : Table("web3wallets") {
     val tenant = varchar("tenant", 128).default("")
-    val accountId = kotlinxUUID("accountId")
+    val accountId = kotlinxUuid("accountId")
 
-    val id = kotlinxUUID("id").autoGenerate()
+    val id = kotlinxUuid("id").autoGenerate()
 
     val address = varchar("address", 256).uniqueIndex()
     val ecosystem = varchar("ecosystem", 128)

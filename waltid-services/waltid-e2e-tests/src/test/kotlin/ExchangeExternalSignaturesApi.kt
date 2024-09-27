@@ -40,18 +40,18 @@ import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
-import kotlin.test.assertEquals
+import kotlin.uuid.Uuid
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.uuid.ExperimentalUuidApi
 
+@OptIn(ExperimentalUuidApi::class)
 class ExchangeExternalSignatures {
 
     private var client: HttpClient
@@ -74,8 +74,8 @@ class ExchangeExternalSignatures {
         email = "${randomUUID()}@email.com",
         password = randomUUID(),
     )
-    private var accountId = UUID.NIL
-    private var walletId = UUID.NIL
+    private var accountId = Uuid.NIL
+    private var walletId = Uuid.NIL
 
     //credential issuance requests
     //w3c jwt_vc_json - no disclosures
@@ -477,6 +477,7 @@ class ExchangeExternalSignatures {
                     prepareResponse,
                     credentialIssuer = prepareResponse.credentialIssuer,
                     offeredCredentialProofsOfPossession = offeredCredentialProofsOfPossession,
+                    accessToken = prepareResponse.accessToken,
                 )
             )
         }.expectSuccess()

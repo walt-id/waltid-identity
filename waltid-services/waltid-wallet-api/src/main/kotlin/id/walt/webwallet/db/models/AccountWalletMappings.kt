@@ -1,11 +1,15 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.db.models
 
+import id.walt.commons.temp.UuidSerializer
+import id.walt.webwallet.db.kotlinxUuid
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
-import kotlinx.uuid.UUID
-import kotlinx.uuid.exposed.kotlinxUUID
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.timestamp
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 @Serializable
 enum class AccountWalletPermissions(val power: Int) {
@@ -16,7 +20,7 @@ enum class AccountWalletPermissions(val power: Int) {
 
 object AccountWalletMappings : Table("account_wallet_mapping") {
     val tenant = varchar("tenant", 128).default("")
-    val accountId = kotlinxUUID("id")
+    val accountId = kotlinxUuid("id")
     val wallet = reference("wallet", Wallets)
 
     val addedOn = timestamp("added_on")
@@ -32,12 +36,14 @@ object AccountWalletMappings : Table("account_wallet_mapping") {
 
 @Serializable
 data class AccountWalletListing(
-    val account: UUID,
+    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    val account: Uuid,
     val wallets: List<WalletListing>,
 ) {
     @Serializable
     data class WalletListing(
-        val id: UUID,
+        @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+        val id: Uuid,
         val name: String,
         val createdOn: Instant,
         val addedOn: Instant,

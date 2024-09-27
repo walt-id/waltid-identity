@@ -9,28 +9,51 @@ import id.walt.target.ios.keys.RSA
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 @Suppress("unused")
-class IosKey(
-    override val keyType: KeyType, override val hasPrivateKey: Boolean, private val kid: String
+class IosKey private constructor(
+    private val options: Options,
+    override val hasPrivateKey: Boolean = false
 ) : Key() {
+
+    class Options @OptIn(ExperimentalUuidApi::class) constructor(
+        val kid: String = Uuid.random().toString(),
+        val keyType: KeyType,
+        val inSecureElement: Boolean = false
+    ) {
+        init {
+            if (inSecureElement) {
+                require(keyType == KeyType.secp256r1) { "kid: $kid, Error: Only KeyType.secp256r1 can be stored in secure element." }
+            }
+        }
+    }
+
     companion object {
         @Throws(Exception::class)
-        fun create(kid: String, type: KeyType): Key = when (type) {
-            KeyType.secp256r1 -> P256.PrivateKey.createInKeychain(kid)
-            KeyType.Ed25519 -> Ed25519.PrivateKey.createInKeychain(kid)
-            KeyType.RSA -> RSA.PrivateKey.createInKeychain(kid, 2048u)
+        fun create(options: Options): Key = when (options.keyType) {
+            KeyType.secp256r1 -> P256.PrivateKey.createInKeychain(
+                options.kid,
+                options.inSecureElement
+            )
 
-            else -> error("Not implemented")
-        }.let { key -> IosKey(type, true, kid) }
+            KeyType.Ed25519 -> Ed25519.PrivateKey.createInKeychain(options.kid)
+            KeyType.RSA -> RSA.PrivateKey.createInKeychain(options.kid, 2048u)
+            else -> error("Not implemented key type ${options.keyType}")
+        }.let { _ -> IosKey(options, true) }
 
         @Throws(Exception::class)
-        fun load(kid: String, type: KeyType): Key = when (type) {
-            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid)
-            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid)
-            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(kid)
-            else -> error("Not implemented")
-        }.let { key -> IosKey(type, true, kid) }
+        fun load(options: Options): Key = when (options.keyType) {
+            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(
+                options.kid,
+                options.inSecureElement
+            )
+
+            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid)
+            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid)
+            else -> error("Not implemented key type ${options.keyType}")
+        }.let { _ -> IosKey(options, true) }
 
         @Throws(Exception::class)
         fun delete(kid: String, type: KeyType): Unit = when (type) {
@@ -41,108 +64,160 @@ class IosKey(
         }
     }
 
-    override suspend fun getKeyId(): String = when (keyType) {
-        KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid)
-        KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid)
-        KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(kid)
-        else -> error("Not implemented")
+    override val keyType
+        get() = options.keyType
+
+    override suspend fun getKeyId(): String = when (options.keyType) {
+        KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement)
+        KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid)
+        KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid)
+        else -> error("Not implemented key type ${options.keyType}")
+
     }.kid()!!
 
+    override suspend fun getThumbprint(): String = when (options.keyType) {
+        KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement)
+            .let {
+                if (hasPrivateKey) {
+                    it
+                } else {
+                    it.publicKey()
+                }
+            }
 
-    override suspend fun getThumbprint(): String = when (keyType) {
-        KeyType.secp256r1 -> if (hasPrivateKey) P256.PrivateKey.loadFromKeychain(kid)
-        else P256.PrivateKey.loadFromKeychain(kid).publicKey()
+        KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid).let {
+            if (hasPrivateKey) {
+                it
+            } else {
+                it.publicKey()
+            }
+        }
 
-        KeyType.Ed25519 -> if (hasPrivateKey) Ed25519.PrivateKey.loadFromKeychain(kid)
-        else Ed25519.PrivateKey.loadFromKeychain(kid).publicKey()
+        KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid).let {
+            if (hasPrivateKey) {
+                it
+            } else {
+                it.publicKey()
+            }
+        }
 
-        KeyType.RSA -> if (hasPrivateKey) RSA.PrivateKey.loadFromKeychain(kid) else
-            RSA.PrivateKey.loadFromKeychain(kid).publicKey()
+        else -> error("Not implemented key type ${options.keyType}")
 
-        else -> error("Not implemented")
     }.thumbprint()
 
     override suspend fun exportJWK(): String = exportJWKObject().toString()
 
 
-    override suspend fun exportJWKObject(): JsonObject = when (keyType) {
-        KeyType.secp256r1 -> if (hasPrivateKey) P256.PrivateKey.loadFromKeychain(kid)
-        else P256.PrivateKey.loadFromKeychain(kid).publicKey()
+    override suspend fun exportJWKObject(): JsonObject = when (options.keyType) {
+        KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement)
+            .let {
+                if (hasPrivateKey) {
+                    it
+                } else {
+                    it.publicKey()
+                }
+            }
 
-        KeyType.Ed25519 -> if (hasPrivateKey) Ed25519.PrivateKey.loadFromKeychain(kid)
-        else Ed25519.PrivateKey.loadFromKeychain(kid).publicKey()
+        KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid).let {
+            if (hasPrivateKey) {
+                it
+            } else {
+                it.publicKey()
+            }
+        }
 
-        KeyType.RSA -> if (hasPrivateKey) RSA.PrivateKey.loadFromKeychain(kid)
-        else RSA.PrivateKey.loadFromKeychain(kid).publicKey()
+        KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid).let {
+            if (hasPrivateKey) {
+                it
+            } else {
+                it.publicKey()
+            }
+        }
 
-        else -> error("Not implemented")
+        else -> error("Not implemented key type ${options.keyType}")
+
     }.jwk()
 
-    override suspend fun exportPEM(): String = when (keyType) {
-        KeyType.secp256r1 -> if (hasPrivateKey) P256.PrivateKey.loadFromKeychain(kid)
-        else P256.PrivateKey.loadFromKeychain(kid).publicKey()
+    override suspend fun exportPEM(): String = when (options.keyType) {
+        KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement)
+            .let {
+                if (hasPrivateKey) {
+                    it
+                } else {
+                    it.publicKey()
+                }
+            }
 
-        KeyType.Ed25519 -> if (hasPrivateKey) Ed25519.PrivateKey.loadFromKeychain(kid)
-        else Ed25519.PrivateKey.loadFromKeychain(kid).publicKey()
+        KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid).let {
+            if (hasPrivateKey) {
+                it
+            } else {
+                it.publicKey()
+            }
+        }
 
-        KeyType.RSA -> if (hasPrivateKey) RSA.PrivateKey.loadFromKeychain(kid)
-        else RSA.PrivateKey.loadFromKeychain(kid).publicKey()
+        KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid).let {
+            if (hasPrivateKey) {
+                it
+            } else {
+                it.publicKey()
+            }
+        }
 
-        else -> error("Not implemented")
+        else -> error("Not implemented key type ${options.keyType}")
     }.pem()
 
     override suspend fun signRaw(plaintext: ByteArray): Any {
         check(hasPrivateKey) { "Only private key can do signing." }
 
-        return when (keyType) {
-            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid)
-            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid)
-            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(kid)
-            else -> error("Not implemented")
+        return when (options.keyType) {
+            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement)
+            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid)
+            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid)
+            else -> error("Not implemented key type ${options.keyType}")
         }.signRaw(plaintext)
     }
 
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         check(hasPrivateKey) { "Only private key can do signing." }
 
-        return when (keyType) {
-            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid)
-            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid)
-            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(kid)
-            else -> error("Not implemented")
+        return when (options.keyType) {
+                KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement)
+                KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid)
+                KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid)
+                else -> error("Not implemented key type ${options.keyType}")
+
         }.signJws(plaintext, headers)
     }
 
     override suspend fun verifyRaw(
         signed: ByteArray, detachedPlaintext: ByteArray?
-    ): Result<ByteArray> {
-        return when (keyType) {
-            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid).publicKey()
-            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid).publicKey()
-            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(kid).publicKey()
-            else -> error("Not implemented")
-        }.verifyRaw(signed, detachedPlaintext!!)
-    }
+    ): Result<ByteArray> = when (options.keyType) {
+            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement).publicKey()
+            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid).publicKey()
+            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid).publicKey()
+            else -> error("Not implemented key type ${options.keyType}")
+    }.verifyRaw(signed, detachedPlaintext!!)
 
-    override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
-        return when (keyType) {
-            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid).publicKey()
-            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid).publicKey()
-            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(kid).publicKey()
-            else -> error("Not implemented")
-        }.verifyJws(signedJws)
-    }
 
-    override suspend fun getPublicKey(): Key = IosKey(keyType, false, kid)
+    override suspend fun verifyJws(signedJws: String): Result<JsonElement> = when (options.keyType) {
+            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement).publicKey()
+            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid).publicKey()
+            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid).publicKey()
+            else -> error("Not implemented key type ${options.keyType}")
 
-    override suspend fun getPublicKeyRepresentation(): ByteArray {
-        return when (keyType) {
-            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid).publicKey()
-            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid).publicKey()
-            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(kid).publicKey()
-            else -> error("Not implemented")
-        }.externalRepresentation()
-    }
+    }.verifyJws(signedJws)
+
+
+    override suspend fun getPublicKey(): Key = IosKey(options, false)
+
+    override suspend fun getPublicKeyRepresentation(): ByteArray = when (options.keyType) {
+            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement).publicKey()
+            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid).publicKey()
+            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid).publicKey()
+            else -> error("Not implemented key type ${options.keyType}")
+
+    }.externalRepresentation()
 
     override suspend fun getMeta(): KeyMeta {
         error("Not yet implemented")
@@ -150,16 +225,20 @@ class IosKey(
 }
 
 // utility functions for swift
-
+@Suppress("unused")
 fun String.ExportedToByteArray(
     startIndex: Int, endIndex: Int, throwOnInvalidSequence: Boolean
 ): ByteArray {
     return this.encodeToByteArray()
 }
 
+@Suppress("unused")
 fun ByteArray.ExportedToString(
 ): String {
     return this.decodeToString()
 }
 
-fun dictionaryToHeaders (input: Map<String, String>):  Map<String, JsonElement> = input.mapValues { (_,v) -> JsonPrimitive(v) }
+@Suppress("unused")
+fun dictionaryToHeaders(input: Map<String, String>): Map<String, JsonElement> =
+    input.mapValues { (_, v) -> JsonPrimitive(v) }
+

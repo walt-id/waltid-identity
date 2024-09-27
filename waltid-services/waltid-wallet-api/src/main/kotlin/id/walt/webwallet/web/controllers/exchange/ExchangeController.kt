@@ -14,6 +14,7 @@ import id.walt.webwallet.web.controllers.auth.getWalletService
 import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeOpenApiCommons
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import id.walt.webwallet.web.controllers.walletRoute
+import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*

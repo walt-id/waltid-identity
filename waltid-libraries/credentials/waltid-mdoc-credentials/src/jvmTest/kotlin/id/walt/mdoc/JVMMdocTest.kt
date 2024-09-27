@@ -41,7 +41,7 @@ import java.security.SecureRandom
 import java.security.Security
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
-import java.util.*
+import java.util.Date
 import kotlin.test.*
 
 class JVMMdocTest {

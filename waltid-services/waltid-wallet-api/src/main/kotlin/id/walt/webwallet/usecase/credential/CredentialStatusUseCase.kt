@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.usecase.credential
 
 import id.walt.webwallet.service.credentials.CredentialStatusServiceFactory
@@ -5,13 +7,15 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.credentials.status.StatusListEntry
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
 
 class CredentialStatusUseCase(
     private val credentialService: CredentialsService,
     private val credentialStatusServiceFactory: CredentialStatusServiceFactory,
 ) {
-    suspend fun get(wallet: UUID, credentialId: String): List<CredentialStatusResult> =
+    suspend fun get(wallet: Uuid, credentialId: String): List<CredentialStatusResult> =
         credentialService.get(wallet, credentialId)?.parsedDocument?.let {
             getStatusEntry(it).fold(emptyList()) { acc, i ->
                 acc.plus(credentialStatusServiceFactory.new(i.type).get(i))
