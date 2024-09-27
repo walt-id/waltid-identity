@@ -18,5 +18,6 @@ object JWTClaims {
         const val keyID = "kid"
         const val jwk = "jwk"
         const val x5c = "x5c"
+        const val cty = "cty"
     }
 }

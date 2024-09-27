@@ -584,12 +584,15 @@ open class CIProvider : OpenIDCredentialIssuer(
         issuerDid = issuerDid,
         subjectDid = holderDid ?: holderKey?.getKeyId() ?: throw IllegalArgumentException("Either holderKey or holderDid must be given"),
         mappings = request.mapping ?: JsonObject(emptyMap()),
-        type = format.value,
+        type = when(format) {
+            CredentialFormat.sd_jwt_vc -> format.value
+            else -> "JWT"
+        },
         additionalJwtHeaders = when(format) {
             CredentialFormat.sd_jwt_vc -> {request.x5Chain?.let {
-                mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }), "typ" to CredentialFormat.sd_jwt_vc.toJsonElement(), "cty" to "credential-claims-set+json".toJsonElement(), "kid" to  issuerDid?.ifEmpty { issuerKey.key.getKeyId() }.toJsonElement())
+                mapOf(JWTClaims.Header.x5c to JsonArray(it.map { cert -> cert.toJsonElement() }), JWTClaims.Header.cty to "credential-claims-set+json".toJsonElement(), JWTClaims.Header.keyID to issuerDid?.ifEmpty { issuerKey.key.getKeyId() }.toJsonElement())
             } ?: mapOf()}
-            else -> mapOf( "typ" to  format.toJsonElement(), "kid" to issuerDid?.ifEmpty { issuerKey.key.getKeyId() }.toJsonElement())
+            else -> mapOf(JWTClaims.Header.keyID to issuerDid?.ifEmpty { issuerKey.key.getKeyId() }.toJsonElement())
         },
         additionalJwtOptions = when(format) {
             CredentialFormat.sd_jwt_vc -> {  SDJwtVC.defaultPayloadProperties(
