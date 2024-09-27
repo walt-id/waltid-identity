@@ -99,7 +99,7 @@ object ExchangeUtils {
         ).joinToString(separator = "")
         IETFSdJwtVpProofParameters(
             credentialId = credential.id,
-            ietfSdJwtVc = serializedVcWithDisclosures,
+            sdJwtVc = serializedVcWithDisclosures,
             header = mapOf(
                 "kid" to keyId.toJsonElement(),
                 "typ" to KeyBindingJwt.KB_JWT_TYPE.toJsonElement(),

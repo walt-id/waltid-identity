@@ -547,7 +547,7 @@ class ExchangeExternalSignatures {
                     ietfSdJwtVpProofs = prepareResponse.ietfSdJwtVpProofParameters?.map { params ->
                         IETFSdJwtVpTokenProof(
                             credentialId = params.credentialId,
-                            sdJwtVc = params.ietfSdJwtVc,
+                            sdJwtVc = params.sdJwtVc,
                             vpTokenProof = holderKey.signJws(
                                 params.payload.toJsonElement().toString().toByteArray(),
                                 params.header,
@@ -649,7 +649,7 @@ class ExchangeExternalSignatures {
                     ietfSdJwtVpProofs = prepareResponse.ietfSdJwtVpProofParameters?.map { params ->
                         IETFSdJwtVpTokenProof(
                             credentialId = params.credentialId,
-                            sdJwtVc = params.ietfSdJwtVc,
+                            sdJwtVc = params.sdJwtVc,
                             vpTokenProof = holderKey.signJws(
                                 params.payload.toJsonElement().toString().toByteArray(),
                                 params.header,
@@ -758,7 +758,7 @@ class ExchangeExternalSignatures {
                     ietfSdJwtVpProofs = prepareResponse.ietfSdJwtVpProofParameters?.map { params ->
                         IETFSdJwtVpTokenProof(
                             credentialId = params.credentialId,
-                            sdJwtVc = params.ietfSdJwtVc,
+                            sdJwtVc = params.sdJwtVc,
                             vpTokenProof = holderKey.signJws(
                                 params.payload.toJsonElement().toString().toByteArray(),
                                 params.header,
