@@ -14,7 +14,6 @@ import id.walt.webwallet.web.controllers.auth.getWalletService
 import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeOpenApiCommons
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import id.walt.webwallet.web.controllers.walletRoute
-import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
@@ -24,7 +23,9 @@ import io.ktor.server.response.*
 import io.ktor.util.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlin.uuid.ExperimentalUuidApi
 
+@OptIn(ExperimentalUuidApi::class)
 fun Application.exchange() = walletRoute {
     route(ExchangeOpenApiCommons.EXCHANGE_ROOT_PATH, ExchangeOpenApiCommons.exchangeRoute()) {
         post("useOfferRequest", {
