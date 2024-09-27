@@ -179,26 +179,26 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         logger.info { "OpenID4VP profile: ${session.openId4VPProfile}" }
         logger.info { "Presentation format: $presentationFormat" }
 
-        return when (session.openId4VPProfile) {
-            OpenId4VPProfile.ISO_18013_7_MDOC -> verifyMdoc(tokenResponse, session)
-            OpenId4VPProfile.HAIP ->  runBlocking { verifySdJwtVC(tokenResponse, session) }
-            else -> if(SDJwtVC.isSdJwtVCPresentation(vpToken)) {
-                val success = runBlocking {
-                     verifySdJwtVC(tokenResponse, session)
-                }
-                policyResults[session.id] = PresentationVerificationResponseSurrogate(
-                    results = listOf(
-                        PresentationResultEntrySurrogate(
-                            vpToken, listOf(
-                                PolicyResultSurrogate(
-                                    policy = "default", isSuccess = success, result = "success".toJsonElement()
-                                )
-                            )
-                        )
-                    ), time = Duration.ZERO, policiesRun = 1
-                )
-                success
-            } else {
+        //return when (session.openId4VPProfile) {
+//            OpenId4VPProfile.ISO_18013_7_MDOC -> verifyMdoc(tokenResponse, session)
+//            OpenId4VPProfile.HAIP ->  runBlocking { verifySdJwtVC(tokenResponse, session) }
+//            else -> if(SDJwtVC.isSdJwtVCPresentation(vpToken)) {
+//                val success = runBlocking {
+//                     verifySdJwtVC(tokenResponse, session)
+//                }
+//                policyResults[session.id] = PresentationVerificationResponseSurrogate(
+//                    results = listOf(
+//                        PresentationResultEntrySurrogate(
+//                            vpToken, listOf(
+//                                PolicyResultSurrogate(
+//                                    policy = "default", isSuccess = success, result = "success".toJsonElement()
+//                                )
+//                            )
+//                        )
+//                    ), time = Duration.ZERO, policiesRun = 1
+//                )
+//                success
+//            } else {
                 val results = runBlocking {
                     Verifier.verifyPresentation(
                         presentationFormat,
@@ -214,9 +214,9 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
                 policyResults[session.id] = PresentationVerificationResponseSurrogate(results)
 
-                results.overallSuccess()
-            }
-        }
+                return results.overallSuccess()
+            //}
+       // }
     }
 
     private fun getAdditionalTrustedRootCAs(session: PresentationSession): List<X509Certificate> {
