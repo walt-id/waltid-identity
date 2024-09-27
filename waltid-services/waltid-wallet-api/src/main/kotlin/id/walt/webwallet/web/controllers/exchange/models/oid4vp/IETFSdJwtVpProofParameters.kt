@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonElement
 @Serializable
 data class IETFSdJwtVpProofParameters(
     val credentialId: String,
-    val ietfSdJwtVc: String,
+    val sdJwtVc: String,
     val header: Map<String, JsonElement>,
     val payload: Map<String, JsonElement>,
 )
