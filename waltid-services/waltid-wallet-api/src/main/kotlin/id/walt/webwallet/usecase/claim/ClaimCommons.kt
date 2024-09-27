@@ -49,7 +49,6 @@ object ClaimCommons {
             ),
             credentialId = credential.id,
         )
-    }
 
     fun storeWalletCredentials(
         wallet: Uuid,

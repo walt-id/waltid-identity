@@ -1,7 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
 import id.walt.commons.interop.LspPotentialInterop
-import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -22,7 +21,6 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.server.util.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
@@ -73,9 +71,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
 
         // === resolve issuer metadata ===
         val issuerMetadata =
-            client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess().let {
-                it.body<OpenIDProviderMetadata>()
-            }
+            client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess().body<OpenIDProviderMetadata>()
         assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
         assertContains(
             issuerMetadata.credentialConfigurationsSupported!!.keys,
@@ -135,7 +131,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         val matchingCreds =
             client.post("/wallet-api/wallet/$walletId/exchange/matchCredentialsForPresentationDefinition") {
                 setBody(parsedRequest.presentationDefinition!!)
-            }.expectSuccess().let { response -> response.body<List<WalletCredential>>() }
+            }.expectSuccess().body<List<WalletCredential>>()
         assertNotEquals(0, matchingCreds.size)
 
         client.post("/wallet-api/wallet/$walletId/exchange/usePresentationRequest") {
@@ -205,18 +201,14 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
 
         // === resolve credential offer ===
         val resolvedOffer = client.post("/wallet-api/wallet/$walletId/exchange/resolveCredentialOffer") {
-            setBody(offerUri)
-        }.expectSuccess().let {
-            it.body<CredentialOffer>()
-        }
+        setBody(offerUri)
+    }.expectSuccess().body<CredentialOffer>()
         assertEquals(1, resolvedOffer.credentialConfigurationIds.size)
         assertEquals("identity_credential_vc+sd-jwt", resolvedOffer.credentialConfigurationIds.first())
 
         // === resolve issuer metadata ===
         val issuerMetadata =
-            client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess().let {
-                it.body<OpenIDProviderMetadata>()
-            }
+            client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess().body<OpenIDProviderMetadata>()
         assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
         assertContains(
             issuerMetadata.credentialConfigurationsSupported!!.keys,

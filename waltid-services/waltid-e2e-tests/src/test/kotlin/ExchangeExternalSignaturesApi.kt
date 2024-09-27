@@ -1,9 +1,10 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 import COSE.AlgorithmID
 import E2ETestWebService.loadResource
 import cbor.Cbor
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.commons.interop.LspPotentialInterop
-import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -40,12 +41,14 @@ import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
+import kotlin.test.assertEquals
 import kotlin.uuid.Uuid
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -95,7 +98,43 @@ class ExchangeExternalSignatures {
         Json.decodeFromJsonElement<IssuanceRequest>(E2ETest.sdjwtCredential).apply {
             credentialFormat = CredentialFormat.jwt_vc_json
         }
+
     //ietf sd_jwt_vc - with disclosures
+    private val identityCredentialIETFSdJwtX5cIssuanceRequest = IssuanceRequest(
+        Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
+        "identity_credential_vc+sd-jwt",
+        credentialData = buildJsonObject {
+            put("family_name", "Doe")
+            put("given_name", "John")
+            put("birthdate", "1940-01-01")
+        },
+        "identity_credential",
+        x5Chain = listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT),
+        trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT),
+        selectiveDisclosure = SDMap(
+            mapOf(
+                "birthdate" to SDField(sd = true)
+            )
+        ),
+        credentialFormat = CredentialFormat.sd_jwt_vc
+    )
+    private val identityCredentialIETFSdJwtDidIssuanceRequest = IssuanceRequest(
+        Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
+        "identity_credential_vc+sd-jwt",
+        credentialData = buildJsonObject {
+            put("family_name", "Doe")
+            put("given_name", "John")
+            put("birthdate", "1940-01-01")
+        },
+        mdocData = null,
+        selectiveDisclosure = SDMap(
+            mapOf(
+                "birthdate" to SDField(sd = true)
+            )
+        ),
+        issuerDid = LspPotentialIssuanceInterop.ISSUER_DID,
+        credentialFormat = CredentialFormat.sd_jwt_vc
+    )
 
     //mDoc
     private val mDocIssuanceRequest = Json.decodeFromString<IssuanceRequest>(
@@ -112,43 +151,6 @@ class ExchangeExternalSignatures {
     )
     private val openbadgeUniversityDegreePresentationRequest = loadResource(
         "presentation/batch-openbadge-universitydegree-presentation-request.json"
-    )
-
-    //ietf sd_jwt_vc
-    private val identityCredentialIETFSdJwtX5cIssuanceRequest = IssuanceRequest(
-        Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
-        "identity_credential_vc+sd-jwt",
-        credentialData = W3CVC(buildJsonObject {
-            put("family_name", "Doe")
-            put("given_name", "John")
-            put("birthdate", "1940-01-01")
-        }),
-        "identity_credential",
-        x5Chain = listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT),
-        trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT),
-        selectiveDisclosure = SDMap(
-            mapOf(
-                "birthdate" to SDField(sd = true)
-            )
-        ),
-        credentialFormat = CredentialFormat.sd_jwt_vc
-    )
-    private val identityCredentialIETFSdJwtDidIssuanceRequest = IssuanceRequest(
-        Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
-        "identity_credential_vc+sd-jwt",
-        credentialData = W3CVC(buildJsonObject {
-            put("family_name", "Doe")
-            put("given_name", "John")
-            put("birthdate", "1940-01-01")
-        }),
-        mdocData = null,
-        selectiveDisclosure = SDMap(
-            mapOf(
-                "birthdate" to SDField(sd = true)
-            )
-        ),
-        issuerDid = LspPotentialIssuanceInterop.ISSUER_DID,
-        credentialFormat = CredentialFormat.sd_jwt_vc
     )
 
     private suspend fun registerAccountAndLogin() {
@@ -477,7 +479,6 @@ class ExchangeExternalSignatures {
                     prepareResponse,
                     credentialIssuer = prepareResponse.credentialIssuer,
                     offeredCredentialProofsOfPossession = offeredCredentialProofsOfPossession,
-                    accessToken = prepareResponse.accessToken,
                 )
             )
         }.expectSuccess()

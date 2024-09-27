@@ -47,7 +47,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -85,6 +84,18 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                             "vpTokenParams object that is contained within."
                     body<PrepareOID4VPResponse> {
                         required = true
+                        example(
+                            "W3C Verifiable Credential",
+                            ExchangeExternalSignaturesExamples.prepareOid4vpResponseW3CVCExample(),
+                        )
+                        example(
+                            "W3C SD-JWT Verifiable Credential",
+                            ExchangeExternalSignaturesExamples.prepareOid4vpResponseW3CSDJWTVCExample(),
+                        )
+                        example(
+                            "IETF SD-JWT Verifiable Credential",
+                            ExchangeExternalSignaturesExamples.prepareOid4vpResponseIETFSDJWTVCExample(),
+                        )
                     }
                 }
             }
