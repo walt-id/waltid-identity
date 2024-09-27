@@ -15,7 +15,7 @@ import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.credentials.issuance.Issuer.mergingJwtIssue
 import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
 import id.walt.credentials.issuance.dataFunctions
-import id.walt.credentials.utils.W3CDataMergeUtils.mergeSDJwtVCPayloadWithMapping
+import id.walt.credentials.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
@@ -46,7 +46,6 @@ import id.walt.oid4vc.requests.BatchCredentialRequest
 import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialErrorCode
-import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.*
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -568,11 +567,7 @@ open class CIProvider : OpenIDCredentialIssuer(
             subjectDid = holderDid ?: "",
             mappings = request.mapping ?: JsonObject(emptyMap()),
             additionalJwtHeader = emptyMap(),
-            additionalJwtOptions = holderKey?.let {
-                mapOf(
-                    "cnf" to buildJsonObject { put("jwk", it) }
-                )
-            } ?: emptyMap(),
+            additionalJwtOptions = emptyMap()
         )
         else -> vc.mergingSdJwtIssue(
             issuerKey = issuerKey.key,

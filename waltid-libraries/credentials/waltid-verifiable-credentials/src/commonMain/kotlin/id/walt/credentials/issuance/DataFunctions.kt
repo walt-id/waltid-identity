@@ -1,6 +1,6 @@
 package id.walt.credentials.issuance
 
-import id.walt.credentials.utils.W3CDataMergeUtils
+import id.walt.credentials.utils.CredentialDataMergeUtils
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -16,7 +16,7 @@ import kotlin.time.Duration
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-val dataFunctions = mapOf<String, suspend (call: W3CDataMergeUtils.FunctionCall) -> JsonElement>(
+val dataFunctions = mapOf<String, suspend (call: CredentialDataMergeUtils.FunctionCall) -> JsonElement>(
     "subjectDid" to { it.fromContext() },
     "issuerDid" to { it.fromContext() },
 
