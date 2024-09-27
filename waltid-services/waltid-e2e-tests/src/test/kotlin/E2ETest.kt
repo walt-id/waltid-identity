@@ -275,6 +275,7 @@ class E2ETest {
         lspPotentialWallet.testMdocPresentation()
         lspPotentialWallet.testSDJwtVCIssuance()
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
+        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
         lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
 
@@ -345,6 +346,7 @@ class E2ETest {
 
         lspPotentialWallet.testSDJwtVCIssuance()
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
+        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
     }
 
     //@Test // enable to execute test selectively

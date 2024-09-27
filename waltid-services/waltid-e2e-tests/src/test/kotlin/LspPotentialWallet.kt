@@ -1,7 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
 import id.walt.commons.interop.LspPotentialInterop
-import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -129,17 +128,25 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         IssuanceRequest(
             Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
             "identity_credential_vc+sd-jwt",
-            credentialData = W3CVC(buildJsonObject {
+            credentialData = buildJsonObject {
                 put("family_name", "Doe")
                 put("given_name", "John")
                 put("birthdate", "1940-01-01")
-            }),
+            },
             "identity_credential",
             x5Chain = listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT),
             trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT),
             selectiveDisclosure = SDMap(mapOf(
                 "birthdate" to SDField(sd = true)
-            ))
+            )),
+            mapping = Json.parseToJsonElement("""
+              {
+                "id": "<uuid>",
+                "iat": "<timestamp-seconds>",
+                "nbf": "<timestamp-seconds>",
+                "exp": "<timestamp-in-seconds:365d>"
+              }
+            """.trimIndent()).jsonObject
         )
     )
 
@@ -147,15 +154,23 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         IssuanceRequest(
             Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
             "identity_credential_vc+sd-jwt",
-            credentialData = W3CVC(buildJsonObject {
+            credentialData = buildJsonObject {
                 put("family_name", "Doe")
                 put("given_name", "John")
                 put("birthdate", "1940-01-01")
-            }),
+            },
             mdocData = null,
             selectiveDisclosure = SDMap(mapOf(
                 "birthdate" to SDField(sd = true)
             )),
+            mapping = Json.parseToJsonElement("""
+              {
+                "id": "<uuid>",
+                "iat": "<timestamp-seconds>",
+                "nbf": "<timestamp-seconds>",
+                "exp": "<timestamp-in-seconds:365d>"
+              }
+            """.trimIndent()).jsonObject,
             issuerDid = LspPotentialIssuanceInterop.ISSUER_DID
         )
     )
@@ -200,6 +215,15 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         val sdJwtVC = SDJwtVC.parse("${fetchedCredential.document}~${fetchedCredential.disclosures}")
         assert(sdJwtVC.disclosures.isNotEmpty())
         assert(sdJwtVC.sdMap["birthdate"]!!.sd)
+        val id = sdJwtVC.undisclosedPayload["id"]?.jsonPrimitive?.contentOrNull ?: ""
+        val iat = sdJwtVC.undisclosedPayload["iat"]?.jsonPrimitive?.longOrNull ?: 0L
+        val nbf = sdJwtVC.undisclosedPayload["nbf"]?.jsonPrimitive?.longOrNull ?: 0L
+        val exp = sdJwtVC.undisclosedPayload["exp"]?.jsonPrimitive?.longOrNull ?: 0L
+        assert(iat > 0)
+        assert(iat == nbf)
+        assert(exp == iat + 365*24*60*60)
+        assert(id.startsWith("urn:uuid:"))
+
     }
 
     suspend fun testSDJwtPresentation(openIdProfile: OpenId4VPProfile = OpenId4VPProfile.HAIP) = E2ETestWebService.test("test sd-jwt-vc presentation") {

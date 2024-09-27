@@ -36,6 +36,7 @@ import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.oid4vc.OpenID4VP
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.providers.CredentialVerifierConfig
 import id.walt.oid4vc.providers.OpenIDCredentialVerifier
 import id.walt.oid4vc.providers.PresentationSession
@@ -250,8 +251,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
     private suspend fun resolveIssuerKeyFromSdJwt(sdJwt: SDJwtVC): Key {
         val kid = sdJwt.keyID ?: randomUUID()
-        return if(DidUtils.isDidUrl(kid)) {
-            DidService.resolveToKey(kid).getOrThrow()
+        return if(!sdJwt.issuer.isNullOrEmpty() && DidUtils.isDidUrl(sdJwt.issuer!!)) {
+            DidService.resolveToKey(sdJwt.issuer!!).getOrThrow()
         } else {
             sdJwt.header.get("x5c")?.jsonArray?.last()?.let {
                 return JWKKey.importPEM(it.jsonPrimitive.content).getOrThrow().let { JWKKey(it.jwk, kid) }
