@@ -37,17 +37,6 @@ data class PresentationDefinition(
         override fun fromJSON(jsonObject: JsonObject) =
             Json.decodeFromJsonElement(PresentationDefinitionSerializer, jsonObject)
 
-        fun defaultGenerationFromVcTypesForProfile(types: List<String>, openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT): PresentationDefinition {
-            return PresentationDefinition(inputDescriptors = types.map { type ->
-                when(openId4VPProfile) {
-                    OpenId4VPProfile.HAIP -> generateDefaultSDJwtVCInputDescriptor(type)
-                    OpenId4VPProfile.ISO_18013_7_MDOC -> generateDefaultMDOCInputDescriptor(type)
-                    OpenId4VPProfile.EBSIV3 -> generateDefaultEBSIV3InputDescriptor(type)
-                    else -> generateDefaultW3CInputDescriptor(type)
-                }
-            })
-        }
-
         fun defaultGenerationFromVcTypesForCredentialFormat(types: List<String>, format: CredentialFormat): PresentationDefinition {
             return PresentationDefinition(inputDescriptors = types.map { type ->
                 when(format) {

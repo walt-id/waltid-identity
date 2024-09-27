@@ -15,7 +15,7 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-object W3CDataMergeUtils {
+object CredentialDataMergeUtils {
 
     private val log = KotlinLogging.logger { }
 
@@ -45,7 +45,7 @@ object W3CDataMergeUtils {
             try {
                 func.invoke(FunctionCall(cmd, null, context, null))
             } catch (e: NullPointerException) {
-                e.printStackTrace()
+                log.error { e }
                 throw IllegalArgumentException("Could not execute dynamic data function \"$cmd\" - missing argument! At function call: $cmdLine")
             }
         }
@@ -78,12 +78,8 @@ object W3CDataMergeUtils {
             is JsonObject -> {
                 v.jsonObject.forEach { (k2, v2) ->
                     if (!this.containsKey(k)) {
-                        //println("Creating for $k: (to do: $v)")
                         this[k] = JsonObject(emptyMap())
-                        //println("We now have: $this")
                     }
-
-                    //println("Sub-patching for $k: (current is: ${this[k]})")
 
                     val kJson = runCatching { this[k]?.jsonObject }.getOrElse { ex ->
                         throw IllegalArgumentException(
@@ -114,7 +110,7 @@ object W3CDataMergeUtils {
             }
 
             else -> {
-                println("Unsupported: $v")
+                log.debug { "Unsupported: $v" }
             }
         }
 
@@ -133,7 +129,7 @@ object W3CDataMergeUtils {
         val args: String?
     ) {
         fun fromContext(): JsonElement {
-            println("CONTEXT: $context")
+            log.debug { "CONTEXT: $context" }
             return context[func] ?: throw IllegalArgumentException("Cannot find in context: $func")
         }
     }
