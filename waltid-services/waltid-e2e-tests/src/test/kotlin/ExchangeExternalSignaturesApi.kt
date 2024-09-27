@@ -9,7 +9,7 @@ import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
-import id.walt.mdoc.dataelement.*
+import id.walt.mdoc.dataelement.MapElement
 import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.ProofType
@@ -29,10 +29,12 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
+import kotlin.uuid.Uuid
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.uuid.ExperimentalUuidApi
 
+@OptIn(ExperimentalUuidApi::class)
 class ExchangeExternalSignatures {
 
     private var client: HttpClient
@@ -55,8 +57,8 @@ class ExchangeExternalSignatures {
         email = "${randomUUID()}@email.com",
         password = randomUUID(),
     )
-    private var accountId = UUID.NIL
-    private var walletId = UUID.NIL
+    private var accountId = Uuid.NIL
+    private var walletId = Uuid.NIL
 
     private suspend fun registerAccountAndLogin() {
         authApi.register(accountRequest)
@@ -257,7 +259,7 @@ class ExchangeExternalSignatures {
         if (issuanceRequests.size == 1) {
             when (firstIssuanceRequest.credentialFormat) {
                 CredentialFormat.mso_mdoc -> {
-                    issuerApi.issueMDoc(
+                    issuerApi.mdoc(
                         firstIssuanceRequest,
                     ) {
                         offerURL = it
@@ -266,7 +268,7 @@ class ExchangeExternalSignatures {
                 }
 
                 CredentialFormat.sd_jwt_vc -> {
-                    issuerApi.issueSdJwt(
+                    issuerApi.sdjwt(
                         firstIssuanceRequest,
                     ) {
                         offerURL = it
@@ -275,7 +277,7 @@ class ExchangeExternalSignatures {
                 }
 
                 else -> {
-                    issuerApi.issue(
+                    issuerApi.jwt(
                         firstIssuanceRequest,
                     ) {
                         offerURL = it

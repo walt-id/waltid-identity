@@ -1,14 +1,16 @@
 package id.walt.webwallet.db.models
 
-import kotlinx.uuid.exposed.kotlinxUUID
+import id.walt.webwallet.db.kotlinxUuid
 import org.jetbrains.exposed.dao.id.IntIdTable
 import org.jetbrains.exposed.sql.javatime.timestamp
+import kotlin.uuid.ExperimentalUuidApi
 
+@OptIn(ExperimentalUuidApi::class)
 object Events : IntIdTable("events") {
     val tenant = varchar("tenant", 128).default("")
     val originator = varchar("originator", 128).default("unknown")
-    val account = kotlinxUUID("account")
-    val wallet = kotlinxUUID("wallet").nullable()
+    val account = kotlinxUuid("account")
+    val wallet = kotlinxUuid("wallet").nullable()
     val credentialId = varchar("credential", 256).nullable()
     val timestamp = timestamp("timestamp")
     val event = varchar("event", 48)

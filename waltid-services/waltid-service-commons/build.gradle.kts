@@ -16,6 +16,7 @@ object Versions {
 }
 
 dependencies {
+    api(project(":waltid-libraries:waltid-library-commons"))
     // Ktor
     api("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
     api("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
@@ -26,34 +27,34 @@ dependencies {
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
     // Logging
-    api("io.klogging:klogging-jvm:0.7.0") // JVM + ~JS
-    implementation("io.klogging:slf4j-klogging:0.7.0")
-    implementation("org.slf4j:jul-to-slf4j:2.0.13")
+    api("io.klogging:klogging-jvm:0.7.2") // JVM + ~JS
+    implementation("io.klogging:slf4j-klogging:0.7.2")
+    implementation("org.slf4j:jul-to-slf4j:2.0.16")
 
     // CLI
     api("com.github.ajalt.clikt:clikt:4.4.0")  // JVM
 
     // Config
-    api("com.sksamuel.hoplite:hoplite-core:2.8.0.RC3")
-    api("com.sksamuel.hoplite:hoplite-hocon:2.8.0.RC3")
-    api("com.sksamuel.hoplite:hoplite-hikaricp:2.8.0.RC3")
+    api("com.sksamuel.hoplite:hoplite-core:2.8.0")
+    api("com.sksamuel.hoplite:hoplite-hocon:2.8.0")
+    api("com.sksamuel.hoplite:hoplite-hikaricp:2.8.0")
 
     // Kotlinx.serialization
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // Health checks
     api("com.sksamuel.cohort:cohort-ktor:2.5.1")
 
     // OpenAPI
-    api("io.github.smiley4:ktor-swagger-ui:3.2.0")
-    implementation("io.github.smiley4:schema-kenerator-core:1.0.1")
+    api("io.github.smiley4:ktor-swagger-ui:3.4.0")
+    implementation("io.github.smiley4:schema-kenerator-core:1.1.0")
     implementation("io.github.smiley4:schema-kenerator-serialization:1.0.1")
-    implementation("io.github.smiley4:schema-kenerator-reflection:1.0.1")
-    implementation("io.github.smiley4:schema-kenerator-swagger:1.0.1")
+    implementation("io.github.smiley4:schema-kenerator-reflection:1.1.0")
+    implementation("io.github.smiley4:schema-kenerator-swagger:1.1.0")
 
     // Persistence
     api("io.github.reactivecircus.cache4k:cache4k:0.13.0")
-    api("app.softwork:kotlinx-uuid-core:0.0.26")
+    api("app.softwork:kotlinx-uuid-core:0.1.2")
     api("redis.clients:jedis:5.2.0-beta4")
 
     // Testing

@@ -19,6 +19,7 @@ object WebBaseRoutes {
     }
 
     fun Application.authenticatedWebWalletRoute(block: Route.() -> Unit) = routing {
+        //authenticate("ktor-authnz", "auth-session", "auth-bearer", "auth-bearer-alternative") {
         authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
             routedWebWalletRoute(block)
         }

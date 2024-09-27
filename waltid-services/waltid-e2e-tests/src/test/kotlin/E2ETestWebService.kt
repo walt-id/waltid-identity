@@ -24,8 +24,10 @@ import id.walt.webwallet.webWalletSetup
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
+import kotlinx.coroutines.test.runTest
 import java.io.File
 import java.net.URLDecoder
+import java.time.Duration
 
 object E2ETestWebService {
 
@@ -62,7 +64,7 @@ object E2ETestWebService {
     val testNames = HashMap<Int, String>()
     val t = Terminal(ansiLevel = AnsiLevel.TRUECOLOR)
 
-    suspend fun testBlock(block: suspend () -> Unit) {
+    fun testBlock(timeout: kotlin.time.Duration, block: suspend () -> Unit) = runTest(timeout = timeout) {
 
         fun getTestStats(): TestStats {
             val succeeded = testResults.count { it.isSuccess }

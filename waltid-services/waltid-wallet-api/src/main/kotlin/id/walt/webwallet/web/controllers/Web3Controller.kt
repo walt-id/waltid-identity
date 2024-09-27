@@ -11,8 +11,10 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import kotlinx.serialization.json.Json
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 fun Application.web3accounts() = walletRoute {
     route("web3accounts", {
         tags = listOf("Web3 wallet accounts")
@@ -62,7 +64,7 @@ fun Application.web3accounts() = walletRoute {
             }
         }) {
             val wallet = getWalletService()
-            val walletId = UUID(call.receiveText())
+            val walletId = Uuid.parse(call.receiveText())
             context.respond(wallet.unlinkWallet(walletId))
         }
 
@@ -81,7 +83,7 @@ fun Application.web3accounts() = walletRoute {
             }
         }) {
             val wallet = getWalletService()
-            val walletId = UUID(call.receiveText())
+            val walletId = Uuid.parse(call.receiveText())
             context.respond(wallet.connectWallet(walletId))
         }
 
@@ -95,7 +97,7 @@ fun Application.web3accounts() = walletRoute {
             }
         }) {
             val wallet = getWalletService()
-            val walletId = UUID(call.receiveText())
+            val walletId = Uuid.parse(call.receiveText())
             context.respond(wallet.disconnectWallet(walletId))
         }
     }

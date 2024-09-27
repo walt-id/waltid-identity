@@ -1,7 +1,11 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.service.account
+
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager.whenFeatureSuspend
+import id.walt.commons.temp.UuidSerializer
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.*
@@ -15,11 +19,15 @@ import id.walt.webwallet.web.model.*
 import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.uuid.UUID
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
+@OptIn(ExperimentalUuidApi::class)
 object AccountsService {
 
     private suspend fun initializeUserAccount(tenant: String, name: String?, registrationResult: RegistrationResult) =
@@ -51,14 +59,14 @@ object AccountsService {
     suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> = runCatching {
         when (request) {
             is EmailAccountRequest -> EmailAccountStrategy.register(tenant, request)
-            is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
+            // is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
             is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
             is KeycloakAccountRequest -> KeycloakAccountStrategy.register(tenant, request)
             is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.register(tenant, request)
             is X5CAccountRequest -> X5CAccountStrategy.register(tenant, request)
+            else -> throw NotImplementedError("unknown auth method")
         }.fold(onSuccess = {
             initializeUserAccount(tenant, request.name, it)
-
         }, onFailure = {
             throw it
         })
@@ -68,11 +76,13 @@ object AccountsService {
     suspend fun authenticate(tenant: String, request: AccountRequest): Result<AuthenticatedUser> = runCatching {
         when (request) {
             is EmailAccountRequest -> EmailAccountStrategy.authenticate(tenant, request)
-            is AddressAccountRequest -> Web3WalletAccountStrategy.authenticate(tenant, request)
+//            is AddressAccountRequest -> Web3WalletAccountStrategy.authenticate(tenant, request)
             is OidcAccountRequest -> OidcAccountStrategy.authenticate(tenant, request)
             is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.authenticate(tenant, request)
             is KeycloakAccountRequest -> KeycloakAccountStrategy.authenticate(tenant, request)
             is X5CAccountRequest -> X5CAccountStrategy.authenticate(tenant, request)
+            else -> throw NotImplementedError("unknown auth method")
+
         }
     }.fold(onSuccess = {
         WalletServiceManager.eventUseCase.log(
@@ -80,13 +90,13 @@ object AccountsService {
             tenant = tenant,
             originator = "wallet",
             accountId = it.id,
-            walletId = UUID.NIL,
+            walletId = Uuid.NIL,
             data = AccountEventData(accountId = it.id.toString())
         )
         Result.success(it)
     }, onFailure = { Result.failure(it) })
 
-    fun getAccountWalletMappings(tenant: String, account: UUID) =
+    fun getAccountWalletMappings(tenant: String, account: Uuid) =
         AccountWalletListing(
             account,
             wallets =
@@ -99,7 +109,7 @@ object AccountsService {
                     }
                     .map {
                         AccountWalletListing.WalletListing(
-                            id = it[AccountWalletMappings.wallet].value,
+                            id = it[AccountWalletMappings.wallet].value.toKotlinUuid(),
                             name = it[Wallets.name],
                             createdOn = it[Wallets.createdOn].toKotlinInstant(),
                             addedOn = it[AccountWalletMappings.addedOn].toKotlinInstant(),
@@ -108,9 +118,9 @@ object AccountsService {
                     }
             })
 
-    fun getAccountForWallet(wallet: UUID) = transaction {
+    fun getAccountForWallet(wallet: Uuid) = transaction {
         AccountWalletMappings.select(AccountWalletMappings.accountId)
-            .where { AccountWalletMappings.wallet eq wallet }.firstOrNull()
+            .where { AccountWalletMappings.wallet eq wallet.toJavaUuid() }.firstOrNull()
             ?.let { it[AccountWalletMappings.accountId] }
     }
 
@@ -168,7 +178,7 @@ object AccountsService {
             .firstOrNull()
     }
 
-    fun get(account: UUID) = transaction {
+    fun get(account: Uuid) = transaction {
         Accounts.selectAll().where { Accounts.id eq account }.single().let {
             Account(it)
         }
@@ -204,33 +214,39 @@ object AccountsService {
 
 @Serializable
 data class RegistrationResult(
-    val id: UUID,
+    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    val id: Uuid,
 )
 
 @Serializable
 sealed class AuthenticatedUser {
-    abstract val id: UUID
+    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    abstract val id: Uuid
 }
 
 @Serializable
 data class UsernameAuthenticatedUser(
-    override val id: UUID,
+    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    override val id: Uuid,
     val username: String,
 ) : AuthenticatedUser()
 
 @Serializable
 data class AddressAuthenticatedUser(
-    override val id: UUID,
+    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    override val id: Uuid,
     val address: String,
 ) : AuthenticatedUser()
 
 @Serializable
 data class KeycloakAuthenticatedUser(
-    override val id: UUID,
+    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    override val id: Uuid,
     val keycloakUserId: String,
 ) : AuthenticatedUser()
 
 @Serializable
 data class X5CAuthenticatedUser(
-    override val id: UUID,
+    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    override val id: Uuid,
 ) : AuthenticatedUser()

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers.exchange
 
 import com.nimbusds.jose.jwk.JWK
@@ -43,8 +45,8 @@ import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 fun Application.exchangeExternalSignatures() = walletRoute {
     val logger = KotlinLogging.logger { }
@@ -120,7 +122,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
             val matchedCredentials = walletService.getCredentialsByIds(req.selectedCredentialIdList)
             logger.debug { "Matched credentials: $matchedCredentials" }
 
-            val presentationId = "urn:uuid:" + UUID.generateUUID().toString().lowercase()
+            val presentationId = "urn:uuid:" + Uuid.random().toString().lowercase()
 
             val authKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document)
             logger.debug { "Resolved authorization keyId: $authKeyId" }

@@ -1,6 +1,7 @@
 plugins {
     kotlin("multiplatform")
     kotlin("native.cocoapods")
+    kotlin("plugin.serialization")
 }
 
 kotlin {
@@ -18,16 +19,26 @@ kotlin {
         }
 
         pod("JOSESwift") {
-            version = "2.4.0"
+            version = "3.0.0"
         }
     }
 
     sourceSets {
+        val ktor_version = "2.3.12"
+
         commonMain.dependencies {
             implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             implementation(project(":waltid-libraries:waltid-did"))
             implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
             implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+
+            implementation("io.ktor:ktor-client-core:$ktor_version")
+            implementation("io.ktor:ktor-client-serialization:$ktor_version")
+            implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
+            implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
+            implementation("io.ktor:ktor-client-json:$ktor_version")
+            implementation("io.ktor:ktor-client-logging:$ktor_version")
         }
         commonTest.dependencies {
 

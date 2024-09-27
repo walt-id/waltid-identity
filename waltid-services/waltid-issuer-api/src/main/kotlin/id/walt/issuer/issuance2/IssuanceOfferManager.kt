@@ -1,4 +1,7 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.issuer.issuance2
+
 
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.issuer.issuance.NewIssuanceRequest
@@ -6,9 +9,9 @@ import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.GrantType
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
 import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 object IssuanceOfferManager {
 
@@ -59,8 +62,7 @@ object IssuanceOfferManager {
             offerBuilder = offerBuilder.addOfferedCredential(it)
         }
 
-        val sessionId = UUID.generateUUID().toString()
-
+        val sessionId = Uuid.random().toString()
 
         when (issuanceRequest.issuance.flow) {
             GrantType.authorization_code -> offerBuilder.addAuthorizationCodeGrant(
@@ -85,7 +87,7 @@ object IssuanceOfferManager {
 
         // Also store active types
         issuanceRequest.credential.forEach {
-            val expiry = offerPersistence.defaultExpiration.inWholeSeconds
+            val expiry = offerPersistence.defaultExpiration?.inWholeSeconds
             val type = it.credentialData.getType()
             val typeId = type.last()
 
