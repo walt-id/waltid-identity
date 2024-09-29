@@ -57,9 +57,11 @@ abstract class IssuanceServiceBase {
         req: TokenRequest,
     ) = http.submitForm(
         tokenURL, formParameters = parametersOf(req.toHttpParameters())
-    ).let {
-        logger.debug { "Raw TokenResponse: $it" }
-        it.body<JsonObject>().let { TokenResponse.fromJSON(it) }
+    ).let { rawResponse ->
+        logger.debug { "Raw TokenResponse: $rawResponse" }
+        rawResponse.body<JsonObject>().let {
+            TokenResponse.fromJSON(it)
+        }
     }
 
     protected fun validateTokenResponse(
@@ -75,59 +77,98 @@ abstract class IssuanceServiceBase {
         }
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
     protected suspend fun getCredentialData(
-        processedOffer: ProcessedCredentialOffer, manifest: JsonObject?,
-    ) = let {
+        processedOffer: ProcessedCredentialOffer,
+        manifest: JsonObject?,
+    ): CredentialDataResult {
         val credential = processedOffer.credentialResponse.credential!!.jsonPrimitive.content
 
-        when (val credentialFormat = processedOffer.credentialResponse.format) {
-            CredentialFormat.mso_mdoc -> {
-                val credentialEncoding =
-                    processedOffer.credentialResponse.customParameters["credential_encoding"]?.jsonPrimitive?.content
-                        ?: "issuer-signed"
-                val docType =
-                    processedOffer.credentialRequest?.docType
-                        ?: throw IllegalArgumentException("Credential request has no docType property")
-                val format =
-                    processedOffer.credentialResponse.format
-                        ?: throw IllegalArgumentException("Credential response has no format property")
-                val mdoc = when (credentialEncoding) {
-                    "issuer-signed" -> MDoc(
-                        docType.toDataElement(), IssuerSigned.fromMapElement(
-                            Cbor.decodeFromByteArray(credential.base64UrlDecode())
-                        ), null
-                    )
-
-                    else -> throw IllegalArgumentException("Invalid credential encoding: $credentialEncoding")
-                }
-                // TODO: review ID generation for mdoc
-                CredentialDataResult(randomUUID(), mdoc.toCBORHex(), type = docType, format = format)
+        val credentialFormat = processedOffer.credentialRequest?.format
+            ?: requireNotNull(processedOffer.credentialResponse.format) {
+                "No credential format specified in either the " +
+                        "credential request, or credential response"
             }
 
-            else -> {
-                val credentialParts = credential.decodeJwsOrSdjwt()
-                logger.debug { "Got credential: $credentialParts" }
+        return when (credentialFormat) {
+            CredentialFormat.mso_mdoc -> getMdocCredentialDataResult(
+                processedOffer,
+                credential,
+            )
 
-                val typ = credentialParts.jwsParts.header["typ"]?.jsonPrimitive?.content?.lowercase()
-                    ?: error("Credential does not have `typ`!")
-
-                val vc = credentialParts.jwsParts.payload["vc"]?.jsonObject ?: credentialParts.jwsParts.payload
-                val credentialId = vc["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUID()
-
-                val disclosures = credentialParts.sdJwtDisclosures
-                logger.debug { "Disclosures (${disclosures.size}): $disclosures" }
-
-                CredentialDataResult(
-                    id = credentialId,
-                    document = credentialParts.jwsParts.toString(),
-                    disclosures = credentialParts.sdJwtDisclosuresString().drop(1), // remove first '~'
-                    manifest = manifest?.toString(),
-                    type = typ,
-                    format = credentialFormat ?: error("No credential format")
-                )
-            }
+            else -> getDefaultCredentialDataResult(
+                credential,
+                manifest,
+                credentialFormat,
+            )
+        }.also {
+            logger.debug { "Generated from processed credential offer: $it" }
         }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private suspend fun getMdocCredentialDataResult(
+        processedOffer: ProcessedCredentialOffer,
+        credential: String,
+    ): CredentialDataResult {
+        val credentialEncoding =
+            processedOffer.credentialResponse.customParameters["credential_encoding"]?.jsonPrimitive?.content
+                ?: "issuer-signed"
+        logger.debug { "Parsed credential encoding: $credentialEncoding" }
+
+        val docType =
+            processedOffer.credentialRequest?.docType
+                ?: throw IllegalArgumentException("Credential request has no docType property")
+        logger.debug { "Parsed docType: $docType" }
+
+        val mDoc = when (credentialEncoding) {
+            "issuer-signed" -> MDoc(
+                docType.toDataElement(), IssuerSigned.fromMapElement(
+                    Cbor.decodeFromByteArray(credential.base64UrlDecode())
+                ), null
+            )
+
+            else -> throw IllegalArgumentException("Invalid credential encoding: $credentialEncoding")
+        }
+        // TODO: review ID generation for mdoc
+        return CredentialDataResult(
+            id = randomUUID(),
+            document = mDoc.toCBORHex(),
+            type = docType,
+            format = CredentialFormat.mso_mdoc,
+        )
+    }
+
+    private suspend fun getDefaultCredentialDataResult(
+        credential: String,
+        manifest: JsonObject?,
+        credentialFormat: CredentialFormat,
+    ): CredentialDataResult {
+        val credentialParts = credential.decodeJwsOrSdjwt()
+        logger.debug { "Parsed JWT-based credential parts: $credentialParts" }
+
+        val typ = credentialParts.jwsParts.header["typ"]?.jsonPrimitive?.content?.lowercase()
+            ?: throw IllegalArgumentException(
+                "JWT-based credential $credential does not have " +
+                        "`typ` value specified in its header"
+            )
+        logger.debug { "Parsed JWT-based credential type: $typ" }
+
+        val vc = credentialParts.jwsParts.payload["vc"]?.jsonObject ?: credentialParts.jwsParts.payload
+        logger.debug { "Parsed JWT-based vc payload: $vc" }
+
+        val credentialId = vc["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUID()
+
+        val disclosures = credentialParts.sdJwtDisclosures
+        logger.debug { "Parsed disclosures (size = ${disclosures.size}): $disclosures" }
+
+        return CredentialDataResult(
+            id = credentialId,
+            document = credentialParts.jwsParts.toString(),
+            disclosures = credentialParts.sdJwtDisclosuresString().drop(1), // remove first '~'
+            manifest = manifest?.toString(),
+            type = typ,
+            format = credentialFormat,
+        )
     }
 
     suspend fun resolveVct(vct: String): SDJWTVCTypeMetadata {
