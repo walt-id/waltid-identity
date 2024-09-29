@@ -594,7 +594,7 @@ class ExchangeExternalSignatures {
                             listOf(
                                 RequestedCredential(
                                     format = VCFormat.sd_jwt_vc,
-                                    vct = "http://localhost:22222/identity_credential",
+                                    vct = "${E2ETestWebService.getBaseURL()}/identity_credential",
                                 ).let {
                                     Json.encodeToJsonElement(it)
                                 })
@@ -696,7 +696,7 @@ class ExchangeExternalSignatures {
                             listOf(
                                 RequestedCredential(
                                     format = VCFormat.sd_jwt_vc,
-                                    vct = "http://localhost:22222/identity_credential",
+                                    vct = "${E2ETestWebService.getBaseURL()}/identity_credential",
                                 ).let {
                                     Json.encodeToJsonElement(it)
                                 },

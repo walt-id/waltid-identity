@@ -42,7 +42,9 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         val keysApi = KeysApi(client)
 
         runBlocking {
-            keysApi.generate(Uuid.parse(walletId), KeyGenerationRequest(keyType = KeyType.secp256r1)) { generatedKeyId = it }
+            keysApi.generate(Uuid.parse(walletId), KeyGenerationRequest(keyType = KeyType.secp256r1)) {
+                generatedKeyId = it
+            }
             DidsApi(client).create(Uuid.parse(walletId), DidsApi.DidCreateRequest("jwk", keyId = generatedKeyId)) {
                 generatedDid = it
             }
@@ -71,7 +73,8 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
 
         // === resolve issuer metadata ===
         val issuerMetadata =
-            client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess().body<OpenIDProviderMetadata>()
+            client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess()
+                .body<OpenIDProviderMetadata>()
         assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
         assertContains(
             issuerMetadata.credentialConfigurationsSupported!!.keys,
@@ -151,17 +154,21 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
             "identity_credential",
             x5Chain = listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT),
             trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT),
-            selectiveDisclosure = SDMap(mapOf(
-                "birthdate" to SDField(sd = true)
-            )),
-            mapping = Json.parseToJsonElement("""
+            selectiveDisclosure = SDMap(
+                mapOf(
+                    "birthdate" to SDField(sd = true)
+                )
+            ),
+            mapping = Json.parseToJsonElement(
+                """
               {
                 "id": "<uuid>",
                 "iat": "<timestamp-seconds>",
                 "nbf": "<timestamp-seconds>",
                 "exp": "<timestamp-in-seconds:365d>"
               }
-            """.trimIndent()).jsonObject
+            """.trimIndent()
+            ).jsonObject
         )
     )
 
@@ -175,17 +182,21 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
                 put("birthdate", "1940-01-01")
             },
             mdocData = null,
-            selectiveDisclosure = SDMap(mapOf(
-                "birthdate" to SDField(sd = true)
-            )),
-            mapping = Json.parseToJsonElement("""
+            selectiveDisclosure = SDMap(
+                mapOf(
+                    "birthdate" to SDField(sd = true)
+                )
+            ),
+            mapping = Json.parseToJsonElement(
+                """
               {
                 "id": "<uuid>",
                 "iat": "<timestamp-seconds>",
                 "nbf": "<timestamp-seconds>",
                 "exp": "<timestamp-in-seconds:365d>"
               }
-            """.trimIndent()).jsonObject,
+            """.trimIndent()
+            ).jsonObject,
             issuerDid = LspPotentialIssuanceInterop.ISSUER_DID
         )
     )
@@ -201,14 +212,15 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
 
         // === resolve credential offer ===
         val resolvedOffer = client.post("/wallet-api/wallet/$walletId/exchange/resolveCredentialOffer") {
-        setBody(offerUri)
-    }.expectSuccess().body<CredentialOffer>()
+            setBody(offerUri)
+        }.expectSuccess().body<CredentialOffer>()
         assertEquals(1, resolvedOffer.credentialConfigurationIds.size)
         assertEquals("identity_credential_vc+sd-jwt", resolvedOffer.credentialConfigurationIds.first())
 
         // === resolve issuer metadata ===
         val issuerMetadata =
-            client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess().body<OpenIDProviderMetadata>()
+            client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess()
+                .body<OpenIDProviderMetadata>()
         assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
         assertContains(
             issuerMetadata.credentialConfigurationsSupported!!.keys,
@@ -236,43 +248,57 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         val exp = sdJwtVC.undisclosedPayload["exp"]?.jsonPrimitive?.longOrNull ?: 0L
         assert(iat > 0)
         assert(iat == nbf)
-        assert(exp == iat + 365*24*60*60)
+        assert(exp == iat + 365 * 24 * 60 * 60)
         assert(id.startsWith("urn:uuid:"))
 
     }
 
-    suspend fun testSDJwtPresentation(openIdProfile: OpenId4VPProfile = OpenId4VPProfile.HAIP) = E2ETestWebService.test("test sd-jwt-vc presentation") {
-        val createReqResponse = client.post("/openid4vc/verify") {
-            header("authorizeBaseUrl", "openid4vp://")
-            header("openId4VPProfile", openIdProfile.name)
-            header("responseMode", "direct_post")
-            contentType(ContentType.Application.Json)
-            setBody(
-                buildJsonObject {
-                    put("request_credentials", JsonArray(listOf(RequestedCredential(format = VCFormat.sd_jwt_vc, vct = "http://localhost:22222/identity_credential").let { Json.encodeToJsonElement(it) })))
-                })
+    suspend fun testSDJwtPresentation(openIdProfile: OpenId4VPProfile = OpenId4VPProfile.HAIP) =
+        E2ETestWebService.test("test sd-jwt-vc presentation") {
+            val createReqResponse = client.post("/openid4vc/verify") {
+                header("authorizeBaseUrl", "openid4vp://")
+                header("openId4VPProfile", openIdProfile.name)
+                header("responseMode", "direct_post")
+                contentType(ContentType.Application.Json)
+                setBody(
+                    buildJsonObject {
+                        put(
+                            "request_credentials",
+                            JsonArray(
+                                listOf(
+                                    RequestedCredential(
+                                        format = VCFormat.sd_jwt_vc,
+                                        vct = "${E2ETestWebService.getBaseURL()}/identity_credential",
+                                    ).let {
+                                        Json.encodeToJsonElement(it)
+                                    })
+                            )
+                        )
+                    })
+            }
+            assertEquals(200, createReqResponse.status.value)
+            val presReqUrl = createReqResponse.bodyAsText()
+
+            // === resolve presentation request ===
+            val parsedRequest = client.post("/wallet-api/wallet/$walletId/exchange/resolvePresentationRequest") {
+                setBody(presReqUrl)
+            }.expectSuccess().let { response ->
+                response.body<String>()
+                    .let { AuthorizationRequest.fromHttpParameters(parseQueryString(Url(it).encodedQuery).toMap()) }
+            }
+            assertNotNull(parsedRequest.presentationDefinition)
+
+            // === find matching credential ===
+            val matchingCreds =
+                client.post("/wallet-api/wallet/$walletId/exchange/matchCredentialsForPresentationDefinition") {
+                    setBody(parsedRequest.presentationDefinition!!)
+                }.expectSuccess().body<List<WalletCredential>>()
+            assertNotEquals(0, matchingCreds.size)
+
+            client.post("/wallet-api/wallet/$walletId/exchange/usePresentationRequest") {
+                setBody(UsePresentationRequest(generatedDid, presReqUrl, listOf(issuedSDJwtVCId)))
+            }.expectSuccess()
         }
-        assertEquals(200, createReqResponse.status.value)
-        val presReqUrl = createReqResponse.bodyAsText()
-
-        // === resolve presentation request ===
-        val parsedRequest = client.post("/wallet-api/wallet/$walletId/exchange/resolvePresentationRequest") {
-            setBody(presReqUrl)
-        }.expectSuccess().let { response ->
-            response.body<String>().let { AuthorizationRequest.fromHttpParameters(parseQueryString(Url(it).encodedQuery).toMap()) }
-        }
-        assertNotNull(parsedRequest.presentationDefinition)
-
-        // === find matching credential ===
-        val matchingCreds = client.post("/wallet-api/wallet/$walletId/exchange/matchCredentialsForPresentationDefinition") {
-            setBody(parsedRequest.presentationDefinition!!)
-        }.expectSuccess().body<List<WalletCredential>>()
-        assertNotEquals(0, matchingCreds.size)
-
-        client.post("/wallet-api/wallet/$walletId/exchange/usePresentationRequest") {
-            setBody(UsePresentationRequest(generatedDid, presReqUrl, listOf(issuedSDJwtVCId)))
-        }.expectSuccess()
-    }
 
 
 }
