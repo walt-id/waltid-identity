@@ -1,9 +1,11 @@
 package id.walt.did.exceptions
 
-open class DidExceptions(message: String) : Exception(message)
+open  class DidIllegalArgumentException(message: String) : IllegalArgumentException(message)
+open class DidIllegalStateException(message: String) : IllegalStateException(message)
 
-class InvalidServiceIdException(message: String) : DidExceptions(message)
-class InvalidServiceTypeException(message: String) : DidExceptions(message)
-class EmptyServiceEndpointException(message: String) : DidExceptions(message)
-class ReservedKeyOverrideException(message: String) : DidExceptions(message)
-class InvalidServiceControllerException(message: String) : DidExceptions(message)
+
+class InvalidServiceIdException(message: String) : DidIllegalArgumentException(message)
+class InvalidServiceTypeException(message: String) : DidIllegalArgumentException(message)
+class EmptyServiceEndpointException(message: String) : DidIllegalArgumentException(message)
+class ReservedKeyOverrideException(message: String) : DidIllegalStateException(message)
+class InvalidServiceControllerException(message: String) : DidIllegalStateException(message)
