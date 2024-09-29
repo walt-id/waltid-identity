@@ -403,6 +403,7 @@ fun Application.issuerApi() {
                                 description =
                                     "Pass the unsigned credential that you intend to issue in the body of the request."
                                 example("W3C SD-JWT example", IssuanceExamples.sdJwtW3CExample)
+                                example("W3C SD-JWT PDA1 example", IssuanceExamples.sdJwtW3CPDA1Example)
                                 example("SD-JWT-VC example", IssuanceExamples.sdJwtVCExample)
                                 example("SD-JWT-VC example featuring selectively disclosable sub and iat claims", IssuanceExamples.sdJwtVCExampleWithSDSub)
                                 example("SD-JWT-VC example with issuer DID", IssuanceExamples.sdJwtVCWithIssuerDidExample)
