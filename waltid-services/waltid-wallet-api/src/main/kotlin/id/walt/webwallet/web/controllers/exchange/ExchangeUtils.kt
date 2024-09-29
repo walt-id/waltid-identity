@@ -93,9 +93,10 @@ object ExchangeUtils {
         val serializedVcWithDisclosures = listOf(
             credential.document
         ).plus(
-            if (disclosures?.containsKey(credential.id) == true) {
-                "~${disclosures[credential.id]!!.joinToString("~")}~"
-            } else "~"
+            getDisclosures(
+                disclosures = disclosures,
+                credentialId = credential.id,
+            )
         ).joinToString(separator = "")
         IETFSdJwtVpProofParameters(
             credentialId = credential.id,
@@ -112,4 +113,11 @@ object ExchangeUtils {
             ).filterValues { it.toString().isNotBlank() },
         )
     }.takeIf { it.isNotEmpty() }
+
+    private fun getDisclosures(
+        disclosures: Map<String, List<String>>?,
+        credentialId: String
+    ) = if (disclosures?.containsKey(credentialId) == true) {
+        "~${disclosures[credentialId]!!.joinToString("~")}~"
+    } else "~"
 }
