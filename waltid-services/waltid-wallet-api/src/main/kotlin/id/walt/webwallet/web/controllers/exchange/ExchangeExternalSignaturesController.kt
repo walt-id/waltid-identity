@@ -146,7 +146,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 val presentationId = "urn:uuid:" + Uuid.random().toString().lowercase()
                 val keyId = walletDID.keyId
                 logger.debug { "keyId: $keyId" }
-                val didFirstAuthKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()
+                val didFirstAuthKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document)
                 logger.debug { "Resolved first did authentication keyId: $didFirstAuthKeyId" }
 
                 //this is not really correct, we need to actually compute the proof parameters
@@ -462,7 +462,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 } ?: walletService.listDids().firstOrNull()
                 ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
                 logger.debug { "Retrieved wallet DID: $walletDID" }
-                val didFirstAuthKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document).getOrThrow()
+                val didFirstAuthKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document)
                 logger.debug { "Resolved first did authentication keyId: $didFirstAuthKeyId" }
                 val authPublicKey = KeysService.get(walletService.walletId, walletDID.keyId)?.let {
                     runCatching {
