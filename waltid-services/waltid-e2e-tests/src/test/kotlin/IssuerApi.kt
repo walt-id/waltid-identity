@@ -13,7 +13,7 @@ class IssuerApi(private val client: HttpClient) {
     )
 
     suspend fun sdjwt(request: IssuanceRequest, output: ((String) -> Unit)? = null) = issue(
-        name = "/openid4vc/jwt/issue - issue sdjwt credential",
+        name = "/openid4vc/sdjwt/issue - issue sdjwt credential",
         url = "/openid4vc/sdjwt/issue",
         request = request,
         output = output,

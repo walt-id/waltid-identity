@@ -9,6 +9,7 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.CredentialEventData
 import id.walt.webwallet.service.events.CredentialEventDataActor
+import id.walt.webwallet.service.exchange.CredentialDataResult
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.service.trust.TrustValidationService
@@ -65,7 +66,7 @@ class SilentClaimStrategyTest {
     private val credentialType = "test-credential-type"
     private val credentialId = "http://example.gov/credentials/1"
     private val credentialData =
-        json.decodeFromString<IssuanceService.CredentialDataResult>(TestUtils.loadResource("silent-claiming/credential-data.json"))
+        json.decodeFromString<CredentialDataResult>(TestUtils.loadResource("silent-claiming/credential-data.json"))
     private val eventData =
         json.decodeFromString<CredentialEventData>(TestUtils.loadResource("silent-claiming/event-data.json"))
 
