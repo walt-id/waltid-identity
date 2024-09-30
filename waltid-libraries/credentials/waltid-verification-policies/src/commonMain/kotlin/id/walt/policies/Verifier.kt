@@ -7,6 +7,7 @@ import id.walt.policies.models.PresentationResultEntry
 import id.walt.policies.models.PresentationVerificationResponse
 import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDJwtVC
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.coroutineScope
@@ -110,7 +111,7 @@ object Verifier {
                         val dataForPolicy: JsonElement = when (policyRequest.policy) {
                             is JwtVerificationPolicy -> JsonPrimitive(jwt)
 
-                            is CredentialDataValidatorPolicy, is CredentialWrapperValidatorPolicy -> jwt.decodeJws().payload
+                            is CredentialDataValidatorPolicy, is CredentialWrapperValidatorPolicy -> SDJwt.parse(jwt).fullPayload
 
                             else -> throw IllegalArgumentException("Unsupported policy type: ${policyRequest.policy::class.simpleName}")
                         }

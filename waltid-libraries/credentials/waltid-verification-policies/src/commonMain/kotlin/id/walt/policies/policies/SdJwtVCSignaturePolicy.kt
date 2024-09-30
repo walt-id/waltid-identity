@@ -23,7 +23,7 @@ expect object JWTCryptoProviderManager {
 }
 
 class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
-  override val name = "signature"
+  override val name = "signature_sd-jwt-vc"
   override val description =
     "Checks a SD-JWT-VC credential by verifying its cryptographic signature using the key referenced by the DID in `iss`."
   override val supportedVCFormats = setOf(VCFormat.sd_jwt_vc)

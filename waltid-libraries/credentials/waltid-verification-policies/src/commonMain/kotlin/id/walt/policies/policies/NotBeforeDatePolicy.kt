@@ -31,7 +31,7 @@ class NotBeforeDatePolicy : CredentialWrapperValidatorPolicy(
     override val name = "not-before"
     override val description =
         "Verifies that the credentials not-before date (for JWT: `nbf`, if unavailable: `iat` - 1 min) is correctly exceeded."
-    override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc)
+    override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc, VCFormat.sd_jwt_vc)
 
     companion object {
         private val vcClaims = listOf<Claims>(VcClaims.V2.NotBefore, VcClaims.V1.NotBefore)

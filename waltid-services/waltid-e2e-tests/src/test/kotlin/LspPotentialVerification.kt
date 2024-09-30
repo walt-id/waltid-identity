@@ -182,6 +182,8 @@ class LspPotentialVerification(private val client: HttpClient) {
         setBody(
           buildJsonObject {
             put("request_credentials", JsonArray(listOf(RequestedCredential(format = VCFormat.sd_jwt_vc, vct = "identity_credential_vc+sd-jwt").let { Json.encodeToJsonElement(it) })))
+            put("vp_policies", JsonArray(listOf(JsonPrimitive("signature_sd-jwt-vc"))))
+            put("vc_policies", JsonArray(listOf(JsonPrimitive("not-before"), JsonPrimitive("expired"))))
           })
       }
       assertEquals(200, createReqResponse.status.value)
