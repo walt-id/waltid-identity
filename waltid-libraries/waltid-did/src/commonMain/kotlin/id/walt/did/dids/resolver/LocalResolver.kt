@@ -27,7 +27,8 @@ class LocalResolver : DidResolver {
         DidJwkResolver(),
         DidWebResolver(http),
         DidKeyResolver(),
-        DidEbsiResolver(http)
+        DidEbsiResolver(http),
+        DidCheqdResolver()
     ).associateBy { it.method }.toMutableMap()
 
     fun deactivateMethod(method: String) {
@@ -42,7 +43,7 @@ class LocalResolver : DidResolver {
 
     private fun getResolverForDid(did: String): LocalResolverMethod {
         val method = methodFromDid(did)
-        return resolvers[method] ?: throw IllegalArgumentException("No resolver for method: $did")
+        return resolvers[method] ?: throw IllegalArgumentException("Local resolver has no resolver for method: $did")
     }
 
     @JvmBlocking

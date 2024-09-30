@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 import E2ETestWebService.test
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.webwallet.service.keys.SingleKeyResponse
@@ -7,12 +9,14 @@ import io.ktor.client.request.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
+
 import kotlin.test.assertNotNull
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class KeysApi(private val client: HttpClient) {
 
-    suspend fun list(wallet: UUID, expected: KeyGenerationRequest?) =
+    suspend fun list(wallet: Uuid, expected: KeyGenerationRequest?) =
         test("/wallet-api/wallet/{wallet}/keys - get keys") {
             client.get("/wallet-api/wallet/$wallet/keys").expectSuccess().apply {
                 val listing = body<List<SingleKeyResponse>>()
@@ -23,7 +27,7 @@ class KeysApi(private val client: HttpClient) {
             }
         }
 
-    suspend fun generate(wallet: UUID, request: KeyGenerationRequest, output: ((String) -> Unit)? = null) =
+    suspend fun generate(wallet: Uuid, request: KeyGenerationRequest, output: ((String) -> Unit)? = null) =
         test("/wallet-api/wallet/{wallet}/keys/generate - generate key") {
             client.post("/wallet-api/wallet/$wallet/keys/generate") {
                 setBody(request)
@@ -34,7 +38,7 @@ class KeysApi(private val client: HttpClient) {
             }
         }
 
-    suspend fun load(wallet: UUID, keyId: String, expected: KeyGenerationRequest) =
+    suspend fun load(wallet: Uuid, keyId: String, expected: KeyGenerationRequest) =
         test("/wallet-api/wallet/{wallet}/keys/{keyId}/load - load key") {
             client.get("/wallet-api/wallet/$wallet/keys/$keyId/load").expectSuccess().apply {
                 val response = body<JsonElement>()
@@ -42,7 +46,7 @@ class KeysApi(private val client: HttpClient) {
             }
         }
 
-    suspend fun meta(wallet: UUID, keyId: String, expected: KeyGenerationRequest) =
+    suspend fun meta(wallet: Uuid, keyId: String, expected: KeyGenerationRequest) =
         test("/wallet-api/wallet/{wallet}/keys/{keyId}/meta - key meta") {
             client.get("/wallet-api/wallet/$wallet/keys/$keyId/meta").expectSuccess().apply {
                 val response = body<JsonElement>()
@@ -60,7 +64,7 @@ class KeysApi(private val client: HttpClient) {
         }
 
     suspend fun export(
-        wallet: UUID, keyId: String, format: String, isPrivate: Boolean, expected: KeyGenerationRequest
+        wallet: Uuid, keyId: String, format: String, isPrivate: Boolean, expected: KeyGenerationRequest
     ) = test("/wallet-api/wallet/{wallet}/keys/{keyId}/export - export key") {
         client.get("/wallet-api/wallet/$wallet/keys/$keyId/export") {
             url {
@@ -73,11 +77,11 @@ class KeysApi(private val client: HttpClient) {
         }
     }
 
-    suspend fun delete(wallet: UUID, keyId: String) = test("/wallet-api/wallet/{wallet}/keys/{keyId} - delete key") {
+    suspend fun delete(wallet: Uuid, keyId: String) = test("/wallet-api/wallet/{wallet}/keys/{keyId} - delete key") {
         client.delete("/wallet-api/wallet/$wallet/keys/$keyId").expectSuccess()
     }
 
-    suspend fun import(wallet: UUID, payload: String) = test("/wallet-api/wallet/{wallet}/keys/import - import key") {
+    suspend fun import(wallet: Uuid, payload: String) = test("/wallet-api/wallet/{wallet}/keys/import - import key") {
         client.post("/wallet-api/wallet/$wallet/keys/import") {
             setBody(payload)
         }.expectSuccess()

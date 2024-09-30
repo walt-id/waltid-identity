@@ -24,15 +24,17 @@ import platform.Security.errSecSuccess
 import platform.Security.kSecAttrApplicationTag
 import platform.Security.kSecAttrKeyClass
 import platform.Security.kSecAttrKeyType
+import platform.Security.kSecAttrTokenID
+import platform.Security.kSecAttrTokenIDSecureEnclave
 import platform.Security.kSecClass
 import platform.Security.kSecClassKey
 import platform.Security.kSecReturnRef
 import platform.darwin.OSStatus
 
 internal inline fun <T> withSecKey(
-    kid: String, type: CFStringRef?, keyClass: CFStringRef?, block: MemScope.(SecKeyRef?) -> T
+    kid: String, type: CFStringRef?, keyClass: CFStringRef?, secureEnclave: Boolean = false, block: MemScope.(SecKeyRef?) -> T
 ) = cfRetain(kid.toNSData()) { kidCf ->
-    operation(query(kidCf, type, keyClass)) { query ->
+    operation(query(kidCf, type, keyClass, secureEnclave)) { query ->
         val secKeyRef = alloc<CFTypeRefVar>()
         checkReturnStatus { SecItemCopyMatching(query, secKeyRef.ptr) }
         val secKey = secKeyRef.value as SecKeyRef?
@@ -55,15 +57,18 @@ internal inline fun <T> MemScope.operation(
 }
 
 internal fun query(
-    kidCF: CFTypeRef?, keyType: CFStringRef?, keyClass: CFStringRef?
+    kidCF: CFTypeRef?, keyType: CFStringRef?, keyClass: CFStringRef?, secureEnclave: Boolean = false
 ) = CFDictionaryCreateMutable(
-    kCFAllocatorDefault, 5, kCFTypeDictionaryKeyCallBacks.ptr, kCFTypeDictionaryValueCallBacks.ptr
+    kCFAllocatorDefault, 6, kCFTypeDictionaryKeyCallBacks.ptr, kCFTypeDictionaryValueCallBacks.ptr
 ).apply {
     CFDictionaryAddValue(this, kSecAttrApplicationTag, kidCF)
     CFDictionaryAddValue(this, kSecAttrKeyType, keyType)
     CFDictionaryAddValue(this, kSecClass, kSecClassKey)
     keyClass?.let {
         CFDictionaryAddValue(this, kSecAttrKeyClass, it)
+    }
+    if (secureEnclave) {
+        CFDictionaryAddValue(this, kSecAttrTokenID, kSecAttrTokenIDSecureEnclave)
     }
     CFDictionaryAddValue(this, kSecReturnRef, kCFBooleanTrue)
 }

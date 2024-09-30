@@ -20,6 +20,7 @@ import org.slf4j.bridge.SLF4JBridgeHandler
 import java.sql.Connection
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
+import kotlin.uuid.ExperimentalUuidApi
 
 object Db {
 
@@ -73,6 +74,7 @@ object Db {
     ).toTypedArray()
 
 
+    @OptIn(ExperimentalUuidApi::class)
     private fun recreateDatabase() {
         transaction {
 //            addLogger(StdOutSqlLogger)
@@ -92,7 +94,7 @@ object Db {
                     wallet = walletId,
                     WalletCredential(
                         wallet = walletId,
-                        id = "urn:uuid:" + UUID.generateUUID(Random),
+                        id = "urn:uuid:" + Uuid.generateUUID(Random),
                         document = IssuanceExamples.universityDegreeCredential,
                         disclosures = null,
                         addedOn = Clock.System.now(),

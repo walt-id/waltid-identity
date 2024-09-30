@@ -24,10 +24,14 @@ import id.walt.webwallet.webWalletSetup
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
+import kotlinx.coroutines.test.runTest
 import java.io.File
 import java.net.URLDecoder
 
 object E2ETestWebService {
+
+    private const val HOST = "localhost"
+    private const val PORT = 22222
 
     data class TestWebService(
         val module: Application.() -> Unit,
@@ -42,8 +46,8 @@ object E2ETestWebService {
         fun run(block: suspend () -> Unit): suspend () -> Unit = {
             embeddedServer(
                 CIO,
-                port = 22222,
-                host = "127.0.0.1",
+                port = PORT,
+                host = HOST,
                 module = webServiceModule
             ).start(wait = false)
 
@@ -62,7 +66,9 @@ object E2ETestWebService {
     val testNames = HashMap<Int, String>()
     val t = Terminal(ansiLevel = AnsiLevel.TRUECOLOR)
 
-    suspend fun testBlock(block: suspend () -> Unit) {
+    fun getBaseURL() = "http://$HOST:$PORT"
+
+    fun testBlock(timeout: kotlin.time.Duration, block: suspend () -> Unit) = runTest(timeout = timeout) {
 
         fun getTestStats(): TestStats {
             val succeeded = testResults.count { it.isSuccess }

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 import E2ETestWebService.test
 import id.walt.webwallet.db.models.WalletDid
 import io.ktor.client.*
@@ -5,22 +7,24 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
 import kotlin.test.assertNotNull
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 class DidsApi(private val client: HttpClient) {
     private val didRegexPattern = "^^did:%s:\\S+\$"
     suspend fun list(
-        wallet: UUID,
-        size: Int,
+        wallet: Uuid,
         expectedDefault: DefaultDidOption,
+        size: Int? = null,
         output: ((List<WalletDid>) -> Unit)? = null
     ) =
         test("/wallet-api/wallet/{wallet}/dids - list DIDs") {
             client.get("/wallet-api/wallet/$wallet/dids").expectSuccess().apply {
                 val dids = body<List<WalletDid>>()
                 assert(dids.isNotEmpty()) { "Wallet has no DIDs!" }
-                assert(dids.size == size) { "Wallet has invalid number of DIDs!" }
+                size?.let { assert(dids.size == it) { "Wallet has invalid number of DIDs!" } }
                 expectedDefault.whenNone { assert(dids.none { it.default }) }
                 expectedDefault.whenAny { assertNotNull(dids.single { it.default }) }
                 expectedDefault.whenSome { did -> assert(dids.single { it.did == did }.default) }
@@ -28,7 +32,7 @@ class DidsApi(private val client: HttpClient) {
             }
         }
 
-    suspend fun get(wallet: UUID, did: String) = test("/wallet-api/wallet/{wallet}/dids/{did} - show specific DID") {
+    suspend fun get(wallet: Uuid, did: String) = test("/wallet-api/wallet/{wallet}/dids/{did} - show specific DID") {
         client.get("/wallet-api/wallet/$wallet/dids/$did").expectSuccess().apply {
             val response = body<JsonObject>()
             assert(response["id"]?.jsonPrimitive?.content == did)
@@ -36,16 +40,16 @@ class DidsApi(private val client: HttpClient) {
         }
     }
 
-    suspend fun delete(wallet: UUID, did: String) = test("/wallet-api/wallet/{wallet}/dids/{did} - delete did") {
+    suspend fun delete(wallet: Uuid, did: String) = test("/wallet-api/wallet/{wallet}/dids/{did} - delete did") {
         client.delete("/wallet-api/wallet/$wallet/dids/$did").expectSuccess()
     }
 
-    suspend fun default(wallet: UUID, did: String) =
+    suspend fun default(wallet: Uuid, did: String) =
         test("/wallet-api/wallet/{wallet}/dids/default - set default did") {
             client.post("/wallet-api/wallet/$wallet/dids/default?did=$did").expectSuccess()
         }
 
-    suspend fun create(wallet: UUID, payload: DidCreateRequest, output: ((String) -> Unit)? = null) =
+    suspend fun create(wallet: Uuid, payload: DidCreateRequest, output: ((String) -> Unit)? = null) =
         test("/wallet-api/wallet/{wallet}/dids/create/${payload.method} - create did:${payload.method}") {
             client.post("/wallet-api/wallet/$wallet/dids/create/${payload.method}") {
                 url {

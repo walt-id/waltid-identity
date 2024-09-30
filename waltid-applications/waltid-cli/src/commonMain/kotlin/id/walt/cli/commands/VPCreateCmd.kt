@@ -23,7 +23,8 @@ import id.walt.did.dids.DidService
 import id.walt.did.utils.randomUUID
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import java.io.File
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.exists

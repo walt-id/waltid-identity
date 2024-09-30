@@ -12,10 +12,18 @@ import kotlin.js.JsName
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-open class DidCreateOptions(val method: String, val config: JsonElement) {
+open class DidCreateOptions(
+    val method: String,
+    val config: JsonElement,
+    val didDocConfig: DidDocConfig? = null,
+) {
 
     @JsName("secondaryConstructor")
-    constructor(method: String, config: Map<String, Any?>) : this(method, config.toJsonElement())
+    constructor(
+        method: String,
+        config: Map<String, Any?>,
+        didDocConfig: DidDocConfig? = null,
+    ) : this(method, config.toJsonElement(), didDocConfig)
 
     @JsExport.Ignore
     inline operator fun <reified T> get(name: String): T? =

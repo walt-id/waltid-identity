@@ -241,8 +241,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
     private suspend fun resolveIssuerKeyFromSdJwt(sdJwt: SDJwtVC): Key {
         val kid = sdJwt.keyID ?: randomUUID()
-        return if(DidUtils.isDidUrl(kid)) {
-            DidService.resolveToKey(kid).getOrThrow()
+        return if(!sdJwt.issuer.isNullOrEmpty() && DidUtils.isDidUrl(sdJwt.issuer!!)) {
+            DidService.resolveToKey(sdJwt.issuer!!).getOrThrow()
         } else {
             sdJwt.header.get("x5c")?.jsonArray?.last()?.let {
                 return JWKKey.importPEM(it.jsonPrimitive.content).getOrThrow().let { JWKKey(it.jwk, kid) }

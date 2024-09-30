@@ -65,8 +65,8 @@ kotlin {
                 api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
                 api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
                 implementation("com.google.code.gson:gson:2.11.0")
 
                 // CLI
@@ -74,7 +74,7 @@ kotlin {
                 implementation("com.github.ajalt.clikt:clikt:4.4.0")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
@@ -83,16 +83,16 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
             }
         }
         val jvmMain by getting {
             dependencies {
                 // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.13")
+                implementation("org.slf4j:slf4j-simple:2.0.16")
 
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:9.40")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
 
                 // BouncyCastle for PEM import
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.6")
@@ -100,10 +100,10 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 implementation("com.wolpl.clikt-testkit:clikt-testkit:2.0.0")
 
-                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0")
 
                 // Ktor server
                 implementation("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.service.WalletServiceManager
@@ -14,6 +16,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.util.*
 import kotlinx.serialization.Serializable
+import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.issuers() = walletRoute {
     route("issuers", {

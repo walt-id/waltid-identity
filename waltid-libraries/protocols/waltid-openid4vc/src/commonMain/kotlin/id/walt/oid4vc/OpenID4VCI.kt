@@ -8,12 +8,12 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.definitions.JWTClaims
+import id.walt.oid4vc.errors.TokenError
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.requests.TokenRequest
-import id.walt.oid4vc.responses.TokenErrorCode
-import id.walt.oid4vc.errors.TokenError
 import id.walt.oid4vc.responses.AuthorizationCodeWithAuthorizationRequestResponse
+import id.walt.oid4vc.responses.TokenErrorCode
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.http
 import id.walt.policies.Verifier
@@ -24,7 +24,6 @@ import io.ktor.http.*
 import io.ktor.util.*
 import io.ktor.utils.io.core.*
 import kotlinx.serialization.json.*
-import kotlinx.serialization.json.Json
 
 object OpenID4VCI {
     fun getCredentialOfferRequestUrl(

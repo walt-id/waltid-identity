@@ -143,6 +143,12 @@ object OidcApi : CIProvider() {
                                     val vpTokenRequestJwtKid = issuanceSessionData.first().issuerKey.key.getKeyId()
                                     val vpTokenRequestJwtPrivKey = issuanceSessionData.first().issuerKey
                                     val vpProfile = issuanceSessionData.first().request.vpProfile ?: OpenId4VPProfile.DEFAULT
+                                    val credFormat = issuanceSessionData.first().request.credentialFormat ?: when(vpProfile) {
+                                        OpenId4VPProfile.HAIP -> CredentialFormat.sd_jwt_vc
+                                        OpenId4VPProfile.ISO_18013_7_MDOC -> CredentialFormat.mso_mdoc
+                                        OpenId4VPProfile.EBSIV3 -> CredentialFormat.jwt_vc
+                                        else -> CredentialFormat.jwt_vc_json
+                                    }
                                     val vpRequestValue = issuanceSessionData.first().request.vpRequestValue
                                         ?: throw IllegalArgumentException("missing vpRequestValue parameter")
 
@@ -156,7 +162,7 @@ object OidcApi : CIProvider() {
                                         } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
                                     }
                                     val presentationDefinition =
-                                        PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes, vpProfile)
+                                        PresentationDefinition.defaultGenerationFromVcTypesForCredentialFormat(requestedTypes, credFormat)
 
                                     processCodeFlowAuthorizationWithAuthorizationRequest(
                                         authReq,
