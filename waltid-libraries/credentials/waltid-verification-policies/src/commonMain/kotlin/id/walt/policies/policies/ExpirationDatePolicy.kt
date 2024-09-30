@@ -29,7 +29,7 @@ class ExpirationDatePolicy : CredentialWrapperValidatorPolicy(
 
     override val name = "expired"
     override val description = "Verifies that the credentials expiration date (`exp` for JWTs) has not been exceeded."
-    override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc)
+    override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc, VCFormat.sd_jwt_vc)
 
     companion object {
         private val vcClaims = listOf<Claims>(VcClaims.V2.NotAfter, VcClaims.V1.NotAfter)
