@@ -5,6 +5,7 @@ import id.walt.credentials.utils.VCFormat
 import id.walt.credentials.utils.randomUUID
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.policies.JwtVerificationPolicy
@@ -17,7 +18,11 @@ import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.JsExport
 
-class SdJwtVCSignaturePolicy(val jwtCryptoProvider: JWTCryptoProvider): JwtVerificationPolicy() {
+expect object JWTCryptoProviderManager {
+  fun getDefaultJWTCryptoProvider(keys: Map<String, Key>): JWTCryptoProvider
+}
+
+class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
   override val name = "signature"
   override val description =
     "Checks a SD-JWT-VC credential by verifying its cryptographic signature using the key referenced by the DID in `iss`."
@@ -41,7 +46,20 @@ class SdJwtVCSignaturePolicy(val jwtCryptoProvider: JWTCryptoProvider): JwtVerif
   override suspend fun verify(credential: String, args: Any?, context: Map<String, Any>): Result<Any> {
     val sdJwtVC = SDJwtVC.parse(credential)
     val issuerKey = resolveIssuerKeyFromSdJwt(sdJwtVC)
-    return issuerKey.verifyJws(credential)
+    if(!sdJwtVC.isPresentation)
+      return issuerKey.verifyJws(credential)
+    else {
+      val holderKey = JWKKey.importJWK(sdJwtVC.holderKeyJWK.toString()).getOrThrow()
+      return sdJwtVC.verifyVC(
+        JWTCryptoProviderManager.getDefaultJWTCryptoProvider(mapOf(
+          (sdJwtVC.keyID ?: issuerKey.getKeyId()) to issuerKey,
+          holderKey.getKeyId() to holderKey)
+        ),
+        requiresHolderKeyBinding = true,
+        context["clientId"]?.toString(),
+        context["challenge"]?.toString()
+      ).let { Result.success(sdJwtVC.undisclosedPayload) }
+    }
   }
 
 }

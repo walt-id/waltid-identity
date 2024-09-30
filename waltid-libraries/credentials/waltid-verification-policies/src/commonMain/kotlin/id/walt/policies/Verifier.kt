@@ -7,6 +7,7 @@ import id.walt.policies.models.PresentationResultEntry
 import id.walt.policies.models.PresentationVerificationResponse
 import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.sdjwt.SDJwtVC
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -136,6 +137,25 @@ object Verifier {
         specificCredentialPolicies: Map<String, List<PolicyRequest>>,
         presentationContext: Map<String, Any> = emptyMap(),
     ): PresentationVerificationResponse {
+        return when(format) {
+            VCFormat.sd_jwt_vc -> verifySDJwtVCPresentation(vpToken, vpPolicies, globalVcPolicies, specificCredentialPolicies, presentationContext)
+            VCFormat.mso_mdoc -> TODO()
+            else -> verifyW3CPresentation(format, vpToken, vpPolicies, globalVcPolicies, specificCredentialPolicies, presentationContext)
+        }
+    }
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    suspend fun verifyW3CPresentation(
+        format: VCFormat,
+        vpToken: String,
+        vpPolicies: List<PolicyRequest>,
+        globalVcPolicies: List<PolicyRequest>,
+        specificCredentialPolicies: Map<String, List<PolicyRequest>>,
+        presentationContext: Map<String, Any> = emptyMap(),
+    ): PresentationVerificationResponse {
         val providedJws = vpToken.decodeJws() // usually VP
         val payload = providedJws.payload
         val vpType = when (payload.contains("vp")) {
@@ -200,6 +220,63 @@ object Verifier {
                     /* Specific Credential Policies */
                     specificCredentialPolicies[credentialType]?.let { specificPolicyRequests ->
                         runPolicyRequests(vcIdx, credentialJwt, specificPolicyRequests)
+                    }
+                }
+            }
+        }
+
+        return PresentationVerificationResponse(results, time, policiesRun)
+    }
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    suspend fun verifySDJwtVCPresentation(
+        vpToken: String,
+        vpPolicies: List<PolicyRequest>,
+        globalVcPolicies: List<PolicyRequest>,
+        specificCredentialPolicies: Map<String, List<PolicyRequest>>,
+        presentationContext: Map<String, Any> = emptyMap(),
+    ): PresentationVerificationResponse {
+        val sdJwtVC = SDJwtVC.parse(vpToken)
+        val payload = sdJwtVC.fullPayload
+        val vpType =  sdJwtVC.type ?: sdJwtVC.vct ?: ""
+
+        val results = ArrayList<PresentationResultEntry>()
+
+        val resultMutex = Mutex()
+        var policiesRun = 0
+
+        val time = measureTime {
+            coroutineScope {
+                suspend fun runPolicyRequests(idx: Int, jwt: String, policies: List<PolicyRequest>) =
+                    runPolicyRequests(jwt, policies, presentationContext, onSuccess = { policyResult ->
+                        resultMutex.withLock {
+                            policiesRun++
+                            results[idx].policyResults.add(policyResult)
+                        }
+                    }, onError = { policyResult, exception ->
+                        resultMutex.withLock {
+                            policiesRun++
+                            results[idx].policyResults.add(policyResult)
+                        }
+                    })
+
+                /* VP Policies */
+                results.add(PresentationResultEntry(vpToken))
+                runPolicyRequests(0, vpToken, vpPolicies)
+
+                // VCs
+                if(globalVcPolicies.size > 0 || specificCredentialPolicies.containsKey(vpType)) {
+                    results.add(PresentationResultEntry(vpType))
+
+                    /* Global VC Policies */
+                    runPolicyRequests(1, vpToken, globalVcPolicies)
+
+                    /* Specific Credential Policies */
+                    specificCredentialPolicies[vpType]?.let { specificPolicyRequests ->
+                        runPolicyRequests(1, vpToken, specificPolicyRequests)
                     }
                 }
             }
