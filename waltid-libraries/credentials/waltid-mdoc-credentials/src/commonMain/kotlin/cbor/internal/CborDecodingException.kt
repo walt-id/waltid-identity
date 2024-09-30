@@ -4,7 +4,7 @@ package cbor.internal
  * Copyright 2017-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license.
  */
 
-import kotlinx.serialization.*
+import kotlinx.serialization.SerializationException
 
 internal class CborDecodingException(message: String) : SerializationException(message)
 

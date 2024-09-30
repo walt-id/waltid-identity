@@ -8,7 +8,7 @@ import id.walt.webwallet.db.models.Web3Wallets
 import id.walt.webwallet.service.dto.*
 import id.walt.webwallet.service.nft.fetchers.DataFetcher
 import id.walt.webwallet.service.nft.fetchers.parameters.*
-import kotlinx.uuid.UUID
+
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -80,9 +80,9 @@ class NftKitNftService : NftService {
             )
         } ?: throw IllegalArgumentException("Token details not available: $parameter")
 
-    private fun getWalletById(tenant: String, accountId: String) = getWalletById(tenant, UUID(accountId))
+    private fun getWalletById(tenant: String, accountId: String) = getWalletById(tenant, Uuid(accountId))
 
-    private fun getWalletById(tenant: String, accountId: UUID) =
+    private fun getWalletById(tenant: String, accountId: Uuid) =
         transaction {
             Web3Wallets.selectAll().where { (Web3Wallets.tenant eq tenant) and (Web3Wallets.accountId eq accountId) }.firstOrNull()
         }?.let {

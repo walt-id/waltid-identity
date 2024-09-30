@@ -1,6 +1,7 @@
 package id.walt.did.dids.document
 
 
+import id.walt.did.dids.DidUtils
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -28,7 +29,7 @@ import kotlin.js.JsName
 @Serializable
 data class DidJwkDocument(
     @EncodeDefault @SerialName("@context")
-    val context: List<String> = DEFAULT_CONTEXT,
+    val context: List<String> = DidUtils.DEFAULT_CONTEXT,
     val id: String, // did:jwk:${base64url-value}
 
     val verificationMethod: List<VerificationMethod>?,
@@ -38,9 +39,6 @@ data class DidJwkDocument(
     val capabilityDelegation: List<String>?,
     val keyAgreement: List<String>?,
 ) {
-    companion object {
-        private val DEFAULT_CONTEXT = listOf("https://www.w3.org/ns/did/v1", "https://w3id.org/security/suites/jws-2020/v1")
-    }
 
     @Serializable
     data class VerificationMethod(
@@ -54,7 +52,7 @@ data class DidJwkDocument(
 
     @JsName("secondaryConstructor")
     constructor(did: String, didJwk: JsonObject) : this(
-        context = DEFAULT_CONTEXT,
+        context = DidUtils.DEFAULT_CONTEXT,
         id = did,
         verificationMethod = listOf(VerificationMethod("$did#0", "JsonWebKey2020", did, didJwk)),
 

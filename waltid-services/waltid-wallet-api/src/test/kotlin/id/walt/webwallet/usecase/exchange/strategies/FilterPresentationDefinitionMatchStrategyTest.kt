@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.usecase.exchange.strategies
 
 import TestUtils
@@ -15,9 +17,11 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 
 class FilterPresentationDefinitionMatchStrategyTest {
@@ -34,7 +38,7 @@ class FilterPresentationDefinitionMatchStrategyTest {
         Json.decodeFromString<List<FilterData>>(TestUtils.loadResource("presentation-definition/filters/filter-composite.json"))
     private val credentials = listOf(
         WalletCredential(
-            wallet = UUID(),
+            wallet = Uuid.random(),
             id = "array-type",
             document = """
                 {
@@ -50,7 +54,7 @@ class FilterPresentationDefinitionMatchStrategyTest {
             format = CredentialFormat.ldp_vc
         ),
         WalletCredential(
-            wallet = UUID(),
+            wallet = Uuid.random(),
             id = "primitive-type",
             document = """
                 {
@@ -66,7 +70,7 @@ class FilterPresentationDefinitionMatchStrategyTest {
             format = CredentialFormat.ldp_vc
         ),
         WalletCredential(
-            wallet = UUID(),
+            wallet = Uuid.random(),
             id = "primitive-type",
             document = """
                 {

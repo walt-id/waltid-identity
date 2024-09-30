@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.usecase.claim
 
 import id.walt.webwallet.db.models.Notification
@@ -9,6 +11,7 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.Event
 import id.walt.webwallet.service.events.EventType
+import id.walt.webwallet.service.exchange.CredentialDataResult
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.trust.TrustValidationService
 import id.walt.webwallet.usecase.event.EventLogUseCase
@@ -17,8 +20,9 @@ import id.walt.webwallet.usecase.notification.NotificationDispatchUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.JsonObject
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
 
 class SilentClaimStrategy(
     private val issuanceService: IssuanceService,
@@ -69,27 +73,27 @@ class SilentClaimStrategy(
             did = issuer, type = type, egfUri = egfUri
         )
 
-    private fun storeCredentials(wallet: UUID, credentials: Array<WalletCredential>) = runCatching {
+    private fun storeCredentials(wallet: Uuid, credentials: Array<WalletCredential>) = runCatching {
         credentialService.add(
             wallet = wallet, credentials = credentials
         )
     }
 
     private suspend fun createNotifications(
-        account: UUID, credentials: Array<WalletCredential>, type: EventType.Action,
+        account: Uuid, credentials: Array<WalletCredential>, type: EventType.Action,
     ) = prepareNotifications(account, credentials, type.toString()).runCatching {
         notificationUseCase.add(*this.toTypedArray())
         notificationDispatchUseCase.send(*this.toTypedArray())
     }
 
     private fun createEvents(
-        tenant: String, account: UUID, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action,
+        tenant: String, account: Uuid, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action,
     ) = prepareEvents(account, tenant, credentials, type).runCatching {
         eventUseCase.log(*this.toTypedArray())
     }
 
     private fun prepareCredentialData(
-        did: String, data: IssuanceService.CredentialDataResult, issuerDid: String,
+        did: String, data: CredentialDataResult, issuerDid: String,
     ) = didService.getWalletsForDid(did).map {
         Pair(
             WalletCredential(
@@ -107,7 +111,7 @@ class SilentClaimStrategy(
     }
 
     private fun prepareEvents(
-        account: UUID, tenant: String, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action,
+        account: Uuid, tenant: String, credentials: List<Pair<WalletCredential, String?>>, type: EventType.Action,
     ) = credentials.map {
         Event(
             action = type,
@@ -124,10 +128,10 @@ class SilentClaimStrategy(
         )
     }
 
-    private fun prepareNotifications(account: UUID, credentials: Array<WalletCredential>, type: String) =
+    private fun prepareNotifications(account: Uuid, credentials: Array<WalletCredential>, type: String) =
         credentials.map {
             Notification(
-                id = UUID.generateUUID().toString(),//TODO: converted back and forth (see notification-service)
+                id = Uuid.random().toString(),//TODO: converted back and forth (see notification-service)
                 account = account.toString(),
                 wallet = it.wallet.toString(),
                 type = type,

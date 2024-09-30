@@ -11,12 +11,12 @@ import kotlinx.datetime.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.js.JsName
 import kotlin.time.Duration
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -29,7 +29,7 @@ enum class CredentialBuilderType {
 
     MdocsCredentialBuilder // TODO
 }
-@OptIn(ExperimentalJsExport::class)
+@OptIn(ExperimentalJsExport::class, ExperimentalUuidApi::class)
 @JsExport
 class CredentialBuilder(
     val builderType: CredentialBuilderType = W3CV2CredentialBuilder
@@ -50,9 +50,9 @@ class CredentialBuilder(
         context = context.toMutableList().apply { add(addContext) }
     }
 
-    var credentialId: String? = "urn:uuid:${UUID.generateUUID()}"
+    var credentialId: String? = "urn:uuid:${Uuid.random()}"
     fun randomCredentialSubjectUUID() {
-        credentialId = "urn:uuid:${UUID.generateUUID()}"
+        credentialId = "urn:uuid:${Uuid.random()}"
     }
 
     var issuerDid: String? = null

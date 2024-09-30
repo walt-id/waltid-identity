@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.service.oidc4vc
 
 import COSE.AlgorithmID
@@ -52,10 +54,12 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
+
+
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:$WALLET_PORT"
@@ -167,9 +171,9 @@ class TestCredentialWallet(
         println("=== GENERATING PRESENTATION FOR VP TOKEN - Session: $session")
 
         val selectedCredentials =
-            HACK_outsideMappedSelectedCredentialsPerSession[session.authorizationRequest!!.state + session.authorizationRequest.presentationDefinition]!!
+            HACK_outsideMappedSelectedCredentialsPerSession[session.authorizationRequest!!.state + session.authorizationRequest.presentationDefinition?.id]!!
         val selectedDisclosures =
-            HACK_outsideMappedSelectedDisclosuresPerSession[session.authorizationRequest.state + session.authorizationRequest.presentationDefinition]
+            HACK_outsideMappedSelectedDisclosuresPerSession[session.authorizationRequest.state + session.authorizationRequest.presentationDefinition?.id]
 
         println("Selected credentials: $selectedCredentials")
 //        val matchedCredentials = walletService.getCredentialsByIds(selectedCredentials)
@@ -241,7 +245,7 @@ class TestCredentialWallet(
         }
         println("mdocsPresented: $mdocsPresented")
 
-        val presentationId = (session.presentationDefinition?.id ?: "urn:uuid:${UUID.generateUUID().toString().lowercase()}")
+        val presentationId = (session.presentationDefinition?.id ?: "urn:uuid:${Uuid.random().toString().lowercase()}")
 
         val vp = if (jwtsPresented.isNotEmpty()) getVpJson(
             credentialsPresented = jwtsPresented,
@@ -279,9 +283,24 @@ class TestCredentialWallet(
                 definitionId = presentationId,
                 descriptorMap = matchedCredentials.mapIndexed { index, credential ->
                     when (credential.format) {
-                        CredentialFormat.mso_mdoc -> buildDescriptorMappingMDoc(session, index, credential.document, rootPathMDoc)
-                        CredentialFormat.sd_jwt_vc -> buildDescriptorMappingSDJwtVC(session, index, credential.document, "$")
-                        else -> buildDescriptorMappingJwtVP(session, index, credential.document, rootPathVP)
+                        CredentialFormat.mso_mdoc -> buildDescriptorMappingMDoc(
+                            session.presentationDefinition,
+                            index,
+                            credential.document,
+                            rootPathMDoc,
+                        )
+                        CredentialFormat.sd_jwt_vc -> buildDescriptorMappingSDJwtVC(
+                            session.presentationDefinition,
+                            index,
+                            credential.document,
+                            "$",
+                        )
+                        else -> buildDescriptorMappingJwtVP(
+                            session.presentationDefinition,
+                            index,
+                            credential.document,
+                            rootPathVP,
+                        )
                     }
                 }
             )
@@ -376,19 +395,24 @@ class TestCredentialWallet(
         )
     }
 
-    private fun buildDescriptorMappingJwtVP(session: VPresentationSession, index: Int, vcJwsStr: String, rootPath: String = "$") = let {
+    fun buildDescriptorMappingJwtVP(
+        presentationDefinition: PresentationDefinition?,
+        index: Int,
+        vcJwsStr: String,
+        rootPath: String = "$",
+    ) = let {
         val vcJws = vcJwsStr.base64UrlToBase64().decodeJws()
         val type = vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
             ?: "VerifiableCredential"
 
         DescriptorMapping(
-            id = getDescriptorId(type, session.presentationDefinition),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
+            id = getDescriptorId(type, presentationDefinition),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
             format = VCFormat.jwt_vp,  // jwt_vp_json
             path = rootPath,
             pathNested = DescriptorMapping(
                 id = getDescriptorId(
                     type,
-                    session.presentationDefinition
+                    presentationDefinition,
                 ),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
                 format = VCFormat.jwt_vc_json, // jwt_vc_json
                 path = "$rootPath.verifiableCredential[$index]", //.vp.verifiableCredentials
@@ -396,35 +420,48 @@ class TestCredentialWallet(
         )
     }
 
-    private fun buildDescriptorMappingMDoc(session: VPresentationSession, index: Int, mdoc: String, rootPath: String = "$") = let {
+    fun buildDescriptorMappingMDoc(
+        presentationDefinition: PresentationDefinition?,
+        index: Int,
+        mdoc: String,
+        rootPath: String = "$",
+    ) = let {
         val mdoc = MDoc.fromCBORHex(mdoc)
         val type = mdoc.docType.value
 
         DescriptorMapping(
-            id = getDescriptorId(type, session.presentationDefinition),
+            id = getDescriptorId(type, presentationDefinition),
             format = VCFormat.mso_mdoc,
             path = rootPath,
             pathNested = DescriptorMapping(
-                id = getDescriptorId(type, session.presentationDefinition),
+                id = getDescriptorId(type, presentationDefinition),
                 format = VCFormat.mso_mdoc,
                 path = "$rootPath.documents[$index]",
             )
         )
     }
 
-    private fun buildDescriptorMappingSDJwtVC(session: VPresentationSession, index: Int, vcJwsStr: String, rootPath: String = "$") = let {
+    fun buildDescriptorMappingSDJwtVC(
+        presentationDefinition: PresentationDefinition?,
+        index: Int,
+        vcJwsStr: String,
+        rootPath: String = "$",
+    ) = let {
         val vcJws = vcJwsStr.base64UrlToBase64().decodeJws()
         val type = vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
             ?: "VerifiableCredential"
 
         DescriptorMapping(
-            id = session.presentationDefinition!!.id,
+            id = presentationDefinition!!.id,
             format = VCFormat.sd_jwt_vc,
             path = rootPath
         )
     }
 
-    private fun getDescriptorId(type: String, presentationDefinition: PresentationDefinition?) =
+    private fun getDescriptorId(
+        type: String,
+        presentationDefinition: PresentationDefinition?,
+    ) =
         presentationDefinition?.inputDescriptors?.find {
             (it.name ?: it.id) == type
         }?.id

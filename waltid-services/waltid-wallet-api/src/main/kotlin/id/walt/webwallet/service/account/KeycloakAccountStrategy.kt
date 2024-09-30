@@ -25,13 +25,16 @@ import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
+
+
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>() {
     val http = HttpClient {
         install(ContentNegotiation) { json() }
@@ -92,7 +95,7 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
         val createdAccountId = transaction {
             val accountId = Accounts.insert {
                 it[Accounts.tenant] = tenant
-                it[id] = UUID.generateUUID()
+                it[id] = Uuid.random()
                 it[name] = request.username
                 it[email] = request.email
                 it[password] = hash

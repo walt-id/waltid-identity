@@ -29,7 +29,7 @@ class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
   override val supportedVCFormats = setOf(VCFormat.sd_jwt_vc)
 
   private suspend fun resolveIssuerKeyFromSdJwt(sdJwt: SDJwtVC): Key {
-    val kid = sdJwt.keyID ?: randomUUID()
+    val kid = sdJwt.issuer ?: randomUUID()
     return if(DidUtils.isDidUrl(kid)) {
       DidService.resolveToKey(kid).getOrThrow()
     } else {

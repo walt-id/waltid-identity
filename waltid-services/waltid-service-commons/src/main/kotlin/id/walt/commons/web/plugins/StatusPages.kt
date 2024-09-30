@@ -35,7 +35,6 @@ private fun statusCodeForException(cause: Throwable) = when (cause) {
     is BadRequestException -> HttpStatusCode.BadRequest
     is IllegalStateException -> HttpStatusCode.InternalServerError
     is WebException -> cause.status
-
     else -> HttpStatusCode.InternalServerError
 }
 

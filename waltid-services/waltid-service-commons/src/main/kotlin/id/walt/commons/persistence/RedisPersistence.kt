@@ -6,7 +6,7 @@ import kotlin.time.Duration
 
 class RedisPersistence<V>(
     discriminator: String,
-    defaultExpiration: Duration,
+    defaultExpiration: Duration? = null,
     val encoding: (V) -> String,
     val decoding: (String) -> V,
     val pool: UnifiedJedis,
@@ -16,7 +16,10 @@ class RedisPersistence<V>(
         pool.get("$discriminator:$id")?.let { decoding.invoke(it) }
 
     override operator fun set(id: String, value: V) {
-        pool.setex("$discriminator:$id", defaultExpiration.inWholeSeconds, encoding.invoke(value))
+        if (defaultExpiration != null)
+            pool.setex("$discriminator:$id", defaultExpiration.inWholeSeconds, encoding.invoke(value))
+        else
+            pool["$discriminator:$id"] = encoding.invoke(value)
     }
 
     override fun remove(id: String) {
@@ -39,7 +42,9 @@ class RedisPersistence<V>(
 
     override fun listAdd(id: String, value: V) {
         pool.sadd("$discriminator:$id", value.toString())
-        pool.expire("$discriminator:$id", defaultExpiration.inWholeSeconds)
+
+        if (defaultExpiration != null)
+            pool.expire("$discriminator:$id", defaultExpiration.inWholeSeconds)
     }
 
     override fun listSize(id: String): Int = pool.scard(id).toInt()

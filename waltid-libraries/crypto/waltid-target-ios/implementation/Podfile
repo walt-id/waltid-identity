@@ -6,5 +6,5 @@ target 'waltid.crypto.ios.utils' do
   use_frameworks!
 
   # Pods for waltid.crypto.ios.utils
-  pod 'JOSESwift', '~> 2.4.0'
+  pod 'JOSESwift', '3.0.0'
 end

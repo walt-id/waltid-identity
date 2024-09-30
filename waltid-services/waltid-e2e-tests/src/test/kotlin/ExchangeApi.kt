@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 import E2ETestWebService.test
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.usecase.exchange.FilterData
@@ -7,10 +9,12 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
 
 class ExchangeApi(private val client: HttpClient) {
-    suspend fun resolveCredentialOffer(wallet: UUID, offerUrl: String, output: ((String) -> Unit)? = null) =
+    suspend fun resolveCredentialOffer(wallet: Uuid, offerUrl: String, output: ((String) -> Unit)? = null) =
         test("/wallet-api/wallet/{wallet}/exchange/resolveCredentialOffer - resolve credential offer") {
             client.post("/wallet-api/wallet/$wallet/exchange/resolveCredentialOffer") {
                 setBody(offerUrl)
@@ -20,7 +24,7 @@ class ExchangeApi(private val client: HttpClient) {
         }
 
     suspend fun useOfferRequest(
-        wallet: UUID,
+        wallet: Uuid,
         offerUrl: String,
         numberOfExpected: Int,
         requireUserInput: Boolean = false,
@@ -36,7 +40,7 @@ class ExchangeApi(private val client: HttpClient) {
     }
 
     suspend fun resolvePresentationRequest(
-        wallet: UUID,
+        wallet: Uuid,
         presentationRequestUrl: String,
         output: ((String) -> Unit)? = null
     ) = test("/wallet-api/wallet/{wallet}/exchange/resolvePresentationRequest - get presentation definition") {
@@ -51,7 +55,7 @@ class ExchangeApi(private val client: HttpClient) {
     }
 
     suspend fun matchCredentialsForPresentationDefinition(
-        wallet: UUID,
+        wallet: Uuid,
         presentationDefinition: String,
         expectedCredentialIds: List<String> = emptyList(),
         output: ((List<WalletCredential>) -> Unit)? = null
@@ -69,7 +73,7 @@ class ExchangeApi(private val client: HttpClient) {
         }
 
     suspend fun unmatchedCredentialsForPresentationDefinition(
-        wallet: UUID,
+        wallet: Uuid,
         presentationDefinition: String,
         expectedData: List<FilterData> = emptyList(),
         output: ((List<FilterData>) -> Unit)? = null
@@ -85,19 +89,12 @@ class ExchangeApi(private val client: HttpClient) {
         }
 
     suspend fun usePresentationRequest(
-        wallet: UUID,
-        did: String? = null,
-        presentationRequestUrl: String,
-        credentialIds: List<String>
+        wallet: Uuid,
+        request: UsePresentationRequest,
+        expectStatus: suspend HttpResponse.() -> HttpResponse = expectSuccess
     ) = test("/wallet-api/wallet/{wallet}/exchange/usePresentationRequest - present credentials") {
         client.post("/wallet-api/wallet/$wallet/exchange/usePresentationRequest") {
-            setBody(
-                UsePresentationRequest(
-                    did = did,
-                    presentationRequest = presentationRequestUrl,
-                    selectedCredentials = credentialIds,
-                )
-            )
-        }.expectSuccess()
+            setBody(request)
+        }.expectStatus()
     }
 }
