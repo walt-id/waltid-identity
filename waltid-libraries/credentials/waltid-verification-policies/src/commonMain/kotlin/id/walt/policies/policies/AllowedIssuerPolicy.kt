@@ -21,7 +21,7 @@ class AllowedIssuerPolicy : CredentialWrapperValidatorPolicy() {
 
     override val name = "allowed-issuer"
     override val description = "Checks that the issuer of the credential is present in the supplied list."
-    override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc)
+    override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc, VCFormat.sd_jwt_vc)
 
     @JvmBlocking
     @JvmAsync

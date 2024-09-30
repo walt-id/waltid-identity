@@ -158,7 +158,7 @@ fun Application.lspPotentialVerificationTestApi() {
           vct = "urn:eu.europa.ec.eudi:pid:1",
           additionalJwtHeader = mapOf("x5c" to listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT)),
           nbf = Clock.System.now().epochSeconds - 1,
-          exp = Clock.System.now().epochSeconds + 5
+          exp = Clock.System.now().epochSeconds + 60
         )
 
         logger.debug { "SIGNED SD-JWT-VC:" }
