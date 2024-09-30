@@ -2,8 +2,9 @@ package id.walt.webwallet.service.exchange
 
 import COSE.OneKey
 import com.nimbusds.jose.jwk.ECKey
+import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.OfferedCredential
 import id.walt.oid4vc.data.ProofOfPossession
@@ -15,24 +16,23 @@ import kotlinx.serialization.json.encodeToJsonElement
 
 object ProofOfPossessionParameterFactory {
     suspend fun new(
-        did: String,
-        keyId: String,
+        didAuthKeyId: String,
+        publicKey: Key,
         useKeyProof: Boolean,
         offeredCredential: OfferedCredential,
         credentialOffer: CredentialOffer,
         nonce: String?
     ): ProofOfPossessionParameters = when (useKeyProof) {
-        true -> keyProofParameters(did, offeredCredential, credentialOffer, nonce)
-        false -> didProofParameters(did, keyId, offeredCredential, credentialOffer, nonce)
+        true -> keyProofParameters(publicKey, offeredCredential, credentialOffer, nonce)
+        false -> didProofParameters(didAuthKeyId, offeredCredential, credentialOffer, nonce)
     }
 
     private suspend fun keyProofParameters(
-        did: String,
+        publicKey: Key,
         offeredCredential: OfferedCredential,
         credentialOffer: CredentialOffer,
         nonce: String?
     ): ProofOfPossessionParameters {
-        val key = DidService.resolveToKey(did).getOrThrow()
         val proofType = offeredCredential.proofTypesSupported?.keys?.first() ?: ProofType.jwt
         return when (proofType) {
             ProofType.cwt -> {
@@ -40,14 +40,14 @@ object ProofOfPossessionParameterFactory {
                     issuerUrl = credentialOffer.credentialIssuer,
                     nonce = nonce,
                     coseKey = OneKey(
-                        ECKey.parse(key.getPublicKey().exportJWK()).toECPublicKey(),
+                        ECKey.parse(publicKey.getPublicKey().exportJWK()).toECPublicKey(),
                         null
                     ).AsCBOR().EncodeToBytes(),
                 ).let {
                     ProofOfPossessionParameters(
                         ProofType.cwt,
-                        Json.encodeToJsonElement(it.headers.toCBOR()),
-                        Json.encodeToJsonElement(it.payload.toCBOR()),
+                        Json.encodeToJsonElement(it.headers.toCBOR().encodeToBase64()),
+                        Json.encodeToJsonElement(it.payload.toCBOR().encodeToBase64()),
                     )
                 }
             }
@@ -57,8 +57,7 @@ object ProofOfPossessionParameterFactory {
                 ProofOfPossession.JWTProofBuilder(
                     issuerUrl = credentialOffer.credentialIssuer,
                     nonce = nonce,
-                    keyJwk = key.getPublicKey().exportJWKObject(),
-                    keyId = key.getKeyId(),
+                    keyJwk = publicKey.exportJWKObject(),
                 ).let {
                     ProofOfPossessionParameters(
                         ProofType.jwt,
@@ -71,8 +70,7 @@ object ProofOfPossessionParameterFactory {
     }
 
     private fun didProofParameters(
-        did: String,
-        keyId: String,
+        didAuthKeyId: String,
         offeredCredential: OfferedCredential,
         credentialOffer: CredentialOffer,
         nonce: String?
@@ -82,13 +80,12 @@ object ProofOfPossessionParameterFactory {
             ProofType.cwt -> {
                 ProofOfPossession.CWTProofBuilder(
                     issuerUrl = credentialOffer.credentialIssuer,
-                    clientId = did,
                     nonce = nonce,
                 ).let {
                     ProofOfPossessionParameters(
                         ProofType.cwt,
-                        Json.encodeToJsonElement(it.headers.toCBOR()),
-                        Json.encodeToJsonElement(it.payload.toCBOR()),
+                        Json.encodeToJsonElement(it.headers.toCBOR().encodeToBase64()),
+                        Json.encodeToJsonElement(it.payload.toCBOR().encodeToBase64()),
                     )
                 }
             }
@@ -97,9 +94,8 @@ object ProofOfPossessionParameterFactory {
             else -> {
                 ProofOfPossession.JWTProofBuilder(
                     issuerUrl = credentialOffer.credentialIssuer,
-                    clientId = did,
-                    nonce,
-                    keyId,
+                    nonce = nonce,
+                    keyId = didAuthKeyId,
                 ).let {
                     ProofOfPossessionParameters(
                         ProofType.jwt,
