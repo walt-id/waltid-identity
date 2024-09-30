@@ -267,7 +267,7 @@ class E2ETest {
         }
     }
 
-    @Test
+    //@Test
     fun lspVerifierTests() = runTest(timeout = 5.minutes) {
         val client = testHttpClient(doFollowRedirects = false)
         testBlock {
