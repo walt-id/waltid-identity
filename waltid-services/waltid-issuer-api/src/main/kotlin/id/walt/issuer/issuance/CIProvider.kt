@@ -645,11 +645,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         return sessionDataList.find { sessionData ->
             val credentialConfigurationId = sessionData.request.credentialConfigurationId
             val credentialFormat = getFormatByCredentialConfigurationId(credentialConfigurationId)
-            val formatMatches = credentialFormat == credentialRequest.format
-            if (!formatMatches) {
-                throw IllegalArgumentException("Format does not match")
-            }
-
+            require(credentialFormat == credentialRequest.format) { "Format does not match" }
             // Depending on the format, perform specific checks
             val additionalMatches =
                 when (credentialRequest.format) {
