@@ -108,3 +108,41 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
         )
     )
 }
+
+publishing {
+    publications {
+        create<MavenPublication>("mavenJava") {
+            pom {
+                name.set("walt.id verification policies")
+                description.set(
+                    """
+                    Kotlin/Java library for Verification Policies
+                    """.trimIndent()
+                )
+                url.set("https://walt.id")
+            }
+            from(components["java"])
+        }
+    }
+
+    repositories {
+        maven {
+            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
+            val envUsername = System.getenv("MAVEN_USERNAME")
+            val envPassword = System.getenv("MAVEN_PASSWORD")
+
+            val usernameFile = File("secret_maven_username.txt")
+            val passwordFile = File("secret_maven_password.txt")
+
+            val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
+            val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+
+            credentials {
+                username = secretMavenUsername
+                password = secretMavenPassword
+            }
+        }
+    }
+}
