@@ -8,9 +8,9 @@ import id.walt.commons.web.WebService
 import id.walt.policies.PolicyManager
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
+import id.walt.policies.policies.vp.PresentationDefinitionPolicy
 import id.walt.verifier.entra.entraVerifierApi
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
-import id.walt.verifier.policies.PresentationDefinitionPolicy
 import id.walt.verifier.web.plugins.configureHTTP
 import id.walt.verifier.web.plugins.configureMonitoring
 import id.walt.verifier.web.plugins.configureRouting

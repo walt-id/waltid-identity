@@ -16,7 +16,6 @@ import id.walt.issuer.issuerModule
 import id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment
 import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
-import id.walt.verifier.policies.PresentationDefinitionPolicy
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.webWalletModule
@@ -86,7 +85,6 @@ object E2ETestWebService {
                 ),
                 init = {
                     webWalletSetup()
-                    PolicyManager.registerPolicies(PresentationDefinitionPolicy())
                     WaltidServices.minimalInit()
                     Db.start()
                 },

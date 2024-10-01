@@ -60,6 +60,7 @@ kotlin {
                 implementation("io.github.optimumcode:json-schema-validator:0.2.2")
 
                 implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+                implementation(project(":waltid-libraries:credentials:waltid-dif-definitions-parser"))
                 implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
                 // Kotlinx

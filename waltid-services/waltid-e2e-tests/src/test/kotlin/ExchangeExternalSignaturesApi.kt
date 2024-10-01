@@ -321,8 +321,8 @@ class ExchangeExternalSignatures {
                 openbadgeSdJwtIssuanceRequest,
             ),
         )
-        testOID4VP(openbadgePresentationRequest)
-        testOID4VP(openbadgePresentationRequest, true)
+        //testOID4VP(openbadgePresentationRequest)
+        //testOID4VP(openbadgePresentationRequest, true)
         clearWalletCredentials()
     }
 

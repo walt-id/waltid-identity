@@ -58,6 +58,7 @@ import kotlin.uuid.Uuid
 
 class LspPotentialVerification(private val client: HttpClient) {
 
+  @OptIn(ExperimentalUuidApi::class)
   suspend fun testPotentialInteropTrack3() = E2ETestWebService.test("test track 3") {
      println("Starting test")
 
@@ -185,8 +186,8 @@ class LspPotentialVerification(private val client: HttpClient) {
         contentType(ContentType.Application.Json)
         setBody(
           buildJsonObject {
-            put("request_credentials", JsonArray(listOf(RequestedCredential(format = VCFormat.sd_jwt_vc, vct = "identity_credential_vc+sd-jwt").let { Json.encodeToJsonElement(it) })))
-            put("vp_policies", JsonArray(listOf(JsonPrimitive("signature_sd-jwt-vc"))))
+            put("request_credentials", JsonArray(listOf(RequestedCredential(format = VCFormat.sd_jwt_vc, vct = "urn:eu.europa.ec.eudi:pid:1").let { Json.encodeToJsonElement(it) })))
+            put("vp_policies", JsonArray(listOf(JsonPrimitive("signature_sd-jwt-vc"), JsonPrimitive("presentation-definition"))))
             put("vc_policies", JsonArray(listOf(JsonPrimitive("not-before"), JsonPrimitive("expired"),
               JsonObject(mapOf(
                 "policy" to JsonPrimitive("allowed-issuer"),
@@ -200,7 +201,7 @@ class LspPotentialVerification(private val client: HttpClient) {
       assertNotNull(presReq.presentationDefinition)
       assertNotNull(presReq.responseUri)
       assertEquals(VCFormat.sd_jwt_vc, presReq.presentationDefinition!!.inputDescriptors.firstOrNull()?.format?.keys?.first())
-      assertEquals("identity_credential_vc+sd-jwt", presReq.presentationDefinition!!.inputDescriptors.flatMap { it.constraints!!.fields!! }.first { it.path.contains("$.vct") }.filter?.get("pattern")?.jsonPrimitive?.content)
+      assertEquals("urn:eu.europa.ec.eudi:pid:1", presReq.presentationDefinition!!.inputDescriptors.flatMap { it.constraints!!.fields!! }.first { it.path.contains("$.vct") }.filter?.get("pattern")?.jsonPrimitive?.content)
 
       val ecHolderKey = ECKey.parse(holderKey.exportJWK())
       val cryptoProvider = SimpleMultiKeyJWTCryptoProvider(mapOf(

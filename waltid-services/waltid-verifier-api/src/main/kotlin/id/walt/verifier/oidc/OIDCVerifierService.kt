@@ -42,10 +42,10 @@ import id.walt.oid4vc.providers.OpenIDCredentialVerifier
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
+import id.walt.policies.policies.vp.PresentationDefinitionPolicy
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
-import id.walt.verifier.policies.PresentationDefinitionPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
@@ -190,12 +190,13 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
                         vpPolicies = policies.vpPolicies,
                         globalVcPolicies = policies.vcPolicies,
                         specificCredentialPolicies = policies.specificPolicies,
-                        presentationContext = mapOf(
-                            "presentationDefinition" to session.presentationDefinition,
+                        presentationContext = listOfNotNull(
+                            "presentationDefinition" to session.presentationDefinition.toJSON(),
+                            tokenResponse.presentationSubmission?.toJSON()?.let { "presentationSubmission" to it },
                             "challenge" to (session.authorizationRequest?.nonce ?: ""),
                             "clientId" to (session.authorizationRequest?.clientId ?: ""),
                             "responseUri" to (session.authorizationRequest?.responseUri ?: "")
-                        )
+                        ).toMap()
                     )
                 }
 
