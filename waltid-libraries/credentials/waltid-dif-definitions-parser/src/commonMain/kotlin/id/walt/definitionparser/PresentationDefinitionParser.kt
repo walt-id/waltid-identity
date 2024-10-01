@@ -36,13 +36,13 @@ class JsonObjectEnquirer {
 
 object PresentationDefinitionParser {
 
-    fun matchCredentialsForInputDescriptor(credentials: List<W3CVC>, inputDescriptor: PresentationDefinition.InputDescriptor): List<W3CVC> {
+    fun matchCredentialsForInputDescriptor(credentials: List<JsonObject>, inputDescriptor: PresentationDefinition.InputDescriptor): List<JsonObject> {
 
         println("--- Checking descriptor ${inputDescriptor.name} --")
 
         val enquirer = JsonObjectEnquirer()
 
-        return enquirer.filterDocumentsByConstraints(credentials.map { it.toJsonObject() }, inputDescriptor.constraints.fields!!).map { W3CVC(it) }
+        return enquirer.filterDocumentsByConstraints(credentials, inputDescriptor.constraints.fields!!)
 
     }
 
@@ -326,7 +326,7 @@ fun main() {
     val inputDescriptorList = Json.decodeFromString<List<PresentationDefinition.InputDescriptor>>(inputDescriptors)
 
     inputDescriptorList.forEach {
-        val matched = PresentationDefinitionParser.matchCredentialsForInputDescriptor(credentialList, it)
+        val matched = PresentationDefinitionParser.matchCredentialsForInputDescriptor(credentialList.map { it.toJsonObject() }, it)
         println("Matched for ${it.name}: $matched")
     }
 }
