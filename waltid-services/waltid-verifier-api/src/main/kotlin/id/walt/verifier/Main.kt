@@ -5,7 +5,7 @@ import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.WebService
-import id.walt.credentials.verification.PolicyManager
+import id.walt.policies.PolicyManager
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.verifier.entra.entraVerifierApi

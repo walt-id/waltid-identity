@@ -10,6 +10,7 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64URL
 import id.walt.commons.interop.LspPotentialInterop
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -31,7 +32,6 @@ import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.oid4vc.OpenID4VP
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationSubmission
-import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.sdjwt.SDJwtVC
@@ -186,6 +186,11 @@ class LspPotentialVerification(private val client: HttpClient) {
         setBody(
           buildJsonObject {
             put("request_credentials", JsonArray(listOf(RequestedCredential(format = VCFormat.sd_jwt_vc, vct = "identity_credential_vc+sd-jwt").let { Json.encodeToJsonElement(it) })))
+            put("vp_policies", JsonArray(listOf(JsonPrimitive("signature_sd-jwt-vc"))))
+            put("vc_policies", JsonArray(listOf(JsonPrimitive("not-before"), JsonPrimitive("expired"),
+              JsonObject(mapOf(
+                "policy" to JsonPrimitive("allowed-issuer"),
+                "args" to JsonPrimitive(LspPotentialInterop.POTENTIAL_ISSUER_KEY_ID))))))
           })
       }
       assertEquals(200, createReqResponse.status.value)

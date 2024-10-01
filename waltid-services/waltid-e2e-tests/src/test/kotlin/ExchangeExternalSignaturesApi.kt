@@ -5,6 +5,7 @@ import E2ETestWebService.loadResource
 import cbor.Cbor
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.commons.interop.LspPotentialInterop
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -21,7 +22,6 @@ import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ProofType
-import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.utils.Base64Utils.encodeToBase64Url

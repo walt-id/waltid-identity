@@ -4,13 +4,14 @@ package id.walt.verifier
 
 import com.nimbusds.jose.JWSAlgorithm
 import id.walt.commons.config.ConfigManager
-import id.walt.credentials.verification.PolicyManager
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.*
+import id.walt.policies.PolicyManager
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.RequestSigningCryptoProvider

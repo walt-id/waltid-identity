@@ -1,6 +1,6 @@
 package id.walt.oid4vc
 
-import id.walt.credentials.verification.policies.JwtSignaturePolicy
+import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.providers.CredentialVerifierConfig
