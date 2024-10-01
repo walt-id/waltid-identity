@@ -78,6 +78,7 @@ class E2ETest {
         }
     }
 
+    @OptIn(ExperimentalUuidApi::class)
     @Test
     fun e2e() = testBlock(defaultTestTimeout) {
         var client = testHttpClient()
@@ -312,7 +313,7 @@ class E2ETest {
         lspPotentialIssuance.testTrack2()
     }
 
-    // @Test
+    //@Test
     fun lspVerifierTests() = testBlock(timeout = defaultTestTimeout) {
         val client = testHttpClient(doFollowRedirects = false)
         val lspPotentialVerification = LspPotentialVerification(client)
