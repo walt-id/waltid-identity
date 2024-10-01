@@ -9,7 +9,7 @@ import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.commons.web.plugins.configureSerialization
 import id.walt.commons.web.plugins.configureStatusPages
-import id.walt.credentials.verification.PolicyManager
+import id.walt.policies.PolicyManager
 import id.walt.did.helpers.WaltidServices
 import id.walt.issuer.FeatureCatalog
 import id.walt.issuer.issuerModule

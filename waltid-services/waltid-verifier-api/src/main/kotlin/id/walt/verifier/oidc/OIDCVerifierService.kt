@@ -8,16 +8,17 @@ import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.persistence.ConfiguredPersistence
-import id.walt.credentials.verification.VerificationPolicy
-import id.walt.credentials.verification.Verifier
-import id.walt.credentials.verification.models.PolicyRequest
-import id.walt.credentials.verification.models.PolicyResultSurrogate
-import id.walt.credentials.verification.models.PresentationResultEntrySurrogate
-import id.walt.credentials.verification.models.PresentationVerificationResponseSurrogate
-import id.walt.credentials.verification.policies.*
-import id.walt.credentials.verification.policies.vp.HolderBindingPolicy
-import id.walt.credentials.verification.policies.vp.MaximumCredentialsPolicy
-import id.walt.credentials.verification.policies.vp.MinimumCredentialsPolicy
+import id.walt.credentials.utils.VCFormat
+import id.walt.policies.VerificationPolicy
+import id.walt.policies.Verifier
+import id.walt.policies.models.PolicyRequest
+import id.walt.policies.models.PolicyResultSurrogate
+import id.walt.policies.models.PresentationResultEntrySurrogate
+import id.walt.policies.models.PresentationVerificationResponseSurrogate
+import id.walt.policies.policies.*
+import id.walt.policies.policies.vp.HolderBindingPolicy
+import id.walt.policies.policies.vp.MaximumCredentialsPolicy
+import id.walt.policies.policies.vp.MinimumCredentialsPolicy
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -36,7 +37,6 @@ import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.oid4vc.OpenID4VP
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.providers.CredentialVerifierConfig
 import id.walt.oid4vc.providers.OpenIDCredentialVerifier
 import id.walt.oid4vc.providers.PresentationSession
@@ -173,38 +173,28 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         }
 
         if (tokenResponse.vpToken is JsonObject) TODO("Token response is jsonobject - not yet handled")
+        val presentationFormat = tokenResponse.presentationSubmission?.descriptorMap?.firstOrNull()?.format ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
 
         logger.debug { "VP token: $vpToken" }
         logger.info { "OpenID4VP profile: ${session.openId4VPProfile}" }
+        logger.info { "Presentation format: $presentationFormat" }
 
         return when (session.openId4VPProfile) {
+            // TODO: also move mdoc verification into Verifier.verifyPresentation path with policies
             OpenId4VPProfile.ISO_18013_7_MDOC -> verifyMdoc(tokenResponse, session)
-            OpenId4VPProfile.HAIP ->  runBlocking { verifySdJwtVC(tokenResponse, session) }
-            else -> if(SDJwtVC.isSdJwtVCPresentation(vpToken)) {
-                val success = runBlocking {
-                     verifySdJwtVC(tokenResponse, session)
-                }
-                policyResults[session.id] = PresentationVerificationResponseSurrogate(
-                    results = listOf(
-                        PresentationResultEntrySurrogate(
-                            vpToken, listOf(
-                                PolicyResultSurrogate(
-                                    policy = "default", isSuccess = success, result = "success".toJsonElement()
-                                )
-                            )
-                        )
-                    ), time = Duration.ZERO, policiesRun = 1
-                )
-                success
-            } else {
+            else -> {
                 val results = runBlocking {
                     Verifier.verifyPresentation(
-                        vpTokenJwt = vpToken,
+                        presentationFormat,
+                        vpToken = vpToken,
                         vpPolicies = policies.vpPolicies,
                         globalVcPolicies = policies.vcPolicies,
                         specificCredentialPolicies = policies.specificPolicies,
                         presentationContext = mapOf(
-                            "presentationDefinition" to session.presentationDefinition, "challenge" to session.id
+                            "presentationDefinition" to session.presentationDefinition,
+                            "challenge" to (session.authorizationRequest?.nonce ?: ""),
+                            "clientId" to (session.authorizationRequest?.clientId ?: ""),
+                            "responseUri" to (session.authorizationRequest?.responseUri ?: "")
                         )
                     )
                 }

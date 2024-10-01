@@ -1,9 +1,9 @@
 package id.walt.verifier.policies
 
-import id.walt.credentials.verification.CredentialWrapperValidatorPolicy
-import id.walt.credentials.verification.PresentationDefinitionException
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.policies.CredentialWrapperValidatorPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -17,6 +17,7 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
     override val name = "presentation-definition"
     override val description =
         "Verifies that with an Verifiable Presentation at minimum the list of credentials `request_credentials` has been presented."
+    override val supportedVCFormats = setOf(VCFormat.jwt_vp, VCFormat.jwt_vp_json, VCFormat.ldp_vp)
 
     override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
         val presentationDefinition = context["presentationDefinition"] as? PresentationDefinition
@@ -38,7 +39,13 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
             log.debug { "Requested types: $requestedTypes" }
             log.debug { "Presented types: $presentedTypes" }
 
-            Result.failure(PresentationDefinitionException(missingCredentialTypes = requestedTypes.minus(presentedTypes.toSet())))
+            Result.failure(
+              id.walt.policies.PresentationDefinitionException(
+                missingCredentialTypes = requestedTypes.minus(
+                  presentedTypes.toSet()
+                )
+              )
+            )
         }
     }
 }
