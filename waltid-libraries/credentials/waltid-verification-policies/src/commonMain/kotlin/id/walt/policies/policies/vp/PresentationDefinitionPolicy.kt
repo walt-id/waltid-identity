@@ -4,6 +4,7 @@ import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.definitionparser.PresentationDefinition
+import id.walt.definitionparser.PresentationDefinitionParser
 import id.walt.definitionparser.PresentationSubmission
 import id.walt.policies.CredentialWrapperValidatorPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -41,7 +42,13 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
         }
 
 
-        val success = presentedTypes.containsAll(requestedTypes)
+        val success = presentedTypes.containsAll(requestedTypes) && when(format) {
+            VCFormat.sd_jwt_vc -> PresentationDefinitionParser.matchCredentialsForInputDescriptor(
+                listOf(data), presentationDefinition.inputDescriptors.first()
+            ).isNotEmpty()
+            // TODO: support presentation definition matching for w3c credentials!
+            else -> true
+        }
 
         return if (success)
             Result.success(presentedTypes)

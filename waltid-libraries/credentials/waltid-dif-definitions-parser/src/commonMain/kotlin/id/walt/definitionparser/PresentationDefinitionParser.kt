@@ -46,7 +46,7 @@ object PresentationDefinitionParser {
 
     }
 
-    fun matchCredentialsForDefinition(credentials: List<W3CVC>, definition: PresentationDefinition) {
+    fun matchCredentialsForDefinition(credentials: List<JsonObject>, definition: PresentationDefinition) {
 
     }
 
