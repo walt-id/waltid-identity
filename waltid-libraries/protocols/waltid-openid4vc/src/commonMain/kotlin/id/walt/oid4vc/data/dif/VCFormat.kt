@@ -1,10 +1,10 @@
 package id.walt.oid4vc.data.dif
 
+import id.walt.credentials.utils.VCFormat
 import id.walt.oid4vc.data.JsonDataObject
 import id.walt.oid4vc.data.JsonDataObjectFactory
 import id.walt.oid4vc.data.JsonDataObjectSerializer
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.encoding.Decoder
@@ -13,20 +13,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-
-@Serializable
-enum class VCFormat(val value: String) {
-    jwt("jwt"),
-    jwt_vc("jwt_vc"),
-    jwt_vp("jwt_vp"),
-    ldp_vc("ldp_vc"),
-    ldp_vp("ldp_vp"),
-    ldp("ldp"),
-    jwt_vc_json("jwt_vc_json"),
-    jwt_vp_json("jwt_vp_json"),
-    mso_mdoc("mso_mdoc"),
-    @SerialName("vc+sd-jwt") sd_jwt_vc("vc+sd-jwt")
-}
 
 @Serializable
 data class VCFormatDefinition(

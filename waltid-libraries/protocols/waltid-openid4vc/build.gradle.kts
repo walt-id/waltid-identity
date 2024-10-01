@@ -102,6 +102,7 @@ kotlin {
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
                 implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+                implementation(project(":waltid-libraries:credentials:waltid-verification-policies"))
                 implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
                 implementation(project(":waltid-libraries:waltid-did"))
 

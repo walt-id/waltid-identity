@@ -1,6 +1,7 @@
 package id.walt.oid4vc.data.dif
 
 import id.walt.oid4vc.data.*
+import id.walt.credentials.utils.VCFormat
 import id.walt.oid4vc.util.ShortIdUtils
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName

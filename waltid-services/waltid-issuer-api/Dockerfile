@@ -4,6 +4,7 @@ COPY gradle/ /work/gradle
 COPY settings.gradle.kts build.gradle.kts gradle.properties gradlew /work/
 
 COPY waltid-libraries/credentials/waltid-verifiable-credentials/build.gradle.kts /work/waltid-libraries/credentials/waltid-verifiable-credentials/
+COPY waltid-libraries/credentials/waltid-verification-policies/build.gradle.kts /work/waltid-libraries/credentials/waltid-verification-policies/
 COPY waltid-libraries/crypto/waltid-crypto/build.gradle.kts /work/waltid-libraries/crypto/waltid-crypto/
 COPY waltid-libraries/waltid-did/build.gradle.kts /work/waltid-libraries/waltid-did/
 COPY waltid-libraries/protocols/waltid-openid4vc/build.gradle.kts /work/waltid-libraries/protocols/waltid-openid4vc/
@@ -18,6 +19,7 @@ WORKDIR /work/waltid-services/waltid-issuer-api/
 RUN gradle build || return 0
 
 COPY waltid-libraries/credentials/waltid-verifiable-credentials/. /work/waltid-libraries/credentials/waltid-verifiable-credentials
+COPY waltid-libraries/credentials/waltid-verification-policies/. /work/waltid-libraries/credentials/waltid-verification-policies
 COPY waltid-libraries/crypto/waltid-crypto/. /work/waltid-libraries/crypto/waltid-crypto
 COPY waltid-libraries/waltid-did/. /work/waltid-libraries/waltid-did
 COPY waltid-libraries/protocols/waltid-openid4vc/. /work/waltid-libraries/protocols/waltid-openid4vc

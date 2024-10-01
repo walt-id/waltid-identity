@@ -27,7 +27,8 @@ val modules = listOf(
     * "$libraries:credentials".group(
         "waltid-verifiable-credentials",
         "waltid-mdoc-credentials",
-        "waltid-dif-definitions-parser"
+        "waltid-dif-definitions-parser",
+        "waltid-verification-policies"
     ),
 
     * "$libraries:protocols".group(

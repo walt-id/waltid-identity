@@ -1,6 +1,8 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
 import id.walt.commons.interop.LspPotentialInterop
+import id.walt.credentials.utils.VCFormat
+import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -8,7 +10,6 @@ import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
 import id.walt.oid4vc.data.*
-import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDJwtVC
