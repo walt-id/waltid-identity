@@ -61,7 +61,7 @@ kotlin {
     }
 }
 
-/*publishing {
+publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             pom {
@@ -73,7 +73,7 @@ kotlin {
                 )
                 url.set("https://walt.id")
             }
-            from(components["java"])
+            from(components["kotlin"])
         }
     }
 
@@ -97,5 +97,5 @@ kotlin {
             }
         }
     }
-}*/
+}
 
