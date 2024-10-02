@@ -7,7 +7,6 @@ plugins {
 }
 
 group = "id.walt.permissions"
-version = "1.0.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
@@ -62,7 +61,7 @@ kotlin {
     }
 }
 
-publishing {
+/*publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             pom {
@@ -98,5 +97,5 @@ publishing {
             }
         }
     }
-}
+}*/
 
