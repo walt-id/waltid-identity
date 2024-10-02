@@ -121,7 +121,7 @@ publishing {
                 )
                 url.set("https://walt.id")
             }
-            from(components["java"])
+            from(components["kotlin"])
         }
     }
 
