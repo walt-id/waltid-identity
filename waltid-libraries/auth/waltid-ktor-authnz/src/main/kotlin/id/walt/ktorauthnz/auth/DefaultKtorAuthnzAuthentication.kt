@@ -1,12 +1,9 @@
 package id.walt.ktorauthnz.auth
 
 import id.walt.ktorauthnz.KtorAuthnzManager
-import id.walt.ktorauthnz.sessions.AuthSession
 import io.ktor.http.*
-import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.response.*
-import io.ktor.util.pipeline.*
 
 /**
  * A `basic` [Authentication] provider.
@@ -14,9 +11,9 @@ import io.ktor.util.pipeline.*
  * @see [basic]
  * @property name is the name of the provider, or `null` for a default provider.
  */
-public class KtorAuthnzAuthenticationProvider internal constructor(
+class DefaultKtorAuthnzAuthentication internal constructor(
     config: Config,
-) : AuthenticationProvider(config) {
+) : KtorAuthnzAuthenticationProvider(config) {
 
 //    private val challengeFunction: FormAuthChallengeFunction = config.challengeFunction
 
@@ -61,7 +58,7 @@ public class KtorAuthnzAuthenticationProvider internal constructor(
     /**
      * A configuration for the ktor-authnz authentication provider.
      */
-    public class Config internal constructor(name: String?) : AuthenticationProvider.Config(name) {
+    class Config internal constructor(name: String?) : AuthenticationProvider.Config(name) {
         /*internal var challengeFunction: FormAuthChallengeFunction = {
             call.respond(UnauthorizedResponse())
         }*/
@@ -71,31 +68,10 @@ public class KtorAuthnzAuthenticationProvider internal constructor(
 /**
  * Installs the ktor-authnz [Authentication] provider.
  */
-public fun AuthenticationConfig.ktorAuthnz(
+fun AuthenticationConfig.ktorAuthnz(
     name: String? = null,
-    configure: KtorAuthnzAuthenticationProvider.Config.() -> Unit,
+    configure: DefaultKtorAuthnzAuthentication.Config.() -> Unit,
 ) {
-    val provider = KtorAuthnzAuthenticationProvider(KtorAuthnzAuthenticationProvider.Config(name).apply(configure))
+    val provider = DefaultKtorAuthnzAuthentication(DefaultKtorAuthnzAuthentication.Config(name).apply(configure))
     register(provider)
-}
-
-fun PipelineContext<Unit, ApplicationCall>.getAuthToken(): String {
-    val token = call.principal<UserIdPrincipal>()?.name
-    check(token != null) { "No token for request principal" }
-
-    return token
-}
-
-// TODO: switch to @OptIn instead of @Deprecated
-@Deprecated("Externally provided JWT token cannot resolve to authenticated session")
-suspend fun PipelineContext<Unit, ApplicationCall>.getAuthenticatedSession(): AuthSession {
-    val token = getAuthToken()
-
-    return KtorAuthnzManager.tokenHandler.resolveTokenToSession(token)
-}
-
-suspend fun PipelineContext<Unit, ApplicationCall>.getAuthenticatedAccount(): String {
-    val token = getAuthToken()
-
-    return KtorAuthnzManager.tokenHandler.getTokenAccountId(token)
 }
