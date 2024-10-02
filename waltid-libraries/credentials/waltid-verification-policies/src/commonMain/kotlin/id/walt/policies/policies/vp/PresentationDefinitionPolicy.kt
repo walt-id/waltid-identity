@@ -61,6 +61,8 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
         else {
             log.debug { "Requested types: $requestedTypes" }
             log.debug { "Presented types: $presentedTypes" }
+            log.debug { "Presentation definition: $presentationDefinition" }
+            log.debug { "Presented data: $data" }
 
             Result.failure(
               id.walt.policies.PresentationDefinitionException(

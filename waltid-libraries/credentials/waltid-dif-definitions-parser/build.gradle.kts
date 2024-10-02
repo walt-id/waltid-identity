@@ -47,12 +47,14 @@ kotlin {
                 implementation("io.github.optimumcode:json-schema-validator:0.2.3")
 
                 implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+
+                // Loggin
+                implementation("io.github.oshai:kotlin-logging:7.0.0")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                //implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
             }
         }
         val jvmTest by getting {

@@ -129,7 +129,6 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                //implementation("com.nfeld.jsonpathkt:jsonpathkt:2.0.1")
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
             }
         }
