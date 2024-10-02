@@ -321,6 +321,11 @@ class E2ETest {
         lspPotentialVerification.testPotentialInteropTrack4()
     }
 
+    //@Test
+    fun testExternalSignatureAPIs() = testBlock(defaultTestTimeout) {
+        ExchangeExternalSignatures().executeTestCases()
+    }
+
     suspend fun setupTestWallet(): LspPotentialWallet {
         var client = testHttpClient()
         client.post("/wallet-api/auth/login") {

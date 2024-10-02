@@ -149,6 +149,9 @@ class ExchangeExternalSignatures {
     private val openbadgePresentationRequest = loadResource(
         "presentation/openbadgecredential-presentation-request.json"
     )
+    private val openbadgeSdJwtPresentationRequest = loadResource(
+        "presentation/openbadgecredential-sd-presentation-request.json"
+    )
     private val openbadgeUniversityDegreePresentationRequest = loadResource(
         "presentation/batch-openbadge-universitydegree-presentation-request.json"
     )
@@ -321,8 +324,8 @@ class ExchangeExternalSignatures {
                 openbadgeSdJwtIssuanceRequest,
             ),
         )
-        //testOID4VP(openbadgePresentationRequest)
-        //testOID4VP(openbadgePresentationRequest, true)
+        testOID4VP(openbadgeSdJwtPresentationRequest)
+        testOID4VP(openbadgeSdJwtPresentationRequest, true)
         clearWalletCredentials()
     }
 

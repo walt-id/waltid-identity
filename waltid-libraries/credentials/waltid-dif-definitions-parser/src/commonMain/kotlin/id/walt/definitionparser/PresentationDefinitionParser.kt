@@ -7,6 +7,7 @@ import id.walt.definitionparser.PresentationDefinition.InputDescriptor.Constrain
 import io.github.optimumcode.json.schema.JsonSchema
 import io.github.optimumcode.json.schema.OutputCollector
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
 class JsonObjectEnquirer {
@@ -27,7 +28,10 @@ class JsonObjectEnquirer {
                 } else {
                     if (field.filter != null) {
                         val schema = JsonSchema.fromJsonElement(field.filter)
-                        schema.validate(resolvedPath, OutputCollector.flag()).valid
+                        when(resolvedPath) {
+                            is JsonArray -> resolvedPath.any { schema.validate(it, OutputCollector.flag()).valid }
+                            else -> schema.validate(resolvedPath, OutputCollector.flag()).valid
+                        }
                     } else true
                 }
             }
