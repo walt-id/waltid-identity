@@ -1,7 +1,5 @@
 package id.walt.sdjwt
 
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
 
@@ -82,7 +80,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       put("kid", holderDid)
     }, issuerKeyId, vct, nbf, exp, status, additionalJwtHeader, subject)
 
-    suspend fun sign(
+    fun sign(
       sdPayload: SDPayload,
       jwtCryptoProvider: JWTCryptoProvider,
       issuerDid: String,
@@ -93,10 +91,10 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       additionalJwtHeader: Map<String, Any> = emptyMap(),
       subject: String? = null
     ): SDJwtVC = doSign(sdPayload, jwtCryptoProvider, issuerDid, buildJsonObject {
-      put("jwk", holderKeyJWK.plus("kid" to JWKKey.importJWK(holderKeyJWK.toString()).getOrThrow().getKeyId()).toJsonElement())
+      put("jwk", holderKeyJWK)
     }, issuerKeyId, vct, nbf, exp, status, additionalJwtHeader, subject)
 
-    suspend fun sign(
+    fun sign(
       sdPayload: SDPayload,
       jwtCryptoProvider: JWTCryptoProvider,
       issuerDid: String,
