@@ -281,4 +281,10 @@ object VerifierApiExamples {
 
         """.trimIndent()
     )
+
+    val sdJwtVCExampleWithRequiredFields = jsonObjectValueExampleDescriptorDsl(
+        """
+            {"request_credentials":[{"format":"vc+sd-jwt","vct":"urn:eu.europa.ec.eudi:pid:1","input_descriptor":{"id":"urn:eu.europa.ec.eudi:pid:1","format":{"vc+sd-jwt":{}},"constraints":{"fields":[{"path":["${'$'}.vct"],"filter":{"type":"string","pattern":"urn:eu.europa.ec.eudi:pid:1"}},{"path":["${'$'}.birthdate"],"filter":{"type":"string","pattern":".*"}}],"limit_disclosure":"required"}}}],"vp_policies":["signature_sd-jwt-vc","presentation-definition"],"vc_policies":["not-before","expired",{"policy":"allowed-issuer","args":"potential-lsp-issuer-key-01"}]}
+        """.trimIndent()
+    )
 }

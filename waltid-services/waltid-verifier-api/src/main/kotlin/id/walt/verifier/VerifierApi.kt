@@ -191,6 +191,7 @@ fun Application.verfierApi() {
                         example("Example with EBSI PDA1 Presentation Definition", VerifierApiExamples.EbsiVerifiablePDA1)
                         example("MDoc verification example", VerifierApiExamples.lspPotentialMdocExample)
                         example("SD-JWT-VC verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
+                        example("SD-JWT-VC verification example with mandatory fields", VerifierApiExamples.sdJwtVCExampleWithRequiredFields)
                     }
                 }
 
