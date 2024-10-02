@@ -16,7 +16,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
 
   private fun verifyHolderKeyBinding(jwtCryptoProvider: JWTCryptoProvider, requiresHolderKeyBinding: Boolean,
                                        audience: String? = null, nonce: String? = null): Boolean {
-    return if(!holderDid.isNullOrEmpty()) true
+    return if(!holderDid.isNullOrEmpty()) TODO("Holder DID verification not yet supported")
     else if(holderKeyJWK != null) {
       isPresentation && keyBindingJwt != null && !audience.isNullOrEmpty() && !nonce.isNullOrEmpty() &&
           keyBindingJwt.verifyKB(jwtCryptoProvider, audience, nonce, this, holderKeyJWK["kid"]?.jsonPrimitive?.content)
