@@ -1,4 +1,7 @@
 package id.walt.sdjwt
+
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
 
@@ -30,20 +33,22 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
                audience: String? = null, nonce: String? = null): VCVerificationResult {
     var message: String = ""
     return VCVerificationResult(
-      this, verify(jwtCryptoProvider, header["kid"]?.jsonPrimitive?.content ?: issuer),
-(notBefore?.let { Clock.System.now().epochSeconds >= it } ?: true).also {
-        if(!it) message = "$message, VC is not valid before $notBefore"
-      } &&
-      (expiration?.let { Clock.System.now().epochSeconds < it } ?: true).also {
-        if(!it) message = "$message, VC is not valid after $expiration"
-      } &&
-      !vct.isNullOrEmpty().also {
-        if(!it) message = "$message, VC has no verifiable credential type property (vct)"
-      } &&
-      verifyHolderKeyBinding(jwtCryptoProvider, requiresHolderKeyBinding, audience, nonce).also {
-        if(!it) message = "$message, holder key binding could not be verified"
-      },
-      message
+      sdJwtVC = this,
+      sdJwtVerificationResult = verify(jwtCryptoProvider, header["kid"]?.jsonPrimitive?.content ?: issuer),
+      sdJwtVCVerified =
+        (notBefore?.let { Clock.System.now().epochSeconds >= it } ?: true).also {
+          if(!it) message = "$message, VC is not valid before $notBefore"
+        } &&
+        (expiration?.let { Clock.System.now().epochSeconds < it } ?: true).also {
+          if(!it) message = "$message, VC is not valid after $expiration"
+        } &&
+        !vct.isNullOrEmpty().also {
+          if(it) message = "$message, VC has no verifiable credential type property (vct)"
+        } &&
+        verifyHolderKeyBinding(jwtCryptoProvider, requiresHolderKeyBinding, audience, nonce).also {
+          if(!it) message = "$message, holder key binding could not be verified"
+        },
+      vcVerificationMessage = message
     )
   }
 
@@ -77,7 +82,7 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       put("kid", holderDid)
     }, issuerKeyId, vct, nbf, exp, status, additionalJwtHeader, subject)
 
-    fun sign(
+    suspend fun sign(
       sdPayload: SDPayload,
       jwtCryptoProvider: JWTCryptoProvider,
       issuerDid: String,
@@ -88,10 +93,10 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
       additionalJwtHeader: Map<String, Any> = emptyMap(),
       subject: String? = null
     ): SDJwtVC = doSign(sdPayload, jwtCryptoProvider, issuerDid, buildJsonObject {
-      put("jwk", holderKeyJWK)
+      put("jwk", holderKeyJWK.plus("kid" to JWKKey.importJWK(holderKeyJWK.toString()).getOrThrow().getKeyId()).toJsonElement())
     }, issuerKeyId, vct, nbf, exp, status, additionalJwtHeader, subject)
 
-    fun sign(
+    suspend fun sign(
       sdPayload: SDPayload,
       jwtCryptoProvider: JWTCryptoProvider,
       issuerDid: String,
