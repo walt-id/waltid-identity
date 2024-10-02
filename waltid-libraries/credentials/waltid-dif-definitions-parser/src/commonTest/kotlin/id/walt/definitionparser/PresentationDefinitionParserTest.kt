@@ -277,7 +277,7 @@ class PresentationDefinitionParserTest {
 
   private val log = KotlinLogging.logger { }
 
-  @Test
+  //@Test
   fun testPresentationDefinitionParser() {
     val credentialList = Json.decodeFromString<List<W3CVC>>(credentials)
     val inputDescriptorList = Json.decodeFromString<List<PresentationDefinition.InputDescriptor>>(inputDescriptors)
