@@ -7,6 +7,7 @@ import id.walt.definitionparser.PresentationDefinition
 import id.walt.definitionparser.PresentationDefinitionParser
 import id.walt.definitionparser.PresentationSubmission
 import id.walt.policies.CredentialWrapperValidatorPolicy
+import id.walt.sdjwt.SDJwt
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -36,8 +37,8 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
         val presentedTypes = when(format) {
             VCFormat.sd_jwt_vc -> listOf(data["vct"]!!.jsonPrimitive.content)
             else -> data["vp"]!!.jsonObject["verifiableCredential"]?.jsonArray?.mapNotNull {
-                it.jsonPrimitive.contentOrNull?.decodeJws()?.payload
-                    ?.jsonObject?.get("vc")?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
+                it.jsonPrimitive.contentOrNull?.let { SDJwt.parse(it) }?.fullPayload
+                    ?.get("vc")?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
             } ?: emptyList()
         }
 
@@ -46,8 +47,13 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
             VCFormat.sd_jwt_vc -> PresentationDefinitionParser.matchCredentialsForInputDescriptor(
                 listOf(data), presentationDefinition.inputDescriptors.first()
             ).isNotEmpty()
-            // TODO: support presentation definition matching for w3c credentials!
-            else -> true
+            else -> data["vp"]!!.jsonObject["verifiableCredential"]?.jsonArray?.mapIndexedNotNull { idx,cred ->
+                val payload = cred.jsonPrimitive.contentOrNull?.let { SDJwt.parse(it) }?.fullPayload ?: throw IllegalArgumentException("Credential $idx is not a valid JWT string")
+                PresentationDefinitionParser.matchCredentialsForInputDescriptor(
+                    listOf(payload.get("vc")?.jsonObject ?: throw IllegalArgumentException("Credential $idx has no vc property")),
+                    presentationDefinition.inputDescriptors.get(idx)
+                ).isNotEmpty()
+            }!!.all { it }
         }
 
         return if (success)
