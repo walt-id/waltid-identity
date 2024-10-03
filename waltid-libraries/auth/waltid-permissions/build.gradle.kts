@@ -1,15 +1,30 @@
+import love.forte.plugin.suspendtrans.ClassInfo
+import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
+import love.forte.plugin.suspendtrans.TargetPlatform
+import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
+import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
     id("dev.petuska.npm.publish") version "3.4.3"
     id("com.github.ben-manes.versions")
+    id("love.forte.plugin.suspend-transform") version "2.0.20-0.9.2"
 }
 
 group = "id.walt.permissions"
 
 repositories {
     mavenCentral()
+}
+
+suspendTransform {
+    enabled = true
+    includeRuntime = true
+    useDefault()
+
+    includeAnnotation = false // Required in the current version to avoid "compileOnly" warning
 }
 
 kotlin {
@@ -50,6 +65,7 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+                implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
             }
         }
         val commonTest by getting {
@@ -99,3 +115,12 @@ publishing {
     }
 }
 
+extensions.getByType<SuspendTransformGradleExtension>().apply {
+    transformers[TargetPlatform.JS] = mutableListOf(
+        SuspendTransformConfiguration.jsPromiseTransformer.copy(
+            copyAnnotationExcludes = listOf(
+                ClassInfo("kotlin.js", "JsExport.Ignore")
+            )
+        )
+    )
+}
