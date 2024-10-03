@@ -30,8 +30,7 @@ import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.docrequest.MDocRequestBuilder
 import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.oid4vc.OpenID4VP
-import id.walt.oid4vc.data.dif.DescriptorMapping
-import id.walt.oid4vc.data.dif.PresentationSubmission
+import id.walt.oid4vc.data.dif.*
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.sdjwt.SDJwtVC
@@ -58,6 +57,7 @@ import kotlin.uuid.Uuid
 
 class LspPotentialVerification(private val client: HttpClient) {
 
+  @OptIn(ExperimentalUuidApi::class)
   suspend fun testPotentialInteropTrack3() = E2ETestWebService.test("test track 3") {
      println("Starting test")
 
@@ -185,8 +185,27 @@ class LspPotentialVerification(private val client: HttpClient) {
         contentType(ContentType.Application.Json)
         setBody(
           buildJsonObject {
-            put("request_credentials", JsonArray(listOf(RequestedCredential(format = VCFormat.sd_jwt_vc, vct = "identity_credential_vc+sd-jwt").let { Json.encodeToJsonElement(it) })))
-            put("vp_policies", JsonArray(listOf(JsonPrimitive("signature_sd-jwt-vc"))))
+            put("request_credentials", JsonArray(listOf(
+              RequestedCredential(
+                format = VCFormat.sd_jwt_vc,
+                vct = "urn:eu.europa.ec.eudi:pid:1",
+                inputDescriptor = InputDescriptor(
+                  id = "urn:eu.europa.ec.eudi:pid:1",
+                  format = mapOf(VCFormat.sd_jwt_vc to VCFormatDefinition()),
+                  constraints = InputDescriptorConstraints(
+                    limitDisclosure = DisclosureLimitation.required,
+                    fields = listOf(
+                      InputDescriptorField(path = listOf("$.vct"), filter = JsonObject(
+                        mapOf("type" to JsonPrimitive("string"), "pattern" to JsonPrimitive("urn:eu.europa.ec.eudi:pid:1")))
+                      ),
+                      InputDescriptorField(path = listOf("$.birthdate"), filter = JsonObject(
+                        mapOf("type" to JsonPrimitive("string"), "pattern" to JsonPrimitive(".*")))
+                      )
+                    )
+                  )
+                )
+              ).let { Json.encodeToJsonElement(it) })))
+            put("vp_policies", JsonArray(listOf(JsonPrimitive("signature_sd-jwt-vc"), JsonPrimitive("presentation-definition"))))
             put("vc_policies", JsonArray(listOf(JsonPrimitive("not-before"), JsonPrimitive("expired"),
               JsonObject(mapOf(
                 "policy" to JsonPrimitive("allowed-issuer"),
@@ -200,7 +219,7 @@ class LspPotentialVerification(private val client: HttpClient) {
       assertNotNull(presReq.presentationDefinition)
       assertNotNull(presReq.responseUri)
       assertEquals(VCFormat.sd_jwt_vc, presReq.presentationDefinition!!.inputDescriptors.firstOrNull()?.format?.keys?.first())
-      assertEquals("identity_credential_vc+sd-jwt", presReq.presentationDefinition!!.inputDescriptors.flatMap { it.constraints!!.fields!! }.first { it.path.contains("$.vct") }.filter?.get("pattern")?.jsonPrimitive?.content)
+      assertEquals("urn:eu.europa.ec.eudi:pid:1", presReq.presentationDefinition!!.inputDescriptors.flatMap { it.constraints!!.fields!! }.first { it.path.contains("$.vct") }.filter?.get("pattern")?.jsonPrimitive?.content)
 
       val ecHolderKey = ECKey.parse(holderKey.exportJWK())
       val cryptoProvider = SimpleMultiKeyJWTCryptoProvider(mapOf(
@@ -209,13 +228,19 @@ class LspPotentialVerification(private val client: HttpClient) {
       ))
       // 4. present (wallet)
       val vp_token = sdJwtVc.present(true, presReq.clientId, presReq.nonce!!, cryptoProvider, holderKey.getKeyId()).toString()
+      val vp_token_undisclosed = sdJwtVc.present(false, presReq.clientId, presReq.nonce!!, cryptoProvider, holderKey.getKeyId()).toString()
 
       println(vp_token)
+      println(vp_token_undisclosed)
 
       assertTrue(SDJwtVC.isSdJwtVCPresentation(vp_token))
+      assertTrue(SDJwtVC.isSdJwtVCPresentation(vp_token_undisclosed))
       val parseAndVerifyResult = SDJwtVC.parseAndVerify(vp_token, cryptoProvider, false, audience = presReq.clientId, nonce = presReq.nonce)
+      val parseAndVerifyUndisclosedResult = SDJwtVC.parseAndVerify(vp_token_undisclosed, cryptoProvider, false, audience = presReq.clientId, nonce = presReq.nonce)
       assertTrue(parseAndVerifyResult.verified)
       assertTrue(parseAndVerifyResult.sdJwtVC.toString().equals(vp_token))
+      assertTrue(parseAndVerifyUndisclosedResult.verified)
+      assertTrue(parseAndVerifyUndisclosedResult.sdJwtVC.toString().equals(vp_token_undisclosed))
 
       val tokenResp = OpenID4VP.generatePresentationResponse(PresentationResult(
         listOf(JsonPrimitive(vp_token)),
@@ -224,9 +249,18 @@ class LspPotentialVerification(private val client: HttpClient) {
         ))
       ))
       println(tokenResp)
+      val tokenRespUndisclosed = OpenID4VP.generatePresentationResponse(PresentationResult(
+        listOf(JsonPrimitive(vp_token_undisclosed)),
+        PresentationSubmission("presentation_1", presReq.presentationDefinition!!.id, listOf(
+          DescriptorMapping(presReq.presentationDefinition!!.id, VCFormat.sd_jwt_vc, path = "$")
+        ))
+      ))
+      println(tokenRespUndisclosed)
 
       val httpResp = client.submitForm(presReq.responseUri!!, parametersOf(tokenResp.toHttpParameters()))
+      val httpRespUndisclosed = client.submitForm(presReq.responseUri!!, parametersOf(tokenRespUndisclosed.toHttpParameters()))
       assertEquals(200, httpResp.status.value)
+      assertEquals(400, httpRespUndisclosed.status.value)
     }
   }
 }
