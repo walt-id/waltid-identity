@@ -22,6 +22,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.issuer.config.CredentialTypeConfig
@@ -308,9 +309,12 @@ open class CIProvider : OpenIDCredentialIssuer(
                 else if (issuerDid.startsWith("did:ebsi"))
                   issuerKid = issuerDid + "#" + issuerKey.key.getKeyId()
               }
-              when (data.request.credentialFormat) {
+
+                val holderKeyJWK =  JWKKey.importJWK(holderKey.toString()).getOrNull()?.exportJWKObject()?.plus("kid" to JWKKey.importJWK(holderKey.toString()).getOrThrow().getKeyId())?.toJsonObject()
+
+                when (data.request.credentialFormat) {
                   CredentialFormat.sd_jwt_vc -> sdJwtVc(
-                      JWKKey.importJWK(holderKey.toString()).getOrNull(),
+                      holderKeyJWK,
                       vc,
                       holderDid, issuerKid)
                   else -> w3cSdJwtVc(W3CVC(vc), issuerKid, holderDid, holderKey)
@@ -528,7 +532,7 @@ open class CIProvider : OpenIDCredentialIssuer(
     }
 
     private suspend fun IssuanceSessionData.sdJwtVc(
-        holderKey: JWKKey?,
+        holderKey: JsonObject?,
         vc: JsonObject,
         holderDid: String?, issuerKid: String?
     ): String = SDJwtVC.sign(
@@ -546,7 +550,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         jwtCryptoProvider = jwtCryptoProvider,
         issuerDid = (issuerDid ?: "").ifEmpty { issuerKey.key.getKeyId() },
         holderDid = holderDid,
-        holderKeyJWK = holderKey?.exportJWKObject(),
+        holderKeyJWK = holderKey,
         issuerKeyId = issuerKey.key.getKeyId(),
         vct = metadata.credentialConfigurationsSupported?.get(request.credentialConfigurationId)?.vct ?: throw ConfigurationException(
             ConfigException("No vct configured for given credential configuration id: ${request.credentialConfigurationId}")
