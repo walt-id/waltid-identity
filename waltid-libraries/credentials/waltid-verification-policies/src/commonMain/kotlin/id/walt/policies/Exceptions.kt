@@ -70,6 +70,7 @@ data class WebhookPolicyException(
 @SerialName("PresentationDefinitionException")
 class PresentationDefinitionException(
     val missingCredentialTypes: List<String>,
+    val presentationDefinitionMatch: Boolean
 ) : id.walt.policies.SerializableRuntimeException()
 
 @JsExport
