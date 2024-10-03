@@ -42,8 +42,7 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
             } ?: emptyList()
         }
 
-
-        val success = presentedTypes.containsAll(requestedTypes) && when(format) {
+        val presentationDefinitionMatch = when(format) {
             VCFormat.sd_jwt_vc -> PresentationDefinitionParser.matchCredentialsForInputDescriptor(
                 listOf(data), presentationDefinition.inputDescriptors.first()
             ).isNotEmpty()
@@ -55,6 +54,8 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
                 ).isNotEmpty()
             }!!.all { it }
         }
+
+        val success = presentedTypes.containsAll(requestedTypes) && presentationDefinitionMatch
 
         return if (success)
             Result.success(presentedTypes)
@@ -68,7 +69,7 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
               id.walt.policies.PresentationDefinitionException(
                 missingCredentialTypes = requestedTypes.minus(
                   presentedTypes.toSet()
-                )
+                ), presentationDefinitionMatch
               )
             )
         }
