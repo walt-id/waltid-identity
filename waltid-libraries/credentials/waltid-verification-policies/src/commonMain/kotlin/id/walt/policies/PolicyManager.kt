@@ -4,6 +4,7 @@ import id.walt.policies.policies.*
 import id.walt.policies.policies.vp.HolderBindingPolicy
 import id.walt.policies.policies.vp.MaximumCredentialsPolicy
 import id.walt.policies.policies.vp.MinimumCredentialsPolicy
+import id.walt.policies.policies.vp.PresentationDefinitionPolicy
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
@@ -47,7 +48,8 @@ object PolicyManager {
             MaximumCredentialsPolicy(),
             HolderBindingPolicy(),
             AllowedIssuerPolicy(),
-            RevocationPolicy()
+            RevocationPolicy(),
+            PresentationDefinitionPolicy()
         )
     }
 

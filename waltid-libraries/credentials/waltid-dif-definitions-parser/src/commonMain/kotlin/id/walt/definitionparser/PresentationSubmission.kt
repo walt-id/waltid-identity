@@ -16,7 +16,7 @@ data class PresentationSubmission(
 ) {
     @Serializable
     data class Descriptor(
-        val id: String,
+        val id: String? = null,
         val format: JsonElement,
         val path: String,
 

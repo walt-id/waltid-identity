@@ -78,6 +78,7 @@ class E2ETest {
         }
     }
 
+    @OptIn(ExperimentalUuidApi::class)
     @Test
     fun e2e() = testBlock(defaultTestTimeout) {
         var client = testHttpClient()
@@ -312,12 +313,17 @@ class E2ETest {
         lspPotentialIssuance.testTrack2()
     }
 
-    // @Test
+    //@Test
     fun lspVerifierTests() = testBlock(timeout = defaultTestTimeout) {
         val client = testHttpClient(doFollowRedirects = false)
         val lspPotentialVerification = LspPotentialVerification(client)
         lspPotentialVerification.testPotentialInteropTrack3()
         lspPotentialVerification.testPotentialInteropTrack4()
+    }
+
+    //@Test
+    fun testExternalSignatureAPIs() = testBlock(defaultTestTimeout) {
+        ExchangeExternalSignatures().executeTestCases()
     }
 
     suspend fun setupTestWallet(): LspPotentialWallet {
