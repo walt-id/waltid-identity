@@ -26,8 +26,6 @@ suspend fun main(args: Array<String>) {
                     registerResolver(LocalResolver())
                     updateResolversForMethods()
                 }
-
-                PolicyManager.registerPolicies(PresentationDefinitionPolicy())
             },
             run = WebService(Application::verifierModule).run()
         )
