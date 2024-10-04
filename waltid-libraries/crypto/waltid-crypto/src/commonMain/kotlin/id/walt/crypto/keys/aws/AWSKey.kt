@@ -282,21 +282,39 @@ ${sha256Hex(canonicalRequest)}
     val digest = SHA256()
     val hashedcanonicalRequest = digest.digest(canonicalRequest.encodeToByteArray()).toHexString()
 
+        @OptIn(ExperimentalEncodingApi::class)
+        suspend fun getPublicKey(config: AWSKeyMetadata, keyId: String): Key {
+            val method = HttpMethod.Post
+            val body = """
+{
+"KeyId": "$keyId"
+}
+""".trimIndent().trimMargin()
+            val headers = buildSigV4Headers(
+                method = method,
+                payload = body,
+                config = config
+            )
+            val key = client.post("https://kms.${config.region}.amazonaws.com/") {
+                headers {
+                    headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
+                    append(HttpHeaders.Host, "kms.${config.region}.amazonaws.com")
+                    append("X-Amz-Target", "TrentService.GetPublicKey") // Specific KMS action for ListKeys
+                }
+                setBody(
+                    body
+                ) // Set the JSON body
+            }.awsJsonDataBody()
+            val public = key["PublicKey"]?.jsonPrimitive?.content
+            val pem_key = """
+-----BEGIN PUBLIC KEY-----
+$public
+-----END PUBLIC KEY-----
+""".trimIndent()
 
-    val stringToSign = """
-        $algorithm
-        ${time.format(ISO_DATETIME_BASIC)}
-        20241002/eu-central-1/kms/aws4_request
-        $hashedcanonicalRequest
-    """.trimIndent()
-    println("Canonical headers:\n$canonicalHeaders")
-    println("========================================")
-    println("Canonical Request:\n$canonicalRequest")
-    println("========================================")
-    println("Hashed Canonical Request: $hashedcanonicalRequest")
-    println("========================================")
-    println("String to Sign:\n$stringToSign")
-    println("========================================")
+            val keyJWK = JWKKey.importPEM(pem_key)
+            return keyJWK.getOrThrow()
+        }
 
 
     val macDate = HmacSHA256("AWS4$AWS_SECRET_ACCESS_KEY".encodeToByteArray())
