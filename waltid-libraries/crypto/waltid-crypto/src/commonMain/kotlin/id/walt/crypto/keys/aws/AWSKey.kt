@@ -357,24 +357,43 @@ $public
             }
         }
 
-    val authorizationRequest =
-        "AWS4-HMAC-SHA256 Credential=$credential,SignedHeaders=$signedHeaders,Signature=${signature.toHexString()}"
+        override suspend fun generate(metadata: AWSKeyMetadata, type: KeyType): AWSKey {
+            val body =
+                """{
+"KeySpec":"ECC_NIST_P256",
+"KeyUsage":"SIGN_VERIFY"
+}
+""".trimIndent().trimMargin()
+            val headers = buildSigV4Headers(
+                method = HttpMethod.Post,
+                payload = body,
+                config = metadata
+
+            )
+            val key = client.post("https://kms.${metadata.region}.amazonaws.com/") {
+                headers {
+                    headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
+                    append(HttpHeaders.Host, "kms.${metadata.region}.amazonaws.com")
+                    append("X-Amz-Target", "TrentService.CreateKey") // Specific KMS action for CreateKey
+                }
+                setBody(body) // Set the JSON body
+            }.awsJsonDataBody()
+
+            val KeyId = key["KeyMetadata"]?.jsonObject?.get("KeyId")?.jsonPrimitive?.content
+            val publicKey = getPublicKey(metadata, KeyId.toString())
 
 
-    println("Authorization Request: $authorizationRequest")
+            return AWSKey(
+                config = metadata,
+                id = KeyId.toString(),
+                _publicKey = publicKey.exportJWK(),
+                _keyType = type
+            )
 
-    val http = HttpClient {
-        install(ContentNegotiation) { json() }
-        defaultRequest {
-            header(HttpHeaders.Date, time.format(ISO_DATETIME_BASIC))
-            header(HttpHeaders.ContentType, ContentType.Application.Json)
-            header(HttpHeaders.Accept, ContentType.Application.Json)
         }
-        install(Logging) {
-            logger = Logger.DEFAULT
-            level = LogLevel.ALL
-        }
+
     }
+}
 
     val response = http.post("https://$endpoint") {
         header(HttpHeaders.ContentType, "application/x-amz-json-1.1")
