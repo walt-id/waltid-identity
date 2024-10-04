@@ -36,10 +36,26 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 private val logger = KotlinLogging.logger { }
 
-class AWSKey(override val keyType: KeyType, override val hasPrivateKey: Boolean) : Key() {
-    override suspend fun getKeyId(): String {
-        TODO("Not yet implemented")
-    }
+class AWSKey(
+    val config: AWSKeyMetadata,
+    val id: String,
+    private var _publicKey: String? = null,
+    private var _keyType: KeyType? = null
+) : Key() {
+
+
+    override var keyType: KeyType
+        get() = _keyType!!
+        set(value) {
+            _keyType = value
+        }
+
+    override val hasPrivateKey: Boolean
+        get() = false
+
+    override fun toString(): String = "[AWS ${keyType.name} key @AWS]"
+
+    override suspend fun getKeyId(): String = getPublicKey().getKeyId()
 
     override suspend fun getThumbprint(): String {
         TODO("Not yet implemented")
