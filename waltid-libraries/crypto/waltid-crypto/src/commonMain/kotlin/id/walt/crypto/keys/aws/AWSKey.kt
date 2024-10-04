@@ -168,59 +168,116 @@ class AWSKey(
         TODO("Not yet implemented")
     }
 
-    companion object {
+    companion object : AWSKeyCreator {
+        val client = HttpClient()
 
 
-    }
+        // Utility to hash data using SHA256
+        @OptIn(ExperimentalStdlibApi::class)
+        fun sha256Hex(data: String): String = SHA256().digest(data.toByteArray()).toHexString()
 
-}
+        // Utility to perform HMAC-SHA256
+        fun hmacSHA256(key: ByteArray, data: String): ByteArray =
+            HmacSHA256(key).doFinal(data.toByteArray(Charsets.UTF_8))
 
-@OptIn(InternalKotlinCryptoApi::class, ExperimentalStdlibApi::class, InternalAPI::class, ExperimentalEncodingApi::class)
-suspend fun main() {
-
-    val ISO_DATETIME_BASIC by lazy {
-        LocalDateTime.Format {
-            date(LocalDate.Formats.ISO_BASIC)
-            alternativeParsing({ char('t') }) { char('T') }
-            time(LocalTime.Format {
-                hour()
-                minute()
-                second()
-            })
-            char('Z')
+        // Generate Signature Key
+        fun getSignatureKey(config: AWSKeyMetadata, dateStamp: String): ByteArray {
+            val kDate = hmacSHA256("AWS4${config.secretAccessKey}".toByteArray(), dateStamp)
+            val kRegion = hmacSHA256(kDate, config.region)
+            val kService = hmacSHA256(kRegion, "kms")
+            return hmacSHA256(kService, "aws4_request")
         }
-    }
-    val time = Clock.System.now().toLocalDateTime(TimeZone.UTC)
-    println(time.format(ISO_DATETIME_BASIC)) // 20241002T162417Z
 
-    val endpoint = "kms.eu-central-1.amazonaws.com"
-    val algorithm = "AWS4-HMAC-SHA256"
+        // Prepare canonical request
+        fun createCanonicalRequest(
+            method: HttpMethod,
+            canonicalUri: String,
+            canonicalQueryString: String,
+            canonicalHeaders: String,
+            signedHeaders: String,
+            payload: String
+        ): String {
+            val payloadHash = sha256Hex(payload)
+            return """${method.value}
+$canonicalUri
+$canonicalQueryString
+$canonicalHeaders
+$signedHeaders
+$payloadHash
+""".trimIndent().trimMargin()
+        }
 
-    val credential =
-        "AKIAWFMCC3FM2U2TQU5F/20241002/eu-central-1/kms/aws4_request" //AKIAWFMCC3FMR43YUFO6/20130728/us-east-1/kms/aws4_request
-    val signedHeaders = "content-type;host;x-amz-date;x-amz-algorithm;x-amz-target"
-    val method = "POST"
-    val AWS_SECRET_ACCESS_KEY = ""
-    val canonicalUri = "/"
-    val canonicalQueryString = ""
+        // Prepare string to sign
+        fun createStringToSign(
+            algorithm: String,
+            amzDate: String,
+            credentialScope: String,
+            canonicalRequest: String
+        ): String {
+            return """$algorithm
+$amzDate
+$credentialScope
+${sha256Hex(canonicalRequest)}
+""".trimIndent().trimMargin()
+        }
 
+        // Generate the final signature
+        @OptIn(ExperimentalStdlibApi::class)
+        fun generateSignature(signingKey: ByteArray, stringToSign: String): String {
+            return hmacSHA256(signingKey, stringToSign).toHexString()
+        }
 
-    val canonicalHeaders =
-        "content-type:application/x-amz-json-1.1\nhost:$endpoint\nx-amz-date:${time.format(ISO_DATETIME_BASIC)}\nx-amz-algorithm:AWS4-HMAC-SHA256\nx-amz-target:TrentService.ListKeys\n".trimIndent()
+        // Construct Authorization Header
+        fun createAuthorizationHeader(
+            algorithm: String,
+            accessKey: String,
+            credentialScope: String,
+            signedHeaders: String,
+            signature: String
+        ): String {
+            return "$algorithm Credential=$accessKey/$credentialScope, SignedHeaders=$signedHeaders, Signature=$signature"
+        }
 
+        // Build the SigV4 headers
+        fun buildSigV4Headers(
+            method: HttpMethod,
+            payload: String,
+            config: AWSKeyMetadata
+        ): Map<String, String> {
+            val currentDateTime = Clock.System.now().toLocalDateTime(TimeZone.UTC)
+            val dateStamp = currentDateTime.date.toString().replace("-", "")
+            val amzDate = currentDateTime.toInstant(TimeZone.UTC).toString().replace("-", "").replace(":", "")
+                .substring(0, 15) + "Z"
 
-    val digestHashedPayload = SHA256()
-    val HashedPayload = digestHashedPayload.digest("".encodeToByteArray()).toHexString()
+            val canonicalUri = "/"
+            val canonicalQueryString = ""
+            val canonicalHeaders =
+                "content-type:application/x-amz-json-1.1\nhost:kms.${config.region}.amazonaws.com\nx-amz-date:$amzDate\n"
+            val signedHeaders = "content-type;host;x-amz-date"
+            val credentialScope = "$dateStamp/${config.region}/kms/aws4_request"
 
+            val canonicalRequest = createCanonicalRequest(
+                method, canonicalUri, canonicalQueryString, canonicalHeaders, signedHeaders, payload
+            )
+            val stringToSign = createStringToSign(
+                "AWS4-HMAC-SHA256", amzDate, credentialScope, canonicalRequest
+            )
 
-    val canonicalRequest = listOf(
-        method,
-        canonicalUri,
-        canonicalQueryString,
-        canonicalHeaders,
-        signedHeaders,
-        HashedPayload
-    ).joinToString("\n")
+            val signingKey = getSignatureKey(config, dateStamp)
+            val signature = generateSignature(signingKey, stringToSign)
+
+            return mapOf(
+                "Authorization" to createAuthorizationHeader(
+                    "AWS4-HMAC-SHA256",
+                    config.accessKeyId,
+                    credentialScope,
+                    signedHeaders,
+                    signature
+                ),
+                "x-amz-date" to amzDate,
+                "content-type" to "application/x-amz-json-1.1"
+            )
+        }
 
     val digest = SHA256()
     val hashedcanonicalRequest = digest.digest(canonicalRequest.encodeToByteArray()).toHexString()
