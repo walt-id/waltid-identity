@@ -49,9 +49,7 @@ class AWSKey(override val keyType: KeyType, override val hasPrivateKey: Boolean)
         TODO("Not yet implemented")
     }
 
-    override suspend fun exportJWKObject(): JsonObject {
-        TODO("Not yet implemented")
-    }
+    override suspend fun exportJWKObject(): JsonObject = Json.parseToJsonElement(_publicKey!!).jsonObject
 
     override suspend fun exportPEM(): String {
         TODO("Not yet implemented")
