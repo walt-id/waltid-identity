@@ -116,7 +116,32 @@ class AWSKey(
         signed: ByteArray,
         detachedPlaintext: ByteArray?
     ): Result<ByteArray> {
-        TODO("Not yet implemented")
+        val body = """
+{
+"KeyId":"$id",
+"Message":"${detachedPlaintext?.encodeBase64()}",
+"MessageType":"RAW",
+"Signature":"${signed.decodeToString()}",
+"SigningAlgorithm":"ECDSA_SHA_256"
+}
+""".trimIndent().trimMargin()
+        println("body : $body")
+        val headers = buildSigV4Headers(
+            HttpMethod.Post,
+            payload = body,
+            config = config
+        )
+        val verification = client.post("https://kms.${config.region}.amazonaws.com/") {
+            headers {
+                headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
+                append(HttpHeaders.Host, "kms.${config.region}.amazonaws.com")
+                append("X-Amz-Target", "TrentService.Verify") // Specific KMS action for CreateKey
+            }
+            setBody(body) // Set the JSON body
+        }.awsJsonDataBody()
+        return Result.success(
+            verification["SignatureValid"]?.jsonPrimitive?.content?.toByteArray() ?: throw Error("failed to verify")
+        )
     }
 
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
