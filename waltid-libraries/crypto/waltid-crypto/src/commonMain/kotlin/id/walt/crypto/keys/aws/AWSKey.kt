@@ -339,15 +339,23 @@ $public
 
         }
 
-    val macSigningKey = HmacSHA256(DateRegionServiceKey)
-    val SigningKey = macSigningKey.doFinal("aws4_request".encodeToByteArray())
-    println("SigningKey : $SigningKey")
+        private suspend fun HttpResponse.awsJsonDataBody(): JsonObject {
+            val baseMsg = { "AWS server (URL: ${this.request.url}) returned an invalid response: " }
 
-    val macsignature = HmacSHA256(SigningKey)
-    val signature = macsignature.doFinal(stringToSign.encodeToByteArray())
-    println("the signature is $signature , in hex ${signature.toHexString()}")
-    println("========================================")
+            return runCatching {
+                // First, get the body as a string
+                val bodyStr = this.bodyAsText()
 
+                // Parse the string as JsonObject
+                Json.parseToJsonElement(bodyStr).jsonObject
+            }.getOrElse {
+                val bodyStr = this.bodyAsText() // Get the body in case of an exception
+                throw IllegalArgumentException(
+                    baseMsg.invoke() + if (bodyStr.isEmpty()) "empty response (instead of JSON data)"
+                    else "invalid response: $bodyStr"
+                )
+            }
+        }
 
     val authorizationRequest =
         "AWS4-HMAC-SHA256 Credential=$credential,SignedHeaders=$signedHeaders,Signature=${signature.toHexString()}"
