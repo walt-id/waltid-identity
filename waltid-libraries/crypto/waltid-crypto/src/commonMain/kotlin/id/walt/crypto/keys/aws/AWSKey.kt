@@ -395,18 +395,40 @@ $public
     }
 }
 
-    val response = http.post("https://$endpoint") {
-        header(HttpHeaders.ContentType, "application/x-amz-json-1.1")
-        header(HttpHeaders.Host, endpoint)
-        header(HttpHeaders.Authorization, authorizationRequest)
-        header("X-Amz-Date", time.format(ISO_DATETIME_BASIC))
-        header("X-Amz-Algorithm", "AWS4-HMAC-SHA256")
-        header("X-Amz-Target", "TrentService.ListKeys")
+suspend fun main() {
 
 
-    }
+    val meta = AWSKeyMetadata(
 
-    response.bodyAsText().let { println(it) }
+        accessKeyId = "",
+        secretAccessKey = "",
+        region = "eu-central-1"
+    )
+//    list_keys(meta)
+//    val awsKey = TEST.generate(
+//        metadata = AWSKeyMetadata(
+//            accessKeyId = "",
+//            secretAccessKey = "",
+//            region = "eu-central-1"
+//        ),
+//        type = KeyType.secp256r1
+//    )
+//    println("************************************")
+//    println(awsKey)
+//    println(awsKey.id)
+//    println(awsKey.getPublicKey())
+//    println("************************************")
 
+    val awsKey = AWSKey(
+        config = meta,
+        id = "44d4aa2f-9ee5-4624-ac72-71714d396b7d",
+        _publicKey = "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"rYr7NEc4xSaUfP2_IEyQgMXEJqM7Dql0NHjiVs4flHU\",\"y\":\"mi56CojOhmbQnq8eEUW_X9mlzLVPenkGMELD7hsgUm8\"}",
+        _keyType = KeyType.secp256r1
+    )
+
+    println(awsKey.exportJWKObject())
+    val signatureRaw = awsKey.signRaw("hello".toByteArray())
+    println("signature $signatureRaw")
+    val verificationRaw = awsKey.verifyRaw(signatureRaw, "hello".toByteArray())
+    println("verification ${verificationRaw.isSuccess}")
 }
-
