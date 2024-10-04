@@ -71,8 +71,32 @@ class AWSKey(
         TODO("Not yet implemented")
     }
 
-    override suspend fun signRaw(plaintext: ByteArray): Any {
-        TODO("Not yet implemented")
+
+    override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+        val body = """
+{
+"KeyId":"$id",
+"Message":"${plaintext.encodeBase64()}",
+"MessageType":"RAW",
+"SigningAlgorithm":"ECDSA_SHA_256"
+}
+""".trimIndent().trimMargin()
+        println("body : $body")
+        val headers = buildSigV4Headers(
+            HttpMethod.Post,
+            payload = body,
+            config = config
+        )
+        val signature = client.post("https://kms.${config.region}.amazonaws.com/") {
+            headers {
+                headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
+                append(HttpHeaders.Host, "kms.${config.region}.amazonaws.com")
+                append("X-Amz-Target", "TrentService.Sign") // Specific KMS action for CreateKey
+            }
+            setBody(body) // Set the JSON body
+        }.awsJsonDataBody()
+        println("signature : ${signature["Signature"]?.jsonPrimitive?.content}")
+        return signature["Signature"]?.jsonPrimitive?.content?.toByteArray() ?: throw Error("failed to sign")
     }
 
     override suspend fun signJws(
