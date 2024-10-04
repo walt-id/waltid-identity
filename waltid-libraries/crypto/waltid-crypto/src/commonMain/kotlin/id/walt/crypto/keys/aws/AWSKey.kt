@@ -279,8 +279,6 @@ ${sha256Hex(canonicalRequest)}
             )
         }
 
-    val digest = SHA256()
-    val hashedcanonicalRequest = digest.digest(canonicalRequest.encodeToByteArray()).toHexString()
 
         @OptIn(ExperimentalEncodingApi::class)
         suspend fun getPublicKey(config: AWSKeyMetadata, keyId: String): Key {
@@ -317,18 +315,28 @@ $public
         }
 
 
-    val macDate = HmacSHA256("AWS4$AWS_SECRET_ACCESS_KEY".encodeToByteArray())
-    val DateKey = macDate.doFinal("20241002".encodeToByteArray())
-    println("dateKey : $DateKey")
+        suspend fun list_keys(config: AWSKeyMetadata) {
+            val method = HttpMethod.Post
+            val headers = buildSigV4Headers(
+                method = method,
+                payload = """{}""",
+                config = config
+            )
+            val key = client.post("https://kms.${config.region}.amazonaws.com/") {
+                headers {
+                    headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
+                    append(HttpHeaders.Host, "kms.${config.region}.amazonaws.com")
+                    append("X-Amz-Target", "TrentService.ListKeys") // Specific KMS action for ListKeys
+                }
+                setBody(
+                    """{}"""
+                ) // Set the JSON body
+            }
 
-    val macDateRegionKey = HmacSHA256(DateKey)
-    val DateRegionKey = macDateRegionKey.doFinal("eu-central-1".encodeToByteArray())
-    println("dateRegion : $DateRegionKey")
+            println(key.bodyAsText())
 
 
-    val macDateRegionServiceKey = HmacSHA256(DateRegionKey)
-    val DateRegionServiceKey = macDateRegionServiceKey.doFinal("kms".encodeToByteArray())
-    println("dateReginService : $DateRegionServiceKey")
+        }
 
     val macSigningKey = HmacSHA256(DateRegionServiceKey)
     val SigningKey = macSigningKey.doFinal("aws4_request".encodeToByteArray())
