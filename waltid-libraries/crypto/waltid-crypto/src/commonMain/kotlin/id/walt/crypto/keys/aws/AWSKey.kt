@@ -71,7 +71,13 @@ class AWSKey(
         TODO("Not yet implemented")
     }
 
-
+    private val AwsSigningAlgorithm by lazy {
+        when (keyType) {
+            KeyType.secp256r1 -> "ECC_NIST_P256"
+            KeyType.RSA -> "RSA_2048"
+            else -> throw KeyTypeNotSupportedException(keyType.name)
+        }
+    }
     override suspend fun signRaw(plaintext: ByteArray): ByteArray {
         val body = """
 {
