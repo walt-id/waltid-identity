@@ -63,40 +63,40 @@ export default function Success() {
         setCredentials(
           Array.isArray(vcs)
             ? vcs.map((vc: string) => {
-                if (typeof vc !== 'string') {
-                  console.error(
-                    'Invalid VC format: expected a string but got',
-                    vc
+              if (typeof vc !== 'string') {
+                console.error(
+                  'Invalid VC format: expected a string but got',
+                  vc
+                );
+                return vc;
+              }
+              let split = vc.split('~');
+              let parsed = parseJwt(split[0]);
+
+              if (split.length === 1) return parsed.vc ? parsed.vc : parsed;
+              else {
+                let credentialWithSdJWTAttributes = { ...parsed };
+                split.slice(1).forEach((item) => {
+                  // If it is key binding jwt, skip
+                  if (item.split('.').length === 3) return;
+
+                  let parsedItem = JSON.parse(
+                    Buffer.from(item, 'base64').toString()
                   );
-                  return vc;
-                }
-                let split = vc.split('~');
-                let parsed = parseJwt(split[0]);
-
-                if (split.length === 1) return parsed.vc ? parsed.vc : parsed;
-                else {
-                  let credentialWithSdJWTAttributes = { ...parsed };
-                  split.slice(1).forEach((item) => {
-                    // If it is key binding jwt, skip
-                    if (item.split('.').length === 3) return;
-
-                    let parsedItem = JSON.parse(
-                      Buffer.from(item, 'base64').toString()
-                    );
-                    credentialWithSdJWTAttributes.credentialSubject = {
-                      [parsedItem[1]]: parsedItem[2],
-                      ...credentialWithSdJWTAttributes.credentialSubject,
-                    };
-                    // credentialWithSdJWTAttributes.credentialSubject._sd.map((sdItem: string) => {
-                    //   if (sdItem === parsedItem[0]) {
-                    //     return `${parsedItem[1]}: ${parsedItem[2]}`
-                    //   }
-                    //   return sdItem;
-                    // })
-                  });
-                  return credentialWithSdJWTAttributes;
-                }
-              })
+                  credentialWithSdJWTAttributes.credentialSubject = {
+                    [parsedItem[1]]: parsedItem[2],
+                    ...credentialWithSdJWTAttributes.credentialSubject,
+                  };
+                  // credentialWithSdJWTAttributes.credentialSubject._sd.map((sdItem: string) => {
+                  //   if (sdItem === parsedItem[0]) {
+                  //     return `${parsedItem[1]}: ${parsedItem[2]}`
+                  //   }
+                  //   return sdItem;
+                  // })
+                });
+                return credentialWithSdJWTAttributes;
+              }
+            })
             : []
         );
 
@@ -138,7 +138,7 @@ export default function Success() {
           <div className="w-full">
             <textarea
               value={JSON.stringify(
-                credentials[index]?.credentialSubject,
+                credentials[index]?.credentialSubject ?? credentials[index],
                 null,
                 4
               )}
@@ -185,8 +185,8 @@ export default function Success() {
                     <h6 className={'text-2xl font-bold '}>
                       {credentials[index]?.type
                         ? credentials[index]?.type[
-                            credentials[index].type.length - 1
-                          ].replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+                          credentials[index].type.length - 1
+                        ].replace(/([a-z0-9])([A-Z])/g, '$1 $2')
                         : credentials[index]?.vct
                           ? vctName
                           : credentials[index]?.vct}
@@ -195,12 +195,12 @@ export default function Success() {
                 </div>
               </div>
               <div className="absolute inset-0 h-full w-full rounded-xl bg-white p-5 text-slate-200 [transform:rotateY(180deg)] [backface-visibility:hidden] overflow-y-scroll">
-                {credentials[index] &&
+                {credentials[index] && credentials[index].credentialSubject &&
                   Object.keys(credentials[index].credentialSubject)
                     .map((key) => {
                       if (
                         typeof credentials[index].credentialSubject[key] ===
-                          'string' &&
+                        'string' &&
                         credentials[index].credentialSubject[key].length > 0 &&
                         credentials[index].credentialSubject[key].length < 20
                       ) {
@@ -218,11 +218,11 @@ export default function Success() {
                         .map((key) => {
                           if (
                             typeof credentials[index].credentialSubject[key] ===
-                              'string' &&
+                            'string' &&
                             credentials[index].credentialSubject[key].length >
-                              0 &&
+                            0 &&
                             credentials[index].credentialSubject[key].length <
-                              20
+                            20
                           ) {
                             return {
                               key: (
@@ -232,7 +232,7 @@ export default function Success() {
                             };
                           }
                         })
-                        .map((item) => {
+                        .map((item, index) => {
                           return (
                             <div key={index} className="flex flex-row py-1">
                               <div className="text-gray-600 text-left w-1/2 capitalize leading-[1.1]">
