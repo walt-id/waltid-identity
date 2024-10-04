@@ -148,9 +148,17 @@ class AWSKey(
         TODO("Not yet implemented")
     }
 
-    override suspend fun getPublicKey(): Key {
-        TODO("Not yet implemented")
-    }
+    @Transient
+    private var backedKey: Key? = null
+
+    override suspend fun getPublicKey(): Key = backedKey ?: when {
+
+        _publicKey != null -> _publicKey!!.let {
+            JWKKey.importJWK(it).getOrThrow()
+        }
+
+        else -> getPublicKey()
+    }.also { newBackedKey -> backedKey = newBackedKey }
 
     override suspend fun getPublicKeyRepresentation(): ByteArray {
         TODO("Not yet implemented")
