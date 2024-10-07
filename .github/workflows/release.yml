@@ -105,8 +105,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: v${{ inputs.release_version }}
-          body: |
-            ${{ steps.changelog.outputs.changelog }}
+#          body: |
+#            ${{ steps.changelog.outputs.changelog }}
           prerelease: ${{ steps.changelog.outputs.prerelease }}
       #      issuer-api
       - name: Prepare CD - issuer
