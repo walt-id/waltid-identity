@@ -130,7 +130,19 @@ class AWSKey(
         plaintext: ByteArray,
         headers: Map<String, JsonElement>
     ): String {
-        TODO("Not yet implemented")
+        val header = Json.encodeToString(mutableMapOf(
+            "typ" to "JWT".toJsonElement(),
+            "alg" to keyType.jwsAlg().toJsonElement(),
+        ).apply { putAll(headers) }).encodeToByteArray().encodeToBase64Url()
+
+        val payload = plaintext.encodeToBase64Url()
+
+        val signable = "$header.$payload"
+
+        val signatureBase64 = signRaw(signable.encodeToByteArray())
+        val signatureBase64Url = signatureBase64.encodeToBase64Url()
+
+        return "$signable.$signatureBase64Url"
     }
 
     override suspend fun verifyRaw(
