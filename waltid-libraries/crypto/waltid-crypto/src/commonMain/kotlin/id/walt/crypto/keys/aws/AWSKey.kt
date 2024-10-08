@@ -155,7 +155,7 @@ class AWSKey(
 "Message":"${detachedPlaintext?.encodeBase64()}",
 "MessageType":"RAW",
 "Signature":"${signed.decodeToString()}",
-"SigningAlgorithm":"ECDSA_SHA_256"
+"SigningAlgorithm":"$AwsSigningAlgorithm"
 }
 """.trimIndent().trimMargin()
         println("body : $body")
