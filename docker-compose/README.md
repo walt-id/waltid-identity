@@ -16,6 +16,46 @@ above command again.
 docker-compose down
 ```
 
+### Starting services selectively
+
+It is possible to start services selectively, including their dependencies.
+
+#### Start the demo wallet and all dependant services
+
+```console
+docker compose up waltid-demo-wallet
+```
+
+will start automatically:
+- caddy
+- postgres
+- wallet-api
+- and waltid-web-wallet
+
+#### Start services using compose profiles
+
+`COMPOSE_PROFILES` environment variable located in the .env file allows the selection of
+profiles to start the services for. Currently, the services are available with 2 profiles:
+
+- identity - for the waltid-identity services
+- tse - for the Hashicorp vault service, will be initialized with:
+  - a transit secrets engine
+  - and authentication methods
+    - approle - for my-role, where role-id and secret-id will be output in the console<sup>1</sup>
+    - userpass - for myuser with mypassword
+    - access-token - with dev-only-token
+
+Profiles can be combined, e.g. `COMPOSE_PROFILES=identity,tse` - will start the
+waltid-identity services and the vault (also can be done with the `all` profile).
+
+<sup>1</sup> - example output:
+
+```console
+vault-init            | Role ID: 66f3f095-74c9-b270-9d1f-1f842aa6bf3f
+vault-init            | Secret ID: 3abf1e00-2dc1-9e77-0705-9a81a95c7c59
+```
+
+
 ## Port mapping
 
 ### Services
@@ -23,6 +63,7 @@ docker-compose down
 - Wallet API: [http://localhost:7001](http://localhost:7001)
 - Issuer API: [http://localhost:7002](http://localhost:7002)
 - Verifier API: [http://localhost:7003](http://localhost:7003)
+- Hashicorp vault: [http://localhost:8200](http://localhost:8200)
 
 ### Apps
 
