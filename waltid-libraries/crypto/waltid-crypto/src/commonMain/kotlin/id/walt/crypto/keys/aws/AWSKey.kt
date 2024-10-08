@@ -215,9 +215,7 @@ class AWSKey(
         TODO("Not yet implemented")
     }
 
-    override suspend fun getMeta(): KeyMeta {
-        TODO("Not yet implemented")
-    }
+    override suspend fun getMeta(): AwsKeyMeta = AwsKeyMeta(getKeyId())
 
     companion object : AWSKeyCreator {
         val client = HttpClient()
