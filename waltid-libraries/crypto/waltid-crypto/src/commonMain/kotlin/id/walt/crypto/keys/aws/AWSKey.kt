@@ -1,10 +1,14 @@
 package id.walt.crypto.keys.aws
 
 import id.walt.crypto.exceptions.KeyTypeNotSupportedException
+import id.walt.crypto.keys.AwsKeyMeta
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyMeta
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.JwsUtils.jwsAlg
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.client.request.headers
@@ -16,16 +20,22 @@ import io.ktor.client.statement.request
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.util.encodeBase64
+import io.ktor.utils.io.charsets.Charset
 import io.ktor.utils.io.charsets.Charsets
 import io.ktor.utils.io.core.toByteArray
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.kotlincrypto.hash.sha2.SHA256
@@ -34,6 +44,8 @@ import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.forEach
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
 private val logger = KotlinLogging.logger { }
 
@@ -74,18 +86,20 @@ class AWSKey(
 
     private val AwsSigningAlgorithm by lazy {
         when (keyType) {
-            KeyType.secp256r1 -> "ECC_NIST_P256"
-            KeyType.RSA -> "RSA_2048"
+            KeyType.secp256r1 -> "ECDSA_SHA_256"
+            KeyType.RSA -> "RSASSA_PSS_SHA_256"
             else -> throw KeyTypeNotSupportedException(keyType.name)
         }
     }
+
+    @OptIn(ExperimentalStdlibApi::class)
     override suspend fun signRaw(plaintext: ByteArray): ByteArray {
         val body = """
 {
 "KeyId":"$id",
 "Message":"${plaintext.encodeBase64()}",
 "MessageType":"RAW",
-"SigningAlgorithm":"ECDSA_SHA_256"
+"SigningAlgorithm":"$AwsSigningAlgorithm"
 }
 """.trimIndent().trimMargin()
         println("body : $body")
@@ -104,6 +118,7 @@ class AWSKey(
         }.awsJsonDataBody()
         println("signature : ${signature["Signature"]?.jsonPrimitive?.content}")
         return signature["Signature"]?.jsonPrimitive?.content?.toByteArray() ?: throw Error("failed to sign")
+
     }
 
     override suspend fun signJws(
@@ -357,10 +372,24 @@ $public
             }
         }
 
-        override suspend fun generate(metadata: AWSKeyMetadata, type: KeyType): AWSKey {
+        private fun keyTypeToAwsKeyMapping(type: KeyType) = when (type) {
+            KeyType.secp256r1 -> "ECC_NIST_P256"
+            KeyType.RSA -> "RSA_2048"
+            else -> throw KeyTypeNotSupportedException(type.name)
+        }
+
+        private fun awsKeyToKeyTypeMapping(type: String) = when (type) {
+            "ECC_NIST_P256" -> KeyType.secp256r1
+            "RSA_2048" -> KeyType.RSA
+            else -> throw KeyTypeNotSupportedException(type)
+        }
+
+
+        override suspend fun generate(type: KeyType, metadata: AWSKeyMetadata): AWSKey {
+            val keyType = keyTypeToAwsKeyMapping(type)
             val body =
                 """{
-"KeySpec":"ECC_NIST_P256",
+"KeySpec":"$keyType",
 "KeyUsage":"SIGN_VERIFY"
 }
 """.trimIndent().trimMargin()
@@ -387,7 +416,7 @@ $public
                 config = metadata,
                 id = KeyId.toString(),
                 _publicKey = publicKey.exportJWK(),
-                _keyType = type
+                _keyType = awsKeyToKeyTypeMapping(keyType)
             )
 
         }
