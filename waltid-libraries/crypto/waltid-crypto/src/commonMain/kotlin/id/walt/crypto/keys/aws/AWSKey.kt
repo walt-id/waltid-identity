@@ -20,7 +20,6 @@ import io.ktor.client.statement.request
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.util.encodeBase64
-import io.ktor.utils.io.charsets.Charset
 import io.ktor.utils.io.charsets.Charsets
 import io.ktor.utils.io.core.toByteArray
 import kotlinx.datetime.Clock
@@ -547,5 +546,11 @@ suspend fun main() {
     println("signature $signatureRaw")
     val verificationRaw = awsKey.verifyRaw(signatureRaw, "hello".toByteArray())
     println("verification ${verificationRaw.isSuccess}")
-//    val signatureRaw = awsKey.signRaw("hello".toByteArray())
+
+
+    val signatureJws = awsKey.signJws(payload.toString().toByteArray())
+    println("signature $signatureJws")
+    val verificationJws = awsKey.verifyJws(signatureJws)
+    println("verification ${verificationJws.isSuccess}")
+
 }
