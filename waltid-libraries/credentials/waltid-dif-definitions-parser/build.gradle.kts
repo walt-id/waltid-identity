@@ -70,10 +70,10 @@ publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             pom {
-                name.set("walt.id verification policies")
+                name.set("walt.id DIF Definitions Parser")
                 description.set(
                     """
-                    Kotlin/Java library for Verification Policies
+                    Kotlin/Java library for DIF definitions parsing
                     """.trimIndent()
                 )
                 url.set("https://walt.id")
