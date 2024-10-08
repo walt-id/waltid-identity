@@ -5,5 +5,5 @@ import id.walt.crypto.keys.KeyType
 interface AWSKeyCreator {
 
 
-    suspend fun generate(metadata: AWSKeyMetadata, type: KeyType): AWSKey
+    suspend fun generate(type: KeyType, metadata: AWSKeyMetadata): AWSKey
 }
