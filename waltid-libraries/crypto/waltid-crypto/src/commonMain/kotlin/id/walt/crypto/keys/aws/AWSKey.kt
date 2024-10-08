@@ -49,6 +49,11 @@ import kotlin.js.JsExport
 
 private val logger = KotlinLogging.logger { }
 
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+@Suppress("TRANSIENT_IS_REDUNDANT")
+@Serializable
+@SerialName("aws")
 class AWSKey(
     val config: AWSKeyMetadata,
     val id: String,
