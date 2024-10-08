@@ -178,7 +178,25 @@ class AWSKey(
     }
 
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
-        TODO("Not yet implemented")
+        val parts = signedJws.split(".")
+        check(parts.size == 3) { "Invalid JWT part count: ${parts.size} instead of 3" }
+
+        val header = parts[0]
+        val headers: Map<String, JsonElement> = Json.decodeFromString(header.decodeFromBase64Url().decodeToString())
+        headers["alg"]?.let {
+            val algValue = it.jsonPrimitive.content
+            check(algValue == keyType.jwsAlg()) { "Invalid key algorithm for JWS: JWS has $algValue, key is ${keyType.jwsAlg()}!" }
+        }
+
+        val payload = parts[1]
+        val signature = parts[2].decodeFromBase64Url()
+
+        val signable = "$header.$payload".encodeToByteArray()
+
+        return verifyRaw(signature, signable).map {
+            val verifiedPayload = it.decodeToString().substringAfter(".").decodeFromBase64Url().decodeToString()
+            Json.parseToJsonElement(verifiedPayload)
+        }
     }
 
     @Transient
