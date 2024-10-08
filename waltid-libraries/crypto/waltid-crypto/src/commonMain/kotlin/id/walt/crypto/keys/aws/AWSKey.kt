@@ -459,6 +459,61 @@ $public
 
 suspend fun main() {
 
+    val payload = JsonObject(
+        mapOf(
+            "issuerKey" to JsonObject(
+                mapOf(
+                    "type" to JsonPrimitive("jwk"),
+                    "jwk" to JsonObject(
+                        mapOf(
+                            "kty" to JsonPrimitive("OKP"),
+                            "d" to JsonPrimitive("mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI"),
+                            "crv" to JsonPrimitive("Ed25519"),
+                            "kid" to JsonPrimitive("Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8"),
+                            "x" to JsonPrimitive("T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM")
+                        )
+                    )
+                )
+            ),
+            "issuerDid" to JsonPrimitive("did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"),
+            "subjectDid" to JsonPrimitive("did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"),
+            "credentialData" to JsonObject(
+                mapOf(
+                    "@context" to JsonArray(
+                        listOf(
+                            JsonPrimitive("https://www.w3.org/2018/credentials/v1"),
+                            JsonPrimitive("https://www.w3.org/2018/credentials/examples/v1")
+                        )
+                    ),
+                    "id" to JsonPrimitive("http://example.gov/credentials/3732"),
+                    "type" to JsonArray(
+                        listOf(
+                            JsonPrimitive("VerifiableCredential"),
+                            JsonPrimitive("UniversityDegreeCredential")
+                        )
+                    ),
+                    "issuer" to JsonObject(
+                        mapOf(
+                            "id" to JsonPrimitive("did:web:vc.transmute.world")
+                        )
+                    ),
+                    "issuanceDate" to JsonPrimitive("2020-03-10T04:24:12.164Z"),
+                    "credentialSubject" to JsonObject(
+                        mapOf(
+                            "id" to JsonPrimitive("did:example:ebfeb1f712ebc6f1c276e12ec21"),
+                            "degree" to JsonObject(
+                                mapOf(
+                                    "type" to JsonPrimitive("BachelorDegree"),
+                                    "name" to JsonPrimitive("Bachelor of Science and Arts")
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+
 
     val meta = AWSKeyMetadata(
 
@@ -467,30 +522,30 @@ suspend fun main() {
         region = "eu-central-1"
     )
 //    list_keys(meta)
-//    val awsKey = TEST.generate(
-//        metadata = AWSKeyMetadata(
-//            accessKeyId = "",
-//            secretAccessKey = "",
-//            region = "eu-central-1"
-//        ),
-//        type = KeyType.secp256r1
-//    )
-//    println("************************************")
-//    println(awsKey)
-//    println(awsKey.id)
-//    println(awsKey.getPublicKey())
-//    println("************************************")
-
-    val awsKey = AWSKey(
-        config = meta,
-        id = "44d4aa2f-9ee5-4624-ac72-71714d396b7d",
-        _publicKey = "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"rYr7NEc4xSaUfP2_IEyQgMXEJqM7Dql0NHjiVs4flHU\",\"y\":\"mi56CojOhmbQnq8eEUW_X9mlzLVPenkGMELD7hsgUm8\"}",
-        _keyType = KeyType.secp256r1
+    val awsKey = AWSKey.generate(
+        metadata = meta,
+        type = KeyType.secp256r1
     )
+    println("************************************")
+    println(awsKey)
+    println(awsKey.id)
+    println(awsKey.getPublicKey())
+    println(awsKey.getPublicKey().exportJWK())
+    println(awsKey.keyType)
+    println("************************************")
+
+//    val awsKey = AWSKey(
+//        config = meta,
+//        id = "44d4aa2f-9ee5-4624-ac72-71714d396b7d",
+//        _publicKey = "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"rYr7NEc4xSaUfP2_IEyQgMXEJqM7Dql0NHjiVs4flHU\",\"y\":\"mi56CojOhmbQnq8eEUW_X9mlzLVPenkGMELD7hsgUm8\"}",
+//        _keyType = KeyType.secp256r1
+//    )
+
 
     println(awsKey.exportJWKObject())
     val signatureRaw = awsKey.signRaw("hello".toByteArray())
     println("signature $signatureRaw")
     val verificationRaw = awsKey.verifyRaw(signatureRaw, "hello".toByteArray())
     println("verification ${verificationRaw.isSuccess}")
+//    val signatureRaw = awsKey.signRaw("hello".toByteArray())
 }
