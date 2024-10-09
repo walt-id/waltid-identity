@@ -1,3 +1,5 @@
+package id.walt.commons.testing
+
 import com.github.ajalt.mordant.rendering.AnsiLevel
 import com.github.ajalt.mordant.rendering.TextColors
 import com.github.ajalt.mordant.rendering.TextStyles
@@ -5,54 +7,18 @@ import com.github.ajalt.mordant.terminal.Terminal
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
-import id.walt.commons.featureflag.CommonsFeatureCatalog
-import id.walt.commons.web.modules.AuthenticationServiceModule
-import id.walt.commons.web.plugins.configureSerialization
-import id.walt.commons.web.plugins.configureStatusPages
-import id.walt.policies.PolicyManager
-import id.walt.did.helpers.WaltidServices
-import id.walt.issuer.FeatureCatalog
-import id.walt.issuer.issuerModule
-import id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment
-import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
-import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
-import id.walt.verifier.verifierModule
-import id.walt.webwallet.db.Db
-import id.walt.webwallet.webWalletModule
-import id.walt.webwallet.webWalletSetup
+import id.walt.commons.featureflag.AbstractFeature
+import id.walt.commons.featureflag.ServiceFeatureCatalog
 import io.ktor.server.application.*
-import io.ktor.server.cio.*
-import io.ktor.server.engine.*
 import kotlinx.coroutines.test.runTest
-import java.io.File
-import java.net.URLDecoder
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
-object E2ETestWebService {
+object E2ETest {
 
-    private const val HOST = "localhost"
-    private const val PORT = 22222
-
-    data class TestWebService(
-        val module: Application.() -> Unit,
-    ) {
-        private val webServiceModule: Application.() -> Unit = {
-            configureStatusPages()
-            configureSerialization()
-            AuthenticationServiceModule.run { enable() }
-            module.invoke(this)
-        }
-
-        fun run(block: suspend () -> Unit): suspend () -> Unit = {
-            embeddedServer(
-                CIO,
-                port = PORT,
-                host = HOST,
-                module = webServiceModule
-            ).start(wait = false)
-
-            block.invoke()
-        }
-    }
+    private var HOST = "localhost"
+    private var PORT = 22222
+    var failEarly = false
 
     data class TestStats(
         val overall: Int,
@@ -67,30 +33,57 @@ object E2ETestWebService {
 
     fun getBaseURL() = "http://$HOST:$PORT"
 
-    fun testBlock(timeout: kotlin.time.Duration, block: suspend () -> Unit) = runTest(timeout = timeout) {
+    fun getTestStats(): TestStats {
+        val succeeded = testResults.count { it.isSuccess }
+        val failed = testResults.size - succeeded
+        return TestStats(testResults.size, succeeded, failed)
+    }
 
-        fun getTestStats(): TestStats {
-            val succeeded = testResults.count { it.isSuccess }
-            val failed = testResults.size - succeeded
-            return TestStats(testResults.size, succeeded, failed)
-        }
+    fun testBlock(
+        config: ServiceConfiguration = ServiceConfiguration("e2e-test"),
+        features: List<ServiceFeatureCatalog>,
+        featureAmendments: Map<AbstractFeature, suspend () -> Unit> = emptyMap(),
+        init: suspend () -> Unit,
+        module: Application.() -> Unit,
+        host: String = "localhost",
+        port: Int = PORT,
+        timeout: Duration = 5.minutes,
+        block: suspend () -> Unit,
+    ) =
+        testBlock(
+            service = ServiceMain(
+                config = config,
+                init = ServiceInitialization(
+                    features = features,
+                    featureAmendments = featureAmendments,
+                    init = init,
+                    run = E2ETestWebService(module).runService(block, host, port)
+                )
+            ),
+            timeout = timeout, host = host, port = port
+        )
 
 
-        ServiceMain(
+    fun testBlock(service: ServiceMain, timeout: Duration, host: String, port: Int) = runTest(timeout = timeout) {
+        HOST = host
+        PORT = port
+
+        /*ServiceMain(
             ServiceConfiguration("e2e-test"), ServiceInitialization(
-                features = listOf(FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
+                features = listOf(id.walt.issuer.FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
                 featureAmendments = mapOf(
-                    CommonsFeatureCatalog.authenticationServiceFeature to walletAuthenticationPluginAmendment,
+                    CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
 //                    CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
                 ),
                 init = {
-                    webWalletSetup()
-                    WaltidServices.minimalInit()
-                    Db.start()
+                    id.walt.webwallet.webWalletSetup()
+                    id.walt.did.helpers.WaltidServices.minimalInit()
+                    id.walt.webwallet.db.Db.start()
                 },
-                run = TestWebService(Application::e2eTestModule).run(block)
+                run = E2ETestWebService(Application::e2eTestModule).run(block)
             )
-        ).main(arrayOf("-l", "trace"))
+        )*/
+        service.main(arrayOf("-l", "trace"))
 
         t.println("\n" + TextColors.magenta("Test results:"))
         testResults.forEachIndexed { index, result ->
@@ -123,9 +116,17 @@ object E2ETestWebService {
         t.println("\n${TextColors.cyan(TextStyles.bold("---=== Start $id. test: $name === ---"))}")
 
         val result = runCatching { function.invoke() }
+        if (failEarly && result.isFailure) {
+            t.println("\n${TextColors.brightRed("Fail early called for $id. test: $name")}")
+            result.getOrThrow()
+            t.println()
+        }
+
         testResults.add(result)
 
         t.println(TextColors.blue("End result of test \"$name\": $result"))
+
+
         if (result.isFailure) {
             result.exceptionOrNull()!!.printStackTrace()
         }
@@ -138,14 +139,4 @@ object E2ETestWebService {
         t.println(TextColors.magenta("Current test stats: ${testResults.size} overall | $overallSuccess succeeded | $failedStr\n"))
     }
 
-    fun loadResource(relativePath: String): String =
-        URLDecoder.decode(object {}.javaClass.getResource(relativePath)!!.path, "UTF-8").let { File(it).readText() }
-}
-
-private fun Application.e2eTestModule() {
-    webWalletModule(true)
-    issuerModule(false)
-    lspPotentialIssuanceTestApi()
-    verifierModule(false)
-    lspPotentialVerificationTestApi()
 }

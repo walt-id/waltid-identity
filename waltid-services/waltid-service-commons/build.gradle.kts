@@ -2,6 +2,8 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
     id("maven-publish")
+
+    id("com.github.ben-manes.versions") version "0.51.0"
 }
 
 group = "id.walt"
@@ -17,6 +19,7 @@ object Versions {
 
 dependencies {
     api(project(":waltid-libraries:waltid-library-commons"))
+
     // Ktor
     api("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
     api("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
@@ -32,12 +35,12 @@ dependencies {
     implementation("org.slf4j:jul-to-slf4j:2.0.16")
 
     // CLI
-    api("com.github.ajalt.clikt:clikt:4.4.0")  // JVM
+    api("com.github.ajalt.clikt:clikt:5.0.1")  // JVM
 
     // Config
-    api("com.sksamuel.hoplite:hoplite-core:2.8.0")
-    api("com.sksamuel.hoplite:hoplite-hocon:2.8.0")
-    api("com.sksamuel.hoplite:hoplite-hikaricp:2.8.0")
+    api("com.sksamuel.hoplite:hoplite-core:2.8.2")
+    api("com.sksamuel.hoplite:hoplite-hocon:2.8.2")
+    api("com.sksamuel.hoplite:hoplite-hikaricp:2.8.2")
 
     // Kotlinx.serialization
     api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
@@ -46,19 +49,21 @@ dependencies {
     api("com.sksamuel.cohort:cohort-ktor:2.5.1")
 
     // OpenAPI
-    api("io.github.smiley4:ktor-swagger-ui:3.4.0")
-    implementation("io.github.smiley4:schema-kenerator-core:1.1.0")
-    implementation("io.github.smiley4:schema-kenerator-serialization:1.0.1")
-    implementation("io.github.smiley4:schema-kenerator-reflection:1.1.0")
-    implementation("io.github.smiley4:schema-kenerator-swagger:1.1.0")
+    api("io.github.smiley4:ktor-swagger-ui:3.5.0")
+    implementation("io.github.smiley4:schema-kenerator-core:1.4.1")
+    implementation("io.github.smiley4:schema-kenerator-serialization:1.4.1")
+    implementation("io.github.smiley4:schema-kenerator-reflection:1.4.1")
+    implementation("io.github.smiley4:schema-kenerator-swagger:1.4.1")
 
     // Persistence
     api("io.github.reactivecircus.cache4k:cache4k:0.13.0")
     api("app.softwork:kotlinx-uuid-core:0.1.2")
-    api("redis.clients:jedis:5.2.0-beta4")
+    api("redis.clients:jedis:5.2.0")
 
     // Testing
-    testImplementation(kotlin("test"))
+    testApi(kotlin("test"))
+    testApi("io.ktor:ktor-server-test-host:2.3.12")
+    testApi("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 }
 
 tasks.test {
@@ -104,4 +109,24 @@ publishing {
             }
         }
     }
+}
+
+
+// Create a configuration for test artifacts
+configurations {
+    create("testArtifacts") {
+        extendsFrom(configurations["testImplementation"])
+        isCanBeConsumed = true
+        isCanBeResolved = false
+    }
+}
+
+// Package the test classes in a jar
+val testJar by tasks.creating(Jar::class) {
+    archiveClassifier.set("test")
+    from(sourceSets["test"].output)
+}
+
+artifacts {
+    add("testArtifacts", testJar)
 }

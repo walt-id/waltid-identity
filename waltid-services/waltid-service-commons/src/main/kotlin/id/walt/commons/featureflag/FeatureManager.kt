@@ -62,11 +62,11 @@ object FeatureManager {
     /**
      * Run block if provided feature is enabled
      */
-    private fun <T> runIfEnabledBlocking(feature: OptionalFeature, block: () -> T?): T? = runBlocking {
+    fun <T> runIfEnabledBlocking(feature: OptionalFeature, block: () -> T?): T? = runBlocking {
         runIfEnabled(feature, block)
     }
 
-    private suspend fun <T> runIfEnabled(feature: OptionalFeature, block: suspend () -> T?): T? =
+    suspend fun <T> runIfEnabled(feature: OptionalFeature, block: suspend () -> T?): T? =
         feature.takeIf { isFeatureEnabled(it) }?.let { block.invoke() }
 
     infix fun OptionalFeature.feature(block: () -> Unit) {
