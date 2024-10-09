@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-import E2ETestWebService.test
+import id.walt.commons.testing.E2ETest.test
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import io.ktor.client.*
@@ -9,7 +9,6 @@ import io.ktor.client.request.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonPrimitive
-
 import kotlin.test.assertNotNull
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -64,7 +63,7 @@ class KeysApi(private val client: HttpClient) {
         }
 
     suspend fun export(
-        wallet: Uuid, keyId: String, format: String, isPrivate: Boolean, expected: KeyGenerationRequest
+        wallet: Uuid, keyId: String, format: String, isPrivate: Boolean, expected: KeyGenerationRequest,
     ) = test("/wallet-api/wallet/{wallet}/keys/{keyId}/export - export key") {
         client.get("/wallet-api/wallet/$wallet/keys/$keyId/export") {
             url {

@@ -1,4 +1,4 @@
-import E2ETestWebService.test
+import id.walt.commons.testing.E2ETest.test
 import id.walt.verifier.oidc.PresentationSessionInfo
 import io.ktor.client.*
 import io.ktor.client.call.*

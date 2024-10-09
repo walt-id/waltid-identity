@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-import E2ETestWebService.test
+import id.walt.commons.testing.E2ETest.test
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.webwallet.db.models.Account
@@ -22,7 +22,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.bouncycastle.asn1.x500.X500Name
 import java.security.KeyPairGenerator
 import java.security.cert.X509Certificate
-import java.util.*
+import java.util.Base64
+import java.util.Date
 import kotlin.test.assertNotNull
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -117,7 +118,8 @@ class AuthApi(private val client: HttpClient) {
 
     class X5c(private val client: HttpClient) {
 
-        private val rootCAPrivateKey = PKIXUtils.pemDecodeJavaPrivateKey("""
+        private val rootCAPrivateKey = PKIXUtils.pemDecodeJavaPrivateKey(
+            """
             -----BEGIN PRIVATE KEY-----
             MIIJQQIBADANBgkqhkiG9w0BAQEFAASCCSswggknAgEAAoICAQCpvw7JISG1BoTy
             hyqJneOEV3iIKUrQ829vDVJFm+g6mW+tHO4dYkgGroi6cL9VRZdGHCi9boQnYPxJ
@@ -170,7 +172,8 @@ class AuthApi(private val client: HttpClient) {
             9OO3zWyf0OmuUO6eblDMSODqyQKJ1/rEchbMKPeGbAtKuMUtvv1Wmy/FwUk8ZZEy
             Hlz/QYm+jw2iRfidZxwx9tY+dWjB
             -----END PRIVATE KEY-----
-        """.trimIndent())
+        """.trimIndent()
+        )
         private val rootCADistinguishedName = X500Name("CN=RootCA")
 
         //we don't care about the bit size of the key, it's a test case (as long as it's bigger than 512)
@@ -211,7 +214,7 @@ class AuthApi(private val client: HttpClient) {
         private suspend fun checkX5CLoginCreatesWallet() = test(
             name = "/wallet-api/auth/x5c/login - validate wallet api x5c login with trustworthy subject certificate also creates wallet"
         ) {
-            var tempClient = E2ETest.testHttpClient()
+            var tempClient = WaltidServicesE2ETests.testHttpClient()
             val keyPair = keyPairGenerator.generateKeyPair()
             val dn = X500Name("CN=YeSubject")
             val cert = PKIXUtils.generateSubjectCertificate(
@@ -229,11 +232,11 @@ class AuthApi(private val client: HttpClient) {
                 url = "/wallet-api/auth/x5c/login",
                 request = createX5CAccountRequest(jwkPrivateKey, cert)
             ) {
-                tempClient = E2ETest.testHttpClient(token = it["token"]!!.jsonPrimitive.content)
+                tempClient = WaltidServicesE2ETests.testHttpClient(token = it["token"]!!.jsonPrimitive.content)
             }
             val response = tempClient.get("/wallet-api/wallet/accounts/wallets").expectSuccess()
             val accWalletListing = response.body<AccountWalletListing>()
-            assert( accWalletListing.wallets.isNotEmpty())
+            assert(accWalletListing.wallets.isNotEmpty())
         }
 
         suspend fun executeTestCases() {
