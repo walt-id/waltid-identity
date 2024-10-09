@@ -563,6 +563,7 @@ class CI_JVM_Test {
             put(JWTClaims.Payload.audience, TokenTarget.ACCESS.name)
             put(JWTClaims.Payload.jwtID, "token-id")
         })
+
         val cNonce = "pop-nonce"
         val tokenResponse: TokenResponse = TokenResponse.success(accessToken, "bearer", cNonce = cNonce)
 

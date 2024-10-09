@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-import E2ETestWebService.test
+import id.walt.commons.testing.E2ETest.test
 import id.walt.webwallet.db.models.WalletOperationHistory
 import io.ktor.client.*
 import io.ktor.client.call.*

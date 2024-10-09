@@ -1,19 +1,26 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-import E2ETestWebService.loadResource
-import E2ETestWebService.testBlock
+import id.walt.commons.ServiceConfiguration
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.featureflag.CommonsFeatureCatalog
+import id.walt.commons.testing.E2ETest
+import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import id.walt.commons.web.plugins.httpJson
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.issuer.issuerModule
+import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
+import id.walt.verifier.verifierModule
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
+import id.walt.webwallet.webWalletModule
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -24,16 +31,16 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.application.*
 import io.ktor.server.util.*
 import kotlinx.serialization.json.*
-
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-class E2ETest {
+class WaltidServicesE2ETests {
 
     companion object {
         val defaultTestTimeout = 5.minutes
@@ -78,30 +85,59 @@ class E2ETest {
         }
     }
 
+    val e2eTestModule: Application.() -> Unit = {
+        webWalletModule(true)
+        issuerModule(false)
+        lspPotentialIssuanceTestApi()
+        verifierModule(false)
+        lspPotentialVerificationTestApi()
+    }
+
     @OptIn(ExperimentalUuidApi::class)
     @Test
-    fun e2e() = testBlock(defaultTestTimeout) {
+    fun e2e() = E2ETest.testBlock(
+        config = ServiceConfiguration("e2e-test"),
+        features = listOf(id.walt.issuer.FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
+        featureAmendments = mapOf(
+            CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
+            // CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
+        ),
+        init = {
+            id.walt.webwallet.webWalletSetup()
+            id.walt.did.helpers.WaltidServices.minimalInit()
+            id.walt.webwallet.db.Db.start()
+        },
+        module = e2eTestModule,
+        timeout = defaultTestTimeout
+    ) {
         var client = testHttpClient()
-            lateinit var accountId: Uuid
-            lateinit var wallet: Uuid
+        lateinit var accountId: Uuid
+        lateinit var wallet: Uuid
         var authApi = AuthApi(client)
 
         // the e2e http request tests here
 
         //region -Auth-
-        authApi.userInfo(HttpStatusCode.Unauthorized)
-        authApi.login(defaultEmailAccount) {
-            client = testHttpClient(token = it["token"]!!.jsonPrimitive.content)
-            authApi = AuthApi(client)
+
+        authApi.run {
+            userInfo(HttpStatusCode.Unauthorized)
+            login(defaultEmailAccount) {
+                client = testHttpClient(token = it["token"]!!.jsonPrimitive.content)
+                authApi = AuthApi(client)
+            }
         }
-        authApi.userInfo(HttpStatusCode.OK) {
-            accountId = it.id
+        authApi.run {
+            userInfo(HttpStatusCode.OK) {
+                accountId = it.id
+            }
+            userSession()
+            userWallets(accountId) {
+                wallet = it.wallets.first().id
+                println("Selected wallet: $wallet")
+            }
         }
-        authApi.userSession()
-        authApi.userWallets(accountId) {
-            wallet = it.wallets.first().id
-            println("Selected wallet: $wallet")
-        }
+
+
         //region -Auth X5c-
         AuthApi.X5c(client).executeTestCases()
         //endregion -Auth X5c-
@@ -305,26 +341,26 @@ class E2ETest {
         //endregion -External Signatures-
     }
 
-    // @Test // enable to execute test selectively
+    /* @Test // enable to execute test selectively
     fun lspIssuanceTests() = testBlock(timeout = defaultTestTimeout) {
         val client = testHttpClient(doFollowRedirects = false)
         val lspPotentialIssuance = LspPotentialIssuance(client)
         lspPotentialIssuance.testTrack1()
         lspPotentialIssuance.testTrack2()
-    }
+    }*/
 
-    //@Test
+    /* @Test
     fun lspVerifierTests() = testBlock(timeout = defaultTestTimeout) {
         val client = testHttpClient(doFollowRedirects = false)
         val lspPotentialVerification = LspPotentialVerification(client)
         lspPotentialVerification.testPotentialInteropTrack3()
         lspPotentialVerification.testPotentialInteropTrack4()
-    }
+    }*/
 
-    //@Test
+    /* @Test
     fun testExternalSignatureAPIs() = testBlock(defaultTestTimeout) {
         ExchangeExternalSignatures().executeTestCases()
-    }
+    }*/
 
     suspend fun setupTestWallet(): LspPotentialWallet {
         var client = testHttpClient()
@@ -347,7 +383,7 @@ class E2ETest {
         return LspPotentialWallet(client, walletId)
     }
 
-    //@Test // enable to execute test selectively
+    /* @Test // enable to execute test selectively
     fun lspWalletTests() = testBlock(timeout = defaultTestTimeout) {
         val lspPotentialWallet = setupTestWallet()
         lspPotentialWallet.testMDocIssuance()
@@ -356,14 +392,14 @@ class E2ETest {
         lspPotentialWallet.testSDJwtVCIssuance()
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
-    }
+    }*/
 
-    //@Test // enable to execute test selectively
+    /* @Test // enable to execute test selectively
     fun testSdJwtVCIssuanceWithIssuerDid() = testBlock(timeout = defaultTestTimeout) {
         val lspPotentialWallet = setupTestWallet()
         lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
-    }
+    }*/
 }
 
 fun String.expectLooksLikeJwt(): String =
