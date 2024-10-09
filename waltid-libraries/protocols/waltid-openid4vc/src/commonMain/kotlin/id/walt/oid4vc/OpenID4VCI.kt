@@ -1,7 +1,13 @@
 package id.walt.oid4vc
 
+import cbor.Cbor
 import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.mdoc.cose.COSESign1
+import id.walt.mdoc.dataelement.ByteStringElement
+import id.walt.mdoc.dataelement.MapKey
+import id.walt.mdoc.dataelement.StringElement
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.ResponseType.Companion.getResponseTypeString
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -9,23 +15,34 @@ import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.TokenError
+import id.walt.oid4vc.interfaces.ITokenProvider
+import id.walt.oid4vc.providers.IssuanceSession
+import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
+import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationCodeWithAuthorizationRequestResponse
+import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.responses.TokenErrorCode
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.http
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
 import io.ktor.utils.io.core.*
+import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
 
 object OpenID4VCI {
+    private val log = KotlinLogging.logger { }
+
+    class CredentialRequestValidationResult(val success: Boolean, errorCode: CredentialErrorCode? = null, val message: String? = null) {}
+
     fun getCredentialOfferRequestUrl(
         credOffer: CredentialOffer,
         credentialOfferEndpoint: String = CROSS_DEVICE_CREDENTIAL_OFFER_URL,
@@ -286,4 +303,57 @@ object OpenID4VCI {
         idTokenSigningAlgValuesSupported = setOf("ES256"), // (EBSI) https://openid.net/specs/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-
         codeChallengeMethodsSupported = listOf("S256")
     )
+
+    fun getNonceFromProof(proofOfPossession: ProofOfPossession) = when (proofOfPossession.proofType) {
+        ProofType.jwt -> JwtUtils.parseJWTPayload(proofOfPossession.jwt!!)[JWTClaims.Payload.nonce]?.jsonPrimitive?.content
+        ProofType.cwt -> Cbor.decodeFromByteArray<COSESign1>(proofOfPossession.cwt!!.base64UrlDecode()).decodePayload()?.let { payload ->
+            payload.value[MapKey(ProofOfPossession.CWTProofBuilder.LABEL_NONCE)].let {
+                when (it) {
+                    is ByteStringElement -> io.ktor.utils.io.core.String(it.value)
+                    is StringElement -> it.value
+                    else -> throw Error("Invalid nonce type")
+                }
+            }
+        }
+
+        else -> null
+    }
+
+    fun validateProofOfPossession(credentialRequest: CredentialRequest, nonce: String, tokenProvider: ITokenProvider): Boolean {
+        log.debug { "VALIDATING: ${credentialRequest.proof} with nonce $nonce" }
+        log.debug { "VERIFYING ITS SIGNATURE" }
+        if (credentialRequest.proof == null) return false
+        return when {
+            credentialRequest.proof.isJwtProofType -> tokenProvider.verifyTokenSignature(
+                TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.jwt!!
+            ) && getNonceFromProof(credentialRequest.proof) == nonce
+
+            credentialRequest.proof.isCwtProofType -> tokenProvider.verifyCOSESign1Signature(
+                TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.cwt!!
+            ) && getNonceFromProof(credentialRequest.proof) == nonce
+
+            else -> false
+        }
+    }
+
+    fun validateCredentialRequest(credentialRequest: CredentialRequest, session: IssuanceSession, openIDProviderMetadata: OpenIDProviderMetadata, tokenProvider: ITokenProvider): CredentialRequestValidationResult {
+        val nonce = session.cNonce ?: return CredentialRequestValidationResult(false, CredentialErrorCode.invalid_request,"Invalid session")
+        log.debug { "Credential request to validate: $credentialRequest" }
+        if (credentialRequest.proof == null || !validateProofOfPossession(credentialRequest, nonce, tokenProvider)) {
+            return CredentialRequestValidationResult(
+                false,
+                CredentialErrorCode.invalid_or_missing_proof,
+                "Invalid proof of possession"
+            )
+        }
+        val supportedCredentialFormats = openIDProviderMetadata.credentialConfigurationsSupported?.values?.map { it.format }?.toSet() ?: setOf()
+        if (!supportedCredentialFormats.contains(credentialRequest.format))
+            return CredentialRequestValidationResult(
+                false,
+                CredentialErrorCode.unsupported_credential_format,
+                "Credential format not supported"
+            )
+
+        return CredentialRequestValidationResult(true)
+    }
 }

@@ -305,7 +305,7 @@ class E2ETest {
         //endregion -External Signatures-
     }
 
-    // @Test // enable to execute test selectively
+    //@Test // enable to execute test selectively
     fun lspIssuanceTests() = testBlock(timeout = defaultTestTimeout) {
         val client = testHttpClient(doFollowRedirects = false)
         val lspPotentialIssuance = LspPotentialIssuance(client)
