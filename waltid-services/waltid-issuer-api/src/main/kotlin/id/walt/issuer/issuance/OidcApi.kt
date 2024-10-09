@@ -7,6 +7,7 @@ import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
+import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.*
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -14,6 +15,7 @@ import id.walt.oid4vc.requests.BatchCredentialRequest
 import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
+import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.sdjwt.JWTVCIssuerMetadata
 import id.walt.sdjwt.SDJWTVCTypeMetadata
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -325,12 +327,15 @@ object OidcApi : CIProvider() {
             }
             post("/credential") {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
-                if (accessToken.isNullOrEmpty() || !verifyTokenSignature(TokenTarget.ACCESS, accessToken)) {
+                val parsedToken = accessToken?.let { verifyAndParseToken(it, TokenTarget.ACCESS) }
+                if (parsedToken == null) {
                     call.respond(HttpStatusCode.Unauthorized)
                 } else {
                     val credReq = CredentialRequest.fromJSON(call.receive<JsonObject>())
                     try {
-                        call.respond(generateCredentialResponse(credReq, accessToken).toJSON())
+                        val session = parsedToken.get(JWTClaims.Payload.subject)?.jsonPrimitive?.content?.let { getSession(it) }
+                            ?: throw CredentialError(credReq, CredentialErrorCode.invalid_request, "Session not found for access token")
+                        call.respond(generateCredentialResponse(credReq, session).toJSON())
                     } catch (exc: CredentialError) {
                         logger.error(exc) { "Credential error: " }
                         call.respond(HttpStatusCode.BadRequest, exc.toCredentialErrorResponse().toJSON())
@@ -356,12 +361,15 @@ object OidcApi : CIProvider() {
             }
             post("/batch_credential") {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
-                if (accessToken.isNullOrEmpty() || !verifyTokenSignature(TokenTarget.ACCESS, accessToken)) {
+                val parsedToken = accessToken?.let { verifyAndParseToken(it, TokenTarget.ACCESS) }
+                if (parsedToken == null) {
                     call.respond(HttpStatusCode.Unauthorized)
                 } else {
                     val req = BatchCredentialRequest.fromJSON(call.receive())
                     try {
-                        call.respond(generateBatchCredentialResponse(req, accessToken).toJSON())
+                        val session = parsedToken.get(JWTClaims.Payload.subject)?.jsonPrimitive?.content?.let { getSession(it) }
+                            ?: throw BatchCredentialError(req, CredentialErrorCode.invalid_request, "Session not found for access token")
+                        call.respond(generateBatchCredentialResponse(req, session).toJSON())
                     } catch (exc: BatchCredentialError) {
                         logger.error(exc) { "BatchCredentialError: " }
                         call.respond(HttpStatusCode.BadRequest, exc.toBatchCredentialErrorResponse().toJSON())
