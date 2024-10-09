@@ -104,7 +104,7 @@ dependencies {
     implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
 
     // Multiplatform / Hashes
-    testImplementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.4.0"))
+    testImplementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.5.3"))
     testImplementation("org.kotlincrypto.hash:sha2")
 }
 

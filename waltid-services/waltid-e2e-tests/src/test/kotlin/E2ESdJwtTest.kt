@@ -1,5 +1,5 @@
-import E2ETest.Companion.nameFieldSchemaPresentationRequestPayload
-import E2ETest.Companion.sdjwtCredential
+import WaltidServicesE2ETests.Companion.nameFieldSchemaPresentationRequestPayload
+import WaltidServicesE2ETests.Companion.sdjwtCredential
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential

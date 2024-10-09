@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-import E2ETestWebService.test
+import id.walt.commons.testing.E2ETest.test
 import id.walt.webwallet.db.models.WalletDid
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -18,7 +18,7 @@ class DidsApi(private val client: HttpClient) {
         wallet: Uuid,
         expectedDefault: DefaultDidOption,
         size: Int? = null,
-        output: ((List<WalletDid>) -> Unit)? = null
+        output: ((List<WalletDid>) -> Unit)? = null,
     ) =
         test("/wallet-api/wallet/{wallet}/dids - list DIDs") {
             client.get("/wallet-api/wallet/$wallet/dids").expectSuccess().apply {

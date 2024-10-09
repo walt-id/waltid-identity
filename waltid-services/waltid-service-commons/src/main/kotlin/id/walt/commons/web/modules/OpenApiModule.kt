@@ -14,11 +14,8 @@ import io.github.smiley4.schemakenerator.core.handleNameAnnotation
 import io.github.smiley4.schemakenerator.reflection.collectSubTypes
 import io.github.smiley4.schemakenerator.reflection.processReflection
 import io.github.smiley4.schemakenerator.serialization.processKotlinxSerialization
-import io.github.smiley4.schemakenerator.swagger.compileReferencingRoot
+import io.github.smiley4.schemakenerator.swagger.*
 import io.github.smiley4.schemakenerator.swagger.data.TitleType
-import io.github.smiley4.schemakenerator.swagger.generateSwaggerSchema
-import io.github.smiley4.schemakenerator.swagger.handleCoreAnnotations
-import io.github.smiley4.schemakenerator.swagger.withAutoTitle
 import io.klogging.noCoLogger
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -47,7 +44,7 @@ object OpenApiModule {
         .handleNameAnnotation()
         .generateSwaggerSchema()
         .handleCoreAnnotations()
-        .withAutoTitle(TitleType.SIMPLE)
+        .withTitle(TitleType.SIMPLE)
         .compileReferencingRoot()
 
     private fun KType.processWithReflectionGenerator() =
@@ -57,7 +54,7 @@ object OpenApiModule {
             .handleNameAnnotation()
             .generateSwaggerSchema()
             .handleCoreAnnotations()
-            .withAutoTitle(TitleType.SIMPLE)
+            .withTitle(TitleType.SIMPLE)
             .compileReferencingRoot()
 
     // Module
@@ -159,6 +156,11 @@ object OpenApiModule {
         }
     }
     private val skippedTypes = listOf(typeOf<String>(), typeOf<Enum<*>>())
+
+    private val exampleJson = Json {
+        encodeDefaults = true
+        explicitNulls = false
+    }
     private fun encodeSwaggerExample(descriptor: KTypeDescriptor, example: Any?) = when {
         skippedTypes.any { descriptor.type.isSubtypeOf(it) } -> {
             logger.trace { "Skipped encoding for type: ${descriptor.type}; example is: $example (${example!!::class.simpleName})" }
@@ -166,10 +168,7 @@ object OpenApiModule {
         }
         else -> {
             logger.trace("Example for: ${descriptor.type}; example is: $example (${example!!::class.simpleName})")
-            Json {
-                encodeDefaults = true
-                explicitNulls = false
-            }.encodeToString(Json.serializersModule.serializer(descriptor.type), example)
+            exampleJson.encodeToString(Json.serializersModule.serializer(descriptor.type), example)
         }
     }
 }
