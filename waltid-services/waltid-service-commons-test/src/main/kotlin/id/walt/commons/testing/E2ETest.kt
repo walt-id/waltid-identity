@@ -9,6 +9,14 @@ import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
 import id.walt.commons.featureflag.AbstractFeature
 import id.walt.commons.featureflag.ServiceFeatureCatalog
+import io.ktor.client.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import kotlinx.coroutines.test.runTest
 import kotlin.time.Duration
@@ -25,6 +33,23 @@ object E2ETest {
         val success: Int,
         val failed: Int,
     )
+
+    fun testHttpClient(bearerToken: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
+        install(ContentNegotiation) {
+            json()
+        }
+        install(DefaultRequest) {
+            contentType(ContentType.Application.Json)
+            host = HOST
+            port = PORT
+
+            if (bearerToken != null) bearerAuth(bearerToken)
+        }
+        install(Logging) {
+            level = LogLevel.ALL
+        }
+        followRedirects = doFollowRedirects
+    }
 
     var numTests = 0
     val testResults = ArrayList<Result<Any?>>()
