@@ -34,7 +34,9 @@ import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDocBuilder
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
-import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.CredentialFormat
+import id.walt.oid4vc.data.CredentialSupported
+import id.walt.oid4vc.data.ProofOfPossession
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.CredentialError
 import id.walt.oid4vc.errors.DeferredCredentialError
@@ -48,7 +50,10 @@ import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.util.randomUUID
-import id.walt.sdjwt.*
+import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.SDPayload
+import id.walt.sdjwt.SingleKeyJWTCryptoProvider
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.plugins.*
@@ -618,7 +623,7 @@ open class CIProvider : OpenIDCredentialIssuer(
         return jwksList
     }
 
-    fun getVctByCredentialConfigurationId(credentialConfigurationId: String) = OidcApi.metadata.credentialConfigurationsSupported?.get(credentialConfigurationId)?.vct
+    fun getVctByCredentialConfigurationId(credentialConfigurationId: String) = metadata.credentialConfigurationsSupported?.get(credentialConfigurationId)?.vct
 
     fun getVctBySupportedCredentialConfiguration(
         baseUrl: String,
