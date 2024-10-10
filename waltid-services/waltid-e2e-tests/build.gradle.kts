@@ -25,7 +25,7 @@ dependencies {
     testImplementation("com.github.ajalt.mordant:mordant:2.7.1")
 
     // Libraries to test
-    testImplementation(project(":waltid-services:waltid-service-commons", configuration = "testArtifacts"))
+    testImplementation(project(":waltid-services:waltid-service-commons-test"))
     testImplementation(project(":waltid-services:waltid-issuer-api"))
     testImplementation(project(":waltid-services:waltid-verifier-api"))
     testImplementation(project(":waltid-services:waltid-wallet-api"))
