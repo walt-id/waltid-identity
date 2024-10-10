@@ -73,26 +73,6 @@ kotlin {
     jvmToolchain(17)
 }
 
-
-// Create a configuration for test artifacts
-configurations {
-    create("testArtifacts") {
-        extendsFrom(configurations["testImplementation"])
-        isCanBeConsumed = true
-        isCanBeResolved = false
-    }
-}
-
-// Package the test classes in a jar
-val testJar by tasks.creating(Jar::class) {
-    archiveClassifier.set("test")
-    from(sourceSets["test"].output)
-}
-
-artifacts {
-    add("testArtifacts", testJar)
-}
-
 publishing {
     publications {
         // Main sources
@@ -107,25 +87,6 @@ publishing {
                 url.set("https://walt.id")
             }
             from(components["java"])
-        }
-
-        // Testing sources
-        create<MavenPublication>("testArtifact") {
-            artifactId = "waltid-service-commons-test"
-            pom {
-                name.set("walt.id service-commons testing")
-                description.set(
-                    """
-                    Kotlin/Java library for the walt.id services-commons testing
-                    """.trimIndent()
-                )
-                url.set("https://walt.id")
-            }
-            //from(components["java"])
-
-            artifact(testJar)/* {
-                classifier = "test"
-            }*/
         }
     }
 

@@ -20,7 +20,7 @@ data class WebService(
 ) {
     private val log = logger("WebService")
 
-    internal val webServiceModule: Application.() -> Unit = {
+    val webServiceModule: Application.() -> Unit = {
         { FeatureFlagInformationModule.run { enable() } } whenFeature CommonsFeatureCatalog.featureFlagInformationEndpointFeature
         { ServiceHealthChecksDebugModule.run { enable() } } whenFeature CommonsFeatureCatalog.healthChecksFeature
         { OpenApiModule.run { enable() } } whenFeature CommonsFeatureCatalog.openApiFeature
