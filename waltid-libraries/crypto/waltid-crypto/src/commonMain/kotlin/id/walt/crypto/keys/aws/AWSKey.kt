@@ -150,19 +150,25 @@ class AWSKey(
         plaintext: ByteArray,
         headers: Map<String, JsonElement>
     ): String {
-        val header = Json.encodeToString(mutableMapOf(
-            "typ" to "JWT".toJsonElement(),
-            "alg" to keyType.jwsAlg().toJsonElement(),
-        ).apply { putAll(headers) }).encodeToByteArray().encodeToBase64Url()
+        val appendedHeader = HashMap(headers).apply {
+            put("alg", "ES256".toJsonElement())
+        }
 
+        val header = Json.encodeToString(appendedHeader).encodeToByteArray().encodeToBase64Url()
         val payload = plaintext.encodeToBase64Url()
 
-        val signable = "$header.$payload"
+        var rawSignature = signRaw("$header.$payload".encodeToByteArray())
+        if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) {
 
-        val signatureBase64 = signRaw(signable.encodeToByteArray())
-        val signatureBase64Url = signatureBase64.encodeToBase64Url()
+            rawSignature = EccUtils.convertDERtoIEEEP1363(rawSignature)
+        } else {
+            Error("Unsupported key type for JWS signing: $keyType")
+        }
 
-        return "$signable.$signatureBase64Url"
+        val encodedSignature = rawSignature.encodeToBase64Url()
+        val jws = "$header.$payload.$encodedSignature"
+
+        return jws
     }
 
     @JvmBlocking
