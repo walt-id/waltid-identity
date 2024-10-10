@@ -22,8 +22,13 @@ dependencies {
 
     // Testing
     api(kotlin("test"))
-    api("io.ktor:ktor-server-test-host:2.3.12")
+    api("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
     api("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+
+    implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-logging:${Versions.KTOR_VERSION}")
 }
 
 tasks.test {
