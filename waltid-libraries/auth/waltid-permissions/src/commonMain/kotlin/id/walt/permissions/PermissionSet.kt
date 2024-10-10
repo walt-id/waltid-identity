@@ -5,6 +5,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
 @Serializable
 /**
@@ -33,6 +35,8 @@ data class PermissionSet(
 /**
  *
  */
+@JsExport
+@OptIn(ExperimentalJsExport::class)
 data class FlowPermissionSet(
     val id: String,
     val permissions: Flow<Permission>,
@@ -45,6 +49,14 @@ data class FlowPermissionSet(
             return FlowPermissionSet(
                 id = id,
                 permissions = permissionStrings.flatMapMerge { Permission.parseFromPermissionString(it) }
+            )
+        }
+
+//      For Javascript
+        fun fromPermissionStringFlow(id: String, permissionStrings: String): FlowPermissionSet {
+            return FlowPermissionSet(
+                id = id,
+                permissions = Permission.parseFromPermissionString(permissionStrings)
             )
         }
     }

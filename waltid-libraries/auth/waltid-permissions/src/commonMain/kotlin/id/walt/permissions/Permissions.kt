@@ -4,6 +4,11 @@ import id.walt.permissions.Permission.MinimalPermission
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.serialization.Serializable
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
 infix fun String.permissions(permissions: List<String>) =
     permissions(permissions.asFlow())
@@ -12,11 +17,14 @@ infix fun String.permissions(permissions: Flow<String>) =
     FlowPermissionSet.fromPermissionStringsFlow(this, permissions)
 
 
+@JsExport
+@OptIn(ExperimentalJsExport::class)
 class PermissionChecker {
 
     val allowTrie = PermissionTrie()
     val denyTrie = PermissionTrie()
 
+    @JsExport.Ignore
     fun applyPermissions(set: PermissionSet) {
         set.grantPermissions.forEach {
             allowTrie.storePermission(it.target, it.action)
@@ -26,6 +34,10 @@ class PermissionChecker {
         }
     }
 
+    @JvmAsync()
+    @JvmBlocking()
+    @JsPromise()
+    @JsExport.Ignore
     suspend fun applyPermissions(set: FlowPermissionSet) {
         set.permissions.collect {
             when (it.operation) {
@@ -47,6 +59,7 @@ class PermissionChecker {
      * @param target Target to check for operation
      * @param operation Operation to check for target
      */
+    @JsExport.Ignore
     fun checkPermission(target: PermissionedResourceTarget, operation: String): Boolean {
         val isAllowed = allowTrie.hasAnyMatching(target, operation)
 
@@ -60,6 +73,7 @@ class PermissionChecker {
     }
 
     @Serializable
+    @JsExport.Ignore
     data class PermissionInsights(
         val target: PermissionedResourceTarget,
         val operation: String,
@@ -72,6 +86,7 @@ class PermissionChecker {
         }
     }
 
+    @JsExport.Ignore
     fun checkPermissionInsights(target: String, operation: String) = checkPermissionInsights(PermissionedResourceTarget(target), operation)
     fun checkPermissionInsights(target: PermissionedResourceTarget, operation: String): PermissionInsights {
         val allowedBy = allowTrie.findAllMatching(target, operation)
