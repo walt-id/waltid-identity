@@ -4,6 +4,7 @@ package id.walt.issuer.issuance
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
@@ -132,11 +133,11 @@ object OidcApi : CIProvider() {
                                 AuthenticationMethod.ID_TOKEN -> {
                                     val idTokenRequestJwtKid = issuanceSessionData.first().issuerKey.key.getKeyId()
                                     val idTokenRequestJwtPrivKey = issuanceSessionData.first().issuerKey
-                                    processCodeFlowAuthorizationWithAuthorizationRequest(
+                                    OpenID4VC.processCodeFlowAuthorizationWithAuthorizationRequest(
+                                        OidcApi,
                                         authReq,
-                                        idTokenRequestJwtKid,
-                                        idTokenRequestJwtPrivKey.key,
                                         ResponseType.IdToken,
+                                        metadata,
                                         issuanceSessionData.first().request.useJar
                                     )
                                 }
@@ -166,11 +167,12 @@ object OidcApi : CIProvider() {
                                     val presentationDefinition =
                                         PresentationDefinition.defaultGenerationFromVcTypesForCredentialFormat(requestedTypes, credFormat)
 
-                                    processCodeFlowAuthorizationWithAuthorizationRequest(
+                                    OpenID4VC.processCodeFlowAuthorizationWithAuthorizationRequest(
+                                        OidcApi,
                                         authReq,
-                                        vpTokenRequestJwtKid,
-                                        vpTokenRequestJwtPrivKey.key,
-                                        ResponseType.VpToken,
+//                                        vpTokenRequestJwtKid,
+//                                        vpTokenRequestJwtPrivKey.key,
+                                        ResponseType.VpToken, metadata,
                                         issuanceSessionData.first().request.useJar,
                                         presentationDefinition
                                     )
@@ -256,7 +258,7 @@ object OidcApi : CIProvider() {
                         val idToken = params["id_token"]?.get(0)!!
 
                         // Verify and Parse ID Token
-                        verifyAndParseIdToken(idToken)
+                        OpenID4VC.verifyAndParseIdToken(OidcApi, idToken)
 
                     } else {
                         val vpToken = params["vp_token"]?.get(0)!!
@@ -327,7 +329,7 @@ object OidcApi : CIProvider() {
             }
             post("/credential") {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
-                val parsedToken = accessToken?.let { verifyAndParseToken(it, TokenTarget.ACCESS) }
+                val parsedToken = accessToken?.let { OpenID4VC.verifyAndParseToken(OidcApi, it, metadata.issuer!!, TokenTarget.ACCESS) }
                 if (parsedToken == null) {
                     call.respond(HttpStatusCode.Unauthorized)
                 } else {
@@ -361,7 +363,7 @@ object OidcApi : CIProvider() {
             }
             post("/batch_credential") {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
-                val parsedToken = accessToken?.let { verifyAndParseToken(it, TokenTarget.ACCESS) }
+                val parsedToken = accessToken?.let { OpenID4VC.verifyAndParseToken(OidcApi, it, metadata.issuer!!, TokenTarget.ACCESS) }
                 if (parsedToken == null) {
                     call.respond(HttpStatusCode.Unauthorized)
                 } else {

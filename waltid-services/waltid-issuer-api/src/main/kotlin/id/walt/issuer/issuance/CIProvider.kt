@@ -34,9 +34,9 @@ import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDocBuilder
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
+import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
-import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.definitions.OPENID_CREDENTIAL_AUTHORIZATION_TYPE
 import id.walt.oid4vc.errors.AuthorizationError
@@ -44,6 +44,7 @@ import id.walt.oid4vc.errors.CredentialError
 import id.walt.oid4vc.errors.DeferredCredentialError
 import id.walt.oid4vc.errors.TokenError
 import id.walt.oid4vc.interfaces.CredentialResult
+import id.walt.oid4vc.interfaces.ITokenProvider
 import id.walt.oid4vc.providers.*
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
@@ -74,17 +75,12 @@ import kotlin.uuid.Uuid
  */
 @OptIn(ExperimentalUuidApi::class)
 open class CIProvider(
-    baseUrl: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl },
-    override val config: CredentialIssuerConfig = CredentialIssuerConfig(credentialConfigurationsSupported = ConfigManager.getConfig<CredentialTypeConfig>().parse())
-//) : OpenIDCredentialIssuer(
-//    baseUrl = let {
-//        ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl
-//    }, config = CredentialIssuerConfig(
-//        credentialConfigurationsSupported = supportedCredentialTypes
-//    )
-): OpenIDProvider<IssuanceSession>(baseUrl) {
+    val baseUrl: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl },
+    val config: CredentialIssuerConfig = CredentialIssuerConfig(credentialConfigurationsSupported = ConfigManager.getConfig<CredentialTypeConfig>().parse())
+//): OpenIDProvider<IssuanceSession>(baseUrl) {
+): ITokenProvider {
     private val log = KotlinLogging.logger { }
-    override val metadata
+    val metadata
         get() = OpenID4VCI.createDefaultProviderMetadata(baseUrl).copy(
             credentialConfigurationsSupported = config.credentialConfigurationsSupported
         )
@@ -126,12 +122,12 @@ open class CIProvider(
         decoding = { Json.decodeFromString(it) },
     )
 
-    override fun getSession(id: String): IssuanceSession? {
+    fun getSession(id: String): IssuanceSession? {
         log.debug { "RETRIEVING CI AUTH SESSION: $id" }
         return authSessions[id]
     }
 
-    override fun getSessionByAuthServerState(authServerState: String): IssuanceSession? {
+    fun getSessionByAuthServerState(authServerState: String): IssuanceSession? {
         log.debug { "RETRIEVING CI AUTH SESSION by authServerState: $authServerState" }
         var properSession: IssuanceSession? = null
         authSessions.getAll().forEach { session ->
@@ -148,16 +144,26 @@ open class CIProvider(
     }
 
 
-    override fun putSession(id: String, session: IssuanceSession) {
+    fun putSession(id: String, session: IssuanceSession) {
         log.debug { "SETTING CI AUTH SESSION: $id = $session" }
         authSessions[id] = session
     }
 
-    override fun removeSession(id: String) {
+    fun removeSession(id: String) {
         log.debug { "REMOVING CI AUTH SESSION: $id" }
         authSessions.remove(id)
     }
 
+    fun getVerifiedSession(sessionId: String): IssuanceSession? {
+        return getSession(sessionId)?.let {
+            if (it.isExpired) {
+                removeSession(sessionId)
+                null
+            } else {
+                it
+            }
+        }
+    }
 
     // ------------------------------------------
     // Simple cryptographics operation interface implementations
@@ -701,13 +707,13 @@ open class CIProvider(
             }
     }
 
-    override fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean {
+    fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean {
         return authorizationRequest.authorizationDetails != null && authorizationRequest.authorizationDetails!!.any {
             isSupportedAuthorizationDetails(it)
         }
     }
 
-    override fun initializeAuthorization(
+    fun initializeAuthorization(
         authorizationRequest: AuthorizationRequest,
         expiresIn: Duration,
         authServerState: String?, //the state used for additional authentication with pwd, id_token or vp_token.
@@ -755,7 +761,7 @@ open class CIProvider(
         credentialOfferBuilder.addAuthorizationCodeGrant(sessionId)
         if (allowPreAuthorized)
             credentialOfferBuilder.addPreAuthorizedCodeGrant(
-                generateToken(sessionId, TokenTarget.TOKEN),
+                OpenID4VC.generateAuthorizationCodeFor(this, sessionId, metadata.issuer!!),
                 txCode
             )
         return IssuanceSession(
@@ -770,27 +776,14 @@ open class CIProvider(
         }
     }
 
-    fun getCredentialOfferRequestUrl(
-        offerRequest: CredentialOfferRequest,
-        walletCredentialOfferEndpoint: String = CROSS_DEVICE_CREDENTIAL_OFFER_URL,
-    ): String {
-        val url = URLBuilder(walletCredentialOfferEndpoint).apply {
-            parameters.appendAll(parametersOf(offerRequest.toHttpParameters()))
-        }.buildString()
-
-        log.debug { "CREATED URL: $url" }
-
-        return url
-    }
-
     private fun createCredentialResponseFor(credentialResult: CredentialResult, session: IssuanceSession): CredentialResponse {
         return credentialResult.credential?.let { credential ->
             CredentialResponse.success(credentialResult.format, credential, customParameters = credentialResult.customParameters)
         } ?: generateProofOfPossessionNonceFor(session).let { updatedSession ->
             CredentialResponse.deferred(
                 credentialResult.format,
-                generateToken(
-                    session.id, TokenTarget.DEFERRED_CREDENTIAL,
+                OpenID4VCI.generateDeferredCredentialToken(this,
+                    session.id, metadata.issuer ?: throw Exception("No issuer defined in provider metadata"),
                     credentialResult.credentialId ?: throw Exception("credentialId must not be null, if credential issuance is deferred.")
                 ),
                 updatedSession.cNonce,
@@ -812,7 +805,7 @@ open class CIProvider(
 
     fun generateDeferredCredentialResponse(acceptanceToken: String): CredentialResponse {
         val accessInfo =
-            verifyAndParseToken(acceptanceToken, TokenTarget.DEFERRED_CREDENTIAL) ?: throw DeferredCredentialError(
+            OpenID4VC.verifyAndParseToken(this, acceptanceToken, metadata.issuer!!, TokenTarget.DEFERRED_CREDENTIAL) ?: throw DeferredCredentialError(
                 CredentialErrorCode.invalid_token,
                 message = "Invalid acceptance token"
             )
@@ -826,7 +819,14 @@ open class CIProvider(
         return createCredentialResponseFor(getDeferredCredential(credentialId), session)
     }
 
-    override fun generateTokenResponse(session: IssuanceSession, tokenRequest: TokenRequest): TokenResponse {
+    fun processTokenRequest(tokenRequest: TokenRequest): TokenResponse {
+        val payload = OpenID4VC.validateAndParseTokenRequest(this, tokenRequest, metadata.issuer!!) ?: throw TokenError(tokenRequest, TokenErrorCode.invalid_request, "Token request could not be validated")
+        val sessionId = payload[JWTClaims.Payload.subject]?.jsonPrimitive?.content ?: throw TokenError(tokenRequest, TokenErrorCode.invalid_request, "Token contains no session ID in subject")
+        val session = getVerifiedSession(sessionId) ?: throw TokenError(
+            tokenRequest = tokenRequest,
+            errorCode = TokenErrorCode.invalid_request,
+            message = "No authorization session found for given authorization code, or session expired."
+        )
         if (tokenRequest.grantType == GrantType.pre_authorized_code && session.txCode != null &&
             session.txCodeValue != tokenRequest.txCode
         ) {
@@ -836,10 +836,16 @@ open class CIProvider(
                 message = "User PIN required for this issuance session has not been provided or PIN is wrong."
             )
         }
-        return super.generateTokenResponse(session, tokenRequest).copy(
+        // Expiration time required by EBSI
+        val currentTime = Clock.System.now().epochSeconds
+        val expirationTime = (currentTime + 864000L) // ten days in milliseconds
+        return TokenResponse.success(
+            OpenID4VC.generateToken(this, sessionId, metadata.issuer!!, TokenTarget.ACCESS),
+            tokenType = "bearer",
+            expiresIn = expirationTime,
             cNonce = generateProofOfPossessionNonceFor(session).cNonce,
-            cNonceExpiresIn = session.expirationTimestamp - Clock.System.now()
-            // TODO: authorization_pending, interval
+            cNonceExpiresIn = session.expirationTimestamp - Clock.System.now(),
+            state = session.authorizationRequest?.state
         )
     }
 }
