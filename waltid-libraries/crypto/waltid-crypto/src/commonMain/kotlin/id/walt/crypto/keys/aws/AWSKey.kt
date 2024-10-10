@@ -72,21 +72,36 @@ class AWSKey(
 
     override fun toString(): String = "[AWS ${keyType.name} key @AWS ${config.region} - $id]"
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getKeyId(): String = getPublicKey().getKeyId()
 
-    override suspend fun getThumbprint(): String {
-        TODO("Not yet implemented")
-    }
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun getThumbprint(): String =
+        throw NotImplementedError("Thumbprint is not available for remote keys.")
 
-    override suspend fun exportJWK(): String {
-        TODO("Not yet implemented")
-    }
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun exportJWK(): String = throw NotImplementedError("JWK export is not available for remote keys.")
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun exportJWKObject(): JsonObject = Json.parseToJsonElement(_publicKey!!).jsonObject
 
-    override suspend fun exportPEM(): String {
-        TODO("Not yet implemented")
-    }
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun exportPEM(): String = throw NotImplementedError("PEM export is not available for remote keys.")
 
     private val AwsSigningAlgorithm by lazy {
         when (keyType) {
@@ -96,6 +111,10 @@ class AWSKey(
         }
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     @OptIn(ExperimentalStdlibApi::class)
     override suspend fun signRaw(plaintext: ByteArray): ByteArray {
         val body = """
@@ -125,6 +144,10 @@ class AWSKey(
 
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun signJws(
         plaintext: ByteArray,
         headers: Map<String, JsonElement>
@@ -144,6 +167,10 @@ class AWSKey(
         return "$signable.$signatureBase64Url"
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun verifyRaw(
         signed: ByteArray,
         detachedPlaintext: ByteArray?
@@ -176,6 +203,10 @@ class AWSKey(
         )
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
         val parts = signedJws.split(".")
         check(parts.size == 3) { "Invalid JWT part count: ${parts.size} instead of 3" }
@@ -201,6 +232,10 @@ class AWSKey(
     @Transient
     private var backedKey: Key? = null
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getPublicKey(): Key = backedKey ?: when {
 
         _publicKey != null -> _publicKey!!.let {
@@ -210,10 +245,18 @@ class AWSKey(
         else -> getPublicKey()
     }.also { newBackedKey -> backedKey = newBackedKey }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getPublicKeyRepresentation(): ByteArray {
         TODO("Not yet implemented")
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getMeta(): AwsKeyMeta = AwsKeyMeta(getKeyId())
 
     companion object : AWSKeyCreator {
@@ -327,7 +370,10 @@ ${sha256Hex(canonicalRequest)}
             )
         }
 
-
+        @JvmBlocking
+        @JvmAsync
+        @JsPromise
+        @JsExport.Ignore
         @OptIn(ExperimentalEncodingApi::class)
         suspend fun getPublicKey(config: AWSKeyMetadata, keyId: String): Key {
             val method = HttpMethod.Post
@@ -362,7 +408,10 @@ $public
             return keyJWK.getOrThrow()
         }
 
-
+        @JvmBlocking
+        @JvmAsync
+        @JsPromise
+        @JsExport.Ignore
         suspend fun list_keys(config: AWSKeyMetadata) {
             val method = HttpMethod.Post
             val headers = buildSigV4Headers(
@@ -417,6 +466,7 @@ $public
         }
 
 
+        @JsExport.Ignore
         override suspend fun generate(type: KeyType, metadata: AWSKeyMetadata): AWSKey {
             val keyType = keyTypeToAwsKeyMapping(type)
             val body =
