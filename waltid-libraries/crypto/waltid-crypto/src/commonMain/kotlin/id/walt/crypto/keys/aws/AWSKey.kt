@@ -70,7 +70,7 @@ class AWSKey(
     override val hasPrivateKey: Boolean
         get() = false
 
-    override fun toString(): String = "[AWS ${keyType.name} key @AWS]"
+    override fun toString(): String = "[AWS ${keyType.name} key @AWS ${config.region} - $id]"
 
     override suspend fun getKeyId(): String = getPublicKey().getKeyId()
 
