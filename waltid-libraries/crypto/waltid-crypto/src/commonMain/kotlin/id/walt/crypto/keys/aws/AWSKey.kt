@@ -121,7 +121,7 @@ class AWSKey(
         val body = """
 {
 "KeyId":"$id",
-"Message":"${plaintext.encodeBase64()}",
+"Message":"${plaintext.encodeToBase64Url()}",
 "MessageType":"RAW",
 "SigningAlgorithm":"$AwsSigningAlgorithm"
 }
@@ -178,7 +178,7 @@ class AWSKey(
 "KeyId":"$id",
 "Message":"${detachedPlaintext?.encodeBase64()}",
 "MessageType":"RAW",
-"Signature":"${signed.decodeToString()}",
+"Signature":"${signed.encodeBase64()}",
 "SigningAlgorithm":"$AwsSigningAlgorithm"
 }
 """.trimIndent().trimMargin()
