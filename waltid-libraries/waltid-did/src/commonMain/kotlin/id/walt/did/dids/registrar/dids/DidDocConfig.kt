@@ -5,13 +5,16 @@ import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.document.models.service.Service
-import id.walt.did.dids.document.models.service.ServiceMap
 import id.walt.did.dids.document.models.service.ServiceEndpoint
+import id.walt.did.dids.document.models.service.ServiceMap
 import id.walt.did.dids.document.models.verification.method.VerificationMaterialType
 import id.walt.did.dids.document.models.verification.method.VerificationMethod
 import id.walt.did.dids.document.models.verification.method.VerificationMethodType
 import id.walt.did.dids.document.models.verification.relationship.VerificationRelationship
 import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
+import id.walt.did.exceptions.InvalidVerificationConfigurationException
+import id.walt.did.exceptions.PrivateKeyNotAllowedException
+import id.walt.did.exceptions.ReservedKeyOverrideException
 import id.walt.did.utils.randomUUID
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -140,28 +143,31 @@ data class DidDocConfig(
 
     private fun validateRootCustomProperties() = rootCustomProperties?.forEach {
         require(!reservedKeys.contains(it.key)) {
-            "Invalid attempt to override reserved root did document property with key ${it.key} via rootCustomProperties map"
+            throw ReservedKeyOverrideException("Invalid attempt to override reserved root did document property with key ${it.key} via rootCustomProperties map")
         }
     }
 
     private fun validatePublicKeyMap() = publicKeyMap.values.forEach {
-        require(!it.hasPrivateKey) { "The key map must contain only public keys" }
+        require(!it.hasPrivateKey) {
+            throw PrivateKeyNotAllowedException("Private keys are not allowed in the publicKeyMap property")
+        }
     }
 
     private fun validateVerificationConfigurationMap() =
         verificationConfigurationMap.takeIf { it.isNotEmpty() }?.let {
             require(publicKeyMap.isNotEmpty()) {
-                "Key map cannot be empty when verification configuration map is not empty"
+                throw InvalidVerificationConfigurationException("Key map cannot be empty when verification configuration map is not empty")
+
             }
             it.forEach { (type, configSet) ->
                 configSet.forEach { config ->
                     require(publicKeyMap.containsKey(config.publicKeyId))
-                    val key = publicKeyMap[config.publicKeyId] ?: throw IllegalArgumentException(
+                    val key = publicKeyMap[config.publicKeyId] ?: throw InvalidVerificationConfigurationException(
                         "Key ID ${config.publicKeyId} is missing from key map but is defined " +
                                 "in verification configuration $config of type $type"
                     )
                     if (type == VerificationRelationshipType.KeyAgreement) {
-                        require(key.keyType != KeyType.Ed25519) { "Invalid key type ${key.keyType} specified for keyAgreement property." }
+                        require(key.keyType != KeyType.Ed25519) { throw InvalidVerificationConfigurationException("Invalid key type ${key.keyType} specified for keyAgreement property.") }
                     }
                 }
             }
