@@ -95,6 +95,7 @@ artifacts {
 
 publishing {
     publications {
+        // Main sources
         create<MavenPublication>("mavenJava") {
             pom {
                 name.set("walt.id service-commons")
@@ -108,6 +109,7 @@ publishing {
             from(components["java"])
         }
 
+        // Testing sources
         create<MavenPublication>("testArtifact") {
             artifactId = "waltid-service-commons-test"
             pom {
@@ -119,8 +121,11 @@ publishing {
                 )
                 url.set("https://walt.id")
             }
-            from(components["java"])
-            artifact(tasks["testJar"])
+            //from(components["java"])
+
+            artifact(testJar)/* {
+                classifier = "test"
+            }*/
         }
     }
 
