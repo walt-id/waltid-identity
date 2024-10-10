@@ -70,6 +70,15 @@ object OpenID4VCI {
         }.buildString()
     }
 
+    fun getCredentialOfferRequestUrl(
+        credOfferReq: CredentialOfferRequest,
+        credentialOfferEndpoint: String = CROSS_DEVICE_CREDENTIAL_OFFER_URL
+    ): String {
+        return URLBuilder(credentialOfferEndpoint).apply {
+            parameters.appendAll(parametersOf(credOfferReq.toHttpParameters()))
+        }.buildString()
+    }
+
     fun parseCredentialOfferRequestUrl(credOfferReqUrl: String): CredentialOfferRequest {
         return CredentialOfferRequest.fromHttpParameters(Url(credOfferReqUrl).parameters.toMap())
     }
@@ -355,5 +364,9 @@ object OpenID4VCI {
             )
 
         return CredentialRequestValidationResult(true)
+    }
+
+    fun generateDeferredCredentialToken(tokenProvider: ITokenProvider, sessionId: String, issuer: String, credentialId: String): String {
+        return OpenID4VC.generateToken(tokenProvider, sessionId, issuer, TokenTarget.DEFERRED_CREDENTIAL, credentialId)
     }
 }
