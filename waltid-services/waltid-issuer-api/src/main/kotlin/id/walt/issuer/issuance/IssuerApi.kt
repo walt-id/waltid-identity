@@ -128,6 +128,10 @@ fun Application.issuerApi() {
                             "did:jwk + OCI REST API key  (Oracle Cloud Infrastructure - Secp256r1)",
                             IssuanceExamples.issuerOnboardingRequestOciRestApiExample
                         )
+                        example(
+                            "did:jwk + AWS REST API key  (AWS - Secp256r1)",
+                            IssuanceExamples.issuerOnboardingRequestAwsRestApiExample
+                        )
                         required = true
                     }
                 }

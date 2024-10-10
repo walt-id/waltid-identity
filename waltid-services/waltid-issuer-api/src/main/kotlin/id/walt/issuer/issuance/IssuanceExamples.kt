@@ -859,6 +859,31 @@ object IssuanceExamples {
         """.trimIndent()
     )
 
+
+    //language=JSON
+    val issuerOnboardingRequestAwsRestApiExample = typedValueExampleDescriptorDsl<OnboardingRequest>(
+        """
+            {
+                "key":
+                {
+                    "backend": "aws",
+                    "keyType": "secp256r1",
+                    "config":
+                    {
+                        "accessKeyId": "AKIA........QU5F",
+                        "secretAccessKey": "6YDr..................7Sr",
+                        "region": "eu-central-1"
+                      
+                    }
+                },
+                "did":
+                {
+                    "method": "jwk"
+                }
+            }
+        """.trimIndent()
+    )
+
     //language=JSON
     val issuerOnboardingResponseOciRestApiExample = typedValueExampleDescriptorDsl<IssuerOnboardingResponse>(
         """

@@ -125,6 +125,9 @@ kotlin {
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
 
 
+                implementation(platform("org.kotlincrypto.macs:bom:0.5.3"))
+                implementation("org.kotlincrypto.macs:hmac-sha2")
+
             }
         }
         val commonTest by getting {
