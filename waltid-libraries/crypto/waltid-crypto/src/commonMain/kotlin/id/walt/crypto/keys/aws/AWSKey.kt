@@ -2,13 +2,13 @@ package id.walt.crypto.keys.aws
 
 import id.walt.crypto.exceptions.KeyTypeNotSupportedException
 import id.walt.crypto.keys.AwsKeyMeta
+import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.crypto.utils.JwsUtils.jwsAlg
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.client.request.headers
