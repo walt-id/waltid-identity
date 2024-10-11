@@ -1,6 +1,6 @@
 package id.walt.ktorauthnz.tokens.ktorauthnztoken
 
-class InMemoryKtorAuthNzTokenStore: KtorAuthnzTokenStore {
+class InMemoryKtorAuthNzTokenStore : KtorAuthnzTokenStore {
 
     val tokens = HashMap<String, String>()
 
@@ -9,7 +9,7 @@ class InMemoryKtorAuthNzTokenStore: KtorAuthnzTokenStore {
     }
 
     override fun getTokenSessionId(token: String): String {
-        return tokens[token]  ?: error("Unknown token: $token")
+        return tokens[token] ?: error("Unknown token: $token")
     }
 
     override fun validateToken(token: String): Boolean {

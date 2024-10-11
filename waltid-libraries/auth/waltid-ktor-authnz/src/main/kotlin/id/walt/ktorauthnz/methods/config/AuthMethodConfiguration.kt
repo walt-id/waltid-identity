@@ -1,3 +1,6 @@
 package id.walt.ktorauthnz.methods.config
 
-interface AuthMethodConfiguration
+import kotlinx.serialization.Serializable
+
+@Serializable
+sealed interface AuthMethodConfiguration

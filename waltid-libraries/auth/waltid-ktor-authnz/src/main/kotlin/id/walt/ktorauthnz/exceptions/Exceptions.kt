@@ -9,7 +9,7 @@ data class AuthenticationFailureException(override val message: String) : Illega
 inline fun authFailure(message: String): Nothing = throw AuthenticationFailureException(message)
 
 @OptIn(ExperimentalContracts::class)
-public inline fun authCheck(value: Boolean, lazyMessage: () -> Any): Unit {
+inline fun authCheck(value: Boolean, lazyMessage: () -> Any): Unit {
     contract {
         returns() implies value
     }

@@ -1,4 +1,4 @@
-package id.walt.ktorauthnz.plugins
+package id.walt.web.plugins
 
 import io.github.smiley4.ktorswaggerui.SwaggerUI
 import io.github.smiley4.ktorswaggerui.dsl.config.PluginConfigDsl
@@ -51,7 +51,7 @@ fun Application.configureRouting() {
     install(StatusPages) {
         exception<Throwable> { call, cause ->
             cause.printStackTrace()
-            call.respondText(text = "500: $cause" , status = HttpStatusCode.InternalServerError)
+            call.respondText(text = "500: $cause", status = HttpStatusCode.InternalServerError)
         }
     }
 }

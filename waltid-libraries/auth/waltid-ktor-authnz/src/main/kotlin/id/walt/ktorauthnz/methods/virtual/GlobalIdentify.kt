@@ -14,9 +14,5 @@ object GlobalIdentify : IdentifyVirtualAuth("identify-global") {
         throw NotImplementedError("This method is internally referenced and not to be used by the caller.")
     }
 
-    @Serializable
-    data class FlowAmendmentData(
-        val appendFlow: Set<AuthFlow>? = null,
-        var replaceFlow: Set<AuthFlow>? = null,
-    ): AuthMethodStoredData
+
 }

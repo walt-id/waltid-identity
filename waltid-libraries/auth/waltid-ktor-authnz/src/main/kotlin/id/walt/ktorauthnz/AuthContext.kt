@@ -21,7 +21,7 @@ data class AuthContext(
     /**
      * For implicit session start the auth flow is necessary
      */
-    val initialFlow: AuthFlow? = null
+    val initialFlow: AuthFlow? = null,
 ) {
 
     init {

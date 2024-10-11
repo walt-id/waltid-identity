@@ -1,3 +1,6 @@
 package id.walt.ktorauthnz.methods.data
 
-interface AuthMethodStoredData
+import kotlinx.serialization.Serializable
+
+@Serializable
+sealed interface AuthMethodStoredData

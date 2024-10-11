@@ -29,7 +29,9 @@ data class AuthFlow(
 
         if (continueWith != null) {
             check(continueWith.isNotEmpty()) { "Next flow list (`continueWith`) is empty at method $method" }
-            check(continueWith.methods().toSet().size == continueWith.size) { "Duplicated method in same flow in next flow list (`continueWith`) at method $method" }
+            check(
+                continueWith.methods().toSet().size == continueWith.size
+            ) { "Duplicated method in same flow in next flow list (`continueWith`) at method $method" }
         }
     }
 
