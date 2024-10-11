@@ -1,6 +1,6 @@
 package id.walt.ktorauthnz.methods
 
-import id.walt.ktorauthnz.accounts.identifiers.AccountIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.sessions.AuthSession
 import io.ktor.http.*
 import io.ktor.server.application.*

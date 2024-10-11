@@ -1,7 +1,7 @@
 package id.walt.ktorauthnz.methods
 
 import id.walt.ktorauthnz.AuthContext
-import id.walt.ktorauthnz.accounts.identifiers.OIDCIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
 import id.walt.ktorauthnz.methods.config.OidcAuthConfiguration
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.client.*

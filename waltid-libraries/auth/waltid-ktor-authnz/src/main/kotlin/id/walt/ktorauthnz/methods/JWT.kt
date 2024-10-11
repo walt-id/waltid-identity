@@ -3,7 +3,7 @@ package id.walt.ktorauthnz.methods
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.ktorauthnz.AuthContext
-import id.walt.ktorauthnz.accounts.identifiers.JWTIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.JWTIdentifier
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.config.JwtAuthConfiguration
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
