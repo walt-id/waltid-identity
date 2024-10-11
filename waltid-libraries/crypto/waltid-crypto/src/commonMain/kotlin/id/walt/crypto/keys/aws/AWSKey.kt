@@ -9,19 +9,15 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.jwsSigningAlgorithm
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.HttpClient
-import io.ktor.client.request.headers
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
-import io.ktor.client.statement.request
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpMethod
-import io.ktor.util.encodeBase64
-import io.ktor.utils.io.charsets.Charsets
-import io.ktor.utils.io.core.toByteArray
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.util.*
+import io.ktor.utils.io.charsets.*
+import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -30,11 +26,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -42,7 +34,6 @@ import org.kotlincrypto.hash.sha2.SHA256
 import org.kotlincrypto.macs.hmac.sha2.HmacSHA256
 import kotlin.collections.component1
 import kotlin.collections.component2
-import kotlin.collections.forEach
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
@@ -104,7 +95,7 @@ class AWSKey(
     @JsExport.Ignore
     override suspend fun exportPEM(): String = throw NotImplementedError("PEM export is not available for remote keys.")
 
-    private val AwsSigningAlgorithm by lazy {
+    private val awsSigningAlgorithm by lazy {
         when (keyType) {
             KeyType.secp256r1 -> "ECDSA_SHA_256"
             KeyType.RSA -> "RSASSA_PSS_SHA_256"
@@ -123,7 +114,7 @@ class AWSKey(
 "KeyId":"$id",
 "Message":"${plaintext.encodeToBase64Url()}",
 "MessageType":"RAW",
-"SigningAlgorithm":"$AwsSigningAlgorithm"
+"SigningAlgorithm":"$awsSigningAlgorithm"
 }
 """.trimIndent().trimMargin()
         val headers = buildSigV4Headers(
@@ -131,7 +122,12 @@ class AWSKey(
             payload = body,
             config = config
         )
-        val signature = client.post("https://kms.${config.region}.amazonaws.com/") {
+
+        val awsKmsUrl = "kms.${config.region}.amazonaws.com"
+
+        logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.Sign" }
+
+        val signature = client.post("$awsKmsUrl/") {
             headers {
                 headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
                 append(HttpHeaders.Host, "kms.${config.region}.amazonaws.com")
@@ -151,18 +147,18 @@ class AWSKey(
         headers: Map<String, JsonElement>
     ): String {
         val appendedHeader = HashMap(headers).apply {
-            put("alg", "ES256".toJsonElement())
+            put("alg", jwsSigningAlgorithm(keyType).toJsonElement())
         }
 
         val header = Json.encodeToString(appendedHeader).encodeToByteArray().encodeToBase64Url()
         val payload = plaintext.encodeToBase64Url()
 
         var rawSignature = signRaw("$header.$payload".encodeToByteArray())
-        if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) {
 
+        if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) { // TODO: Add RSA support
             rawSignature = EccUtils.convertDERtoIEEEP1363(rawSignature)
         } else {
-            Error("Unsupported key type for JWS signing: $keyType")
+            throw Error("Unsupported key type for JWS signing: $keyType")
         }
 
         val encodedSignature = rawSignature.encodeToBase64Url()
@@ -185,7 +181,7 @@ class AWSKey(
 "Message":"${detachedPlaintext?.encodeBase64()}",
 "MessageType":"RAW",
 "Signature":"${signed.encodeBase64()}",
-"SigningAlgorithm":"$AwsSigningAlgorithm"
+"SigningAlgorithm":"$awsSigningAlgorithm"
 }
 """.trimIndent().trimMargin()
         val headers = buildSigV4Headers(
@@ -193,10 +189,15 @@ class AWSKey(
             payload = body,
             config = config
         )
-        val verification = client.post("https://kms.${config.region}.amazonaws.com/") {
+
+        val awsKmsUrl = "kms.${config.region}.amazonaws.com"
+
+        logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.Verify" }
+
+        val verification = client.post("$awsKmsUrl/") {
             headers {
                 headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
-                append(HttpHeaders.Host, "kms.${config.region}.amazonaws.com")
+                append(HttpHeaders.Host, awsKmsUrl)
                 append("X-Amz-Target", "TrentService.Verify") // Specific KMS action for CreateKey
             }
             setBody(body) // Set the JSON body
@@ -228,6 +229,7 @@ class AWSKey(
         _publicKey != null -> _publicKey!!.let {
             JWKKey.importJWK(it).getOrThrow()
         }
+
         else -> getPublicKey()
     }.also { newBackedKey -> backedKey = newBackedKey }
 
@@ -373,52 +375,34 @@ ${sha256Hex(canonicalRequest)}
                 payload = body,
                 config = config
             )
-            val key = client.post("https://kms.${config.region}.amazonaws.com/") {
+
+            val awsKmsUrl = "kms.${config.region}.amazonaws.com"
+
+            logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.GetPublicKey" }
+
+            val key = client.post("$awsKmsUrl/") {
                 headers {
                     headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
-                    append(HttpHeaders.Host, "kms.${config.region}.amazonaws.com")
+                    append(HttpHeaders.Host, awsKmsUrl)
                     append("X-Amz-Target", "TrentService.GetPublicKey") // Specific KMS action for ListKeys
                 }
                 setBody(
                     body
                 ) // Set the JSON body
             }.awsJsonDataBody()
+
             val public = key["PublicKey"]?.jsonPrimitive?.content
-            val pem_key = """
+
+            if (public.isNullOrEmpty()) throw Error("Could not determine PublicKey")
+
+            val pemKey = """
 -----BEGIN PUBLIC KEY-----
 $public
 -----END PUBLIC KEY-----
 """.trimIndent()
 
-            val keyJWK = JWKKey.importPEM(pem_key)
+            val keyJWK = JWKKey.importPEM(pemKey)
             return keyJWK.getOrThrow()
-        }
-
-        @JvmBlocking
-        @JvmAsync
-        @JsPromise
-        @JsExport.Ignore
-        suspend fun list_keys(config: AWSKeyMetadata) {
-            val method = HttpMethod.Post
-            val headers = buildSigV4Headers(
-                method = method,
-                payload = """{}""",
-                config = config
-            )
-            val key = client.post("https://kms.${config.region}.amazonaws.com/") {
-                headers {
-                    headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
-                    append(HttpHeaders.Host, "kms.${config.region}.amazonaws.com")
-                    append("X-Amz-Target", "TrentService.ListKeys") // Specific KMS action for ListKeys
-                }
-                setBody(
-                    """{}"""
-                ) // Set the JSON body
-            }
-
-            println(key.bodyAsText())
-
-
         }
 
         private suspend fun HttpResponse.awsJsonDataBody(): JsonObject {
@@ -453,7 +437,7 @@ $public
 
 
         @JsExport.Ignore
-        override suspend fun generate(type: KeyType, metadata: AWSKeyMetadata): AWSKey {
+        override suspend fun generate(type: KeyType, config: AWSKeyMetadata): AWSKey {
             val keyType = keyTypeToAwsKeyMapping(type)
             val body =
                 """{
@@ -464,31 +448,63 @@ $public
             val headers = buildSigV4Headers(
                 method = HttpMethod.Post,
                 payload = body,
-                config = metadata
-
+                config = config
             )
-            val key = client.post("https://kms.${metadata.region}.amazonaws.com/") {
+            val awsKmsUrl = "kms.${config.region}.amazonaws.com"
+
+            logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.CreateKey" }
+
+            val key = client.post("$awsKmsUrl/") {
                 headers {
                     headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
-                    append(HttpHeaders.Host, "kms.${metadata.region}.amazonaws.com")
+                    append(HttpHeaders.Host, awsKmsUrl)
                     append("X-Amz-Target", "TrentService.CreateKey") // Specific KMS action for CreateKey
                 }
                 setBody(body) // Set the JSON body
             }.awsJsonDataBody()
 
-            val KeyId = key["KeyMetadata"]?.jsonObject?.get("KeyId")?.jsonPrimitive?.content
-            val publicKey = getPublicKey(metadata, KeyId.toString())
+            val keyId = key["KeyMetadata"]?.jsonObject?.get("KeyId")?.jsonPrimitive?.content
 
+            if (keyId.isNullOrEmpty()) throw Error("Key ID could not be determined")
+
+            val publicKey = getPublicKey(config, keyId.toString())
 
             return AWSKey(
-                config = metadata,
-                id = KeyId.toString(),
+                config = config,
+                id = keyId.toString(),
                 _publicKey = publicKey.exportJWK(),
                 _keyType = awsKeyToKeyTypeMapping(keyType)
             )
-
         }
 
+        /*
+        //TODO: remove, if not used
+        @JvmBlocking
+        @JvmAsync
+        @JsPromise
+        @JsExport.Ignore
+        suspend fun listKeys(config: AWSKeyMetadata) {
+            val method = HttpMethod.Post
+            val headers = buildSigV4Headers(
+                method = method,
+                payload = """{}""",
+                config = config
+            )
+            val key = client.post("https://kms.${config.region}.amazonaws.com/") {
+                headers {
+                    headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
+                    append(HttpHeaders.Host, "kms.${config.region}.amazonaws.com")
+                    append("X-Amz-Target", "TrentService.ListKeys") // Specific KMS action for ListKeys
+                }
+                setBody(
+                    """{}"""
+                ) // Set the JSON body
+            }
+
+            println(key.bodyAsText())
+
+
+        }*/
     }
 }
 

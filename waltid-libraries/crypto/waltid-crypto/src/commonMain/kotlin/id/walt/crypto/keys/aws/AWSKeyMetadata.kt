@@ -5,10 +5,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class AWSKeyMetadata(
-
     val accessKeyId: String,
     val secretAccessKey: String,
-    val region: String,
-
-    )
+    val region: String
+)
 
