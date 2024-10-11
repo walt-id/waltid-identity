@@ -6,6 +6,8 @@ import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.TOTP
 import id.walt.ktorauthnz.methods.UserPass
 import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.data.TOTPStoredData
+import id.walt.ktorauthnz.methods.data.UserPassStoredData
 import id.walt.ktorauthnz.sessions.AuthSession
 
 object ExampleAccountStore : EditableAccountStore {
@@ -29,8 +31,8 @@ object ExampleAccountStore : EditableAccountStore {
         val accountIdentifier = UsernameIdentifier("alice1")
         addAccountIdentifierToAccount(newAccount, accountIdentifier)
 
-        addAccountStoredData(newAccount.id, UserPass to UserPass.UserPassStoredData("123456"))
-        addAccountStoredData(newAccount.id, TOTP to TOTP.TOTPStoredData("JBSWY3DPEHPK3PXP")) // https://totp.danhersam.com/
+        addAccountStoredData(newAccount.id, UserPass to UserPassStoredData("123456"))
+        addAccountStoredData(newAccount.id, TOTP to TOTPStoredData("JBSWY3DPEHPK3PXP")) // https://totp.danhersam.com/
     }
 
     override fun registerAccount(newAccount: Account) {

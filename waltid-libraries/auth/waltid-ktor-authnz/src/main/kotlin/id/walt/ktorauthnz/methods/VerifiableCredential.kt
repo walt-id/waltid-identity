@@ -3,7 +3,7 @@ package id.walt.ktorauthnz.methods
 import com.nfeld.jsonpathkt.JsonPath
 import com.nfeld.jsonpathkt.kotlinx.resolveAsStringOrNull
 import id.walt.ktorauthnz.AuthContext
-import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
+import id.walt.ktorauthnz.methods.config.VerifiableCredentialAuthConfiguration
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -27,12 +27,6 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 object VerifiableCredential : AuthenticationMethod("vc") {
 
-    @Serializable
-    data class VerifiableCredentialAuthConfiguration(
-        val verification: Map<String, JsonElement>,
-        //val claimMappings: Map<String, String>? = null,
-        //val redirectUrl: String? = null,
-    ) : AuthMethodConfiguration
 
     // TODO:
     val verifierUrl = "http://localhost:7003"
@@ -88,7 +82,11 @@ object Verifier {
         val state: String,
     )
 
-    suspend fun verify(verifierUrl: String, verificationRequest: Map<String, JsonElement>, redirectUrl: String? = null): VerificationSessionResponse {
+    suspend fun verify(
+        verifierUrl: String,
+        verificationRequest: Map<String, JsonElement>,
+        redirectUrl: String? = null,
+    ): VerificationSessionResponse {
         val response: HttpResponse = client.post("$verifierUrl/openid4vc/verify") {
             setBody(verificationRequest)
 

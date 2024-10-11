@@ -8,7 +8,7 @@ import com.atlassian.onetime.model.TOTPSecret
 import com.atlassian.onetime.service.DefaultTOTPService
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.exceptions.authCheck
-import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.data.TOTPStoredData
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
@@ -21,10 +21,6 @@ import kotlinx.serialization.Serializable
 
 object TOTP : AuthenticationMethod("totp") {
 
-    @Serializable
-    data class TOTPStoredData(
-        val secret: String,
-    ) : AuthMethodStoredData
 
     fun auth(session: AuthSession, code: String) {
         val storedData = lookupStoredMultiData<TOTPStoredData>(session /* context() */)

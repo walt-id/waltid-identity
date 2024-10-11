@@ -39,7 +39,7 @@ dependencies {
 
     // JWT
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
-    implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.41.2")
 
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm")
@@ -70,7 +70,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
 
     // Ktor server external
-    implementation("io.github.smiley4:ktor-swagger-ui:3.4.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:3.5.0")
 
     // JSON
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")

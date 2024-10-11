@@ -4,7 +4,7 @@ import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.UsernameIdentifier
 import id.walt.ktorauthnz.exceptions.authCheck
-import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.data.UserPassStoredData
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
@@ -20,10 +20,6 @@ data class UserPassCredentials(val username: String, val password: String)
 
 object UserPass : UserPassBasedAuthMethod("userpass") {
 
-    @Serializable
-    data class UserPassStoredData(
-        val password: String,
-    ) : AuthMethodStoredData
 
     override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
         val identifier = UsernameIdentifier(credential.name)
