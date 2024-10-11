@@ -1,8 +1,8 @@
 package id.walt.ktorauthnz.methods
 
 import id.walt.ktorauthnz.AuthContext
-import id.walt.ktorauthnz.accounts.identifiers.AccountIdentifier
-import id.walt.ktorauthnz.accounts.identifiers.UsernameIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.UsernameIdentifier
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.data.UserPassStoredData
 import id.walt.ktorauthnz.sessions.AuthSession

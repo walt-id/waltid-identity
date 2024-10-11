@@ -1,8 +1,8 @@
 package id.walt.ktorauthnz.methods
 
 import id.walt.ktorauthnz.AuthContext
-import id.walt.ktorauthnz.accounts.identifiers.AccountIdentifier
-import id.walt.ktorauthnz.accounts.identifiers.LDAPIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.LDAPIdentifier
 import id.walt.ktorauthnz.exceptions.authFailure
 import id.walt.ktorauthnz.methods.config.LDAPConfiguration
 import id.walt.ktorauthnz.sessions.AuthSession
