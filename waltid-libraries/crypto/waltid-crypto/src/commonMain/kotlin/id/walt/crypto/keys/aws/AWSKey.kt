@@ -194,7 +194,7 @@ class AWSKey(
 
         logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.Verify" }
 
-        val verification = client.post("$awsKmsUrl/") {
+        val verification = client.post("https://$awsKmsUrl/") {
             headers {
                 headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
                 append(HttpHeaders.Host, awsKmsUrl)
@@ -380,7 +380,7 @@ ${sha256Hex(canonicalRequest)}
 
             logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.GetPublicKey" }
 
-            val key = client.post("$awsKmsUrl/") {
+            val key = client.post("https://$awsKmsUrl/") {
                 headers {
                     headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
                     append(HttpHeaders.Host, awsKmsUrl)
@@ -454,7 +454,7 @@ $public
 
             logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.CreateKey" }
 
-            val key = client.post("$awsKmsUrl/") {
+            val key = client.post("https://$awsKmsUrl/") {
                 headers {
                     headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
                     append(HttpHeaders.Host, awsKmsUrl)
