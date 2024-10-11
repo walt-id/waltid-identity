@@ -33,7 +33,9 @@ kotlin {
     }
     js(IR) {
         moduleName = "waltid-permissions"
-        nodejs()
+        nodejs {
+            generateTypeScriptDefinitions()
+        }
         browser {
             generateTypeScriptDefinitions()
             /*testTask {
@@ -115,6 +117,10 @@ publishing {
     }
 }
 
+tasks.named("jsBrowserTest") {
+    enabled = false
+}
+
 extensions.getByType<SuspendTransformGradleExtension>().apply {
     transformers[TargetPlatform.JS] = mutableListOf(
         SuspendTransformConfiguration.jsPromiseTransformer.copy(
@@ -123,8 +129,4 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
             )
         )
     )
-}
-
-tasks.named("jsBrowserTest") {
-    enabled = false
 }
