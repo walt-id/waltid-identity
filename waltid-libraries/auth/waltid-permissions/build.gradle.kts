@@ -33,9 +33,10 @@ kotlin {
     }
     js(IR) {
         moduleName = "waltid-permissions"
+        nodejs()
         browser {
             generateTypeScriptDefinitions()
-            testTask {
+            /*testTask {
                 useKarma {
                     fun hasProgram(program: String) =
                         runCatching {
@@ -51,11 +52,10 @@ kotlin {
                     ).entries.firstOrNull { hasProgram(it.key) }
                     if (testEngine == null) println("No web test engine installed, please install chromium or firefox or chrome.")
                     else {
-                        // println("Using web test engine: ${testEngine.key}")
                         testEngine.value.invoke()
                     }
                 }
-            }
+            }*/
         }
         binaries.library()
     }
@@ -123,4 +123,8 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
             )
         )
     )
+}
+
+tasks.named("jsBrowserTest") {
+    enabled = false
 }
