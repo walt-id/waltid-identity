@@ -1,9 +1,12 @@
 package id.walt.ktorauthnz.accounts.identifiers.methods
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class JWTIdentifier(val subject: String) : AccountIdentifier("jwt") {
+@SerialName("jwt")
+data class JWTIdentifier(val subject: String) : AccountIdentifier() {
+    override fun identifierName() = "jwt"
     override fun toDataString() = subject
 
     companion object : AccountIdentifierFactory<JWTIdentifier>("jwt") {

@@ -1,5 +1,8 @@
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+
 plugins {
     kotlin("jvm")
+    kotlin("plugin.power-assert")
     kotlin("plugin.serialization")
     id("io.ktor.plugin") version "2.3.12"
     id("maven-publish")
@@ -129,4 +132,16 @@ publishing {
             }
         }
     }
+}
+
+@OptIn(ExperimentalKotlinGradlePluginApi::class)
+powerAssert {
+    includedSourceSets = listOf("test")
+    functions = listOf(
+        // kotlin.test
+        "kotlin.assert", "kotlin.test.assertTrue", "kotlin.test.assertEquals", "kotlin.test.assertNull",
+
+        // checks
+        "kotlin.require", "kotlin.check"
+    )
 }

@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods.config
 
+import id.walt.ktorauthnz.methods.JWT
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -8,4 +9,6 @@ import kotlinx.serialization.Serializable
 data class JwtAuthConfiguration(
     val verifyKey: String,
     val identifyClaim: String = "sub",
-) : AuthMethodConfiguration
+) : AuthMethodConfiguration {
+    override fun authMethod() = JWT
+}

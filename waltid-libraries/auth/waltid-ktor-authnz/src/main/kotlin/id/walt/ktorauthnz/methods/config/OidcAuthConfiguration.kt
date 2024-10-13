@@ -33,4 +33,6 @@ data class OidcAuthConfiguration(
     init {
         runBlocking { init() }
     }
+
+    override fun authMethod() = OIDC
 }

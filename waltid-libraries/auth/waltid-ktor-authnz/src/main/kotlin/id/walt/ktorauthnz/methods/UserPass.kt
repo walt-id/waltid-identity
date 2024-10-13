@@ -20,6 +20,7 @@ data class UserPassCredentials(val username: String, val password: String)
 
 object UserPass : UserPassBasedAuthMethod("userpass") {
 
+    override val relatedAuthMethodStoredData = UserPassStoredData::class
 
     override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
         val identifier = UsernameIdentifier(credential.name)

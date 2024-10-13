@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 plugins {
     kotlin("jvm")
-    kotlin("plugin.power-assert") version "2.0.0"
+    kotlin("plugin.power-assert")
 }
 
 group = "id.walt"

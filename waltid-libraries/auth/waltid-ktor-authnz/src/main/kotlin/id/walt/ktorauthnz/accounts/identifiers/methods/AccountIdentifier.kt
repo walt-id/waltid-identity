@@ -5,14 +5,19 @@ import kotlinx.serialization.Serializable
 
 @Suppress("EqualsOrHashCode")
 @Serializable
-abstract class AccountIdentifier(val identifierName: String) {
+sealed class AccountIdentifier {
 
-    override fun toString(): String = "[$identifierName: ${toDataString()}]"
+    internal abstract fun identifierName(): String
+
+    val accountIdentifierName
+        get() = identifierName()
+
+    override fun toString(): String = "[$accountIdentifierName: ${toDataString()}]"
     abstract fun toDataString(): String
 
     override fun equals(other: Any?): Boolean {
         if (other !is AccountIdentifier) return false
-        if (other.identifierName != identifierName) return false
+        if (other.accountIdentifierName != accountIdentifierName) return false
         if (other.hashCode() != hashCode()) return false
 
         return true

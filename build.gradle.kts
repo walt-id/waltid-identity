@@ -15,6 +15,7 @@ plugins {
     val kotlinVersion = "2.0.20"
     kotlin("multiplatform") version kotlinVersion apply false
     kotlin("jvm") version kotlinVersion
+    kotlin("plugin.power-assert") version kotlinVersion apply false
 
     kotlin("plugin.compose") version kotlinVersion apply false
 
