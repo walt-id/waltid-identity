@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods.config
 
+import id.walt.ktorauthnz.methods.LDAP
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -8,4 +9,6 @@ import kotlinx.serialization.Serializable
 data class LDAPConfiguration(
     val ldapServerUrl: String,
     val userDNFormat: String,
-) : AuthMethodConfiguration
+) : AuthMethodConfiguration {
+    override fun authMethod() = LDAP
+}

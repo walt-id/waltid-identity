@@ -2,7 +2,7 @@ package id.walt.ktorauthnz.accounts.identifiers
 
 import id.walt.ktorauthnz.accounts.identifiers.methods.*
 
-object AccountIdentifierRegistry {
+object AccountIdentifierManager {
 
     private val defaultIdentifiers =
         listOf(EmailIdentifier, JWTIdentifier, LDAPIdentifier, OIDCIdentifier, RADIUSIdentifier, UsernameIdentifier)

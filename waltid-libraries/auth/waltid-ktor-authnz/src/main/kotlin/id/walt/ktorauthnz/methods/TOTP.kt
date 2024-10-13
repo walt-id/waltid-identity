@@ -21,6 +21,7 @@ import kotlinx.serialization.Serializable
 
 object TOTP : AuthenticationMethod("totp") {
 
+    override val relatedAuthMethodStoredData = TOTPStoredData::class
 
     fun auth(session: AuthSession, code: String) {
         val storedData = lookupStoredMultiData<TOTPStoredData>(session /* context() */)

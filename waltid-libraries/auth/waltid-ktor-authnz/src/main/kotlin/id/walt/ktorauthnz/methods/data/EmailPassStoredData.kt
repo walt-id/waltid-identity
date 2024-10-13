@@ -1,10 +1,13 @@
 package id.walt.ktorauthnz.methods.data
 
+import id.walt.ktorauthnz.methods.EmailPass
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-@SerialName("emailpass-data")
+@SerialName("email")
 data class EmailPassStoredData(
     val password: String,
-) : AuthMethodStoredData
+) : AuthMethodStoredData {
+    override fun authMethod() = EmailPass
+}
