@@ -56,7 +56,7 @@ object ExampleAccountStore : EditableAccountStore {
     }
 
     // TODO
-    override fun lookupStoredMultiDataForAccount(session: AuthSession, method: AuthenticationMethod): AuthMethodStoredData? {
+    override suspend fun lookupStoredMultiDataForAccount(session: AuthSession, method: AuthenticationMethod): AuthMethodStoredData? {
         check(session.accountId != null) { "No account id available for session yet (no AccountIdentifier used yet)." }
         val storedData = wip_accountAuthMechanisms[session.accountId]!![method]
 
@@ -64,19 +64,19 @@ object ExampleAccountStore : EditableAccountStore {
     }
 
     // TODO
-    override fun lookupStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): AuthMethodStoredData? {
+    override suspend fun lookupStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): AuthMethodStoredData? {
         val uuid = wip_account_ids[identifier] ?: error("No account for identifier: $identifier")
         val storedData = wip_accountAuthMechanisms[uuid]!![method]
 
         return storedData
     }
 
-    override fun hasStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): Boolean {
+    override suspend fun hasStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): Boolean {
         val uuid = wip_account_ids[identifier] ?: error("No account for identifier: $identifier")
         return wip_accountAuthMechanisms[uuid]!!.containsKey(method)
     }
 
-    override fun lookupAccountUuid(identifier: AccountIdentifier): String {
+    override suspend fun lookupAccountUuid(identifier: AccountIdentifier): String {
         return wip_account_ids[identifier] ?: error("No account for account id: $this")
     }
 
