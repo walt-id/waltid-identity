@@ -23,7 +23,7 @@ object TOTP : AuthenticationMethod("totp") {
 
     override val relatedAuthMethodStoredData = TOTPStoredData::class
 
-    fun auth(session: AuthSession, code: String) {
+    suspend fun auth(session: AuthSession, code: String) {
         val storedData = lookupStoredMultiData<TOTPStoredData>(session /* context() */)
 
         val userProvidedOtpCode = TOTP(code)

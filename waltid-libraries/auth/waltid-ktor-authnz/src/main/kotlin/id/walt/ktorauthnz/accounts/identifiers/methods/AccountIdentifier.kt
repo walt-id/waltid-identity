@@ -23,7 +23,7 @@ sealed class AccountIdentifier {
         return true
     }
 
-    fun resolveToAccountId() = KtorAuthnzManager.accountStore.lookupAccountUuid(this)
+    suspend fun resolveToAccountId() = KtorAuthnzManager.accountStore.lookupAccountUuid(this)
 
     abstract class AccountIdentifierFactory<T : AccountIdentifier>(val identifierName: String) {
         abstract fun fromAccountIdentifierDataString(dataString: String): T
