@@ -1,10 +1,10 @@
 package id.walt.ktorauthnz.methods
 
 import id.walt.ktorauthnz.AuthContext
-import id.walt.ktorauthnz.accounts.identifiers.AccountIdentifier
-import id.walt.ktorauthnz.accounts.identifiers.LDAPIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.LDAPIdentifier
 import id.walt.ktorauthnz.exceptions.authFailure
-import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
+import id.walt.ktorauthnz.methods.config.LDAPConfiguration
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
@@ -13,18 +13,11 @@ import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
-import kotlinx.serialization.Serializable
 import org.apache.directory.api.ldap.model.exception.LdapException
 import org.apache.directory.ldap.client.api.LdapConnection
 import org.apache.directory.ldap.client.api.LdapNetworkConnection
 
 object LDAP : UserPassBasedAuthMethod("ldap") {
-
-    @Serializable
-    data class LDAPConfiguration(
-        val ldapServerUrl: String,
-        val userDNFormat: String,
-    ) : AuthMethodConfiguration
 
     override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
         val config = session.lookupConfiguration<LDAPConfiguration>(this)

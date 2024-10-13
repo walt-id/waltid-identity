@@ -95,6 +95,7 @@ dependencies {
     api(project(":waltid-libraries:waltid-did"))
 
     api(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+    api(project(":waltid-libraries:credentials:waltid-verification-policies"))
     api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
     api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
@@ -103,7 +104,7 @@ dependencies {
     implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
 
     // Multiplatform / Hashes
-    testImplementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.4.0"))
+    testImplementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.5.3"))
     testImplementation("org.kotlincrypto.hash:sha2")
 }
 

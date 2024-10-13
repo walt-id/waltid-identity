@@ -9,7 +9,9 @@ COPY waltid-libraries/crypto/waltid-crypto/build.gradle.kts /work/waltid-librari
 COPY waltid-libraries/crypto/waltid-crypto-oci/build.gradle.kts /work/waltid-libraries/crypto/waltid-crypto-oci/
 COPY waltid-libraries/waltid-did/build.gradle.kts /work/waltid-libraries/waltid-did/
 COPY waltid-libraries/credentials/waltid-mdoc-credentials/build.gradle.kts /work/waltid-libraries/credentials/waltid-mdoc-credentials/
-COPY waltid-libraries/credentials/waltid-verifiable-credentials//build.gradle.kts /work/waltid-libraries/credentials/waltid-verifiable-credentials/
+COPY waltid-libraries/credentials/waltid-verifiable-credentials/build.gradle.kts /work/waltid-libraries/credentials/waltid-verifiable-credentials/
+COPY waltid-libraries/credentials/waltid-verification-policies/build.gradle.kts /work/waltid-libraries/credentials/waltid-verification-policies/
+COPY waltid-libraries/credentials/waltid-dif-definitions-parser/build.gradle.kts /work/waltid-libraries/credentials/waltid-dif-definitions-parser/
 COPY waltid-libraries/auth/waltid-ktor-authnz/build.gradle.kts /work/waltid-libraries/auth/waltid-ktor-authnz/
 COPY waltid-libraries/auth/waltid-permissions/build.gradle.kts /work/waltid-libraries/auth/waltid-permissions/
 COPY waltid-libraries/waltid-library-commons/build.gradle.kts /work/waltid-libraries/waltid-library-commons/
@@ -27,6 +29,8 @@ COPY waltid-libraries/crypto/waltid-crypto-oci/. /work/waltid-libraries/crypto/w
 COPY waltid-libraries/waltid-did/. /work/waltid-libraries/waltid-did
 COPY waltid-libraries/credentials/waltid-mdoc-credentials/. /work/waltid-libraries/credentials/waltid-mdoc-credentials
 COPY waltid-libraries/credentials/waltid-verifiable-credentials/. /work/waltid-libraries/credentials/waltid-verifiable-credentials
+COPY waltid-libraries/credentials/waltid-verification-policies/. /work/waltid-libraries/credentials/waltid-verification-policies
+COPY waltid-libraries/credentials/waltid-dif-definitions-parser/. /work/waltid-libraries/credentials/waltid-dif-definitions-parser
 COPY waltid-libraries/auth/waltid-ktor-authnz/. /work/waltid-libraries/auth/waltid-ktor-authnz
 COPY waltid-libraries/auth/waltid-permissions/. /work/waltid-libraries/auth/waltid-permissions
 COPY waltid-libraries/waltid-library-commons/. /work/waltid-libraries/waltid-library-commons

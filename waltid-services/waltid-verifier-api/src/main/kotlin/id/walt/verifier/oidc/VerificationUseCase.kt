@@ -5,9 +5,10 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
-import id.walt.credentials.verification.models.PolicyRequest
-import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
-import id.walt.credentials.verification.policies.JwtSignaturePolicy
+import id.walt.credentials.utils.VCFormat
+import id.walt.policies.models.PolicyRequest
+import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
+import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -20,6 +21,8 @@ import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
+import id.walt.policies.VerificationPolicy
+import id.walt.policies.policies.SdJwtVCSignaturePolicy
 import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import io.klogging.logger
@@ -55,16 +58,16 @@ class VerificationUseCase(
         walletInitiatedAuthState: String? = null,
         trustedRootCAs: JsonArray? = null,
     ) = let {
-        val vpPolicies = vpPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
-
-        val vcPolicies = vcPoliciesJson?.jsonArray?.parsePolicyRequests() ?: listOf(PolicyRequest(JwtSignaturePolicy()))
-
         val requestedCredentials = requestCredentialsJson.jsonArray.map {
             when (it) {
                 is JsonObject -> Json.decodeFromJsonElement<RequestedCredential>(it)
                 else -> throw IllegalArgumentException("Invalid JSON type for requested credential: $it")
             }
         }
+
+        val presentationFormat = getPresentationFormat(requestedCredentials)
+        val vpPolicies = vpPoliciesJson?.jsonArray?.parsePolicyRequests() ?: getDefaultVPPolicyRequests(presentationFormat)
+        val vcPolicies = vcPoliciesJson?.jsonArray?.parsePolicyRequests() ?: getDefaultVCPolicies(presentationFormat)
 
         val presentationDefinition = PresentationDefinition(inputDescriptors = requestedCredentials.map { it.toInputDescriptor() })
 
@@ -234,6 +237,31 @@ class VerificationUseCase(
             OpenId4VPProfile.ISO_18013_7_MDOC -> ClientIdScheme.X509SanDns
             else -> defaultClientIdScheme
         }
+    }
+
+    private fun getPresentationFormat(requestedCredentials: List<RequestedCredential>): VCFormat {
+        val credentialFormat = requestedCredentials.map { it.format }.distinct().singleOrNull()
+        if(credentialFormat == null) throw IllegalArgumentException("Credentials formats must be distinct for a presentation request")
+        return when (credentialFormat) {
+            VCFormat.mso_mdoc -> VCFormat.mso_mdoc
+            VCFormat.sd_jwt_vc -> VCFormat.sd_jwt_vc
+            VCFormat.ldp_vc, VCFormat.ldp -> VCFormat.ldp_vp
+            VCFormat.jwt_vc, VCFormat.jwt -> VCFormat.jwt_vp
+            VCFormat.jwt_vc_json -> VCFormat.jwt_vp_json
+            else -> throw IllegalArgumentException("Credentials format $credentialFormat is not a valid format for a requested credential")
+        }
+    }
+
+    private fun getDefaultVPPolicyRequests(presentationFormat: VCFormat): List<PolicyRequest> = when(presentationFormat) {
+        //VCFormat.mso_mdoc -> TODO()
+        VCFormat.sd_jwt_vc -> listOf(PolicyRequest(SdJwtVCSignaturePolicy()))
+        else -> listOf(PolicyRequest(JwtSignaturePolicy()))
+    }
+
+    private fun getDefaultVCPolicies(presentationFormat: VCFormat): List<PolicyRequest> = when(presentationFormat) {
+        //VCFormat.mso_mdoc -> TODO()
+        VCFormat.sd_jwt_vc -> listOf()
+        else -> listOf(PolicyRequest(JwtSignaturePolicy()))
     }
 }
 

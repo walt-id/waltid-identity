@@ -9,14 +9,17 @@ import com.github.ajalt.clikt.parameters.types.path
 import id.walt.cli.util.JsonUtils.toJsonPrimitive
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
-import id.walt.credentials.verification.*
-import id.walt.credentials.verification.models.PolicyRequest
-import id.walt.credentials.verification.models.PolicyResult
-import id.walt.credentials.verification.models.PresentationVerificationResponse
+import id.walt.policies.models.PolicyRequest
+import id.walt.policies.models.PolicyResult
+import id.walt.policies.models.PresentationVerificationResponse
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
+import id.walt.policies.ExpirationDatePolicyException
+import id.walt.policies.NotBeforePolicyException
+import id.walt.policies.PolicyManager
+import id.walt.policies.Verifier
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -263,8 +266,10 @@ class VPVerifyCmd : CliktCommand(
     private fun verify(params: VpVerifyParameters): PresentationVerificationResponse {
         try {
             return runBlocking {
+                val presentationFormat = params.presentationSubmission.descriptorMap.firstOrNull()?.format ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
                 Verifier.verifyPresentation(
-                    vpTokenJwt = params.vp,
+                    presentationFormat,
+                    vpToken = params.vp,
                     vpPolicies = params.vpPolicyRequests,
                     globalVcPolicies = params.globalVcPolicyRequests,
                     specificCredentialPolicies = emptyMap(),
@@ -296,7 +301,7 @@ class VPVerifyCmd : CliktCommand(
     private fun handleFailure(it: PolicyResult) {
         when (val exception = it.result.exceptionOrNull()) {
 
-            is JsonSchemaVerificationException -> {
+            is id.walt.policies.JsonSchemaVerificationException -> {
                 exception.validationErrors.forEach { err ->
                     print.dim("${it.request.policy.name}: ", false)
                     print.red("Fail! ", false)

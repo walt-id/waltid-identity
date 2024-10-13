@@ -99,14 +99,6 @@ This value will be used by reverse proxy (and services configs, if any).
 
 ## Troubleshooting
 
----
-
-#### Display of VC verification result on success page of portal doesn't work
-
-We are working on fixing this issue.
-
----
-
 #### Updating ports doesn't work
 
 Make sure the ports are also updated in:
@@ -121,3 +113,14 @@ Make sure the ports are also updated in:
 - wallet-api/config
     - web.conf
     - db.conf
+
+
+#### Removing the DB volume
+```
+docker volume rm docker-compose_wallet-api-db
+```
+#### DB Backup / Restore
+```
+pg_dump -U your_user_name -h your_host -d your_db_name > backup.sql
+psql -U your_user_name -h your_host -d your_db_name < backup.sql
+```

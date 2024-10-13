@@ -7,6 +7,7 @@ import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.PresentationBuilder
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -16,7 +17,6 @@ import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
-import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.errors.PresentationError
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.interfaces.SimpleHttpResponse

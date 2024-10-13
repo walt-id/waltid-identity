@@ -1,10 +1,10 @@
 package id.walt.webwallet.web.controllers.exchange.openapi.examples
 
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationSubmission
-import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures
 import id.walt.webwallet.service.exchange.ProofOfPossessionParameters
 import id.walt.webwallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIRequest

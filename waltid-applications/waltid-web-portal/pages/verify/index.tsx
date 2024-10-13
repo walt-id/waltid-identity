@@ -56,21 +56,26 @@ export default function Verification() {
         }
       });
 
+      let requestBody: any = {
+        request_credentials: request_credentials,
+      };
+
+      if (mapFormat(format) !== 'vc+sd-jwt') {
+        requestBody.vc_policies = vps.map((vp) => {
+          if (vp.includes('=')) {
+            return {
+              policy: vp.split('=')[0],
+              args: vp.split('=')[1],
+            };
+          } else {
+            return vp;
+          }
+        });
+      }
+
       const response = await axios.post(
         `${env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER}/openid4vc/verify`,
-        {
-          request_credentials: request_credentials,
-          vc_policies: vps.map((vp) => {
-            if (vp.includes('=')) {
-              return {
-                policy: vp.split('=')[0],
-                args: vp.split('=')[1],
-              };
-            } else {
-              return vp;
-            }
-          }),
-        },
+          requestBody,
         {
           headers: {
             successRedirectUri: `${window.location.origin}/success/$id`,

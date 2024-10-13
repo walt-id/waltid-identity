@@ -4,6 +4,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class PresentationDefinition(
@@ -64,7 +66,7 @@ data class PresentationDefinition(
                 val name: String? = null,
                 @SerialName("intent_to_retain")
                 val intentToRetain: Boolean? = null,
-                val filter: JsonElement? = null,
+                val filter: JsonObject? = null,
                 val predicate: String? = null
             )
 
@@ -85,5 +87,15 @@ data class PresentationDefinition(
                 }
             }
         }
+    }
+
+    fun primitiveVerificationGetTypeList(): List<String> {
+        val fields = inputDescriptors.mapNotNull { it.constraints.fields }.flatten()
+            // filter for field paths "$.type" (W3C) or "$.vct" (sd-jwt-vc)
+            .filter { field -> field.path.any { "type" in it || "vct" in it } && field.filter?.get("type")?.jsonPrimitive?.contentOrNull == "string" }
+
+        val types = fields.mapNotNull { it.filter?.get("pattern")?.jsonPrimitive?.contentOrNull }
+
+        return types
     }
 }

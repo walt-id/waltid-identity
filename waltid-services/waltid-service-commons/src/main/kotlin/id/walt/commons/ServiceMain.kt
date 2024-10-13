@@ -1,5 +1,6 @@
 package id.walt.commons
 
+import com.github.ajalt.clikt.core.main
 import id.walt.commons.commands.ServiceRunnableCommand
 import id.walt.commons.config.statics.RunConfiguration
 

@@ -28,8 +28,6 @@ import kotlin.uuid.toKotlinUuid
 //    override val id: Column<EntityID<ComparableUuid>> = kotlinxUuid(columnName)
 //        .autoGenerate()
 //        .entityId()
-//    val x = uuid("y").autoGenerate().entityId()
-//
 //
 //    override val primaryKey: PrimaryKey by lazy { super.primaryKey ?: PrimaryKey(id) }
 //}
