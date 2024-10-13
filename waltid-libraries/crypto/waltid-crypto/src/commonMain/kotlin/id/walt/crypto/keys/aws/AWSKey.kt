@@ -481,34 +481,6 @@ $public
             )
         }
 
-        /*
-        //TODO: remove, if not used
-        @JvmBlocking
-        @JvmAsync
-        @JsPromise
-        @JsExport.Ignore
-        suspend fun listKeys(config: AWSKeyMetadata) {
-            val method = HttpMethod.Post
-            val headers = buildSigV4Headers(
-                method = method,
-                payload = """{}""",
-                config = config
-            )
-            val key = client.post("https://kms.${config.region}.amazonaws.com/") {
-                headers {
-                    headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
-                    append(HttpHeaders.Host, "kms.${config.region}.amazonaws.com")
-                    append("X-Amz-Target", "TrentService.ListKeys") // Specific KMS action for ListKeys
-                }
-                setBody(
-                    """{}"""
-                ) // Set the JSON body
-            }
-
-            println(key.bodyAsText())
-
-
-        }*/
     }
 }
 
