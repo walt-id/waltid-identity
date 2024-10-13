@@ -1,6 +1,9 @@
 package id.walt.crypto.keys.aws
 
+import id.walt.crypto.exceptions.KeyNotFoundException
 import id.walt.crypto.exceptions.KeyTypeNotSupportedException
+import id.walt.crypto.exceptions.SigningException
+import id.walt.crypto.exceptions.VerificationException
 import id.walt.crypto.keys.AwsKeyMeta
 import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.Key
@@ -135,7 +138,8 @@ class AWSKey(
             }
             setBody(body) // Set the JSON body
         }.awsJsonDataBody()
-        return signature["Signature"]?.jsonPrimitive?.content?.decodeFromBase64() ?: throw Error("failed to sign")
+        return signature["Signature"]?.jsonPrimitive?.content?.decodeFromBase64()
+            ?: throw SigningException("failed to sign")
     }
 
     @JvmBlocking
@@ -158,7 +162,7 @@ class AWSKey(
         if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) { // TODO: Add RSA support
             rawSignature = EccUtils.convertDERtoIEEEP1363(rawSignature)
         } else {
-            throw Error("Unsupported key type for JWS signing: $keyType")
+            throw KeyTypeNotSupportedException("$keyType")
         }
 
         val encodedSignature = rawSignature.encodeToBase64Url()
@@ -204,7 +208,7 @@ class AWSKey(
         }.awsJsonDataBody()
         return Result.success(
             verification["SignatureValid"]?.jsonPrimitive?.content?.decodeFromBase64()
-                ?: throw Error("failed to verify")
+                ?: throw VerificationException("failed to verify")
         )
     }
 
@@ -393,7 +397,7 @@ ${sha256Hex(canonicalRequest)}
 
             val public = key["PublicKey"]?.jsonPrimitive?.content
 
-            if (public.isNullOrEmpty()) throw Error("Could not determine PublicKey")
+            if (public.isNullOrEmpty()) throw KeyNotFoundException(message = "Could not determine PublicKey")
 
             val pemKey = """
 -----BEGIN PUBLIC KEY-----
@@ -465,7 +469,7 @@ $public
 
             val keyId = key["KeyMetadata"]?.jsonObject?.get("KeyId")?.jsonPrimitive?.content
 
-            if (keyId.isNullOrEmpty()) throw Error("Key ID could not be determined")
+            if (keyId.isNullOrEmpty()) throw KeyNotFoundException(message = "Key ID could not be determined")
 
             val publicKey = getPublicKey(config, keyId.toString())
 
