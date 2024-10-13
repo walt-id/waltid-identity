@@ -1,5 +1,6 @@
 package id.walt.verifier.oidc
 
+import id.walt.credentials.utils.VCFormat
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.dif.*
 import kotlinx.serialization.SerialName

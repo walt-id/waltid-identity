@@ -97,7 +97,7 @@ data class CredentialTypeConfig(
                     CredentialFormat.entries.associate { format ->
                         "${entry.key}_${format.value}" to CredentialSupported(
                             format = format,
-                            cryptographicBindingMethodsSupported = setOf("did"),
+                            cryptographicBindingMethodsSupported = if (format == CredentialFormat.sd_jwt_vc) setOf("jwk") else setOf("did"),
                             credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
                             credentialDefinition = if (format != CredentialFormat.sd_jwt_vc && format != CredentialFormat.mso_mdoc ) CredentialDefinition(type = type)  else null,
                             vct = if (format == CredentialFormat.sd_jwt_vc) baseUrl.plus("/${entry.key}") else null,

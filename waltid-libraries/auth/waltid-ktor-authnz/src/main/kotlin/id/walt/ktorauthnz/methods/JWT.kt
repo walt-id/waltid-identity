@@ -3,9 +3,9 @@ package id.walt.ktorauthnz.methods
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.ktorauthnz.AuthContext
-import id.walt.ktorauthnz.accounts.identifiers.JWTIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.JWTIdentifier
 import id.walt.ktorauthnz.exceptions.authCheck
-import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
+import id.walt.ktorauthnz.methods.config.JwtAuthConfiguration
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.ktor.http.*
@@ -13,15 +13,8 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
-import kotlinx.serialization.Serializable
 
 object JWT : AuthenticationMethod("jwt") {
-
-    @Serializable
-    data class JwtAuthConfiguration(
-        val verifyKey: String,
-        val identifyClaim: String = "sub",
-    ) : AuthMethodConfiguration
 
     fun auth(jwt: String, config: JwtAuthConfiguration): JWTIdentifier {
         // todo: handle others

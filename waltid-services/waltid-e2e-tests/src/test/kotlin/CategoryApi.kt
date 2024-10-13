@@ -1,11 +1,10 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-import E2ETestWebService.test
+import id.walt.commons.testing.E2ETest.test
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.serialization.json.JsonObject
-
 import java.net.URLEncoder
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid

@@ -1,6 +1,9 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
 import id.walt.commons.interop.LspPotentialInterop
+import id.walt.commons.testing.E2ETest.getBaseURL
+import id.walt.commons.testing.E2ETest.test
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -8,7 +11,6 @@ import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
 import id.walt.oid4vc.data.*
-import id.walt.oid4vc.data.dif.VCFormat
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDJwtVC
@@ -51,7 +53,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         }
     }
 
-    suspend fun testMDocIssuance() = E2ETestWebService.test("test mdoc issuance") {
+    suspend fun testMDocIssuance() = test("test mdoc issuance") {
         // === get credential offer from test issuer API ===
         val issuanceReq = Json.decodeFromString<IssuanceRequest>(IssuanceExamples.mDLCredentialIssuanceData).copy(
             authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED
@@ -95,7 +97,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         runBlocking { issuedMdocId = fetchedCredential.id }
     }
 
-    suspend fun testMdocPresentation() = E2ETestWebService.test("test mdoc presentation") {
+    suspend fun testMdocPresentation() = test("test mdoc presentation") {
         val createReqResponse = client.post("/openid4vc/verify") {
             header("authorizeBaseUrl", "mdoc-openid4vp://")
             header("responseMode", "direct_post_jwt")
@@ -201,7 +203,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         )
     )
 
-    suspend fun testSDJwtVCIssuance(issuanceReq: IssuanceRequest) = E2ETestWebService.test("test sd-jwt-vc issuance") {
+    suspend fun testSDJwtVCIssuance(issuanceReq: IssuanceRequest) = test("test sd-jwt-vc issuance") {
         // === get credential offer from test issuer API ===
         val offerResp = client.post("/openid4vc/sdjwt/issue") {
             contentType(ContentType.Application.Json)
@@ -254,7 +256,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
     }
 
     suspend fun testSDJwtPresentation(openIdProfile: OpenId4VPProfile = OpenId4VPProfile.HAIP) =
-        E2ETestWebService.test("test sd-jwt-vc presentation") {
+        test("test sd-jwt-vc presentation") {
             val createReqResponse = client.post("/openid4vc/verify") {
                 header("authorizeBaseUrl", "openid4vp://")
                 header("openId4VPProfile", openIdProfile.name)
@@ -268,7 +270,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
                                 listOf(
                                     RequestedCredential(
                                         format = VCFormat.sd_jwt_vc,
-                                        vct = "${E2ETestWebService.getBaseURL()}/identity_credential",
+                                        vct = "${getBaseURL()}/identity_credential",
                                     ).let {
                                         Json.encodeToJsonElement(it)
                                     })

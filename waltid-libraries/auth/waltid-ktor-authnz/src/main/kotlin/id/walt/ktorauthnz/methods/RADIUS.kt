@@ -1,10 +1,10 @@
 package id.walt.ktorauthnz.methods
 
 import id.walt.ktorauthnz.AuthContext
-import id.walt.ktorauthnz.accounts.identifiers.AccountIdentifier
-import id.walt.ktorauthnz.accounts.identifiers.RADIUSIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.RADIUSIdentifier
 import id.walt.ktorauthnz.exceptions.authCheck
-import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
+import id.walt.ktorauthnz.methods.config.RADIUSConfiguration
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
@@ -13,7 +13,6 @@ import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
-import kotlinx.serialization.Serializable
 import org.aaa4j.radius.client.RadiusClient
 import org.aaa4j.radius.client.clients.UdpRadiusClient
 import org.aaa4j.radius.core.attribute.StringData
@@ -27,15 +26,6 @@ import org.aaa4j.radius.core.packet.packets.AccessRequest
 import java.net.InetSocketAddress
 
 object RADIUS : UserPassBasedAuthMethod("radius") {
-
-    @Serializable
-    data class RADIUSConfiguration(
-        val radiusServerHost: String,
-        val radiusServerPort: Int,
-        val radiusServerSecret: String,
-        val radiusNasIdentifier: String,
-    ) : AuthMethodConfiguration
-
 
     override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
         val config = session.lookupConfiguration<RADIUSConfiguration>(this)

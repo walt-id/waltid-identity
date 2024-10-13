@@ -47,18 +47,58 @@ kotlin {
                 implementation("io.github.optimumcode:json-schema-validator:0.2.3")
 
                 implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+
+                // Loggin
+                implementation("io.github.oshai:kotlin-logging:7.0.0")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                //implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 implementation("org.slf4j:slf4j-simple:2.0.16")
+            }
+        }
+    }
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("mavenJava") {
+            pom {
+                name.set("walt.id DIF Definitions Parser")
+                description.set(
+                    """
+                    Kotlin/Java library for DIF definitions parsing
+                    """.trimIndent()
+                )
+                url.set("https://walt.id")
+            }
+            from(components["kotlin"])
+        }
+    }
+
+    repositories {
+        maven {
+            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
+            val envUsername = System.getenv("MAVEN_USERNAME")
+            val envPassword = System.getenv("MAVEN_PASSWORD")
+
+            val usernameFile = File("secret_maven_username.txt")
+            val passwordFile = File("secret_maven_password.txt")
+
+            val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
+            val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+
+            credentials {
+                username = secretMavenUsername
+                password = secretMavenPassword
             }
         }
     }

@@ -1,6 +1,6 @@
 package id.walt.ktorauthnz.methods
 
-import id.walt.ktorauthnz.accounts.identifiers.AccountIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.sessions.AuthSession
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -62,8 +62,10 @@ abstract class UserPassBasedAuthMethod(
             ContentType.Application.FormUrlEncoded -> {
                 val form = receiveParameters()
 
-                val username = form[usernameName] ?: form[DEFAULT_USER_NAME] ?: error("Invalid or missing $usernameName in form post request. $EXPLANATION_MESSAGE")
-                val password = form[passwordName] ?: form[DEFAULT_PASSWORD_NAME] ?: error("Invalid or missing $passwordName in form post request. $EXPLANATION_MESSAGE")
+                val username = form[usernameName] ?: form[DEFAULT_USER_NAME]
+                ?: error("Invalid or missing $usernameName in form post request. $EXPLANATION_MESSAGE")
+                val password = form[passwordName] ?: form[DEFAULT_PASSWORD_NAME]
+                ?: error("Invalid or missing $passwordName in form post request. $EXPLANATION_MESSAGE")
 
                 return UserPasswordCredential(username, password)
             }

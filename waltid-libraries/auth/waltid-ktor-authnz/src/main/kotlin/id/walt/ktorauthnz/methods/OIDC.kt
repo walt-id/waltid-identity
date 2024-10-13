@@ -1,8 +1,8 @@
 package id.walt.ktorauthnz.methods
 
 import id.walt.ktorauthnz.AuthContext
-import id.walt.ktorauthnz.accounts.identifiers.OIDCIdentifier
-import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
+import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
+import id.walt.ktorauthnz.methods.config.OidcAuthConfiguration
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -17,7 +17,6 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.pipeline.*
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -28,7 +27,6 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 object OIDC : AuthenticationMethod("oidc") {
-
 
 //    override val config = OidcAuthConfiguration::class
 
@@ -44,33 +42,6 @@ object OIDC : AuthenticationMethod("oidc") {
     3. Validate returned ID token, retrieve claims
     */
 
-    @Serializable
-    data class OidcAuthConfiguration(
-        val openIdConfigurationUrl: String? = null,
-        var openIdConfiguration: OpenIdConfiguration = OpenIdConfiguration.INVALID,
-
-        val clientId: String,
-        val clientSecret: String,
-
-        val accountIdentifierClaim: String = "sub"
-    ): AuthMethodConfiguration {
-        fun check() {
-            require(openIdConfiguration != OpenIdConfiguration.INVALID || openIdConfigurationUrl != null) { "Either openIdConfiguration or openIdConfigurationUrl have to be provided!" }
-        }
-
-        suspend fun init() {
-            check()
-
-            if (openIdConfiguration == OpenIdConfiguration.INVALID) {
-                // TODO: move to cache
-                openIdConfiguration = resolveConfiguration(openIdConfigurationUrl!!)
-            }
-        }
-
-        init {
-            runBlocking { init() }
-        }
-    }
 
     /**
      * minimal open id configuration - unused fields are omitted, use Json with ignoreUnknownKeys = true when deserializing into this

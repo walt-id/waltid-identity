@@ -86,7 +86,7 @@ object X5CAccountStrategy : PasswordlessAccountStrategy<X5CAccountRequest>() {
         // add x5c logins record
         X5CLogins.insert {
             it[X5CLogins.tenant] = tenant
-            it[X5CLogins.accountId] = accountId.toJavaUuid()
+            it[X5CLogins.accountId] = accountId
             it[x5cId] = thumbprint
         }
         return accountId

@@ -2,7 +2,8 @@ package id.walt.ktorauthnz.methods.virtual
 
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
-import id.walt.ktorauthnz.accounts.identifiers.EmailIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
+import id.walt.ktorauthnz.methods.data.FlowAmendmentData
 import id.walt.ktorauthnz.sessions.SessionManager
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.ktor.server.application.*
@@ -35,7 +36,7 @@ object IdentifyEmail : IdentifyVirtualAuth("identify") {
                     store.lookupStoredDataFor(identifier, GlobalIdentify)
 
                 else -> error("No global identifier found for $email")
-            } as GlobalIdentify.FlowAmendmentData
+            } as FlowAmendmentData
 
             val session = getSession(authContext)
 

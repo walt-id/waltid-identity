@@ -1,4 +1,3 @@
-import E2ETestWebService.loadResource
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.*
@@ -14,6 +13,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import kotlin.test.assertEquals
 
 

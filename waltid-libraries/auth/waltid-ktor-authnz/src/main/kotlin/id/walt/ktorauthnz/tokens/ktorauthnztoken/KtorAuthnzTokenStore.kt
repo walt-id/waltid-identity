@@ -14,5 +14,4 @@ interface KtorAuthnzTokenStore {
     fun dropToken(token: String)
 
 
-
 }

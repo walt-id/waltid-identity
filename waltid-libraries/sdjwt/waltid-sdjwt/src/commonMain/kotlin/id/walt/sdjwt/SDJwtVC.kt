@@ -1,4 +1,5 @@
 package id.walt.sdjwt
+
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
 
@@ -30,20 +31,22 @@ class SDJwtVC(sdJwt: SDJwt): SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJ
                audience: String? = null, nonce: String? = null): VCVerificationResult {
     var message: String = ""
     return VCVerificationResult(
-      this, verify(jwtCryptoProvider, header["kid"]?.jsonPrimitive?.content ?: issuer),
-(notBefore?.let { Clock.System.now().epochSeconds >= it } ?: true).also {
-        if(!it) message = "$message, VC is not valid before $notBefore"
-      } &&
-      (expiration?.let { Clock.System.now().epochSeconds < it } ?: true).also {
-        if(!it) message = "$message, VC is not valid after $expiration"
-      } &&
-      !vct.isNullOrEmpty().also {
-        if(!it) message = "$message, VC has no verifiable credential type property (vct)"
-      } &&
-      verifyHolderKeyBinding(jwtCryptoProvider, requiresHolderKeyBinding, audience, nonce).also {
-        if(!it) message = "$message, holder key binding could not be verified"
-      },
-      message
+      sdJwtVC = this,
+      sdJwtVerificationResult = verify(jwtCryptoProvider, header["kid"]?.jsonPrimitive?.content ?: issuer),
+      sdJwtVCVerified =
+        (notBefore?.let { Clock.System.now().epochSeconds >= it } ?: true).also {
+          if(!it) message = "$message, VC is not valid before $notBefore"
+        } &&
+        (expiration?.let { Clock.System.now().epochSeconds < it } ?: true).also {
+          if(!it) message = "$message, VC is not valid after $expiration"
+        } &&
+        !vct.isNullOrEmpty().also {
+          if(it) message = "$message, VC has no verifiable credential type property (vct)"
+        } &&
+        verifyHolderKeyBinding(jwtCryptoProvider, requiresHolderKeyBinding, audience, nonce).also {
+          if(!it) message = "$message, holder key binding could not be verified"
+        },
+      vcVerificationMessage = message
     )
   }
 
