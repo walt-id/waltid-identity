@@ -11,6 +11,7 @@ import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.errors.TokenError
 import id.walt.oid4vc.interfaces.ITokenProvider
+import id.walt.oid4vc.providers.AuthorizationSession
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
@@ -225,14 +226,14 @@ object OpenID4VC {
     )
   }
 
-  fun processCodeFlowAuthorization(authorizationRequest: AuthorizationRequest): AuthorizationCodeResponse {
+  fun processCodeFlowAuthorization(authorizationRequest: AuthorizationRequest, authorizationSession: AuthorizationSession): AuthorizationCodeResponse {
     if (!authorizationRequest.responseType.contains(ResponseType.Code))
       throw AuthorizationError(
         authorizationRequest,
         AuthorizationErrorCode.invalid_request,
         message = "Invalid response type ${authorizationRequest.responseType}, for authorization code flow."
       )
-    val authorizationSession = getOrInitAuthorizationSession(authorizationRequest)
+//    val authorizationSession = getOrInitAuthorizationSession(authorizationRequest)
     val code = generateAuthorizationCodeFor(authorizationSession)
     return AuthorizationCodeResponse.success(code, mapOf("state" to listOf(authorizationRequest.state ?: randomUUID())))
   }
