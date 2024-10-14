@@ -30,6 +30,11 @@ suspendTransform {
 }
 
 kotlin {
+
+    fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+    val enableAndroidBuild = getSetting("enableAndroidBuild")
+    val enableIosBuild = getSetting("enableIosBuild")
+
     jvmToolchain(17)
 
     jvm {
@@ -50,6 +55,12 @@ kotlin {
         }
         binaries.library()
     }
+
+    if (enableIosBuild) {
+        iosArm64()
+        iosSimulatorArm64()
+    }
+
     val ktor_version = "2.3.12"
     sourceSets {
         val commonMain by getting {
@@ -95,6 +106,26 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
                 implementation("org.slf4j:slf4j-simple:2.0.13")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
+            }
+        }
+
+        if (enableIosBuild) {
+            val iosArm64Main by getting
+            val iosSimulatorArm64Main by getting
+
+            val iosMain by creating {
+                dependsOn(commonMain)
+                iosArm64Main.dependsOn(this)
+                iosSimulatorArm64Main.dependsOn(this)
+            }
+
+            val iosArm64Test by getting
+            val iosSimulatorArm64Test by getting
+
+            val iosTest by creating {
+                dependsOn(commonTest)
+                iosArm64Test.dependsOn(this)
+                iosSimulatorArm64Test.dependsOn(this)
             }
         }
     }
