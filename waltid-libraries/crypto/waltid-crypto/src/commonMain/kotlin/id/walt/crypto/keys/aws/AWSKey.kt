@@ -161,8 +161,6 @@ class AWSKey(
 
         if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) { // TODO: Add RSA support
             rawSignature = EccUtils.convertDERtoIEEEP1363(rawSignature)
-        } else {
-            throw KeyTypeNotSupportedException("$keyType")
         }
 
         val encodedSignature = rawSignature.encodeToBase64Url()
