@@ -130,7 +130,7 @@ class AWSKey(
 
         logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.Sign" }
 
-        val signature = client.post("$awsKmsUrl/") {
+        val signature = client.post("https://$awsKmsUrl/") {
             headers {
                 headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
                 append(HttpHeaders.Host, "kms.${config.region}.amazonaws.com")
