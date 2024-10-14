@@ -15,16 +15,17 @@ import id.walt.oid4vc.providers.AuthorizationSession
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
-import id.walt.oid4vc.responses.AuthorizationCodeResponse
-import id.walt.oid4vc.responses.AuthorizationCodeWithAuthorizationRequestResponse
-import id.walt.oid4vc.responses.AuthorizationErrorCode
-import id.walt.oid4vc.responses.TokenErrorCode
+import id.walt.oid4vc.responses.*
 import id.walt.oid4vc.util.randomUUID
+import kotlinx.datetime.Clock
+import kotlinx.serialization.MissingFieldException
+import kotlinx.serialization.internal.throwMissingFieldException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.measureTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -226,7 +227,7 @@ object OpenID4VC {
     )
   }
 
-  fun processCodeFlowAuthorization(authorizationRequest: AuthorizationRequest, authorizationSession: AuthorizationSession): AuthorizationCodeResponse {
+  fun processCodeFlowAuthorization(tokenProvider: ITokenProvider, authorizationRequest: AuthorizationRequest, sessionId: String, providerMetadata: OpenIDProviderMetadata): AuthorizationCodeResponse {
     if (!authorizationRequest.responseType.contains(ResponseType.Code))
       throw AuthorizationError(
         authorizationRequest,
@@ -234,7 +235,44 @@ object OpenID4VC {
         message = "Invalid response type ${authorizationRequest.responseType}, for authorization code flow."
       )
 //    val authorizationSession = getOrInitAuthorizationSession(authorizationRequest)
-    val code = generateAuthorizationCodeFor(authorizationSession)
+    val code = generateAuthorizationCodeFor(tokenProvider, sessionId, providerMetadata.issuer ?: throw AuthorizationError(authorizationRequest, AuthorizationErrorCode.server_error,"No issuer configured in given provider metadata"))
     return AuthorizationCodeResponse.success(code, mapOf("state" to listOf(authorizationRequest.state ?: randomUUID())))
   }
+
+  fun processImplicitFlowAuthorization(tokenProvider: ITokenProvider, authorizationRequest: AuthorizationRequest, sessionId: String, providerMetadata: OpenIDProviderMetadata): TokenResponse {
+    println("> processImplicitFlowAuthorization for $authorizationRequest")
+    if (!authorizationRequest.responseType.contains(ResponseType.Token) && !authorizationRequest.responseType.contains(ResponseType.VpToken)
+      && !authorizationRequest.responseType.contains(ResponseType.IdToken)
+    )
+      throw AuthorizationError(
+        authorizationRequest,
+        AuthorizationErrorCode.invalid_request,
+        message = "Invalid response type ${authorizationRequest.responseType}, for implicit authorization flow."
+      )
+    println("> processImplicitFlowAuthorization: Generating authorizationSession (getOrInitAuthorizationSession)...")
+    //val authorizationSession = getOrInitAuthorizationSession(authorizationRequest)
+    println("> processImplicitFlowAuthorization: generateTokenResponse...")
+    return TokenResponse.success(
+      generateToken(tokenProvider, sessionId, providerMetadata.issuer ?: throw AuthorizationError(authorizationRequest, AuthorizationErrorCode.server_error,"No issuer configured in given provider metadata"),
+        TokenTarget.ACCESS),
+      "bearer", state = authorizationRequest.state,
+      expiresIn = Clock.System.now().epochSeconds + 864000L // ten days in seconds
+    )
+  }
+
+  fun processDirectPost(tokenProvider: ITokenProvider, authorizationRequest: AuthorizationRequest, sessionId: String, providerMetadata: OpenIDProviderMetadata): AuthorizationCodeResponse {
+    // Verify nonce - need to add Id token nonce session
+    // if (payload[JWTClaims.Payload.nonce] != session.)
+
+    // Generate code and proceed as regular authorization request
+    val mappedState = mapOf("state" to listOf(authorizationRequest.state!!))
+    val code = generateAuthorizationCodeFor(tokenProvider, sessionId, providerMetadata.issuer ?: throw AuthorizationError(authorizationRequest, AuthorizationErrorCode.server_error,"No issuer configured in given provider metadata"))
+
+    return AuthorizationCodeResponse.success(code, mappedState)
+  }
+
+  const val PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX = "urn:ietf:params:oauth:request_uri:"
+  fun getPushedAuthorizationRequestUri(sessionId: String): String = "$PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX${sessionId}"
+  fun getPushedAuthorizationSessionId(requestUri: String): String = requestUri.substringAfter(
+    PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX)
 }

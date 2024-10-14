@@ -1,6 +1,7 @@
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
+import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.ResponseType.Companion.getResponseTypeString
@@ -324,7 +325,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     }
 
     fun getPushedAuthorizationSuccessResponse(authorizationSession: S) = PushedAuthorizationResponse.success(
-        requestUri = "urn:ietf:params:oauth:request_uri:${authorizationSession.id}",
+        requestUri = "${OpenID4VC.PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX}${authorizationSession.id}",
         expiresIn = authorizationSession.expirationTimestamp - Clock.System.now()
     )
 
@@ -338,7 +339,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     fun getPushedAuthorizationSession(authorizationRequest: AuthorizationRequest): S {
         val session = authorizationRequest.requestUri?.let {
             getVerifiedSession(
-                it.substringAfter("urn:ietf:params:oauth:request_uri:")
+                it.substringAfter(OpenID4VC.PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX)
             ) ?: throw AuthorizationError(
                 authorizationRequest,
                 AuthorizationErrorCode.invalid_request,

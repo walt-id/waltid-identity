@@ -10,6 +10,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.*
+import id.walt.oid4vc.providers.IssuanceSession
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.BatchCredentialRequest
@@ -17,6 +18,7 @@ import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.CredentialErrorCode
+import id.walt.oid4vc.responses.PushedAuthorizationResponse
 import id.walt.sdjwt.JWTVCIssuerMetadata
 import id.walt.sdjwt.SDJWTVCTypeMetadata
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -31,6 +33,7 @@ import io.ktor.server.routing.*
 import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -99,7 +102,11 @@ object OidcApi : CIProvider() {
                 val authReq = AuthorizationRequest.fromHttpParameters(call.receiveParameters().toMap())
                 try {
                     val session = initializeAuthorization(authReq, 5.minutes, null)
-                    call.respond(getPushedAuthorizationSuccessResponse(session).toJSON())
+                    call.respond(
+                        PushedAuthorizationResponse.success(
+                        requestUri = "${OpenID4VC.PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX}${session.id}",
+                        expiresIn = session.expirationTimestamp - Clock.System.now()
+                    ).toJSON())
                 } catch (exc: AuthorizationError) {
                     logger.error(exc) { "Authorization error: " }
                     call.respond(HttpStatusCode.BadRequest, exc.toPushedAuthorizationErrorResponse().toJSON())
@@ -178,8 +185,8 @@ object OidcApi : CIProvider() {
                                     )
                                 }
 
-                                AuthenticationMethod.NONE -> processCodeFlowAuthorization(authReq)
-
+                                AuthenticationMethod.NONE -> OpenID4VC.processCodeFlowAuthorization(
+                                    OidcApi, authReq, issuanceSessionData.first().id, metadata)
                                 else -> {
                                     throw AuthorizationError(
                                         authReq,
@@ -190,7 +197,8 @@ object OidcApi : CIProvider() {
                             }
                         }
 
-                        ResponseType.Token in authReq.responseType -> processImplicitFlowAuthorization(authReq)
+                        ResponseType.Token in authReq.responseType -> OpenID4VC.processImplicitFlowAuthorization(
+                            OidcApi, authReq, issuanceSessionData.first().id, metadata)
 
                         else -> {
                             throw AuthorizationError(
@@ -206,7 +214,8 @@ object OidcApi : CIProvider() {
                             ?: "openid://"
 
                         else -> if (authReq.isReferenceToPAR) {
-                            getPushedAuthorizationSession(authReq).authorizationRequest?.redirectUri
+                            val pushedSession = getPushedAuthorizationSession(authReq)
+                            pushedSession.authorizationRequest?.redirectUri
                         } else {
                             authReq.redirectUri
                         } ?: throw AuthorizationError(
@@ -279,7 +288,10 @@ object OidcApi : CIProvider() {
                     }
 
                     // Process response
-                    val resp = processDirectPost(state, buildJsonObject { })
+                    val session = getSessionByAuthServerState(state) ?: throw IllegalStateException("No session found for given state parameter")
+                    val resp = OpenID4VC.processDirectPost(OidcApi,
+                        session.authorizationRequest ?: throw IllegalStateException("Session for given state has no authorization request"),
+                        session.id, metadata)
 
                     // Get the authorization_endpoint parameter which is the redirect_uri from the Authorization Request Parameter
                     val redirectUri = getSessionByAuthServerState(state)!!.authorizationRequest!!.redirectUri!!
@@ -412,7 +424,7 @@ object OidcApi : CIProvider() {
 
                     // should redirect to authorization request redirect uri with the code
                     val session = getSessionByAuthServerState(call.request.rawQueryParameters.toMap()["state"]!![0])
-                    val authResp = processCodeFlowAuthorization(session?.authorizationRequest!!)
+                    val authResp = OpenID4VC.processCodeFlowAuthorization(OidcApi, session?.authorizationRequest!!, session.id, metadata)
 
                     val redirectUri = when (session.authorizationRequest!!.isReferenceToPAR) {
                         true -> getPushedAuthorizationSession(session.authorizationRequest!!).authorizationRequest?.redirectUri
@@ -442,6 +454,19 @@ object OidcApi : CIProvider() {
         }
     }
 
+    private fun getPushedAuthorizationSession(authorizationRequest: AuthorizationRequest): IssuanceSession {
+        return authorizationRequest.requestUri?.let {
+            getVerifiedSession(OpenID4VC.getPushedAuthorizationSessionId(it)) ?: throw AuthorizationError(
+                authorizationRequest,
+                AuthorizationErrorCode.invalid_request,
+                "No session found for given request URI, or session expired"
+            )
+        } ?: throw AuthorizationError(
+            authorizationRequest,
+            AuthorizationErrorCode.invalid_request,
+            "Authorization request does not refer to a pushed authorization session"
+        )
+    }
 
     /*
     private val sessionCache = mutableMapOf<String, IssuanceSession>()

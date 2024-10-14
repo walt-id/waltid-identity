@@ -77,7 +77,6 @@ import kotlin.uuid.Uuid
 open class CIProvider(
     val baseUrl: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl },
     val config: CredentialIssuerConfig = CredentialIssuerConfig(credentialConfigurationsSupported = ConfigManager.getConfig<CredentialTypeConfig>().parse())
-//): OpenIDProvider<IssuanceSession>(baseUrl) {
 ): ITokenProvider {
     private val log = KotlinLogging.logger { }
     val metadata
