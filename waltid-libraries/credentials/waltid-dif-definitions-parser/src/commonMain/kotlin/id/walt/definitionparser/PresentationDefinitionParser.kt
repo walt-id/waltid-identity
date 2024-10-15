@@ -48,7 +48,7 @@ object PresentationDefinitionParser {
         inputDescriptor: PresentationDefinition.InputDescriptor,
     ): Flow<JsonObject> {
 
-        log.debug { "--- Checking descriptor ${inputDescriptor.name} --" }
+        log.trace { "--- Checking descriptor ${inputDescriptor.name} --" }
 
         val enquirer = JsonObjectEnquirer()
 
