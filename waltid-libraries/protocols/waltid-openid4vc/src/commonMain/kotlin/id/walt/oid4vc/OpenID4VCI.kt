@@ -328,16 +328,16 @@ object OpenID4VCI {
         else -> null
     }
 
-    fun validateProofOfPossession(credentialRequest: CredentialRequest, nonce: String, tokenProvider: ITokenProvider): Boolean {
+    suspend fun validateProofOfPossession(credentialRequest: CredentialRequest, nonce: String): Boolean {
         log.debug { "VALIDATING: ${credentialRequest.proof} with nonce $nonce" }
         log.debug { "VERIFYING ITS SIGNATURE" }
         if (credentialRequest.proof == null) return false
         return when {
-            credentialRequest.proof.isJwtProofType -> tokenProvider.verifyTokenSignature(
+            credentialRequest.proof.isJwtProofType -> OpenID4VC.verifyTokenSignature(
                 TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.jwt!!
             ) && getNonceFromProof(credentialRequest.proof) == nonce
 
-            credentialRequest.proof.isCwtProofType -> tokenProvider.verifyCOSESign1Signature(
+            credentialRequest.proof.isCwtProofType -> OpenID4VC.verifyCOSESign1Signature(
                 TokenTarget.PROOF_OF_POSSESSION, credentialRequest.proof.cwt!!
             ) && getNonceFromProof(credentialRequest.proof) == nonce
 
@@ -345,10 +345,10 @@ object OpenID4VCI {
         }
     }
 
-    fun validateCredentialRequest(credentialRequest: CredentialRequest, session: IssuanceSession, openIDProviderMetadata: OpenIDProviderMetadata, tokenProvider: ITokenProvider): CredentialRequestValidationResult {
+    suspend fun validateCredentialRequest(credentialRequest: CredentialRequest, session: IssuanceSession, openIDProviderMetadata: OpenIDProviderMetadata): CredentialRequestValidationResult {
         val nonce = session.cNonce ?: return CredentialRequestValidationResult(false, CredentialErrorCode.invalid_request,"Invalid session")
         log.debug { "Credential request to validate: $credentialRequest" }
-        if (credentialRequest.proof == null || !validateProofOfPossession(credentialRequest, nonce, tokenProvider)) {
+        if (credentialRequest.proof == null || !validateProofOfPossession(credentialRequest, nonce)) {
             return CredentialRequestValidationResult(
                 false,
                 CredentialErrorCode.invalid_or_missing_proof,
@@ -366,7 +366,7 @@ object OpenID4VCI {
         return CredentialRequestValidationResult(true)
     }
 
-    fun generateDeferredCredentialToken(tokenProvider: ITokenProvider, sessionId: String, issuer: String, credentialId: String): String {
-        return OpenID4VC.generateToken(tokenProvider, sessionId, issuer, TokenTarget.DEFERRED_CREDENTIAL, credentialId)
+    suspend fun generateDeferredCredentialToken(sessionId: String, issuer: String, credentialId: String, tokenKey: Key): String {
+        return OpenID4VC.generateToken(sessionId, issuer, TokenTarget.DEFERRED_CREDENTIAL, credentialId, tokenKey)
     }
 }
