@@ -20,24 +20,30 @@ class JsonObjectEnquirer {
     private fun getJsonPath(path: String): JsonPath =
         compiledJsonPaths.getOrPut(path) { JsonPath.compile(path) }
 
+    fun filterConstraint(document: JsonObject, field: Field): Boolean {
+        val resolvedPath = field.path.firstNotNullOfOrNull { document.resolveOrNull(getJsonPath(it)) }
+
+        return if (resolvedPath == null) {
+            false
+        } else {
+            if (field.filter != null) {
+                val schema = JsonSchema.fromJsonElement(field.filter)
+                when (resolvedPath) {
+                    is JsonArray -> resolvedPath.any { schema.validate(it, OutputCollector.flag()).valid }
+                    else -> schema.validate(resolvedPath, OutputCollector.flag()).valid
+                }
+            } else true
+        }
+    }
+
+    fun checkDocumentAgainstConstraints(document: JsonObject, constraints: List<Field>): Boolean =
+        constraints.all { field ->
+            filterConstraint(document, field)
+        }
 
     fun filterDocumentsByConstraints(documents: Flow<JsonObject>, constraints: List<Field>): Flow<JsonObject> =
         documents.filter { document ->
-            constraints.all { field ->
-                val resolvedPath = field.path.firstNotNullOfOrNull { document.resolveOrNull(getJsonPath(it)) }
-
-                if (resolvedPath == null) {
-                    false
-                } else {
-                    if (field.filter != null) {
-                        val schema = JsonSchema.fromJsonElement(field.filter)
-                        when (resolvedPath) {
-                            is JsonArray -> resolvedPath.any { schema.validate(it, OutputCollector.flag()).valid }
-                            else -> schema.validate(resolvedPath, OutputCollector.flag()).valid
-                        }
-                    } else true
-                }
-            }
+            checkDocumentAgainstConstraints(document, constraints)
         }
 }
 
