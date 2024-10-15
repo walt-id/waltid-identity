@@ -44,10 +44,10 @@ import id.walt.oid4vc.errors.CredentialError
 import id.walt.oid4vc.errors.DeferredCredentialError
 import id.walt.oid4vc.errors.TokenError
 import id.walt.oid4vc.interfaces.CredentialResult
-import id.walt.oid4vc.interfaces.ITokenProvider
 import id.walt.oid4vc.providers.*
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
+import id.walt.oid4vc.util.COSESign1Utils
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.*
@@ -77,7 +77,7 @@ import kotlin.uuid.Uuid
 open class CIProvider(
     val baseUrl: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl },
     val config: CredentialIssuerConfig = CredentialIssuerConfig(credentialConfigurationsSupported = ConfigManager.getConfig<CredentialTypeConfig>().parse())
-): ITokenProvider {
+) {
     private val log = KotlinLogging.logger { }
     val metadata
         get() = OpenID4VCI.createDefaultProviderMetadata(baseUrl).copy(
@@ -100,7 +100,7 @@ open class CIProvider(
 
         // TODO: make configurable
 //        private val CI_TOKEN_KEY by lazy { KeyManager.resolveSerializedKeyBlocking("""""") }
-        private val CI_TOKEN_KEY =
+        val CI_TOKEN_KEY =
             runBlocking { KeyManager.resolveSerializedKey(ConfigManager.getConfig<OIDCIssuerServiceConfig>().ciTokenKey) }
 //        private val CI_TOKEN_KEY by lazy { runBlocking { JWKKey.generate(KeyType.Ed25519) } }
     }
@@ -162,70 +162,6 @@ open class CIProvider(
                 it
             }
         }
-    }
-
-    // ------------------------------------------
-    // Simple cryptographics operation interface implementations
-    override fun signToken(
-        target: TokenTarget,
-        payload: JsonObject,
-        header: JsonObject?,
-        keyId: String?,
-        privKey: Key?,
-    ) =
-        runBlocking {
-            log.debug { "Signing JWS:   $payload" }
-            log.debug { "JWS Signature: target: $target, keyId: $keyId, header: $header" }
-            if (header != null && keyId != null && privKey != null) {
-                val headers = header.toMutableMap()
-                    .plus(mapOf("alg" to "ES256".toJsonElement(), "type" to "jwt".toJsonElement(), "kid" to keyId.toJsonElement()))
-                privKey.signJws(payload.toString().toByteArray(), headers).also {
-                    log.debug { "Signed JWS: >> $it" }
-                }
-
-            } else {
-                CI_TOKEN_KEY.signJws(payload.toString().toByteArray()).also {
-                    log.debug { "Signed JWS: >> $it" }
-                }
-            }
-        }
-
-    override fun signCWTToken(
-        target: TokenTarget,
-        payload: MapElement,
-        header: MapElement?,
-        keyId: String?,
-        privKey: Key?,
-    ): String {
-        TODO("Not yet implemented")
-    }
-
-    override fun verifyTokenSignature(target: TokenTarget, token: String) = runBlocking {
-        log.debug { "Verifying JWS: $token" }
-        log.debug { "JWS Verification: target: $target" }
-
-        val tokenHeader = Json.parseToJsonElement(token.split(".")[0].base64UrlDecode().decodeToString()).jsonObject
-        val key = if (tokenHeader["jwk"] != null) {
-            JWKKey.importJWK(tokenHeader["jwk"].toString()).getOrThrow()
-        } else if (tokenHeader["kid"] != null) {
-            val did = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
-            log.debug { "Resolving DID: $did" }
-            DidService.resolveToKey(did).getOrThrow()
-        } else {
-            CI_TOKEN_KEY
-        }
-        key.verifyJws(token).also { log.debug { "VERIFICATION IS: $it" } }
-    }.isSuccess
-
-    @OptIn(ExperimentalSerializationApi::class)
-    override fun verifyCOSESign1Signature(target: TokenTarget, token: String) = runBlocking {
-        println("Verifying JWS: $token")
-        println("JWS Verification: target: $target")
-        val coseSign1 = Cbor.decodeFromByteArray<COSESign1>(token.base64UrlDecode())
-        val keyInfo = extractHolderKey(coseSign1)
-        val cryptoProvider = SimpleCOSECryptoProvider(listOf(keyInfo))
-
-        cryptoProvider.verify1(coseSign1, "pub-key")
     }
 
     // -------------------------------------
@@ -337,27 +273,6 @@ open class CIProvider(
         }))
     }
 
-    private fun extractHolderKey(coseSign1: COSESign1): COSECryptoProviderKeyInfo {
-        val tokenHeader = coseSign1.decodeProtectedHeader()
-        return if (tokenHeader.value.containsKey(MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY))) {
-            val rawKey = (tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)] as ByteStringElement).value
-            COSECryptoProviderKeyInfo(
-                "pub-key", AlgorithmID.ECDSA_256,
-                OneKey(CBORObject.DecodeFromBytes(rawKey)).AsPublicKey()
-            )
-        } else {
-            val x5c = tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_X5CHAIN)]
-            val x5Chain = when (x5c) {
-                is ListElement -> x5c.value.map { X509CertUtils.parse((it as ByteStringElement).value) }
-                else -> listOf(X509CertUtils.parse((x5c as ByteStringElement).value))
-            }
-            COSECryptoProviderKeyInfo(
-                "pub-key", AlgorithmID.ECDSA_256,
-                x5Chain.first().publicKey, x5Chain = x5Chain
-            )
-        }
-    }
-
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun doGenerateMDoc(
         credentialRequest: CredentialRequest,
@@ -368,7 +283,7 @@ open class CIProvider(
                 CredentialErrorCode.invalid_or_missing_proof, message = "No CWT proof found on credential request"
             )
         )
-        val holderKey = extractHolderKey(coseSign1)
+        val holderKey = COSESign1Utils.extractHolderKey(coseSign1)
         val nonce = OpenID4VCI.getNonceFromProof(credentialRequest.proof!!) ?: throw CredentialError(
             credentialRequest,
             CredentialErrorCode.invalid_or_missing_proof,
@@ -755,15 +670,15 @@ open class CIProvider(
         expiresIn: Duration,
         allowPreAuthorized: Boolean,
         txCode: TxCode? = null, txCodeValue: String? = null,
-    ): IssuanceSession {
+    ): IssuanceSession = runBlocking {
         val sessionId = randomUUID()
         credentialOfferBuilder.addAuthorizationCodeGrant(sessionId)
         if (allowPreAuthorized)
             credentialOfferBuilder.addPreAuthorizedCodeGrant(
-                OpenID4VC.generateAuthorizationCodeFor(this, sessionId, metadata.issuer!!),
+                OpenID4VC.generateAuthorizationCodeFor(sessionId, metadata.issuer!!, CI_TOKEN_KEY),
                 txCode
             )
-        return IssuanceSession(
+        return@runBlocking IssuanceSession(
             id = sessionId,
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
@@ -775,36 +690,36 @@ open class CIProvider(
         }
     }
 
-    private fun createCredentialResponseFor(credentialResult: CredentialResult, session: IssuanceSession): CredentialResponse {
-        return credentialResult.credential?.let { credential ->
+    private fun createCredentialResponseFor(credentialResult: CredentialResult, session: IssuanceSession): CredentialResponse = runBlocking {
+        return@runBlocking credentialResult.credential?.let { credential ->
             CredentialResponse.success(credentialResult.format, credential, customParameters = credentialResult.customParameters)
         } ?: generateProofOfPossessionNonceFor(session).let { updatedSession ->
             CredentialResponse.deferred(
                 credentialResult.format,
-                OpenID4VCI.generateDeferredCredentialToken(this,
-                    session.id, metadata.issuer ?: throw Exception("No issuer defined in provider metadata"),
-                    credentialResult.credentialId ?: throw Exception("credentialId must not be null, if credential issuance is deferred.")
-                ),
+                OpenID4VCI.generateDeferredCredentialToken(session.id,
+                    metadata.issuer ?: throw Exception("No issuer defined in provider metadata"),
+                    credentialResult.credentialId ?: throw Exception("credentialId must not be null, if credential issuance is deferred."),
+                    CI_TOKEN_KEY),
                 updatedSession.cNonce,
                 updatedSession.expirationTimestamp - Clock.System.now()
             )
         }
     }
 
-    fun generateCredentialResponse(credentialRequest: CredentialRequest, session: IssuanceSession): CredentialResponse {
+    fun generateCredentialResponse(credentialRequest: CredentialRequest, session: IssuanceSession): CredentialResponse = runBlocking {
         // access_token should be validated on API level and issuance session extracted
         // Validate credential request (proof of possession, etc)
-        val validationResult = OpenID4VCI.validateCredentialRequest(credentialRequest, session, metadata,this)
+        val validationResult = OpenID4VCI.validateCredentialRequest(credentialRequest, session, metadata)
         if(!validationResult.success)
             throw CredentialError(credentialRequest, CredentialErrorCode.invalid_request, message = validationResult.message)
         // create credential result
         val credentialResult = generateCredential(credentialRequest)
-        return createCredentialResponseFor(credentialResult, session)
+        return@runBlocking createCredentialResponseFor(credentialResult, session)
     }
 
-    fun generateDeferredCredentialResponse(acceptanceToken: String): CredentialResponse {
+    fun generateDeferredCredentialResponse(acceptanceToken: String): CredentialResponse = runBlocking {
         val accessInfo =
-            OpenID4VC.verifyAndParseToken(this, acceptanceToken, metadata.issuer!!, TokenTarget.DEFERRED_CREDENTIAL) ?: throw DeferredCredentialError(
+            OpenID4VC.verifyAndParseToken(acceptanceToken, metadata.issuer!!, TokenTarget.DEFERRED_CREDENTIAL, CI_TOKEN_KEY) ?: throw DeferredCredentialError(
                 CredentialErrorCode.invalid_token,
                 message = "Invalid acceptance token"
             )
@@ -815,11 +730,11 @@ open class CIProvider(
             "Session not found for given access token, or session expired."
         )
         // issue credential for credential request
-        return createCredentialResponseFor(getDeferredCredential(credentialId), session)
+        return@runBlocking createCredentialResponseFor(getDeferredCredential(credentialId), session)
     }
 
-    fun processTokenRequest(tokenRequest: TokenRequest): TokenResponse {
-        val payload = OpenID4VC.validateAndParseTokenRequest(this, tokenRequest, metadata.issuer!!) ?: throw TokenError(tokenRequest, TokenErrorCode.invalid_request, "Token request could not be validated")
+    fun processTokenRequest(tokenRequest: TokenRequest): TokenResponse = runBlocking {
+        val payload = OpenID4VC.validateAndParseTokenRequest(tokenRequest, metadata.issuer!!, CI_TOKEN_KEY) ?: throw TokenError(tokenRequest, TokenErrorCode.invalid_request, "Token request could not be validated")
         val sessionId = payload[JWTClaims.Payload.subject]?.jsonPrimitive?.content ?: throw TokenError(tokenRequest, TokenErrorCode.invalid_request, "Token contains no session ID in subject")
         val session = getVerifiedSession(sessionId) ?: throw TokenError(
             tokenRequest = tokenRequest,
@@ -838,8 +753,8 @@ open class CIProvider(
         // Expiration time required by EBSI
         val currentTime = Clock.System.now().epochSeconds
         val expirationTime = (currentTime + 864000L) // ten days in milliseconds
-        return TokenResponse.success(
-            OpenID4VC.generateToken(this, sessionId, metadata.issuer!!, TokenTarget.ACCESS),
+        return@runBlocking TokenResponse.success(
+            OpenID4VC.generateToken(sessionId, metadata.issuer!!, TokenTarget.ACCESS, null, CI_TOKEN_KEY),
             tokenType = "bearer",
             expiresIn = expirationTime,
             cNonce = generateProofOfPossessionNonceFor(session).cNonce,

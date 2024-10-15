@@ -141,10 +141,9 @@ object OidcApi : CIProvider() {
                                     val idTokenRequestJwtKid = issuanceSessionData.first().issuerKey.key.getKeyId()
                                     val idTokenRequestJwtPrivKey = issuanceSessionData.first().issuerKey
                                     OpenID4VC.processCodeFlowAuthorizationWithAuthorizationRequest(
-                                        OidcApi,
                                         authReq,
                                         ResponseType.IdToken,
-                                        metadata,
+                                        metadata, CI_TOKEN_KEY,
                                         issuanceSessionData.first().request.useJar
                                     )
                                 }
@@ -175,18 +174,15 @@ object OidcApi : CIProvider() {
                                         PresentationDefinition.defaultGenerationFromVcTypesForCredentialFormat(requestedTypes, credFormat)
 
                                     OpenID4VC.processCodeFlowAuthorizationWithAuthorizationRequest(
-                                        OidcApi,
                                         authReq,
-//                                        vpTokenRequestJwtKid,
-//                                        vpTokenRequestJwtPrivKey.key,
-                                        ResponseType.VpToken, metadata,
+                                        ResponseType.VpToken, metadata, CI_TOKEN_KEY,
                                         issuanceSessionData.first().request.useJar,
                                         presentationDefinition
                                     )
                                 }
 
                                 AuthenticationMethod.NONE -> OpenID4VC.processCodeFlowAuthorization(
-                                    OidcApi, authReq, issuanceSessionData.first().id, metadata)
+                                    authReq, issuanceSessionData.first().id, metadata, CI_TOKEN_KEY)
                                 else -> {
                                     throw AuthorizationError(
                                         authReq,
@@ -198,7 +194,7 @@ object OidcApi : CIProvider() {
                         }
 
                         ResponseType.Token in authReq.responseType -> OpenID4VC.processImplicitFlowAuthorization(
-                            OidcApi, authReq, issuanceSessionData.first().id, metadata)
+                            authReq, issuanceSessionData.first().id, metadata, CI_TOKEN_KEY)
 
                         else -> {
                             throw AuthorizationError(
@@ -267,7 +263,7 @@ object OidcApi : CIProvider() {
                         val idToken = params["id_token"]?.get(0)!!
 
                         // Verify and Parse ID Token
-                        OpenID4VC.verifyAndParseIdToken(OidcApi, idToken)
+                        OpenID4VC.verifyAndParseIdToken(idToken)
 
                     } else {
                         val vpToken = params["vp_token"]?.get(0)!!
@@ -289,9 +285,9 @@ object OidcApi : CIProvider() {
 
                     // Process response
                     val session = getSessionByAuthServerState(state) ?: throw IllegalStateException("No session found for given state parameter")
-                    val resp = OpenID4VC.processDirectPost(OidcApi,
+                    val resp = OpenID4VC.processDirectPost(
                         session.authorizationRequest ?: throw IllegalStateException("Session for given state has no authorization request"),
-                        session.id, metadata)
+                        session.id, metadata, CI_TOKEN_KEY)
 
                     // Get the authorization_endpoint parameter which is the redirect_uri from the Authorization Request Parameter
                     val redirectUri = getSessionByAuthServerState(state)!!.authorizationRequest!!.redirectUri!!
@@ -341,7 +337,7 @@ object OidcApi : CIProvider() {
             }
             post("/credential") {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
-                val parsedToken = accessToken?.let { OpenID4VC.verifyAndParseToken(OidcApi, it, metadata.issuer!!, TokenTarget.ACCESS) }
+                val parsedToken = accessToken?.let { OpenID4VC.verifyAndParseToken(it, metadata.issuer!!, TokenTarget.ACCESS, CI_TOKEN_KEY) }
                 if (parsedToken == null) {
                     call.respond(HttpStatusCode.Unauthorized)
                 } else {
@@ -358,7 +354,7 @@ object OidcApi : CIProvider() {
             }
             post("/credential_deferred") {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
-                if (accessToken.isNullOrEmpty() || !verifyTokenSignature(
+                if (accessToken.isNullOrEmpty() || !OpenID4VC.verifyTokenSignature(
                         TokenTarget.DEFERRED_CREDENTIAL,
                         accessToken
                     )
@@ -375,7 +371,7 @@ object OidcApi : CIProvider() {
             }
             post("/batch_credential") {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
-                val parsedToken = accessToken?.let { OpenID4VC.verifyAndParseToken(OidcApi, it, metadata.issuer!!, TokenTarget.ACCESS) }
+                val parsedToken = accessToken?.let { OpenID4VC.verifyAndParseToken(it, metadata.issuer!!, TokenTarget.ACCESS, CI_TOKEN_KEY) }
                 if (parsedToken == null) {
                     call.respond(HttpStatusCode.Unauthorized)
                 } else {
@@ -424,7 +420,7 @@ object OidcApi : CIProvider() {
 
                     // should redirect to authorization request redirect uri with the code
                     val session = getSessionByAuthServerState(call.request.rawQueryParameters.toMap()["state"]!![0])
-                    val authResp = OpenID4VC.processCodeFlowAuthorization(OidcApi, session?.authorizationRequest!!, session.id, metadata)
+                    val authResp = OpenID4VC.processCodeFlowAuthorization(session?.authorizationRequest!!, session.id, metadata, CI_TOKEN_KEY)
 
                     val redirectUri = when (session.authorizationRequest!!.isReferenceToPAR) {
                         true -> getPushedAuthorizationSession(session.authorizationRequest!!).authorizationRequest?.redirectUri
