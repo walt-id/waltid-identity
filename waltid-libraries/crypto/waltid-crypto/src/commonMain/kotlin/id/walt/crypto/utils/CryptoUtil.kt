@@ -10,7 +10,8 @@ internal fun minimalPem(privateKeyAsPem: String) = privateKeyAsPem.lines()
     .joinToString("")
 
 fun jwsSigningAlgorithm(keyType: KeyType) = when (keyType) {
-    KeyType.secp256k1, KeyType.secp256r1 -> "ES256"
+    KeyType.secp256r1 -> "ES256"
+    KeyType.secp256k1 -> "ES256K"
     KeyType.RSA -> "RS256"
     KeyType.Ed25519 -> "EdDSA"
 }
