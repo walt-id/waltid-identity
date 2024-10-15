@@ -2,12 +2,12 @@ package id.walt.definitionparser
 
 import com.nfeld.jsonpathkt.JsonPath
 import com.nfeld.jsonpathkt.kotlinx.resolveOrNull
-import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.definitionparser.PresentationDefinition.InputDescriptor.Constraints.Field
 import io.github.optimumcode.json.schema.JsonSchema
 import io.github.optimumcode.json.schema.OutputCollector
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.json.Json
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
@@ -20,32 +20,41 @@ class JsonObjectEnquirer {
     private fun getJsonPath(path: String): JsonPath =
         compiledJsonPaths.getOrPut(path) { JsonPath.compile(path) }
 
+    fun filterConstraint(document: JsonObject, field: Field): Boolean {
+        val resolvedPath = field.path.firstNotNullOfOrNull { document.resolveOrNull(getJsonPath(it)) }
 
-    fun filterDocumentsByConstraints(documents: List<JsonObject>, constraints: List<Field>): List<JsonObject> =
-        documents.filter { document ->
-            constraints.all { field ->
-                val resolvedPath = field.path.firstNotNullOfOrNull { document.resolveOrNull(getJsonPath(it)) }
-
-                if (resolvedPath == null) {
-                    false
-                } else {
-                    if (field.filter != null) {
-                        val schema = JsonSchema.fromJsonElement(field.filter)
-                        when(resolvedPath) {
-                            is JsonArray -> resolvedPath.any { schema.validate(it, OutputCollector.flag()).valid }
-                            else -> schema.validate(resolvedPath, OutputCollector.flag()).valid
-                        }
-                    } else true
+        return if (resolvedPath == null) {
+            false
+        } else {
+            if (field.filter != null) {
+                val schema = JsonSchema.fromJsonElement(field.filter)
+                when (resolvedPath) {
+                    is JsonArray -> resolvedPath.any { schema.validate(it, OutputCollector.flag()).valid }
+                    else -> schema.validate(resolvedPath, OutputCollector.flag()).valid
                 }
-            }
+            } else true
+        }
+    }
+
+    fun checkDocumentAgainstConstraints(document: JsonObject, constraints: List<Field>): Boolean =
+        constraints.all { field ->
+            filterConstraint(document, field)
+        }
+
+    fun filterDocumentsByConstraints(documents: Flow<JsonObject>, constraints: List<Field>): Flow<JsonObject> =
+        documents.filter { document ->
+            checkDocumentAgainstConstraints(document, constraints)
         }
 }
 
 object PresentationDefinitionParser {
 
-    fun matchCredentialsForInputDescriptor(credentials: List<JsonObject>, inputDescriptor: PresentationDefinition.InputDescriptor): List<JsonObject> {
+    fun matchCredentialsForInputDescriptor(
+        credentials: Flow<JsonObject>,
+        inputDescriptor: PresentationDefinition.InputDescriptor,
+    ): Flow<JsonObject> {
 
-        log.debug { "--- Checking descriptor ${inputDescriptor.name} --" }
+        log.trace { "--- Checking descriptor ${inputDescriptor.name} --" }
 
         val enquirer = JsonObjectEnquirer()
 

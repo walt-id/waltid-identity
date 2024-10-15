@@ -48,6 +48,9 @@ kotlin {
 
                 implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
 
+                // Coroutines
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+
                 // Loggin
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
             }
