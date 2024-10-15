@@ -100,7 +100,7 @@ class AWSKey(
 
     private val awsSigningAlgorithm by lazy {
         when (keyType) {
-            KeyType.secp256r1 -> "ECDSA_SHA_256"
+            KeyType.secp256r1, KeyType.secp256k1 -> "ECDSA_SHA_256"
             KeyType.RSA -> "RSASSA_PKCS1_V1_5_SHA_256"
             else -> throw KeyTypeNotSupportedException(keyType.name)
         }
@@ -427,12 +427,14 @@ $public
 
         private fun keyTypeToAwsKeyMapping(type: KeyType) = when (type) {
             KeyType.secp256r1 -> "ECC_NIST_P256"
+            KeyType.secp256k1 -> "ECC_SECG_P256K1"
             KeyType.RSA -> "RSA_2048"
             else -> throw KeyTypeNotSupportedException(type.name)
         }
 
         private fun awsKeyToKeyTypeMapping(type: String) = when (type) {
             "ECC_NIST_P256" -> KeyType.secp256r1
+            "ECC_SECG_P256K1" -> KeyType.secp256k1
             "RSA_2048" -> KeyType.RSA
             else -> throw KeyTypeNotSupportedException(type)
         }
