@@ -1,4 +1,4 @@
-package id.walt.credentials.verification.policies
+package id.walt.policies.policies
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
