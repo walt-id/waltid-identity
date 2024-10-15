@@ -1,3 +1,4 @@
+import AWSKeyTest.Config.payloadJWS
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.aws.AWSKey
 import id.walt.crypto.keys.aws.AWSKeyMetadata
@@ -6,6 +7,9 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class AWSKeyTest {
 
@@ -15,7 +19,7 @@ class AWSKeyTest {
         const val accessKeyId = ""
         val region = "eu-central-1"
 
-        val payload1 = JsonObject(
+        val payloadJWS = JsonObject(
             mapOf(
                 "sub" to JsonPrimitive("16bb17e0-e733-4622-9384-122bc2fc6290"),
                 "iss" to JsonPrimitive("http://localhost:3000"),
@@ -24,7 +28,7 @@ class AWSKeyTest {
         )
         val payload = "Hello, World!"
 
-        val TESTABLE_KEY_TYPES = listOf(KeyType.RSA, KeyType.secp256r1)
+        val TESTABLE_KEY_TYPES = listOf(KeyType.RSA, KeyType.secp256r1, KeyType.secp256k1)
 
 
     }
@@ -49,7 +53,7 @@ class AWSKeyTest {
             println("Testing sign & verify raw (payload: ${Config.payload})...")
             awsTestSignRaw()
 
-            println("Testing sign & verify JWS (payload: ${Config.payload})...")
+            println("Testing sign & verify JWS (payload: ${Config.payloadJWS})...")
             awsTestSignJws()
 
 
@@ -64,15 +68,21 @@ class AWSKeyTest {
         )
 
         keys = Config.TESTABLE_KEY_TYPES.map {
-            AWSKey.generate(it, awsMetadata).also {
-                println("Generated key: ${it.keyType} - ${it.getKeyId()}")
+            AWSKey.generate(it, awsMetadata).also { key ->
+                println("Generated key: ${key.keyType} - ${key.getKeyId()}")
+                assertNotNull(key, "Key generation failed for $it")
+                assertNotNull(key.getKeyId(), "Key ID should not be null")
+                assertTrue(key.getKeyId().isNotBlank(), "Key ID should not be blank")
+                assertEquals(it, key.keyType, "Key type does not match expected value")
             }
+
         }
     }
 
     private suspend fun awsTestPublicKeys() {
         keys.forEach {
             println("Public key: ${it.getPublicKey().exportJWK()}")
+
         }
     }
 
@@ -80,15 +90,20 @@ class AWSKeyTest {
         keys.forEach { key ->
             val signature = key.signRaw(Config.payload.toString().toByteArray())
             val verified = key.verifyRaw(signature, Config.payload.toString().toByteArray())
-            println("Signature: $signature - Verified: ${verified.isSuccess}")
+            assertNotNull(signature, "Signature should not be null")
+            assertTrue(signature.isNotEmpty(), "Signature should not be empty")
+            assertTrue(verified.isSuccess, "Raw signature verification failed")
         }
     }
 
     private suspend fun awsTestSignJws() {
         keys.forEach { key ->
-            val signature = key.signJws(Config.payload1.toString().toByteArray())
+            val signature = key.signJws(payloadJWS.toString().toByteArray())
             val verified = key.verifyJws(signature)
-            println("Signature: $signature - Verified: ${verified.isSuccess} with keytype: ${key.keyType}")
+            assertNotNull(signature, "JWS signature should not be null")
+            assertTrue(signature.isNotEmpty(), "JWS signature should not be empty")
+            assertTrue(verified.isSuccess, "JWS signature verification failed")
+            assertEquals(payloadJWS, verified.getOrThrow(), "JWS payload mismatch after verification")
         }
     }
 }
