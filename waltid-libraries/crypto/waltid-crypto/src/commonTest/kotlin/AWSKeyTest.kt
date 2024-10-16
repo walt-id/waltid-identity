@@ -2,7 +2,7 @@ import AWSKeyTest.Config.payloadJWS
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.aws.AWSKey
 import id.walt.crypto.keys.aws.AWSKeyMetadata
-import io.ktor.utils.io.core.toByteArray
+import io.ktor.utils.io.core.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -11,12 +11,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+
+/**
+ * Enable this test by providing valid credentials for accessKeyId and secretAccessKey below.
+ */
 class AWSKeyTest {
 
 
     private object Config {
-        const val secretAccessKey = ""
-        const val accessKeyId = ""
+        val accessKeyId = ""
+        val secretAccessKey = ""
         val region = "eu-central-1"
 
         val payloadJWS = JsonObject(
@@ -55,8 +59,6 @@ class AWSKeyTest {
 
             println("Testing sign & verify JWS (payload: ${Config.payloadJWS})...")
             awsTestSignJws()
-
-
         }
     }
 
@@ -75,21 +77,20 @@ class AWSKeyTest {
                 assertTrue(key.getKeyId().isNotBlank(), "Key ID should not be blank")
                 assertEquals(it, key.keyType, "Key type does not match expected value")
             }
-
         }
     }
 
     private suspend fun awsTestPublicKeys() {
         keys.forEach {
             println("Public key: ${it.getPublicKey().exportJWK()}")
-
         }
     }
 
     private suspend fun awsTestSignRaw() {
         keys.forEach { key ->
-            val signature = key.signRaw(Config.payload.toString().toByteArray())
-            val verified = key.verifyRaw(signature, Config.payload.toString().toByteArray())
+            println("RAW sign/verification test with key type: ${key.keyType}")
+            val signature = key.signRaw(Config.payload.toByteArray())
+            val verified = key.verifyRaw(signature, Config.payload.toByteArray())
             assertNotNull(signature, "Signature should not be null")
             assertTrue(signature.isNotEmpty(), "Signature should not be empty")
             assertTrue(verified.isSuccess, "Raw signature verification failed")
@@ -98,6 +99,7 @@ class AWSKeyTest {
 
     private suspend fun awsTestSignJws() {
         keys.forEach { key ->
+            println("JWS sign/verification test with key type: ${key.keyType}")
             val signature = key.signJws(payloadJWS.toString().toByteArray())
             val verified = key.verifyJws(signature)
             assertNotNull(signature, "JWS signature should not be null")
