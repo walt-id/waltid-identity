@@ -49,7 +49,7 @@ dependencies {
     api("com.sksamuel.cohort:cohort-ktor:2.5.1")
 
     // OpenAPI
-    api("io.github.smiley4:ktor-swagger-ui:3.5.0")
+    api("io.github.smiley4:ktor-swagger-ui:3.5.1")
     implementation("io.github.smiley4:schema-kenerator-core:1.4.1")
     implementation("io.github.smiley4:schema-kenerator-serialization:1.4.1")
     implementation("io.github.smiley4:schema-kenerator-reflection:1.4.1")

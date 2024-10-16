@@ -1,6 +1,7 @@
 package id.walt
 
 import id.walt.web.plugins.configureMonitoring
+import id.walt.web.plugins.configureOpenApi
 import id.walt.web.plugins.configureRouting
 import id.walt.web.plugins.configureSerialization
 import io.klogging.Level
@@ -54,6 +55,7 @@ fun Application.module() {
     configureMonitoring()
     configureSerialization()
     configureRouting()
+    configureOpenApi()
 
     testApp()
 
