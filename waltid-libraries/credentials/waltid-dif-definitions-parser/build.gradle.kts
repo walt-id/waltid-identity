@@ -50,8 +50,8 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
                 // JSON
+                implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 implementation("io.github.optimumcode:json-schema-validator:0.2.3")
 
@@ -60,7 +60,7 @@ kotlin {
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
-                // Loggin
+                // Logging
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
             }
         }
