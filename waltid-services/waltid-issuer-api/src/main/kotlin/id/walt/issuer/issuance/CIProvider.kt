@@ -547,23 +547,6 @@ open class CIProvider(
         return jwksList
     }
 
-    fun getVctByCredentialConfigurationId(credentialConfigurationId: String) = metadata.credentialConfigurationsSupported?.get(credentialConfigurationId)?.vct
-
-    fun getVctBySupportedCredentialConfiguration(
-        baseUrl: String,
-        credType: String
-    ): CredentialSupported {
-        val expectedVct = "$baseUrl/$credType"
-
-        metadata.credentialConfigurationsSupported?.entries?.forEach { entry ->
-            if (getVctByCredentialConfigurationId(entry.key) == expectedVct) {
-                return entry.value
-            }
-        }
-
-       throw IllegalArgumentException("Invalid type value: $credType. The $credType type is not supported")
-    }
-
     fun getFormatByCredentialConfigurationId(id: String) = metadata.credentialConfigurationsSupported?.get(id)?.format
 
     fun getTypesByCredentialConfigurationId(id: String) = metadata.credentialConfigurationsSupported?.get(id)?.credentialDefinition?.type
@@ -587,7 +570,7 @@ open class CIProvider(
                         types?.containsAll(credentialRequest.credentialDefinition?.type ?: emptyList()) ?: false
                     }
                     CredentialFormat.sd_jwt_vc -> {
-                        val vct = getVctByCredentialConfigurationId(credentialConfigurationId)
+                        val vct = metadata.getVctByCredentialConfigurationId(credentialConfigurationId)
                         vct == credentialRequest.vct
                     }
                     else -> {
@@ -627,7 +610,7 @@ open class CIProvider(
         }
     }
 
-    fun initializeAuthorization(
+    fun initializeIssuanceSession(
         authorizationRequest: AuthorizationRequest,
         expiresIn: Duration,
         authServerState: String?, //the state used for additional authentication with pwd, id_token or vp_token.

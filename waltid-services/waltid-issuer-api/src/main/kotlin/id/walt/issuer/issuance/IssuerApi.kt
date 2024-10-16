@@ -5,7 +5,6 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.did.dids.DidService
 import id.walt.issuer.issuance.OidcApi.getFormatByCredentialConfigurationId
-import id.walt.issuer.issuance.OidcApi.getVctByCredentialConfigurationId
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.data.CredentialFormat
@@ -40,7 +39,7 @@ suspend fun createCredentialOfferUri(
     val overwrittenIssuanceRequests = issuanceRequests.map {
         it.copy(
             credentialFormat = credentialFormat,
-            vct = if (credentialFormat == CredentialFormat.sd_jwt_vc) getVctByCredentialConfigurationId(it.credentialConfigurationId) ?: throw IllegalArgumentException("VCT not found") else null)
+            vct = if (credentialFormat == CredentialFormat.sd_jwt_vc) OidcApi.metadata.getVctByCredentialConfigurationId(it.credentialConfigurationId) ?: throw IllegalArgumentException("VCT not found") else null)
     }
 
     val credentialOfferBuilder =

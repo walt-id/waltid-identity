@@ -83,7 +83,7 @@ object OidcApi : CIProvider() {
                 val credType = call.parameters["type"] ?: throw IllegalArgumentException("Type required")
 
                 // issuer api is the <authority>
-                val vctMetadata = getVctBySupportedCredentialConfiguration(baseUrl, credType)
+                val vctMetadata = metadata.getVctBySupportedCredentialConfiguration(baseUrl, credType)
                 call.respond(
                     HttpStatusCode.OK,
                     when (vctMetadata.sdJwtVcTypeMetadata != null) {
@@ -101,7 +101,7 @@ object OidcApi : CIProvider() {
             post("/par") {
                 val authReq = AuthorizationRequest.fromHttpParameters(call.receiveParameters().toMap())
                 try {
-                    val session = initializeAuthorization(authReq, 5.minutes, null)
+                    val session = initializeIssuanceSession(authReq, 5.minutes, null)
                     call.respond(
                         PushedAuthorizationResponse.success(
                         requestUri = "${OpenID4VC.PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX}${session.id}",
@@ -405,7 +405,7 @@ object OidcApi : CIProvider() {
                         else -> runBlocking { AuthorizationRequest.fromHttpQueryString(internalAuthReqParams) }
                     }
                     if (authReq != null && externalAuthReq != null) {
-                        initializeAuthorization(authReq, 5.minutes, externalAuthReq.state)
+                        initializeIssuanceSession(authReq, 5.minutes, externalAuthReq.state)
                     }
 
                 }
