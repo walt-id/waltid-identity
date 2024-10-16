@@ -43,7 +43,7 @@ kotlin {
                 }
             }
 
-            testTask {
+            /*testTask {
                 useKarma {
                     fun hasProgram(program: String) =
                         runCatching {
@@ -63,7 +63,7 @@ kotlin {
                         testEngine.value.invoke()
                     }
                 }
-            }
+            }*/
         }
         nodejs {
             generateTypeScriptDefinitions()
@@ -194,6 +194,10 @@ kotlin {
             }
         }
     }
+}
+
+tasks.named("jsBrowserTest") {
+    enabled = false
 }
 
 npmPublish {

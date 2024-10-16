@@ -58,6 +58,7 @@ val modules = listOf(
 
     // Service commons
     "$services:waltid-service-commons",
+    "$services:waltid-service-commons-test",
 
     // Services based on libs
     "$services:waltid-issuer-api",

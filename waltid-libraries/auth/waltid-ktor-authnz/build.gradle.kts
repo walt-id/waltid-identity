@@ -1,5 +1,8 @@
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+
 plugins {
     kotlin("jvm")
+    kotlin("plugin.power-assert")
     kotlin("plugin.serialization")
     id("io.ktor.plugin") version "2.3.12"
     id("maven-publish")
@@ -39,7 +42,7 @@ dependencies {
 
     // JWT
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
-    implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.41.2")
 
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm")
@@ -70,7 +73,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
 
     // Ktor server external
-    implementation("io.github.smiley4:ktor-swagger-ui:3.4.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:3.5.1")
 
     // JSON
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
@@ -129,4 +132,16 @@ publishing {
             }
         }
     }
+}
+
+@OptIn(ExperimentalKotlinGradlePluginApi::class)
+powerAssert {
+    includedSourceSets = listOf("test")
+    functions = listOf(
+        // kotlin.test
+        "kotlin.assert", "kotlin.test.assertTrue", "kotlin.test.assertEquals", "kotlin.test.assertNull",
+
+        // checks
+        "kotlin.require", "kotlin.check"
+    )
 }

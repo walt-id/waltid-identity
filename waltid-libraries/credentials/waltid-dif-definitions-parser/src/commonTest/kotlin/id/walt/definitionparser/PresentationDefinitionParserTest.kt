@@ -2,13 +2,14 @@ package id.walt.definitionparser
 
 import id.walt.credentials.vc.vcs.W3CVC
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
-import kotlin.test.Test
 
 class PresentationDefinitionParserTest {
 
-  //language=JSON
-  val credentials = """
+    //language=JSON
+    val credentials = """
         [
           {
             "@context": "https://www.w3.org/2018/credentials/v1",
@@ -57,8 +58,8 @@ class PresentationDefinitionParserTest {
         ]
     """.trimIndent()
 
-  //language=JSON
-  val inputDescriptors = """
+    //language=JSON
+    val inputDescriptors = """
         [
           {
             "id": "banking_input_1",
@@ -275,16 +276,16 @@ class PresentationDefinitionParserTest {
         ]
     """.trimIndent()
 
-  private val log = KotlinLogging.logger { }
+    private val log = KotlinLogging.logger { }
 
-  //@Test
-  fun testPresentationDefinitionParser() {
-    val credentialList = Json.decodeFromString<List<W3CVC>>(credentials)
-    val inputDescriptorList = Json.decodeFromString<List<PresentationDefinition.InputDescriptor>>(inputDescriptors)
+    //@Test
+    fun testPresentationDefinitionParser() {
+        val credentialList = Json.decodeFromString<List<W3CVC>>(credentials).asFlow()
+        val inputDescriptorList = Json.decodeFromString<List<PresentationDefinition.InputDescriptor>>(inputDescriptors)
 
-    inputDescriptorList.forEach {
-      val matched = PresentationDefinitionParser.matchCredentialsForInputDescriptor(credentialList.map { it.toJsonObject() }, it)
-      log.debug { "Matched for ${it.name}: $matched" }
+        inputDescriptorList.forEach {
+            val matched = PresentationDefinitionParser.matchCredentialsForInputDescriptor(credentialList.map { it.toJsonObject() }, it)
+            log.debug { "Matched for ${it.name}: $matched" }
+        }
     }
-  }
 }

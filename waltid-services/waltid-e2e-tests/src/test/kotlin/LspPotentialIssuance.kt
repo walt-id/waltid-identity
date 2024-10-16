@@ -3,6 +3,8 @@ import COSE.OneKey
 import cbor.Cbor
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.commons.interop.LspPotentialInterop
+import id.walt.commons.testing.E2ETest.getBaseURL
+import id.walt.commons.testing.E2ETest.test
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -53,7 +55,7 @@ import kotlin.test.*
 class LspPotentialIssuance(val client: HttpClient) {
 
     @OptIn(ExperimentalEncodingApi::class, ExperimentalSerializationApi::class)
-    suspend fun testTrack1() = E2ETestWebService.test("test track 1") {
+    suspend fun testTrack1() = test("test track 1") {
         // ### steps 1-6
         val offerResp = client.get("/lsp-potential/lspPotentialCredentialOfferT1")
         println("Offer resp: $offerResp")
@@ -231,7 +233,7 @@ class LspPotentialIssuance(val client: HttpClient) {
     }
 
     @OptIn(ExperimentalEncodingApi::class)
-    suspend fun testTrack2() = E2ETestWebService.test("test track 2") {
+    suspend fun testTrack2() = test("test track 2") {
         // ### steps 1-6
         val offerResp = client.get("/lsp-potential/lspPotentialCredentialOfferT2")
         assertEquals(HttpStatusCode.OK, offerResp.status)
@@ -265,7 +267,7 @@ class LspPotentialIssuance(val client: HttpClient) {
         println("Offered credentials: $offeredCredentials")
         val offeredCredential = offeredCredentials.first()
         assertEquals(CredentialFormat.sd_jwt_vc, offeredCredential.format)
-        assertEquals("${E2ETestWebService.getBaseURL()}/identity_credential", offeredCredential.vct)
+        assertEquals("${getBaseURL()}/identity_credential", offeredCredential.vct)
 
         // ### step 11: confirm issuance (nothing to do)
 

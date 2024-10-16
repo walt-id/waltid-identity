@@ -69,7 +69,12 @@ data class AuthSession(
         val flow = flows?.firstOrNull { it.method == method.id } ?: error("No flow for method: ${method.id}")
         val config: V =
             flow.config?.let {
-                runCatching { Json.decodeFromJsonElement<V>(flow.config) }.getOrElse { throw IllegalArgumentException("Invalid config provided at auth method ${method.id}, required would have been: ${V::class.jvmName}", it)}
+                runCatching { Json.decodeFromJsonElement<V>(flow.config) }.getOrElse {
+                    throw IllegalArgumentException(
+                        "Invalid config provided at auth method ${method.id}, required would have been: ${V::class.jvmName}",
+                        it
+                    )
+                }
             } ?: error("Authentication method ${method.id} requested config, but none is provided by authentication flow.")
 
         return config

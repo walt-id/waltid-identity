@@ -1,4 +1,4 @@
-import E2ETestWebService.test
+import id.walt.commons.testing.E2ETest.test
 import id.walt.issuer.issuance.IssuanceRequest
 import io.ktor.client.*
 import io.ktor.client.call.*

@@ -1,11 +1,13 @@
 package id.walt.ktorauthnz.accounts
 
-import id.walt.ktorauthnz.accounts.identifiers.AccountIdentifier
-import id.walt.ktorauthnz.accounts.identifiers.UsernameIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.UsernameIdentifier
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.TOTP
 import id.walt.ktorauthnz.methods.UserPass
 import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.data.TOTPStoredData
+import id.walt.ktorauthnz.methods.data.UserPassStoredData
 import id.walt.ktorauthnz.sessions.AuthSession
 
 object ExampleAccountStore : EditableAccountStore {
@@ -29,8 +31,8 @@ object ExampleAccountStore : EditableAccountStore {
         val accountIdentifier = UsernameIdentifier("alice1")
         addAccountIdentifierToAccount(newAccount, accountIdentifier)
 
-        addAccountStoredData(newAccount.id, UserPass to UserPass.UserPassStoredData("123456"))
-        addAccountStoredData(newAccount.id, TOTP to TOTP.TOTPStoredData("JBSWY3DPEHPK3PXP")) // https://totp.danhersam.com/
+        addAccountStoredData(newAccount.id, UserPass to UserPassStoredData("123456"))
+        addAccountStoredData(newAccount.id, TOTP to TOTPStoredData("JBSWY3DPEHPK3PXP")) // https://totp.danhersam.com/
     }
 
     override fun registerAccount(newAccount: Account) {
@@ -54,7 +56,7 @@ object ExampleAccountStore : EditableAccountStore {
     }
 
     // TODO
-    override fun lookupStoredMultiDataForAccount(session: AuthSession, method: AuthenticationMethod): AuthMethodStoredData? {
+    override suspend fun lookupStoredMultiDataForAccount(session: AuthSession, method: AuthenticationMethod): AuthMethodStoredData? {
         check(session.accountId != null) { "No account id available for session yet (no AccountIdentifier used yet)." }
         val storedData = wip_accountAuthMechanisms[session.accountId]!![method]
 
@@ -62,19 +64,19 @@ object ExampleAccountStore : EditableAccountStore {
     }
 
     // TODO
-    override fun lookupStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): AuthMethodStoredData? {
+    override suspend fun lookupStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): AuthMethodStoredData? {
         val uuid = wip_account_ids[identifier] ?: error("No account for identifier: $identifier")
         val storedData = wip_accountAuthMechanisms[uuid]!![method]
 
         return storedData
     }
 
-    override fun hasStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): Boolean {
+    override suspend fun hasStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): Boolean {
         val uuid = wip_account_ids[identifier] ?: error("No account for identifier: $identifier")
         return wip_accountAuthMechanisms[uuid]!!.containsKey(method)
     }
 
-    override fun lookupAccountUuid(identifier: AccountIdentifier): String {
+    override suspend fun lookupAccountUuid(identifier: AccountIdentifier): String {
         return wip_account_ids[identifier] ?: error("No account for account id: $this")
     }
 

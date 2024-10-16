@@ -1,8 +1,9 @@
 package id.walt
 
-import id.walt.ktorauthnz.plugins.configureMonitoring
-import id.walt.ktorauthnz.plugins.configureRouting
-import id.walt.ktorauthnz.plugins.configureSerialization
+import id.walt.web.plugins.configureMonitoring
+import id.walt.web.plugins.configureOpenApi
+import id.walt.web.plugins.configureRouting
+import id.walt.web.plugins.configureSerialization
 import io.klogging.Level
 import io.klogging.config.loggingConfiguration
 import io.klogging.rendering.RENDER_ANSI
@@ -54,6 +55,7 @@ fun Application.module() {
     configureMonitoring()
     configureSerialization()
     configureRouting()
+    configureOpenApi()
 
     testApp()
 

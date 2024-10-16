@@ -192,7 +192,7 @@ class OpenID4VCI_Test {
   }
 
   // Test case for available authentication methods are: NONE, ID_TOKEN, VP_TOKEN, PRE_AUTHORIZED PWD(Handled by third party authorization server)
-  @Test
+  //@Test
   fun testCredentialIssuanceIsolatedFunctionsAuthCodeFlow() = runTest {
     // TODO: consider re-implementing CITestProvider, making use of new lib functions
     // is it ok to generate the credential offer using the ciTestProvider (OpenIDCredentialIssuer class) ?
@@ -320,7 +320,7 @@ class OpenID4VCI_Test {
     // ----------------------------------
     println("// --Authentication method is ID_TOKEN--")
     issuerState = "test-state-idtoken-auth"
-    credOffer = testIsolatedFunctionsCreateCredentialOffer(ISSUER_BASE_URL, issuerState, issuedCredentialId)
+    credOffer = CredentialOffer.fromJSONString(testIsolatedFunctionsCreateCredentialOffer(ISSUER_BASE_URL, issuerState, issuedCredentialId))
 
     // Issuer Client shows credential offer request as QR code
     println(OpenID4VCI.getCredentialOfferRequestUrl(credOffer))

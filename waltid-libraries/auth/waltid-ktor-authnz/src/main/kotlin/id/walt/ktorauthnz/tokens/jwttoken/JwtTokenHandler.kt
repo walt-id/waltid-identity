@@ -1,9 +1,9 @@
 package id.walt.ktorauthnz.tokens.jwttoken
 
-import id.walt.ktorauthnz.sessions.AuthSession
-import id.walt.ktorauthnz.tokens.TokenHandler
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.ktorauthnz.sessions.AuthSession
+import id.walt.ktorauthnz.tokens.TokenHandler
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
