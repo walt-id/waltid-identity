@@ -15,8 +15,6 @@ import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.TokenError
-import id.walt.oid4vc.interfaces.ITokenProvider
-import id.walt.oid4vc.providers.IssuanceSession
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
@@ -345,8 +343,7 @@ object OpenID4VCI {
         }
     }
 
-    suspend fun validateCredentialRequest(credentialRequest: CredentialRequest, session: IssuanceSession, openIDProviderMetadata: OpenIDProviderMetadata): CredentialRequestValidationResult {
-        val nonce = session.cNonce ?: return CredentialRequestValidationResult(false, CredentialErrorCode.invalid_request,"Invalid session")
+    suspend fun validateCredentialRequest(credentialRequest: CredentialRequest, nonce: String, openIDProviderMetadata: OpenIDProviderMetadata): CredentialRequestValidationResult {
         log.debug { "Credential request to validate: $credentialRequest" }
         if (credentialRequest.proof == null || !validateProofOfPossession(credentialRequest, nonce)) {
             return CredentialRequestValidationResult(

@@ -709,7 +709,8 @@ open class CIProvider(
     fun generateCredentialResponse(credentialRequest: CredentialRequest, session: IssuanceSession): CredentialResponse = runBlocking {
         // access_token should be validated on API level and issuance session extracted
         // Validate credential request (proof of possession, etc)
-        val validationResult = OpenID4VCI.validateCredentialRequest(credentialRequest, session, metadata)
+        val nonce = session.cNonce ?: throw CredentialError(credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "No cNonce found on current issuance session")
+        val validationResult = OpenID4VCI.validateCredentialRequest(credentialRequest, nonce, metadata)
         if(!validationResult.success)
             throw CredentialError(credentialRequest, CredentialErrorCode.invalid_request, message = validationResult.message)
         // create credential result
