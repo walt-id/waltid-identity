@@ -9,30 +9,31 @@
   },
   "dependencies": {
     "@github/webauthn-json": "^2.1.1",
-    "@headlessui/vue": "1.7.22",
+    "@headlessui/vue": "1.7.23",
     "@heroicons/vue": "^2.1.5",
     "@julr/unocss-preset-forms": "^0.1.0",
-    "@pinia/nuxt": "^0.5.4",
+    "@pinia/nuxt": "^0.5.5",
     "jsonpath-plus": "^10.0.0",
-    "pinia": "^2.2.2",
+    "pinia": "^2.2.4",
     "qr-scanner": "^1.4.2",
-    "qrcode.vue": "^3.4.1",
-    "unocss": "^0.62.2"
+    "qrcode.vue": "^3.5.0",
+    "unocss": "^0.63.4"
   },
   "devDependencies": {
-    "@nuxt/content": "^2.13.2",
-    "@nuxtjs/color-mode": "3.4.4",
-    "@nuxtjs/i18n": "8.5.0",
-    "@sidebase/nuxt-auth": "^0.8.2",
-    "@unocss/nuxt": "0.62.2",
-    "@unocss/preset-icons": "^0.62.2",
-    "@unocss/transformer-directives": "^0.62.2",
-    "@unocss/transformer-variant-group": "^0.62.2",
-    "@vite-pwa/nuxt": "^0.10.0",
-    "@vueuse/core": "^11.0.1",
-    "@vueuse/nuxt": "11.0.1",
-    "nuxt": "^3.12.4",
+    "@nuxt/content": "^2.13.4",
+    "@nuxtjs/color-mode": "3.5.1",
+    "@nuxtjs/i18n": "8.5.5",
+    "@sidebase/nuxt-auth": "^0.9.3",
+    "@unocss/nuxt": "0.63.4",
+    "@unocss/preset-icons": "^0.63.4",
+    "@unocss/transformer-directives": "^0.63.4",
+    "@unocss/transformer-variant-group": "^0.63.4",
+    "@vite-pwa/nuxt": "^0.10.5",
+    "@vueuse/core": "^11.1.0",
+    "@vueuse/nuxt": "11.1.0",
+    "nuxt": "^3.13.2",
     "nuxt-icon": "^0.6.10",
-    "typescript": "5.5.4"
+    "typescript": "5.6.3"
   }
 }
+
