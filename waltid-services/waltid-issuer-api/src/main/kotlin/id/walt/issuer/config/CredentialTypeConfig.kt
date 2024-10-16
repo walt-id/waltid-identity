@@ -39,6 +39,7 @@ data class CredentialTypeConfig(
         "AlpsTourReservation" to vc("VerifiableCredential", "VerifiableAttestation", "AlpsTourReservation"),
         "EducationalID" to vc("VerifiableCredential", "VerifiableAttestation", "EducationalID"),
         "HotelReservation" to vc("VerifiableCredential", "VerifiableAttestation", "HotelReservation"),
+        "IdentityCredential" to vc("VerifiableCredential", "VerifiableAttestation", "IdentityCredential"),
         "Iso18013DriversLicenseCredential" to vc("VerifiableCredential", "VerifiableAttestation", "Iso18013DriversLicenseCredential"),
         "TaxReceipt" to vc("VerifiableCredential", "VerifiableAttestation", "TaxReceipt"),
         "VerifiablePortableDocumentA1" to vc("VerifiableCredential", "VerifiableAttestation", "VerifiablePortableDocumentA1"),

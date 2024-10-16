@@ -12,7 +12,7 @@ allprojects {
 }
 
 plugins {
-    val kotlinVersion = "2.0.20"
+    val kotlinVersion = "2.0.21"
     kotlin("multiplatform") version kotlinVersion apply false
     kotlin("jvm") version kotlinVersion
     kotlin("plugin.power-assert") version kotlinVersion apply false

@@ -8,7 +8,7 @@ import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionStatus
 import id.walt.ktorauthnz.sessions.SessionManager
-import io.ktor.http.*
+import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -40,7 +40,8 @@ abstract class AuthenticationMethod(open val id: String) {
 
         if (session.status == AuthSessionStatus.OK) {
             check(session.token != null) { "Session token does not exist after successful authentication?" }
-            this.response.cookies.append(Cookie("ktor-authnz-auth", session.token!!))
+
+            SessionTokenCookieHandler.run { setCookie(session.token!!) }
         }
 
         this.respond(session.toInformation())
