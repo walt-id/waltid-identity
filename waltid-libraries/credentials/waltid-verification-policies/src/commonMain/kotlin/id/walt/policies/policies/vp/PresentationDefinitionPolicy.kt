@@ -2,13 +2,14 @@ package id.walt.policies.policies.vp
 
 import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.definitionparser.PresentationDefinition
 import id.walt.definitionparser.PresentationDefinitionParser
 import id.walt.definitionparser.PresentationSubmission
 import id.walt.policies.CredentialWrapperValidatorPolicy
 import id.walt.sdjwt.SDJwt
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
@@ -44,14 +45,14 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
 
         val presentationDefinitionMatch = when(format) {
             VCFormat.sd_jwt_vc -> PresentationDefinitionParser.matchCredentialsForInputDescriptor(
-                listOf(data), presentationDefinition.inputDescriptors.first()
-            ).isNotEmpty()
+                flowOf(data), presentationDefinition.inputDescriptors.first()
+            ).toList().isNotEmpty()
             else -> data["vp"]!!.jsonObject["verifiableCredential"]?.jsonArray?.mapIndexedNotNull { idx,cred ->
                 val payload = cred.jsonPrimitive.contentOrNull?.let { SDJwt.parse(it) }?.fullPayload ?: throw IllegalArgumentException("Credential $idx is not a valid JWT string")
                 PresentationDefinitionParser.matchCredentialsForInputDescriptor(
-                    listOf(payload.get("vc")?.jsonObject ?: throw IllegalArgumentException("Credential $idx has no vc property")),
+                    flowOf(payload.get("vc")?.jsonObject ?: throw IllegalArgumentException("Credential $idx has no vc property")),
                     presentationDefinition.inputDescriptors.get(idx)
-                ).isNotEmpty()
+                ).toList().isNotEmpty()
             }!!.all { it }
         }
 

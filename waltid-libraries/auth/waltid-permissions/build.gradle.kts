@@ -1,9 +1,16 @@
+import love.forte.plugin.suspendtrans.ClassInfo
+import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
+import love.forte.plugin.suspendtrans.TargetPlatform
+import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
+import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
     id("dev.petuska.npm.publish") version "3.4.3"
     id("com.github.ben-manes.versions")
+    id("love.forte.plugin.suspend-transform") version "2.0.20-0.9.2"
 }
 
 group = "id.walt.permissions"
@@ -12,15 +19,26 @@ repositories {
     mavenCentral()
 }
 
+suspendTransform {
+    enabled = true
+    includeRuntime = true
+    useDefault()
+
+    includeAnnotation = false // Required in the current version to avoid "compileOnly" warning
+}
+
 kotlin {
     jvm {
 
     }
     js(IR) {
         moduleName = "waltid-permissions"
+        nodejs {
+            generateTypeScriptDefinitions()
+        }
         browser {
             generateTypeScriptDefinitions()
-            testTask {
+            /*testTask {
                 useKarma {
                     fun hasProgram(program: String) =
                         runCatching {
@@ -36,11 +54,10 @@ kotlin {
                     ).entries.firstOrNull { hasProgram(it.key) }
                     if (testEngine == null) println("No web test engine installed, please install chromium or firefox or chrome.")
                     else {
-                        // println("Using web test engine: ${testEngine.key}")
                         testEngine.value.invoke()
                     }
                 }
-            }
+            }*/
         }
         binaries.library()
     }
@@ -50,6 +67,7 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+                implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
             }
         }
         val commonTest by getting {
@@ -99,3 +117,34 @@ publishing {
     }
 }
 
+tasks.named("jsBrowserTest") {
+    enabled = false
+}
+
+extensions.getByType<SuspendTransformGradleExtension>().apply {
+    transformers[TargetPlatform.JS] = mutableListOf(
+        SuspendTransformConfiguration.jsPromiseTransformer.copy(
+            copyAnnotationExcludes = listOf(
+                ClassInfo("kotlin.js", "JsExport.Ignore")
+            )
+        )
+    )
+}
+
+npmPublish {
+    registries {
+        val envToken = System.getenv("NPM_TOKEN")
+        val npmTokenFile = File("secret_npm_token.txt")
+        val secretNpmToken =
+            envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
+        val hasNPMToken = secretNpmToken.isNotEmpty()
+        val isReleaseBuild = Regex("\\d+.\\d+.\\d+").matches(version.get())
+        if (isReleaseBuild && hasNPMToken) {
+            readme.set(File("README-JS.md"))
+            register("npmjs") {
+                uri.set(uri("https://registry.npmjs.org"))
+                authToken.set(secretNpmToken)
+            }
+        }
+    }
+}

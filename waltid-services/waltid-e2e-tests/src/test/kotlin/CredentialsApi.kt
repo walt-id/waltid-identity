@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-import E2ETestWebService.test
+import id.walt.commons.testing.E2ETest.test
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.usecase.credential.CredentialStatusResult
@@ -10,7 +10,6 @@ import io.ktor.client.request.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
-
 import kotlin.test.assertNotNull
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -20,7 +19,7 @@ class CredentialsApi(private val client: HttpClient) {
         wallet: Uuid,
         filter: CredentialFilterObject = CredentialFilterObject.default,
         expectedSize: Int = 0,
-        vararg expectedCredential: String
+        vararg expectedCredential: String,
     ) = test("/wallet-api/wallet/{wallet}/credentials - list credentials") {
         client.get("/wallet-api/wallet/$wallet/credentials") {
             url {

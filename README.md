@@ -7,9 +7,7 @@
 </a>
 <a href="https://twitter.com/intent/follow?screen_name=walt_id">
 <img src="https://img.shields.io/twitter/follow/walt_id.svg?label=Follow%20@walt_id" alt="Follow @walt_id" />
-</a>
-
-
+<img alt="GitHub commits since latest release" src="https://img.shields.io/github/commits-since/walt-id/waltid-identity/latest"></a>
 </div>
 
 ## Getting Started
@@ -18,17 +16,18 @@
 
 Available for Kotlin/Java and JavaScript environments.
 
-- **Crypto** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-keys/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto)) - create and use keys based on different algorithms.
+- **Crypto** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-keys/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto)) -
+  create and use keys based on different algorithms.
 - **DID** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-dids/overview) | [GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-did/README.md)) -
   create, register, and resolve DIDs on different ecosystems.
 - **Verifiable Credentials** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-credentials/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-verifiable-credentials)) -
   issue and verify W3C credentials as JWTs and SD-JWTs.
-- **mdoc Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-mdoc-credentials)) - issue and
-  verify mdoc credentials (mDL ISO/IEC 18013-5).
+- **mdoc Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-mdoc-credentials)) -
+  issue and verify mdoc credentials (mDL ISO/IEC 18013-5).
 - **OpenID4VC** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc)) -
   implementation of the OID4VCI and OIDC4VP protocols.
-- **SD-JWT** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/sdjwt/waltid-sdjwt)) - create and verify
-  Selective Disclosure JWTs.
+- **SD-JWT** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/sdjwt/waltid-sdjwt)) -
+  create and verify Selective Disclosure JWTs.
 
 ### Services
 
@@ -63,7 +62,8 @@ Learn more about the exposed ports [here](https://github.com/walt-id/waltid-iden
 
 ## Use the Command Line Tool
 
-Use the [walt.id CLI](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-cli) to run the core functions from the command line. Make sure you have your Java Runtime set up.
+Use the [walt.id CLI](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-cli) to run the core functions from
+the command line. Make sure you have your Java Runtime set up.
 
 ```bash
 cd waltid-applications/waltid-cli && ./waltid-cli.sh
