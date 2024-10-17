@@ -19,24 +19,24 @@ The library provides the following key entities to work with:
   an implementation of a local (in-memory) key (private / public)
 - [TSEKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/tse/TSEKey.kt) -
   an implementation of a Hashicorp Vault Transit Secrets Engine key (private / public)
-- [OCIKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/oci/OCIKeyRestApi.kt) -
-  an implementation of an OCI key (private / public)
 - [AWSKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/aws/AWSKey.kt) -
   an implementation of an AWS key (private / public)
-
+- [OCIKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/oci/OCIKeyRestApi.kt) -
+  an implementation of an Oracle OCI key (private / public)
 <table>
     <tbody>
         <!-- header -->
         <tr>
             <td align="center" rowspan="3">Feature</td>
             <td align="center" rowspan="3" colspan="2">Category</td>
-            <td align="center" colspan="12">Key</td>
+            <td align="center" colspan="16">Key</td>
         </tr>
         <!-- sub-header key type -->
         <tr>
             <td align="center" colspan="4">Local</td>
             <td align="center" colspan="4">TSE</td>
             <td align="center" colspan="4">AWS</td>
+            <td align="center" colspan="4">OCI</td>
         </tr>
         <!-- sub-sub-header key algorithm -->
         <tr>
@@ -51,6 +51,11 @@ The library provides the following key entities to work with:
             <td align="center">secp256r1</td>
             <td align="center">rsa</td>
             <!-- aws -->
+            <td align="center">ed25519</td>
+            <td align="center">secp256k1</td>
+            <td align="center">secp256r1</td>
+            <td align="center">rsa</td>
+            <!-- oci -->
             <td align="center">ed25519</td>
             <td align="center">secp256k1</td>
             <td align="center">secp256r1</td>
@@ -77,6 +82,11 @@ The library provides the following key entities to work with:
             <td align="center">&check;</td>
             <td align="center">&check;</td>
             <td align="center">&check;</td>
+            <!-- oci -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
         </tr>
         <!-- raw -->
         <tr>
@@ -92,6 +102,11 @@ The library provides the following key entities to work with:
             <td align="center">&check;</td>
             <td align="center">&check;</td>
             <!-- aws -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- oci -->
             <td align="center">&check;</td>
             <td align="center">&check;</td>
             <td align="center">&check;</td>
@@ -119,6 +134,11 @@ The library provides the following key entities to work with:
             <td align="center">&check;</td>
             <td align="center">&check;</td>
             <td align="center">&check;</td>
+            <!-- oci -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
         </tr>
         <!-- raw -->
         <tr>
@@ -134,6 +154,11 @@ The library provides the following key entities to work with:
             <td align="center">&check;</td>
             <td align="center">&check;</td>
             <!-- aws -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- oci -->
             <td align="center">&check;</td>
             <td align="center">&check;</td>
             <td align="center">&check;</td>
@@ -163,6 +188,11 @@ The library provides the following key entities to work with:
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
+            <!-- oci -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- public -->
         <tr>
@@ -178,6 +208,11 @@ The library provides the following key entities to work with:
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
             <!-- aws -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- oci -->
             <td align="center">&check;</td>
             <td align="center">&check;</td>
             <td align="center">&check;</td>
@@ -203,6 +238,11 @@ The library provides the following key entities to work with:
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
+            <!-- oci -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- public -->
         <tr>
@@ -218,7 +258,12 @@ The library provides the following key entities to work with:
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
             <!-- aws -->
-            <td align="center">&cross;</td>
+            <td align="center">-</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- oci -->
+            <td align="center">-</td>
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
@@ -243,6 +288,11 @@ The library provides the following key entities to work with:
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
+            <!-- oci -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- public -->
         <tr>
@@ -262,6 +312,11 @@ The library provides the following key entities to work with:
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
+            <!-- oci -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
         </tr>
         <!-- end export -->
         <tr><td align="center" colspan="11"></td></tr>
@@ -287,6 +342,11 @@ The library provides the following key entities to work with:
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
+            <!-- oci -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- public -->
         <tr>
@@ -302,6 +362,11 @@ The library provides the following key entities to work with:
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
             <!-- aws -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- oci -->
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
@@ -327,6 +392,11 @@ The library provides the following key entities to work with:
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
+            <!-- oci -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- public -->
         <tr>
@@ -342,6 +412,11 @@ The library provides the following key entities to work with:
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
             <!-- aws -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- oci -->
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
@@ -367,6 +442,11 @@ The library provides the following key entities to work with:
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
+            <!-- oci -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
         </tr>
         <!-- public -->
         <tr>
@@ -382,6 +462,11 @@ The library provides the following key entities to work with:
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
             <!-- aws -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- oci -->
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
