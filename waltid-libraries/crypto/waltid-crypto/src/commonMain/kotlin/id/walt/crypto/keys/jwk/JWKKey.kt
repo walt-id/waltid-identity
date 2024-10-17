@@ -50,7 +50,7 @@ expect class JWKKey(jwk: String?, _keyId: String? = null) : Key {
 
     /**
      * Decrypts JWE: Decrypts an encrypted message using this private key
-     * @param encrypted encrypted
+     * @param encrypted data
      * @return Result wrapping the plaintext; Result failure when the decryption fails
      */
     override suspend fun decrypt(encrypted: ByteArray): Result<ByteArray>

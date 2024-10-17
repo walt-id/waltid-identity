@@ -11,6 +11,475 @@
 </a>
 </div>
 
+## What it provides
+
+The library provides the following key entities to work with:
+
+- [JWKKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/jwk/JWKKey.kt) -
+  an implementation of a local (in-memory) key (private / public)
+- [TSEKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/tse/TSEKey.kt) -
+  an implementation of a Hashicorp Vault Transit Secrets Engine key (private / public)
+- [AWSKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/aws/AWSKey.kt) -
+  an implementation of an AWS key (private / public)
+- [OCIKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/oci/OCIKeyRestApi.kt) -
+  an implementation of an Oracle OCI key (private / public)
+<table>
+    <tbody>
+        <!-- header -->
+        <tr>
+            <td align="center" rowspan="3">Feature</td>
+            <td align="center" rowspan="3" colspan="2">Category</td>
+            <td align="center" colspan="16">Key</td>
+        </tr>
+        <!-- sub-header key type -->
+        <tr>
+            <td align="center" colspan="4">Local</td>
+            <td align="center" colspan="4">TSE</td>
+            <td align="center" colspan="4">AWS</td>
+            <td align="center" colspan="4">OCI</td>
+        </tr>
+        <!-- sub-sub-header key algorithm -->
+        <tr>
+            <!-- local -->
+            <td align="center">ed25519</td>
+            <td align="center">secp256k1</td>
+            <td align="center">secp256r1</td>
+            <td align="center">rsa</td>
+            <!-- tse -->
+            <td align="center">ed25519</td>
+            <td align="center">secp256k1</td>
+            <td align="center">secp256r1</td>
+            <td align="center">rsa</td>
+            <!-- aws -->
+            <td align="center">ed25519</td>
+            <td align="center">secp256k1</td>
+            <td align="center">secp256r1</td>
+            <td align="center">rsa</td>
+            <!-- oci -->
+            <td align="center">ed25519</td>
+            <td align="center">secp256k1</td>
+            <td align="center">secp256r1</td>
+            <td align="center">rsa</td>
+        </tr>
+        <!-- content -->
+        <!-- sign -->
+        <!-- jws -->
+        <tr>
+            <td align="center" rowspan="2">sign</td>
+            <td align="center" colspan="2">jws</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- aws -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- oci -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+        </tr>
+        <!-- raw -->
+        <tr>
+            <td align="center" colspan="2">raw</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- aws -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- oci -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+        </tr>
+        <!-- end sign -->
+        <tr><td align="center" colspan="11"></td></tr>
+        <!-- verify -->
+        <!-- jws -->
+        <tr>
+            <td align="center" rowspan="2">verify</td>
+            <td align="center" colspan="2">jws</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- aws -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- oci -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+        </tr>
+        <!-- raw -->
+        <tr>
+            <td align="center" colspan="2">raw</td>
+            <!-- local -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- tse -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- aws -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- oci -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+        </tr>
+        <!-- end verify -->
+        <tr><td align="center" colspan="11"></td></tr>
+        <!-- export -->
+        <!-- jwk -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="6">export</td>
+            <td align="center" rowspan="2">jwk</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- aws -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- oci -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- aws -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- oci -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+        </tr>
+        <!-- pem -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="2">pem</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&cross;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- aws -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- oci -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&cross;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- aws -->
+            <td align="center">-</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- oci -->
+            <td align="center">-</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- JsonObject -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="2">JsonObject</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- aws -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- oci -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- aws -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- oci -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+        </tr>
+        <!-- end export -->
+        <tr><td align="center" colspan="11"></td></tr>
+        <!-- import -->
+        <!-- jwk -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="6">import</td>
+            <td align="center" rowspan="2">jwk</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- aws -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- oci -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- aws -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- oci -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- pem -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="2">pem</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- aws -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- oci -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- aws -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- oci -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- raw -->
+        <!-- private -->
+        <tr>
+            <td align="center" rowspan="2">raw</td>
+            <td align="center">private</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- aws -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <!-- oci -->
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+            <td align="center">&dash;</td>
+        </tr>
+        <!-- public -->
+        <tr>
+            <td align="center">public</td>
+            <!-- local -->
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
+            <!-- tse -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- aws -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <!-- oci -->
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- end import -->
+    </tbody>
+</table>
+
+- &check; implemented
+- &cross; not implemented
+- &dash; not available
+
 ## Installation
 
 Add the crypto library as a dependency to your Kotlin or Java project.
@@ -39,293 +508,6 @@ dependencies {
 Replace `version` with the version of the walt.id crypto library you want to use.
 Note: As the crypto lib is part of the mono-repo walt.id identity, you need to use the version of
 walt.id identity.
-
-## What it provides
-
-<table>
-    <tbody>
-        <!-- header -->
-        <tr>
-            <td align="center" rowspan="3">Feature</td>
-            <td align="center" rowspan="3" colspan="2">Category</td>
-            <td align="center" colspan="8">Key</td>
-        </tr>
-        <!-- sub-header key type -->
-        <tr>
-            <td align="center" colspan="4">Local</td>
-            <td align="center" colspan="4">TSE</td>
-        </tr>
-        <!-- sub-sub-header key algorithm -->
-        <tr>
-            <!-- local -->
-            <td align="center">ed25519</td>
-            <td align="center">secp256k1</td>
-            <td align="center">secp256r1</td>
-            <td align="center">rsa</td>
-            <!-- tse -->
-            <td align="center">ed25519</td>
-            <td align="center">secp256k1</td>
-            <td align="center">secp256r1</td>
-            <td align="center">rsa</td>
-        </tr>
-        <!-- content -->
-        <!-- sign -->
-        <!-- jws -->
-        <tr>
-            <td align="center" rowspan="2">sign</td>
-            <td align="center" colspan="2">jws</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-        </tr>
-        <!-- raw -->
-        <tr>
-            <td align="center" colspan="2">raw</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-        </tr>
-        <!-- end sign -->
-        <tr><td align="center" colspan="11"></td></tr>
-        <!-- verify -->
-        <!-- jws -->
-        <tr>
-            <td align="center" rowspan="2">verify</td>
-            <td align="center" colspan="2">jws</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-        </tr>
-        <!-- raw -->
-        <tr>
-            <td align="center" colspan="2">raw</td>
-            <!-- local -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <!-- tse -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-        </tr>
-        <!-- end verify -->
-        <tr><td align="center" colspan="11"></td></tr>
-        <!-- export -->
-        <!-- jwk -->
-        <!-- private -->
-        <tr>
-            <td align="center" rowspan="6">export</td>
-            <td align="center" rowspan="2">jwk</td>
-            <td align="center">private</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-        </tr>
-        <!-- public -->
-        <tr>
-            <td align="center">public</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- pem -->
-        <!-- private -->
-        <tr>
-            <td align="center" rowspan="2">pem</td>
-            <td align="center">private</td>
-            <!-- local -->
-            <td align="center">&cross;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-        </tr>
-        <!-- public -->
-        <tr>
-            <td align="center">public</td>
-            <!-- local -->
-            <td align="center">&cross;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-        </tr>
-        <!-- JsonObject -->
-        <!-- private -->
-        <tr>
-            <td align="center" rowspan="2">JsonObject</td>
-            <td align="center">private</td>
-            <!-- local -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <!-- tse -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-        </tr>
-        <!-- public -->
-        <tr>
-            <td align="center">public</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- end export -->
-        <tr><td align="center" colspan="11"></td></tr>
-        <!-- import -->
-        <!-- jwk -->
-        <!-- private -->
-        <tr>
-            <td align="center" rowspan="6">import</td>
-            <td align="center" rowspan="2">jwk</td>
-            <td align="center">private</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-        </tr>
-        <!-- public -->
-        <tr>
-            <td align="center">public</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- pem -->
-        <!-- private -->
-        <tr>
-            <td align="center" rowspan="2">pem</td>
-            <td align="center">private</td>
-            <!-- local -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <!-- tse -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-        </tr>
-        <!-- public -->
-        <tr>
-            <td align="center">public</td>
-            <!-- local -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- raw -->
-        <!-- private -->
-        <tr>
-            <td align="center" rowspan="2">raw</td>
-            <td align="center">private</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-        </tr>
-        <!-- public -->
-        <tr>
-            <td align="center">public</td>
-            <!-- local -->
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <!-- tse -->
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-        </tr>
-        <!-- end import -->
-    </tbody>
-</table>
-
-- &check; implemented
-- &cross; not implemented
-- &dash; not available
 
 ### Signature schemes
 
@@ -358,13 +540,6 @@ walt.id identity.
 
 ## How to use it
 
-The library provides the following key entities to work with:
-
-- [JWKKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/jwk/JWKKey.kt) -
-  an implementation of a local (in-memory) key (private / public)
-- [TSEKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/tse/TSEKey.kt) -
-  an implementation of a Hashicorp Vault Transit Secrets Engine key (private / public)
-- [OCIKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/oci/OCIKeyRestApi.kt) - an implementation of an OCI key (private / public)
 ### Working with JWKKey
 
 **Create key**
@@ -398,7 +573,7 @@ val verificationResult = key.getPublicKey().verifyJws(signature)
 - raw
 
 ```kotlin
-val verificationResult = key.getPublicKey().verifyRaw(signature , payloadString.encodeToByteArray())
+val verificationResult = key.getPublicKey().verifyRaw(signature, payloadString.encodeToByteArray())
 ```
 
 **Import key**
@@ -428,7 +603,6 @@ val key = JWKKey.importRawPublicKey(KeyType.Ed25519, bytes, JWKKeyMetadata())
 ```kotlin
 val jwkString = key.exportJWK()
 ```
-
 
 - JsonObject
 
@@ -529,6 +703,29 @@ vault secrets enable transit
 3. on the 'Secrets Engines' page, select 'enable new engine'
 4. on the 'Enable a secrets engine' page, select 'Transit' from the 'Generic' group
 5. click 'Next', then 'Enable Engine'
+
+### Working with AWSKey
+
+An AWS account is required in order to be able to use an `AWSKey` for signing and verification. This
+implies covering the following steps:
+
+1. [create an AWS account](https://aws.amazon.com/resources/create-account/)
+2. [create an IAM user](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html)
+3. [create an access key](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user_manage_add-key.html)
+
+#### AwsKeyMetadata
+
+The `AWSKeyMetadata` class is used to specify the AWS access key ID, secret access key, and region.
+It is used when creating an `AWSKey` instance.
+
+```kotlin
+@Serializable
+data class AWSKeyMetadata(
+  val accessKeyId: String,
+  val secretAccessKey: String,
+  val region: String
+)
+```
 
 For usage examples on _create_, _sign_, _verify_, _import_ and _export_ functions see
 [Working with JWKKey](#working-with-jwkKey).
