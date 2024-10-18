@@ -130,6 +130,8 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
+                implementation("com.augustcellars.cose:cose-java:1.1.0")
+                implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
             }
         }
         val jvmTest by getting {

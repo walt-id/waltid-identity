@@ -1,5 +1,6 @@
 package id.walt.oid4vc.requests
 
+import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
@@ -52,7 +53,7 @@ data class AuthorizationRequest(
     val idTokenHint: String? = null,
     override val customParameters: Map<String, List<String>> = mapOf()
 ) : HTTPDataObject(), IAuthorizationRequest {
-    val isReferenceToPAR get() = requestUri?.startsWith("urn:ietf:params:oauth:request_uri:") ?: false
+    val isReferenceToPAR get() = requestUri?.startsWith(OpenID4VC.PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX) ?: false
     override fun toHttpParameters(): Map<String, List<String>> {
         return buildMap {
             put("response_type", listOf(ResponseType.getResponseTypeString(responseType)))

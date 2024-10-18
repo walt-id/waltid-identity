@@ -126,6 +126,23 @@ data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) co
         override fun fromJSON(jsonObject: JsonObject): OpenIDProviderMetadata =
             Json.decodeFromJsonElement(OpenIDProviderMetadataSerializer, jsonObject)
     }
+
+    fun getVctByCredentialConfigurationId(credentialConfigurationId: String) = credentialConfigurationsSupported?.get(credentialConfigurationId)?.vct
+
+    fun getVctBySupportedCredentialConfiguration(
+        baseUrl: String,
+        credType: String
+    ): CredentialSupported {
+        val expectedVct = "$baseUrl/$credType"
+
+        credentialConfigurationsSupported?.entries?.forEach { entry ->
+            if (getVctByCredentialConfigurationId(entry.key) == expectedVct) {
+                return entry.value
+            }
+        }
+
+        throw IllegalArgumentException("Invalid type value: $credType. The $credType type is not supported")
+    }
 }
 
 object OpenIDProviderMetadataSerializer :
