@@ -5,7 +5,7 @@ import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.ECKey
-import id.walt.credentials.verification.policies.JwtSignaturePolicy
+import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
@@ -71,7 +71,7 @@ class CI_JVM_Test {
                         backgroundColor = "#12107c", textColor = "#FFFFFF"
                     )
                 ),
-                types = listOf("VerifiableCredential", "UniversityDegreeCredential"),
+                credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "UniversityDegreeCredential")),
                 credentialSubject = mapOf(
                     "name" to ClaimDescriptor(
                         mandatory = false,
@@ -94,7 +94,7 @@ class CI_JVM_Test {
                 cryptographicBindingMethodsSupported = setOf("did"),
                 credentialSigningAlgValuesSupported = setOf("ES256K"),
                 display = listOf(DisplayProperties("Verifiable ID")),
-                types = listOf("VerifiableCredential", "VerifiableId"),
+                credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableId")),
                 context = listOf(
                     JsonPrimitive("https://www.w3.org/2018/credentials/v1"),
                     JsonObject(mapOf("@version" to JsonPrimitive(1.1)))
@@ -225,9 +225,7 @@ class CI_JVM_Test {
                 "&client_id=s6BhdRkqt3" +
                 "&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM" +
                 "&code_challenge_method=S256" +
-                "&authorization_details=%5B%7B%22type%22:%22openid_credential" +
-                "%22,%22format%22:%22jwt_vc_json%22,%22types%22:%5B%22Verifia" +
-                "bleCredential%22,%22UniversityDegreeCredential%22%5D%7D%5D" +
+                "&authorization_details=%5B%7B%22type%22%3A%22openid_credential%22%2C%22format%22%3A%22jwt_vc_json%22%2C%22credential_definition%22%3A%7B%22type%22%3A%5B%22VerifiableCredential%22%2C%22UniversityDegreeCredential%22%5D%7D%7D%5D" +
                 "&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb"
         val parsedReq = AuthorizationRequest.fromHttpQueryString(authorizationReq)
         assertEquals(expected = "s6BhdRkqt3", actual = parsedReq.clientId)
@@ -240,7 +238,7 @@ class CI_JVM_Test {
                 AuthorizationDetails(
                     type = OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
                     format = CredentialFormat.jwt_vc_json,
-                    types = listOf("VerifiableCredential", "UniversityDegreeCredential")
+                    credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "UniversityDegreeCredential"))
                 )
             ),
             customParameters = mapOf(
@@ -309,11 +307,11 @@ class CI_JVM_Test {
                 AuthorizationDetails(
                     type = OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
                     format = CredentialFormat.jwt_vc_json,
-                    types = listOf("VerifiableCredential", "VerifiableId")
+                    credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableId"))
                 ), AuthorizationDetails(
                     type = OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
                     format = CredentialFormat.jwt_vc_json,
-                    types = listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableDiploma")
+                    credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableDiploma"))
                 )
             )
         )
@@ -517,7 +515,7 @@ class CI_JVM_Test {
         println("offeredCredentials: $offeredCredentials")
         assertEquals(expected = 1, actual = offeredCredentials.size)
         assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
-        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().credentialDefinition?.type?.last())
         val offeredCredential = offeredCredentials.first()
         println("offeredCredentials[0]: $offeredCredential")
 
@@ -565,6 +563,7 @@ class CI_JVM_Test {
             put(JWTClaims.Payload.audience, TokenTarget.ACCESS.name)
             put(JWTClaims.Payload.jwtID, "token-id")
         })
+
         val cNonce = "pop-nonce"
         val tokenResponse: TokenResponse = TokenResponse.success(accessToken, "bearer", cNonce = cNonce)
 
@@ -649,7 +648,7 @@ class CI_JVM_Test {
         println("offeredCredentials: $offeredCredentials")
         assertEquals(expected = 1, actual = offeredCredentials.size)
         assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
-        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().credentialDefinition?.type?.last())
         var offeredCredential = offeredCredentials.first()
         println("offeredCredentials[0]: $offeredCredential")
 
@@ -766,7 +765,7 @@ class CI_JVM_Test {
         println("offeredCredentials: $offeredCredentials")
         assertEquals(expected = 1, actual = offeredCredentials.size)
         assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
-        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().credentialDefinition?.type?.last())
         offeredCredential = offeredCredentials.first()
         println("offeredCredentials[0]: $offeredCredential")
 
@@ -909,7 +908,7 @@ class CI_JVM_Test {
         println("offeredCredentials: $offeredCredentials")
         assertEquals(expected = 1, actual = offeredCredentials.size)
         assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
-        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().credentialDefinition?.type?.last())
         offeredCredential = offeredCredentials.first()
         println("offeredCredentials[0]: $offeredCredential")
 
@@ -942,7 +941,7 @@ class CI_JVM_Test {
             } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
         }
 
-        val presentationDefinition = PresentationDefinition.primitiveGenerationFromVcTypes(requestedTypes, vpProfile)
+        val presentationDefinition = PresentationDefinition.defaultGenerationFromVcTypesForCredentialFormat(requestedTypes, CredentialFormat.jwt_vc)
 
         // Issuer Client creates state and nonce for the vp_token authorization request
         authReqIssuerState = "secured_state_issuer_vptoken"
@@ -1063,7 +1062,7 @@ class CI_JVM_Test {
         println("offeredCredentials: $offeredCredentials")
         assertEquals(expected = 1, actual = offeredCredentials.size)
         assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
-        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().credentialDefinition?.type?.last())
         offeredCredential = offeredCredentials.first()
         println("offeredCredentials[0]: $offeredCredential")
         assertNotNull(actual = parsedCredOffer.grants[GrantType.pre_authorized_code.value]?.preAuthorizedCode)
@@ -1718,7 +1717,7 @@ class CI_JVM_Test {
 
         assertEquals(expected = 1, actual = offeredCredentials.size)
         assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
-        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().credentialDefinition?.type?.last())
         val offeredCredential = offeredCredentials.first()
         println("offeredCredentials[0]: $offeredCredential")
 
@@ -1845,7 +1844,7 @@ class CI_JVM_Test {
         println("offeredCredentials: $offeredCredentials")
         assertEquals(expected = 1, actual = offeredCredentials.size)
         assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
-        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().credentialDefinition?.type?.last())
         val offeredCredential = offeredCredentials.first()
         println("offeredCredentials[0]: $offeredCredential")
 
@@ -1937,11 +1936,11 @@ class CI_JVM_Test {
                 AuthorizationDetails(
                     type = OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
                     format = CredentialFormat.jwt_vc_json,
-                    types = listOf("VerifiableCredential", "VerifiableId")
+                    credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableId"))
                 ), AuthorizationDetails(
                     type = OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
                     format = CredentialFormat.jwt_vc_json,
-                    types = listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableDiploma")
+                    credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableAttestation", "VerifiableDiploma"))
                 )
             )
         )
@@ -2223,7 +2222,7 @@ class CI_JVM_Test {
         println("offeredCredentials: $offeredCredentials")
         assertEquals(expected = 1, actual = offeredCredentials.size)
         assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
-        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+        assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().credentialDefinition?.type?.last())
         val offeredCredential = offeredCredentials.first()
         println("offeredCredentials[0]: $offeredCredential")
 
@@ -2587,7 +2586,7 @@ suspend fun testIsolatedFunctionsResolveCredentialOffer(credOfferUrl: String): O
     println("offeredCredentials: $offeredCredentials")
     assertEquals(expected = 1, actual = offeredCredentials.size)
     assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
-    assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().types?.last())
+    assertEquals(expected = "VerifiableId", actual = offeredCredentials.first().credentialDefinition?.type?.last())
     val offeredCredential = offeredCredentials.first()
     println("offeredCredentials[0]: $offeredCredential")
 

@@ -1,7 +1,6 @@
 package id.walt.oid4vc
 
-import id.walt.credentials.verification.Verifier
-import id.walt.credentials.verification.models.PolicyRequest.Companion.parsePolicyRequests
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.Key
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.ResponseType.Companion.getResponseTypeString
@@ -9,21 +8,22 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.definitions.JWTClaims
+import id.walt.oid4vc.errors.TokenError
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.requests.TokenRequest
-import id.walt.oid4vc.responses.TokenErrorCode
-import id.walt.oid4vc.errors.TokenError
 import id.walt.oid4vc.responses.AuthorizationCodeWithAuthorizationRequestResponse
+import id.walt.oid4vc.responses.TokenErrorCode
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.http
+import id.walt.policies.Verifier
+import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
 import io.ktor.utils.io.core.*
 import kotlinx.serialization.json.*
-import kotlinx.serialization.json.Json
 
 object OpenID4VCI {
     fun getCredentialOfferRequestUrl(
@@ -85,7 +85,7 @@ object OpenID4VCI {
         }.buildString()
 
     fun getJWTIssuerProviderMetadataUrl(baseUrl: String) = URLBuilder(baseUrl).apply {
-            appendPathSegments(".well-known", "jwt-issuer")
+            appendPathSegments(".well-known", "jwt-vc-issuer")
         }.buildString()
 
     suspend fun resolveCIProviderMetadata(credOffer: CredentialOffer) = http.get(getCIProviderMetadataUrl(credOffer)).bodyAsText().let {
@@ -248,8 +248,10 @@ object OpenID4VCI {
         // 4. Verify VP or ID Token
         val policies =
             Json.parseToJsonElement("""["signature", "expired", "not-before"]""").jsonArray.parsePolicyRequests()
+        val presentationFormat = presentationSubmission?.descriptorMap?.firstOrNull()?.format ?: VCFormat.jwt
         Verifier.verifyPresentation(
-            vpTokenJwt = token,
+            presentationFormat,
+            vpToken = token,
             vpPolicies = policies,
             globalVcPolicies = policies,
             specificCredentialPolicies = emptyMap(),

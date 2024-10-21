@@ -1,9 +1,13 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.usecase.credential.CredentialStatusResult
+import id.walt.webwallet.web.controllers.auth.getWalletId
+import id.walt.webwallet.web.controllers.auth.getWalletService
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import id.walt.webwallet.web.parameter.NoteRequestParameter
 import io.github.smiley4.ktorswaggerui.dsl.routing.*
@@ -12,6 +16,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.util.*
+import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.credentials() = walletRoute {
     route("credentials", {

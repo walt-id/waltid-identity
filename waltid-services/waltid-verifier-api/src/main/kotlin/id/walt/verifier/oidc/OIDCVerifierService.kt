@@ -8,16 +8,20 @@ import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.persistence.ConfiguredPersistence
-import id.walt.credentials.verification.VerificationPolicy
-import id.walt.credentials.verification.Verifier
-import id.walt.credentials.verification.models.PolicyRequest
-import id.walt.credentials.verification.models.PresentationVerificationResponseSurrogate
-import id.walt.credentials.verification.policies.*
-import id.walt.credentials.verification.policies.vp.HolderBindingPolicy
-import id.walt.credentials.verification.policies.vp.MaximumCredentialsPolicy
-import id.walt.credentials.verification.policies.vp.MinimumCredentialsPolicy
+import id.walt.credentials.utils.VCFormat
+import id.walt.policies.VerificationPolicy
+import id.walt.policies.Verifier
+import id.walt.policies.models.PolicyRequest
+import id.walt.policies.models.PolicyResultSurrogate
+import id.walt.policies.models.PresentationResultEntrySurrogate
+import id.walt.policies.models.PresentationVerificationResponseSurrogate
+import id.walt.policies.policies.*
+import id.walt.policies.policies.vp.HolderBindingPolicy
+import id.walt.policies.policies.vp.MaximumCredentialsPolicy
+import id.walt.policies.policies.vp.MinimumCredentialsPolicy
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.mdoc.COSECryptoProviderKeyInfo
@@ -38,11 +42,12 @@ import id.walt.oid4vc.providers.OpenIDCredentialVerifier
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
+import id.walt.policies.policies.vp.PresentationDefinitionPolicy
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
-import id.walt.verifier.policies.PresentationDefinitionPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -125,6 +130,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
 
     override fun getSession(id: String) = presentationSessions[id]
+        ?: throw NotFoundException("Id parameter $id doesn't refer to an existing session, or session expired")
     override fun putSession(id: String, session: PresentationSession) = presentationSessions.put(id, session)
     override fun getSessionByAuthServerState(authServerState: String): PresentationSession? {
         TODO("Not yet implemented")
@@ -149,7 +155,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     // Simple cryptographic operations interface implementation
     override fun doVerify(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
         val policies = sessionVerificationInfos[session.id]
-            ?: throw IllegalArgumentException("Could not find policy listing for session: ${session.id}")
+            ?: throw NotFoundException("Policy listing for session: ${session.id} is missing. Please ensure that the session ID is correct and that the policies have been properly configured.")
 
         val vpToken = when (tokenResponse.idToken) {
             null -> when (tokenResponse.vpToken) {
@@ -167,23 +173,30 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         }
 
         if (tokenResponse.vpToken is JsonObject) TODO("Token response is jsonobject - not yet handled")
+        val presentationFormat = tokenResponse.presentationSubmission?.descriptorMap?.firstOrNull()?.format ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
 
         logger.debug { "VP token: $vpToken" }
         logger.info { "OpenID4VP profile: ${session.openId4VPProfile}" }
+        logger.info { "Presentation format: $presentationFormat" }
 
         return when (session.openId4VPProfile) {
+            // TODO: also move mdoc verification into Verifier.verifyPresentation path with policies
             OpenId4VPProfile.ISO_18013_7_MDOC -> verifyMdoc(tokenResponse, session)
-            OpenId4VPProfile.HAIP -> runBlocking { verifySdJwtVC(tokenResponse, session) }
             else -> {
                 val results = runBlocking {
                     Verifier.verifyPresentation(
-                        vpTokenJwt = vpToken,
+                        presentationFormat,
+                        vpToken = vpToken,
                         vpPolicies = policies.vpPolicies,
                         globalVcPolicies = policies.vcPolicies,
                         specificCredentialPolicies = policies.specificPolicies,
-                        presentationContext = mapOf(
-                            "presentationDefinition" to session.presentationDefinition, "challenge" to session.id
-                        )
+                        presentationContext = listOfNotNull(
+                            "presentationDefinition" to session.presentationDefinition.toJSON(),
+                            tokenResponse.presentationSubmission?.toJSON()?.let { "presentationSubmission" to it },
+                            "challenge" to (session.authorizationRequest?.nonce ?: ""),
+                            "clientId" to (session.authorizationRequest?.clientId ?: ""),
+                            "responseUri" to (session.authorizationRequest?.responseUri ?: "")
+                        ).toMap()
                     )
                 }
 
@@ -206,7 +219,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val parsedDeviceResponse = DeviceResponse.fromCBORBase64URL(tokenResponse.vpToken!!.jsonPrimitive.content)
         val parsedMdoc = parsedDeviceResponse.documents[0]
         val deviceKey = OneKey(CBORObject.DecodeFromBytes(parsedMdoc.MSO!!.deviceKeyInfo.deviceKey.toCBOR()))
-        val issuerKey = parsedMdoc.issuerSigned.issuerAuth?.x5Chain?.let { X509CertUtils.parse(it) }?.publicKey ?: throw Exception("Issuer key not found in x5Chain header (33)")
+        val issuerKey = parsedMdoc.issuerSigned.issuerAuth?.x5Chain?.let { X509CertUtils.parse(it) }?.publicKey
+            ?: throw BadRequestException("Issuer's Public Key Missing: The x5c header in the JWT is either missing or does not contain the expected X.509 certificate chain. Please ensure that the x5c header is correctly formatted and includes the issuer’s public key")
         return parsedMdoc.verify(
             MDocVerificationParams(
                 VerificationType.forPresentation,
@@ -227,9 +241,9 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     }
 
     private suspend fun resolveIssuerKeyFromSdJwt(sdJwt: SDJwtVC): Key {
-        val kid = sdJwt.header.get("kid")?.jsonPrimitive?.content ?: randomUUID()
-        return if(DidUtils.isDidUrl(kid)) {
-            DidService.resolveToKey(kid).getOrThrow()
+        val kid = sdJwt.keyID ?: randomUUID()
+        return if(!sdJwt.issuer.isNullOrEmpty() && DidUtils.isDidUrl(sdJwt.issuer!!)) {
+            DidService.resolveToKey(sdJwt.issuer!!).getOrThrow()
         } else {
             sdJwt.header.get("x5c")?.jsonArray?.last()?.let {
                 return JWKKey.importPEM(it.jsonPrimitive.content).getOrThrow().let { JWKKey(it.jwk, kid) }
@@ -244,7 +258,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val issuerKey = resolveIssuerKeyFromSdJwt(sdJwtVC)
         val verificationResult = sdJwtVC.verifyVC(
             WaltIdJWTCryptoProvider(mapOf(
-                issuerKey.getKeyId() to issuerKey,
+                (sdJwtVC.keyID ?: issuerKey.getKeyId()) to issuerKey,
                 holderKey.getKeyId() to holderKey)
             ),
             requiresHolderKeyBinding = true,

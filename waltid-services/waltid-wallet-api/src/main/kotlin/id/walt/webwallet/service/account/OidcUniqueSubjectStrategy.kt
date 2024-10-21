@@ -6,11 +6,14 @@ import id.walt.webwallet.utils.JwkUtils.verifyToken
 import id.walt.webwallet.web.model.OidcUniqueSubjectRequest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
+
+
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 object OidcUniqueSubjectStrategy : PasswordlessAccountStrategy<OidcUniqueSubjectRequest>() {
     override suspend fun register(tenant: String, request: OidcUniqueSubjectRequest): Result<RegistrationResult> {
         val jwt = verifyToken(request.token)
@@ -21,7 +24,7 @@ object OidcUniqueSubjectStrategy : PasswordlessAccountStrategy<OidcUniqueSubject
         val createdAccountId = transaction {
             val accountId = Accounts.insert {
                 it[Accounts.tenant] = tenant
-                it[id] = UUID.generateUUID()
+                it[id] = Uuid.random()
                 it[name] = sub
                 it[email] = sub
                 it[createdOn] = Clock.System.now().toJavaInstant()

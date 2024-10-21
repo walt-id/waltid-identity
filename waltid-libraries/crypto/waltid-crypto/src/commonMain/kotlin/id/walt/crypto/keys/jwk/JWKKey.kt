@@ -4,7 +4,6 @@ import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.encoding.Decoder
@@ -51,7 +50,7 @@ expect class JWKKey(jwk: String?, _keyId: String? = null) : Key {
 
     /**
      * Decrypts JWE: Decrypts an encrypted message using this private key
-     * @param encrypted encrypted
+     * @param encrypted data
      * @return Result wrapping the plaintext; Result failure when the decryption fails
      */
     override suspend fun decrypt(encrypted: ByteArray): Result<ByteArray>

@@ -4,6 +4,7 @@ import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.push.PushManager
 import id.walt.webwallet.usecase.notification.NotificationDTO
 import id.walt.webwallet.usecase.notification.NotificationFilterParameter
+import id.walt.webwallet.web.controllers.auth.getWalletId
 import io.github.smiley4.ktorswaggerui.dsl.routing.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -14,16 +15,17 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.uuid.UUID
 import java.net.URI
 import java.net.URL
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 
+@OptIn(ExperimentalUuidApi::class)
 object NotificationController {
 
     /*
@@ -123,7 +125,7 @@ object NotificationController {
                     val status = call.parameters.getOrFail("status").toBoolean()
                     context.respond(
                         if (WalletServiceManager.notificationUseCase.setStatus(
-                                *ids.map { UUID(it) }.toTypedArray(), isRead = status
+                                *ids.map { Uuid.parse(it) }.toTypedArray(), isRead = status
                             ) > 0
                         ) HttpStatusCode.Accepted else HttpStatusCode.BadRequest
                     )
@@ -147,7 +149,7 @@ object NotificationController {
                         }
                     }) {
                         val id = call.parameters.getOrFail("id")
-                        context.respond(WalletServiceManager.notificationUseCase.findById(UUID(id)).fold(onSuccess = {
+                        context.respond(WalletServiceManager.notificationUseCase.findById(Uuid.parse(id)).fold(onSuccess = {
                             it
                         }, onFailure = {
                             it.localizedMessage
@@ -161,7 +163,7 @@ object NotificationController {
                         }
                     }) {
                         val id = call.parameters.getOrFail("id")
-                        context.respond(if (WalletServiceManager.notificationUseCase.deleteById(UUID(id)) > 0) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+                        context.respond(if (WalletServiceManager.notificationUseCase.deleteById(Uuid.parse(id)) > 0) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
                     }
                 }
 

@@ -5,7 +5,7 @@ import id.walt.commons.logging.setups.TraceLoggingSetup
 import id.walt.credentials.CredentialBuilder
 import id.walt.credentials.CredentialBuilderType
 import id.walt.credentials.issuance.Issuer.baseIssue
-import id.walt.credentials.verification.policies.JwtSignaturePolicy
+import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -59,7 +59,7 @@ private fun doGenerateCredential(credentialRequest: CredentialRequest): Credenti
         credentialRequest,
         CredentialErrorCode.unsupported_credential_format
     )
-    val types = credentialRequest.types ?: credentialRequest.credentialDefinition?.types ?: throw CredentialError(
+    val types = credentialRequest.credentialDefinition?.type ?: credentialRequest.credentialDefinition?.type ?: throw CredentialError(
         credentialRequest,
         CredentialErrorCode.unsupported_credential_type
     )
@@ -75,7 +75,7 @@ private fun doGenerateCredential(credentialRequest: CredentialRequest): Credenti
     )
     return runBlocking {
         CredentialBuilder(CredentialBuilderType.W3CV2CredentialBuilder).apply {
-            type = credentialRequest.types ?: listOf("VerifiableCredential")
+            type = credentialRequest.credentialDefinition?.type ?: listOf("VerifiableCredential")
             issuerDid = testIssuerDid
             subjectDid = holderKid
         }.buildW3C().baseIssue(issuerDidKey, testIssuerDid, holderKid, mapOf(), mapOf(), mapOf(), mapOf())
@@ -124,7 +124,7 @@ suspend fun main() {
 
     //check(offeredCredentials.size == 1)
     offeredCredentials.any { it.format ==  CredentialFormat.jwt_vc_json}
-    offeredCredentials.any { it.types?.last() == "VerifiableId" }
+    offeredCredentials.any { it.credentialDefinition?.type?.last() == "VerifiableId" }
 
     val offeredCredential = offeredCredentials.first()
     println("offeredCredentials[0]: $offeredCredential")

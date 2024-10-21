@@ -2,7 +2,7 @@ package id.walt.credentials.issuance
 
 import id.walt.credentials.JwtClaims
 import id.walt.credentials.VcClaims
-import id.walt.credentials.utils.W3CDataMergeUtils.mergeWithMapping
+import id.walt.credentials.utils.CredentialDataMergeUtils.mergeWithMapping
 import id.walt.credentials.utils.W3CVcUtils.overwrite
 import id.walt.credentials.utils.W3CVcUtils.update
 import id.walt.credentials.vc.vcs.W3CVC
@@ -60,7 +60,7 @@ object Issuer {
     @JsExport.Ignore
     suspend fun W3CVC.mergingJwtIssue(
         issuerKey: Key,
-        issuerDid: String,
+        issuerDid: String?,
         issuerKid: String? = null,
         subjectDid: String,
 
@@ -96,7 +96,7 @@ object Issuer {
     @JsExport.Ignore
     suspend fun W3CVC.mergingSdJwtIssue(
         issuerKey: Key,
-        issuerDid: String,
+        issuerDid: String?,
         subjectDid: String,
 
         mappings: JsonObject,
@@ -114,7 +114,7 @@ object Issuer {
     ).run {
         w3cVc.signSdJwt(
             issuerKey = issuerKey,
-            issuerDid = issuerDid,
+            issuerKeyId = issuerDid ?: issuerKey.getKeyId(),
             subjectDid = subjectDid,
             disclosureMap = disclosureMap,
             additionalJwtHeaders = additionalJwtHeaders.toMutableMap().apply {
@@ -139,7 +139,7 @@ object Issuer {
     @JsPromise
     @JsExport.Ignore
     suspend fun W3CVC.mergingToVc(
-        issuerDid: String,
+        issuerDid: String?,
         subjectDid: String,
 
         mappings: JsonObject,
@@ -147,9 +147,9 @@ object Issuer {
         completeJwtWithDefaultCredentialData: Boolean = true,
     ): IssuanceInformation {
         val context = mapOf(
-            "issuerDid" to JsonPrimitive(issuerDid),
-            "subjectDid" to JsonPrimitive(subjectDid)
-        )
+            "issuerDid" to issuerDid,
+            "subjectDid" to subjectDid
+        ).filterValues { !it.isNullOrEmpty() }.mapValues { JsonPrimitive(it.value) }
 
         val mapped = this.mergeWithMapping(mappings, context, dataFunctions)
 

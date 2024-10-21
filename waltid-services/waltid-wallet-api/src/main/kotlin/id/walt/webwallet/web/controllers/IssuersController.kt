@@ -1,8 +1,11 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.issuers.CredentialDataTransferObject
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
+import id.walt.webwallet.web.controllers.auth.getWalletService
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.put
@@ -13,6 +16,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.util.*
 import kotlinx.serialization.Serializable
+import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.issuers() = walletRoute {
     route("issuers", {

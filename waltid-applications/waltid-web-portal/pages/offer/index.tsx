@@ -2,7 +2,7 @@ import QRCode from 'react-qr-code';
 import Button from '@/components/walt/button/Button';
 import Icon from '@/components/walt/logo/Icon';
 import WaltIcon from '@/components/walt/logo/WaltIcon';
-import { useState, useEffect, useContext } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { CredentialsContext, EnvContext } from '@/pages/_app';
 import { sendToWebWallet } from '@/utils/sendToWebWallet';
@@ -29,11 +29,10 @@ export default function Offer() {
   useEffect(() => {
     const getOfferURL = async () => {
       let credentials;
-      if (localStorage.getItem('offer')){
+      if (localStorage.getItem('offer')) {
         credentials = JSON.parse(localStorage.getItem('offer')!);
         localStorage.removeItem('offer');
-      }
-      else{
+      } else {
         let ids = router.query.ids?.toString().split(',') ?? [];
         credentials = AvailableCredentials.filter((cred) => {
           for (const id of ids) {
@@ -45,15 +44,25 @@ export default function Offer() {
         });
       }
       if (credentials) {
-        const response = await getOfferUrl(credentials, env.NEXT_PUBLIC_VC_REPO ? env.NEXT_PUBLIC_VC_REPO : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VC_REPO, env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER, router.query.authenticationMethod as string,  router.query.vpRequestValue as string,  router.query.vpProfile as string);
+        const response = await getOfferUrl(
+          credentials,
+          env.NEXT_PUBLIC_VC_REPO
+            ? env.NEXT_PUBLIC_VC_REPO
+            : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VC_REPO,
+          env.NEXT_PUBLIC_ISSUER
+            ? env.NEXT_PUBLIC_ISSUER
+            : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER,
+          router.query.authenticationMethod as string,
+          router.query.vpRequestValue as string,
+          router.query.vpProfile as string
+        );
         setOfferURL(response.data);
         setLoading(false);
       }
     };
-  //   getOfferURL();
-  // }, [router.query.credentialId]);
-    if (router.isReady)
-      getOfferURL();
+    //   getOfferURL();
+    // }, [router.query.credentialId]);
+    if (router.isReady) getOfferURL();
   }, [router.isReady, router.query]);
 
   async function copyCurrentURLToClipboard() {
@@ -71,7 +80,13 @@ export default function Offer() {
   }
 
   function openWebWallet() {
-    sendToWebWallet(env.NEXT_PUBLIC_WALLET ? env.NEXT_PUBLIC_WALLET : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_WALLET as string, 'api/siop/initiateIssuance', offerURL);
+    sendToWebWallet(
+      env.NEXT_PUBLIC_WALLET
+        ? env.NEXT_PUBLIC_WALLET
+        : (nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_WALLET as string),
+      'api/siop/initiateIssuance',
+      offerURL
+    );
   }
 
   return (
@@ -88,22 +103,23 @@ export default function Offer() {
           Claim Your Credential
         </h1>
         <div className="flex justify-center">
-          {
-            loading ?
-              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 my-10"></div>
-              :
-              <QRCode
-                className="h-full max-h-[220px] my-10"
-                value={offerURL}
-                viewBox={'0 0 256 256'}
-              />
-          }
+          {loading ? (
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 my-10"></div>
+          ) : (
+            <QRCode
+              className="h-full max-h-[220px] my-10"
+              value={offerURL}
+              viewBox={'0 0 256 256'}
+            />
+          )}
         </div>
         <div className="sm:flex flex-row gap-5 justify-center">
           <Button style="link" onClick={copyCurrentURLToClipboard}>
             {copyText}
           </Button>
-          <Button onClick={openWebWallet} style="button">Open Web Wallet</Button>
+          <Button onClick={openWebWallet} style="button">
+            Open Web Wallet
+          </Button>
         </div>
         <div className="flex flex-col items-center mt-12">
           <div className="flex flex-row gap-2 items-center content-center text-sm text-center text-gray-500">

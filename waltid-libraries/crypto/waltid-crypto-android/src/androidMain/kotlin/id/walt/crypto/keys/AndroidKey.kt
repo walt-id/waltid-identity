@@ -18,7 +18,7 @@ import java.security.Signature
 import java.security.cert.Certificate
 import java.security.spec.ECPublicKeySpec
 import java.security.spec.RSAPublicKeySpec
-import java.util.UUID
+import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger { }
 
@@ -115,20 +115,20 @@ class AndroidKey() : Key() {
     }
 
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
-        val signature: ByteArray = signWithKeystore(plaintext)
+        val signingInput =
+            Json.encodeToString(headers).toByteArray()
+                .encodeToBase64Url() + "." + plaintext.encodeToBase64Url()
 
-        val encodedSignature = signature.encodeToBase64Url()
+        val signature = signWithKeystore(signingInput.encodeToByteArray()).let {
+            EccUtils.convertDERtoIEEEP1363(it)
+        }.encodeToBase64Url()
 
-        // Construct the JWS in the format: base64UrlEncode(headers) + '.' + base64UrlEncode(payload) + '.' + base64UrlEncode(signature)
-        val encodedHeaders = Json.encodeToString(headers).toByteArray().encodeToBase64Url()
-        val encodedPayload = plaintext.encodeToBase64Url()
-
-        return "$encodedHeaders.$encodedPayload.$encodedSignature"
+        return "$signingInput.$signature"
     }
 
     override suspend fun verifyRaw(
         signed: ByteArray,
-        detachedPlaintext: ByteArray?
+        detachedPlaintext: ByteArray?,
     ): Result<ByteArray> {
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
@@ -181,7 +181,7 @@ class AndroidKey() : Key() {
             val keyPair = keyStore.getEntry(internalKeyId, null) as? KeyStore.PrivateKeyEntry
             checkNotNull(keyPair) { "This AndroidKey instance does not have a KeyPair!" }
 
-            val id = "$PUBLIC_KEY_ALIAS_PREFIX${UUID.randomUUID()}"
+            val id = "$PUBLIC_KEY_ALIAS_PREFIX${Uuid.random()}"
             keyStore.setCertificateEntry(id, keyPair.certificate)
             AndroidKey(KeyAlias(id), keyType)
         } else this
@@ -218,7 +218,7 @@ class AndroidKey() : Key() {
     companion object : AndroidKeyCreator, AndroidKeyLoader {
         override suspend fun generate(
             type: KeyType,
-            metadata: JwkKeyMeta?,
+            metadata: AndroidKeyParameters?,
         ): AndroidKey = AndroidKeyGenerator.generate(type, metadata)
 
         override suspend fun load(type: KeyType, keyId: String): AndroidKey? =

@@ -7,8 +7,27 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.*
 
+
+private val logger = logger("Web exception")
+
+fun Application.configureStatusPages() {
+    install(StatusPages) {
+
+
+        exception<WebException> { call, cause ->
+            logger.error(cause)
+            call.respond(cause.status, exceptionMap(cause, cause.status))
+        }
+        exception<Throwable> { call, cause ->
+            logger.error(cause)
+
+            val status = statusCodeForException(cause)
+            call.respond(status, exceptionMap(cause, status))
+        }
+    }
+}
 
 private fun statusCodeForException(cause: Throwable) = when (cause) {
     is NotFoundException -> HttpStatusCode.NotFound
@@ -16,34 +35,16 @@ private fun statusCodeForException(cause: Throwable) = when (cause) {
     is BadRequestException -> HttpStatusCode.BadRequest
     is IllegalStateException -> HttpStatusCode.InternalServerError
     is WebException -> cause.status
-
     else -> HttpStatusCode.InternalServerError
 }
 
-private val logger = logger("Web exception")
-
-fun Application.configureStatusPages() {
-    install(StatusPages) {
-
-        fun exceptionMap(cause: Throwable) =
-            mutableMapOf(
-                "exception" to JsonPrimitive(true),
-                "status" to JsonPrimitive(statusCodeForException(cause).description),
-                "code" to JsonPrimitive(statusCodeForException(cause).value.toString()),
-                "message" to JsonPrimitive(cause.message)
-            ).apply {
-                if (cause.cause != null && logger.isTraceEnabled()) put("cause", JsonPrimitive(cause.cause!!.message))
-            }
-
-
-        exception<WebException> { call, cause ->
-            logger.error(cause)
-            call.respond(cause.status, exceptionMap(cause))
-        }
-        exception<Throwable> { call, cause ->
-            logger.error(cause)
-
-            call.respond(statusCodeForException(cause), exceptionMap(cause))
-        }
-    }
+fun exceptionMap(cause: Throwable, status: HttpStatusCode) = mutableMapOf(
+    "exception" to JsonPrimitive(true),
+    "status" to JsonPrimitive(status.description),
+    "code" to JsonPrimitive(status.value.toString()),
+    "message" to JsonPrimitive(cause.message)
+).apply {
+    if (cause.cause != null && logger.isTraceEnabled()) put("cause", JsonPrimitive(cause.cause!!.message))
+}.let {
+    Json.encodeToJsonElement(it).toString()
 }

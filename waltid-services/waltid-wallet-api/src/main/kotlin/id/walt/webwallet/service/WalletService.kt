@@ -3,6 +3,7 @@ package id.walt.webwallet.service
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.requests.CredentialOfferRequest
+import id.walt.sdjwt.SDJWTVCTypeMetadata
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
@@ -13,13 +14,15 @@ import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.settings.WalletSetting
-import id.walt.webwallet.web.controllers.PresentationRequestParameter
+import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
-abstract class WalletService(val tenant: String, val accountId: UUID, val walletId: UUID) {
+@OptIn(ExperimentalUuidApi::class)
+abstract class WalletService(val tenant: String, val accountId: Uuid, val walletId: Uuid) {
 
     // WalletCredentials
     abstract fun listCredentials(filter: CredentialFilterObject): List<WalletCredential>
@@ -39,6 +42,8 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
 
     abstract suspend fun resolvePresentationRequest(request: String): String
     abstract suspend fun resolveCredentialOffer(offerRequest: CredentialOfferRequest): CredentialOffer
+
+    abstract suspend fun resolveVct(vct: String): SDJWTVCTypeMetadata
 
     // DIDs
     abstract suspend fun listDids(): List<WalletDid>
@@ -62,10 +67,10 @@ abstract class WalletService(val tenant: String, val accountId: UUID, val wallet
 
     // Web3 wallets
     abstract suspend fun linkWallet(wallet: WalletDataTransferObject): LinkedWalletDataTransferObject
-    abstract suspend fun unlinkWallet(wallet: UUID): Boolean
+    abstract suspend fun unlinkWallet(wallet: Uuid): Boolean
     abstract suspend fun getLinkedWallets(): List<LinkedWalletDataTransferObject>
-    abstract suspend fun connectWallet(walletId: UUID): Boolean
-    abstract suspend fun disconnectWallet(wallet: UUID): Boolean
+    abstract suspend fun connectWallet(walletId: Uuid): Boolean
+    abstract suspend fun disconnectWallet(wallet: Uuid): Boolean
 
     // TODO: move each such component to use-case
 

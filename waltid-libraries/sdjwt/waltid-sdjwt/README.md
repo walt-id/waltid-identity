@@ -59,43 +59,7 @@ verifiable credentials according to the **SD-JWT-VC** specification:
 
 **Maven / Gradle repository**:
 
-`https://maven.walt.id/repository/waltid/`
-
-**Maven**
-
-```xml
-[...]
-<repositories>
-    <repository>
-        <id>waltid</id>
-        <name>waltid</name>
-        <url>https://maven.walt.id/repository/waltid/</url>
-    </repository>
-</repositories>
-        [...]
-<dependency>
-<groupId>id.walt.sdjwt</groupId>
-<artifactId>waltid-sdjwt-jvm</artifactId>
-<version>[ version ]</version>
-</dependency>
-```
-
-**Gradle**
-
-_Kotlin DSL_
-
-```kotlin
-[...]
-repositories {
-    maven("https://maven.waltid.dev/releases")
-}
-[...]
-val sdJwtVersion = "<version>"
-[...]
-dependencies {
-    implementation("id.walt:waltid-sdjwt-jvm:$sdJwtVersion")
-}
-```
+Take a look at this build file https://github.com/walt-id/waltid-examples/blob/main/build.gradle.kts , which shows how to use this dependency and other walt.id dependencies.
 
 ## Usage with NPM/NodeJs (JavaScript)
 
@@ -133,7 +97,7 @@ node index.js
 This example creates and signs an SD-JWT, using the SimpleJWTCryptoProvider implementation, that's shipped with the waltid-sd-jwt library,
 which uses the `nimbus-jose-jwt` library for cryptographic operations.
 
-In this example we sign the JWT with the HS256 algorithm, and a UUID as a shared secret.
+In this example we sign the JWT with the HS256 algorithm, and a Uuid as a shared secret.
 
 Here we generate the SD payload, by comparing the full payload and the undisclosed payload (with selective fields removed).
 

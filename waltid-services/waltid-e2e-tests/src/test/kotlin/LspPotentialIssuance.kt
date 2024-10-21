@@ -3,6 +3,8 @@ import COSE.OneKey
 import cbor.Cbor
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.commons.interop.LspPotentialInterop
+import id.walt.commons.testing.E2ETest.getBaseURL
+import id.walt.commons.testing.E2ETest.test
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -53,12 +55,15 @@ import kotlin.test.*
 class LspPotentialIssuance(val client: HttpClient) {
 
     @OptIn(ExperimentalEncodingApi::class, ExperimentalSerializationApi::class)
-    suspend fun testTrack1() = E2ETestWebService.test("test track 1") {
+    suspend fun testTrack1() = test("test track 1") {
         // ### steps 1-6
         val offerResp = client.get("/lsp-potential/lspPotentialCredentialOfferT1")
+        println("Offer resp: $offerResp")
         assert(offerResp.status == HttpStatusCode.OK)
         val offerUri = offerResp.bodyAsText()
+        println("Offer uri: $offerUri")
         val parsedOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(offerUri)
+        println("parsedOffer: $parsedOffer")
         // ### get issuer metadata, steps 7-10
         val providerMetadataUri = OpenID4VCI.getCIProviderMetadataUrl(parsedOffer.credentialIssuer)
         val oauthMetadataUri = OpenID4VCI.getOAuthProviderMetadataUrl(parsedOffer.credentialIssuer)
@@ -70,6 +75,10 @@ class LspPotentialIssuance(val client: HttpClient) {
         assertNotNull(oauthMetadata.tokenEndpoint)
         // resolve offered credentials
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOffer, providerMetadata)
+        println("offered credentials: $offeredCredentials")
+
+        assert(offeredCredentials.isNotEmpty()) { "Offered credentials is empty" }
+
         val offeredCredential = offeredCredentials.first()
         assertEquals(CredentialFormat.mso_mdoc, offeredCredential.format)
         assertEquals(MDocTypes.ISO_MDL, offeredCredential.docType)
@@ -224,7 +233,7 @@ class LspPotentialIssuance(val client: HttpClient) {
     }
 
     @OptIn(ExperimentalEncodingApi::class)
-    suspend fun testTrack2() = E2ETestWebService.test("test track 2") {
+    suspend fun testTrack2() = test("test track 2") {
         // ### steps 1-6
         val offerResp = client.get("/lsp-potential/lspPotentialCredentialOfferT2")
         assertEquals(HttpStatusCode.OK, offerResp.status)
@@ -240,8 +249,9 @@ class LspPotentialIssuance(val client: HttpClient) {
         // ### get issuer metadata, steps 7-10
         val providerMetadataUri = OpenID4VCI.getCIProviderMetadataUrl(parsedOffer.credentialIssuer)
         val jwtIssuerMetadataUri = OpenID4VCI.getJWTIssuerProviderMetadataUrl(parsedOffer.credentialIssuer)
+        val oAuthMetadataUri = OpenID4VCI.getOAuthProviderMetadataUrl(parsedOffer.credentialIssuer)
         val providerMetadata = client.get(providerMetadataUri).bodyAsText().let { OpenIDProviderMetadata.fromJSONString(it) }
-        val oauthMetadata = client.get(jwtIssuerMetadataUri).body<OpenIDProviderMetadata>()
+        val oauthMetadata = client.get(oAuthMetadataUri).body<OpenIDProviderMetadata>()
         val jwtIssuerMetadata = client.get(jwtIssuerMetadataUri).body<OpenIDProviderMetadata>()
         assertNotNull(providerMetadata.credentialConfigurationsSupported)
         assertNotNull(providerMetadata.credentialEndpoint)
@@ -257,7 +267,7 @@ class LspPotentialIssuance(val client: HttpClient) {
         println("Offered credentials: $offeredCredentials")
         val offeredCredential = offeredCredentials.first()
         assertEquals(CredentialFormat.sd_jwt_vc, offeredCredential.format)
-        assertEquals("identity_credential_vc+sd-jwt", offeredCredential.docType)
+        assertEquals("${getBaseURL()}/identity_credential", offeredCredential.vct)
 
         // ### step 11: confirm issuance (nothing to do)
 

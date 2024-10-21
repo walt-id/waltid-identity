@@ -1,16 +1,20 @@
-import E2ETestWebService.test
+@file:OptIn(ExperimentalUuidApi::class)
+
+import id.walt.commons.testing.E2ETest.test
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.usecase.exchange.FilterData
-import id.walt.webwallet.web.controllers.UsePresentationRequest
+import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
 
 class ExchangeApi(private val client: HttpClient) {
-    suspend fun resolveCredentialOffer(wallet: UUID, offerUrl: String, output: ((String) -> Unit)? = null) =
+    suspend fun resolveCredentialOffer(wallet: Uuid, offerUrl: String, output: ((String) -> Unit)? = null) =
         test("/wallet-api/wallet/{wallet}/exchange/resolveCredentialOffer - resolve credential offer") {
             client.post("/wallet-api/wallet/$wallet/exchange/resolveCredentialOffer") {
                 setBody(offerUrl)
@@ -20,11 +24,11 @@ class ExchangeApi(private val client: HttpClient) {
         }
 
     suspend fun useOfferRequest(
-        wallet: UUID,
+        wallet: Uuid,
         offerUrl: String,
         numberOfExpected: Int,
         requireUserInput: Boolean = false,
-        output: ((List<WalletCredential>) -> Unit)? = null
+        output: ((List<WalletCredential>) -> Unit)? = null,
     ) = test("/wallet-api/wallet/{wallet}/exchange/useOfferRequest - claim credential from issuer") {
         client.post("/wallet-api/wallet/$wallet/exchange/useOfferRequest") {
             setBody(offerUrl)
@@ -36,9 +40,9 @@ class ExchangeApi(private val client: HttpClient) {
     }
 
     suspend fun resolvePresentationRequest(
-        wallet: UUID,
+        wallet: Uuid,
         presentationRequestUrl: String,
-        output: ((String) -> Unit)? = null
+        output: ((String) -> Unit)? = null,
     ) = test("/wallet-api/wallet/{wallet}/exchange/resolvePresentationRequest - get presentation definition") {
         client.post("/wallet-api/wallet/$wallet/exchange/resolvePresentationRequest") {
             contentType(ContentType.Text.Plain)
@@ -51,10 +55,10 @@ class ExchangeApi(private val client: HttpClient) {
     }
 
     suspend fun matchCredentialsForPresentationDefinition(
-        wallet: UUID,
+        wallet: Uuid,
         presentationDefinition: String,
         expectedCredentialIds: List<String> = emptyList(),
-        output: ((List<WalletCredential>) -> Unit)? = null
+        output: ((List<WalletCredential>) -> Unit)? = null,
     ) =
         test("/wallet-api/wallet/{wallet}/exchange/matchCredentialsForPresentationDefinition - should match OpenBadgeCredential in wallet") {
             client.post("/wallet-api/wallet/$wallet/exchange/matchCredentialsForPresentationDefinition") {
@@ -62,16 +66,17 @@ class ExchangeApi(private val client: HttpClient) {
             }.expectSuccess().apply {
                 val matched = body<List<WalletCredential>>()
                 assert(matched.size == expectedCredentialIds.size) { "presentation definition should match $expectedCredentialIds credential(s), but have ${matched.size}" }
-                assert(matched.map { it.id }.containsAll(expectedCredentialIds)) { "matched credentials does not contain all of the expected ones" }
+                assert(matched.map { it.id }
+                    .containsAll(expectedCredentialIds)) { "matched credentials does not contain all of the expected ones" }
                 output?.invoke(matched)
             }
         }
 
     suspend fun unmatchedCredentialsForPresentationDefinition(
-        wallet: UUID,
+        wallet: Uuid,
         presentationDefinition: String,
         expectedData: List<FilterData> = emptyList(),
-        output: ((List<FilterData>) -> Unit)? = null
+        output: ((List<FilterData>) -> Unit)? = null,
     ) =
         test("/wallet-api/wallet/{wallet}/exchange/unmatchedCredentialsForPresentationDefinition - none should be missing") {
             client.post("/wallet-api/wallet/$wallet/exchange/unmatchedCredentialsForPresentationDefinition") {
@@ -84,19 +89,12 @@ class ExchangeApi(private val client: HttpClient) {
         }
 
     suspend fun usePresentationRequest(
-        wallet: UUID,
-        did: String? = null,
-        presentationRequestUrl: String,
-        credentialIds: List<String>
+        wallet: Uuid,
+        request: UsePresentationRequest,
+        expectStatus: suspend HttpResponse.() -> HttpResponse = expectSuccess,
     ) = test("/wallet-api/wallet/{wallet}/exchange/usePresentationRequest - present credentials") {
         client.post("/wallet-api/wallet/$wallet/exchange/usePresentationRequest") {
-            setBody(
-                UsePresentationRequest(
-                    did = did,
-                    presentationRequest = presentationRequestUrl,
-                    selectedCredentials = credentialIds,
-                )
-            )
-        }.expectSuccess()
+            setBody(request)
+        }.expectStatus()
     }
 }

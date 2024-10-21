@@ -4,8 +4,8 @@ import id.walt.commons.config.ConfigManager
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.issuer.issuance.IssuanceRequest
-import id.walt.issuer.issuance.IssuanceType
 import id.walt.issuer.issuance.createCredentialOfferUri
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.sdjwt.SDMapBuilder
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -131,20 +131,19 @@ class IssuerApiTest {
     fun testJwt() = runTest {
         val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)
         val jsonVCObj = Json.decodeFromString<JsonObject>(TEST_W3VC)
-        val w3cVc = W3CVC(jsonVCObj.toMap())
         val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
 
         val issueRequest =
             IssuanceRequest(
                 issuerKey = jsonKeyObj,
-                issuerDid = TEST_ISSUER_DID,
-                credentialData = w3cVc,
+                credentialData = jsonVCObj,
                 credentialConfigurationId = "OpenBadgeCredential_jwt_vc_json",
-                mapping = jsonMappingObj
+                mapping = jsonMappingObj,
+                issuerDid = TEST_ISSUER_DID
             )
 
         ConfigManager.testWithConfigs(testConfigs)
-        val offerUri = createCredentialOfferUri(listOf(issueRequest), IssuanceType.w3c)
+        val offerUri = createCredentialOfferUri(listOf(issueRequest), CredentialFormat.jwt_vc_json)
 
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
     }
@@ -154,21 +153,20 @@ class IssuerApiTest {
     fun testSdJwt() = runTest {
         val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)
         val jsonVCObj = Json.decodeFromString<JsonObject>(TEST_W3VC)
-        val w3cVc = W3CVC(jsonVCObj.toMap())
         val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
 
         val selectiveDisclosureMap = SDMapBuilder().addField("sd", true).build()
         val issueRequest = IssuanceRequest(
             issuerKey = jsonKeyObj,
-            issuerDid = TEST_ISSUER_DID,
-            credentialData = w3cVc,
+            credentialData = jsonVCObj,
             credentialConfigurationId = "OpenBadgeCredential",
             mapping = jsonMappingObj,
-            selectiveDisclosure = selectiveDisclosureMap
+            selectiveDisclosure = selectiveDisclosureMap,
+            issuerDid = TEST_ISSUER_DID
         )
 
         ConfigManager.testWithConfigs(testConfigs)
-        val offerUri = createCredentialOfferUri(listOf(issueRequest), IssuanceType.w3c)
+        val offerUri = createCredentialOfferUri(listOf(issueRequest), CredentialFormat.jwt_vc_json)
 
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
     }
@@ -194,29 +192,27 @@ class IssuerApiTest {
         val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)
         val jsonVCObj1 = Json.decodeFromString<JsonObject>(TEST_W3VC)
         val jsonVCObj2 = Json.decodeFromString<JsonObject>(TEST_W3VC2)
-        val w3cVc1 = W3CVC(jsonVCObj1.toMap())
-        val w3cVc2 = W3CVC(jsonVCObj2.toMap())
         val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
 
         val issueRequest1 = IssuanceRequest(
             issuerKey = jsonKeyObj,
-            issuerDid = TEST_ISSUER_DID,
-            credentialData = w3cVc1,
+            credentialData = jsonVCObj1,
             credentialConfigurationId = "OpenBadgeCredential_jwt_vc_json",
-            mapping = jsonMappingObj
+            mapping = jsonMappingObj,
+            issuerDid = TEST_ISSUER_DID,
         )
         val issueRequest2 = IssuanceRequest(
             issuerKey = jsonKeyObj,
-            issuerDid = TEST_ISSUER_DID,
             credentialConfigurationId = "BankId_jwt_vc_json",
-            credentialData = w3cVc2,
-            mapping = jsonMappingObj
+            credentialData = jsonVCObj2,
+            mapping = jsonMappingObj,
+            issuerDid = TEST_ISSUER_DID,
         )
 
         val issuanceRequests = listOf(issueRequest1, issueRequest2)
 
         ConfigManager.loadConfigs(emptyArray())
-        val offerUri = createCredentialOfferUri(issuanceRequests, IssuanceType.w3c)
+        val offerUri = createCredentialOfferUri(issuanceRequests, CredentialFormat.jwt_vc_json)
 
         assertEquals(true, offerUri.contains("//localhost:7002/?credential_offer"))
 

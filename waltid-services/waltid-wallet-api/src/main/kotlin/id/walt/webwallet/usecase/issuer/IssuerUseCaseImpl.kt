@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.usecase.issuer
 
 import id.walt.webwallet.service.issuers.CredentialDataTransferObject
@@ -8,7 +10,9 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
 
 class IssuerUseCaseImpl(
     private val service: IssuersService,
@@ -18,11 +22,11 @@ class IssuerUseCaseImpl(
         ignoreUnknownKeys
     }
 
-    override fun get(wallet: UUID, did: String): Result<IssuerDataTransferObject> = runCatching {
+    override fun get(wallet: Uuid, did: String): Result<IssuerDataTransferObject> = runCatching {
         service.get(wallet, did) ?: error("Issuer not found")
     }
 
-    override fun list(wallet: UUID): List<IssuerDataTransferObject> = service.list(wallet)
+    override fun list(wallet: Uuid): List<IssuerDataTransferObject> = service.list(wallet)
 
     override fun add(issuer: IssuerDataTransferObject): Result<Boolean> = runCatching {
         service.add(
@@ -35,11 +39,11 @@ class IssuerUseCaseImpl(
         ) > 0
     }
 
-    override fun authorize(wallet: UUID, did: String): Result<Boolean> = runCatching {
+    override fun authorize(wallet: Uuid, did: String): Result<Boolean> = runCatching {
         service.authorize(wallet, did) > 0
     }
 
-    override suspend fun credentials(wallet: UUID, did: String): Result<IssuerCredentialsDataTransferObject> =
+    override suspend fun credentials(wallet: Uuid, did: String): Result<IssuerCredentialsDataTransferObject> =
         runCatching {
             get(wallet, did).getOrThrow().let {
                 IssuerCredentialsDataTransferObject(
@@ -49,13 +53,18 @@ class IssuerUseCaseImpl(
         }
 
     private suspend fun fetchCredentials(url: String): List<CredentialDataTransferObject> =
-        fetchConfiguration(url).jsonObject["credentials_supported"]!!.jsonArray.map {
-            CredentialDataTransferObject(id = it.jsonObject["id"]!!.jsonPrimitive.content,
-                format = it.jsonObject["format"]!!.jsonPrimitive.content,
-                types = it.jsonObject["types"]!!.jsonArray.map {
-                    it.jsonPrimitive.content
-                })
-        }
+        fetchConfiguration(url).jsonObject["credential_configurations_supported"]?.jsonObject?.entries?.mapNotNull { (key, value) ->
+            value.jsonObject.let { jsonObject ->
+                val format = jsonObject["format"]?.jsonPrimitive?.content
+                val types = jsonObject["types"]?.jsonArray?.map { it.jsonPrimitive.content }
+
+                if (format != null && types != null) {
+                    CredentialDataTransferObject(id = key, format = format, types = types)
+                } else {
+                    null
+                }
+            }
+        } ?: emptyList()
 
     private suspend fun fetchConfiguration(url: String): JsonObject = let {
         json.parseToJsonElement(http.get(url).bodyAsText()).jsonObject

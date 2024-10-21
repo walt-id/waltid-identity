@@ -1,6 +1,7 @@
 package id.walt.oid4vc
 
-import id.walt.credentials.verification.policies.JwtSignaturePolicy
+import id.walt.credentials.utils.VCFormat
+import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.*
@@ -24,12 +25,13 @@ import io.ktor.util.reflect.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
-import kotlinx.uuid.generateUUID
 import org.junit.jupiter.api.BeforeAll
 import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 class VP_JVM_Test {
 
     val http = HttpClient {
@@ -168,7 +170,7 @@ class VP_JVM_Test {
                         )
                     )
                 )
-            ), ResponseMode.query, setOf(ResponseType.VpToken), "http://blank", UUID.generateUUID().toString(),
+            ), ResponseMode.query, setOf(ResponseType.VpToken), "http://blank", Uuid.random().toString(),
             "test", setOf(), "test-verifier", ClientIdScheme.PreRegistered, ClientMetadataParameter.fromClientMetadata(
                 OpenIDClientMetadata(listOf(testWallet.baseUrl))
             )

@@ -1,19 +1,22 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.verifier
 
 import com.nimbusds.jose.JWSAlgorithm
 import id.walt.commons.config.ConfigManager
-import id.walt.credentials.verification.PolicyManager
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.*
+import id.walt.policies.PolicyManager
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
-import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerificationUseCase
+import id.walt.verifier.oidc.SwaggerPresentationSessionInfo
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
@@ -24,18 +27,21 @@ import io.ktor.client.plugins.logging.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.*
+import io.ktor.util.pipeline.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 private val SERVER_URL by lazy {
     runBlocking {
@@ -113,7 +119,6 @@ private const val fixedPresentationDefinitionForEbsiConformanceTest =
 
 private val verificationUseCase = VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
 
-@OptIn(ExperimentalSerializationApi::class)
 fun Application.verfierApi() {
     routing {
 
@@ -179,19 +184,23 @@ fun Application.verfierApi() {
                         example("Example with VP & global VC policies", VerifierApiExamples.vpGlobalVcPolicies)
                         example("Example with VP, VC & specific credential policies", VerifierApiExamples.vcVpIndividualPolicies)
                         example(
-                            "Example with VP, VC & specific policies, and explicit presentation_definition  (maximum example)",
+                            "Example with VP, VC & specific policies, and explicit input_descriptor(s)  (maximum example)",
                             VerifierApiExamples.maxExample
                         )
                         example("Example with presentation definition policy", VerifierApiExamples.presentationDefinitionPolicy)
                         example("Example with EBSI PDA1 Presentation Definition", VerifierApiExamples.EbsiVerifiablePDA1)
                         example("MDoc verification example", VerifierApiExamples.lspPotentialMdocExample)
-                        example("SD-JWT verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
+                        example("SD-JWT-VC verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
+                        example("SD-JWT-VC verification example with mandatory fields", VerifierApiExamples.sdJwtVCExampleWithRequiredFields)
                     }
                 }
+
             }) {
+
                 val authorizeBaseUrl = context.request.header("authorizeBaseUrl") ?: defaultAuthorizeBaseUrl
                 val responseMode =
-                    context.request.header("responseMode")?.let { ResponseMode.fromString(it) } ?: ResponseMode.direct_post
+                    context.request.header("responseMode")?.let { ResponseMode.fromString(it) }
+                        ?: ResponseMode.direct_post
                 val successRedirectUri = context.request.header("successRedirectUri")
                 val errorRedirectUri = context.request.header("errorRedirectUri")
                 val statusCallbackUri = context.request.header("statusCallbackUri")
@@ -204,16 +213,17 @@ fun Application.verfierApi() {
                 val session = verificationUseCase.createSession(
                     vpPoliciesJson = body["vp_policies"],
                     vcPoliciesJson = body["vc_policies"],
-                    requestCredentialsJson = body["request_credentials"]!!,
-                    presentationDefinitionJson = body["presentation_definition"],
+                    requestCredentialsJson = body["request_credentials"]
+                        ?: throw BadRequestException("Field request_credentials is required"),
                     responseMode = responseMode,
                     successRedirectUri = successRedirectUri,
                     errorRedirectUri = errorRedirectUri,
                     statusCallbackUri = statusCallbackUri,
                     statusCallbackApiKey = statusCallbackApiKey,
                     stateId = stateId,
-                    openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
-                    ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
+                    openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull
+                        ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
+                        ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
                     trustedRootCAs = body["trusted_root_cas"]?.jsonArray
                 )
 
@@ -231,6 +241,8 @@ fun Application.verfierApi() {
                     )
                 )
             }
+
+
 
             post("/verify/{state}", {
                 tags = listOf("OIDC")
@@ -260,47 +272,21 @@ fun Application.verfierApi() {
                     }
                 }
             }) {
+
                 logger.info { "POST verify/state" }
-                val sessionId = call.parameters["state"]
+                val sessionId = call.parameters.getOrFail("state")
                 logger.info { "State: $sessionId" }
                 verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
                     .onSuccess {
-                        val session = verificationUseCase.getSession(sessionId!!)
-                        if (session.walletInitiatedAuthState != null) {
-                            val state = session.walletInitiatedAuthState
-                            val code = UUID().toString()
-                            context.respondRedirect("openid://?code=$code&state=$state")
-                        } else {
-                            call.respond(HttpStatusCode.OK, it)
-                        }
+                        processVerificationSuccessResult(sessionId, it)
                     }.onFailure {
-                        logger.debug(it) { "Verification failed ($it)" }
-                        var errorDescription = it.localizedMessage
-                        logger.error { "Error: $errorDescription" }
-                        if (sessionId != null) {
-                            val session = verificationUseCase.getSession(sessionId)
-                            if (session.walletInitiatedAuthState != null) {
-                                val state = session.walletInitiatedAuthState
-                                when (it.localizedMessage) {
-                                    "Verification policies did not succeed: expired" -> errorDescription =
-                                        "<\$presentation_submission.descriptor_map[x].id> is expired"
-
-                                    "Verification policies did not succeed: not-before" -> errorDescription =
-                                        "<\$presentation_submission.descriptor_map[x].id> is not yet valid"
-
-                                    "Verification policies did not succeed: revoked_status_list" -> errorDescription =
-                                        "<\$presentation_submission.descriptor_map[x].id> is revoked"
-                                }
-                                context.respondRedirect("openid://?state=$state&error=invalid_request&error_description=$errorDescription")
-                            }
-                        } else {
-                            logger.error(it) { "/verify error: $errorDescription" }
-                            call.respond(HttpStatusCode.BadRequest, errorDescription)
-                        }
+                        processVerificationFailureResult(sessionId, it)
                     }.also {
-                        sessionId?.run { verificationUseCase.notifySubscribers(this) }
+                        verificationUseCase.notifySubscribers(sessionId)
                     }
+
             }
+
             get("/session/{id}", {
                 tags = listOf("Credential Verification")
                 summary = "Get info about OIDC presentation session, that was previously initialized"
@@ -314,20 +300,29 @@ fun Application.verfierApi() {
                 }
                 response {
                     HttpStatusCode.OK to {
-                        body<PresentationSessionInfo> { // it's PresentationSessionInfo
+                        // body<PresentationSessionInfo> { // cannot encode duration
+                        body<SwaggerPresentationSessionInfo> {
                             description = "Session info"
                         }
                     }
+                    HttpStatusCode.NotFound to {
+                        body<String> {
+                            description = "Session not found or invalid"
+                            example("Session not found") {
+                                value = "Invalid id provided (expired?): 123"
+                            }
+                        }
+
+                    }
+
                 }
             }) {
                 val id = call.parameters.getOrFail("id")
-                verificationUseCase.getResult(id).onSuccess {
+                verificationUseCase.getResult(id).getOrThrow().let {
                     call.respond(HttpStatusCode.OK, it)
-                }.onFailure {
-                    logger.debug(it) { "Verification failed ($it)" }
-                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
+
             get("/pd/{id}", {
                 tags = listOf("OIDC")
                 summary = "Get presentation definition object by ID"
@@ -339,13 +334,17 @@ fun Application.verfierApi() {
                         required = true
                     }
                 }
+                response {
+                    HttpStatusCode.OK to { body<JsonObject>() }
+                    HttpStatusCode.NotFound to { body<String>() }
+                }
             }) {
                 val id = call.parameters["id"]
 
                 verificationUseCase.getPresentationDefinition(id ?: "").onSuccess {
                     call.respond(it.toJSON())
                 }.onFailure {
-                    call.respond(HttpStatusCode.NotFound)
+                    throw NotFoundException("Presentation definition not found for id: $id")
                 }
             }
             get("policy-list", {
@@ -371,7 +370,7 @@ fun Application.verfierApi() {
                     call.respondText(it, ContentType.parse("application/oauth-authz-req+jwt"), HttpStatusCode.OK)
                 }.onFailure {
                     logger.debug(it) { "Cannot view request session ($it)" }
-                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                    throw NotFoundException(it.message)
                 }
             }
         }
@@ -421,7 +420,7 @@ fun Application.verfierApi() {
             val walletInitiatedAuthState = params["state"]?.jsonArray?.get(0)?.jsonPrimitive?.content
             val scope = params["scope"]?.jsonArray.toString().replace("\"", "").replace("[", "").replace("]", "")
 
-            val stateId = UUID().toString()
+            val stateId = Uuid.random().toString()
             val session = verificationUseCase.createSession(
                 vpPoliciesJson = null,
                 vcPoliciesJson = buildJsonArray {
@@ -430,11 +429,10 @@ fun Application.verfierApi() {
                     add("not-before")
                     add("revoked_status_list")
                 },
-                requestCredentialsJson = buildJsonArray {},
                 presentationDefinitionJson = when (scope.contains("openid ver_test:vp_token")) {
-                    true -> Json.parseToJsonElement(fixedPresentationDefinitionForEbsiConformanceTest)
+                    true -> Json.parseToJsonElement(fixedPresentationDefinitionForEbsiConformanceTest).jsonObject
                     else -> null
-                },
+                } ?: throw IllegalArgumentException(""),
                 responseMode = ResponseMode.direct_post,
                 successRedirectUri = null,
                 errorRedirectUri = null,
@@ -450,5 +448,64 @@ fun Application.verfierApi() {
             )
             context.respondRedirect("openid://?${session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}" })}")
         }
+    }
+}
+
+private fun getErrorDescription(it: Throwable): String? = when (it.message) {
+    "Verification policies did not succeed: expired" ->
+        "<\$presentation_submission.descriptor_map[x].id> is expired"
+
+    "Verification policies did not succeed: not-before" ->
+        "<\$presentation_submission.descriptor_map[x].id> is not yet valid"
+
+    "Verification policies did not succeed: revoked_status_list" ->
+        "<\$presentation_submission.descriptor_map[x].id> is revoked"
+
+    else -> null
+}
+
+private suspend fun PipelineContext<Unit, ApplicationCall>.processError(
+    sessionId: String,
+    error: Throwable
+) {
+    val session = verificationUseCase.getSession(sessionId)
+    if (session.walletInitiatedAuthState != null) {
+        val state = session.walletInitiatedAuthState
+        context.respondRedirect(
+            "openid://?state=$state&error=invalid_request&error_description=${getErrorDescription(error)}"
+        )
+    } else if (error is VerificationUseCase.FailedVerificationException && error.redirectUrl != null) {
+        context.respond(HttpStatusCode.BadRequest, error.redirectUrl)
+    } else {
+        throw error
+    }
+}
+
+private suspend fun PipelineContext<Unit, ApplicationCall>.processVerificationFailureResult(
+    sessionId: String?,
+    error: Throwable,
+) {
+    logger.debug(error) { "Verification failed ($error)" }
+    val errorDescription = error.message ?: "Verification failed"
+    logger.error { "Error: $errorDescription" }
+    if (sessionId != null) {
+        processError(sessionId, error)
+    } else {
+        logger.error(error) { "/verify error: $errorDescription" }
+        call.respond(HttpStatusCode.BadRequest, errorDescription)
+    }
+}
+
+private suspend fun PipelineContext<Unit, ApplicationCall>.processVerificationSuccessResult(
+    sessionId: String?,
+    redirectUrl: String,
+) {
+    val session = verificationUseCase.getSession(sessionId!!)
+    if (session.walletInitiatedAuthState != null) {
+        val state = session.walletInitiatedAuthState
+        val code = Uuid.random().toString()
+        context.respondRedirect("openid://?code=$code&state=$state")
+    } else {
+        call.respond(HttpStatusCode.OK, redirectUrl)
     }
 }

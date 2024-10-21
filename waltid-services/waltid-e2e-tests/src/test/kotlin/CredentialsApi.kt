@@ -1,4 +1,6 @@
-import E2ETestWebService.test
+@file:OptIn(ExperimentalUuidApi::class)
+
+import id.walt.commons.testing.E2ETest.test
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.usecase.credential.CredentialStatusResult
@@ -8,15 +10,16 @@ import io.ktor.client.request.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
-import kotlinx.uuid.UUID
 import kotlin.test.assertNotNull
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class CredentialsApi(private val client: HttpClient) {
     suspend fun list(
-        wallet: UUID,
+        wallet: Uuid,
         filter: CredentialFilterObject = CredentialFilterObject.default,
         expectedSize: Int = 0,
-        vararg expectedCredential: String
+        vararg expectedCredential: String,
     ) = test("/wallet-api/wallet/{wallet}/credentials - list credentials") {
         client.get("/wallet-api/wallet/$wallet/credentials") {
             url {
@@ -31,7 +34,7 @@ class CredentialsApi(private val client: HttpClient) {
         }
     }
 
-    suspend fun get(wallet: UUID, credential: String, output: ((WalletCredential) -> Unit)? = null) =
+    suspend fun get(wallet: Uuid, credential: String, output: ((WalletCredential) -> Unit)? = null) =
         test("/wallet-api/wallet/{wallet}/credentials/{credentialId} - get credential") {
             client.get("/wallet-api/wallet/$wallet/credentials/$credential").expectSuccess().apply {
                 val credential = body<WalletCredential>()
@@ -39,7 +42,7 @@ class CredentialsApi(private val client: HttpClient) {
             }
         }
 
-    suspend fun delete(wallet: UUID, credential: String, permanent: Boolean = false) =
+    suspend fun delete(wallet: Uuid, credential: String, permanent: Boolean = false) =
         test("/wallet-api/wallet/{wallet}/credentials/{credentialId} - delete credential") {
             client.delete("/wallet-api/wallet/$wallet/credentials/$credential") {
                 url {
@@ -48,26 +51,26 @@ class CredentialsApi(private val client: HttpClient) {
             }.expectSuccess()
         }
 
-    suspend fun restore(wallet: UUID, credential: String, output: ((WalletCredential) -> Unit)? = null) =
+    suspend fun restore(wallet: Uuid, credential: String, output: ((WalletCredential) -> Unit)? = null) =
         test("/wallet-api/wallet/{wallet}/credentials/{credentialId}/restore - restore credential") {
             client.post("/wallet-api/wallet/$wallet/credentials/$credential/restore").expectSuccess().apply {
                 output?.invoke(body<WalletCredential>())
             }
         }
 
-    suspend fun accept(wallet: UUID, credential: String) =
+    suspend fun accept(wallet: Uuid, credential: String) =
         test("/wallet-api/wallet/{wallet}/credentials/{credentialId}/accept - accept credential") {
             client.post("/wallet-api/wallet/$wallet/credentials/$credential/accept").expectSuccess()
         }
 
-    suspend fun reject(wallet: UUID, credential: String, note: String? = null) =
+    suspend fun reject(wallet: Uuid, credential: String, note: String? = null) =
         test("/wallet-api/wallet/{wallet}/credentials/{credentialId}/reject - reject credential") {
             client.post("/wallet-api/wallet/$wallet/credentials/$credential/reject") {
                 setBody(mapOf("note" to note))
             }.expectSuccess()
         }
 
-    suspend fun status(wallet: UUID, credential: String, output: ((List<CredentialStatusResult>) -> Unit)? = null) =
+    suspend fun status(wallet: Uuid, credential: String, output: ((List<CredentialStatusResult>) -> Unit)? = null) =
         test("/wallet-api/wallet/{wallet}/credentials/{credentialId}/status - get credential status") {
             client.get("/wallet-api/wallet/$wallet/credentials/$credential/status").expectSuccess().apply {
                 val result = body<List<CredentialStatusResult>>()
@@ -75,21 +78,21 @@ class CredentialsApi(private val client: HttpClient) {
             }
         }
 
-    suspend fun attachCategory(wallet: UUID, credential: String, vararg categories: String) =
+    suspend fun attachCategory(wallet: Uuid, credential: String, vararg categories: String) =
         test("/wallet-api/wallet/{wallet}/credentials/{credentialId}/category - attach category") {
             client.put("/wallet-api/wallet/$wallet/credentials/$credential/category") {
                 setBody(categories.toList())
             }.expectSuccess()
         }
 
-    suspend fun detachCategory(wallet: UUID, credential: String, vararg categories: String) =
+    suspend fun detachCategory(wallet: Uuid, credential: String, vararg categories: String) =
         test("/wallet-api/wallet/{wallet}/credentials/{credentialId}/category - detach category") {
             client.delete("/wallet-api/wallet/$wallet/credentials/$credential/category") {
                 setBody(categories.toList())
             }.expectSuccess()
         }
 
-    suspend fun store(wallet: UUID, credential: String) =
+    suspend fun store(wallet: Uuid, credential: String) =
         test("/wallet-api/wallet/{wallet}/credentials - store credential") {
             TODO("Not implemented")
         }

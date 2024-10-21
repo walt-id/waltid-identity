@@ -5,8 +5,8 @@ import android.security.keystore.KeyProperties
 import java.math.BigInteger
 import java.security.KeyPairGenerator
 import java.security.spec.ECGenParameterSpec
-import java.util.UUID
 import javax.security.auth.x500.X500Principal
+import kotlin.uuid.Uuid
 
 object AndroidKeyGenerator : AndroidKeyCreator {
 
@@ -15,8 +15,9 @@ object AndroidKeyGenerator : AndroidKeyCreator {
     const val ANDROID_KEYSTORE = "AndroidKeyStore"
 
     // Create an instance using key type
-    override suspend fun generate(type: KeyType, metadata: JwkKeyMeta?): AndroidKey {
-        val alias = metadata?.keyId ?: "$KEY_PAIR_ALIAS_PREFIX${UUID.randomUUID()}"
+    override suspend fun generate(type: KeyType, metadata: AndroidKeyParameters?): AndroidKey {
+
+        val alias = metadata?.keyId ?: "$KEY_PAIR_ALIAS_PREFIX${Uuid.random()}"
         KeyPairGenerator.getInstance(getAlgorithmFor(type), ANDROID_KEYSTORE).apply {
             initialize(
                 KeyGenParameterSpec.Builder(
@@ -43,10 +44,7 @@ object AndroidKeyGenerator : AndroidKeyCreator {
 
                     // Set of padding schemes with which the key can be used when signing/verifying
                     setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1)
-
-                    setUserAuthenticationRequired(true)
-                    setUserAuthenticationValidityDurationSeconds(5)
-
+                    setUserAuthenticationRequired(metadata?.isProtected ?: false)
                     build()
                 }
             )

@@ -1,10 +1,7 @@
 package id.walt.oid4vc
 
-import id.walt.credentials.verification.policies.JwtSignaturePolicy
-import id.walt.oid4vc.data.AuthorizationDetails
-import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.data.GrantType
-import id.walt.oid4vc.data.OpenIDProviderMetadata
+import id.walt.policies.policies.JwtSignaturePolicy
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -87,13 +84,11 @@ class wallettest {
         AuthorizationDetails(
             type = "minim",
             format = null,
-            types = listOf(),
+            credentialDefinition = CredentialDefinition(type = listOf()),
             credentialSubject = mapOf(),
             docType = null,
             claims = mapOf(),
-            credentialDefinition = null,
             customParameters = mapOf()
-
         )
 
         println("// -------- WALLET ----------")

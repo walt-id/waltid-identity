@@ -1,13 +1,14 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.usecase.claim
 
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.credentials.CredentialsService
-import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.usecase.event.EventLogUseCase
-import kotlinx.datetime.Clock
-import kotlinx.uuid.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class ExplicitClaimStrategy(
     private val issuanceService: IssuanceService,
@@ -15,41 +16,31 @@ class ExplicitClaimStrategy(
     private val eventUseCase: EventLogUseCase,
 ) {
     suspend fun claim(
-        tenant: String, account: UUID, wallet: UUID, did: String, offer: String, pending: Boolean = true,
+        tenant: String, account: Uuid, wallet: Uuid, did: String, offer: String, pending: Boolean = true,
     ): List<WalletCredential> = issuanceService.useOfferRequest(
         offer = offer,
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
         clientId = SSIKit2WalletService.testCIClientConfig.clientID
-    ).map {
-        WalletCredential(
-            wallet = wallet,
-            id = it.id,
-            document = it.document,
-            disclosures = it.disclosures,
-            addedOn = Clock.System.now(),
-            manifest = it.manifest,
-            deletedOn = null,
-            pending = pending,
-            format = it.format,
+    ).map { credentialDataResult ->
+        ClaimCommons.convertCredentialDataResultToWalletCredential(
+            credentialDataResult,
+            wallet,
+            pending,
         ).also { credential ->
-            eventUseCase.log(
-                action = EventType.Credential.Receive,
-                originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
-                tenant = tenant,
-                accountId = account,
-                walletId = wallet,
-                data = eventUseCase.credentialEventData(
-                    credential = credential,
-                    subject = eventUseCase.subjectData(credential),
-                    organization = eventUseCase.issuerData(credential),
-                    type = it.type
-                ),
-                credentialId = credential.id,
+            ClaimCommons.addReceiveCredentialToUseCaseLog(
+                tenant,
+                account,
+                wallet,
+                credential,
+                credentialDataResult.type,
+                eventUseCase,
             )
         }
     }.also {
-        credentialService.add(
-            wallet = wallet, credentials = it.toTypedArray()
+        ClaimCommons.storeWalletCredentials(
+            wallet,
+            it,
+            credentialService,
         )
     }
 }

@@ -1,4 +1,4 @@
-import E2ETestWebService.test
+import id.walt.commons.testing.E2ETest.test
 import id.walt.verifier.oidc.PresentationSessionInfo
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -22,6 +22,9 @@ object Verifier {
             client.post("/openid4vc/verify") {
                 setBody(Json.decodeFromString<JsonObject>(payload))
             }.expectSuccess().apply {
+                val url = bodyAsText()
+                assert(url.contains("presentation_definition_uri="))
+                assert(!url.contains("presentation_definition="))
                 output?.invoke(bodyAsText())
             }
         }

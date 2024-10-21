@@ -10,7 +10,7 @@ plugins {
     id("com.android.library")
     id("maven-publish")
     id("com.github.ben-manes.versions")
-    id("love.forte.plugin.suspend-transform") version "2.0.20-Beta1-0.9.2"
+    id("love.forte.plugin.suspend-transform") version "2.0.20-0.9.2"
 }
 
 group = "id.walt.crypto"
@@ -78,17 +78,24 @@ kotlin {
     }
 
     sourceSets {
+
+        all {
+            languageSettings.optIn("kotlin.ExperimentalStdlibApi")
+            languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
+            languageSettings.optIn("kotlin.io.encoding.ExperimentalEncodingApi")
+        }
+
         val androidMain by getting {
             dependencies {
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 implementation("io.github.oshai:kotlin-logging:7.0.0")
             }
         }
         val androidInstrumentedTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
                 implementation("androidx.test.ext:junit:1.2.1")
                 implementation("androidx.test:runner:1.6.1")
                 implementation("androidx.test:rules:1.6.1")
@@ -97,8 +104,8 @@ kotlin {
         val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.junit.jupiter:junit-jupiter-api:5.11.0-M2")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.11.0")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0")
             }
         }
         publishing {
@@ -111,9 +118,13 @@ kotlin {
                     val usernameFile = File("$rootDir/secret_maven_username.txt")
                     val passwordFile = File("$rootDir/secret_maven_password.txt")
 
-                    val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
+                    val secretMavenUsername = envUsername ?: usernameFile.let {
+                        if (it.isFile) it.readLines().first() else ""
+                    }
                     //println("Deploy username length: ${secretMavenUsername.length}")
-                    val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+                    val secretMavenPassword = envPassword ?: passwordFile.let {
+                        if (it.isFile) it.readLines().first() else ""
+                    }
 
                     //if (secretMavenPassword.isBlank()) {
                     //   println("WARNING: Password is blank!")

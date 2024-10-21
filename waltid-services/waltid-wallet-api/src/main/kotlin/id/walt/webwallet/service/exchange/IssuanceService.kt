@@ -1,28 +1,15 @@
 package id.walt.webwallet.service.exchange
 
-import cbor.Cbor
-import id.walt.crypto.utils.Base64Utils.base64UrlDecode
-import id.walt.crypto.utils.JwsUtils.decodeJwsOrSdjwt
 import id.walt.did.dids.DidService
-import id.walt.mdoc.dataelement.toDataElement
-import id.walt.mdoc.doc.MDoc
-import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.data.CredentialOffer
-import id.walt.oid4vc.data.GrantType
-import id.walt.oid4vc.data.OpenIDProviderMetadata
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
-import id.walt.oid4vc.util.randomUUID
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
-import id.walt.webwallet.utils.WalletHttpClients
 import io.klogging.logger
-import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
@@ -34,10 +21,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-object IssuanceService {
+object IssuanceService: IssuanceServiceBase() {
 
-    private val http = WalletHttpClients.getHttpClient()
-    private val logger = logger<IssuanceService>()
+    override val logger = logger<IssuanceService>()
 
     suspend fun useOfferRequest(
         offer: String, credentialWallet: TestCredentialWallet, clientId: String,
@@ -45,7 +31,7 @@ object IssuanceService {
         logger.debug { "// -------- WALLET ----------" }
         logger.debug { "// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code" }
         logger.debug { "// parse credential URI" }
-        val reqParams = Url(offer).parameters.toMap()
+        val reqParams = parseOfferParams(offer)
 
         // entra or openid4vc credential offer
         val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)
@@ -81,19 +67,16 @@ object IssuanceService {
         credentialWallet: TestCredentialWallet,
         clientId: String,
     ): List<ProcessedCredentialOffer> {
-        logger.debug { "// get issuer metadata" }
-        val providerMetadataUri =
-            credentialWallet.getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
-        logger.debug { "Getting provider metadata from: $providerMetadataUri" }
-        val providerMetadataResult = http.get(providerMetadataUri)
-        logger.debug { "Provider metadata returned: " + providerMetadataResult.bodyAsText() }
-
-        val providerMetadata = providerMetadataResult.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }
+        val providerMetadata = getCredentialIssuerOpenIDMetadata(
+            credentialOffer.credentialIssuer,
+            credentialWallet,
+        )
         logger.debug { "providerMetadata: $providerMetadata" }
 
         logger.debug { "// resolve offered credentials" }
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
         logger.debug { "offeredCredentials: $offeredCredentials" }
+        require(offeredCredentials.isNotEmpty()) { "Resolved an empty list of offered credentials" }
 
         logger.debug { "// fetch access token using pre-authorized code (skipping authorization step)" }
         val tokenReq = TokenRequest(
@@ -103,19 +86,18 @@ object IssuanceService {
             preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
             txCode = null
         )
-
-        val tokenResp = http.submitForm(
-            providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
-        ).let {
-            logger.debug { "tokenResp raw: $it" }
-            it.body<JsonObject>().let { TokenResponse.fromJSON(it) }
-        }
-
-        logger.debug { ">>> Token response = success: ${tokenResp.isSuccess}" }
+        val tokenResp = issueTokenRequest(
+            providerMetadata.tokenEndpoint!!,
+            tokenReq,
+        )
+        logger.debug { ">>> Token response is: $tokenResp" }
+        validateTokenResponse(tokenResp)
+        //we know for a fact that there is an access token in the response
+        //due to the validation call above
+        val accessToken = tokenResp.accessToken!!
 
         logger.debug { "// receive credential" }
         val nonce = tokenResp.cNonce
-
 
         logger.debug { "Using issuer URL: ${credentialOffer.credentialIssuer}" }
         val credReqs = offeredCredentials.map { offeredCredential ->
@@ -127,20 +109,21 @@ object IssuanceService {
                     ) ?: ""
                 }"
             )
-            // Use key proof if supported cryptographic binding method is not empty, doesn't contain did and contains cose_key
-            val useKeyProof = (offeredCredential.cryptographicBindingMethodsSupported != null &&
-                    (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
-                            offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
-                    !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
-                proof = ProofOfPossessionFactory.new(useKeyProof, credentialWallet, offeredCredential, credentialOffer, nonce)
+                proof = ProofOfPossessionFactory.new(
+                    isKeyProofRequiredForOfferedCredential(offeredCredential),
+                    credentialWallet,
+                    offeredCredential,
+                    credentialOffer,
+                    nonce
+                )
             )
         }
         logger.debug { "credReqs: $credReqs" }
 
         require(credReqs.isNotEmpty()) { "No credentials offered" }
-        return CredentialOfferProcessor.process(credReqs, providerMetadata, tokenResp)
+        return CredentialOfferProcessor.process(credReqs, providerMetadata, accessToken)
     }
 
     private suspend fun processMSEntraIssuanceRequest(
@@ -210,66 +193,4 @@ object IssuanceService {
         } else logger.debug { "No authorization request state or redirectUri found in Entra issuance request, skipping completion response callback" }
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
-    private suspend fun getCredentialData(
-        processedOffer: ProcessedCredentialOffer, manifest: JsonObject?,
-    ) = let {
-        val credential = processedOffer.credentialResponse.credential!!.jsonPrimitive.content
-
-        when (val credentialFormat = processedOffer.credentialResponse.format) {
-            CredentialFormat.mso_mdoc -> {
-                val credentialEncoding =
-                    processedOffer.credentialResponse.customParameters["credential_encoding"]?.jsonPrimitive?.content ?: "issuer-signed"
-                val docType =
-                    processedOffer.credentialRequest?.docType
-                        ?: throw IllegalArgumentException("Credential request has no docType property")
-                val format =
-                    processedOffer.credentialResponse.format ?: throw IllegalArgumentException("Credential response has no format property")
-                val mdoc = when (credentialEncoding) {
-                    "issuer-signed" -> MDoc(
-                        docType.toDataElement(), IssuerSigned.fromMapElement(
-                            Cbor.decodeFromByteArray(credential.base64UrlDecode())
-                        ), null
-                    )
-
-                    else -> throw IllegalArgumentException("Invalid credential encoding: $credentialEncoding")
-                }
-                // TODO: review ID generation for mdoc
-                CredentialDataResult(randomUUID(), mdoc.toCBORHex(), type = docType, format = format)
-            }
-
-            else -> {
-                val credentialParts = credential.decodeJwsOrSdjwt()
-                logger.debug { "Got credential: $credentialParts" }
-
-                val typ = credentialParts.jwsParts.header["typ"]?.jsonPrimitive?.content?.lowercase()
-                    ?: error("Credential does not have `typ`!")
-
-                val vc = credentialParts.jwsParts.payload["vc"]?.jsonObject ?: credentialParts.jwsParts.payload
-                val credentialId = vc["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUID()
-
-                val disclosures = credentialParts.sdJwtDisclosures
-                logger.debug { "Disclosures (${disclosures.size}): $disclosures" }
-
-                CredentialDataResult(
-                    id = credentialId,
-                    document = credentialParts.jwsParts.toString(),
-                    disclosures = credentialParts.sdJwtDisclosuresString().drop(1), // remove first '~'
-                    manifest = manifest?.toString(),
-                    type = typ,
-                    format = credentialFormat ?: error("No credential format")
-                )
-            }
-        }
-    }
-
-    @Serializable
-    data class CredentialDataResult(
-        val id: String,
-        val document: String,
-        val manifest: String? = null,
-        val disclosures: String? = null,
-        val type: String,
-        val format: CredentialFormat,
-    )
 }

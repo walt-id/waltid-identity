@@ -1,9 +1,9 @@
 package id.walt.issuer.issuance
 
 import id.walt.commons.interop.LspPotentialInterop
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
-import id.walt.oid4vc.data.dif.VCFormat
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
 import kotlinx.serialization.json.*
 
@@ -57,6 +57,100 @@ object IssuanceExamples {
             }
           }
     """.trimIndent()
+
+    val pda1CredentialData = """
+        {
+        "@context": [
+            "https://www.w3.org/2018/credentials/v1"
+        ],
+        "id": "https://www.w3.org/2018/credentials/v1",
+        "type": [
+            "VerifiableCredential",
+            "VerifiableAttestation",
+            "VerifiablePortableDocumentA1"
+        ],
+        "issuer": "did:ebsi:zf39qHTXaLrr6iy3tQhT3UZ",
+        "issuanceDate": "2020-03-10T04:24:12Z",
+        "credentialSubject": {
+            "id": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrvQgsKodq2xnfBMYGk99qtunHHQuvvi35kRvbH9SDnue2ZNJqcnaU7yAxeKqEqDX4qFzeKYCj6rdbFnTsf4c8QjFXcgGYS21Db9d2FhHxw9ZEnqt9KPgLsLbQHVAmNNZoz",
+            "section1": {
+                "personalIdentificationNumber": "1",
+                "sex": "01",
+                "surname": "Savvaidis",
+                "forenames": "Charalampos",
+                "dateBirth": "1985-08-15",
+                "nationalities": [
+                    "BE"
+                ],
+                "stateOfResidenceAddress": {
+                    "streetNo": "sss, nnn ",
+                    "postCode": "ppp",
+                    "town": "ccc",
+                    "countryCode": "BE"
+                },
+                "stateOfStayAddress": {
+                    "streetNo": "sss, nnn ",
+                    "postCode": "ppp",
+                    "town": "ccc",
+                    "countryCode": "BE"
+                }
+            },
+            "section2": {
+                "memberStateWhichLegislationApplies": "DE",
+                "startingDate": "2022-10-09",
+                "endingDate": "2022-10-29",
+                "certificateForDurationActivity": true,
+                "determinationProvisional": false,
+                "transitionRulesApplyAsEC8832004": false
+            },
+            "section3": {
+                "postedEmployedPerson": false,
+                "employedTwoOrMoreStates": false,
+                "postedSelfEmployedPerson": true,
+                "selfEmployedTwoOrMoreStates": true,
+                "civilServant": true,
+                "contractStaff": false,
+                "mariner": false,
+                "employedAndSelfEmployed": false,
+                "civilAndEmployedSelfEmployed": true,
+                "flightCrewMember": false,
+                "exception": false,
+                "exceptionDescription": "",
+                "workingInStateUnder21": false
+            },
+            "section4": {
+                "employee": false,
+                "selfEmployedActivity": true,
+                "nameBusinessName": "1",
+                "registeredAddress": {
+                    "streetNo": "1, 1 1",
+                    "postCode": "1",
+                    "town": "1",
+                    "countryCode": "DE"
+                }
+            },
+            "section5": {
+                "noFixedAddress": true
+            },
+            "section6": {
+                "name": "National Institute for the Social Security of the Self-employed (NISSE)",
+                "address": {
+                    "streetNo": "Quai de Willebroeck 35",
+                    "postCode": "1000",
+                    "town": "Bruxelles",
+                    "countryCode": "BE"
+                },
+                "institutionID": "NSSIE/INASTI/RSVZ",
+                "officeFaxNo": "",
+                "officePhoneNo": "0800 12 018",
+                "email": "info@rsvz-inasti.fgov.be",
+                "date": "2022-10-28",
+                "signature": "Official signature"
+            }
+        }
+    }
+    """.trimIndent()
+
 
     // language=json
     private val universityDegreeCredentialProofData = """
@@ -142,6 +236,21 @@ object IssuanceExamples {
     """.trimIndent()
     private const val issuerDid = "\"did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp\""
 
+    private val issuerKeyEbsi = """
+    {
+        "type": "jwk",
+        "jwk": {
+            "kty": "EC",
+            "x": "SgfOvOk1TL5yiXhK5Nq7OwKfn_RUkDizlIhAf8qd2wE",
+            "y": "u_y5JZOsw3SrnNPydzJkoaiqb8raSdCNE_nPovt1fNI",
+            "crv": "P-256",
+            "d": "UqSi2MbJmPczfRmwRDeOJrdivoEy-qk4OEDjFwJYlUI"
+        }
+    }
+    """.trimIndent()
+    private const val issuerDidEbsi = "\"did:ebsi:zf39qHTXaLrr6iy3tQhT3UZ\""
+
+
     //language=json
     private val mapping = """
         {
@@ -156,6 +265,35 @@ object IssuanceExamples {
              "expirationDate":"<timestamp-in:365d>"
           }
     """.trimIndent()
+
+    private val pda1Mapping = """
+    {
+            "id": "<uuid>",
+            "issuer": "<issuerDid>",
+            "credentialSubject": {
+                "id": "<subjectDid>"
+            },
+            "issuanceDate": "<timestamp-ebsi>",
+            "issued": "<timestamp-ebsi>",
+            "validFrom": "<timestamp-ebsi>",
+            "expirationDate": "<timestamp-ebsi-in:365d>",
+            "credentialSchema": {
+                "id": "https://api-conformance.ebsi.eu/trusted-schemas-registry/v3/schemas/z5qB8tydkn3Xk3VXb15SJ9dAWW6wky1YEoVdGzudWzhcW",
+                "type": "FullJsonSchemaValidator2021"
+            }
+    }
+    """.trimIndent()
+
+
+    private val ietfSdJwtmapping = """
+        {
+            "id":"<uuid>",
+            "iat": "<timestamp-seconds>",
+            "nbf": "<timestamp-seconds>",
+            "exp": "<timestamp-in-seconds:365d>"
+          }
+    """.trimIndent()
+
 
     // language=json
     val openBadgeCredentialIssuance = """
@@ -377,7 +515,7 @@ object IssuanceExamples {
             {
                 "issuerKey": $issuerKey,
                 "issuerDid": $issuerDid,
-                "credentialConfigurationId": "OpenBadgeCredential_${VCFormat.jwt_vc.value}",
+                "credentialConfigurationId": "OpenBadgeCredential_${VCFormat.jwt_vc_json.value}",
                 "credentialData": $openBadgeCredentialData,
                 "mdocData": null,
                 "mapping": $mapping,
@@ -391,6 +529,167 @@ object IssuanceExamples {
                         }
                     }
                 }
+            }
+        """.trimIndent()
+    )
+
+    val sdJwtW3CPDA1Example = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        """
+            {
+                "issuerKey": $issuerKeyEbsi,
+                "issuerDid": $issuerDidEbsi,
+                "credentialConfigurationId": "VerifiablePortableDocumentA1_${VCFormat.jwt_vc.value}",
+                "credentialData": $pda1CredentialData,
+                "mdocData": null,
+                "mapping": $pda1Mapping,
+                 "selectiveDisclosure": {
+                        "fields": {
+                            "credentialSubject": {
+                                "sd": false,
+                                "children": {
+                                    "fields": {
+                                        "section1": {
+                                            "sd": false,
+                                            "children": {
+                                                "fields": {
+                                                    "personalIdentificationNumber": {
+                                                        "sd": true
+                                                    },
+                                                    "sex": {
+                                                        "sd": true
+                                                    },
+                                                    "surname": {
+                                                        "sd": true
+                                                    },
+                                                    "forenames": {
+                                                        "sd": true
+                                                    },
+                                                    "dateBirth": {
+                                                        "sd": true
+                                                    },
+                                                    "nationalities": {
+                                                        "sd": true
+                                                    },
+                                                    "stateOfResidenceAddress": {
+                                                        "sd": true
+                                                    },
+                                                    "stateOfStayAddress": {
+                                                        "sd": true
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "section3": {
+                                            "sd": false,
+                                            "children": {
+                                                "fields": {
+                                                    "postedEmployedPerson": {
+                                                        "sd": true
+                                                    },
+                                                    "employedTwoOrMoreStates": {
+                                                        "sd": true
+                                                    },
+                                                    "postedSelfEmployedPerson": {
+                                                        "sd": true
+                                                    },
+                                                    "selfEmployedTwoOrMoreStates": {
+                                                        "sd": true
+                                                    },
+                                                    "civilServant": {
+                                                        "sd": true
+                                                    },
+                                                    "contractStaff": {
+                                                        "sd": true
+                                                    },
+                                                    "mariner": {
+                                                        "sd": true
+                                                    },
+                                                    "employedAndSelfEmployed": {
+                                                        "sd": true
+                                                    },
+                                                    "civilAndEmployedSelfEmployed": {
+                                                        "sd": true
+                                                    },
+                                                    "flightCrewMember": {
+                                                        "sd": true
+                                                    },
+                                                    "exception": {
+                                                        "sd": true
+                                                    },
+                                                    "exceptionDescription": {
+                                                        "sd": true
+                                                    },
+                                                    "workingInStateUnder21": {
+                                                        "sd": true
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "section4": {
+                                            "sd": false,
+                                            "children": {
+                                                "fields": {
+                                                    "employee": {
+                                                        "sd": true
+                                                    },
+                                                    "selfEmployedActivity": {
+                                                        "sd": true
+                                                    },
+                                                    "nameBusinessName": {
+                                                        "sd": true
+                                                    },
+                                                    "registeredAddress": {
+                                                        "sd": true
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "section5": {
+                                            "sd": false,
+                                            "children": {
+                                                "fields": {
+                                                    "noFixedAddress": {
+                                                        "sd": true
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "section6": {
+                                            "sd": false,
+                                            "children": {
+                                                "fields": {
+                                                    "name": {
+                                                        "sd": true
+                                                    },
+                                                    "address": {
+                                                        "sd": true
+                                                    },
+                                                    "institutionID": {
+                                                        "sd": true
+                                                    },
+                                                    "officeFaxNo": {
+                                                        "sd": true
+                                                    },
+                                                    "officePhoneNo": {
+                                                        "sd": true
+                                                    },
+                                                    "email": {
+                                                        "sd": true
+                                                    },
+                                                    "date": {
+                                                        "sd": true
+                                                    },
+                                                    "signature": {
+                                                        "sd": true
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                 }
             }
         """.trimIndent()
     )
@@ -560,6 +859,31 @@ object IssuanceExamples {
         """.trimIndent()
     )
 
+
+    //language=JSON
+    val issuerOnboardingRequestAwsRestApiExample = typedValueExampleDescriptorDsl<OnboardingRequest>(
+        """
+            {
+                "key":
+                {
+                    "backend": "aws",
+                    "keyType": "secp256r1",
+                    "config":
+                    {
+                        "accessKeyId": "AKIA........QU5F",
+                        "secretAccessKey": "6YDr..................7Sr",
+                        "region": "eu-central-1"
+                      
+                    }
+                },
+                "did":
+                {
+                    "method": "jwk"
+                }
+            }
+        """.trimIndent()
+    )
+
     //language=JSON
     val issuerOnboardingResponseOciRestApiExample = typedValueExampleDescriptorDsl<IssuerOnboardingResponse>(
         """
@@ -707,7 +1031,6 @@ object IssuanceExamples {
     // language=json
     private val sdjwt_vc_identity_credential = """
     {
-     "vct": "identity_credential_vc+sd-jwt",
      "given_name": "John",
      "family_name": "Doe",
      "email": "johndoe@example.com",
@@ -732,11 +1055,10 @@ object IssuanceExamples {
                 "type": "jwk",
                 "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
             },
-            "issuerDid": "",
             "credentialConfigurationId": "identity_credential_vc+sd-jwt",
             "credentialData": $sdjwt_vc_identity_credential,
             "mdocData": null,
-            "mapping": $mapping,
+            "mapping": $ietfSdJwtmapping,
             "selectiveDisclosure":
             {
                 "fields":
@@ -757,4 +1079,70 @@ object IssuanceExamples {
     """.trimIndent()
 
     val sdJwtVCExample = typedValueExampleDescriptorDsl<IssuanceRequest>(sdJwtVCData)
+
+    val sdJwtVCDataWithIssuerDid = """
+        {
+            "issuerKey": { 
+                "type": "jwk",
+                "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
+            },
+            "credentialConfigurationId": "identity_credential_vc+sd-jwt",
+            "credentialData": $sdjwt_vc_identity_credential,
+            "mdocData": null,
+            "mapping": $ietfSdJwtmapping,
+            "selectiveDisclosure":
+            {
+                "fields":
+                {
+                    "birthdate":
+                    {
+                        "sd": true
+                    },
+                    "family_name":
+                    {
+                        "sd": false
+                    }
+                }
+            },
+            "issuerDid": "${LspPotentialIssuanceInterop.ISSUER_DID}"
+        }
+    """.trimIndent()
+
+    val sdJwtVCWithIssuerDidExample = typedValueExampleDescriptorDsl<IssuanceRequest>(sdJwtVCDataWithIssuerDid)
+
+    val sdJwtVCDataWithSDSub = """
+        {
+            "issuerKey": { 
+                "type": "jwk",
+                "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
+            },
+            "credentialConfigurationId": "identity_credential_vc+sd-jwt",
+            "credentialData": $sdjwt_vc_identity_credential,
+            "mdocData": null,
+            "mapping": $ietfSdJwtmapping,
+            "selectiveDisclosure":
+            {
+                "fields":
+                {
+                    "birthdate":
+                    {
+                        "sd": true
+                    },
+                    "sub":
+                    {
+                        "sd": true
+                    },
+                    "iat":
+                    {
+                        "sd": true
+                    }
+                }
+            },
+            "x5Chain": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ISSUER_CERT) }},
+            "trustedRootCAs": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT) }}
+        }
+    """.trimIndent()
+
+    val sdJwtVCExampleWithSDSub = typedValueExampleDescriptorDsl<IssuanceRequest>(sdJwtVCDataWithSDSub)
+
 }

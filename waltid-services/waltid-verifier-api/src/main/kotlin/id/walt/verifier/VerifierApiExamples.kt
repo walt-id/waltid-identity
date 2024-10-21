@@ -87,7 +87,7 @@ object VerifierApiExamples {
             {
                 "request_credentials":
                 [
-                    "OpenBadgeCredential"
+                    { "format": "jwt_vc_json", "type": "OpenBadgeCredential" }
                 ]
             }
         """.trimIndent()
@@ -101,8 +101,8 @@ object VerifierApiExamples {
                 "vp_policies": $vpPolicyMinMaxData,
                 "request_credentials":
                 [
-                    "OpenBadgeCredential",
-                    "VerifiableId"
+                    { "format": "jwt_vc_json", "type": "OpenBadgeCredential" },
+                    { "format": "jwt_vc_json", "type": "VerifiableId" }
                 ]
             }
         """.trimIndent()
@@ -117,8 +117,8 @@ object VerifierApiExamples {
                 "vc_policies": ${vcPoliciesData("\"revoked_status_list\"")},
                 "request_credentials":
                 [
-                    "OpenBadgeCredential",
-                    "VerifiableId"
+                    { "format": "jwt_vc_json", "type": "OpenBadgeCredential" },
+                    { "format": "jwt_vc_json", "type": "VerifiableId" }
                 ]
             }
         """.trimIndent()
@@ -134,10 +134,11 @@ object VerifierApiExamples {
                 "vc_policies": ${vcPoliciesData("\"revoked_status_list\"")},
                 "request_credentials":
                 [
-                    "VerifiableId",
-                    "ProofOfResidence",
+                    { "format": "jwt_vc_json", "type": "VerifiableId" },
+                    { "format": "jwt_vc_json", "type": "ProofOfResidence" },
                     {
-                        "credential": "OpenBadgeCredential",
+                        "format": "jwt_vc_json",
+                        "type": "OpenBadgeCredential",
                         "policies":
                         [
                             "signature",
@@ -159,23 +160,19 @@ object VerifierApiExamples {
                 "vc_policies": ${vcPoliciesData("\"revoked_status_list\"")},
                 "request_credentials":
                 [
-                    "VerifiableId",
-                    "ProofOfResidence",
+                    { "format": "jwt_vc_json", "type": "VerifiableId" },
+                    { "format": "jwt_vc_json", "type": "ProofOfResidence" },
                     {
-                        "credential": "OpenBadgeCredential",
+                        "format": "jwt_vc_json",
+                        "type": "OpenBadgeCredential",
                         "policies":
                         [
                             "signature",
                             $issuerPolicyData
                         ]
-                    }
-                ],
-                "presentation_definition":
-                {
-                    "id": "<automatically assigned>",
-                    "input_descriptors":
-                    [
-                        {
+                    },
+                    {
+                      "input_descriptor": {
                             "id": "VerifiableId",
                             "format":
                             {
@@ -199,8 +196,8 @@ object VerifierApiExamples {
                                 ]
                             }
                         }
-                    ]
-                }
+                    }
+                ]
             }
         """.trimIndent()
     )
@@ -213,9 +210,10 @@ object VerifierApiExamples {
                 "vc_policies": ${vcPoliciesData()},
                 "request_credentials":
                 [
-                    "ProofOfResidence",
+                    { "format": "jwt_vc_json", "type": "ProofOfResidence" },
                     {
-                        "credential": "OpenBadgeCredential",
+                        "format": "jwt_vc_json", 
+                        "type":  "OpenBadgeCredential",
                         "policies":
                         [
                             "signature",
@@ -234,15 +232,7 @@ object VerifierApiExamples {
                 "vc_policies": ${vcPoliciesData("\"revoked_status_list\"")},
                 "request_credentials":
                 [
-                    "VerifiablePortableDocumentA1"
-                ],
-                "openid_profile": "EBSIv3",
-                "presentation_definition":
-                {
-                    "id": "70fc7fab-89c0-4838-ba77-4886f47c3761",
-                    "input_descriptors":
-                    [
-                        {
+                    { "input_descriptor": {
                             "id": "e3d700aa-0988-4eb6-b9c9-e00f4b27f1d8",
                             "constraints":
                             {
@@ -265,13 +255,9 @@ object VerifierApiExamples {
                                 ]
                             }
                         }
-                    ],
-                    "format":
-                    {
-                        "jwt_vc": ${jwtFormat("\"ES256\"")},
-                        "jwt_vp": ${jwtFormat("\"ES256\"")}
                     }
-                }
+                ],
+                "openid_profile": "EBSIv3"
             }
         """.trimIndent()
     )
@@ -279,7 +265,7 @@ object VerifierApiExamples {
     val lspPotentialMdocExample = jsonObjectValueExampleDescriptorDsl(
         """
             {
-                "request_credentials": [ "org.iso.18013.5.1.mDL" ],
+                "request_credentials": [ { "format": "mso_mdoc", "doc_type": "org.iso.18013.5.1.mDL" } ],
                 "trusted_root_cas":[ ${Json.encodeToJsonElement(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT)} ],
                 "openid_profile": "ISO_18013_7_MDOC"
             }
@@ -290,10 +276,15 @@ object VerifierApiExamples {
     val lspPotentialSDJwtVCExample = jsonObjectValueExampleDescriptorDsl(
         """
             {
-                "request_credentials": [ "identity_credential_vc+sd-jwt" ],
-                "openid_profile": "HAIP"
+                "request_credentials": [ { "format": "vc+sd-jwt", "vct": "http://localhost:7002/identity_credential" } ]
             }
 
+        """.trimIndent()
+    )
+
+    val sdJwtVCExampleWithRequiredFields = jsonObjectValueExampleDescriptorDsl(
+        """
+            {"request_credentials":[{"format":"vc+sd-jwt","vct":"https://issuer.portal.walt-test.cloud/identity_credential","input_descriptor":{"id":"https://issuer.portal.walt-test.cloud/identity_credential","format":{"vc+sd-jwt":{}},"constraints":{"fields":[{"path":["${'$'}.vct"],"filter":{"type":"string","pattern":"https://issuer.portal.walt-test.cloud/identity_credential"}},{"path":["${'$'}.birthdate"],"filter":{"type":"string","pattern":".*"}}],"limit_disclosure":"required"}}}],"vp_policies":["signature_sd-jwt-vc","presentation-definition"],"vc_policies":["not-before","expired"]}
         """.trimIndent()
     )
 }

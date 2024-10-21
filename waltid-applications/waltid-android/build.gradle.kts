@@ -53,13 +53,12 @@ android {
 dependencies {
     // walt.id
     api(project(":waltid-libraries:crypto:waltid-crypto-android"))
-
     api(project(":waltid-libraries:waltid-did"))
     api(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
     api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // -- Android --
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
@@ -79,7 +78,7 @@ dependencies {
 
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.test.ext:junit:1.2.1")
     testImplementation("androidx.test.espresso:espresso-core:3.6.1")
