@@ -17,7 +17,7 @@
 Available for Kotlin/Java and JavaScript environments.
 
 - **Crypto** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-keys/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto)) -
-  create and use keys based on different algorithms.
+  create and use keys based on different algorithms and KMS backends (in-memory, AWS, Hashicorp TSE, OCI)
 - **DID** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-dids/overview) | [GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-did/README.md)) -
   create, register, and resolve DIDs on different ecosystems.
 - **Verifiable Credentials** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-credentials/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-verifiable-credentials)) -

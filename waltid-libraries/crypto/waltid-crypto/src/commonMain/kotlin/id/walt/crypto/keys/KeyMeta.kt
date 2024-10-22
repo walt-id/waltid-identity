@@ -23,3 +23,9 @@ data class JwkKeyMeta(
     override val keyId: String,
     val keySize: Int? = null,
 ) : KeyMeta()
+
+@Serializable
+data class AwsKeyMeta(
+    override val keyId: String,
+    val keySize: Int? = null,
+) : KeyMeta()
