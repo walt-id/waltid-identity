@@ -34,7 +34,7 @@ object E2ETest {
         val failed: Int,
     )
 
-    fun testHttpClient(bearerToken: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
+    fun testHttpClient(bearerToken: String? = null, doFollowRedirects: Boolean = true, block: HttpClientConfig<*>.() -> Unit = {}) = HttpClient(CIO) {
         install(ContentNegotiation) {
             json()
         }
@@ -49,6 +49,7 @@ object E2ETest {
             level = LogLevel.ALL
         }
         followRedirects = doFollowRedirects
+        block.invoke(this)
     }
 
     var numTests = 0
