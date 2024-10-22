@@ -194,7 +194,7 @@ class WaltIdDidCreateCmdTest {
         for (keyFile in keyFileList) {
             val tempOutputFile = "${randomUUID()}.json"
             File(tempOutputFile).deleteOnExit()
-            assertContains(command.test("-j -k $keyFile -o $tempOutputFile").output, "did:key:z[a-km-zA-HJ-NP-Z1-9]+".toRegex())
+            assertContains(command.test("-j -k \"$keyFile\" -o '$tempOutputFile'").output, "did:key:z[a-km-zA-HJ-NP-Z1-9]+".toRegex())
         }
     }
 

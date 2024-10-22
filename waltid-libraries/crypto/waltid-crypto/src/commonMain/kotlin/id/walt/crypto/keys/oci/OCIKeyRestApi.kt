@@ -15,6 +15,7 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.JwsUtils.jwsAlg
+import id.walt.crypto.utils.jwsSigningAlgorithm
 import id.walt.crypto.utils.sha256WithRsa
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -168,7 +169,7 @@ class OCIKeyRestApi(
     @JsExport.Ignore
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         val appendedHeader = HashMap(headers).apply {
-            put("alg", "ES256".toJsonElement())
+            put("alg", jwsSigningAlgorithm(keyType).toJsonElement())
         }
 
         val header = Json.encodeToString(appendedHeader).encodeToByteArray().encodeToBase64Url()
