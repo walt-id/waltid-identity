@@ -4,7 +4,7 @@ import io.klogging.logger
 
 class InMemorySessionStore : SessionStore {
 
-    val log = logger("InMemorySessionStore")
+    private val log = logger("InMemorySessionStore")
     val wip_sessions = HashMap<String, AuthSession>()
 
     override fun resolveSessionId(sessionId: String): AuthSession = wip_sessions[sessionId] ?: error("Unknown session id: $sessionId")
