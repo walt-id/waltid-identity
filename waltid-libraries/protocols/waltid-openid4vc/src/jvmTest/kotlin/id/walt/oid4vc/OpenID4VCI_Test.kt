@@ -103,7 +103,8 @@ class OpenID4VCI_Test {
     println("// -------- CREDENTIAL ISSUER ----------")
 
     // create issuance session and generate authorization code
-    val authCodeResponse: AuthorizationCodeResponse = AuthorizationCodeResponse.success("test-code")
+    val authCodeResponse = OpenID4VC.processCodeFlowAuthorization(authReq, authReq.issuerState!!, ISSUER_METADATA, ISSUER_TOKEN_KEY)
+    //val authCodeResponse: AuthorizationCodeResponse = AuthorizationCodeResponse.success("test-code")
     val redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.query)
     Url(redirectUri).let {
       assertContains(iterable = it.parameters.names(), element = ResponseType.Code.name.lowercase())
