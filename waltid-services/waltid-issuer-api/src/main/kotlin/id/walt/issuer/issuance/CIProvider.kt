@@ -263,10 +263,10 @@ open class CIProvider(
                 val holderKeyJWK =  JWKKey.importJWK(holderKey.toString()).getOrNull()?.exportJWKObject()?.plus("kid" to JWKKey.importJWK(holderKey.toString()).getOrThrow().getKeyId())?.toJsonObject()
 
                 when (data.request.credentialFormat) {
-                  CredentialFormat.sd_jwt_vc -> sdJwtVc(
-                      holderKeyJWK,
-                      vc,
-                      holderDid, issuerKid)
+                    CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(credentialRequest, vc, request.mapping,
+                        request.selectiveDisclosure, vct = metadata.credentialConfigurationsSupported?.get(request.credentialConfigurationId)?.vct ?: throw ConfigurationException(
+                            ConfigException("No vct configured for given credential configuration id: ${request.credentialConfigurationId}")
+                        ), issuerDid, issuerKid, request.x5Chain, data.issuerKey.key).toString()
                   else -> w3cSdJwtVc(W3CVC(vc), issuerKid, holderDid, holderKey)
               }
             }.also { log.debug { "Respond VC: $it" } }
@@ -458,39 +458,6 @@ open class CIProvider(
                 put("request", Json.encodeToJsonElement(it.request).jsonObject)
             })
         }
-    }
-
-    private suspend fun IssuanceSessionData.sdJwtVc(
-        holderKey: JsonObject?,
-        vc: JsonObject,
-        holderDid: String?, issuerKid: String?
-    ): String = SDJwtVC.sign(
-        sdPayload = SDPayload.createSDPayload(
-            vc.mergeSDJwtVCPayloadWithMapping(
-                mapping = request.mapping ?: JsonObject(emptyMap()),
-                context = mapOf(
-                    "issuerDid" to issuerDid,
-                    "subjectDid" to holderDid
-                ).filterValues { !it.isNullOrEmpty() }.mapValues { JsonPrimitive(it.value) },
-                dataFunctions
-            ),
-            request.selectiveDisclosure ?: SDMap(mapOf())
-        ),
-        jwtCryptoProvider = jwtCryptoProvider,
-        issuerDid = (issuerDid ?: "").ifEmpty { issuerKey.key.getKeyId() },
-        holderDid = holderDid,
-        holderKeyJWK = holderKey,
-        issuerKeyId = issuerKey.key.getKeyId(),
-        vct = metadata.credentialConfigurationsSupported?.get(request.credentialConfigurationId)?.vct ?: throw ConfigurationException(
-            ConfigException("No vct configured for given credential configuration id: ${request.credentialConfigurationId}")
-        ),
-        additionalJwtHeader = request.x5Chain?.let {
-            mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
-        } ?: mapOf()
-    ).toString().also {
-        sendCallback("sdjwt_issue", buildJsonObject {
-            put("sdjwt", it)
-        })
     }
 
     private suspend fun IssuanceSessionData.w3cSdJwtVc(

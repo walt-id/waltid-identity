@@ -1,9 +1,15 @@
 package id.walt.oid4vc
 
 import cbor.Cbor
+import id.walt.credentials.issuance.dataFunctions
+import id.walt.credentials.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
 import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.JsonUtils.toJsonObject
+import id.walt.did.dids.DidUtils
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.MapKey
@@ -14,6 +20,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.definitions.JWTClaims
+import id.walt.oid4vc.errors.CredentialError
 import id.walt.oid4vc.errors.TokenError
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -27,6 +34,12 @@ import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.http
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
+import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
+import id.walt.sdjwt.SDJwtVC.Companion.defaultPayloadProperties
+import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.SDPayload
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -366,6 +379,61 @@ object OpenID4VCI {
     suspend fun generateDeferredCredentialToken(sessionId: String, issuer: String, credentialId: String, tokenKey: Key): String {
         return OpenID4VC.generateToken(sessionId, issuer, TokenTarget.DEFERRED_CREDENTIAL, credentialId, tokenKey)
     }
+
+    suspend fun generateSdJwtVC(credentialRequest: CredentialRequest,
+                                credentialData: JsonObject, dataMapping: JsonObject?,
+                                selectiveDisclosure: SDMap?, vct: String,
+                                issuerDid: String?, issuerKid: String?, x5Chain: List<String>?,
+                                issuerKey: Key): SDJwtVC {
+        val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
+            credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
+        )
+        val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content
+        val holderKey = proofHeader[JWTClaims.Header.jwk]?.jsonObject
+        if (holderKey.isNullOrEmpty() && holderKid.isNullOrEmpty()) throw CredentialError(
+            credentialRequest,
+            CredentialErrorCode.invalid_or_missing_proof,
+            message = "Proof JWT header must contain kid or jwk claim"
+        )
+        val holderDid = if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else null
+        val holderKeyJWK =  JWKKey.importJWK(holderKey.toString()).getOrNull()?.exportJWKObject()?.plus("kid" to JWKKey.importJWK(holderKey.toString()).getOrThrow().getKeyId())?.toJsonObject()
+
+        val sdPayload = SDPayload.createSDPayload(
+            credentialData.mergeSDJwtVCPayloadWithMapping(
+                mapping = dataMapping ?: JsonObject(emptyMap()),
+                context = mapOf(
+                    "issuerDid" to issuerDid,
+                    "subjectDid" to holderDid
+                ).filterValues { !it.isNullOrEmpty() }.mapValues { JsonPrimitive(it.value) },
+                dataFunctions
+            ),
+            selectiveDisclosure ?: SDMap(mapOf())
+        )
+        val cnf = holderDid?.let { buildJsonObject { put("kid", holderDid) } } ?:
+        holderKeyJWK?.let { buildJsonObject { put("jwk", holderKeyJWK) } }
+        ?: throw IllegalArgumentException("Either holderKey or holderDid must be given")
+
+        val defaultPayloadProperties = defaultPayloadProperties(
+            issuerDid ?: issuerKid ?: issuerKey.getKeyId(),
+            cnf, vct, null, null, null, null)
+        val undisclosedPayload = sdPayload.undisclosedPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
+        val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
+
+        val headers = mapOf(
+            "kid" to issuerKid,
+            "typ" to SD_JWT_VC_TYPE_HEADER
+        ).plus(x5Chain?.let {
+            mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
+        } ?: mapOf())
+
+        val finalSdPayload = SDPayload.createSDPayload(fullPayload, undisclosedPayload)
+
+        val jwt = issuerKey.signJws(finalSdPayload.undisclosedPayload.toString().encodeToByteArray(),
+            headers.mapValues { it.value.toJsonElement() })
+        return SDJwtVC(SDJwt.createFromSignedJwt(jwt, finalSdPayload))
+    }
+
+
 //
 //    suspend private fun createCredentialResponseFor(sessionId: String, credentialResult: CredentialResult, openIDProviderMetadata: OpenIDProviderMetadata, sessionExpirationTime: Instant, tokenKey: Key): CredentialResponse {
 //        return credentialResult.credential?.let { credential ->
