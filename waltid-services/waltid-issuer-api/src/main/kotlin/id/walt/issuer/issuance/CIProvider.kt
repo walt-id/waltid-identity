@@ -491,7 +491,14 @@ open class CIProvider(
     }
 
     suspend fun getJwksSessions() : JsonObject{
-        var jwksList = buildJsonObject {}
+        var jwksList = buildJsonObject {
+            put("keys", buildJsonArray { add(buildJsonObject {
+                CI_TOKEN_KEY.getPublicKey().exportJWKObject().forEach {
+                    put(it.key, it.value)
+                }
+                put("kid", CI_TOKEN_KEY.getKeyId())
+            }) })
+        }
         sessionCredentialPreMapping.getAll().forEach {
             it.forEach {
                 jwksList = buildJsonObject {
