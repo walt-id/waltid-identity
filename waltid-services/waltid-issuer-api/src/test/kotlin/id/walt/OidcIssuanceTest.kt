@@ -2,6 +2,7 @@ package id.walt
 
 import id.walt.commons.config.ConfigManager
 import id.walt.issuer.issuance.CIProvider
+import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import kotlin.test.Test
@@ -22,7 +23,7 @@ class OidcIssuanceTest {
         )
 
         val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
-        val offerUri = ciTestProvider.getCredentialOfferRequestUrl(offerRequest)
+        val offerUri = OpenID4VCI.getCredentialOfferRequestUrl(offerRequest)
         println("Offer URI: $offerUri")
     }
 
