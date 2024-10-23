@@ -1,19 +1,79 @@
-# walt.id Identity Package
+# walt.id Identity Docker Environment
 
-This package is a docker compose configuration that starts all the services and apps of the identity repo
+This directory contains the Docker Compose configuration that sets up and runs the services and applications of the walt.id Identity Stack.
+You can either run the latest release using pre-built Docker images or build your images locally.
 
-## Executing The Package
+## Prerequisites
+
+Ensure you have the following tools installed:
+
+- [Docker]()
+- [Docker Compose]()
+
+---
+
+## Quick Start with Latest Release Images
+
+If you prefer to run the services using latest release pre-built Docker images, follow these steps:
+
+### Pull the Latest Release Images
+
+Start by pulling the latest release Docker images for the services:
 
 ```bash
 docker-compose pull
+```
+
+This ensures that you're using the most recent release images from the Docker registry.
+
+### Start the Services
+Once the images are pulled, start the services by running:
+```bash
 docker-compose up
 ```
 
-Note: If you are facing issues with the containers, try running the following command to remove the existing containers and then run the
+*Note:* If you are facing issues with the containers, try running the following command to remove the existing containers and then run the
 above command again.
 
+### Stop the Services
 ```bash
 docker-compose down
+```
+
+### Tear down the Services
+```bash
+docker-compose down -v
+```
+
+*Note:*
+The version of the images pulled is controlled by the `VERSION_TAG` in the `.env` file. By default, it is set to latest, which pulls the most recent release of the Docker images. 
+If you prefer to use a specific version, such as a past release, modify the `VERSION_TAG` in the `.env` file before pulling the images.
+
+## Building and Running Services Locally
+
+### Update the VERSION_TAG
+Before building locally, ensure the correct version is specified in the `.env` file. 
+Update the `VERSION_TAG` variable to the desired version value for the local build.
+
+### Build the Docker Images Locally 
+Once the `VERSION_TAG` is set, build the Docker images based on your local changes by running:
+```bash
+docker-compose build
+```
+
+### Start the Services
+```bash
+docker-compose up
+```
+
+### Stop the Services
+```bash
+docker-compose down
+```
+
+### Tear down the Services
+```bash
+docker-compose down -v
 ```
 
 ## Port mapping
