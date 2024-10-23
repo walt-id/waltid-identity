@@ -20,6 +20,11 @@ import id.walt.did.dids.registrar.local.cheqd.models.job.request.JobDeactivateRe
 import id.walt.did.dids.registrar.local.cheqd.models.job.request.JobSignRequest
 import id.walt.did.dids.registrar.local.cheqd.models.job.response.JobActionResponse
 import id.walt.did.dids.registrar.local.cheqd.models.job.response.didresponse.DidGetResponse
+import id.walt.did.exceptions.DidFinalizationException
+import id.walt.did.exceptions.JobInitializationException
+import id.walt.did.exceptions.KeyTypeMismatchException
+import id.walt.did.exceptions.UnexpectedActionException
+import id.walt.did.exceptions.UnexpectedDidStateException
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -88,7 +93,7 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
 
     @OptIn(ExperimentalStdlibApi::class)
     private suspend fun createDid(key: Key, network: String): DidDocument = let {
-        if (key.keyType != KeyType.Ed25519) throw IllegalArgumentException("Key of type Ed25519 expected")
+        if (key.keyType != KeyType.Ed25519) throw KeyTypeMismatchException("Key of type Ed25519 expected")
         // step#0. get public key hex
         val pubKeyHex = key.getPublicKeyRepresentation().toHexString()
         // step#1. fetch the did document from cheqd registrar
@@ -112,8 +117,8 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
                 val didState =
                     finalizeDidJob(didRegisterUrl, it, did.didDoc.verificationMethod.first().id, signatures).didState
                 (didState as? FinishedDidState)?.didDocument
-                    ?: throw IllegalArgumentException("Failed to finalize the did onboarding process.\nCheqd registrar returning \"${(didState as FailedDidState).description}\"")
-            } ?: throw Exception("Initialize job didn't return any jobId.")
+                    ?: throw DidFinalizationException("Failed to finalize the did onboarding process.\nCheqd registrar returning \"${(didState as FailedDidState).description}\"")
+            } ?: throw JobInitializationException("Initialize job didn't return any jobId.")
         }
     }
 
@@ -124,8 +129,8 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
         job.jobId?.let {
             // TODO: associate verificationMethodId with signature
             (finalizeDidJob(didDeactivateUrl, job.jobId, "", signatures).didState as? FinishedDidState)?.didDocument
-                ?: throw Exception("Failed to finalize the did onboarding process")
-        } ?: throw Exception("Initialize job didn't return any jobId.")
+                ?: throw DidFinalizationException("Failed to finalize the did onboarding process")
+        } ?: throw JobInitializationException("Initialize job didn't return any jobId.")
     }
 
     private fun updateDid(did: String) {
@@ -157,8 +162,12 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
 
     @OptIn(ExperimentalEncodingApi::class)
     private suspend fun signPayload(key: Key, job: JobActionResponse): List<String> = let {
-        val state = (job.didState as? ActionDidState) ?: error("Unexpected did state")
-        if (!state.action.equals("signPayload", true)) error("Unexpected state action: ${state.action}")
+        val state = (job.didState as? ActionDidState) ?: throw UnexpectedDidStateException("Unexpected did state")
+        if (!state.action.equals(
+                "signPayload",
+                true
+            )
+        ) throw UnexpectedActionException("Unexpected state action: ${state.action}")
         val payloads = state.signingRequest.map {
             Base64.decode(it.serializedPayload)
         }
