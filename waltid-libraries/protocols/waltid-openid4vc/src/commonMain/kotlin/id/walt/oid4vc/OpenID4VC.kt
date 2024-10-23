@@ -97,7 +97,7 @@ object OpenID4VC {
     val did = kid.substringBefore("#")
 
     if (iss != sub || iss != did || sub != did) {
-      println("$sub $iss $did")
+      log.debug { "$sub $iss $did" }
       throw IllegalArgumentException("Invalid payload in token. sub != iss != did")
     }
 
@@ -210,14 +210,13 @@ object OpenID4VC {
         AuthorizationErrorCode.invalid_request,
         message = "Invalid response type ${authorizationRequest.responseType}, for authorization code flow."
       )
-//    val authorizationSession = getOrInitAuthorizationSession(authorizationRequest)
     val issuer = providerMetadata.issuer ?: throw AuthorizationError(authorizationRequest, AuthorizationErrorCode.server_error,"No issuer configured in given provider metadata")
     val code = generateAuthorizationCodeFor(sessionId, issuer, tokenKey)
     return AuthorizationCodeResponse.success(code, mapOf("state" to listOf(authorizationRequest.state ?: randomUUID())))
   }
 
   suspend fun processImplicitFlowAuthorization(authorizationRequest: AuthorizationRequest, sessionId: String, providerMetadata: OpenIDProviderMetadata, tokenKey: Key): TokenResponse {
-    println("> processImplicitFlowAuthorization for $authorizationRequest")
+    log.debug { "> processImplicitFlowAuthorization for $authorizationRequest" }
     if (!authorizationRequest.responseType.contains(ResponseType.Token) && !authorizationRequest.responseType.contains(ResponseType.VpToken)
       && !authorizationRequest.responseType.contains(ResponseType.IdToken)
     )
@@ -226,9 +225,7 @@ object OpenID4VC {
         AuthorizationErrorCode.invalid_request,
         message = "Invalid response type ${authorizationRequest.responseType}, for implicit authorization flow."
       )
-    println("> processImplicitFlowAuthorization: Generating authorizationSession (getOrInitAuthorizationSession)...")
-    //val authorizationSession = getOrInitAuthorizationSession(authorizationRequest)
-    println("> processImplicitFlowAuthorization: generateTokenResponse...")
+    log.debug { "> processImplicitFlowAuthorization: generateTokenResponse..." }
     val issuer = providerMetadata.issuer ?: throw AuthorizationError(authorizationRequest, AuthorizationErrorCode.server_error,"No issuer configured in given provider metadata")
     return TokenResponse.success(
       generateToken(sessionId, issuer, TokenTarget.ACCESS, null, tokenKey),
@@ -305,8 +302,8 @@ object OpenID4VC {
   @OptIn(ExperimentalSerializationApi::class)
   suspend fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean {
     // May not be required anymore (removed from https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#cwt-proof-type)
-    println("Verifying JWS: $token")
-    println("JWS Verification: target: $target")
+    log.debug { "Verifying JWS: $token" }
+    log.debug { "JWS Verification: target: $target" }
     // requires currently JVM specific implementation for COSE_Sign1 signature verification
     return COSESign1Utils.verifyCOSESign1Signature(target, token)
   }
