@@ -14,7 +14,7 @@ class ConfigurationException(override val cause: ConfigException): IllegalArgume
 
 object ConfigManager {
 
-    val log = noCoLogger("ConfigManager")
+    private val log = noCoLogger("ConfigManager")
 
     val registeredConfigurations = ConcurrentLinkedQueue<ConfigData>()
     val loadedConfigurations = HashMap<Pair<String, KClass<out WaltConfig>>, WaltConfig>()

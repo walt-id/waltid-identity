@@ -1,6 +1,11 @@
 package id.walt.commons.config.list
 
 data class WebConfig(
+    /**
+     * What host should the server listen on, mostly either
+     * - 127.0.0.1: only locally accessible
+     * - 0.0.0.0: accessible from all network interfaces
+     */
     val webHost: String = "0.0.0.0",
     val webPort: Int = 3000
 )
