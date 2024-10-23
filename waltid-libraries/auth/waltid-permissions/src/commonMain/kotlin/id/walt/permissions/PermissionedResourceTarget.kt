@@ -1,13 +1,16 @@
 package id.walt.permissions
 
 import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmInline
 
 /*
  handle .* and stuff
  */
+@JvmInline
 @Serializable
-data class PermissionedResourceTarget(val id: String) {
-    val path = id.split(".")
+value class PermissionedResourceTarget(val id: String) {
+    val path: List<String>
+        get() = id.split(".")
 
     override fun toString(): String {
         return path.joinToString(".")
