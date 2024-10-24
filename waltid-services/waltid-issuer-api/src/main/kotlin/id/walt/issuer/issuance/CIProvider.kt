@@ -267,7 +267,8 @@ open class CIProvider(
                         request.selectiveDisclosure, vct = metadata.credentialConfigurationsSupported?.get(request.credentialConfigurationId)?.vct ?: throw ConfigurationException(
                             ConfigException("No vct configured for given credential configuration id: ${request.credentialConfigurationId}")
                         ), issuerDid, issuerKid, request.x5Chain, data.issuerKey.key).toString()
-                  else -> w3cSdJwtVc(W3CVC(vc), issuerKid, holderDid, holderKey)
+                  else -> OpenID4VCI.generateW3CJwtVC(credentialRequest, vc, request.mapping, request.selectiveDisclosure,
+                        issuerDid, issuerKid, request.x5Chain, data.issuerKey.key)
               }
             }.also { log.debug { "Respond VC: $it" } }
         }))
@@ -458,36 +459,6 @@ open class CIProvider(
                 put("request", Json.encodeToJsonElement(it.request).jsonObject)
             })
         }
-    }
-
-    private suspend fun IssuanceSessionData.w3cSdJwtVc(
-        vc: W3CVC,
-        issuerKid: String,
-        holderDid: String?,
-        holderKey: JsonObject?
-    ) = when(request.selectiveDisclosure.isNullOrEmpty()) {
-        true -> vc.mergingJwtIssue(
-            issuerKey = issuerKey.key,
-            issuerDid = issuerDid,
-            issuerKid = issuerKid,
-            subjectDid = holderDid ?: "",
-            mappings = request.mapping ?: JsonObject(emptyMap()),
-            additionalJwtHeader = emptyMap(),
-            additionalJwtOptions = emptyMap()
-        )
-        else -> vc.mergingSdJwtIssue(
-            issuerKey = issuerKey.key,
-            issuerDid = issuerDid,
-            subjectDid = holderDid ?: "",
-            mappings = request.mapping ?: JsonObject(emptyMap()),
-            additionalJwtHeaders = emptyMap(),
-            additionalJwtOptions = emptyMap(),
-            disclosureMap = request.selectiveDisclosure
-        )
-    }.also {
-        sendCallback("jwt_issue", buildJsonObject {
-            put("jwt", it)
-        })
     }
 
     suspend fun getJwksSessions() : JsonObject{

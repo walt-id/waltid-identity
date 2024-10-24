@@ -1,9 +1,12 @@
 package id.walt.oid4vc
 
 import cbor.Cbor
+import id.walt.credentials.issuance.Issuer.mergingJwtIssue
+import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
 import id.walt.credentials.issuance.dataFunctions
 import id.walt.credentials.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
 import id.walt.credentials.utils.VCFormat
+import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
@@ -384,7 +387,7 @@ object OpenID4VCI {
                                 credentialData: JsonObject, dataMapping: JsonObject?,
                                 selectiveDisclosure: SDMap?, vct: String,
                                 issuerDid: String?, issuerKid: String?, x5Chain: List<String>?,
-                                issuerKey: Key): SDJwtVC {
+                                issuerKey: Key): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
             credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
         )
@@ -430,7 +433,40 @@ object OpenID4VCI {
 
         val jwt = issuerKey.signJws(finalSdPayload.undisclosedPayload.toString().encodeToByteArray(),
             headers.mapValues { it.value.toJsonElement() })
-        return SDJwtVC(SDJwt.createFromSignedJwt(jwt, finalSdPayload))
+        return SDJwtVC(SDJwt.createFromSignedJwt(jwt, finalSdPayload)).toString()
     }
 
+    suspend fun generateW3CJwtVC(credentialRequest: CredentialRequest,
+                                credentialData: JsonObject, dataMapping: JsonObject?,
+                                selectiveDisclosure: SDMap?, issuerDid: String?, issuerKid: String?,
+                                 x5Chain: List<String>?, issuerKey: Key): String {
+        val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
+            credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
+        )
+        val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content
+        val holderDid = if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else null
+        val additionalJwtHeaders = x5Chain?.let {
+            mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
+        } ?: mapOf()
+        return W3CVC(credentialData).let { vc -> when(selectiveDisclosure.isNullOrEmpty()) {
+            true -> vc.mergingJwtIssue(
+                issuerKey = issuerKey,
+                issuerDid = issuerDid,
+                issuerKid = issuerKid,
+                subjectDid = holderDid ?: "",
+                mappings = dataMapping ?: JsonObject(emptyMap()),
+                additionalJwtHeader = additionalJwtHeaders,
+                additionalJwtOptions = emptyMap()
+            )
+            else -> vc.mergingSdJwtIssue(
+                issuerKey = issuerKey,
+                issuerDid = issuerDid,
+                subjectDid = holderDid ?: "",
+                mappings = dataMapping ?: JsonObject(emptyMap()),
+                additionalJwtHeaders = additionalJwtHeaders,
+                additionalJwtOptions = emptyMap(),
+                disclosureMap = selectiveDisclosure
+            )
+        }}
+    }
 }
