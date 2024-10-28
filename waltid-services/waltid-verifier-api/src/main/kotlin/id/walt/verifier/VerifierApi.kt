@@ -391,7 +391,7 @@ fun Application.verfierApi() {
                 tags = listOf("Credential Verification")
                 summary = "DID Web Resolution Endpoint"
             }) {
-                call.respond(RequestSigningCryptoProvider.getSigningDidDocument())
+                call.respond(RequestSigningCryptoProvider.getSigningDidDocument().toJsonObject()["content"]!!.jsonObject)
             }
         }
 

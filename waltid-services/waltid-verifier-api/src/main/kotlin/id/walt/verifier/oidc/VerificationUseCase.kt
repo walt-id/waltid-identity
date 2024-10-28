@@ -75,7 +75,7 @@ class VerificationUseCase(
 
         if (clientIdScheme == ClientIdScheme.Did) {
             OIDCVerifierService.config.defaultClientId = RequestSigningCryptoProvider.getSigningDid()
-            requireNotNull(RequestSigningCryptoProvider.getSigningKey(clientIdScheme))
+            requireNotNull(RequestSigningCryptoProvider.getSigningKey())
         }
 
         val session = OIDCVerifierService.initializeAuthorization(
@@ -217,11 +217,15 @@ class VerificationUseCase(
             "No authorization request found for session id: $sessionId"
         }
 
-        // get clientId Schema
+//         get clientId Schema
         val retrievedClientIdSchema = OIDCVerifierService.getSession(sessionId).authorizationRequest!!.clientIdScheme
 
         OIDCVerifierService.getSession(sessionId).authorizationRequest!!.toRequestObject(
-            RequestSigningCryptoProvider, RequestSigningCryptoProvider.getSigningKey(retrievedClientIdSchema!!).keyID.orEmpty()
+            cryptoProvider = RequestSigningCryptoProvider,
+            keyId = when(retrievedClientIdSchema) {
+                ClientIdScheme.Did -> RequestSigningCryptoProvider.getSigningKeyForDid().keyID
+                else -> RequestSigningCryptoProvider.getSigningKey().keyID.orEmpty()
+            }
         )
     }
 

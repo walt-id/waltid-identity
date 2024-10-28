@@ -7,8 +7,8 @@ import kotlinx.serialization.Serializable
 data class OIDCVerifierServiceConfig(
     val baseUrl: String,
     val requestSigningKeyFile: String? = null,
-    val requestSigningJwkFile: String? = null,
-    val requestSigningDid: String? = null,
+    val requestSigningKeyForDidFile: String? = null,
+    val requestSigningDidDocumentFile: String? = null,
     val requestSigningCertFile: String? = null,
     val x509SanDnsClientId: String? = null,
 ) : WaltConfig()
