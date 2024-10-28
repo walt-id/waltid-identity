@@ -14,7 +14,7 @@ data class Permission(val target: PermissionedResourceTarget, val action: String
     }
 
     override fun toString(): String {
-        return "$target${operation.symbol}$action"
+        return "$target:${operation.symbol}$action"
     }
 
     companion object {
