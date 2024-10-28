@@ -7,6 +7,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
+import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
@@ -35,7 +36,6 @@ import io.ktor.server.util.*
 import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -170,9 +170,15 @@ fun Application.verfierApi() {
                         required = false
                     }
                     headerParameter<String?>("openId4VPProfile") {
-                        description =
-                            "Optional header to set the profile of the VP request, available profiles: ${OpenId4VPProfile.entries.joinToString()}"
-                        // example = ""
+                        description = "Optional header to set the profile of the VP request, available profiles: ${OpenId4VPProfile.entries.joinToString()}"
+                        required = false
+                    }
+                    headerParameter<String?>("clientIdScheme") {
+                        description = "Defaults to ${ClientIdScheme.RedirectUri.value}"
+                        required = false
+                    }
+                    headerParameter<String?>("useJar") {
+                        description = "Defaults to false"
                         required = false
                     }
                     body<JsonObject> {
@@ -207,6 +213,8 @@ fun Application.verfierApi() {
                 val statusCallbackApiKey = context.request.header("statusCallbackApiKey")
                 val stateId = context.request.header("stateId")
                 val openId4VPProfile = context.request.header("openId4VPProfile")
+                val clientIdScheme = context.request.header("clientIdScheme")
+                val useJar = context.request.header("useJar").toBoolean()
 
                 val body = context.receive<JsonObject>()
 
@@ -224,7 +232,8 @@ fun Application.verfierApi() {
                     openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull
                         ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
                         ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
-                    trustedRootCAs = body["trusted_root_cas"]?.jsonArray
+                    trustedRootCAs = body["trusted_root_cas"]?.jsonArray,
+                    clientIdScheme = clientIdScheme?.let { ClientIdScheme.fromValue(it) }
                 )
 
                 context.respond(
@@ -236,7 +245,12 @@ fun Application.verfierApi() {
                             OpenId4VPProfile.EBSIV3 -> session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(
                                 SERVER_URL.let { "$it/openid4vc/request/${session.id}" })
 
-                            else -> session.authorizationRequest!!.toHttpQueryString()
+                            else ->
+                                when(useJar) {
+                                    true -> session.authorizationRequest!!.toRequestObjectByReferenceHttpQueryString(
+                                        ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/request/${session.id}" })
+                                    false -> session.authorizationRequest!!.toHttpQueryString()
+                                }
                         }
                     )
                 )
@@ -373,6 +387,12 @@ fun Application.verfierApi() {
                     throw NotFoundException(it.message)
                 }
             }
+            get("did/did.json", {
+                tags = listOf("Credential Verification")
+                summary = "DID Web Resolution Endpoint"
+            }) {
+                call.respond(RequestSigningCryptoProvider.getSigningDidDocument())
+            }
         }
 
         get("/.well-known/openid-configuration", { tags = listOf("Ebsi") }) {
@@ -396,10 +416,10 @@ fun Application.verfierApi() {
             val jwks = buildJsonObject {
                 put("keys", buildJsonArray {
                     val jwkWithKid = buildJsonObject {
-                        RequestSigningCryptoProvider.signingKey.toPublicJWK().toJSONObject().forEach {
+                        RequestSigningCryptoProvider.getSigningKey().toPublicJWK().toJSONObject().forEach {
                             put(it.key, it.value.toJsonElement())
                         }
-                        put("kid", RequestSigningCryptoProvider.signingKey.keyID)
+                        put("kid", RequestSigningCryptoProvider.getSigningKey().keyID)
                     }
                     add(jwkWithKid)
                 })

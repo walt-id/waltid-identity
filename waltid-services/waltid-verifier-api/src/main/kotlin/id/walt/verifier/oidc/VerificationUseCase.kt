@@ -21,7 +21,6 @@ import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.policies.VerificationPolicy
 import id.walt.policies.policies.SdJwtVCSignaturePolicy
 import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.SimpleJWTCryptoProvider
@@ -57,6 +56,7 @@ class VerificationUseCase(
         openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT,
         walletInitiatedAuthState: String? = null,
         trustedRootCAs: JsonArray? = null,
+        clientIdScheme: ClientIdScheme? = null
     ) = let {
         val requestedCredentials = requestCredentialsJson.jsonArray.map {
             when (it) {
@@ -73,13 +73,15 @@ class VerificationUseCase(
 
         logger.debug { "Presentation definition: " + presentationDefinition.toJSON() }
 
+        if (clientIdScheme == ClientIdScheme.Did) OIDCVerifierService.config.defaultClientId = RequestSigningCryptoProvider.getSigningDid()
+
         val session = OIDCVerifierService.initializeAuthorization(
             presentationDefinition, responseMode = responseMode, sessionId = stateId,
             ephemeralEncKey = when (responseMode) {
                 ResponseMode.direct_post_jwt -> runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
                 else -> null
             },
-            clientIdScheme = this.getClientIdScheme(openId4VPProfile, OIDCVerifierService.config.defaultClientIdScheme),
+            clientIdScheme = clientIdScheme ?: this.getClientIdScheme(openId4VPProfile, OIDCVerifierService.config.defaultClientIdScheme),
             openId4VPProfile = openId4VPProfile,
             walletInitiatedAuthState = walletInitiatedAuthState,
             responseType = responseType,
@@ -211,8 +213,12 @@ class VerificationUseCase(
         checkNotNull(OIDCVerifierService.getSession(sessionId).authorizationRequest) {
             "No authorization request found for session id: $sessionId"
         }
+
+        // get clientId Schema
+        val retrievedClientIdSchema = OIDCVerifierService.getSession(sessionId).authorizationRequest!!.clientIdScheme
+
         OIDCVerifierService.getSession(sessionId).authorizationRequest!!.toRequestObject(
-            RequestSigningCryptoProvider, RequestSigningCryptoProvider.signingKey.keyID.orEmpty()
+            RequestSigningCryptoProvider, RequestSigningCryptoProvider.getSigningKey(retrievedClientIdSchema!!).keyID.orEmpty()
         )
     }
 

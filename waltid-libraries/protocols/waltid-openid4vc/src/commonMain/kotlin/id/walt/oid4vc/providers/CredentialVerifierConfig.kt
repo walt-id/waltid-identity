@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 class CredentialVerifierConfig(
     val redirectUri: String,
     val defaultClientIdScheme: ClientIdScheme = ClientIdScheme.RedirectUri,
-    val defaultClientId: String = redirectUri,
+    var defaultClientId: String = redirectUri,
     val responseUrl: String? = null,
     val clientIdMap: Map<ClientIdScheme, String> = mapOf()
 ) : OpenIDProviderConfig()

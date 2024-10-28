@@ -68,7 +68,12 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
             // here add VpToken if response type is null
             responseType = setOf(responseType!!),
             clientId = when(openId4VPProfile) {
-                OpenId4VPProfile.DEFAULT -> config.redirectUri
+                OpenId4VPProfile.DEFAULT ->
+                    when(clientIdScheme) {
+                        ClientIdScheme.Did -> config.defaultClientId
+                        ClientIdScheme.RedirectUri -> config.redirectUri
+                        else -> config.redirectUri
+                    }
                 OpenId4VPProfile.ISO_18013_7_MDOC -> config.redirectUri
                 OpenId4VPProfile.EBSIV3 -> config.redirectUri.replace("/openid4vc/verify", "")
                 else -> config.clientIdMap[clientIdScheme] ?: config.defaultClientId

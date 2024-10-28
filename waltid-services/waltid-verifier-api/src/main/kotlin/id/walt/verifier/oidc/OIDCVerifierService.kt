@@ -8,12 +8,9 @@ import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.persistence.ConfiguredPersistence
-import id.walt.credentials.utils.VCFormat
 import id.walt.policies.VerificationPolicy
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest
-import id.walt.policies.models.PolicyResultSurrogate
-import id.walt.policies.models.PresentationResultEntrySurrogate
 import id.walt.policies.models.PresentationVerificationResponseSurrogate
 import id.walt.policies.policies.*
 import id.walt.policies.policies.vp.HolderBindingPolicy
@@ -21,7 +18,6 @@ import id.walt.policies.policies.vp.MaximumCredentialsPolicy
 import id.walt.policies.policies.vp.MinimumCredentialsPolicy
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.mdoc.COSECryptoProviderKeyInfo
@@ -65,9 +61,9 @@ import kotlin.time.Duration.Companion.minutes
  */
 object OIDCVerifierService : OpenIDCredentialVerifier(
     config = CredentialVerifierConfig(
-        ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/verify" },
-        clientIdMap = ConfigManager.getConfig<OIDCVerifierServiceConfig>().x509SanDnsClientId?.let { mapOf(ClientIdScheme.X509SanDns to it) }
-            ?: emptyMap())
+        redirectUri = ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/verify" },
+        clientIdMap = ConfigManager.getConfig<OIDCVerifierServiceConfig>().x509SanDnsClientId?.let { mapOf(ClientIdScheme.X509SanDns to it) } ?: emptyMap()
+    )
 ) {
     private val logger = KotlinLogging.logger {}
 
