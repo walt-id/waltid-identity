@@ -24,8 +24,8 @@ import kotlin.time.Duration.Companion.minutes
 
 object E2ETest {
 
-    private var HOST = "localhost"
-    private var PORT = 22222
+    var HOST = "localhost"
+    var PORT = 22222
     var failEarly = false
 
     data class TestStats(
