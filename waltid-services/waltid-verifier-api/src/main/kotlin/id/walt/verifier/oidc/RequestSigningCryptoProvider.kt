@@ -47,7 +47,7 @@ object RequestSigningCryptoProvider : JWTCryptoProvider {
                         else
                             null
                     }
-                } ?: ECKeyGenerator(Curve.P_256).keyUse(KeyUse.SIGNATURE).keyID(Uuid.random().toString()).generate()
+                } ?: throw IllegalArgumentException("Missing requestSigningJwkKey from config file")
             }
             else -> {
                 ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningKeyFile?.let {

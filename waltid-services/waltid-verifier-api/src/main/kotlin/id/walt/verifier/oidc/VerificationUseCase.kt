@@ -73,7 +73,10 @@ class VerificationUseCase(
 
         logger.debug { "Presentation definition: " + presentationDefinition.toJSON() }
 
-        if (clientIdScheme == ClientIdScheme.Did) OIDCVerifierService.config.defaultClientId = RequestSigningCryptoProvider.getSigningDid()
+        if (clientIdScheme == ClientIdScheme.Did) {
+            OIDCVerifierService.config.defaultClientId = RequestSigningCryptoProvider.getSigningDid()
+            requireNotNull(RequestSigningCryptoProvider.getSigningKey(clientIdScheme))
+        }
 
         val session = OIDCVerifierService.initializeAuthorization(
             presentationDefinition, responseMode = responseMode, sessionId = stateId,
