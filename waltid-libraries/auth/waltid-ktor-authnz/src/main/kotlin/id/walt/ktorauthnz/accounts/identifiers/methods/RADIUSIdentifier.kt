@@ -13,5 +13,6 @@ data class RADIUSIdentifier(val host: String, val name: String) : AccountIdentif
 
     companion object : AccountIdentifierFactory<RADIUSIdentifier>("radius") {
         override fun fromAccountIdentifierDataString(dataString: String) = Json.decodeFromString<RADIUSIdentifier>(dataString)
+        val EXAMPLE = RADIUSIdentifier("host", "name")
     }
 }
