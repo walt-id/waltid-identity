@@ -125,7 +125,7 @@ fun Application.keys() = walletRoute {
             runCatching {
                 getWalletService().generateKey(keyGenerationRequest)
             }.onSuccess {
-                context.respond(it)
+                context.respond(HttpStatusCode.Created, it)
             }.onFailure {
                 context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
             }
