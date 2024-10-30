@@ -43,6 +43,7 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
 
         val storedData: EmailPassStoredData = lookupStoredData(identifier /*context()*/)
 
+        // todo: hash
         authCheck(credential.password == storedData.password) { "Invalid password" }
 
         return identifier

@@ -12,7 +12,7 @@ data class EmailIdentifier(val email: String) : AccountIdentifier() {
 
     companion object : AccountIdentifierFactory<EmailIdentifier>("email") {
         override fun fromAccountIdentifierDataString(dataString: String): EmailIdentifier = EmailIdentifier(dataString)
+
+        val EXAMPLE = EmailIdentifier("example@example.com")
     }
-
-
 }
