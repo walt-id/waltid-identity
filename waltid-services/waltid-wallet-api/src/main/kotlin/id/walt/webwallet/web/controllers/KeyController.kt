@@ -100,6 +100,23 @@ fun Application.keys() = walletRoute {
                             }
                         )
                     }
+                    example("AWS key generation request") {
+                        value = KeyGenerationRequest(
+                            backend = "aws",
+                            keyType = KeyType.secp256r1,
+                            config = buildJsonObject {
+                                put("accessKeyId", JsonPrimitive("accessKey"))
+                                put("secretAccessKey", JsonPrimitive("secretKey"))
+                                put("region", JsonPrimitive("eu-central-1"))
+                            }
+                        )
+                    }
+                }
+            }
+            response {
+                HttpStatusCode.Created to {
+                    description = "The generated key"
+                    body<String>()
                 }
             }
         }) {
