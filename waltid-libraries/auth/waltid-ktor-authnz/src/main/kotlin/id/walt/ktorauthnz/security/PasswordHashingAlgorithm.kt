@@ -1,8 +1,10 @@
 package id.walt.ktorauthnz.security
 
 import com.password4j.*
+import kotlinx.serialization.Serializable
 import kotlin.reflect.jvm.jvmName
 
+@Serializable
 enum class PasswordHashingAlgorithm(val algorithmInstance: Lazy<AbstractHashingFunction>) {
     ARGON2(lazy { AlgorithmFinder.getArgon2Instance() }),
     PBKDF2(lazy { AlgorithmFinder.getPBKDF2Instance() }),
