@@ -1,6 +1,6 @@
 package id.walt.ktorauthnz.security.algorithms
 
-import dev.whyoleg.cryptography.BinarySize.Companion.bits
+/*import dev.whyoleg.cryptography.BinarySize.Companion.bits
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.PBKDF2
 import dev.whyoleg.cryptography.algorithms.SHA512
@@ -19,4 +19,4 @@ class PBKDF2PasswordHashAlgorithm : PasswordHashAlgorithm() {
     @OptIn(ExperimentalStdlibApi::class)
     override suspend fun hash(password: String, salt: ByteString): String =
         hashInternal(password, salt).toHexString()
-}
+}*/

@@ -8,15 +8,7 @@ object PasswordHashing {
     private val selectedPwHashFunction
         get() = config.selectedPwHashAlgorithm.algorithmInstance.value
 
-    @Deprecated("Use hash2", replaceWith = ReplaceWith("hash2"))
-    fun hash(password: String): String =
-        Password.hash(password)
-            .addRandomSalt()
-            .addPepper(config.pepper)
-            .with(selectedPwHashFunction)
-            .result
-
-    fun hash2(password: String): PasswordHash =
+    fun hash(password: String): PasswordHash =
         Password.hash(password)
             .addRandomSalt()
             .addPepper(config.pepper)
@@ -27,7 +19,7 @@ object PasswordHashing {
         config.selectedHashConversions.containsKey(storedHash.algorithm)
 
     fun evolvesTo(storedHashAlgorithm: PasswordHashingAlgorithm): PasswordHashingAlgorithm =
-        config.selectedHashConversions[storedHashAlgorithm] ?: error("Does not need evolving: ${storedHashAlgorithm}")
+        config.selectedHashConversions[storedHashAlgorithm] ?: error("Does not need evolving: $storedHashAlgorithm")
 
     data class CheckResult(
         val valid: Boolean,

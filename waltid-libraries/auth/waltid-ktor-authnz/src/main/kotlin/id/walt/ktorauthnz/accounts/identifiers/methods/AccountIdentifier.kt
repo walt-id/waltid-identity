@@ -1,8 +1,6 @@
 package id.walt.ktorauthnz.accounts.identifiers.methods
 
-import dev.whyoleg.cryptography.algorithms.SHA512
 import id.walt.ktorauthnz.KtorAuthnzManager
-import id.walt.ktorauthnz.security.ShaHash
 import kotlinx.serialization.Serializable
 
 @Suppress("EqualsOrHashCode")
@@ -17,7 +15,7 @@ sealed class AccountIdentifier {
     override fun toString(): String = "[$accountIdentifierName: ${toDataString()}]"
     abstract fun toDataString(): String
 
-    suspend fun asSalt() = ShaHash.hash3Sha512Hex(toDataString())
+    //suspend fun asSalt() = ShaHash.hash3Sha512Hex(toDataString())
 
     override fun equals(other: Any?): Boolean {
         if (other !is AccountIdentifier) return false

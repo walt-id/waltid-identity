@@ -1,6 +1,8 @@
 package id.walt
 
-import id.walt.ktorauthnz.security.*
+import id.walt.ktorauthnz.security.PasswordHash
+import id.walt.ktorauthnz.security.PasswordHashing
+import id.walt.ktorauthnz.security.PasswordHashingAlgorithm
 import kotlin.test.Test
 import id.walt.ktorauthnz.KtorAuthnzManager.passwordHashingConfig as config
 
@@ -27,7 +29,7 @@ class PasswordHashingTest {
         println("Using password: $pw")
 
         println("Will hash with 'first' algorithm...")
-        val hash = PasswordHashing.hash2(pw)
+        val hash = PasswordHashing.hash(pw)
         println("Hash: $hash (actual)")
         check(hash.algorithm == config.selectedPwHashAlgorithm)
 
