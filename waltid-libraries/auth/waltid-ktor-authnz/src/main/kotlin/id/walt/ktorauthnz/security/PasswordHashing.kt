@@ -16,10 +16,12 @@ object PasswordHashing {
             .let { PasswordHash(it.result, config.selectedPwHashAlgorithm) }
 
     fun needsEvolving(storedHash: PasswordHash) =
-        config.selectedHashConversions.containsKey(storedHash.algorithm)
+        config.selectedHashConversions.containsKey(storedHash.algorithm) ||
+                (config.selectedHashConversions.containsKey(null) && config.selectedHashConversions[null] != storedHash.algorithm)
 
     fun evolvesTo(storedHashAlgorithm: PasswordHashingAlgorithm): PasswordHashingAlgorithm =
-        config.selectedHashConversions[storedHashAlgorithm] ?: error("Does not need evolving: $storedHashAlgorithm")
+        config.selectedHashConversions[storedHashAlgorithm] ?: config.selectedHashConversions[null]
+        ?: error("Does not need evolving: $storedHashAlgorithm")
 
     data class CheckResult(
         val valid: Boolean,
