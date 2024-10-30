@@ -7,7 +7,6 @@ import io.github.smiley4.ktorswaggerui.routing.swaggerUI
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlin.reflect.KType
 
 fun Application.configureOpenApi() {
     install(SwaggerUI) {

@@ -24,7 +24,7 @@ object TOTP : AuthenticationMethod("totp") {
     override val relatedAuthMethodStoredData = TOTPStoredData::class
 
     suspend fun auth(session: AuthSession, code: String) {
-        val storedData = lookupStoredMultiData<TOTPStoredData>(session /* context() */)
+        val storedData = lookupAccountStoredData<TOTPStoredData>(session.accountId ?: error("No account ID") /* context() */)
 
         val userProvidedOtpCode = TOTP(code)
         val secret = TOTPSecret.fromBase32EncodedString(storedData.secret)

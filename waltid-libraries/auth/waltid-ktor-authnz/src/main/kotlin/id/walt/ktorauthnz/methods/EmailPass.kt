@@ -1,13 +1,13 @@
 package id.walt.ktorauthnz.methods
 
 import id.walt.ktorauthnz.AuthContext
-import id.walt.ktorauthnz.accounts.identifiers.AccountIdentifierManager
+import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
 import id.walt.ktorauthnz.exceptions.authCheck
-import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
-import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
 import id.walt.ktorauthnz.methods.data.EmailPassStoredData
+import id.walt.ktorauthnz.security.PasswordHash
+import id.walt.ktorauthnz.security.PasswordHashing
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
@@ -18,11 +18,6 @@ import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import org.intellij.lang.annotations.Language
 
 @Serializable
 @SerialName("email")
@@ -41,10 +36,16 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
     override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
         val identifier = EmailIdentifier(credential.name)
 
-        val storedData: EmailPassStoredData = lookupStoredData(identifier /*context()*/)
+        val storedData: EmailPassStoredData = lookupAccountIdentifierStoredData(identifier /*context()*/)
 
-        // todo: hash
-        authCheck(credential.password == storedData.password) { "Invalid password" }
+        val passwordHash = PasswordHash.fromString(storedData.passwordHash ?: error("Missing password hash"))
+        val check = PasswordHashing.check(credential.password, passwordHash)
+
+        authCheck(check.valid) { "Invalid password" }
+        if (check.updated) {
+            val newData = storedData.copy(passwordHash = check.updatedHash!!.toString())
+            KtorAuthnzManager.accountStore.updateAccountIdentifierStoredData(identifier, id, newData)
+        }
 
         return identifier
     }

@@ -1,6 +1,6 @@
 package id.walt.ktorauthnz
 
-import id.walt.ktorauthnz.accounts.AccountStore
+import id.walt.ktorauthnz.accounts.EditableAccountStore
 import id.walt.ktorauthnz.accounts.ExampleAccountStore
 import id.walt.ktorauthnz.security.PasswordHashingConfiguration
 import id.walt.ktorauthnz.sessions.InMemorySessionStore
@@ -9,7 +9,8 @@ import id.walt.ktorauthnz.tokens.ktorauthnztoken.KtorAuthNzTokenHandler
 
 object KtorAuthnzManager {
 
-    var accountStore: AccountStore = ExampleAccountStore
+    var passwordHashingConfig = PasswordHashingConfiguration()
+    var accountStore: EditableAccountStore = ExampleAccountStore
     var sessionStore = InMemorySessionStore()
 
     var tokenHandler: TokenHandler = KtorAuthNzTokenHandler()
@@ -20,5 +21,4 @@ object KtorAuthnzManager {
         }
     }*/
 
-    var passwordHashingConfig = PasswordHashingConfiguration()
 }

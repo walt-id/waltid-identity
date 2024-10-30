@@ -30,10 +30,10 @@ object IdentifyEmail : IdentifyVirtualAuth("identify") {
 
             val data = when {
                 store.hasStoredDataFor(identifier, this@IdentifyEmail) ->
-                    store.lookupStoredDataFor(identifier, this@IdentifyEmail)
+                    store.lookupStoredDataForAccountIdentifier(identifier, this@IdentifyEmail)
 
                 store.hasStoredDataFor(identifier, GlobalIdentify) ->
-                    store.lookupStoredDataFor(identifier, GlobalIdentify)
+                    store.lookupStoredDataForAccountIdentifier(identifier, GlobalIdentify)
 
                 else -> error("No global identifier found for $email")
             } as FlowAmendmentData
