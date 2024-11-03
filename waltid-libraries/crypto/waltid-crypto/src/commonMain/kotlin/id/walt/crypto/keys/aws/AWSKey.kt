@@ -43,6 +43,13 @@ import kotlin.js.JsExport
 
 private val logger = KotlinLogging.logger { }
 
+data class AWSauth(
+    val accessKeyId: String,
+    val secretAccessKey: String,
+    val sessionToken: String,
+    val expiration: String
+)
+
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Suppress("TRANSIENT_IS_REDUNDANT")
@@ -360,6 +367,56 @@ ${sha256Hex(canonicalRequest)}
             )
         }
 
+
+        // Function to get IMDSv2 token
+        suspend fun getIMDSv2Token(ttlSeconds: Int = 21600): String {
+            val url = "http://169.254.169.254/latest/api/token"
+            val token = client.put(url) {
+                headers {
+                    append("X-aws-ec2-metadata-token-ttl-seconds", ttlSeconds.toString())
+                }
+            }
+            println("Token: ${token.bodyAsText()}")
+            return token.toString()
+        }
+
+        // Function to get role name
+        suspend fun getRoleName(token: String): String {
+            val url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+            val roleName = client.get(url) {
+                headers {
+                    append("X-aws-ec2-metadata-token", token)
+                }
+            }
+            println("RoleName: ${roleName.bodyAsText()}")
+
+            return roleName.toString()
+        }
+
+        // Function to get temporary credentials using role name
+        suspend fun getTemporaryCredentials(token: String, roleName: String): AWSauth {
+            val url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/$roleName"
+            val response = client.get(url) {
+                headers {
+                    append("X-aws-ec2-metadata-token", token)
+                }
+            }
+            val json = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+
+
+            val accessKeyId = json["AccessKeyId"]?.jsonPrimitive?.content
+            val secretAccessKey = json["SecretAccessKey"]?.jsonPrimitive?.content
+            val sessionToken = json["Token"]?.jsonPrimitive?.content
+            val expiration = json["Expiration"]?.jsonPrimitive?.content
+
+            return AWSauth(
+                accessKeyId = accessKeyId.toString(),
+                secretAccessKey = secretAccessKey.toString(),
+                sessionToken = sessionToken.toString(),
+                expiration = expiration.toString()
+            )
+        }
+
         @JvmBlocking
         @JvmAsync
         @JsPromise
@@ -442,6 +499,13 @@ $public
 
         @JsExport.Ignore
         override suspend fun generate(type: KeyType, config: AWSKeyMetadata): AWSKey {
+            if (config.accessKeyId.isEmpty() || config.secretAccessKey.isEmpty()) {
+                val token = getIMDSv2Token()
+                val roleName = getRoleName(token)
+                val auth = getTemporaryCredentials(token, roleName)
+                return generate(type, AWSKeyMetadata(auth.accessKeyId, auth.secretAccessKey, config.region))
+            }
+
             val keyType = keyTypeToAwsKeyMapping(type)
             val body =
                 """{
