@@ -170,6 +170,7 @@ https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/
 To **create the provider metadata** object for the well-defined [metadata endpoints](#well-defined-endpoints), you may make use of the helper function in the OpenID4VCI utility object:
 [OpenID4VCI::createDefaultProviderMetadata](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/commonMain/kotlin/id/walt/oid4vc/OpenID4VCI.kt#L307),
 which creates the metadata based on the issuer base URL, describing the standard API endpoints, response types and signing algorithms.
+
 **Note**, that this utility function does NOT add supported credential types, as it is up to the implementer, which credential types they can support.
 See [here](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/commonMain/kotlin/id/walt/oid4vc/providers/OpenIDCredentialIssuer.kt#L42) for an example how to load the list of supported credentials from a configuration.
 
