@@ -72,9 +72,9 @@ business logic, for processing the OpenID4VC protocols.
 The examples are based on **JVM** and make use of the following libraries:
 - [**ktor**](https://ktor.io/) for the HTTP server endpoints and client-side request
 handling
-- [**waltid-crypto**](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-crypto) for cryptographic operations
+- [**waltid-crypto**](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto) for cryptographic operations
 - [**waltid-did**](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-did) for DID-related operations 
-- [**waltid-verifiable-credentials**](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-verifiable-credentials) for credential and presentation handling
+- [**waltid-verifiable-credentials**](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-verifiable-credentials) for credential and presentation handling
 
 ### Issuer
 
@@ -84,7 +84,7 @@ For the full demo issuer implementation, refer to `/src/jvmTest/kotlin/id/walt/o
 
 For the OpenID4VCI issuance protocol, implement the following endpoints:
 
-**Well-defined endpoints:**
+##### Well-defined endpoints:
 
 These endpoints are well-defined, and need to be available under this exact path, relative to your issuer base URL:
 
