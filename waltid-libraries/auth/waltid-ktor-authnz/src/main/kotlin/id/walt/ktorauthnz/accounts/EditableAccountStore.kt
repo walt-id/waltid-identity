@@ -1,20 +1,23 @@
 package id.walt.ktorauthnz.accounts
 
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
-import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
 
 interface EditableAccountStore : AccountStore {
 
-    fun registerAccount(newAccount: Account)
+    //fun registerAccount(newAccount: Account)
 
-    fun addAccountIdentifierToAccount(accountId: String, newAccountIdentifier: AccountIdentifier)
+    suspend fun addAccountIdentifierToAccount(accountId: String, newAccountIdentifier: AccountIdentifier)
 
-    fun addAccountIdentifierToAccount(account: Account, newAccountIdentifier: AccountIdentifier) =
+    suspend fun addAccountIdentifierToAccount(account: Account, newAccountIdentifier: AccountIdentifier) =
         addAccountIdentifierToAccount(account.id, newAccountIdentifier)
+    suspend fun removeAccountIdentifierFromAccount(accountIdentifier: AccountIdentifier)
 
-
-    fun addAccountStoredData(accountId: String, data: Pair<AuthenticationMethod, AuthMethodStoredData>)
-
-    fun deleteAccountStoredData(accountId: String, dataFor: AuthenticationMethod)
+    //suspend fun addAccountStoredData(accountIdentifier: AccountIdentifier, data: Pair<AuthenticationMethod, AuthMethodStoredData>)
+    suspend fun addAccountIdentifierStoredData(accountIdentifier: AccountIdentifier, method: String, data: AuthMethodStoredData)
+    suspend fun addAccountStoredData(accountId: String, method: String, data: AuthMethodStoredData)
+    suspend fun updateAccountIdentifierStoredData(accountIdentifier: AccountIdentifier, method: String, data: AuthMethodStoredData)
+    suspend fun updateAccountStoredData(accountId: String, method: String, data: AuthMethodStoredData)
+    suspend fun deleteAccountIdentifierStoredData(accountIdentifier: AccountIdentifier, method: String)
+    suspend fun deleteAccountStoredData(accountId: String, method: String)
 }
