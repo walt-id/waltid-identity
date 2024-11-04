@@ -3,13 +3,12 @@ package id.walt.ktorauthnz.accounts
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
-import id.walt.ktorauthnz.sessions.AuthSession
 
 interface AccountStore {
 
-    suspend fun lookupStoredMultiDataForAccount(session: AuthSession, method: AuthenticationMethod): AuthMethodStoredData?
+    suspend fun lookupStoredDataForAccount(accountId: String, method: AuthenticationMethod): AuthMethodStoredData?
 
-    suspend fun lookupStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): AuthMethodStoredData?
+    suspend fun lookupStoredDataForAccountIdentifier(identifier: AccountIdentifier, method: AuthenticationMethod): AuthMethodStoredData?
 
     /**
      * Resolve account uuid for account identifier

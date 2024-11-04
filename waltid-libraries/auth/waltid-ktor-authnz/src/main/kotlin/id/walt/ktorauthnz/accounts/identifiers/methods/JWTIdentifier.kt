@@ -11,5 +11,7 @@ data class JWTIdentifier(val subject: String) : AccountIdentifier() {
 
     companion object : AccountIdentifierFactory<JWTIdentifier>("jwt") {
         override fun fromAccountIdentifierDataString(dataString: String) = JWTIdentifier(dataString)
+
+        const val EXAMPLE = "subject"
     }
 }

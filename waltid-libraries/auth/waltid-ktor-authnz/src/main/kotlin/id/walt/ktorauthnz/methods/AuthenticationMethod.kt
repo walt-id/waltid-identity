@@ -48,14 +48,14 @@ abstract class AuthenticationMethod(open val id: String) {
     }
 
 
-    suspend inline fun <reified V : AuthMethodStoredData> lookupStoredData(identifier: AccountIdentifier): V {
-        val storedData = KtorAuthnzManager.accountStore.lookupStoredDataFor(identifier, this) ?: error("No stored data for method: $id")
+    suspend inline fun <reified V : AuthMethodStoredData> lookupAccountIdentifierStoredData(identifier: AccountIdentifier): V {
+        val storedData = KtorAuthnzManager.accountStore.lookupStoredDataForAccountIdentifier(identifier, this) ?: error("No stored data for method: $id")
         return (storedData as? V) ?: error("${storedData::class.simpleName} is not requested ${V::class.simpleName}")
     }
 
-    suspend inline fun <reified V : AuthMethodStoredData> lookupStoredMultiData(session: AuthSession): V {
+    suspend inline fun <reified V : AuthMethodStoredData> lookupAccountStoredData(accountId: String): V {
         val storedData =
-            KtorAuthnzManager.accountStore.lookupStoredMultiDataForAccount(session, this) ?: error("No stored data for method: $id")
+            KtorAuthnzManager.accountStore.lookupStoredDataForAccount(accountId, this) ?: error("No stored data for method: $id")
         return (storedData as? V) ?: error("${storedData::class.simpleName} is not requested ${V::class.simpleName}")
     }
 

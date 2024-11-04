@@ -13,5 +13,6 @@ data class OIDCIdentifier(val host: String, val name: String) : AccountIdentifie
 
     companion object : AccountIdentifierFactory<OIDCIdentifier>("oidc") {
         override fun fromAccountIdentifierDataString(dataString: String) = Json.decodeFromString<OIDCIdentifier>(dataString)
+        val EXAMPLE = OIDCIdentifier("host", "name")
     }
 }

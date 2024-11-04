@@ -15,6 +15,8 @@ sealed class AccountIdentifier {
     override fun toString(): String = "[$accountIdentifierName: ${toDataString()}]"
     abstract fun toDataString(): String
 
+    //suspend fun asSalt() = ShaHash.hash3Sha512Hex(toDataString())
+
     override fun equals(other: Any?): Boolean {
         if (other !is AccountIdentifier) return false
         if (other.accountIdentifierName != accountIdentifierName) return false
