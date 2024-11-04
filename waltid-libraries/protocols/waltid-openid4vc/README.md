@@ -99,7 +99,7 @@ https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/
 
 See also [here](#configuration-of-issuance-provider) for details about **creating the provider metadata**, required for these endpoints.
 
-##### Other required endpoints
+#### Other required endpoints
 
 These endpoints can have any path, according to your requirements or preferences, but need to be referenced in the provider metadata,
 returned by the well-defined configuration endpoints listed above.
