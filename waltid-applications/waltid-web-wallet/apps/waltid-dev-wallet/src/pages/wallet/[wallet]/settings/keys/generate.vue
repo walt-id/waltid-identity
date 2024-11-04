@@ -144,12 +144,8 @@
 
 <script lang="ts" setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import {
-  ArrowUturnLeftIcon,
-  CheckIcon,
-  KeyIcon,
-} from "@heroicons/vue/24/outline";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {ArrowUturnLeftIcon, CheckIcon, KeyIcon,} from "@heroicons/vue/24/outline";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 import InlineLoadingCircle from "@waltid-web-wallet/components/loading/InlineLoadingCircle.vue";
 
 const loading = ref(false);
@@ -193,6 +189,11 @@ const options = ref([
     keyGenerationRequest: ["OCI", "oci"],
     keyType: [["ECDSA_Secp256r1", "secp256r1"]],
     config: ["vaultId", "compartmentId"],
+  },
+  {
+    keyGenerationRequest: ["AWS", "aws"],
+    keyType: [["ECDSA_Secp256r1", "secp256r1"], ["ECDSA_Secp256k1", "secp256k1"], ["RSA", "RSA"]],
+    config: ["accessKeyId", "secretAccessKey", "region"],
   },
 ]);
 

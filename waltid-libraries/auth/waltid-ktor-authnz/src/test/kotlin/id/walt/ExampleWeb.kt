@@ -1,9 +1,9 @@
 package id.walt
 
 import id.walt.ktorauthnz.AuthContext
-import id.walt.ktorauthnz.auth.ktorAuthnz
 import id.walt.ktorauthnz.auth.getAuthToken
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
+import id.walt.ktorauthnz.auth.ktorAuthnz
 import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.methods.*
 import id.walt.ktorauthnz.sessions.SessionManager

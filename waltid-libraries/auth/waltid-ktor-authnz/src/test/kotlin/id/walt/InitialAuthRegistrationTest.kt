@@ -5,7 +5,10 @@ import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
 import id.walt.ktorauthnz.methods.initalauth.AuthMethodRegistrationWrapper
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.intellij.lang.annotations.Language
 import kotlin.test.Test
 

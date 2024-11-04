@@ -13,5 +13,6 @@ data class LDAPIdentifier(val host: String, val name: String) : AccountIdentifie
 
     companion object : AccountIdentifierFactory<LDAPIdentifier>("ldap") {
         override fun fromAccountIdentifierDataString(dataString: String) = Json.decodeFromString<LDAPIdentifier>(dataString)
+        val EXAMPLE = LDAPIdentifier("host", "name")
     }
 }

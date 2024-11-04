@@ -11,5 +11,7 @@ data class UsernameIdentifier(val name: String) : AccountIdentifier() {
 
     companion object : AccountIdentifierFactory<UsernameIdentifier>("userpass") {
         override fun fromAccountIdentifierDataString(dataString: String) = UsernameIdentifier(dataString)
+
+        val EXAMPLE = UsernameIdentifier("example")
     }
 }
