@@ -97,13 +97,9 @@ issuer [provider metadata](https://openid.net/specs/openid-4-verifiable-credenti
 
 https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L167-L172
 
-To **create the provider metadata** object for these well-defined endpoints, you may make use of the helper function in the OpenID4VCI utility object:
-[OpenID4VCI::createDefaultProviderMetadata](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/commonMain/kotlin/id/walt/oid4vc/OpenID4VCI.kt#L307),
-which creates the metadata based on the issuer base URL, describing the standard API endpoints, response types and signing algorithms.
-**Note**, that this utility function does NOT add supported credential types, as it is up to the implementer, which credential types they can support.
-See [here](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/commonMain/kotlin/id/walt/oid4vc/providers/OpenIDCredentialIssuer.kt#L42) for an example how to load the list of supported credentials from a configuration.
+See also [here](#configuration-of-issuance-provider) for details about creating the provider metadata, required for these endpoints.
 
-**Other required endpoints**
+##### Other required endpoints
 
 These endpoints can have any path, according to your requirements or preferences, but need to be referenced in the provider metadata,
 returned by the well-defined configuration endpoints listed above.
@@ -139,6 +135,8 @@ defined [here](https://openid.net/specs/openid-4-verifiable-credential-issuance-
 
 https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L237-L249
 
+See also [here](#crypto-operations-and-credential-issuance) for details about generating credentials using the library.
+
 * `POST /credential_deferred`
 
 [Deferred credential endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-deferred-credential-endpoin),
@@ -152,7 +150,8 @@ https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/
 [Batch credential endpoint](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-batch-credential-endpoint) to
 fetch multiple issued credentials. Referenced in provider metadata as `batch_credential_endpoint`, as
 defined [here](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-credential-issuer-metadata-p).
-**Note:** The batch credential endpoint has been removed from the latest OpenID4VCI specification. Support for the new format (credentials array in /credential response object is yet to be implemented. 
+
+**Note:** The batch credential endpoint has been removed from the latest OpenID4VCI specification. Support for the new specification (credentials array in `/credential` response object) is yet to be implemented. 
 
 https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L266-L278
 
@@ -162,21 +161,38 @@ For the business logic, implement the abstract issuance provider
 in `src/commonMain/kotlin/id/walt/oid4vc/providers/OpenIDCredentialIssuer.kt`, providing session and cache management, as well, as
 cryptographic operations for issuing credentials.
 
-* **Configuration of issuance provider**
+##### Configuration of issuance provider
 
 https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L49-L66
 
-* **Simple session management example**
+**Provider metadata**
+
+To **create the provider metadata** object for the well-defined [metadata endpoints](#well-defined-endpoints), you may make use of the helper function in the OpenID4VCI utility object:
+[OpenID4VCI::createDefaultProviderMetadata](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/commonMain/kotlin/id/walt/oid4vc/OpenID4VCI.kt#L307),
+which creates the metadata based on the issuer base URL, describing the standard API endpoints, response types and signing algorithms.
+**Note**, that this utility function does NOT add supported credential types, as it is up to the implementer, which credential types they can support.
+See [here](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/commonMain/kotlin/id/walt/oid4vc/providers/OpenIDCredentialIssuer.kt#L42) for an example how to load the list of supported credentials from a configuration.
+
+
+##### Simple session management example
 
 Here we implement a simplistic in-memory session management:
 
 https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L68-L81
 
-* **Crypto operations and credential issuance**
+##### Crypto operations and credential issuance
 
 Token signing and credential issuance based on [**waltid-crypto**](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto), [**waltid-did**](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-did) and [**waltid-verifiable-credentials**](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-verifiable-credentials).
 
 https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L83-L160
+
+**Credential generation**
+
+For generating W3C or SD-Jwt-VC credentials, as required for the `/credential` endpoint, the library provides two helper functions in the OpenID4VCI utility object:
+* [OpenID4VCI.generateSdJwtVC](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/commonMain/kotlin/id/walt/oid4vc/OpenID4VCI.kt#L386)
+* [OpenID4VCI.generateW3CJwtVC](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/commonMain/kotlin/id/walt/oid4vc/OpenID4VCI.kt#L439)
+
+For an example how to use the utility functions, see [here](https://github.com/walt-id/waltid-identity/blob/main/waltid-services/waltid-issuer-api/src/main/kotlin/id/walt/issuer/issuance/CIProvider.kt#L266-L271).
 
 ### Verifier
 
