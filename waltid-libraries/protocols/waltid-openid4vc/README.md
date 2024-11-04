@@ -97,7 +97,7 @@ issuer [provider metadata](https://openid.net/specs/openid-4-verifiable-credenti
 
 https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L167-L172
 
-See also [here](#configuration-of-issuance-provider) for details about creating the provider metadata, required for these endpoints.
+See also [here](#configuration-of-issuance-provider) for details about **creating the provider metadata**, required for these endpoints.
 
 ##### Other required endpoints
 
@@ -135,7 +135,7 @@ defined [here](https://openid.net/specs/openid-4-verifiable-credential-issuance-
 
 https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L237-L249
 
-See also [here](#crypto-operations-and-credential-issuance) for details about generating credentials using the library.
+See also [here](#crypto-operations-and-credential-issuance) for details about **generating credentials** using the library.
 
 * `POST /credential_deferred`
 
