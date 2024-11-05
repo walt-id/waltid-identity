@@ -45,14 +45,14 @@ import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger { }
 
-data class AWSauth(
-    val accessKeyId: String,
-    val secretAccessKey: String,
-    val sessionToken: String,
-    val expiration: String
+data class AWSAuthConfiguration(
+    val accessKeyId: String?,
+    val secretAccessKey: String?,
+    val sessionToken: String?,
+    val expiration: String?
 )
 
-var _accessAWS: AWSauth? = null
+var _accessAWS: AWSAuthConfiguration? = null
 var timeoutAt: Instant? = null
 
 
@@ -271,7 +271,7 @@ class AWSKey(
             val isAccessDataProvided = config.accessKeyId.isNotEmpty() && config.secretAccessKey.isNotEmpty()
 
             if (isAccessDataProvided) {
-                _accessAWS = AWSauth(config.accessKeyId, config.secretAccessKey, "null", "null")
+                _accessAWS = AWSAuthConfiguration(config.accessKeyId, config.secretAccessKey, null, null)
                 timeoutAt = null
             } else {
                 val token = getIMDSv2Token()
@@ -281,7 +281,7 @@ class AWSKey(
             }
         }
 
-        suspend fun getAccess(config: AWSKeyMetadata): AWSauth? {
+        suspend fun getAccess(config: AWSKeyMetadata): AWSAuthConfiguration? {
             if (_accessAWS == null || (timeoutAt != null && timeoutAt!! <= Clock.System.now())) {
                 authAccess(config)
             }
