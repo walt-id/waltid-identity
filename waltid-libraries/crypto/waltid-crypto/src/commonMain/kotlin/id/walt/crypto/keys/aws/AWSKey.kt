@@ -406,7 +406,7 @@ ${sha256Hex(canonicalRequest)}
                     append("X-aws-ec2-metadata-token-ttl-seconds", ttlSeconds.toString())
                 }
             }
-            logger.debug { "AWS TOKEN: $token" }
+            logger.trace { "AWS TOKEN: $token" }
             return token.bodyAsText()
         }
 
