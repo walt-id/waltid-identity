@@ -22,6 +22,7 @@ import io.ktor.util.*
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
@@ -40,6 +41,7 @@ import kotlin.collections.component2
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger { }
 
@@ -49,6 +51,10 @@ data class AWSauth(
     val sessionToken: String,
     val expiration: String
 )
+
+var _accessAWS: AWSauth? = null
+var timeoutAt: Instant? = null
+
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -256,8 +262,32 @@ class AWSKey(
     @JsExport.Ignore
     override suspend fun getMeta(): AwsKeyMeta = AwsKeyMeta(getKeyId())
 
+
     companion object : AWSKeyCreator {
         val client = HttpClient()
+
+
+        suspend fun authAccess(config: AWSKeyMetadata) {
+            val isAccessDataProvided = config.accessKeyId.isNotEmpty() && config.secretAccessKey.isNotEmpty()
+
+            if (isAccessDataProvided) {
+                _accessAWS = AWSauth(config.accessKeyId, config.secretAccessKey, "null", "null")
+                timeoutAt = null
+            } else {
+                val token = getIMDSv2Token()
+                val role = getRoleName(token)
+                _accessAWS = getTemporaryCredentials(token, role)
+                timeoutAt = Clock.System.now().plus(3600.seconds)
+            }
+        }
+
+        suspend fun getAccess(config: AWSKeyMetadata): AWSauth? {
+            if (_accessAWS == null || (timeoutAt != null && timeoutAt!! <= Clock.System.now())) {
+                authAccess(config)
+            }
+
+            return _accessAWS
+        }
 
 
         // Utility to hash data using SHA256
@@ -376,8 +406,8 @@ ${sha256Hex(canonicalRequest)}
                     append("X-aws-ec2-metadata-token-ttl-seconds", ttlSeconds.toString())
                 }
             }
-            println("Token: ${token.bodyAsText()}")
-            return token.toString()
+            logger.debug { "AWS TOKEN: $token" }
+            return token.bodyAsText()
         }
 
         // Function to get role name
@@ -388,9 +418,8 @@ ${sha256Hex(canonicalRequest)}
                     append("X-aws-ec2-metadata-token", token)
                 }
             }
-            println("RoleName: ${roleName.bodyAsText()}")
-
-            return roleName.toString()
+            logger.debug { "AWS Role Name: $roleName" }
+            return roleName.bodyAsText()
         }
 
         // Function to get temporary credentials using role name
@@ -416,6 +445,7 @@ ${sha256Hex(canonicalRequest)}
                 expiration = expiration.toString()
             )
         }
+
 
         @JvmBlocking
         @JvmAsync
@@ -499,11 +529,10 @@ $public
 
         @JsExport.Ignore
         override suspend fun generate(type: KeyType, config: AWSKeyMetadata): AWSKey {
-            if (config.accessKeyId.isEmpty() || config.secretAccessKey.isEmpty()) {
-                val token = getIMDSv2Token()
-                val roleName = getRoleName(token)
-                val auth = getTemporaryCredentials(token, roleName)
-                return generate(type, AWSKeyMetadata(auth.accessKeyId, auth.secretAccessKey, config.region))
+
+
+            if (config.accessKeyId.isEmpty() && config.secretAccessKey.isEmpty()) {
+                getAccess(config)
             }
 
             val keyType = keyTypeToAwsKeyMapping(type)
