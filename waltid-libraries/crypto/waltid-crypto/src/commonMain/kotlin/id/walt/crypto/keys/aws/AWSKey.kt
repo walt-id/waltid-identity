@@ -266,7 +266,7 @@ class AWSKey(
     companion object : AWSKeyCreator {
         val client = HttpClient()
 
-
+        @JsExport.Ignore
         suspend fun authAccess(config: AWSKeyMetadata) {
             val isAccessDataProvided = config.accessKeyId.isNotEmpty() && config.secretAccessKey.isNotEmpty()
 
@@ -281,6 +281,7 @@ class AWSKey(
             }
         }
 
+        @JsExport.Ignore
         suspend fun getAccess(config: AWSKeyMetadata): AWSAuthConfiguration? {
             if (_accessAWS == null || (timeoutAt != null && timeoutAt!! <= Clock.System.now())) {
                 authAccess(config)
@@ -399,6 +400,7 @@ ${sha256Hex(canonicalRequest)}
 
 
         // Function to get IMDSv2 token
+        @JsExport.Ignore
         suspend fun getIMDSv2Token(ttlSeconds: Int = 21600): String {
             val url = "http://169.254.169.254/latest/api/token"
             val token = client.put(url) {
@@ -411,6 +413,7 @@ ${sha256Hex(canonicalRequest)}
         }
 
         // Function to get role name
+        @JsExport.Ignore
         suspend fun getRoleName(token: String): String {
             val url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
             val roleName = client.get(url) {
@@ -423,6 +426,7 @@ ${sha256Hex(canonicalRequest)}
         }
 
         // Function to get temporary credentials using role name
+        @JsExport.Ignore
         suspend fun getTemporaryCredentials(token: String, roleName: String): AWSAuthConfiguration {
             val url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/$roleName"
             val response = client.get(url) {
