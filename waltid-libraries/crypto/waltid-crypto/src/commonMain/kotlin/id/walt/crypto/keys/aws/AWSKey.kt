@@ -423,7 +423,7 @@ ${sha256Hex(canonicalRequest)}
         }
 
         // Function to get temporary credentials using role name
-        suspend fun getTemporaryCredentials(token: String, roleName: String): AWSauth {
+        suspend fun getTemporaryCredentials(token: String, roleName: String): AWSAuthConfiguration {
             val url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/$roleName"
             val response = client.get(url) {
                 headers {
@@ -433,16 +433,20 @@ ${sha256Hex(canonicalRequest)}
             val json = Json.parseToJsonElement(response.bodyAsText()).jsonObject
 
 
-            val accessKeyId = json["AccessKeyId"]?.jsonPrimitive?.content
+            val accessKeyId =
+                json["AccessKeyId"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("AccessKeyId not found")
             val secretAccessKey = json["SecretAccessKey"]?.jsonPrimitive?.content
-            val sessionToken = json["Token"]?.jsonPrimitive?.content
-            val expiration = json["Expiration"]?.jsonPrimitive?.content
+                ?: throw IllegalArgumentException("SecretAccessKey not found")
+            val sessionToken =
+                json["Token"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Token not found")
+            val expiration =
+                json["Expiration"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Expiration not found")
 
-            return AWSauth(
-                accessKeyId = accessKeyId.toString(),
-                secretAccessKey = secretAccessKey.toString(),
-                sessionToken = sessionToken.toString(),
-                expiration = expiration.toString()
+            return AWSAuthConfiguration(
+                accessKeyId = accessKeyId,
+                secretAccessKey = secretAccessKey,
+                sessionToken = sessionToken,
+                expiration = expiration
             )
         }
 
