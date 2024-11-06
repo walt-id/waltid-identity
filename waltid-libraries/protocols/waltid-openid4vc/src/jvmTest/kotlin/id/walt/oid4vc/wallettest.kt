@@ -40,13 +40,11 @@ class wallettest {
         followRedirects = false
     }
 
-    private lateinit var ciTestProvider: CITestProvider
     private lateinit var credentialWallet: TestCredentialWallet
     private val testCIClientConfig = OpenIDClientConfig("test-client", null, redirectUri = "http://blank")
 
     //@BeforeAll   /* Uncomment me */
     fun init() {
-        ciTestProvider = CITestProvider()
         credentialWallet = TestCredentialWallet(CredentialWalletConfig("http://blank"))
         //ciTestProvider.start()
     }
@@ -142,12 +140,11 @@ class wallettest {
         assertNotNull(actual = tokenResp.cNonce)
 
         println("// receive credential")
-        ciTestProvider.deferIssuance = false
         val nonce = tokenResp.cNonce!!
 
         val credReq = CredentialRequest.forOfferedCredential(
             offeredCredential = offeredCredential,
-            proof = credentialWallet.generateDidProof(credentialWallet.TEST_DID, ciTestProvider.baseUrl, nonce)
+            proof = credentialWallet.generateDidProof(credentialWallet.TEST_DID, providerMetadata.issuer!!, nonce)
         )
         println("credReq: $credReq")
 
