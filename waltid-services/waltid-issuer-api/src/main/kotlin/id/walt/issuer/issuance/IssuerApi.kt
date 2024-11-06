@@ -4,7 +4,6 @@ import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.did.dids.DidService
-import id.walt.issuer.issuance.CIProvider.Companion.CALLBACK_URL_SESSION_PARAM_KEY
 import id.walt.issuer.issuance.OidcApi.getFormatByCredentialConfigurationId
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.AuthenticationMethod
@@ -516,7 +515,7 @@ fun Application.issuerApi() {
                     val credentialOffer = issuanceSession.credentialOffer
                         ?: throw BadRequestException("Session has no credential offer set")
 
-                    issuanceSession.customParameters?.get(CALLBACK_URL_SESSION_PARAM_KEY)?.jsonPrimitive?.content?.let {
+                    issuanceSession.callbackUrl?.let {
                         CIProvider.sendCallback(
                             sessionId, "resolved_credential_offer", credentialOffer.toJSON(), it
                         )

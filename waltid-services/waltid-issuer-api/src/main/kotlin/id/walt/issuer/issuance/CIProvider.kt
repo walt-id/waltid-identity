@@ -8,23 +8,15 @@ import cbor.Cbor
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
 import com.sksamuel.hoplite.ConfigException
-import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.ConfigurationException
 import id.walt.commons.persistence.ConfiguredPersistence
-import id.walt.credentials.issuance.Issuer.mergingJwtIssue
-import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
-import id.walt.credentials.issuance.dataFunctions
-import id.walt.credentials.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
-import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.did.dids.DidService
-import id.walt.did.dids.DidUtils
 import id.walt.issuer.config.CredentialTypeConfig
 import id.walt.issuer.config.OIDCIssuerServiceConfig
 import id.walt.mdoc.COSECryptoProviderKeyInfo
@@ -50,7 +42,6 @@ import id.walt.oid4vc.responses.*
 import id.walt.oid4vc.util.COSESign1Utils
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.randomUUID
-import id.walt.sdjwt.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.plugins.*
@@ -64,11 +55,9 @@ import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 /**
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
@@ -100,8 +89,6 @@ open class CIProvider(
 
         val CI_TOKEN_KEY =
             runBlocking { KeyManager.resolveSerializedKey(ConfigManager.getConfig<OIDCIssuerServiceConfig>().ciTokenKey) }
-        const val ISSUANCE_REQUESTS_SESSION_PARAM_KEY = "issuance-requests"
-        const val CALLBACK_URL_SESSION_PARAM_KEY = "callback-url"
 
         suspend fun sendCallback(sessionId: String, type: String, data: JsonObject, callbackUrl: String) {
             try {
@@ -177,12 +164,6 @@ open class CIProvider(
         }
     }
 
-    fun getIssuanceRequestsForSession(session: IssuanceSession): List<IssuanceRequest> {
-        return session.customParameters?.get(ISSUANCE_REQUESTS_SESSION_PARAM_KEY)?.jsonArray?.map {
-            Json.decodeFromJsonElement(it)
-        } ?: listOf()
-    }
-
     // -------------------------------------
     // Implementation of abstract issuer service provider interface
     fun generateCredential(credentialRequest: CredentialRequest, session: IssuanceSession): CredentialResult {
@@ -235,7 +216,7 @@ open class CIProvider(
 
         log.debug { "RETRIEVING ISSUANCE REQUEST FOR CREDENTIAL REQUEST" }
         val request = findMatchingIssuanceRequest(
-            credentialRequest, getIssuanceRequestsForSession(issuanceSession)
+            credentialRequest, issuanceSession.issuanceRequests
         ) ?: throw IllegalArgumentException("No matching issuance request found for this session: ${issuanceSession.id}!")
 
         return CredentialResult(format = credentialRequest.format, credential = JsonPrimitive(runBlocking {
@@ -284,7 +265,7 @@ open class CIProvider(
         )
         println("RETRIEVING ISSUANCE REQUEST FOR CREDENTIAL REQUEST: $nonce")
         val request = findMatchingIssuanceRequest(
-            credentialRequest, getIssuanceRequestsForSession(issuanceSession)
+            credentialRequest, issuanceSession.issuanceRequests
         ) ?: throw IllegalArgumentException("No matching issuance request found for this session: ${issuanceSession.id}!")
         val issuerSignedItems = request.mdocData ?: throw MissingFieldException(listOf("mdocData"), "mdocData")
         val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
@@ -318,9 +299,8 @@ open class CIProvider(
                 )
             ), cryptoProvider, keyID
         ).also {
-            val callbackUrl = issuanceSession.customParameters?.get(CALLBACK_URL_SESSION_PARAM_KEY)?.jsonPrimitive?.content
-            if(!callbackUrl.isNullOrEmpty())
-                sendCallback(issuanceSession.id, "generated_mdoc", buildJsonObject { put("mdoc", it.toCBORHex()) }, callbackUrl)
+            if(!issuanceSession.callbackUrl.isNullOrEmpty())
+                sendCallback(issuanceSession.id, "generated_mdoc", buildJsonObject { put("mdoc", it.toCBORHex()) }, issuanceSession.callbackUrl)
         }
         return CredentialResult(
             CredentialFormat.mso_mdoc, JsonPrimitive(mdoc.issuerSigned.toMapElement().toCBOR().encodeToBase64Url()),
@@ -366,8 +346,7 @@ open class CIProvider(
             }) })
         }
         authSessions.getAll().forEach { session ->
-            val requests = getIssuanceRequestsForSession(session)
-            requests.forEach {
+            session.issuanceRequests.forEach {
                 val resolvedIssuerKey = KeyManager.resolveSerializedKey(it.issuerKey)
                 jwksList = buildJsonObject {
                     put("keys", buildJsonArray {
@@ -466,7 +445,7 @@ open class CIProvider(
             }
             IssuanceSession(
                 randomUUID(), authorizationRequest,
-                Clock.System.now().plus(expiresIn), authServerState = authServerState
+                Clock.System.now().plus(expiresIn), listOf(), authServerState = authServerState
             )
         } else {
             getVerifiedSession(authorizationRequest.issuerState!!)?.copy(authorizationRequest = authorizationRequest)
@@ -479,11 +458,13 @@ open class CIProvider(
                 id = it.id,
                 authorizationRequest = authorizationRequest,
                 expirationTimestamp = Clock.System.now().plus(5.minutes),
+                issuanceRequests = it.issuanceRequests,
                 authServerState = authServerState,
                 txCode = it.txCode,
                 txCodeValue = it.txCodeValue,
                 credentialOffer = it.credentialOffer,
                 cNonce = it.cNonce,
+                callbackUrl = it.callbackUrl,
                 customParameters = it.customParameters
             )
             putSession(it.id, updatedSession)
@@ -510,12 +491,11 @@ open class CIProvider(
             id = sessionId,
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
+            issuanceRequests= issuanceRequests,
             txCode = txCode,
             txCodeValue = txCodeValue,
             credentialOffer = credentialOfferBuilder.build(),
-            customParameters = mapOf(
-                ISSUANCE_REQUESTS_SESSION_PARAM_KEY to JsonArray(issuanceRequests.map { Json.encodeToJsonElement(it) })
-            ).plus(callbackUrl?.let { listOf(Pair(CALLBACK_URL_SESSION_PARAM_KEY, JsonPrimitive(callbackUrl))) } ?: listOf())
+            callbackUrl = callbackUrl
         ).also {
             putSession(it.id, it)
         }

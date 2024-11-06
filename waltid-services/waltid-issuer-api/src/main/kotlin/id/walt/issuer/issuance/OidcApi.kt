@@ -3,14 +3,12 @@ package id.walt.issuer.issuance
 
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
-import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.*
-import id.walt.oid4vc.providers.IssuanceSession
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.BatchCredentialRequest
@@ -121,8 +119,7 @@ object OidcApi : CIProvider() {
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
                 try {
                     val issuanceSession = authReq.issuerState?.let { getSession(it) } ?: error("No issuance session found for given issuer state, or issuer state was empty: ${authReq.issuerState}")
-                    val issuanceRequests = getIssuanceRequestsForSession(issuanceSession)
-                    val authMethod = issuanceRequests.firstOrNull()?.authenticationMethod ?: AuthenticationMethod.NONE
+                    val authMethod = issuanceSession.issuanceRequests.firstOrNull()?.authenticationMethod ?: AuthenticationMethod.NONE
                     val authResp: Any = when {
                         ResponseType.Code in authReq.responseType -> {
                             when (authMethod) {
@@ -142,19 +139,19 @@ object OidcApi : CIProvider() {
                                         authReq,
                                         ResponseType.IdToken,
                                         metadata, CI_TOKEN_KEY,
-                                        issuanceRequests.first().useJar
+                                        issuanceSession.issuanceRequests.first().useJar
                                     )
                                 }
 
                                 AuthenticationMethod.VP_TOKEN -> {
-                                    val vpProfile = issuanceRequests.first().vpProfile ?: OpenId4VPProfile.DEFAULT
-                                    val credFormat = issuanceRequests.first().credentialFormat ?: when(vpProfile) {
+                                    val vpProfile = issuanceSession.issuanceRequests.first().vpProfile ?: OpenId4VPProfile.DEFAULT
+                                    val credFormat = issuanceSession.issuanceRequests.first().credentialFormat ?: when(vpProfile) {
                                         OpenId4VPProfile.HAIP -> CredentialFormat.sd_jwt_vc
                                         OpenId4VPProfile.ISO_18013_7_MDOC -> CredentialFormat.mso_mdoc
                                         OpenId4VPProfile.EBSIV3 -> CredentialFormat.jwt_vc
                                         else -> CredentialFormat.jwt_vc_json
                                     }
-                                    val vpRequestValue = issuanceRequests.first().vpRequestValue
+                                    val vpRequestValue = issuanceSession.issuanceRequests.first().vpRequestValue
                                         ?: throw IllegalArgumentException("missing vpRequestValue parameter")
 
                                     // Generate Presentation Definition
@@ -172,7 +169,7 @@ object OidcApi : CIProvider() {
                                     OpenID4VC.processCodeFlowAuthorizationWithAuthorizationRequest(
                                         authReq,
                                         ResponseType.VpToken, metadata, CI_TOKEN_KEY,
-                                        issuanceRequests.first().useJar,
+                                        issuanceSession.issuanceRequests.first().useJar,
                                         presentationDefinition
                                     )
                                 }
