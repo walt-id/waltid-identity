@@ -310,21 +310,6 @@ object OidcApi : CIProvider() {
                 try {
                     val tokenResp = processTokenRequest(tokenReq)
                     logger.info { "/token tokenResp: $tokenResp" }
-
-//                    val sessionId = Json.parseToJsonElement(
-//                        (tokenResp.accessToken
-//                            ?: throw IllegalArgumentException("No access token was responded with tokenResp?")).split(
-//                            "."
-//                        )[1].base64UrlDecode().decodeToString()
-//                    ).jsonObject["sub"]?.jsonPrimitive?.contentOrNull
-//                        ?: throw IllegalArgumentException("Could not get session ID from token response!")
-//                    val nonceToken = tokenResp.cNonce
-//                        ?: throw IllegalArgumentException("No nonce token was responded with the tokenResp?")
-//                    OidcApi.mapSessionIdToToken(
-//                        sessionId,
-//                        nonceToken
-//                    )  // TODO: Hack as this is non stateless because of oidc4vc lib API
-
                     call.respond(tokenResp.toJSON())
                 } catch (exc: TokenError) {
                     logger.error(exc) { "Token error: " }
@@ -459,64 +444,4 @@ object OidcApi : CIProvider() {
             "Authorization request does not refer to a pushed authorization session"
         )
     }
-
-    /*
-    private val sessionCache = mutableMapOf<String, IssuanceSession>()
-
-    override fun generateCredential(credentialRequest: CredentialRequest): CredentialResult {
-        return doGenerateCredential(credentialRequest)
-    }
-
-    override fun getDeferredCredential(credentialID: String): CredentialResult {
-        TODO("Not yet implemented")
-    }
-
-    override fun getSession(id: String): IssuanceSession? {
-        return sessionCache[id]
-    }
-
-    override fun putSession(id: String, session: IssuanceSession): IssuanceSession? {
-        return sessionCache.put(id, session)
-    }
-
-    override fun removeSession(id: String): IssuanceSession? {
-        return sessionCache.remove(id)
-    }
-
-    //private val CI_TOKEN_KEY = KeyService.getService().generate(KeyAlgorithm.RSA)
-    //private val CI_DID_KEY = KeyService.getService().generate(KeyAlgorithm.EdDSA_Ed25519)
-    //val CI_ISSUER_DID = DidService.create(DidMethod.key, CI_DID_KEY.id)
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?): String {
-
-        TODO()
-        //return JwtService.getService().sign(keyId ?: CI_TOKEN_KEY.id, payload.toString())
-    }
-
-    override fun verifyTokenSignature(target: TokenTarget, token: String): Boolean = TODO() //JwtService.getService().verify(token).verified
-
-    private fun doGenerateCredential(credentialRequest: CredentialRequest): CredentialResult {
-        TODO()
-        /*if(credentialRequest.format == CredentialFormat.mso_mdoc) throw CredentialError(credentialRequest, CredentialErrorCode.unsupported_credential_format)
-        val types = credentialRequest.types ?: credentialRequest.credentialDefinition?.types ?: throw CredentialError(credentialRequest, CredentialErrorCode.unsupported_credential_type)
-        val proofHeader = credentialRequest.proof?.jwt?.let { parseTokenHeader(it) } ?: throw CredentialError(credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof")
-        val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content ?: throw CredentialError(credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof JWT header must contain kid claim")
-        return Signatory.getService().issue(
-            types.last(),
-            ProofConfig(CI_ISSUER_DID, subjectDid = resolveDIDFor(holderKid)),
-            issuer = W3CIssuer(baseUrl),
-            storeCredential = false).let {
-            when(credentialRequest.format) {
-                CredentialFormat.ldp_vc -> Json.decodeFromString<JsonObject>(it)
-                else -> JsonPrimitive(it)
-            }
-        }.let { CredentialResult(credentialRequest.format, it) }*/
-    }
-
-    private fun resolveDIDFor(keyId: String): String {
-        TODO()
-
-        //return DidUrl.from(keyId).did
-    }
-
-     */
 }
