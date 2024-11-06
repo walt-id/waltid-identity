@@ -103,6 +103,22 @@ open class CIProvider(
         val CI_TOKEN_KEY =
             runBlocking { KeyManager.resolveSerializedKey(ConfigManager.getConfig<OIDCIssuerServiceConfig>().ciTokenKey) }
 //        private val CI_TOKEN_KEY by lazy { runBlocking { JWKKey.generate(KeyType.Ed25519) } }
+        const val ISSUANCE_REQUESTS_SESSION_PARAM_KEY = "issuance-requests"
+        const val CALLBACK_URL_SESSION_PARAM_KEY = "callback-url"
+
+        suspend fun sendCallback(sessionId: String, type: String, data: JsonObject, callbackUrl: String) {
+            try {
+                http.post(callbackUrl.replace("\$id", sessionId)) {
+                    setBody(buildJsonObject {
+                        put("id", sessionId)
+                        put("type", type)
+                        put("data", data)
+                    })
+                }
+            } catch (ex: Exception) {
+                throw IllegalArgumentException("Error sending HTTP POST request to issuer callback url.", ex)
+            }
+        }
     }
 
     // -------------------------------
@@ -164,9 +180,15 @@ open class CIProvider(
         }
     }
 
+    fun getIssuanceRequestsForSession(session: IssuanceSession): List<IssuanceRequest> {
+        return session.customParameters?.get(ISSUANCE_REQUESTS_SESSION_PARAM_KEY)?.jsonArray?.map {
+            Json.decodeFromJsonElement(it)
+        } ?: listOf()
+    }
+
     // -------------------------------------
     // Implementation of abstract issuer service provider interface
-    fun generateCredential(credentialRequest: CredentialRequest): CredentialResult {
+    fun generateCredential(credentialRequest: CredentialRequest, session: IssuanceSession): CredentialResult {
         log.debug { "GENERATING CREDENTIAL:" }
         log.debug { "Credential request: $credentialRequest" }
         log.debug { "CREDENTIAL REQUEST JSON -------:" }
@@ -177,16 +199,16 @@ open class CIProvider(
         }
 
         return when (credentialRequest.format) {
-            CredentialFormat.mso_mdoc -> runBlocking { doGenerateMDoc(credentialRequest) }
-            else -> doGenerateCredential(credentialRequest)
+            CredentialFormat.mso_mdoc -> runBlocking { doGenerateMDoc(credentialRequest, session) }
+            else -> doGenerateCredential(credentialRequest, session)
         }
     }
 
-    fun getDeferredCredential(credentialID: String): CredentialResult {
+    fun getDeferredCredential(credentialID: String, session: IssuanceSession): CredentialResult {
         return deferredCredentialRequests[credentialID]?.let {
             when (it.format) {
-                CredentialFormat.mso_mdoc -> runBlocking { doGenerateMDoc(it) }
-                else -> doGenerateCredential(it)
+                CredentialFormat.mso_mdoc -> runBlocking { doGenerateMDoc(it, session) }
+                else -> doGenerateCredential(it, session)
             }
         }
             ?: throw DeferredCredentialError(CredentialErrorCode.invalid_request, message = "Invalid credential ID given")
@@ -195,6 +217,7 @@ open class CIProvider(
     @OptIn(ExperimentalSerializationApi::class, ExperimentalStdlibApi::class)
     private fun doGenerateCredential(
         credentialRequest: CredentialRequest,
+        issuanceSession: IssuanceSession
     ): CredentialResult {
         if (credentialRequest.format == CredentialFormat.mso_mdoc) throw CredentialError(
             credentialRequest, CredentialErrorCode.unsupported_credential_format
@@ -218,57 +241,33 @@ open class CIProvider(
             CredentialErrorCode.invalid_or_missing_proof, message = "Proof must contain nonce"
         )
 
-        val data: IssuanceSessionData = if (!tokenCredentialMapping.contains(nonce)) {
-            repeat(10) {
-                log.debug { "WARNING: RETURNING DEMO/EXAMPLE (= BOGUS) CREDENTIAL: nonce is not mapped to issuance request data (was deferred issuance tried?)" }
-            }
-            findMatchingSessionData(
-                credentialRequest,
-                listOf(
-                    IssuanceSessionData(
-                        id = Uuid.random().toString(),
-                        exampleIssuerKey,
-                        exampleIssuerDid,
-                        IssuanceRequest(
-                            issuerKey = Json.parseToJsonElement(KeySerialization.serializeKey(exampleIssuerKey)).jsonObject,
-                            credentialConfigurationId = "OpenBadgeCredential_${credentialRequest.format.value}",
-                            credentialData = Json.parseToJsonElement(IssuanceExamples.openBadgeCredentialData).jsonObject,
-                            mdocData = null,
-                            issuerDid = exampleIssuerDid
-                        )
-                    )
-                )
-            ) ?: throw IllegalArgumentException("No matching issuance session data for nonce: $nonce")
-        } else {
-            log.debug { "RETRIEVING VC FROM TOKEN MAPPING: $nonce" }
-            findMatchingSessionData(
-                credentialRequest,
-                tokenCredentialMapping[nonce]
-                    ?: throw IllegalArgumentException("No matching issuance session data found for nonce: $nonce!")
-            ) ?: throw IllegalArgumentException("No matching issuance session data found for nonce: $nonce!")
-        }
+        log.debug { "RETRIEVING ISSUANCE REQUEST FOR CREDENTIAL REQUEST" }
+        val request = findMatchingIssuanceRequest(
+            credentialRequest, getIssuanceRequestsForSession(issuanceSession)
+        ) ?: throw IllegalArgumentException("No matching issuance request found for this session: ${issuanceSession.id}!")
 
         return CredentialResult(format = credentialRequest.format, credential = JsonPrimitive(runBlocking {
-            val vc = data.request.credentialData ?: throw MissingFieldException(listOf("credentialData"), "credentialData")
+            val vc = request.credentialData ?: throw MissingFieldException(listOf("credentialData"), "credentialData")
+            val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
 
-            data.run {
-              var issuerKid = issuerDid ?: data.issuerKey.key.getKeyId()
+            request.run {
+              var issuerKid = issuerDid ?: resolvedIssuerKey.getKeyId()
               if(!issuerDid.isNullOrEmpty()) {
                 if (issuerDid.startsWith("did:key") && issuerDid.length == 186) // EBSI conformance corner case when issuer uses did:key instead of did:ebsi and no trust framework is defined
                   issuerKid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
                 else if (issuerDid.startsWith("did:ebsi"))
-                  issuerKid = issuerDid + "#" + issuerKey.key.getKeyId()
+                  issuerKid = issuerDid + "#" + resolvedIssuerKey.getKeyId()
               }
 
                 val holderKeyJWK =  JWKKey.importJWK(holderKey.toString()).getOrNull()?.exportJWKObject()?.plus("kid" to JWKKey.importJWK(holderKey.toString()).getOrThrow().getKeyId())?.toJsonObject()
 
-                when (data.request.credentialFormat) {
+                when (credentialFormat) {
                     CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(credentialRequest, vc, request.mapping,
                         request.selectiveDisclosure, vct = metadata.credentialConfigurationsSupported?.get(request.credentialConfigurationId)?.vct ?: throw ConfigurationException(
                             ConfigException("No vct configured for given credential configuration id: ${request.credentialConfigurationId}")
-                        ), issuerDid, issuerKid, request.x5Chain, data.issuerKey.key).toString()
+                        ), issuerDid, issuerKid, request.x5Chain, resolvedIssuerKey).toString()
                   else -> OpenID4VCI.generateW3CJwtVC(credentialRequest, vc, request.mapping, request.selectiveDisclosure,
-                        issuerDid, issuerKid, request.x5Chain, data.issuerKey.key)
+                        issuerDid, issuerKid, request.x5Chain, resolvedIssuerKey)
               }
             }.also { log.debug { "Respond VC: $it" } }
         }))
@@ -277,6 +276,7 @@ open class CIProvider(
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun doGenerateMDoc(
         credentialRequest: CredentialRequest,
+        issuanceSession: IssuanceSession
     ): CredentialResult {
         val coseSign1 = Cbor.decodeFromByteArray<COSESign1>(
             credentialRequest.proof?.cwt?.base64UrlDecode() ?: throw CredentialError(
@@ -290,21 +290,25 @@ open class CIProvider(
             CredentialErrorCode.invalid_or_missing_proof,
             message = "No nonce found on proof"
         )
-        println("RETRIEVING VC FROM TOKEN MAPPING: $nonce")
-        val data: IssuanceSessionData = tokenCredentialMapping[nonce]?.first()
-            ?: throw CredentialError(
-                credentialRequest,
-                CredentialErrorCode.invalid_request,
-                "The issuanceIdCredentialMapping does not contain a mapping for: $nonce!"
-            )
-        val issuerSignedItems = data.request.mdocData ?: throw MissingFieldException(listOf("mdocData"), "mdocData")
-        val issuerKey = JWK.parse(runBlocking { data.issuerKey.key.exportJWK() }).toECKey()
-        val keyId = runBlocking { data.issuerKey.key.getKeyId() }
+        println("RETRIEVING ISSUANCE REQUEST FOR CREDENTIAL REQUEST: $nonce")
+        val request = findMatchingIssuanceRequest(
+            credentialRequest, getIssuanceRequestsForSession(issuanceSession)
+        ) ?: throw IllegalArgumentException("No matching issuance request found for this session: ${issuanceSession.id}!")
+//        val data: IssuanceSessionData = tokenCredentialMapping[nonce]?.first()
+//            ?: throw CredentialError(
+//                credentialRequest,
+//                CredentialErrorCode.invalid_request,
+//                "The issuanceIdCredentialMapping does not contain a mapping for: $nonce!"
+//            )
+        val issuerSignedItems = request.mdocData ?: throw MissingFieldException(listOf("mdocData"), "mdocData")
+        val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
+        val issuerKey = JWK.parse(runBlocking { resolvedIssuerKey.exportJWK() }).toECKey()
+        val keyID = resolvedIssuerKey.getKeyId()
         val cryptoProvider = SimpleCOSECryptoProvider(listOf(
             COSECryptoProviderKeyInfo(
-                keyId, AlgorithmID.ECDSA_256, issuerKey.toECPublicKey(), issuerKey.toECPrivateKey(),
-                x5Chain = data.request.x5Chain?.map { X509CertUtils.parse(it) } ?: listOf(),
-                trustedRootCAs = data.request.trustedRootCAs?.map { X509CertUtils.parse(it) } ?: listOf()
+                keyID, AlgorithmID.ECDSA_256, issuerKey.toECPublicKey(), issuerKey.toECPrivateKey(),
+                x5Chain = request.x5Chain?.map { X509CertUtils.parse(it) } ?: listOf(),
+                trustedRootCAs = request.trustedRootCAs?.map { X509CertUtils.parse(it) } ?: listOf()
             )
         ))
         val mdoc = MDocBuilder(
@@ -326,9 +330,11 @@ open class CIProvider(
                 DataElement.fromCBOR(
                     OneKey(holderKey.publicKey, null).AsCBOR().EncodeToBytes()
                 )
-            ), cryptoProvider, keyId
+            ), cryptoProvider, keyID
         ).also {
-            data.sendCallback("generated_mdoc", buildJsonObject { put("mdoc", it.toCBORHex()) })
+            val callbackUrl = issuanceSession.customParameters?.get(CALLBACK_URL_SESSION_PARAM_KEY)?.jsonPrimitive?.content
+            if(!callbackUrl.isNullOrEmpty())
+                sendCallback(issuanceSession.id, "generated_mdoc", buildJsonObject { put("mdoc", it.toCBORHex()) }, callbackUrl)
         }
         return CredentialResult(
             CredentialFormat.mso_mdoc, JsonPrimitive(mdoc.issuerSigned.toMapElement().toCBOR().encodeToBase64Url()),
@@ -385,81 +391,81 @@ open class CIProvider(
     }
 
 
-    @Serializable
-    data class IssuanceSessionData(
-        val id: String,
-        val issuerKey: DirectSerializedKey,
-        val issuerDid: String?,
-        val request: IssuanceRequest,
-        val callbackUrl: String? = null,
-    ) {
-        constructor(
-            id: String,
-            issuerKey: Key,
-            issuerDid: String?,
-            request: IssuanceRequest,
-            callbackUrl: String? = null,
-        ) : this(id, DirectSerializedKey(issuerKey), issuerDid, request, callbackUrl)
+//    @Serializable
+//    data class IssuanceSessionData(
+//        val id: String,
+//        val issuerKey: DirectSerializedKey,
+//        val issuerDid: String?,
+//        val request: IssuanceRequest,
+//        val callbackUrl: String? = null,
+//    ) {
+//        constructor(
+//            id: String,
+//            issuerKey: Key,
+//            issuerDid: String?,
+//            request: IssuanceRequest,
+//            callbackUrl: String? = null,
+//        ) : this(id, DirectSerializedKey(issuerKey), issuerDid, request, callbackUrl)
+//
+//        suspend fun sendCallback(type: String, data: JsonObject) {
+//            if (callbackUrl != null) {
+//                try {
+//                    http.post(callbackUrl.replace("\$id", id)) {
+//                        setBody(buildJsonObject {
+//                            put("id", id)
+//                            put("type", type)
+//                            put("data", data)
+//                        })
+//                    }
+//                } catch (ex: Exception) {
+//                    throw IllegalArgumentException("Error sending HTTP POST request to issuer callback url.", ex)
+//                }
+//            }
+//        }
+//
+//        val jwtCryptoProvider
+//            get() = SingleKeyJWTCryptoProvider(issuerKey.key)
+//    }
+//
+//    // TODO: Hack as this is non stateless because of oidc4vc lib API
+//    val sessionCredentialPreMapping = ConfiguredPersistence<List<IssuanceSessionData>>(
+//        // session id -> VC
+//        "sessionid_vc", defaultExpiration = 5.minutes,
+//        encoding = { Json.encodeToString(it) },
+//        decoding = { Json.decodeFromString(it) },
+//    )
 
-        suspend fun sendCallback(type: String, data: JsonObject) {
-            if (callbackUrl != null) {
-                try {
-                    http.post(callbackUrl.replace("\$id", id)) {
-                        setBody(buildJsonObject {
-                            put("id", id)
-                            put("type", type)
-                            put("data", data)
-                        })
-                    }
-                } catch (ex: Exception) {
-                    throw IllegalArgumentException("Error sending HTTP POST request to issuer callback url.", ex)
-                }
-            }
-        }
+//    // TODO: Hack as this is non stateless because of oidc4vc lib API
+//    private val tokenCredentialMapping = ConfiguredPersistence<List<IssuanceSessionData>>(
+//        // token -> VC
+//        "token_vc", defaultExpiration = 5.minutes,
+//        encoding = { Json.encodeToString(it) },
+//        decoding = { Json.decodeFromString(it) },
+//    )
+//
+//    //private val sessionTokenMapping = HashMap<String, String>() // session id -> token
+//
+//    // TODO: Hack as this is non stateless because of oidc4vc lib API
+//    suspend fun setIssuanceDataForIssuanceId(issuanceId: String, data: List<IssuanceSessionData>) {
+//        log.debug { "DEPOSITED CREDENTIAL FOR ISSUANCE ID: $issuanceId" }
+//        sessionCredentialPreMapping[issuanceId] = data
+//    }
 
-        val jwtCryptoProvider
-            get() = SingleKeyJWTCryptoProvider(issuerKey.key)
-    }
-
-    // TODO: Hack as this is non stateless because of oidc4vc lib API
-    val sessionCredentialPreMapping = ConfiguredPersistence<List<IssuanceSessionData>>(
-        // session id -> VC
-        "sessionid_vc", defaultExpiration = 5.minutes,
-        encoding = { Json.encodeToString(it) },
-        decoding = { Json.decodeFromString(it) },
-    )
-
-    // TODO: Hack as this is non stateless because of oidc4vc lib API
-    private val tokenCredentialMapping = ConfiguredPersistence<List<IssuanceSessionData>>(
-        // token -> VC
-        "token_vc", defaultExpiration = 5.minutes,
-        encoding = { Json.encodeToString(it) },
-        decoding = { Json.decodeFromString(it) },
-    )
-
-    //private val sessionTokenMapping = HashMap<String, String>() // session id -> token
-
-    // TODO: Hack as this is non stateless because of oidc4vc lib API
-    suspend fun setIssuanceDataForIssuanceId(issuanceId: String, data: List<IssuanceSessionData>) {
-        log.debug { "DEPOSITED CREDENTIAL FOR ISSUANCE ID: $issuanceId" }
-        sessionCredentialPreMapping[issuanceId] = data
-    }
-
-    // TODO: Hack as this is non stateless because of oidc4vc lib API
-    suspend fun mapSessionIdToToken(sessionId: String, token: String) {
-        log.debug { "MAPPING SESSION ID TO TOKEN: $sessionId -->> $token" }
-        val premappedVc = sessionCredentialPreMapping[sessionId]
-            ?: throw IllegalArgumentException("No credential pre-mapped with any such session id: $sessionId (for use with token: $token)")
-        sessionCredentialPreMapping.remove(sessionId)
-        log.debug { "SWAPPING PRE-MAPPED VC FROM SESSION ID TO NEW TOKEN: $token" }
-        tokenCredentialMapping[token] = premappedVc
-
-        premappedVc.first().let {
-            it.sendCallback("requested_token", buildJsonObject {
-                put("request", Json.encodeToJsonElement(it.request).jsonObject)
-            })
-        }
-    }
+//    // TODO: Hack as this is non stateless because of oidc4vc lib API
+//    suspend fun mapSessionIdToToken(sessionId: String, token: String) {
+//        log.debug { "MAPPING SESSION ID TO TOKEN: $sessionId -->> $token" }
+//        val premappedVc = sessionCredentialPreMapping[sessionId]
+//            ?: throw IllegalArgumentException("No credential pre-mapped with any such session id: $sessionId (for use with token: $token)")
+//        sessionCredentialPreMapping.remove(sessionId)
+//        log.debug { "SWAPPING PRE-MAPPED VC FROM SESSION ID TO NEW TOKEN: $token" }
+//        tokenCredentialMapping[token] = premappedVc
+//
+//        premappedVc.first().let {
+//            it.sendCallback("requested_token", buildJsonObject {
+//                put("request", Json.encodeToJsonElement(it.request).jsonObject)
+//            })
+//        }
+//    }
 
     suspend fun getJwksSessions() : JsonObject{
         var jwksList = buildJsonObject {
@@ -470,15 +476,17 @@ open class CIProvider(
                 put("kid", CI_TOKEN_KEY.getKeyId())
             }) })
         }
-        sessionCredentialPreMapping.getAll().forEach {
-            it.forEach {
+        authSessions.getAll().forEach { session ->
+            val requests = getIssuanceRequestsForSession(session)
+            requests.forEach {
+                val resolvedIssuerKey = KeyManager.resolveSerializedKey(it.issuerKey)
                 jwksList = buildJsonObject {
                     put("keys", buildJsonArray {
                         val jwkWithKid = buildJsonObject {
-                            it.issuerKey.key.getPublicKey().exportJWKObject().forEach {
+                            resolvedIssuerKey.getPublicKey().exportJWKObject().forEach {
                                 put(it.key, it.value)
                             }
-                            put("kid", it.issuerKey.key.getPublicKey().getKeyId())
+                            put("kid", resolvedIssuerKey.getPublicKey().getKeyId())
                         }
                         add(jwkWithKid)
                         jwksList.forEach { it.value.jsonArray.forEach {
@@ -499,12 +507,12 @@ open class CIProvider(
     fun getDocTypeByCredentialConfigurationId(id: String) = metadata.credentialConfigurationsSupported?.get(id)?.docType
 
     // Use format, type, vct and docType checks to filter matching entries
-    private fun findMatchingSessionData(
+    private fun findMatchingIssuanceRequest(
         credentialRequest: CredentialRequest,
-        sessionDataList: List<IssuanceSessionData>
-    ): IssuanceSessionData? {
-        return sessionDataList.find { sessionData ->
-            val credentialConfigurationId = sessionData.request.credentialConfigurationId
+        issuanceRequests: List<IssuanceRequest>
+    ): IssuanceRequest? {
+        return issuanceRequests.find { sessionData ->
+            val credentialConfigurationId = sessionData.credentialConfigurationId
             val credentialFormat = getFormatByCredentialConfigurationId(credentialConfigurationId)
             require(credentialFormat == credentialRequest.format) { "Format does not match" }
             // Depending on the format, perform specific checks
@@ -594,12 +602,15 @@ open class CIProvider(
     }
 
     open fun initializeCredentialOffer(
-        credentialOfferBuilder: CredentialOffer.Builder,
+        issuanceRequests: List<IssuanceRequest>,
         expiresIn: Duration,
         allowPreAuthorized: Boolean,
+        callbackUrl: String? = null,
         txCode: TxCode? = null, txCodeValue: String? = null,
     ): IssuanceSession = runBlocking {
         val sessionId = randomUUID()
+        val credentialOfferBuilder =
+            OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
         credentialOfferBuilder.addAuthorizationCodeGrant(sessionId)
         if (allowPreAuthorized)
             credentialOfferBuilder.addPreAuthorizedCodeGrant(
@@ -612,7 +623,10 @@ open class CIProvider(
             expirationTimestamp = Clock.System.now().plus(expiresIn),
             txCode = txCode,
             txCodeValue = txCodeValue,
-            credentialOffer = credentialOfferBuilder.build()
+            credentialOffer = credentialOfferBuilder.build(),
+            customParameters = mapOf(
+                ISSUANCE_REQUESTS_SESSION_PARAM_KEY to JsonArray(issuanceRequests.map { Json.encodeToJsonElement(it) })
+            ).plus(callbackUrl?.let { listOf(Pair(CALLBACK_URL_SESSION_PARAM_KEY, JsonPrimitive(callbackUrl))) } ?: listOf())
         ).also {
             putSession(it.id, it)
         }
@@ -642,7 +656,7 @@ open class CIProvider(
         if(!validationResult.success)
             throw CredentialError(credentialRequest, CredentialErrorCode.invalid_request, message = validationResult.message)
         // create credential result
-        val credentialResult = generateCredential(credentialRequest)
+        val credentialResult = generateCredential(credentialRequest, session)
         return@runBlocking createCredentialResponseFor(credentialResult, session)
     }
 
@@ -659,7 +673,7 @@ open class CIProvider(
             "Session not found for given access token, or session expired."
         )
         // issue credential for credential request
-        return@runBlocking createCredentialResponseFor(getDeferredCredential(credentialId), session)
+        return@runBlocking createCredentialResponseFor(getDeferredCredential(credentialId, session), session)
     }
 
     fun processTokenRequest(tokenRequest: TokenRequest): TokenResponse = runBlocking {
