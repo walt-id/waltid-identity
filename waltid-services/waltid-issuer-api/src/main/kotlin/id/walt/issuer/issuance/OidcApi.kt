@@ -120,9 +120,9 @@ object OidcApi : CIProvider() {
             get("/authorize") {
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
                 try {
-                    val issuanceSessionData =
-                        OidcApi.sessionCredentialPreMapping[authReq.issuerState!!] ?: error("No such pre mapping: ${authReq.issuerState}")
-                    val authMethod = issuanceSessionData.first().request.authenticationMethod ?: AuthenticationMethod.NONE
+                    val issuanceSession = authReq.issuerState?.let { getSession(it) } ?: error("No issuance session found for given issuer state, or issuer state was empty: ${authReq.issuerState}")
+                    val issuanceRequests = getIssuanceRequestsForSession(issuanceSession)
+                    val authMethod = issuanceRequests.firstOrNull()?.authenticationMethod ?: AuthenticationMethod.NONE
                     val authResp: Any = when {
                         ResponseType.Code in authReq.responseType -> {
                             when (authMethod) {
@@ -138,27 +138,23 @@ object OidcApi : CIProvider() {
                                 }
 
                                 AuthenticationMethod.ID_TOKEN -> {
-                                    val idTokenRequestJwtKid = issuanceSessionData.first().issuerKey.key.getKeyId()
-                                    val idTokenRequestJwtPrivKey = issuanceSessionData.first().issuerKey
                                     OpenID4VC.processCodeFlowAuthorizationWithAuthorizationRequest(
                                         authReq,
                                         ResponseType.IdToken,
                                         metadata, CI_TOKEN_KEY,
-                                        issuanceSessionData.first().request.useJar
+                                        issuanceRequests.first().useJar
                                     )
                                 }
 
                                 AuthenticationMethod.VP_TOKEN -> {
-                                    val vpTokenRequestJwtKid = issuanceSessionData.first().issuerKey.key.getKeyId()
-                                    val vpTokenRequestJwtPrivKey = issuanceSessionData.first().issuerKey
-                                    val vpProfile = issuanceSessionData.first().request.vpProfile ?: OpenId4VPProfile.DEFAULT
-                                    val credFormat = issuanceSessionData.first().request.credentialFormat ?: when(vpProfile) {
+                                    val vpProfile = issuanceRequests.first().vpProfile ?: OpenId4VPProfile.DEFAULT
+                                    val credFormat = issuanceRequests.first().credentialFormat ?: when(vpProfile) {
                                         OpenId4VPProfile.HAIP -> CredentialFormat.sd_jwt_vc
                                         OpenId4VPProfile.ISO_18013_7_MDOC -> CredentialFormat.mso_mdoc
                                         OpenId4VPProfile.EBSIV3 -> CredentialFormat.jwt_vc
                                         else -> CredentialFormat.jwt_vc_json
                                     }
-                                    val vpRequestValue = issuanceSessionData.first().request.vpRequestValue
+                                    val vpRequestValue = issuanceRequests.first().vpRequestValue
                                         ?: throw IllegalArgumentException("missing vpRequestValue parameter")
 
                                     // Generate Presentation Definition
@@ -176,13 +172,13 @@ object OidcApi : CIProvider() {
                                     OpenID4VC.processCodeFlowAuthorizationWithAuthorizationRequest(
                                         authReq,
                                         ResponseType.VpToken, metadata, CI_TOKEN_KEY,
-                                        issuanceSessionData.first().request.useJar,
+                                        issuanceRequests.first().useJar,
                                         presentationDefinition
                                     )
                                 }
 
                                 AuthenticationMethod.NONE -> OpenID4VC.processCodeFlowAuthorization(
-                                    authReq, issuanceSessionData.first().id, metadata, CI_TOKEN_KEY)
+                                    authReq, issuanceSession.id, metadata, CI_TOKEN_KEY)
                                 else -> {
                                     throw AuthorizationError(
                                         authReq,
@@ -194,7 +190,7 @@ object OidcApi : CIProvider() {
                         }
 
                         ResponseType.Token in authReq.responseType -> OpenID4VC.processImplicitFlowAuthorization(
-                            authReq, issuanceSessionData.first().id, metadata, CI_TOKEN_KEY)
+                            authReq, issuanceSession.id, metadata, CI_TOKEN_KEY)
 
                         else -> {
                             throw AuthorizationError(
@@ -315,19 +311,19 @@ object OidcApi : CIProvider() {
                     val tokenResp = processTokenRequest(tokenReq)
                     logger.info { "/token tokenResp: $tokenResp" }
 
-                    val sessionId = Json.parseToJsonElement(
-                        (tokenResp.accessToken
-                            ?: throw IllegalArgumentException("No access token was responded with tokenResp?")).split(
-                            "."
-                        )[1].base64UrlDecode().decodeToString()
-                    ).jsonObject["sub"]?.jsonPrimitive?.contentOrNull
-                        ?: throw IllegalArgumentException("Could not get session ID from token response!")
-                    val nonceToken = tokenResp.cNonce
-                        ?: throw IllegalArgumentException("No nonce token was responded with the tokenResp?")
-                    OidcApi.mapSessionIdToToken(
-                        sessionId,
-                        nonceToken
-                    )  // TODO: Hack as this is non stateless because of oidc4vc lib API
+//                    val sessionId = Json.parseToJsonElement(
+//                        (tokenResp.accessToken
+//                            ?: throw IllegalArgumentException("No access token was responded with tokenResp?")).split(
+//                            "."
+//                        )[1].base64UrlDecode().decodeToString()
+//                    ).jsonObject["sub"]?.jsonPrimitive?.contentOrNull
+//                        ?: throw IllegalArgumentException("Could not get session ID from token response!")
+//                    val nonceToken = tokenResp.cNonce
+//                        ?: throw IllegalArgumentException("No nonce token was responded with the tokenResp?")
+//                    OidcApi.mapSessionIdToToken(
+//                        sessionId,
+//                        nonceToken
+//                    )  // TODO: Hack as this is non stateless because of oidc4vc lib API
 
                     call.respond(tokenResp.toJSON())
                 } catch (exc: TokenError) {
