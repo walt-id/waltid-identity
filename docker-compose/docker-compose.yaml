@@ -178,7 +178,7 @@ services:
         condition: service_healthy
     entrypoint: /bin/sh -c "/vault/scripts/init.sh"
     volumes:
-      - ./vault/init.sh:/vault/scripts/init.sh
+      - ./vault/init.sh:/vault/scripts/init.sh:rw
 
   caddy:
     image: docker.io/caddy:2
