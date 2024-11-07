@@ -392,10 +392,7 @@ if(validationResult.success) {
 
 Finally, return the credential response JSON object to the wallet, as HTTP response body.
 
-###### ID token authorization flow
-
-
-###### Credential generation
+#### Credential generation
 
 For generating W3C or SD-Jwt-VC credentials, as required for the `/credential` endpoint, the library provides two helper functions in the OpenID4VCI utility object:
 * [OpenID4VCI.generateSdJwtVC](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/commonMain/kotlin/id/walt/oid4vc/OpenID4VCI.kt#L386)
