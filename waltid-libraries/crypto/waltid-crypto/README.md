@@ -15,13 +15,13 @@
 
 The library provides the following key entities to work with:
 
-- [JWKKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/jwk/JWKKey.kt) -
+- [JWKKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/crypto/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/jwk/JWKKey.kt) -
   an implementation of a local (in-memory) key (private / public)
-- [TSEKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/tse/TSEKey.kt) -
+- [TSEKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/crypto/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/tse/TSEKey.kt) -
   an implementation of a Hashicorp Vault Transit Secrets Engine key (private / public)
-- [AWSKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/aws/AWSKey.kt) -
+- [AWSKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/crypto/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/aws/AWSKey.kt) -
   an implementation of an AWS key (private / public)
-- [OCIKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/oci/OCIKeyRestApi.kt) -
+- [OCIKey](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/crypto/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/keys/oci/OCIKeyRestApi.kt) -
   an implementation of an Oracle OCI key (private / public)
 <table>
     <tbody>
