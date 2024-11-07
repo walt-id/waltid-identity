@@ -178,7 +178,7 @@ See [here](https://github.com/walt-id/waltid-identity/blob/081360f3308c144dc4ffd
 
 For implementing the issuance flow from the issuer and wallet side, you find here a step-by-step guide, showing the individual steps and examples of how to use the library functions for the necessary data transformation operations.
 
-Here I will show the pre-authorized code flow, and the authorization flow with an ID_TOKEN. For **other supported authorization flow methods**, you can find a sample implementation [here](https://github.com/walt-id/waltid-identity/blob/081360f3308c144dc4ffd67712318095bdb831fe/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/OpenID4VCI_Test.kt#L196).
+Here I will show the pre-authorized code flow. For **other supported authorization flow methods**, you can find a sample implementation [here](https://github.com/walt-id/waltid-identity/blob/081360f3308c144dc4ffd67712318095bdb831fe/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/OpenID4VCI_Test.kt#L196).
 
 #### Common variables
 The variables used in both flows, defining the issuer base URL and the issued credential type, are as follows:
