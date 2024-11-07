@@ -172,13 +172,13 @@ See [here](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries
 ### Session management
 
 For implementing the issuance flow from the issuer side, you will have to support some kind of session management, where you store state information, authorization requests and results, issuance requests, credential offer, etc. for the current issuance process.
-See [here](https://github.com/walt-id/waltid-identity/blob/081360f3308c144dc4ffd67712318095bdb831fe/waltid-services/waltid-issuer-api/src/main/kotlin/id/walt/issuer/issuance/CIProvider.kt#L110) for an example of a simple session management and a simple [issuance session object](https://github.com/walt-id/waltid-identity/blob/081360f3308c144dc4ffd67712318095bdb831fe/waltid-services/waltid-issuer-api/src/main/kotlin/id/walt/issuer/issuance/IssuanceSession.kt#L12) in our demo implementation of the issuer API.
+See [here](https://github.com/walt-id/waltid-identity/blob/main/waltid-services/waltid-issuer-api/src/main/kotlin/id/walt/issuer/issuance/CIProvider.kt#L110) for an example of a simple session management and a simple [issuance session object](https://github.com/walt-id/waltid-identity/blob/main/waltid-services/waltid-issuer-api/src/main/kotlin/id/walt/issuer/issuance/IssuanceSession.kt#L12) in our demo implementation of the issuer API.
 
 ### Issuance flow
 
 For implementing the issuance flow from the issuer and wallet side, you find here a step-by-step guide, showing the individual steps and examples of how to use the library functions for the necessary data transformation operations.
 
-Here I will show the pre-authorized code flow. For **other supported authorization flow methods**, you can find a sample implementation [here](https://github.com/walt-id/waltid-identity/blob/081360f3308c144dc4ffd67712318095bdb831fe/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/OpenID4VCI_Test.kt#L196).
+Here I will show the pre-authorized code flow. For **other supported authorization flow methods**, you can find a sample implementation [here](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/OpenID4VCI_Test.kt#L196).
 
 #### Common variables
 The variables used in both flows, defining the issuer base URL and the issued credential type, are as follows:
@@ -380,7 +380,7 @@ val validationResult = OpenID4VCI.validateCredentialRequest(credentialRequest, n
 If successful, return credential response:
 
 **Note:** credential generation depends on the type of credential and is out-of-scope of this step-by-step guide. 
-Refer to [issuer-api demo implementation](https://github.com/walt-id/waltid-identity/blob/5c2b50126c7d60a02316a9f69e676dde4cdd09e7/waltid-services/waltid-issuer-api/src/main/kotlin/id/walt/issuer/issuance/CIProvider.kt#L169), for an example how to generate credentials using the walt.id stack.
+Refer to [issuer-api demo implementation](https://github.com/walt-id/waltid-identity/blob/main/waltid-services/waltid-issuer-api/src/main/kotlin/id/walt/issuer/issuance/CIProvider.kt#L169), for an example how to generate credentials using the walt.id stack.
 Also, refer to the [Credential generation](#credential-generation) section for further instructions.
 
 ```kotlin
