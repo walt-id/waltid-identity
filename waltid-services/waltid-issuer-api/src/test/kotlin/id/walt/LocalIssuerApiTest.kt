@@ -15,7 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class IssuerApiTest {
-
+companion object {
     @Language("JSON")
     val TEST_KEY = """{
   "type": "jwk",
@@ -126,13 +126,12 @@ class IssuerApiTest {
   "issuanceDate": "\u003ctimestamp\u003e",
   "expirationDate": "\u003ctimestamp-in:365d\u003e"
 }"""
-
+    val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)
+    val jsonVCObj = Json.decodeFromString<JsonObject>(TEST_W3VC)
+    val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
+}
     @Test
     fun testJwt() = runTest {
-        val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)
-        val jsonVCObj = Json.decodeFromString<JsonObject>(TEST_W3VC)
-        val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
-
         val issueRequest =
             IssuanceRequest(
                 issuerKey = jsonKeyObj,
