@@ -11,6 +11,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
+import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationCodeResponse
@@ -67,7 +68,6 @@ class OpenID4VCI_Test {
 
   @Test
   fun testCredentialIssuanceIsolatedFunctions() = runTest {
-    // TODO: consider re-implementing CITestProvider, making use of new lib functions
     println("// -------- CREDENTIAL ISSUER ----------")
     // init credential offer for full authorization code flow
     val credOffer = CredentialOffer.Builder(ISSUER_BASE_URL)
@@ -104,7 +104,6 @@ class OpenID4VCI_Test {
 
     // create issuance session and generate authorization code
     val authCodeResponse = OpenID4VC.processCodeFlowAuthorization(authReq, authReq.issuerState!!, ISSUER_METADATA, ISSUER_TOKEN_KEY)
-    //val authCodeResponse: AuthorizationCodeResponse = AuthorizationCodeResponse.success("test-code")
     val redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.query)
     Url(redirectUri).let {
       assertContains(iterable = it.parameters.names(), element = ResponseType.Code.name.lowercase())
@@ -193,9 +192,8 @@ class OpenID4VCI_Test {
   }
 
   // Test case for available authentication methods are: NONE, ID_TOKEN, VP_TOKEN, PRE_AUTHORIZED PWD(Handled by third party authorization server)
-  //@Test
+  @Test
   fun testCredentialIssuanceIsolatedFunctionsAuthCodeFlow() = runTest {
-    // TODO: consider re-implementing CITestProvider, making use of new lib functions
     // is it ok to generate the credential offer using the ciTestProvider (OpenIDCredentialIssuer class) ?
     val issuedCredentialId = "VerifiableId"
 
@@ -321,7 +319,8 @@ class OpenID4VCI_Test {
     // ----------------------------------
     println("// --Authentication method is ID_TOKEN--")
     issuerState = "test-state-idtoken-auth"
-    credOffer = CredentialOffer.fromJSONString(testIsolatedFunctionsCreateCredentialOffer(ISSUER_BASE_URL, issuerState, issuedCredentialId))
+    val credOfferUrl = testIsolatedFunctionsCreateCredentialOffer(ISSUER_BASE_URL, issuerState, issuedCredentialId)
+    credOffer = CredentialOfferRequest.fromHttpQueryString(Url(credOfferUrl).encodedQuery).credentialOffer!!
 
     // Issuer Client shows credential offer request as QR code
     println(OpenID4VCI.getCredentialOfferRequestUrl(credOffer))

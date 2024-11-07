@@ -42,29 +42,15 @@ suspend fun createCredentialOfferUri(
             vct = if (credentialFormat == CredentialFormat.sd_jwt_vc) OidcApi.metadata.getVctByCredentialConfigurationId(it.credentialConfigurationId) ?: throw IllegalArgumentException("VCT not found") else null)
     }
 
-    val credentialOfferBuilder =
-        OidcIssuance.issuanceRequestsToCredentialOfferBuilder(overwrittenIssuanceRequests)
-
     val issuanceSession = OidcApi.initializeCredentialOffer(
-        credentialOfferBuilder = credentialOfferBuilder,
+        issuanceRequests = overwrittenIssuanceRequests,
         expiresIn,
         allowPreAuthorized = when (overwrittenIssuanceRequests[0].authenticationMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> true
             else -> false
-        }
+        },
+        callbackUrl = callbackUrl
     )
-
-    OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, overwrittenIssuanceRequests.map {
-        val key = KeyManager.resolveSerializedKey(it.issuerKey)
-
-        CIProvider.IssuanceSessionData(
-            id = issuanceSession.id,
-            issuerKey = key,
-            issuerDid = it.issuerDid,
-            request = it,
-            callbackUrl = callbackUrl
-        )
-    })  // TODO: Hack as this is non stateless because of oidc4vc lib API
 
     logger.debug { "issuanceSession: $issuanceSession" }
 
@@ -529,8 +515,11 @@ fun Application.issuerApi() {
                     val credentialOffer = issuanceSession.credentialOffer
                         ?: throw BadRequestException("Session has no credential offer set")
 
-                    OidcApi.sessionCredentialPreMapping[sessionId]?.first()
-                        ?.sendCallback("resolved_credential_offer", credentialOffer.toJSON())
+                    issuanceSession.callbackUrl?.let {
+                        CIProvider.sendCallback(
+                            sessionId, "resolved_credential_offer", credentialOffer.toJSON(), it
+                        )
+                    }
 
                     context.respond(credentialOffer.toJSON())
                 }
