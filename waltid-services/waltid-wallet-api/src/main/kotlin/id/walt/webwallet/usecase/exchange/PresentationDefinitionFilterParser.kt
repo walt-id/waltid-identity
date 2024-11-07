@@ -18,17 +18,27 @@ class PresentationDefinitionFilterParser {
         getFilter(inputDescriptor.constraints) + getFilter(inputDescriptor.schema)
 
     private fun getFilter(inputDescriptor: InputDescriptorConstraints?) =
-        inputDescriptor?.fields?.map { createTypeFilter(it) } ?: emptyList()
+        inputDescriptor?.fields?.mapNotNull { createTypeFilter(it) } ?: emptyList()
 
     private fun getFilter(schemas: List<InputDescriptorSchema>?) =
         schemas?.map { schema -> createTypeFilter(schema) } ?: emptyList()
 
-    private fun createTypeFilter(inputDescriptorField: InputDescriptorField) = let {
+    // TODO: Don't just match on the types
+    private fun createTypeFilter(inputDescriptorField: InputDescriptorField): TypeFilter? = let {
         val paths = inputDescriptorField.path.map { prefixRegex.replace(it, "") }
         val filterType = inputDescriptorField.filter?.get("type")?.jsonPrimitive?.content
-        val filterPattern = inputDescriptorField.filter?.get("pattern")?.jsonPrimitive?.content
-            ?: throw IllegalArgumentException("No filter pattern in presentation definition constraint")
-        TypeFilter(paths, filterType, filterPattern)
+
+        val filterPattern = inputDescriptorField.filter?.get("const")?.jsonPrimitive?.content
+            ?: inputDescriptorField.filter?.get("pattern")?.jsonPrimitive?.content
+                ?.removePrefix("^")
+                ?.removeSuffix("$")
+
+        /*val filterPattern = inputDescriptorField.filter?.get("pattern")?.jsonPrimitive?.content
+            ?: throw IllegalArgumentException("No filter pattern in presentation definition constraint")*/
+
+        filterPattern?.let {
+            TypeFilter(paths, filterType, filterPattern)
+        }
     }
 
     private fun createTypeFilter(inputDescriptorSchema: InputDescriptorSchema) =
