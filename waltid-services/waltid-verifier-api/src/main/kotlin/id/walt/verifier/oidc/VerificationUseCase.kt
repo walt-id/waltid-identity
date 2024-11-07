@@ -244,7 +244,7 @@ class VerificationUseCase(
     }
 
     private fun getPresentationFormat(requestedCredentials: List<RequestedCredential>): VCFormat {
-        val credentialFormat = requestedCredentials.map { it.format }.distinct().singleOrNull()
+        val credentialFormat = requestedCredentials.map { it.format ?: it.inputDescriptor?.format?.keys?.first() }.distinct().singleOrNull()
         if (credentialFormat == null) throw IllegalArgumentException("Credentials formats must be distinct for a presentation request")
         return when (credentialFormat) {
             VCFormat.mso_mdoc -> VCFormat.mso_mdoc
