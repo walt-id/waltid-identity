@@ -21,7 +21,7 @@ echo "Enable Userpass Authentication"
 vault auth enable userpass
 
 echo "Create a User with Userpass Authentication"
-vault write auth/userpass/users/my-user password=my-password policies=transit-policy
+vault write auth/userpass/users/myuser password=mypassword policies=transit-policy
 
 echo "Enable AppRole Authentication"
 vault auth enable approle
