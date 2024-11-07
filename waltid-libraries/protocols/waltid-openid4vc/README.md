@@ -157,15 +157,10 @@ https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/
 
 #### Business logic
 
-For the business logic, implement the abstract issuance provider
-in `src/commonMain/kotlin/id/walt/oid4vc/providers/OpenIDCredentialIssuer.kt`, providing session and cache management, as well, as
-cryptographic operations for issuing credentials.
+For the business logic you can make use of the stateless utility objects `OpenID4VC` and `OpenID4VCI`, providing
+utility functions for the necessary steps and operations of the issuance flow, from both the wallet and the issuer side.
 
-##### Configuration of issuance provider
-
-https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L49-L66
-
-**Provider metadata**
+##### Provider metadata
 
 To **create the provider metadata** object for the well-defined [metadata endpoints](#well-defined-endpoints), you may make use of the helper function in the OpenID4VCI utility object:
 [OpenID4VCI::createDefaultProviderMetadata](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/commonMain/kotlin/id/walt/oid4vc/OpenID4VCI.kt#L307),
@@ -175,19 +170,223 @@ which creates the metadata based on the issuer base URL, describing the standard
 See [here](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/commonMain/kotlin/id/walt/oid4vc/providers/OpenIDCredentialIssuer.kt#L42) for an example how to load the list of supported credentials from a configuration.
 
 
-##### Simple session management example
+##### Session management
 
-Here we implement a simplistic in-memory session management:
+For implementing the issuance flow from the issuer side, you will have to support some kind of session management, where you store state information, authorization requests and results, issuance requests, credential offer, etc. for the current issuance process.
+See [here](https://github.com/walt-id/waltid-identity/blob/081360f3308c144dc4ffd67712318095bdb831fe/waltid-services/waltid-issuer-api/src/main/kotlin/id/walt/issuer/issuance/CIProvider.kt#L110) for an example of a simple session management and a simple [issuance session object](https://github.com/walt-id/waltid-identity/blob/081360f3308c144dc4ffd67712318095bdb831fe/waltid-services/waltid-issuer-api/src/main/kotlin/id/walt/issuer/issuance/IssuanceSession.kt#L12) in our demo implementation of the issuer API.
 
-https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L68-L81
+##### Issuance flow
 
-##### Crypto operations and credential issuance
+For implementing the issuance flow from the issuer and wallet side, you find here a step-by-step guide, showing the individual steps and examples of how to use the library functions for the necessary data transformation operations.
 
-Token signing and credential issuance based on [**waltid-crypto**](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto), [**waltid-did**](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-did) and [**waltid-verifiable-credentials**](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-verifiable-credentials).
+Here I will show the pre-authorized code flow, and the authorization flow with an ID_TOKEN. For **other supported authorization flow methods**, you can find a sample implementation [here](https://github.com/walt-id/waltid-identity/blob/081360f3308c144dc4ffd67712318095bdb831fe/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/OpenID4VCI_Test.kt#L196).
 
-https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/jvmTest/kotlin/id/walt/oid4vc/CITestProvider.kt#L83-L160
+###### Common variables
+The variables used in both flows, defining the issuer base URL and the issued credential type, are as follows:
 
-**Credential generation**
+```kotlin
+val ISSUER_BASE_URL = "https://test"
+val ISSUER_TOKEN_KEY = runBlocking { JWKKey.generate(KeyType.RSA) }
+val CREDENTIAL_OFFER_BASE_URL = "openid-credential-offer://test"
+val issuedCredentialId = "VerifiableId"
+```
+
+###### Pre-authorized code flow
+
+**1. Issuer: Generate credential offer**
+
+First we create a pre-authorized code and a credential offer, which we have to store in a session object, to validate it in the following steps.
+The pre-authorized code is here a JWT token, that contains the session ID, using a pre-defined token key: `CI_TOKEN_KEY`.
+
+```kotlin
+val preAuthCode = OpenID4VC.generateAuthorizationCodeFor(sessionId, metadata.issuer!!, ISSUER_TOKEN_KEY)
+val credOffer = CredentialOffer.Builder(ISSUER_BASE_URL)
+      .addOfferedCredential(issuedCredentialId)
+      .addPreAuthorizedCodeGrant(preAuthCode)
+      .build()
+```
+
+The **credential offer URL**, that can be shown to the wallet user as a QR code or clickable link, can be generated like this:
+
+```kotlin
+val issueReqUrl = OpenID4VCI.getCredentialOfferRequestUrl(credOffer, CREDENTIAL_OFFER_BASE_URL)
+```
+
+Example credential offer URL: `openid-credential-offer://test?credential_offer=%7B%22credential_issuer%22%3A%22https%3A%2F%2Ftest%22%2C%22credential_configuration_ids%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Apre-authorized_code%22%3A%7B%22pre-authorized_code%22%3A%22e43eab06-c052-47f4-9035-a3fc00ebafc0%22%7D%7D%7D`
+
+**2. Wallet: Scan and parse credential offer**
+
+Now the wallet has to scan the credential offer link, or the user clicked the link and was redirected to the wallet. 
+
+See here, how to parse and resolve the credential offer and the issuer provider metadata in the wallet:
+
+```kotlin
+val credOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl)
+val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(credOffer)
+```
+
+To show the **list of offered credentials** to the user, you can use this utility function:
+
+```kotlin
+val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credOffer, providerMetadata)
+```
+
+Find the **pre-authorized code** from the credential offer grants, like this:
+
+```kotlin
+val preAuthCode = credOffer.grants[GrantType.pre_authorized_code.value]?.preAuthorizedCode
+```
+
+**3. Wallet: Send token request**
+
+Next the wallet has to send a token request to the issuer, to receive the access token, required for fetching the credential.
+
+```kotlin
+val tokenReq = TokenRequest(
+      grantType = GrantType.pre_authorized_code,
+      redirectUri = WALLET_REDIRECT_URI,
+      preAuthorizedCode = preAuthCode,
+      txCode = null
+    )
+```
+
+The token request must be sent as a **HTTP POST** request to the token endpoint of the issuer:
+
+```kotlin
+providerMetadata.tokenEndpoint
+```
+
+**4. Issuer: Receive token request and send response**
+
+The issuer now receives the token request and generates the response:
+
+```kotlin
+val params = call.receiveParameters().toMap()
+val tokenReq = TokenRequest.fromHttpParameters(params)
+```
+
+Validate the pre-authorized code, by validating the signature and parse the token payload:
+
+```kotlin
+val payload = OpenID4VC.validateAndParseTokenRequest(tokenRequest, metadata.issuer!!, ISSUER_TOKEN_KEY)
+```
+
+Get the session ID from the authorization code and find the issuance session in your session management implementation, e.g.:
+
+```kotlin
+val sessionId = payload[JWTClaims.Payload.subject]?.jsonPrimitive?.content
+val session = getSession(sessionId) // up to you how to implement session management
+```
+
+Generate **access token**, with the sessionID as token subject, for the token response:
+
+```kotlin
+val accessToken = OpenID4VC.generateToken(sessionId, ISSUER_BASE_URL, TokenTarget.ACCESS, null, ISSUER_TOKEN_KEY)
+```
+
+Generate a **nonce for the proof-of-possession**, which the wallet has to use to create the proof of holder key possession for the credential to issue:
+
+```kotlin
+val popNonce = randomUUID()
+// update session with proof-of-possession nonce!
+session.copy(
+  cNonce = popNonce
+).also {
+  putSession(it.id, it)
+}
+```
+
+Generate token response and send back to wallet:
+```kotlin
+val tokenResponse = TokenResponse.success(accessToken, "bearer", cNonce = cPoPNonce, expiresIn = expirationTime)
+```
+
+**5. Wallet: Receive token response make credential request**
+
+Receive and parse the token response from the issuer:
+
+```kotlin
+val params = call.receiveParameters().toMap()
+val tokenResponse = TokenResponse.fromHttpParameters(params)
+```
+
+Generate the proof of possession for the holder key, which the credential should be bound to:
+
+In this case we assume the wallet key is loaded from a JWK.
+
+```kotlin
+val WALLET_KEY = "{...}"
+val holderKey = JWKKey.importJWK(WALLET_KEY).getOrThrow()
+val holderKeyId = holderKey.getKeyId()
+val nonce = tokenResponse.cNonce!!
+val proofOfPossession = ProofOfPossession.JWTProofBuilder(providerMetadata.issuer, null, nonce, holderKeyId).build(holderKey)
+```
+
+Create credential request, for one of the offered credentials, which we received previously with the credential offer:
+
+```kotlin
+val offeredCredential = offeredCredentials.first()
+val credReq = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
+```
+
+Post the credential request to the credential endpoint of the issuer, using the access token, received with the token response:
+
+```kotlin
+val accessToken = tokenResponse.accessToken!!
+val credentialResponse = http.post(providerMetadata.credentialEndpoint!!) {
+  contentType(ContentType.Application.Json)
+  bearerAuth(accessToken)
+  setBody(credReq.toJSON())
+}.body<CredentialResponse>()
+```
+
+**6. Issuer: Validate credential request and generate credential response**
+
+Parse access token from credential request:
+
+```kotlin
+val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
+val parsedToken = accessToken?.let { OpenID4VC.verifyAndParseToken(it, ISSUER_BASE_URL, TokenTarget.ACCESS, ISSUER_TOKEN_KEY) }
+```
+
+Parse credential request, from request body:
+
+```kotlin
+val credReq = CredentialRequest.fromJSON(call.receive<JsonObject>())
+```
+
+Get session ID from token subject and find session in your session management:
+
+```kotlin
+val session = parsedToken.get(JWTClaims.Payload.subject)?.jsonPrimitive?.content?.let { getSession(it) }
+```
+
+Validate proof of possession:
+
+```kotlin
+val nonce = session.cNonce
+val validationResult = OpenID4VCI.validateCredentialRequest(credentialRequest, nonce, metadata)
+```
+
+If successful, return credential response:
+
+**Note:** credential generation depends on the type of credential and is out-of-scope of this step-by-step guide. 
+Refer to [issuer-api demo implementation](https://github.com/walt-id/waltid-identity/blob/5c2b50126c7d60a02316a9f69e676dde4cdd09e7/waltid-services/waltid-issuer-api/src/main/kotlin/id/walt/issuer/issuance/CIProvider.kt#L169), for an example how to generate credentials using the walt.id stack.
+Also, refer to the [Credential generation](#credential-generation) section for further instructions.
+
+```kotlin
+if(validationResult.success) {
+  val credential = generateCredential(credentialRequest, session)
+  val responseJSON = CredentialResponse.success(credentialRequest.format, credential).toJSON()
+}
+```
+
+Finally, return the credential response JSON object to the wallet, as HTTP response body.
+
+###### ID token authorization flow
+
+
+###### Credential generation
 
 For generating W3C or SD-Jwt-VC credentials, as required for the `/credential` endpoint, the library provides two helper functions in the OpenID4VCI utility object:
 * [OpenID4VCI.generateSdJwtVC](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/protocols/waltid-openid4vc/src/commonMain/kotlin/id/walt/oid4vc/OpenID4VCI.kt#L386)
