@@ -33,7 +33,7 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
             ?: throw IllegalArgumentException("No presentationSubmission in context!")
         val format = presentationSubmission.descriptorMap.firstOrNull()?.format?.let { Json.decodeFromJsonElement<VCFormat>(it) }
 
-        val requestedTypes = presentationDefinition.primitiveVerificationGetTypeList()
+        //val requestedTypes = presentationDefinition.primitiveVerificationGetTypeList()
 
         val presentedTypes = when(format) {
             VCFormat.sd_jwt_vc -> listOf(data["vct"]!!.jsonPrimitive.content)
@@ -49,28 +49,29 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
             ).toList().isNotEmpty()
             else -> data["vp"]!!.jsonObject["verifiableCredential"]?.jsonArray?.mapIndexedNotNull { idx,cred ->
                 val payload = cred.jsonPrimitive.contentOrNull?.let { SDJwt.parse(it) }?.fullPayload ?: throw IllegalArgumentException("Credential $idx is not a valid JWT string")
+
                 PresentationDefinitionParser.matchCredentialsForInputDescriptor(
-                    flowOf(payload.get("vc")?.jsonObject ?: throw IllegalArgumentException("Credential $idx has no vc property")),
-                    presentationDefinition.inputDescriptors.get(idx)
+                    flowOf(payload["vc"]?.jsonObject ?: payload),
+                    presentationDefinition.inputDescriptors[idx]
                 ).toList().isNotEmpty()
             }!!.all { it }
         }
 
-        val success = presentedTypes.containsAll(requestedTypes) && presentationDefinitionMatch
+        val success = /*presentedTypes.containsAll(requestedTypes) &&*/ presentationDefinitionMatch
 
         return if (success)
             Result.success(presentedTypes)
         else {
-            log.debug { "Requested types: $requestedTypes" }
+//            log.debug { "Requested types: $requestedTypes" }
             log.debug { "Presented types: $presentedTypes" }
             log.debug { "Presentation definition: $presentationDefinition" }
             log.debug { "Presented data: $data" }
 
             Result.failure(
               id.walt.policies.PresentationDefinitionException(
-                missingCredentialTypes = requestedTypes.minus(
+                /*missingCredentialTypes = requestedTypes.minus(
                   presentedTypes.toSet()
-                ), presentationDefinitionMatch
+                ),*/ presentationDefinitionMatch
               )
             )
         }
