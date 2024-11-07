@@ -22,6 +22,7 @@ import io.ktor.util.*
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
@@ -40,8 +41,20 @@ import kotlin.collections.component2
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger { }
+
+data class AWSAuthConfiguration(
+    val accessKeyId: String?,
+    val secretAccessKey: String?,
+    val sessionToken: String?,
+    val expiration: String?
+)
+
+var _accessAWS: AWSAuthConfiguration? = null
+var timeoutAt: Instant? = null
+
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -249,8 +262,33 @@ class AWSKey(
     @JsExport.Ignore
     override suspend fun getMeta(): AwsKeyMeta = AwsKeyMeta(getKeyId())
 
+
     companion object : AWSKeyCreator {
         val client = HttpClient()
+
+        @JsExport.Ignore
+        suspend fun authAccess(config: AWSKeyMetadata) {
+            val isAccessDataProvided = config.accessKeyId.isNotEmpty() && config.secretAccessKey.isNotEmpty()
+
+            if (isAccessDataProvided) {
+                _accessAWS = AWSAuthConfiguration(config.accessKeyId, config.secretAccessKey, null, null)
+                timeoutAt = null
+            } else {
+                val token = getIMDSv2Token()
+                val role = getRoleName(token)
+                _accessAWS = getTemporaryCredentials(token, role)
+                timeoutAt = Clock.System.now().plus(3600.seconds)
+            }
+        }
+
+        @JsExport.Ignore
+        suspend fun getAccess(config: AWSKeyMetadata): AWSAuthConfiguration? {
+            if (_accessAWS == null || (timeoutAt != null && timeoutAt!! <= Clock.System.now())) {
+                authAccess(config)
+            }
+
+            return _accessAWS
+        }
 
 
         // Utility to hash data using SHA256
@@ -360,6 +398,63 @@ ${sha256Hex(canonicalRequest)}
             )
         }
 
+
+        // Function to get IMDSv2 token
+        @JsExport.Ignore
+        suspend fun getIMDSv2Token(ttlSeconds: Int = 21600): String {
+            val url = "http://169.254.169.254/latest/api/token"
+            val token = client.put(url) {
+                headers {
+                    append("X-aws-ec2-metadata-token-ttl-seconds", ttlSeconds.toString())
+                }
+            }
+            logger.trace { "AWS TOKEN: $token" }
+            return token.bodyAsText()
+        }
+
+        // Function to get role name
+        @JsExport.Ignore
+        suspend fun getRoleName(token: String): String {
+            val url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+            val roleName = client.get(url) {
+                headers {
+                    append("X-aws-ec2-metadata-token", token)
+                }
+            }
+            logger.debug { "AWS Role Name: $roleName" }
+            return roleName.bodyAsText()
+        }
+
+        // Function to get temporary credentials using role name
+        @JsExport.Ignore
+        suspend fun getTemporaryCredentials(token: String, roleName: String): AWSAuthConfiguration {
+            val url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/$roleName"
+            val response = client.get(url) {
+                headers {
+                    append("X-aws-ec2-metadata-token", token)
+                }
+            }
+            val json = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+
+
+            val accessKeyId =
+                json["AccessKeyId"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("AccessKeyId not found")
+            val secretAccessKey = json["SecretAccessKey"]?.jsonPrimitive?.content
+                ?: throw IllegalArgumentException("SecretAccessKey not found")
+            val sessionToken =
+                json["Token"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Token not found")
+            val expiration =
+                json["Expiration"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Expiration not found")
+
+            return AWSAuthConfiguration(
+                accessKeyId = accessKeyId,
+                secretAccessKey = secretAccessKey,
+                sessionToken = sessionToken,
+                expiration = expiration
+            )
+        }
+
+
         @JvmBlocking
         @JvmAsync
         @JsPromise
@@ -442,6 +537,12 @@ $public
 
         @JsExport.Ignore
         override suspend fun generate(type: KeyType, config: AWSKeyMetadata): AWSKey {
+
+
+            if (config.accessKeyId.isEmpty() && config.secretAccessKey.isEmpty()) {
+                getAccess(config)
+            }
+
             val keyType = keyTypeToAwsKeyMapping(type)
             val body =
                 """{
