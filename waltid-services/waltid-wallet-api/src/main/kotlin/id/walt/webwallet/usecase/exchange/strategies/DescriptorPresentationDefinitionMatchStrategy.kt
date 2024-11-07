@@ -8,7 +8,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
 class DescriptorPresentationDefinitionMatchStrategy : PresentationDefinitionMatchStrategy<List<WalletCredential>> {
-    override fun match(
+    override suspend fun match(
         credentials: List<WalletCredential>, presentationDefinition: PresentationDefinition,
     ): List<WalletCredential> = match(credentials, presentationDefinition.inputDescriptors)
 

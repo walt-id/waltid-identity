@@ -8,6 +8,7 @@ import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.usecase.exchange.strategies.PresentationDefinitionMatchStrategy
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonArray
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -25,13 +26,11 @@ class MatchPresentationDefinitionCredentialsUseCase(
         val credentialList = credentialService.list(wallet, CredentialFilterObject.default)
         logger.debug { "WalletCredential list is: ${credentialList.map { it.parsedDocument?.get("type")!!.jsonArray }}" }
 
-        var matchedCredentials = emptyList<WalletCredential>()
-        run loop@{
-            matchStrategies.forEach {
-                matchedCredentials = it.match(credentialList, presentationDefinition)
-                if (matchedCredentials.isNotEmpty()) return@loop
-            }
-        }
+        val matchedCredentials = matchStrategies
+            .asSequence()
+            .map { runBlocking { it.match(credentialList, presentationDefinition) } }
+            .firstOrNull { it.isNotEmpty() }
+            .orEmpty()
 
         logger.debug { "Matched credentials: $matchedCredentials" }
 

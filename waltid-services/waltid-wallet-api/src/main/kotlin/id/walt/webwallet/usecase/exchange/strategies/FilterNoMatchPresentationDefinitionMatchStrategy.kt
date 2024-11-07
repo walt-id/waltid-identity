@@ -9,7 +9,7 @@ class FilterNoMatchPresentationDefinitionMatchStrategy(
     private val filterParser: PresentationDefinitionFilterParser,
 ) : BaseFilterPresentationDefinitionMatchStrategy<List<FilterData>>() {
 
-    override fun match(
+    override suspend fun match(
         credentials: List<WalletCredential>, presentationDefinition: PresentationDefinition,
     ): List<FilterData> = match(credentials, filterParser.parse(presentationDefinition))
 

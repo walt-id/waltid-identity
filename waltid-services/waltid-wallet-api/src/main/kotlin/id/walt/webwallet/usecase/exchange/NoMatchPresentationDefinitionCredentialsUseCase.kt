@@ -18,7 +18,7 @@ class NoMatchPresentationDefinitionCredentialsUseCase(
 ) {
     private val logger = KotlinLogging.logger { }
 
-    fun find(wallet: Uuid, presentationDefinition: PresentationDefinition): List<FilterData> {
+    suspend fun find(wallet: Uuid, presentationDefinition: PresentationDefinition): List<FilterData> {
         val credentialList = credentialService.list(wallet, CredentialFilterObject.default)
         logger.debug { "WalletCredential list is: ${credentialList.map { it.parsedDocument?.get("type")!!.jsonArray }}" }
         return matchStrategies.fold<PresentationDefinitionMatchStrategy<List<FilterData>>, List<FilterData>>(listOf()) { acc, i ->
