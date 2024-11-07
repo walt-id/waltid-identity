@@ -18,6 +18,7 @@ import id.walt.oid4vc.responses.AuthorizationCodeResponse
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.JwtUtils
+import id.walt.oid4vc.util.randomUUID
 import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.sdjwt.SDJwt
 import io.ktor.http.*
@@ -31,6 +32,7 @@ import kotlin.test.*
 
 class OpenID4VCI_Test {
   val ISSUER_BASE_URL = "https://test"
+  val CREDENTIAL_OFFER_BASE_URL = "openid-credential-offer://test"
   val ISSUER_METADATA = OpenID4VCI.createDefaultProviderMetadata(ISSUER_BASE_URL).copy(
     credentialConfigurationsSupported = mapOf(
       "VerifiableId" to CredentialSupported(
@@ -615,18 +617,18 @@ class OpenID4VCI_Test {
     // Authentication Method is PRE_AUTHORIZED
     // ----------------------------------
     println("// --Authentication method is PRE_AUTHORIZED--")
-    val preAuthCode = "test-state-pre_auth"
+    val preAuthCode = randomUUID()
     credOffer = CredentialOffer.Builder(ISSUER_BASE_URL)
       .addOfferedCredential(issuedCredentialId)
       .addPreAuthorizedCodeGrant(preAuthCode)
       .build()
 
-    val issueReqUrl = OpenID4VCI.getCredentialOfferRequestUrl(credOffer)
+    val issueReqUrl = OpenID4VCI.getCredentialOfferRequestUrl(credOffer, CREDENTIAL_OFFER_BASE_URL)
     // Issuer Client shows credential offer request as QR code
     println(issueReqUrl)
 
     println("// -------- WALLET ----------")
-    credOffer = credOffer // OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl)
+    credOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl)
     //providerMetadata = OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer)
     assertEquals(expected = credOffer.credentialIssuer, actual = providerMetadata.credentialIssuer)
 
