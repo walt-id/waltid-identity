@@ -6,9 +6,6 @@ import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.utils.VCFormat
-import id.walt.policies.models.PolicyRequest
-import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
-import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -21,7 +18,9 @@ import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.policies.VerificationPolicy
+import id.walt.policies.models.PolicyRequest
+import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
+import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.policies.policies.SdJwtVCSignaturePolicy
 import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.SimpleJWTCryptoProvider
@@ -133,7 +132,11 @@ class VerificationUseCase(
 
     fun getSession(sessionId: String): PresentationSession = sessionId.let { OIDCVerifierService.getSession(it) }
 
-    data class FailedVerificationException(val redirectUrl: String?, override val cause: Throwable?, override val message: String = cause?.message ?: "Verification failed") : IllegalArgumentException()
+    data class FailedVerificationException(
+        val redirectUrl: String?,
+        override val cause: Throwable?,
+        override val message: String = cause?.message ?: "Verification failed",
+    ) : IllegalArgumentException()
 
     suspend fun verify(sessionId: String, tokenResponseParameters: Map<String, List<String>>): Result<String> {
         logger.debug { "Verifying session $sessionId" }
@@ -181,7 +184,8 @@ class VerificationUseCase(
             } else {
                 val failedPolicies =
                     policyResults.results.flatMap { it.policyResults.map { it } }.filter { !it.isSuccess }
-                val errorCause = IllegalArgumentException("Verification policies did not succeed: ${failedPolicies.joinToString { it.policy + " (${it.error})" }}")
+                val errorCause =
+                    IllegalArgumentException("Verification policies did not succeed: ${failedPolicies.joinToString { it.policy + " (${it.error})" }}")
 
                 Result.failure(FailedVerificationException(redirectUri, errorCause))
             }
@@ -240,8 +244,8 @@ class VerificationUseCase(
     }
 
     private fun getPresentationFormat(requestedCredentials: List<RequestedCredential>): VCFormat {
-        val credentialFormat = requestedCredentials.map { it.format }.distinct().singleOrNull()
-        if(credentialFormat == null) throw IllegalArgumentException("Credentials formats must be distinct for a presentation request")
+        val credentialFormat = requestedCredentials.map { it.format ?: it.inputDescriptor?.format?.keys?.first() }.distinct().singleOrNull()
+        if (credentialFormat == null) throw IllegalArgumentException("Credentials formats must be distinct for a presentation request")
         return when (credentialFormat) {
             VCFormat.mso_mdoc -> VCFormat.mso_mdoc
             VCFormat.sd_jwt_vc -> VCFormat.sd_jwt_vc
@@ -252,13 +256,13 @@ class VerificationUseCase(
         }
     }
 
-    private fun getDefaultVPPolicyRequests(presentationFormat: VCFormat): List<PolicyRequest> = when(presentationFormat) {
+    private fun getDefaultVPPolicyRequests(presentationFormat: VCFormat): List<PolicyRequest> = when (presentationFormat) {
         //VCFormat.mso_mdoc -> TODO()
         VCFormat.sd_jwt_vc -> listOf(PolicyRequest(SdJwtVCSignaturePolicy()))
         else -> listOf(PolicyRequest(JwtSignaturePolicy()))
     }
 
-    private fun getDefaultVCPolicies(presentationFormat: VCFormat): List<PolicyRequest> = when(presentationFormat) {
+    private fun getDefaultVCPolicies(presentationFormat: VCFormat): List<PolicyRequest> = when (presentationFormat) {
         //VCFormat.mso_mdoc -> TODO()
         VCFormat.sd_jwt_vc -> listOf()
         else -> listOf(PolicyRequest(JwtSignaturePolicy()))

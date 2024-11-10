@@ -14,6 +14,7 @@ services:
       - .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      - "wase:host-gateway"
     volumes:
       - ./wallet-api/config:/waltid-wallet-api/config
       - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml
