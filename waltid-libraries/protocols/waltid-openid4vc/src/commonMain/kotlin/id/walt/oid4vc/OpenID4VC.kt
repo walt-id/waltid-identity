@@ -146,6 +146,9 @@ object OpenID4VC {
     isJar: Boolean? = true,
     presentationDefinition: PresentationDefinition? = null,
   ): AuthorizationCodeWithAuthorizationRequestResponse {
+
+    providerMetadata as OpenIDProviderMetadataD13
+
     if (!authorizationRequest.responseType.contains(ResponseType.Code))
       throw AuthorizationError(
         authorizationRequest,
@@ -210,12 +213,17 @@ object OpenID4VC {
         AuthorizationErrorCode.invalid_request,
         message = "Invalid response type ${authorizationRequest.responseType}, for authorization code flow."
       )
+
+    providerMetadata as OpenIDProviderMetadataD13
+
     val issuer = providerMetadata.issuer ?: throw AuthorizationError(authorizationRequest, AuthorizationErrorCode.server_error,"No issuer configured in given provider metadata")
     val code = generateAuthorizationCodeFor(sessionId, issuer, tokenKey)
     return AuthorizationCodeResponse.success(code, mapOf("state" to listOf(authorizationRequest.state ?: randomUUID())))
   }
 
   suspend fun processImplicitFlowAuthorization(authorizationRequest: AuthorizationRequest, sessionId: String, providerMetadata: OpenIDProviderMetadata, tokenKey: Key): TokenResponse {
+    providerMetadata as OpenIDProviderMetadataD13
+
     log.debug { "> processImplicitFlowAuthorization for $authorizationRequest" }
     if (!authorizationRequest.responseType.contains(ResponseType.Token) && !authorizationRequest.responseType.contains(ResponseType.VpToken)
       && !authorizationRequest.responseType.contains(ResponseType.IdToken)
@@ -235,6 +243,8 @@ object OpenID4VC {
   }
 
   suspend fun processDirectPost(authorizationRequest: AuthorizationRequest, sessionId: String, providerMetadata: OpenIDProviderMetadata, tokenKey: Key): AuthorizationCodeResponse {
+    providerMetadata as OpenIDProviderMetadataD13
+
     // Verify nonce - need to add Id token nonce session
     // if (payload[JWTClaims.Payload.nonce] != session.)
 

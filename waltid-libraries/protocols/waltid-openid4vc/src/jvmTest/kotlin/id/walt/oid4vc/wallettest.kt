@@ -106,7 +106,7 @@ class wallettest {
         println("// get issuer metadata")
         val providerMetadataUri =
             credentialWallet.getCIProviderMetadataUrl(parsedOfferReq.credentialOffer!!.credentialIssuer)
-        val providerMetadata = ktorClient.get(providerMetadataUri).call.body<OpenIDProviderMetadata>()
+        val providerMetadata = ktorClient.get(providerMetadataUri).call.body<OpenIDProviderMetadata>() as OpenIDProviderMetadataD13
         println("providerMetadata: $providerMetadata")
 
         assertNotNull(actual = providerMetadata.credentialConfigurationsSupported)

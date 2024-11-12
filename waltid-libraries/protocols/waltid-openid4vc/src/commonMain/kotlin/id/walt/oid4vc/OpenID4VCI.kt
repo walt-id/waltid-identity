@@ -133,8 +133,11 @@ object OpenID4VCI {
     }
 
     fun resolveOfferedCredentials(credentialOffer: CredentialOffer, providerMetadata: OpenIDProviderMetadata): List<OfferedCredential> {
-        val supportedCredentials =
-            providerMetadata.credentialConfigurationsSupported ?: mapOf()
+        val supportedCredentials = when (providerMetadata) {
+            is OpenIDProviderMetadataD10 -> providerMetadata.credentialSupported ?: mapOf()
+            is OpenIDProviderMetadataD13 -> providerMetadata.credentialConfigurationsSupported ?: mapOf()
+        }
+
         return credentialOffer.credentialConfigurationIds.mapNotNull { c ->
             supportedCredentials[c]?.let {
                 OfferedCredential.fromProviderMetadata(it)
@@ -304,28 +307,58 @@ object OpenID4VCI {
         return payload
     }
 
-    fun createDefaultProviderMetadata(baseUrl: String) = OpenIDProviderMetadata(
-        issuer = baseUrl,
-        authorizationEndpoint = "$baseUrl/authorize",
-        pushedAuthorizationRequestEndpoint = "$baseUrl/par",
-        tokenEndpoint = "$baseUrl/token",
-        credentialEndpoint = "$baseUrl/credential",
-        batchCredentialEndpoint = "$baseUrl/batch_credential",
-        deferredCredentialEndpoint = "$baseUrl/credential_deferred",
-        jwksUri = "$baseUrl/jwks",
-        grantTypesSupported = setOf(GrantType.authorization_code, GrantType.pre_authorized_code),
-        requestUriParameterSupported = true,
-        subjectTypesSupported = setOf(SubjectType.public),
-        authorizationServer = baseUrl,
-        credentialIssuer = baseUrl, // (EBSI) this should be just "$baseUrl"  https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-11.2.1
-        responseTypesSupported = setOf(
-            "code",
-            "vp_token",
-            "id_token"
-        ),  // (EBSI) this is required one  https://www.rfc-editor.org/rfc/rfc8414.html#section-2
-        idTokenSigningAlgValuesSupported = setOf("ES256"), // (EBSI) https://openid.net/specs/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-
-        codeChallengeMethodsSupported = listOf("S256")
-    )
+    fun createDefaultProviderMetadata(baseUrl: String, credentialSupported: Map<String, CredentialSupported>, version: OpenID4VCIVersion) : OpenIDProviderMetadata {
+
+        return when (version) {
+            OpenID4VCIVersion.D13 -> OpenIDProviderMetadataD13(
+                issuer = baseUrl,
+                authorizationEndpoint = "$baseUrl/authorize",
+                pushedAuthorizationRequestEndpoint = "$baseUrl/par",
+                tokenEndpoint = "$baseUrl/token",
+                credentialEndpoint = "$baseUrl/credential",
+                batchCredentialEndpoint = "$baseUrl/batch_credential",
+                deferredCredentialEndpoint = "$baseUrl/credential_deferred",
+                jwksUri = "$baseUrl/jwks",
+                grantTypesSupported = setOf(GrantType.authorization_code, GrantType.pre_authorized_code),
+                requestUriParameterSupported = true,
+                subjectTypesSupported = setOf(SubjectType.public),
+                authorizationServer = baseUrl,
+                credentialIssuer = baseUrl, // (EBSI) this should be just "$baseUrl"  https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-11.2.1
+                responseTypesSupported = setOf(
+                    "code",
+                    "vp_token",
+                    "id_token"
+                ),  // (EBSI) this is required one  https://www.rfc-editor.org/rfc/rfc8414.html#section-2
+                idTokenSigningAlgValuesSupported = setOf("ES256"), // (EBSI) https://openid.net/specs/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-
+                codeChallengeMethodsSupported = listOf("S256"),
+                credentialConfigurationsSupported = credentialSupported
+            )
+
+            OpenID4VCIVersion.D10 -> OpenIDProviderMetadataD10(
+                issuer = baseUrl,
+                authorizationEndpoint = "$baseUrl/authorize",
+                pushedAuthorizationRequestEndpoint = "$baseUrl/par",
+                tokenEndpoint = "$baseUrl/token",
+                credentialEndpoint = "$baseUrl/credential",
+                batchCredentialEndpoint = "$baseUrl/batch_credential",
+                deferredCredentialEndpoint = "$baseUrl/credential_deferred",
+                jwksUri = "$baseUrl/jwks",
+                grantTypesSupported = setOf(GrantType.authorization_code, GrantType.pre_authorized_code),
+                requestUriParameterSupported = true,
+                subjectTypesSupported = setOf(SubjectType.public),
+                authorizationServer = baseUrl,
+                credentialIssuer = baseUrl, // (EBSI) this should be just "$baseUrl"  https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-11.2.1
+                responseTypesSupported = setOf(
+                    "code",
+                    "vp_token",
+                    "id_token"
+                ),  // (EBSI) this is required one  https://www.rfc-editor.org/rfc/rfc8414.html#section-2
+                idTokenSigningAlgValuesSupported = setOf("ES256"), // (EBSI) https://openid.net/specs/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-
+                codeChallengeMethodsSupported = listOf("S256"),
+                credentialSupported = credentialSupported.mapValues { (_, credential) -> credential.copy(types = credential.credentialDefinition?.type, credentialDefinition = null) }
+            )
+        }
+    }
 
     fun getNonceFromProof(proofOfPossession: ProofOfPossession) = when (proofOfPossession.proofType) {
         ProofType.jwt -> JwtUtils.parseJWTPayload(proofOfPossession.jwt!!)[JWTClaims.Payload.nonce]?.jsonPrimitive?.content
@@ -368,7 +401,11 @@ object OpenID4VCI {
                 "Invalid proof of possession"
             )
         }
-        val supportedCredentialFormats = openIDProviderMetadata.credentialConfigurationsSupported?.values?.map { it.format }?.toSet() ?: setOf()
+        val supportedCredentialFormats = when (openIDProviderMetadata) {
+            is OpenIDProviderMetadataD13 -> openIDProviderMetadata.credentialConfigurationsSupported?.values?.map { it.format }?.toSet() ?: setOf()
+            is OpenIDProviderMetadataD10 -> openIDProviderMetadata.credentialSupported?.values?.map { it.format }?.toSet() ?: setOf()
+        }
+
         if (!supportedCredentialFormats.contains(credentialRequest.format))
             return CredentialRequestValidationResult(
                 false,
@@ -468,5 +505,18 @@ object OpenID4VCI {
                 disclosureMap = selectiveDisclosure
             )
         }}
+    }
+}
+
+
+enum class OpenID4VCIVersion(val versionString: String) {
+    D10("d10"),
+    D13("d13");
+
+    companion object {
+        fun from(version: String): OpenID4VCIVersion {
+            return values().find { it.versionString == version }
+                ?: throw IllegalArgumentException("Unsupported version: $version. Supported Versions are: Draft13 -> d13 and Draft10 -> d10")
+        }
     }
 }

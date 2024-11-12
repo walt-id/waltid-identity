@@ -1,6 +1,7 @@
 package id.walt.webwallet.service.exchange
 
 import id.walt.oid4vc.data.OpenIDProviderMetadata
+import id.walt.oid4vc.data.OpenIDProviderMetadataD13
 import id.walt.oid4vc.requests.BatchCredentialRequest
 import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.responses.BatchCredentialResponse
@@ -29,6 +30,9 @@ object CredentialOfferProcessor {
       providerMetadata: OpenIDProviderMetadata,
       accessToken: String,
     ): List<ProcessedCredentialOffer> {
+
+        providerMetadata as OpenIDProviderMetadataD13
+
         val batchCredentialRequest = BatchCredentialRequest(credReqs)
 
         val batchResponse = http.post(providerMetadata.batchCredentialEndpoint!!) {
@@ -52,6 +56,8 @@ object CredentialOfferProcessor {
       providerMetadata: OpenIDProviderMetadata,
       accessToken: String,
     ): List<ProcessedCredentialOffer> {
+        providerMetadata as OpenIDProviderMetadataD13
+
         val credReq = credReqs.first()
 
         val credentialResponse = http.post(providerMetadata.credentialEndpoint!!) {
