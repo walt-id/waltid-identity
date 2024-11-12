@@ -23,6 +23,7 @@ class AuthorizationCodeFlow(private val client: HttpClient) {
         lateinit var offerUrl: String
         lateinit var issuerState: String
         val issuerApi = IssuerApi(client)
+        val authorizeEndpoint = "d13/authorize"
 
         //
         // Issue credential with Authorized Code Flow and Id Token request
@@ -63,7 +64,7 @@ class AuthorizationCodeFlow(private val client: HttpClient) {
             )
         )
 
-        client.get("/authorize?${authorizationRequest.toHttpQueryString()}") {}
+        client.get("$authorizeEndpoint?${authorizationRequest.toHttpQueryString()}") {}
             .expectRedirect().apply {
                 val idTokenRequest = AuthorizationRequest.fromHttpQueryString(headers["location"]!!)
                 assert(idTokenRequest.responseType == setOf(ResponseType.IdToken)) { "response type should be id_token" }
@@ -97,7 +98,7 @@ class AuthorizationCodeFlow(private val client: HttpClient) {
             )
         )
 
-        client.get("/authorize?${authorizationRequest.toHttpQueryString()}") {
+        client.get("$authorizeEndpoint?${authorizationRequest.toHttpQueryString()}") {
         }.expectRedirect().apply {
             val vpTokenRequest = AuthorizationRequest.fromHttpQueryString(headers["location"]!!)
             assert(vpTokenRequest.responseType == setOf(ResponseType.VpToken)) { "response type should be vp_token" }
@@ -132,7 +133,7 @@ class AuthorizationCodeFlow(private val client: HttpClient) {
             )
         )
 
-        client.get("/authorize?${authorizationRequest.toHttpQueryString()}") {
+        client.get("$authorizeEndpoint?${authorizationRequest.toHttpQueryString()}") {
         }.expectRedirect().apply {
             assertEquals(true, headers["location"]!!.toString().contains("external_login"))
         }
