@@ -434,11 +434,11 @@ object OidcApi : CIProvider() {
                     val session = getSessionByAuthServerState(call.request.rawQueryParameters.toMap()["state"]!![0])
                     val authResp = OpenID4VC.processCodeFlowAuthorization(session?.authorizationRequest!!, session.id, metadata, CI_TOKEN_KEY)
 
-                    val redirectUri = when (session.authorizationRequest!!.isReferenceToPAR) {
-                        true -> getPushedAuthorizationSession(session.authorizationRequest!!).authorizationRequest?.redirectUri
-                        false -> session.authorizationRequest!!.redirectUri
+                    val redirectUri = when (session.authorizationRequest.isReferenceToPAR) {
+                        true -> getPushedAuthorizationSession(session.authorizationRequest).authorizationRequest?.redirectUri
+                        false -> session.authorizationRequest.redirectUri
                     } ?: throw AuthorizationError(
-                        session.authorizationRequest!!,
+                        session.authorizationRequest,
                         AuthorizationErrorCode.invalid_request,
                         "No redirect_uri found for this authorization request"
                     )
@@ -448,12 +448,12 @@ object OidcApi : CIProvider() {
                     call.response.apply {
                         status(HttpStatusCode.Found)
                         val defaultResponseMode =
-                            if (session.authorizationRequest!!.responseType.contains(ResponseType.Code)) ResponseMode.query else ResponseMode.fragment
+                            if (session.authorizationRequest.responseType.contains(ResponseType.Code)) ResponseMode.query else ResponseMode.fragment
                         header(
                             HttpHeaders.Location,
                             authResp.toRedirectUri(
                                 redirectUri,
-                                session.authorizationRequest!!.responseMode ?: defaultResponseMode
+                                session.authorizationRequest.responseMode ?: defaultResponseMode
                             )
                         )
                     }
