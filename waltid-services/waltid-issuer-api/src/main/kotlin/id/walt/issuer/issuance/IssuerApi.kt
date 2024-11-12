@@ -54,7 +54,7 @@ suspend fun createCredentialOfferUri(
     logger.debug { "issuanceSession: $issuanceSession" }
 
     val offerRequest =
-        CredentialOfferRequest(null, "${OidcApi.baseUrl}/openid4vc/credentialOffer?id=${issuanceSession.id}")
+        CredentialOfferRequest(null, "${OidcApi.baseUrl}/credentialOffer?id=${issuanceSession.id}")
     logger.debug { "offerRequest: $offerRequest" }
 
     val offerUri = OpenID4VCI.getCredentialOfferRequestUrl(offerRequest,
@@ -502,26 +502,6 @@ fun Application.issuerApi() {
                     }
                 }
 
-                get("credentialOffer", {
-                    summary = "Gets a credential offer based on the session id"
-                    request {
-                        queryParameter<String>("id") { required = true }
-                    }
-                }) {
-                    val sessionId = call.parameters["id"] ?: throw BadRequestException("Missing parameter \"id\"")
-                    val issuanceSession = OidcApi.getSession(sessionId)
-                        ?: throw NotFoundException("No active issuance session found by the given id")
-                    val credentialOffer = issuanceSession.credentialOffer
-                        ?: throw BadRequestException("Session has no credential offer set")
-
-                    issuanceSession.callbackUrl?.let {
-                        CIProvider.sendCallback(
-                            sessionId, "resolved_credential_offer", credentialOffer.toJSON(), it
-                        )
-                    }
-
-                    context.respond(credentialOffer.toJSON())
-                }
             }
         }
     }

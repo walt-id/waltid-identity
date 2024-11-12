@@ -323,7 +323,29 @@ object OidcApi : CIProvider() {
                     call.respond(HttpStatusCode.BadRequest, exc.toAuthorizationErrorResponse().toJSON())
                 }
             }
-            post("/credential") {
+
+            get("{standardVersion}/credentialOffer", {
+                summary = "Gets a credential offer based on the session id"
+                request {
+                    queryParameter<String>("id") { required = true }
+                }
+            }) {
+                val sessionId = call.parameters["id"] ?: throw BadRequestException("Missing parameter \"id\"")
+                val issuanceSession = getSession(sessionId)
+                    ?: throw NotFoundException("No active issuance session found by the given id")
+                val credentialOffer = issuanceSession.credentialOffer
+                    ?: throw BadRequestException("Session has no credential offer set")
+
+                issuanceSession.callbackUrl?.let {
+                    sendCallback(
+                        sessionId, "resolved_credential_offer", credentialOffer.toJSON(), it
+                    )
+                }
+
+                context.respond(credentialOffer.toJSON())
+            }
+
+            post("{standardVersion}/credential") {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
                 val parsedToken = accessToken?.let { OpenID4VC.verifyAndParseToken(it, metadata.issuer!!, TokenTarget.ACCESS, CI_TOKEN_KEY) }
                 if (parsedToken == null) {
