@@ -12,6 +12,7 @@ import id.walt.mdoc.issuersigned.IssuerSignedItem
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.MSO
 import id.walt.mdoc.mso.ValidityInfo
+import id.walt.mdoc.mso.StatusElement
 
 /**
  * MDoc builder, that provides high-level methods to create/issue and sign mdoc documents
@@ -70,8 +71,8 @@ class MDocBuilder(val docType: String) {
    * @param keyID ID of the key to use for signing, if required by crypto provider
    */
   suspend fun signAsync(validityInfo: ValidityInfo,
-                        deviceKeyInfo: DeviceKeyInfo, cryptoProvider: AsyncCOSECryptoProvider, keyID: String? = null): MDoc {
-    val mso = MSO.createFor(nameSpacesMap, deviceKeyInfo, docType, validityInfo)
+                        deviceKeyInfo: DeviceKeyInfo, cryptoProvider: AsyncCOSECryptoProvider, keyID: String? = null, statusElement: StatusElement? = null): MDoc {
+    val mso = MSO.createFor(nameSpacesMap, deviceKeyInfo, docType, validityInfo, statusElement)
     val issuerAuth = cryptoProvider.sign1(mso.toMapElement().toEncodedCBORElement().toCBOR(), keyID)
     return build(issuerAuth)
   }
@@ -84,8 +85,8 @@ class MDocBuilder(val docType: String) {
    * @param keyID ID of the key to use for signing, if required by crypto provider
    */
   fun sign(validityInfo: ValidityInfo,
-           deviceKeyInfo: DeviceKeyInfo, cryptoProvider: COSECryptoProvider, keyID: String? = null): MDoc {
-    val mso = MSO.createFor(nameSpacesMap, deviceKeyInfo, docType, validityInfo)
+           deviceKeyInfo: DeviceKeyInfo, cryptoProvider: COSECryptoProvider, keyID: String? = null, statusElement: StatusElement? = null): MDoc {
+    val mso = MSO.createFor(nameSpacesMap, deviceKeyInfo, docType, validityInfo, statusElement)
     val issuerAuth = cryptoProvider.sign1(mso.toMapElement().toEncodedCBORElement().toCBOR(), null, null, keyID)
     return build(issuerAuth)
   }
