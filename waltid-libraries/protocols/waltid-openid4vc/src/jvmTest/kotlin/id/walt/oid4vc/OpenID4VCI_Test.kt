@@ -33,7 +33,7 @@ import kotlin.test.*
 class OpenID4VCI_Test {
   val ISSUER_BASE_URL = "https://test"
   val CREDENTIAL_OFFER_BASE_URL = "openid-credential-offer://test"
-  val ISSUER_METADATA = OpenID4VCI.createDefaultProviderMetadata(ISSUER_BASE_URL).copy(
+  val ISSUER_METADATA = (OpenID4VCI.createDefaultProviderMetadata(ISSUER_BASE_URL, emptyMap(), OpenID4VCIVersion.D13) as OpenIDProviderMetadataD13).copy(
     credentialConfigurationsSupported = mapOf(
       "VerifiableId" to CredentialSupported(
         CredentialFormat.jwt_vc_json,

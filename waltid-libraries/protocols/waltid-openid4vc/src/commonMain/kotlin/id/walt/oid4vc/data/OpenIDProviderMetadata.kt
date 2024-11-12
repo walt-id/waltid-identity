@@ -2,14 +2,12 @@ package id.walt.oid4vc.data
 
 import id.walt.oid4vc.*
 import id.walt.oid4vc.definitions.*
-import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.*
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.*
 
 /**
  * OpenID Provider metadata object, according to
@@ -60,7 +58,80 @@ import kotlinx.serialization.json.jsonObject
  * @param opTosUri OPTIONAL. URL that the OpenID Provider provides to the person registering the Client to read about OpenID Provider's terms of service. The registration process SHOULD display this URL to the person registering the Client if it is given.
  */
 @Serializable
-data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) constructor(
+sealed class OpenIDProviderMetadata : JsonDataObject() {
+    override fun toJSON(): JsonObject = Json.encodeToJsonElement(OpenIDProviderMetadataSerializer, this).jsonObject
+
+    companion object : JsonDataObjectFactory<OpenIDProviderMetadata>() {
+        override fun fromJSON(jsonObject: JsonObject): OpenIDProviderMetadata =
+            Json.decodeFromJsonElement(OpenIDProviderMetadataSerializer, jsonObject)
+    }
+}
+
+    @Serializable
+data class OpenIDProviderMetadataD10(
+        @SerialName("issuer") val issuer: String? = null,
+        @SerialName("authorization_endpoint") val authorizationEndpoint: String? = null,
+        @SerialName("pushed_authorization_request_endpoint") val pushedAuthorizationRequestEndpoint: String? = null,
+        @SerialName("token_endpoint") val tokenEndpoint: String? = null,
+        @SerialName("userinfo_endpoint") val userinfoEndpoint: String? = null,
+        @SerialName("jwks_uri") val jwksUri: String? = null,
+        @SerialName("registration_endpoint") val registrationEndpoint: String? = null,
+        @EncodeDefault @SerialName("scopes_supported") val scopesSupported: Set<String> = setOf("openid"),
+        @SerialName("response_types_supported") val responseTypesSupported: Set<String>? = null,
+        @EncodeDefault @SerialName("response_modes_supported") val responseModesSupported: Set<ResponseMode> = setOf(
+            ResponseMode.query,
+            ResponseMode.fragment
+        ),
+        @EncodeDefault @SerialName("grant_types_supported") @Serializable(GrantTypeSetSerializer::class) val grantTypesSupported: Set<GrantType> = setOf(
+            GrantType.authorization_code,
+            GrantType.pre_authorized_code
+        ),
+        @SerialName("acr_values_supported") val acrValuesSupported: Set<String>? = null,
+        @SerialName("subject_types_supported") val subjectTypesSupported: Set<SubjectType>? = null,
+        @SerialName("id_token_signing_alg_values_supported") val idTokenSigningAlgValuesSupported: Set<String>? = null,
+        @SerialName("id_token_encryption_alg_values_supported") val idTokenEncryptionAlgValuesSupported: Set<String>? = null,
+        @SerialName("id_token_encryption_enc_values_supported") val idTokenEncryptionEncValuesSupported: Set<String>? = null,
+        @SerialName("userinfo_signing_alg_values_supported") val userinfoSigningAlgValuesSupported: Set<String>? = null,
+        @SerialName("userinfo_encryption_alg_values_supported") val userinfoEncryptionAlgValuesSupported: Set<String>? = null,
+        @SerialName("userinfo_encryption_enc_values_supported") val userinfoEncryptionEncValuesSupported: Set<String>? = null,
+        @SerialName("request_object_signing_alg_values_supported") val requestObjectSigningAlgValuesSupported: Set<String>? = null,
+        @SerialName("request_object_encryption_alg_values_supported") val requestObjectEncryptionAlgValuesSupported: Set<String>? = null,
+        @SerialName("request_object_encryption_enc_values_supported") val requestObjectEncryptionEncValuesSupported: Set<String>? = null,
+        @SerialName("token_endpoint_auth_methods_supported") val tokenEndpointAuthMethodsSupported: Set<String>? = null,
+        @SerialName("token_endpoint_auth_signing_alg_values_supported") val tokenEndpointAuthSigningAlgValuesSupported: Set<String>? = null,
+        @SerialName("display_values_supported") val displayValuesSupported: Set<String>? = null,
+        @SerialName("claim_types_supported") val claimTypesSupported: Set<String>? = null,
+        @SerialName("claims_supported") val claimsSupported: Set<String>? = null,
+        @SerialName("service_documentation") val serviceDocumentation: String? = null,
+        @SerialName("claims_locales_supported") val claimsLocalesSupported: Set<String>? = null,
+        @SerialName("ui_locales_supported") val uiLocalesSupported: Set<String>? = null,
+        @SerialName("claims_parameter_supported") val claimsParameterSupported: Boolean = false,
+        @SerialName("request_parameter_supported") val requestParameterSupported: Boolean = false,
+        @SerialName("request_uri_parameter_supported") val requestUriParameterSupported: Boolean = true,
+        @SerialName("require_request_uri_registration") val requireRequestUriRegistration: Boolean = false,
+        @SerialName("op_policy_uri") val opPolicyUri: String? = null,
+        @SerialName("op_tos_uri") val opTosUri: String? = null,
+        // OID4VCI properties
+        @SerialName("credential_issuer") val credentialIssuer: String? = null,
+        @SerialName("credential_endpoint") val credentialEndpoint: String? = null,
+        @SerialName("credentials_supported") @Serializable(CredentialSupportedMapSerializer::class) val credentialSupported: Map<String, CredentialSupported>? = null,
+        @SerialName("batch_credential_endpoint") val batchCredentialEndpoint: String? = null,
+        @SerialName("deferred_credential_endpoint") val deferredCredentialEndpoint: String? = null,
+        @SerialName("authorization_servers") val authorizationServers: Set<String>? = null,
+        @SerialName("display") @Serializable(DisplayPropertiesListSerializer::class) val display: List<DisplayProperties>? = null,
+        @SerialName("presentation_definition_uri_supported") val presentationDefinitionUriSupported: Boolean? = null,
+        //@SerialName("vp_formats_supported") @Serializable(SupportedVPFormatMapSerializer::class) val vpFormatsSupported: Map<CredentialFormat, SupportedVPFormat>? = null,
+        @SerialName("client_id_schemes_supported") val clientIdSchemesSupported: List<String>? = null,
+        @SerialName("authorization_server") val authorizationServer: String? = authorizationServers?.firstOrNull(), // Move here since if we have a null value for this parameter, the discovery fails
+        @SerialName("code_challenge_methods_supported") val codeChallengeMethodsSupported: List<String>? = null,
+        @SerialName("require_pushed_authorization_requests") val requirePushedAuthorizationRequests: Boolean? = null,
+        @SerialName("dpop_signing_alg_values_supported") val dpopSigningAlgValuesSupported: Set<String>? = null,
+        override val customParameters: Map<String, JsonElement> = mapOf()
+) : OpenIDProviderMetadata()
+
+
+@Serializable
+data class OpenIDProviderMetadataD13(
     @SerialName("issuer") val issuer: String? = null,
     @SerialName("authorization_endpoint") val authorizationEndpoint: String? = null,
     @SerialName("pushed_authorization_request_endpoint") val pushedAuthorizationRequestEndpoint: String? = null,
@@ -119,14 +190,9 @@ data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) co
     @SerialName("require_pushed_authorization_requests") val requirePushedAuthorizationRequests: Boolean? = null,
     @SerialName("dpop_signing_alg_values_supported") val dpopSigningAlgValuesSupported: Set<String>? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
-) : JsonDataObject() {
-    override fun toJSON(): JsonObject = Json.encodeToJsonElement(OpenIDProviderMetadataSerializer, this).jsonObject
-
-    companion object : JsonDataObjectFactory<OpenIDProviderMetadata>() {
-        override fun fromJSON(jsonObject: JsonObject): OpenIDProviderMetadata =
-            Json.decodeFromJsonElement(OpenIDProviderMetadataSerializer, jsonObject)
-    }
-
+    ) : OpenIDProviderMetadata()
+{
+    // TODO: make them abstract in the sealed class
     fun getVctByCredentialConfigurationId(credentialConfigurationId: String) = credentialConfigurationsSupported?.get(credentialConfigurationId)?.vct
 
     fun getVctBySupportedCredentialConfiguration(
@@ -145,5 +211,32 @@ data class OpenIDProviderMetadata @OptIn(ExperimentalSerializationApi::class) co
     }
 }
 
-object OpenIDProviderMetadataSerializer :
-    JsonDataObjectSerializer<OpenIDProviderMetadata>(OpenIDProviderMetadata.serializer())
+object OpenIDProviderMetadataSerializer : KSerializer<OpenIDProviderMetadata> {
+
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("OpenIDProviderMetadata")
+
+    override fun deserialize(decoder: Decoder): OpenIDProviderMetadata {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: throw IllegalStateException("This class can only be deserialized with JSON")
+
+        val jsonObject = jsonDecoder.decodeJsonElement().jsonObject
+
+        return when {
+            "credentials_supported" in jsonObject -> Json.decodeFromJsonElement(OpenIDProviderMetadataD10.serializer(), jsonObject)
+            "credential_configurations_supported" in jsonObject -> Json.decodeFromJsonElement(OpenIDProviderMetadataD13.serializer(), jsonObject)
+            else -> throw IllegalArgumentException("Unknown OpenIDProviderMetadata version: missing expected fields")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: OpenIDProviderMetadata) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw IllegalStateException("This class can only be serialized with JSON")
+
+        val jsonElement: JsonElement = when (value) {
+            is OpenIDProviderMetadataD10 -> Json.encodeToJsonElement(OpenIDProviderMetadataD10.serializer(), value)
+            is OpenIDProviderMetadataD13 -> Json.encodeToJsonElement(OpenIDProviderMetadataD13.serializer(), value)
+        }
+
+        jsonEncoder.encodeJsonElement(jsonElement)
+    }
+}

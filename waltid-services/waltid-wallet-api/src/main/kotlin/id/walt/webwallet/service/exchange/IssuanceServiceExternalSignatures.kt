@@ -53,7 +53,8 @@ object IssuanceServiceExternalSignatures : IssuanceServiceBase() {
         val providerMetadata = getCredentialIssuerOpenIDMetadata(
             credentialOffer.credentialIssuer,
             credentialWallet,
-        )
+        ) as OpenIDProviderMetadataD13
+
         logger.debug { "providerMetadata: $providerMetadata" }
 
         logger.debug { "// resolve offered credentials" }

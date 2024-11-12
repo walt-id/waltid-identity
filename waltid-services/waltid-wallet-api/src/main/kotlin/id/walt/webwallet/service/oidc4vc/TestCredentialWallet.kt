@@ -26,7 +26,7 @@ import id.walt.mdoc.docrequest.MDocRequestBuilder
 import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.oid4vc.OpenID4VP
 import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.data.OpenIDProviderMetadata
+import id.walt.oid4vc.data.OpenIDProviderMetadataD13
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
@@ -332,8 +332,8 @@ class TestCredentialWallet(
         return true
     }
 
-    override val metadata: OpenIDProviderMetadata
-        get() = createDefaultProviderMetadata()
+    override val metadata
+        get() = createDefaultProviderMetadata() as OpenIDProviderMetadataD13
 
     override fun createSIOPSession(
         id: String,

@@ -29,7 +29,7 @@ fun main() {
             get("/.well-known/openid-credential-issuer") {
 
 
-                val providerMetadata = OpenIDProviderMetadata(
+                val providerMetadata = OpenIDProviderMetadataD13(
                     issuer = url,
                     authorizationEndpoint = "$url/authorize",
                     pushedAuthorizationRequestEndpoint = "$url/par",
