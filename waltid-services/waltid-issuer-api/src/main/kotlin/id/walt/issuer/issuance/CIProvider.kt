@@ -238,7 +238,7 @@ open class CIProvider(
                     CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(credentialRequest, vc, request.mapping,
                         request.selectiveDisclosure, vct = metadata.credentialConfigurationsSupported?.get(request.credentialConfigurationId)?.vct ?: throw ConfigurationException(
                             ConfigException("No vct configured for given credential configuration id: ${request.credentialConfigurationId}")
-                        ), issuerDid, issuerKid, request.x5Chain, resolvedIssuerKey).toString()
+                        ), issuerDid ?: issuerKid, issuerDid, issuerKid, request.x5Chain, resolvedIssuerKey).toString()
                   else -> OpenID4VCI.generateW3CJwtVC(credentialRequest, vc, request.mapping, request.selectiveDisclosure,
                         issuerDid, issuerKid, request.x5Chain, resolvedIssuerKey)
               }
