@@ -70,12 +70,14 @@ data class CredentialSupported(
     val scope: String? = null,
     @SerialName("vct") val vct: String? = null,
     @SerialName("cryptographic_binding_methods_supported") val cryptographicBindingMethodsSupported: Set<String>? = null,
+    @SerialName("id") val id: String? = null, // for draft 10
+    @SerialName("cryptographic_suites_supported") val cryptographicSuitesSupported: Set<String>? = null,  // for draft 10
+    val types: List<String>? = null, // for draft 10
     @SerialName("credential_signing_alg_values_supported") val credentialSigningAlgValuesSupported: Set<String>? = null,
     @SerialName("proof_types_supported") val proofTypesSupported: Map<ProofType, ProofTypeMetadata>? = null,
     @Serializable(DisplayPropertiesListSerializer::class) val display: List<DisplayProperties>? = null,
     @SerialName("@context") val context: List<JsonElement>? = null,
     @SerialName("credential_definition") val credentialDefinition: CredentialDefinition? = null,
-    val types: List<String>? = null, // for draft 11
     @SerialName("doctype") val docType: String? = null,
     @Serializable(ClaimDescriptorMapSerializer::class) val credentialSubject: Map<String, ClaimDescriptor>? = null,
     @Serializable(ClaimDescriptorNamespacedMapSerializer::class) val claims: Map<String, Map<String, ClaimDescriptor>>? = null,
