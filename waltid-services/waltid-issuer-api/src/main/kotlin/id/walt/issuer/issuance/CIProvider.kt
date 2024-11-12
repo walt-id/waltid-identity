@@ -28,6 +28,7 @@ import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
 import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.OpenID4VCI
+import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.definitions.OPENID_CREDENTIAL_AUTHORIZATION_TYPE
@@ -64,14 +65,18 @@ import kotlin.uuid.ExperimentalUuidApi
  */
 @OptIn(ExperimentalUuidApi::class)
 open class CIProvider(
-    val baseUrl: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl },
+    val baseUrl: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.D13.versionString}"},
+    val baseUrlD10: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.D10.versionString}"},
+
     val config: CredentialIssuerConfig = CredentialIssuerConfig(credentialConfigurationsSupported = ConfigManager.getConfig<CredentialTypeConfig>().parse())
 ) {
     private val log = KotlinLogging.logger { }
+
     val metadata
-        get() = OpenID4VCI.createDefaultProviderMetadata(baseUrl).copy(
-            credentialConfigurationsSupported = config.credentialConfigurationsSupported
-        )
+        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrl, config.credentialConfigurationsSupported, OpenID4VCIVersion.D13) as OpenIDProviderMetadataD13)
+
+    val metadataD10
+        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrlD10, config.credentialConfigurationsSupported, OpenID4VCIVersion.D10) as OpenIDProviderMetadataD10)
 
     companion object {
 

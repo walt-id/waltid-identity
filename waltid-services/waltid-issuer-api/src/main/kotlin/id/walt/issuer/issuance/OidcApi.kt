@@ -4,6 +4,7 @@ package id.walt.issuer.issuance
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.oid4vc.OpenID4VC
+import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
@@ -25,6 +26,7 @@ import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -63,21 +65,29 @@ object OidcApi : CIProvider() {
         route("", {
             tags = listOf("oidc")
         }) {
-            get("/.well-known/openid-configuration") {
+            get("{standardVersion}/.well-known/openid-configuration") {
+                val standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required")
+                val version = OpenID4VCIVersion.from(standardVersion)
+
+                val metadata = when (version) {
+                    OpenID4VCIVersion.D10 -> metadataD10
+                    OpenID4VCIVersion.D13 -> metadata
+                }
+
                 call.respond(metadata.toJSON())
             }
-            get("/.well-known/openid-credential-issuer") {
+            get("{standardVersion}/.well-known/openid-credential-issuer") {
                 call.respond(metadata.toJSON())
             }
-            get("/.well-known/oauth-authorization-server") {
+            get("{standardVersion}/.well-known/oauth-authorization-server") {
                 call.respond(metadata.toJSON())
             }
 
-            get("/.well-known/jwt-vc-issuer") {
+            get("{standardVersion}/.well-known/jwt-vc-issuer") {
                 call.respond(HttpStatusCode.OK, JWTVCIssuerMetadata(issuer = metadata.issuer, jwksUri = metadata.jwksUri))
             }
 
-            get("/.well-known/vct/{type}") {
+            get("{standardVersion}/.well-known/vct/{type}") {
                 val credType = call.parameters["type"] ?: throw IllegalArgumentException("Type required")
 
                 // issuer api is the <authority>
@@ -96,7 +106,7 @@ object OidcApi : CIProvider() {
             tags = listOf("oidc")
         }) {
 
-            post("/par") {
+            post("{standardVersion}/par") {
                 val authReq = AuthorizationRequest.fromHttpParameters(call.receiveParameters().toMap())
                 try {
                     val session = initializeIssuanceSession(authReq, 5.minutes, null)
@@ -111,11 +121,11 @@ object OidcApi : CIProvider() {
                 }
             }
 
-            get("/jwks") {
+            get("{standardVersion}/jwks") {
                 call.respond(HttpStatusCode.OK, getJwksSessions())
             }
 
-            get("/authorize") {
+            get("{standardVersion}/authorize") {
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
                 try {
                     val issuanceSession = authReq.issuerState?.let { getSession(it) } ?: error("No issuance session found for given issuer state, or issuer state was empty: ${authReq.issuerState}")
@@ -241,7 +251,7 @@ object OidcApi : CIProvider() {
                 }
             }
 
-            post("/direct_post") {
+            post("{standardVersion}/direct_post") {
                 val params = call.receiveParameters().toMap()
                 logger.info { "/direct_post params: $params" }
 
@@ -296,7 +306,7 @@ object OidcApi : CIProvider() {
                 }
             }
 
-            post("/token") {
+            post("{standardVersion}/token") {
                 val params = call.receiveParameters().toMap()
 
                 logger.info { "/token params: $params" }
@@ -330,7 +340,8 @@ object OidcApi : CIProvider() {
                     }
                 }
             }
-            post("/credential_deferred") {
+
+            post("{standardVersion}/credential_deferred") {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
                 if (accessToken.isNullOrEmpty() || !OpenID4VC.verifyTokenSignature(
                         TokenTarget.DEFERRED_CREDENTIAL,
@@ -347,7 +358,8 @@ object OidcApi : CIProvider() {
                     }
                 }
             }
-            post("/batch_credential") {
+
+            post("{standardVersion}/batch_credential") {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
                 val parsedToken = accessToken?.let { OpenID4VC.verifyAndParseToken(it, metadata.issuer!!, TokenTarget.ACCESS, CI_TOKEN_KEY) }
                 if (parsedToken == null) {
