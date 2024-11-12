@@ -3,6 +3,10 @@ kind: ConfigMap
 metadata:
   name: issuer-web-config
 data:
+  _features.conf: |
+    enabledFeatures = [
+        entra
+    ]
   web.conf: |
     webHost = "0.0.0.0"
     webPort = 3000
@@ -32,7 +36,7 @@ spec:
     spec:
       containers:
         - name: issuer
-          image: waltid/issuer-api:__DEFAULT_IMAGE_TAG__
+          image: waltid/issuer-api:0.9.0
           volumeMounts:
             - name: issuer-web-config
               mountPath: "/waltid-issuer-api/config/"
