@@ -385,7 +385,7 @@ object OpenID4VCI {
 
     suspend fun generateSdJwtVC(credentialRequest: CredentialRequest,
                                 credentialData: JsonObject, dataMapping: JsonObject?,
-                                selectiveDisclosure: SDMap?, vct: String,
+                                selectiveDisclosure: SDMap?, vct: String, issuerId: String,
                                 issuerDid: String?, issuerKid: String?, x5Chain: List<String>?,
                                 issuerKey: Key): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
@@ -417,8 +417,7 @@ object OpenID4VCI {
         ?: throw IllegalArgumentException("Either holderKey or holderDid must be given")
 
         val defaultPayloadProperties = defaultPayloadProperties(
-            issuerDid ?: issuerKid ?: issuerKey.getKeyId(),
-            cnf, vct, null, null, null, null)
+             issuerId, cnf, vct, null, null, null, null)
         val undisclosedPayload = sdPayload.undisclosedPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
         val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
 
