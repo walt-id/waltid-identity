@@ -481,17 +481,21 @@ open class CIProvider(
         expiresIn: Duration,
         allowPreAuthorized: Boolean,
         callbackUrl: String? = null,
-        txCode: TxCode? = null, txCodeValue: String? = null,
+        txCode: TxCode? = null,
+        txCodeValue: String? = null,
     ): IssuanceSession = runBlocking {
         val sessionId = randomUUID()
-        val credentialOfferBuilder =
-            OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
+
+        val credentialOfferBuilder = OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
+
         credentialOfferBuilder.addAuthorizationCodeGrant(sessionId)
+
         if (allowPreAuthorized)
             credentialOfferBuilder.addPreAuthorizedCodeGrant(
-                OpenID4VC.generateAuthorizationCodeFor(sessionId, metadata.issuer!!, CI_TOKEN_KEY),
-                txCode
+                preAuthCode = OpenID4VC.generateAuthorizationCodeFor(sessionId, metadata.issuer!!, CI_TOKEN_KEY),
+                txCode = txCode
             )
+
         return@runBlocking IssuanceSession(
             id = sessionId,
             authorizationRequest = null,
