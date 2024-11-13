@@ -42,11 +42,11 @@ import id.walt.webwallet.service.dto.WalletDataTransferObject
 import id.walt.webwallet.service.events.EventDataNotAvailable
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.events.EventType
-import id.walt.webwallet.service.exchange.IssuanceService
+import id.walt.wallet.core.service.exchange.IssuanceService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.keys.SingleKeyResponse
-import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
-import id.walt.webwallet.service.oidc4vc.VPresentationSession
+import id.walt.wallet.core.service.oidc4vc.TestCredentialWallet
+import id.walt.wallet.core.service.oidc4vc.VPresentationSession
 import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService

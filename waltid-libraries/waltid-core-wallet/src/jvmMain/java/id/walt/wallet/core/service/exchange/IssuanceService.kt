@@ -1,29 +1,30 @@
-package id.walt.webwallet.service.exchange
+package id.walt.wallet.core.service.exchange
 
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.CredentialFormat
+import id.walt.oid4vc.data.CredentialOffer
+import id.walt.oid4vc.data.GrantType
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
-import id.walt.oid4vc.responses.*
-import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
-import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
-import io.klogging.logger
+import id.walt.oid4vc.responses.CredentialResponse
+import id.walt.oid4vc.responses.EntraIssuanceCompletionCode
+import id.walt.oid4vc.responses.EntraIssuanceCompletionErrorDetails
+import id.walt.oid4vc.responses.EntraIssuanceCompletionResponse
+import id.walt.wallet.core.manifest.extractor.EntraManifestExtractor
+import id.walt.wallet.core.service.oidc4vc.TestCredentialWallet
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.util.*
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromByteArray
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-object IssuanceService: IssuanceServiceBase() {
+object IssuanceService : IssuanceServiceBase() {
 
-    override val logger = logger<IssuanceService>()
+    override val logger = KotlinLogging.logger {}
 
     suspend fun useOfferRequest(
         offer: String, credentialWallet: TestCredentialWallet, clientId: String,
@@ -188,7 +189,7 @@ object IssuanceService: IssuanceServiceBase() {
                 contentType(ContentType.Application.Json)
                 setBody(issuanceCompletionResponse)
             }.also {
-                logger.debug { "Entra issuance completion callback response: ${it.status}: ${it.bodyAsText()}" }
+                logger.debug { runBlocking { "Entra issuance completion callback response: ${it.status}: ${it.bodyAsText()}" } }
             }
         } else logger.debug { "No authorization request state or redirectUri found in Entra issuance request, skipping completion response callback" }
     }

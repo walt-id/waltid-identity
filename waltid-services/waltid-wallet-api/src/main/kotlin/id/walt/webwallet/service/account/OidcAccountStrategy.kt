@@ -2,7 +2,6 @@ package id.walt.webwallet.service.account
 
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.db.models.OidcLogins
-import id.walt.webwallet.utils.JwkUtils.verifyToken
 import id.walt.webwallet.web.model.OidcAccountRequest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant

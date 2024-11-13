@@ -7,7 +7,7 @@ import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.mdoc.dataelement.toJsonElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.oid4vc.data.CredentialFormat
-import id.walt.webwallet.manifest.provider.ManifestProvider
+import id.walt.wallet.core.manifest.provider.ManifestProvider
 import id.walt.webwallet.utils.JsonUtils
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant

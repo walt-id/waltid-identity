@@ -1,9 +1,9 @@
-package id.walt.webwallet.manifest.extractor
+package id.walt.wallet.core.manifest.extractor
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.EntraIssuanceRequest
-import id.walt.webwallet.manifest.provider.ManifestProvider
+import id.walt.wallet.core.manifest.provider.ManifestProvider
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.serialization.json.JsonObject

@@ -1,4 +1,4 @@
-package id.walt.webwallet.manifest.provider
+package id.walt.wallet.core.manifest.provider
 
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject

@@ -1,6 +1,8 @@
 package id.walt.webwallet.service
 
 import id.walt.commons.config.ConfigManager
+import id.walt.wallet.core.service.exchange.IssuanceService
+import id.walt.wallet.core.service.exchange.IssuanceServiceExternalSignatures
 import id.walt.webwallet.config.OidcConfiguration
 import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
@@ -22,8 +24,6 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.endpoint.EntraServiceEndpointProvider
 import id.walt.webwallet.service.entity.DefaultNameResolutionService
 import id.walt.webwallet.service.events.EventService
-import id.walt.webwallet.service.exchange.IssuanceService
-import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.service.notifications.NotificationService
 import id.walt.webwallet.service.settings.SettingsService
@@ -51,7 +51,6 @@ import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
-
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll

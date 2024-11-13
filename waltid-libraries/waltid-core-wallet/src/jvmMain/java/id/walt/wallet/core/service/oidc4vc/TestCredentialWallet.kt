@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-package id.walt.webwallet.service.oidc4vc
+package id.walt.wallet.core.service.oidc4vc
 
 import COSE.AlgorithmID
 import com.nimbusds.jose.jwk.ECKey
@@ -181,7 +181,7 @@ class TestCredentialWallet(
         println("Matched credentials: $matchedCredentials")
 
         println("Using disclosures: $selectedDisclosures")
-        val key = runBlocking {
+        val key: Key = runBlocking {
             runCatching {
                 DidService.resolveToKey(did).getOrThrow().let { KeysService.get(it.getKeyId()) }
                     ?.let { KeyManager.resolveSerializedKey(it.document) }
