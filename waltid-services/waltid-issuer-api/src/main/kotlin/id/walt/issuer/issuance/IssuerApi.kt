@@ -43,7 +43,7 @@ suspend fun createCredentialOfferUri(
 
     val issuanceSession = OidcApi.initializeCredentialOffer(
         issuanceRequests = overwrittenIssuanceRequests,
-        expiresIn,
+        expiresIn = expiresIn,
         allowPreAuthorized = when (overwrittenIssuanceRequests[0].authenticationMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> true
             else -> false
@@ -53,14 +53,20 @@ suspend fun createCredentialOfferUri(
 
     logger.debug { "issuanceSession: $issuanceSession" }
 
-    val offerRequest =
-        CredentialOfferRequest(null, "${OidcApi.baseUrl}/credentialOffer?id=${issuanceSession.id}")
+    val offerRequest = CredentialOfferRequest(
+        credentialOffer = null,
+        credentialOfferUri = "${OidcApi.baseUrl}/credentialOffer?id=${issuanceSession.id}"
+    )
+
     logger.debug { "offerRequest: $offerRequest" }
 
-    val offerUri = OpenID4VCI.getCredentialOfferRequestUrl(offerRequest,
-        CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix("https://").removePrefix("http://") + "/"
+    val offerUri = OpenID4VCI.getCredentialOfferRequestUrl(
+        credOfferReq = offerRequest,
+        credentialOfferEndpoint = CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix("https://").removePrefix("http://") + "/"
     )
+
     logger.debug { "Offer URI: $offerUri" }
+
     return offerUri
 }
 
