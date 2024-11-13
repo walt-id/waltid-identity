@@ -1,4 +1,4 @@
-package id.walt.webwallet.service.exchange
+package id.walt.wallet.core.service.exchange
 
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.requests.BatchCredentialRequest
@@ -6,7 +6,7 @@ import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.responses.BatchCredentialResponse
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.webwallet.utils.WalletHttpClients
-import io.klogging.logger
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -14,20 +14,20 @@ import kotlinx.serialization.json.JsonObject
 
 object CredentialOfferProcessor {
     private val http = WalletHttpClients.getHttpClient()
-    private val logger = logger<CredentialOfferProcessor>()
+    private val logger = KotlinLogging.logger {}
     suspend fun process(
-      credentialRequests: List<CredentialRequest>,
-      providerMetadata: OpenIDProviderMetadata,
-      accessToken: String,
+        credentialRequests: List<CredentialRequest>,
+        providerMetadata: OpenIDProviderMetadata,
+        accessToken: String,
     ) = when (credentialRequests.size) {
         1 -> processedSingleCredentialOffer(credentialRequests, providerMetadata, accessToken)
         else -> processBatchCredentialOffer(credentialRequests, providerMetadata, accessToken)
     }
 
     private suspend fun processBatchCredentialOffer(
-      credReqs: List<CredentialRequest>,
-      providerMetadata: OpenIDProviderMetadata,
-      accessToken: String,
+        credReqs: List<CredentialRequest>,
+        providerMetadata: OpenIDProviderMetadata,
+        accessToken: String,
     ): List<ProcessedCredentialOffer> {
         val batchCredentialRequest = BatchCredentialRequest(credReqs)
 
@@ -48,9 +48,9 @@ object CredentialOfferProcessor {
     }
 
     private suspend fun processedSingleCredentialOffer(
-      credReqs: List<CredentialRequest>,
-      providerMetadata: OpenIDProviderMetadata,
-      accessToken: String,
+        credReqs: List<CredentialRequest>,
+        providerMetadata: OpenIDProviderMetadata,
+        accessToken: String,
     ): List<ProcessedCredentialOffer> {
         val credReq = credReqs.first()
 

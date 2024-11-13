@@ -1,4 +1,4 @@
-package id.walt.webwallet.service.exchange
+package id.walt.wallet.core.service.exchange
 
 import cbor.Cbor
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
@@ -13,15 +13,15 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.SDJWTVCTypeMetadata
-import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
+import id.walt.wallet.core.service.oidc4vc.TestCredentialWallet
 import id.walt.webwallet.utils.WalletHttpClients
-import io.klogging.Klogger
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.JsonObject
@@ -31,7 +31,7 @@ import kotlinx.serialization.json.jsonPrimitive
 abstract class IssuanceServiceBase {
 
     protected val http = WalletHttpClients.getHttpClient()
-    protected abstract val logger: Klogger
+    protected abstract val logger: io.github.oshai.kotlinlogging.KLogger
 
     protected fun parseOfferParams(offerURL: String) = Url(offerURL).parameters.toMap()
 
@@ -44,7 +44,7 @@ abstract class IssuanceServiceBase {
             credentialWallet.getCIProviderMetadataUrl(issuerURL)
         logger.debug { "Getting provider metadata from: $providerMetadataUri" }
         val providerMetadataResult = http.get(providerMetadataUri)
-        logger.debug { "Provider metadata returned: ${providerMetadataResult.bodyAsText()}" }
+        logger.debug { runBlocking { "Provider metadata returned: ${providerMetadataResult.bodyAsText()}" } }
         return providerMetadataResult
             .body<JsonObject>()
             .let {

@@ -1,4 +1,4 @@
-package id.walt.webwallet.service.exchange
+package id.walt.wallet.core.service.exchange
 
 import id.walt.crypto.keys.Key
 import id.walt.oid4vc.OpenID4VCI
@@ -7,14 +7,14 @@ import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.EntraIssuanceRequest
 import id.walt.oid4vc.requests.TokenRequest
-import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
-import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
-import io.klogging.logger
+import id.walt.wallet.core.manifest.extractor.EntraManifestExtractor
+import id.walt.wallet.core.service.oidc4vc.TestCredentialWallet
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
 
 object IssuanceServiceExternalSignatures : IssuanceServiceBase() {
 
-    override val logger = logger<IssuanceServiceExternalSignatures>()
+    override val logger = KotlinLogging.logger { }
 
     suspend fun prepareExternallySignedOfferRequest(
         offerURL: String,
@@ -155,14 +155,14 @@ object IssuanceServiceExternalSignatures : IssuanceServiceBase() {
         logger.debug { "Using issuer URL: $credentialIssuerURL" }
         val credReqs = offeredCredentialProofsOfPossession.map { offeredCredentialProofOfPossession ->
             val offeredCredential = offeredCredentialProofOfPossession.offeredCredential
-            logger.info("Offered credential format: ${offeredCredential.format.name}")
-            logger.info(
+            logger.info { "Offered credential format: ${offeredCredential.format.name}" }
+            logger.info {
                 "Offered credential cryptographic binding methods: ${
                     offeredCredential.cryptographicBindingMethodsSupported?.joinToString(
                         ", "
                     ) ?: ""
                 }"
-            )
+            }
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
                 proof = offeredCredentialProofOfPossession.toProofOfPossession(),

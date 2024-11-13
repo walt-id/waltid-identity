@@ -1,4 +1,4 @@
-package id.walt.webwallet.service.exchange
+package id.walt.wallet.core.service.exchange
 
 import id.walt.oid4vc.data.CredentialFormat
 import kotlinx.serialization.Serializable

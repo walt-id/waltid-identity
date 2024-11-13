@@ -12,7 +12,7 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.Event
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.CredentialDataResult
-import id.walt.webwallet.service.exchange.IssuanceService
+import id.walt.wallet.core.service.exchange.IssuanceService
 import id.walt.webwallet.service.trust.TrustValidationService
 import id.walt.webwallet.usecase.event.EventLogUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCase

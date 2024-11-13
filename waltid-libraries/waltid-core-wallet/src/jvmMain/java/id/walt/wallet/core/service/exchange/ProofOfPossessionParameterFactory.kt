@@ -1,4 +1,4 @@
-package id.walt.webwallet.service.exchange
+package id.walt.wallet.core.service.exchange
 
 import COSE.OneKey
 import com.nimbusds.jose.jwk.ECKey

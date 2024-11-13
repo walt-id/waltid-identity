@@ -1,4 +1,4 @@
-package id.walt.webwallet.service.oidc4vc
+package id.walt.wallet.core.service.oidc4vc
 
 import id.walt.oid4vc.providers.SIOPSession
 import id.walt.oid4vc.requests.AuthorizationRequest
