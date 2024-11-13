@@ -355,7 +355,13 @@ object OpenID4VCI {
                 ),  // (EBSI) this is required one  https://www.rfc-editor.org/rfc/rfc8414.html#section-2
                 idTokenSigningAlgValuesSupported = setOf("ES256"), // (EBSI) https://openid.net/specs/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-
                 codeChallengeMethodsSupported = listOf("S256"),
-                credentialSupported = credentialSupported.mapValues { (_, credential) -> credential.copy(types = credential.credentialDefinition?.type, credentialDefinition = null) }
+                credentialSupported = credentialSupported.
+                    filterValues { credential ->
+                        credential.format == CredentialFormat.jwt_vc || credential.format == CredentialFormat.jwt_vc_json
+                    }.
+                    mapValues {
+                        (_, credential) -> credential.copy(types = credential.credentialDefinition?.type, credentialDefinition = null)
+                    }
             )
         }
     }
