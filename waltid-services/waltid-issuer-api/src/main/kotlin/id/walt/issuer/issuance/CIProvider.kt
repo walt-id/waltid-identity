@@ -73,10 +73,10 @@ open class CIProvider(
     private val log = KotlinLogging.logger { }
 
     val metadata
-        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrl, config.credentialConfigurationsSupported, OpenID4VCIVersion.D13) as OpenIDProviderMetadataD13)
+        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrl, config.credentialConfigurationsSupported, OpenID4VCIVersion.D13) as OpenIDProviderMetadata.Draft13)
 
     val metadataD10
-        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrlD10, config.credentialConfigurationsSupported, OpenID4VCIVersion.D10) as OpenIDProviderMetadataD10)
+        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrlD10, config.credentialConfigurationsSupported, OpenID4VCIVersion.D10) as OpenIDProviderMetadata.Draft10)
 
     companion object {
 

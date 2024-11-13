@@ -245,7 +245,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         )
         val issuerMetadataUrl = getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
         val issuerMetadata =
-            httpGetAsJson(Url(issuerMetadataUrl))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadataD13 } ?: throw CredentialOfferError(
+            httpGetAsJson(Url(issuerMetadataUrl))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadata.Draft13 } ?: throw CredentialOfferError(
                 null,
                 credentialOffer,
                 CredentialOfferErrorCode.invalid_issuer,
@@ -276,15 +276,15 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         )
         val issuerMetadataUrl = getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
         val issuerMetadata =
-            httpGetAsJson(Url(issuerMetadataUrl))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadataD13} ?: throw CredentialOfferError(
+            httpGetAsJson(Url(issuerMetadataUrl))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadata.Draft13} ?: throw CredentialOfferError(
                 null,
                 credentialOffer,
                 CredentialOfferErrorCode.invalid_issuer,
                 "Could not resolve issuer provider metadata from $issuerMetadataUrl"
             )
         val authorizationServerMetadata = issuerMetadata.authorizationServer?.let { authServer ->
-            httpGetAsJson(Url(getCommonProviderMetadataUrl(authServer)))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadataD13}
-        } ?: issuerMetadata as OpenIDProviderMetadataD13
+            httpGetAsJson(Url(getCommonProviderMetadataUrl(authServer)))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadata.Draft13}
+        } ?: issuerMetadata as OpenIDProviderMetadata.Draft13
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, issuerMetadata)
         val codeVerifier = if (client.useCodeChallenge) randomUUID() else null
 
@@ -370,7 +370,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         )
         val issuerMetadataUrl = getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
         val issuerMetadata =
-            httpGetAsJson(Url(issuerMetadataUrl))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadataD13 } ?: throw CredentialOfferError(
+            httpGetAsJson(Url(issuerMetadataUrl))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadata.Draft13 } ?: throw CredentialOfferError(
                 null,
                 credentialOffer,
                 CredentialOfferErrorCode.invalid_issuer,
@@ -408,8 +408,8 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
             userPIN,
             codeVerifier
         )
-        authorizationServerMetadata as OpenIDProviderMetadataD13
-        issuerMetadata as OpenIDProviderMetadataD13
+        authorizationServerMetadata as OpenIDProviderMetadata.Draft13
+        issuerMetadata as OpenIDProviderMetadata.Draft13
 
         val tokenHttpResp = httpSubmitForm(Url(authorizationServerMetadata.tokenEndpoint!!), parametersOf(tokenReq.toHttpParameters()))
         if (!tokenHttpResp.status.isSuccess() || tokenHttpResp.body == null) throw TokenError(

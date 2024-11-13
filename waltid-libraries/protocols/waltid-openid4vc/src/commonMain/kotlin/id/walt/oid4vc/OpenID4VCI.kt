@@ -134,8 +134,8 @@ object OpenID4VCI {
 
     fun resolveOfferedCredentials(credentialOffer: CredentialOffer, providerMetadata: OpenIDProviderMetadata): List<OfferedCredential> {
         val supportedCredentials = when (providerMetadata) {
-            is OpenIDProviderMetadataD10 -> providerMetadata.credentialSupported ?: mapOf()
-            is OpenIDProviderMetadataD13 -> providerMetadata.credentialConfigurationsSupported ?: mapOf()
+            is OpenIDProviderMetadata.Draft10 -> providerMetadata.credentialSupported ?: mapOf()
+            is OpenIDProviderMetadata.Draft13 -> providerMetadata.credentialConfigurationsSupported ?: mapOf()
         }
 
         return credentialOffer.credentialConfigurationIds.mapNotNull { c ->
@@ -309,8 +309,9 @@ object OpenID4VCI {
 
     fun createDefaultProviderMetadata(baseUrl: String, credentialSupported: Map<String, CredentialSupported>, version: OpenID4VCIVersion) : OpenIDProviderMetadata {
 
+
         return when (version) {
-            OpenID4VCIVersion.D13 -> OpenIDProviderMetadataD13(
+            OpenID4VCIVersion.D13 -> OpenIDProviderMetadata.Draft13(
                 issuer = baseUrl,
                 authorizationEndpoint = "$baseUrl/authorize",
                 pushedAuthorizationRequestEndpoint = "$baseUrl/par",
@@ -334,7 +335,7 @@ object OpenID4VCI {
                 credentialConfigurationsSupported = credentialSupported
             )
 
-            OpenID4VCIVersion.D10 -> OpenIDProviderMetadataD10(
+            OpenID4VCIVersion.D10 -> OpenIDProviderMetadata.Draft10(
                 issuer = baseUrl,
                 authorizationEndpoint = "$baseUrl/authorize",
                 pushedAuthorizationRequestEndpoint = "$baseUrl/par",
@@ -408,8 +409,8 @@ object OpenID4VCI {
             )
         }
         val supportedCredentialFormats = when (openIDProviderMetadata) {
-            is OpenIDProviderMetadataD13 -> openIDProviderMetadata.credentialConfigurationsSupported?.values?.map { it.format }?.toSet() ?: setOf()
-            is OpenIDProviderMetadataD10 -> openIDProviderMetadata.credentialSupported?.values?.map { it.format }?.toSet() ?: setOf()
+            is OpenIDProviderMetadata.Draft13 -> openIDProviderMetadata.credentialConfigurationsSupported?.values?.map { it.format }?.toSet() ?: setOf()
+            is OpenIDProviderMetadata.Draft10 -> openIDProviderMetadata.credentialSupported?.values?.map { it.format }?.toSet() ?: setOf()
         }
 
         if (!supportedCredentialFormats.contains(credentialRequest.format))

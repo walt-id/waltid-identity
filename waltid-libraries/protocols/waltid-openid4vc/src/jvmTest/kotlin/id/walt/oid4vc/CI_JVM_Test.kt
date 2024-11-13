@@ -45,7 +45,7 @@ import kotlin.test.*
 
 class CI_JVM_Test {
 
-    var testMetadata = OpenIDProviderMetadataD13(
+    var testMetadata = OpenIDProviderMetadata.Draft13(
         authorizationEndpoint = "https://localhost/oidc",
         credentialConfigurationsSupported = mapOf(
             "UniversityDegreeCredential_jwt_vc_json" to CredentialSupported(
@@ -248,7 +248,7 @@ class CI_JVM_Test {
         println("// get issuer metadata")
         val providerMetadataUri =
             credentialWallet.getCIProviderMetadataUrl(credOfferReq.credentialOffer!!.credentialIssuer)
-        val providerMetadata = ktorClient.get(providerMetadataUri).call.body<OpenIDProviderMetadata>() as OpenIDProviderMetadataD13
+        val providerMetadata = ktorClient.get(providerMetadataUri).call.body<OpenIDProviderMetadata>() as OpenIDProviderMetadata.Draft13
         println("providerMetadata: $providerMetadata")
         assertNotNull(actual = providerMetadata.authorizationEndpoint)
         println("// resolve offered credentials")
@@ -303,7 +303,7 @@ class CI_JVM_Test {
         val providerMetadataUri =
             credentialWallet.getCIProviderMetadataUrl(credOfferReq.credentialOffer!!.credentialIssuer)
         val providerMetadata =
-            ktorClient.get(providerMetadataUri).call.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }  as OpenIDProviderMetadataD13
+            ktorClient.get(providerMetadataUri).call.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }  as OpenIDProviderMetadata.Draft13
         println("providerMetadata: $providerMetadata")
         assertNotNull(actual = providerMetadata.authorizationEndpoint)
         println("// resolve offered credentials")
@@ -359,7 +359,7 @@ class CI_JVM_Test {
         val providerMetadataUri =
             credentialWallet.getCIProviderMetadataUrl(credOfferReq.credentialOffer!!.credentialIssuer)
         val providerMetadata =
-            ktorClient.get(providerMetadataUri).call.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }  as OpenIDProviderMetadataD13
+            ktorClient.get(providerMetadataUri).call.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }  as OpenIDProviderMetadata.Draft13
         println("providerMetadata: $providerMetadata")
         assertNotNull(actual = providerMetadata.tokenEndpoint)
         assertNotNull(actual = providerMetadata.credentialEndpoint)
@@ -685,7 +685,7 @@ fun testIsolatedFunctionsCreateCredentialOffer(baseUrl: String, issuerState: Str
 
 suspend fun testIsolatedFunctionsResolveCredentialOffer(credOfferUrl: String): OfferedCredential {
     val parsedCredOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(credOfferUrl)
-    val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer) as OpenIDProviderMetadataD13
+    val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer) as OpenIDProviderMetadata.Draft13
     assertEquals(expected = parsedCredOffer.credentialIssuer, actual = providerMetadata.credentialIssuer)
 
     println("// resolve offered credentials")

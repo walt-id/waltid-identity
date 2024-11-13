@@ -13,7 +13,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.mdoc.dataelement.MapElement
-import id.walt.oid4vc.data.OpenIDProviderMetadataD13
+import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
@@ -91,7 +91,7 @@ class EBSITestWallet(
     ) = SIOPSession(id, authorizationRequest, expirationTimestamp)
 
     override val metadata
-        get() = createDefaultProviderMetadata() as OpenIDProviderMetadataD13
+        get() = createDefaultProviderMetadata() as OpenIDProviderMetadata.Draft13
 
     override fun getSession(id: String): SIOPSession? = sessionCache[id]
     override fun getSessionByAuthServerState(authServerState: String): SIOPSession? {
