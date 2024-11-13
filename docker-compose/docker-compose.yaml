@@ -154,14 +154,14 @@ services:
       timeout: 2s
       retries: 5
     volumes:
-      - ./vault/config.hcl:/vault/config/config.hcl:ro
+      - ./vault/config.hcl:/vault/config/config.hcl
       - ./vault/init.sh:/vault/scripts/init.sh
       - vault_data:/vault/file
     ports:
-      - "8200:8200"
+      - "$VAULT_PORT:8200"
     environment:
-      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
-      VAULT_ADDR: "http://127.0.0.1:8200"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:$VAULT_PORT"
+      VAULT_ADDR: "http://127.0.0.1:$VAULT_PORT"
     command: server -config=/vault/config/config.hcl -dev -dev-root-token-id="dev-only-token"
     restart: always
 
@@ -173,7 +173,7 @@ services:
     container_name: vault-init
     environment:
       VAULT_DEV_ROOT_TOKEN_ID: "dev-only-token"
-      VAULT_ADDR: "http://vault:8200"
+      VAULT_ADDR: "http://vault:$VAULT_PORT"
     depends_on:
       vault:
         condition: service_healthy
