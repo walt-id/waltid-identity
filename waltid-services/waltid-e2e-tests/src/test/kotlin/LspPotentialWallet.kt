@@ -76,7 +76,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         // === resolve issuer metadata ===
         val issuerMetadata =
             client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess()
-                .body<OpenIDProviderMetadataD13>()
+                .body<OpenIDProviderMetadata.Draft13>()
         assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
         assertContains(
             issuerMetadata.credentialConfigurationsSupported!!.keys,
@@ -222,7 +222,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         // === resolve issuer metadata ===
         val issuerMetadata =
             client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess()
-                .body<OpenIDProviderMetadataD13>()
+                .body<OpenIDProviderMetadata.Draft13>()
         assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
         assertContains(
             issuerMetadata.credentialConfigurationsSupported!!.keys,

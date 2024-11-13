@@ -114,7 +114,7 @@ suspend fun main() {
     check(credOffer.toJSONString() == parsedCredOffer.toJSONString())
 
     println("Resolve metadata from ${parsedCredOffer.credentialIssuer}")
-    val providerMetadata = runBlocking { OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer) as OpenIDProviderMetadataD13 }
+    val providerMetadata = runBlocking { OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer) as OpenIDProviderMetadata.Draft13 }
 
     check(parsedCredOffer.credentialIssuer == providerMetadata.credentialIssuer)
 

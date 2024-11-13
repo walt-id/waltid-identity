@@ -31,7 +31,7 @@ import kotlin.uuid.Uuid
 abstract class OpenIDProvider<S : AuthorizationSession>(
     val baseUrl: String,
 ) : ISessionCache<S>, ITokenProvider {
-    abstract val metadata: OpenIDProviderMetadataD13
+    abstract val metadata: OpenIDProviderMetadata.Draft13
     abstract val config: OpenIDProviderConfig
 
     protected open fun createDefaultProviderMetadata() = OpenID4VCI.createDefaultProviderMetadata(baseUrl, emptyMap(), OpenID4VCIVersion.D13)
