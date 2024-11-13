@@ -76,10 +76,28 @@ object OidcApi : CIProvider() {
 
                 call.respond(metadata.toJSON())
             }
+
             get("{standardVersion}/.well-known/openid-credential-issuer") {
+                val standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required")
+                val version = OpenID4VCIVersion.from(standardVersion)
+
+                val metadata = when (version) {
+                    OpenID4VCIVersion.D10 -> metadataD10
+                    OpenID4VCIVersion.D13 -> metadata
+                }
+
                 call.respond(metadata.toJSON())
             }
+
             get("{standardVersion}/.well-known/oauth-authorization-server") {
+                val standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required")
+                val version = OpenID4VCIVersion.from(standardVersion)
+
+                val metadata = when (version) {
+                    OpenID4VCIVersion.D10 -> metadataD10
+                    OpenID4VCIVersion.D13 -> metadata
+                }
+
                 call.respond(metadata.toJSON())
             }
 
