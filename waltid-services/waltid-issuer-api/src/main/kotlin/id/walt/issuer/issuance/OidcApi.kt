@@ -101,11 +101,11 @@ object OidcApi : CIProvider() {
                 call.respond(metadata.toJSON())
             }
 
-            get("{standardVersion}/.well-known/jwt-vc-issuer") {
+            get("/.well-known/jwt-vc-issuer") {
                 call.respond(HttpStatusCode.OK, JWTVCIssuerMetadata(issuer = metadata.issuer, jwksUri = metadata.jwksUri))
             }
 
-            get("{standardVersion}/.well-known/vct/{type}") {
+            get("/.well-known/vct/{type}") {
                 val credType = call.parameters["type"] ?: throw IllegalArgumentException("Type required")
 
                 // issuer api is the <authority>
