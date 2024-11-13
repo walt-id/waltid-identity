@@ -521,7 +521,7 @@ enum class OpenID4VCIVersion(val versionString: String) {
 
     companion object {
         fun from(version: String): OpenID4VCIVersion {
-            return values().find { it.versionString == version }
+            return entries.find { it.versionString == version }
                 ?: throw IllegalArgumentException("Unsupported version: $version. Supported Versions are: Draft13 -> d13 and Draft10 -> d10")
         }
     }
