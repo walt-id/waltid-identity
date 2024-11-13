@@ -173,7 +173,7 @@ services:
     container_name: vault-init
     environment:
       VAULT_DEV_ROOT_TOKEN_ID: "dev-only-token"
-      VAULT_ADDR: "http://host.docker.internal:8200"
+      VAULT_ADDR: "http://vault:8200"
     depends_on:
       vault:
         condition: service_healthy
