@@ -67,7 +67,7 @@ sealed class OpenIDProviderMetadata : JsonDataObject() {
     }
 }
 
-    @Serializable
+@Serializable
 data class OpenIDProviderMetadataD10(
         @SerialName("issuer") val issuer: String? = null,
         @SerialName("authorization_endpoint") val authorizationEndpoint: String? = null,
@@ -127,8 +127,23 @@ data class OpenIDProviderMetadataD10(
         @SerialName("require_pushed_authorization_requests") val requirePushedAuthorizationRequests: Boolean? = null,
         @SerialName("dpop_signing_alg_values_supported") val dpopSigningAlgValuesSupported: Set<String>? = null,
         override val customParameters: Map<String, JsonElement> = mapOf()
-) : OpenIDProviderMetadata()
+) : OpenIDProviderMetadata() {
 
+    override fun toJSON(): JsonObject {
+        val originalJson = super.toJSON().toMutableMap()
+
+        credentialSupported?.let { credentials ->
+            val jsonArray = credentials.map { (id, credential) ->
+                val jsonObject = credential.toJSON().toMutableMap()
+                jsonObject["id"] = JsonPrimitive(id)
+                JsonObject(jsonObject)
+            }
+            originalJson["credentials_supported"] = JsonArray(jsonArray)
+        }
+
+        return JsonObject(originalJson)
+    }
+}
 
 @Serializable
 data class OpenIDProviderMetadataD13(
