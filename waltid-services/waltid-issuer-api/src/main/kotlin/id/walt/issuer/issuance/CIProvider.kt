@@ -224,23 +224,15 @@ open class CIProvider(
             val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
 
             request.run {
-              var issuerKid = issuerDid ?: resolvedIssuerKey.getKeyId()
-              if(!issuerDid.isNullOrEmpty()) {
-                if (issuerDid.startsWith("did:key") && issuerDid.length == 186) // EBSI conformance corner case when issuer uses did:key instead of did:ebsi and no trust framework is defined
-                  issuerKid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
-                else if (issuerDid.startsWith("did:ebsi"))
-                  issuerKid = issuerDid + "#" + resolvedIssuerKey.getKeyId()
-              }
-
                 val holderKeyJWK =  JWKKey.importJWK(holderKey.toString()).getOrNull()?.exportJWKObject()?.plus("kid" to JWKKey.importJWK(holderKey.toString()).getOrThrow().getKeyId())?.toJsonObject()
 
                 when (credentialFormat) {
                     CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(credentialRequest, vc, request.mapping,
                         request.selectiveDisclosure, vct = metadata.credentialConfigurationsSupported?.get(request.credentialConfigurationId)?.vct ?: throw ConfigurationException(
                             ConfigException("No vct configured for given credential configuration id: ${request.credentialConfigurationId}")
-                        ), issuerDid ?: issuerKid, issuerDid, issuerKid, request.x5Chain, resolvedIssuerKey).toString()
+                        ), issuerDid ?: baseUrl, issuerDid, request.x5Chain, resolvedIssuerKey).toString()
                   else -> OpenID4VCI.generateW3CJwtVC(credentialRequest, vc, request.mapping, request.selectiveDisclosure,
-                        issuerDid, issuerKid, request.x5Chain, resolvedIssuerKey)
+                        issuerDid, request.x5Chain, resolvedIssuerKey)
               }
             }.also { log.debug { "Respond VC: $it" } }
         }))
