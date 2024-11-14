@@ -243,7 +243,7 @@ fun Application.testApp() {
 
 The new part here is mainly `fun Route.globalMultistepExample()`
 
-### Usage
+## Usage of the newly implemented example
 
 Some command line examples with [httpie](https://httpie.io/cli) (similar to curl):
 
