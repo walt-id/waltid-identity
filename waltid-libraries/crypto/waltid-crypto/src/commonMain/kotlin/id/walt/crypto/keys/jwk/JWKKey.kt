@@ -59,6 +59,7 @@ expect class JWKKey(jwk: String?, _keyId: String? = null) : Key {
     override suspend fun getPublicKey(): JWKKey
     override suspend fun getPublicKeyRepresentation(): ByteArray
     override suspend fun getMeta(): JwkKeyMeta
+    override suspend fun deleteKey(): Boolean
 
 
     override val hasPrivateKey: Boolean
