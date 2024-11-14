@@ -19,26 +19,28 @@ For example:
 However, in a special case, some authentication methods do not work on an account identifier, but on an account itself.
 For example, certain 2FA (two-factor authentication) methods, like TOTP. TOTP has to know what account to work on, because
 it has to compare the secret for a certain account. But TOTP login does not involve any account id, you just share the 6-digit pin.
-For this reason, you have to have used a certain auth method prior to TOTP, an account can be selected (for example, you could first use
-Email & password, and then use TOTP after that - with the first method, the account can be selected by email, and then the information what
-secret to compare against exists for the TOTP method). So some methods, like TOTP, actually have no identifier (there is no TotpIdentifier).
+For this reason, you have to have used a certain auth method prior to TOTP, so that an account can be selected (for example, you could first
+use Email & password, and then use TOTP after that - with the first method, the account can be selected by email, and then the information
+what secret to compare against exists for the TOTP method). So some methods, like TOTP, actually have no identifier (there is no
+`TotpIdentifier` or similar).
 
 ## Short intro: method
 
 The Auth Method is what holds the implementation that checks authentication.
 
 - Of course, authentication with username & password works differently than with public key or TOTP
-- Some methods have data, some methods have configuration, some have neither
-- Configuration is global to the flow, e.g.:
+- Some methods have configuration (global to the flow), some methods have StoredData, and some have neither
+- Configuration vs StoredData:
     - OIDC remote details (what OIDC server to authenticate against, client id & client secret, etc.) would be global to the flow (the same
       for all users of the flow) -> thus it is AuthMethodConfiguration
     - With the UserPass auth method, users are authenticated against their passwords. Of course, the passwords are not the same for
-      everyone (and thus NOT global to the flow), but different for every user -> thus it is AuthMethodStoredData (stored for every user)
-
+      everyone (and thus NOT global to the flow), but different for every user -> thus it is AuthMethodStoredData (stored for every user
+      individually)
 
 ## Let's see the code
 
 ### Identifier
+
 ```kotlin
 package id.walt.ktorauthnz.accounts.identifiers.methods
 
@@ -53,7 +55,8 @@ data class MultiStepExampleIdentifier(
 
     override fun toDataString() = publicKey // what is part of this identifier? In this case just the string "publicKey"
 
-    companion object : AccountIdentifierFactory<MultiStepExampleIdentifier>("multistep-example") { // this creator id also has to match with identifierName
+    companion object :
+        AccountIdentifierFactory<MultiStepExampleIdentifier>("multistep-example") { // this creator id also has to match with identifierName
         override fun fromAccountIdentifierDataString(dataString: String) = MultiStepExampleIdentifier(dataString)
 
         val EXAMPLE = MultiStepExampleIdentifier("0xABCDEF0123456789") // Define a nice example for the docs
@@ -62,6 +65,7 @@ data class MultiStepExampleIdentifier(
 ```
 
 Remember to add this new method to `AccountIdentifierManager.kt`:
+
 ```kotlin
 private val defaultIdentifiers =
     listOf(
@@ -71,6 +75,7 @@ private val defaultIdentifiers =
 ```
 
 ### Method
+
 ```kotlin
 package id.walt.ktorauthnz.methods
 
@@ -108,31 +113,34 @@ object MultiStepExample : AuthenticationMethod("multistep-example") {
 
     override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
         route("multistep-example") {
-            get("nonce") {
+            get("nonce") { // Step 1
                 context.respond(makeNonce())
             }
-            post<MultiStepExampleSigned>("signed", {
+            
+            post<MultiStepExampleSigned>("signed", { // Step 2
                 request { body<MultiStepExampleSigned>() }
             }) { req ->
                 val session = getSession(authContext)
 
-                verifiySignature(req)
+                verifiySignature(req) // Verification
 
-                val identifier = MultiStepExampleIdentifier(req.publicKey)
+                // Verification was successful:
+                
+                val identifier = MultiStepExampleIdentifier(req.publicKey) // select identifier (= who logged in with this method now?)
 
-
-                context.handleAuthSuccess(session, identifier.resolveToAccountId())
+                context.handleAuthSuccess(session, identifier.resolveToAccountId()) // handleAuthSuccess() -> session is now logged in
             }
         }
-
     }
 }
 ```
 
 ### Add it to the example
+
 To try out our new method, we have to use it somewhere.
 
 Add it in the test/kotlin/id/walt `ExampleWeb.kt` to try it out:
+
 ```kotlin
 @file:OptIn(ExperimentalUuidApi::class)
 
@@ -217,9 +225,11 @@ fun Application.testApp() {
     }
 }
 ```
+
 The new part here is mainly `fun Route.globalMultistepExample()`
 
 ### Usage
+
 Some command line examples with [httpie](https://httpie.io/cli) (similar to curl):
 
 ```bash
