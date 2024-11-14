@@ -65,6 +65,7 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
+                implementation("org.junit.jupiter:junit-jupiter-api:5.11.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 implementation("org.slf4j:slf4j-simple:2.0.16")
             }

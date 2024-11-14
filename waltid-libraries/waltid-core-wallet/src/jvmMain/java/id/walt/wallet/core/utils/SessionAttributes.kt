@@ -1,14 +1,15 @@
 package id.walt.wallet.core.utils
 
 import id.walt.crypto.keys.Key
+import id.walt.wallet.core.service.exchange.CredentialDataResult
 
 object SessionAttributes {
 
     // TODO FIXME: openid4vc lib drops VPresentationSession attributes
-    val HACK_outsideMappedSelectedCredentialsPerSession = HashMap<String, List<WalletCredential>>()
+    val HACK_outsideMappedSelectedCredentialsPerSession = HashMap<String, List<CredentialDataResult>>()
 
     // TODO FIXME: openid4vc lib drops VPresentationSession attributes
-    val HACK_outsideMappedSelectedDisclosuresPerSession = HashMap<String, Map<WalletCredential, List<String>>>()
+    val HACK_outsideMappedSelectedDisclosuresPerSession = HashMap<String, Map<CredentialDataResult, List<String>>>()
 
     val HACK_outsideMappedKey = HashMap<String, Key>()
 

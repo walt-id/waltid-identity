@@ -1,5 +1,6 @@
 package id.walt.wallet.core
 
+import id.walt.crypto.keys.Key
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.sdjwt.SDJWTVCTypeMetadata
@@ -12,8 +13,6 @@ import id.walt.wallet.core.utils.WalletCredential
 import id.walt.webwallet.usecase.exchange.FilterData
 import io.ktor.http.*
 import io.ktor.util.*
-import kotlinx.serialization.json.JsonObject
-import kotlin.uuid.ExperimentalUuidApi
 
 object CoreWallet {
 
@@ -28,11 +27,13 @@ object CoreWallet {
      *
      * @return List of credentials
      */
-    suspend fun useOfferRequest(offer: String, did: String): List<CredentialDataResult> {
+    suspend fun useOfferRequest(offer: String, did: String, key: Key): List<CredentialDataResult> {
         return IssuanceService.useOfferRequest(
             offer = offer,
             credentialWallet = SSIKit2WalletService.getCredentialWallet(did = did),
-            clientId = SSIKit2WalletService.testCIClientConfig.clientID
+            clientId = SSIKit2WalletService.testCIClientConfig.clientID,
+            key = key,
+            did = did
         )
     }
 
@@ -40,24 +41,22 @@ object CoreWallet {
      * Present credential(s) to a Relying Party
      *
      */
-    suspend fun usePresentationRequest(req: UsePresentationRequest): UsePresentationResponse {
+    suspend fun usePresentationRequest(
+        did: String,
+        presentationRequest: String,
+        selectedCredentials: List<CredentialDataResult>,
+        disclosures: Map<CredentialDataResult, List<String>>? = null,
+        key: Key,
+    ): UsePresentationResponse {
         val wallet = getWalletService()
-
-        val request = req.presentationRequest
-        val did = req.did ?: error("Missing DID")
-
-        val selectedCredentialIds = req.selectedCredentials
-        // TODO -> ?: auto matching
-        val disclosures = req.disclosures
-
 
         val result = wallet.usePresentationRequest(
             PresentationRequestParameter(
+                key = key,
                 did = did,
-                request = request,
-                selectedCredentials = selectedCredentialIds,
+                request = presentationRequest,
+                selectedCredentials = selectedCredentials,
                 disclosures = disclosures,
-                note = req.note,
             )
         ) // TODO add disclosures here
 
@@ -70,6 +69,7 @@ object CoreWallet {
             return when (err) {
                 is SSIKit2WalletService.PresentationError ->
                     UsePresentationResponse(ok = false, redirectUri = err.redirectUri, errorMessage = err.message)
+
                 else -> UsePresentationResponse(ok = false, redirectUri = null, errorMessage = err?.message)
             }
         }
@@ -82,8 +82,12 @@ object CoreWallet {
      *
      * @return Credentials that match the presentation definition
      */
-    fun matchCredentialsForPresentationDefinition(credentials: List<WalletCredential>, presentationDefinition: PresentationDefinition): List<WalletCredential> {
-        val matchedCredentials = WalletServiceManager.matchPresentationDefinitionCredentialsUseCase.match(credentials, presentationDefinition)
+    fun matchCredentialsForPresentationDefinition(
+        credentials: List<WalletCredential>,
+        presentationDefinition: PresentationDefinition
+    ): List<WalletCredential> {
+        val matchedCredentials =
+            WalletServiceManager.matchPresentationDefinitionCredentialsUseCase.match(credentials, presentationDefinition)
         return matchedCredentials
     }
 
@@ -94,7 +98,10 @@ object CoreWallet {
      *
      * @return Filters that failed to fulfill the presentation definition
      */
-    fun unmatchedCredentialsForPresentationDefinition(credentials: List<WalletCredential>, presentationDefinition: PresentationDefinition): List<FilterData> {
+    fun unmatchedCredentialsForPresentationDefinition(
+        credentials: List<WalletCredential>,
+        presentationDefinition: PresentationDefinition
+    ): List<FilterData> {
         val unmatchedCredentialTypes = WalletServiceManager.unmatchedPresentationDefinitionCredentialsUseCase.find(
             credentials, presentationDefinition
         )

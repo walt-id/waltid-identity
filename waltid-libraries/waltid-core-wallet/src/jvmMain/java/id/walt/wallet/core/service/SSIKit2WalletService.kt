@@ -109,6 +109,9 @@ class SSIKit2WalletService(
 
         SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
             parameter.selectedCredentials
+        SessionAttributes.HACK_outsideMappedKey[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
+            parameter.key
+
         if (parameter.disclosures != null) {
             SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
                 parameter.disclosures
