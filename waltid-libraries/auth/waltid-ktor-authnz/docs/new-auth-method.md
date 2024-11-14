@@ -259,17 +259,17 @@ http POST localhost:8088/auth/register-by-identifier type=multistep-example publ
 
 # Get challenge
 http GET localhost:8088/auth/flows/global-multistep-example/multistep-example/nonce
+# Responds with:
 n1397597722  # this is the nonce to sign, would then become a JWT etc... see comments in MultistepExample auth method
 
 
 # Invalid signature
 http POST localhost:8088/auth/flows/global-multistep-example/multistep-example/signed challenge=n1397597722 signed=blahblah publicKey=0xABCDEF0123456789
-# 500: AuthenticationFailureException(message=Invalid signature)
+# Responds with: 500: AuthenticationFailureException(message=Invalid signature)
 
 
 # Correct signature
 http POST localhost:8088/auth/flows/global-multistep-example/multistep-example/signed challenge=n1397597722 signed=n1397597722-signed publicKey=0xABCDEF0123456789
-
 # Responds with:
 {
     "session_id": "8b2ff5b4-f6bc-4390-8308-dbe57f177e1e",
@@ -279,7 +279,6 @@ http POST localhost:8088/auth/flows/global-multistep-example/multistep-example/s
 
 # Try to use authenticated route
 http -v localhost:8088/protected -A bearer -a 7f2505a7-3ed0-47c0-b214-67c2c46e9f0b
-
 # Responds with:
 Hello token 7f2505a7-3ed0-47c0-b214-67c2c46e9f0b, you are 897c98e5-0db2-4f09-95d0-2a3322e2ef3b  # token and user id
 ```
