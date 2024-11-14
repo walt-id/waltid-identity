@@ -512,8 +512,17 @@ class SSIKit2WalletService(
         }
     }
 
-    override suspend fun deleteKey(alias: String): Boolean = runCatching {
-        KeysService.get(walletId, alias)?.let { Json.parseToJsonElement(it.document) }?.run {
+    override suspend fun deleteKey(alias: String, hardDelete: Boolean): Boolean = runCatching {
+
+        KeysService.get(walletId, alias)?.let {
+            KeyManager.resolveSerializedKey(it.document)
+                .also { if (hardDelete) it.deleteKey() }
+        }
+
+
+    }.fold(
+        onSuccess = {
+            KeysService.delete(walletId, alias)
             eventUseCase.log(
                 action = EventType.Key.Delete,
                 originator = "wallet",
@@ -521,17 +530,15 @@ class SSIKit2WalletService(
                 accountId = accountId,
                 walletId = walletId,
                 data = eventUseCase.keyEventData(
-                    id = this.jsonObject["jwk"]?.jsonObject?.get("kid")?.jsonPrimitive?.content
-                        ?: EventDataNotAvailable,
-                    algorithm = this.jsonObject["jwk"]?.jsonObject?.get("kty")?.jsonPrimitive?.content
-                        ?: EventDataNotAvailable,
+                    id = alias,
+                    algorithm = EventDataNotAvailable,
                     kmsType = EventDataNotAvailable
                 )
             )
-        }
-    }.let {
-        KeysService.delete(walletId, alias)
-    }
+            true
+        },
+        onFailure = { throw it }
+    )
 
     override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> =
         WalletOperationHistories.selectAll()
