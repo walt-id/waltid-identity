@@ -512,17 +512,23 @@ class SSIKit2WalletService(
         }
     }
 
-    override suspend fun deleteKey(alias: String, hardDelete: Boolean): Boolean = runCatching {
-
-        KeysService.get(walletId, alias)?.let {
-            KeyManager.resolveSerializedKey(it.document)
-                .also { if (hardDelete) it.deleteKey() }
-        }
+    override suspend fun deleteKey(alias: String): Boolean = runCatching {
 
 
-    }.fold(
-        onSuccess = {
+        val key = KeysService.get(walletId, alias)
+
+
+        key?.let {
+
+            val resolvedKey = KeyManager.resolveSerializedKey(it.document)
+
+
+            resolvedKey.deleteKey()
+
+
             KeysService.delete(walletId, alias)
+
+
             eventUseCase.log(
                 action = EventType.Key.Delete,
                 originator = "wallet",
@@ -531,13 +537,19 @@ class SSIKit2WalletService(
                 walletId = walletId,
                 data = eventUseCase.keyEventData(
                     id = alias,
-                    algorithm = EventDataNotAvailable,
+                    algorithm = resolvedKey.keyType.name,
                     kmsType = EventDataNotAvailable
                 )
             )
-            true
-        },
-        onFailure = { throw it }
+        } ?: throw IllegalArgumentException("Key not found for alias: $alias")
+
+    }.fold(
+        onSuccess = { true },
+        onFailure = {
+            logger.error(it) { "Failed to delete key: ${it.message}" }
+            throw IllegalArgumentException("Failed to delete key: ${it.message}")
+            false
+        }
     )
 
     override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> =
