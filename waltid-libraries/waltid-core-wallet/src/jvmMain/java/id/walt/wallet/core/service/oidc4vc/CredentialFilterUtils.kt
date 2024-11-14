@@ -1,7 +1,7 @@
 package id.walt.wallet.core.service.oidc4vc
 
 import id.walt.oid4vc.data.CredentialFormat
-import id.walt.webwallet.db.models.WalletCredential
+import id.walt.wallet.core.utils.WalletCredential
 
 object CredentialFilterUtils {
 
