@@ -76,6 +76,24 @@ solutions. Learn more [here](https://walt.id/blog/p/community-stack).
 
 ![waltid-identity-architecture](https://github.com/user-attachments/assets/0400118b-3a38-421e-91dc-7293f6a44b6c)
 
+## Apps, Libraries & Services
+
+* [waltid-crypto](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto):
+  The walt.id crypto library abstracts Key Management Systems from various providers and platforms (e.g. AWS, OCI, Hashicorp, Android, iOS) and facilitates the creation of JSON Web Signatures (JWTs) that support Selective Disclosure.
+* [waltid-crypto-android](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto-android): Android extension of the crypto library.
+* [waltid-crypto-ios](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto-ios): iOS extension from the crypto library, which ties into the iOS keychain and Secure Enclave
+* [waltid-dif-definitions-parser](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-dif-definitions-parser):  Implementation of the DIF Presentation Exchange specification
+* [waltid-mdoc-credentials](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-mdoc-credentials): Create credentials in mdoc format according to ISO/IEC 18013-5:2021 standard
+* [waltid-verifiable-credentials](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-verifiable-credentials): Verifiable Credentials operations for W3C v1.1 and W3C v2.0 data models.
+* [waltid-did](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-did): Library provides functionality for registering and resolving Decentralized Identifiers (DIDs)
+* [waltid-library-commons](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-library-commons): Common functionality acrosss all Kotlin Multiplatform libaries
+* [waltid-openid4vc](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc): Multiplatform library implementing the data models and protocols of the OpenID for Verifiable Credentials specifications, including OID4VCI, OID4VP and SIOPv2.
+* [waltid-sdjwt](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/sdjwt/waltid-sdjwt): Supports Selective Disclosure for JWTs, allowing specific claims within a JWT to be selectively shared while keeping other information private.
+* [waltid-verification-policies](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-verification-policies): Verification Policies in order to configure credential validation in a highly flexible manner.
+* [waltid-idpkit](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/auth/waltid-idpkit): OIDC bridge for integrating Decentralized Identity with existing IAM tools (e.g. Keycloak, Okta, MS Active Driectory)
+* [waltid-ktor-authnz](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/auth/waltid-ktor-authnz): Authentication and Authorization library for enabling multip-step authentication flows.
+* [waltid-permissions](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/auth/waltid-permissions): Library for implementing Role-Based Access Policies
+
 ## Join the community
 
 * Connect and get the latest updates: <a href="https://discord.gg/AW8AgqJthZ">Discord</a> | <a href="https://walt.id/newsletter">
