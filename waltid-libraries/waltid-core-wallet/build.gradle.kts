@@ -57,5 +57,17 @@ kotlin {
                 implementation("io.ktor:ktor-client-okhttp-jvm:$ktor_version")
             }
         }
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+            }
+        }
+        val jvmTest by getting {
+            dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.slf4j:slf4j-simple:2.0.16")
+            }
+        }
     }
 }
