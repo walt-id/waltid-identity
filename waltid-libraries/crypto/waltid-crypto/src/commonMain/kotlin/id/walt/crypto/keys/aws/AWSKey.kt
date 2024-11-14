@@ -262,12 +262,11 @@ class AWSKey(
     @JsExport.Ignore
     override suspend fun getMeta(): AwsKeyMeta = AwsKeyMeta(getKeyId())
 
-
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun delete() {
+    override suspend fun deleteKey(): Boolean {
         val body = """
 {
 "KeyId":"$id",
@@ -296,9 +295,10 @@ class AWSKey(
         logger.debug { "Key $id scheduled for deletion" }
 
         println("response: ${response.bodyAsText()}")
-
-
+        return true
     }
+
+
 
     companion object : AWSKeyCreator {
         val client = HttpClient()
