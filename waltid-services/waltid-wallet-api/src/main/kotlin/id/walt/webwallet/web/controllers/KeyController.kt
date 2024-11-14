@@ -219,15 +219,29 @@ fun Application.keys() = walletRoute {
 
             delete({
                 summary = "Delete a specific key"
+                description =
+                    "Deletes a specific key. If `hardDelete` is set to true, it will delete the key both from the database and the external KMS."
+                request {
+                    queryParameter<Boolean>("hardDelete") {
+                        description = "If true, performs a hard delete (also deletes from external KMS)."
+                        required = false // Not mandatory
+
+                    }
+                }
+
                 response {
                     HttpStatusCode.Accepted to { description = "Key deleted" }
                     HttpStatusCode.BadRequest to { description = "Key could not be deleted" }
                 }
             }) {
                 val keyId = context.parameters["keyId"] ?: throw IllegalArgumentException("No key id provided.")
+                val hardDelete =
+                    context.request.queryParameters["hardDelete"]?.toBoolean() ?: false // Capture the checkbox value
 
                 val success = getWalletService().deleteKey(keyId)
 
+
+                val success = getWalletService().deleteKey(keyId, hardDelete)
                 context.respond(if (success) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
             }
         }
