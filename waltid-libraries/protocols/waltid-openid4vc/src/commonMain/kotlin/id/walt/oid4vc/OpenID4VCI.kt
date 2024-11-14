@@ -1,6 +1,7 @@
 package id.walt.oid4vc
 
 import cbor.Cbor
+import id.walt.credentials.issuance.Issuer.getKidHeader
 import id.walt.credentials.issuance.Issuer.mergingJwtIssue
 import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
 import id.walt.credentials.issuance.dataFunctions
@@ -388,7 +389,7 @@ object OpenID4VCI {
     suspend fun generateSdJwtVC(credentialRequest: CredentialRequest,
                                 credentialData: JsonObject, dataMapping: JsonObject?,
                                 selectiveDisclosure: SDMap?, vct: String, issuerId: String,
-                                issuerDid: String?, issuerKid: String?, x5Chain: List<String>?,
+                                issuerDid: String?, x5Chain: List<String>?,
                                 issuerKey: Key): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
             credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
@@ -424,7 +425,7 @@ object OpenID4VCI {
         val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
 
         val headers = mapOf(
-            "kid" to issuerKid,
+            "kid" to getKidHeader(issuerKey, issuerDid),
             "typ" to SD_JWT_VC_TYPE_HEADER
         ).plus(x5Chain?.let {
             mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
@@ -439,7 +440,7 @@ object OpenID4VCI {
 
     suspend fun generateW3CJwtVC(credentialRequest: CredentialRequest,
                                 credentialData: JsonObject, dataMapping: JsonObject?,
-                                selectiveDisclosure: SDMap?, issuerDid: String?, issuerKid: String?,
+                                selectiveDisclosure: SDMap?, issuerDid: String?,
                                  x5Chain: List<String>?, issuerKey: Key): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
             credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
@@ -453,7 +454,6 @@ object OpenID4VCI {
             true -> vc.mergingJwtIssue(
                 issuerKey = issuerKey,
                 issuerDid = issuerDid,
-                issuerKid = issuerKid,
                 subjectDid = holderDid ?: "",
                 mappings = dataMapping ?: JsonObject(emptyMap()),
                 additionalJwtHeader = additionalJwtHeaders,

@@ -61,7 +61,6 @@ object Issuer {
     suspend fun W3CVC.mergingJwtIssue(
         issuerKey: Key,
         issuerDid: String?,
-        issuerKid: String? = null,
         subjectDid: String,
 
         mappings: JsonObject,
@@ -79,7 +78,7 @@ object Issuer {
         w3cVc.signJws(
             issuerKey = issuerKey,
             issuerDid = issuerDid,
-            issuerKid = issuerKid,
+            issuerKid = getKidHeader(issuerKey, issuerDid),
             subjectDid = subjectDid,
             additionalJwtHeader = additionalJwtHeader.toMutableMap().apply {
                 put("typ", "JWT".toJsonElement())
@@ -114,7 +113,7 @@ object Issuer {
     ).run {
         w3cVc.signSdJwt(
             issuerKey = issuerKey,
-            issuerKeyId = issuerDid ?: issuerKey.getKeyId(),
+            issuerKeyId = getKidHeader(issuerKey, issuerDid),
             subjectDid = subjectDid,
             disclosureMap = disclosureMap,
             additionalJwtHeaders = additionalJwtHeaders.toMutableMap().apply {
@@ -185,5 +184,18 @@ object Issuer {
         }
 
         return IssuanceInformation(vc, jwtRes)
+    }
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    suspend fun getKidHeader(issuerKey: Key, issuerDid: String? = null): String {
+        return if(!issuerDid.isNullOrEmpty()) {
+            if (issuerDid.startsWith("did:key"))
+                issuerDid + "#" + issuerDid.removePrefix("did:key:")
+            else
+                issuerDid + "#" + issuerKey.getKeyId()
+        } else issuerKey.getKeyId()
     }
 }
