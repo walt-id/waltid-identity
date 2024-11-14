@@ -2,9 +2,9 @@ package id.walt.webwallet.web.controllers
 
 import id.walt.commons.config.ConfigManager
 import id.walt.webwallet.config.RuntimeConfig
-import id.walt.wallet.core.manifest.extractor.EntraMockManifestExtractor
-import id.walt.wallet.core.manifest.extractor.ManifestExtractor
-import id.walt.wallet.core.manifest.provider.ManifestProvider
+import id.walt.webwallet.manifest.extractor.EntraMockManifestExtractor
+import id.walt.webwallet.manifest.extractor.ManifestExtractor
+import id.walt.webwallet.manifest.provider.ManifestProvider
 import id.walt.webwallet.service.credentials.CredentialsService
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.route

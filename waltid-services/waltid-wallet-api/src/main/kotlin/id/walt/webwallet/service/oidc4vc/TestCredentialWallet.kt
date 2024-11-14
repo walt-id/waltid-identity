@@ -1,17 +1,19 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-package id.walt.wallet.core.service.oidc4vc
+package id.walt.webwallet.service.oidc4vc
 
 import COSE.AlgorithmID
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
+import id.walt.did.dids.DidUtils
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.EncodedCBORElement
@@ -37,8 +39,10 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.WaltIdJWTCryptoProvider
-import id.walt.wallet.core.service.exchange.CredentialDataResult
-import id.walt.wallet.core.utils.SessionAttributes
+import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession
+import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession
+import id.walt.webwallet.service.credentials.CredentialsService
+import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -68,6 +72,7 @@ class TestCredentialWallet(
     private val sessionCache = mutableMapOf<String, VPresentationSession>() // TODO not stateless because of oidc4vc library
 
     private val ktorClient = getHttpClient()
+    private val credentialsService = CredentialsService()
 
     private suspend fun resolveDidAuthentication(did: String): String {
         return DidService.resolve(did).getOrElse {
@@ -86,9 +91,10 @@ class TestCredentialWallet(
 
     override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?): String =
         runBlocking {
-            fun debugStateMsg() = "(target: $target, payload: $payload, header: $header)"
+            fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
 
-            val key = privKey ?: error("missing priv key")
+            val key = privKey ?: keyId?.let { tryResolveKeyId(it) }
+            ?: throw IllegalArgumentException("No key given or found for given keyId ${debugStateMsg()}")
 
             val authKeyId = resolveDidAuthentication(did)
             val payloadToSign = Json.encodeToString(payload).encodeToByteArray()
@@ -98,10 +104,17 @@ class TestCredentialWallet(
             key.signJws(payloadToSign, headersToSign)
         }
 
-    override fun signCWTToken(target: TokenTarget, payload: MapElement, header: MapElement?, keyId: String?, privKey: Key?): String = runBlocking {
-        fun debugStateMsg() = "(target: $target, payload: $payload, header: $header)"
+    override fun signCWTToken(
+        target: TokenTarget,
+        payload: MapElement,
+        header: MapElement?,
+        keyId: String?,
+        privKey: Key?,
+    ): String = runBlocking {
+        fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
 
-        val key = privKey ?: error("Missing priv key")
+        val key = privKey ?: keyId?.let { tryResolveKeyId(it) }
+        ?: throw IllegalArgumentException("No key given or found for given keyId ${debugStateMsg()}")
 
         val ecKey = ECKey.parseFromPEMEncodedObjects(key.exportPEM()).toECKey()
         val cryptoProvider = SimpleCOSECryptoProvider(
@@ -109,7 +122,7 @@ class TestCredentialWallet(
                 COSECryptoProviderKeyInfo(key.getKeyId(), AlgorithmID.ECDSA_256, ecKey.toECPublicKey(), ecKey.toECPrivateKey())
             )
         )
-        return@runBlocking cryptoProvider.sign1(payload.toCBOR(), header, null, key.getKeyId()).toCBOR().encodeToBase64Url()
+        return@runBlocking cryptoProvider.sign1(payload.toCBOR(), header, null, keyId).toCBOR().encodeToBase64Url()
     }
 
     override fun verifyTokenSignature(target: TokenTarget, token: String): Boolean {
@@ -158,21 +171,24 @@ class TestCredentialWallet(
         println("=== GENERATING PRESENTATION FOR VP TOKEN - Session: $session")
 
         val selectedCredentials =
-            SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[session.authorizationRequest!!.state + session.authorizationRequest.presentationDefinition?.id]!!
-        val selectedDisclosures2 =
-            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[session.authorizationRequest.state + session.authorizationRequest.presentationDefinition?.id]
-        val selectedDisclosures = selectedDisclosures2?.entries?.associate { it.key.id to it.value }
-        val key = SessionAttributes
-            .HACK_outsideMappedKey[
-            session.authorizationRequest.state
-                    + session.authorizationRequest.presentationDefinition?.id] ?: error("Missing outside mapped key for this presentation session: ${SessionAttributes.HACK_outsideMappedKey}")
+            HACK_outsideMappedSelectedCredentialsPerSession[session.authorizationRequest!!.state + session.authorizationRequest.presentationDefinition?.id]!!
+        val selectedDisclosures =
+            HACK_outsideMappedSelectedDisclosuresPerSession[session.authorizationRequest.state + session.authorizationRequest.presentationDefinition?.id]
 
         println("Selected credentials: $selectedCredentials")
 //        val matchedCredentials = walletService.getCredentialsByIds(selectedCredentials)
-        val matchedCredentials = selectedCredentials
+        val matchedCredentials = credentialsService.get(selectedCredentials)
         println("Matched credentials: $matchedCredentials")
 
         println("Using disclosures: $selectedDisclosures")
+        val key = runBlocking {
+            runCatching {
+                DidService.resolveToKey(did).getOrThrow().let { KeysService.get(it.getKeyId()) }
+                    ?.let { KeyManager.resolveSerializedKey(it.document) }
+            }
+        }.getOrElse {
+            throw IllegalArgumentException("Could not resolve key to sign JWS to generate presentation for vp_token", it)
+        } ?: error("No key was resolved when trying to resolve key to sign JWS to generate presentation for vp_token")
 
         val jwtsPresented = CredentialFilterUtils.getJwtVcList(matchedCredentials, selectedDisclosures)
         println("jwtsPresented: $jwtsPresented")
@@ -350,9 +366,9 @@ class TestCredentialWallet(
     fun initializeAuthorization(
         authorizationRequest: AuthorizationRequest,
         expiresIn: Duration,
-        selectedCredentials: Set<CredentialDataResult>,
+        selectedCredentials: Set<String>,
     ): VPresentationSession {
-        return super.initializeAuthorization(authorizationRequest, expiresIn, null).copy(selectedCredentials = selectedCredentials).also {
+        return super.initializeAuthorization(authorizationRequest, expiresIn, null).copy(selectedCredentialIds = selectedCredentials).also {
             putSession(it.id, it)
         }
     }
@@ -450,4 +466,13 @@ class TestCredentialWallet(
             (it.name ?: it.id) == type
         }?.id
 
+    private suspend fun tryResolveKeyId(keyId: String) = runCatching {
+        val kid = keyId.takeIf { DidUtils.isDidUrl(it) }?.let {
+            DidService.resolveToKey(it).getOrThrow().getKeyId()
+        } ?: keyId
+        KeysService.get(kid)?.let {
+            KeyManager.resolveSerializedKey(it.document)
+        }
+    }.getOrElse { throw IllegalArgumentException("Could not resolve key to sign token", it) }
+        ?: error("No key was resolved when trying to resolve key to sign token")
 }

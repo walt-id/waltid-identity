@@ -1,5 +1,6 @@
 package id.walt.wallet.core.service.exchange
 
+import id.walt.crypto.keys.Key
 import id.walt.wallet.core.utils.WalletCredential
 import kotlinx.serialization.Serializable
 
@@ -11,7 +12,6 @@ data class UsePresentationRequest(
 
     val selectedCredentials: List<WalletCredential>, // todo: automatically choose matching
     val disclosures: Map<WalletCredential, List<String>>? = null,
-    val note: String? = null,
 )
 
 @Serializable
@@ -24,7 +24,7 @@ data class UsePresentationResponse(
 data class PresentationRequestParameter(
     val did: String,
     val request: String,
-    val selectedCredentials: List<WalletCredential>,
-    val disclosures: Map<WalletCredential, List<String>>? = null,
-    val note: String? = null,
+    val selectedCredentials: List<CredentialDataResult>,
+    val disclosures: Map<CredentialDataResult, List<String>>? = null,
+    val key: Key
 )

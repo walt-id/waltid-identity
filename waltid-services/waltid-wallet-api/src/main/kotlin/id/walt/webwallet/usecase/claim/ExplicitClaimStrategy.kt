@@ -1,11 +1,11 @@
-@file:OptIn(ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalUuidApi::class, ExperimentalUuidApi::class)
 
 package id.walt.webwallet.usecase.claim
 
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.credentials.CredentialsService
-import id.walt.wallet.core.service.exchange.IssuanceService
+import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.usecase.event.EventLogUseCase
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid

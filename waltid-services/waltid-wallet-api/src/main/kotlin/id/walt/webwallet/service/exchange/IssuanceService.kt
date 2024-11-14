@@ -1,35 +1,32 @@
-package id.walt.wallet.core.service.exchange
+package id.walt.webwallet.service.exchange
 
-import id.walt.crypto.keys.Key
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.data.CredentialOffer
-import id.walt.oid4vc.data.GrantType
+import id.walt.oid4vc.data.*
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
-import id.walt.oid4vc.responses.CredentialResponse
-import id.walt.oid4vc.responses.EntraIssuanceCompletionCode
-import id.walt.oid4vc.responses.EntraIssuanceCompletionErrorDetails
-import id.walt.oid4vc.responses.EntraIssuanceCompletionResponse
-import id.walt.wallet.core.manifest.extractor.EntraManifestExtractor
-import id.walt.wallet.core.service.oidc4vc.TestCredentialWallet
-import io.github.oshai.kotlinlogging.KotlinLogging
+import id.walt.oid4vc.responses.*
+import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
+import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
+import io.klogging.logger
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.coroutines.runBlocking
+import io.ktor.util.*
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-object IssuanceService : IssuanceServiceBase() {
+object IssuanceService: IssuanceServiceBase() {
 
-    override val logger = KotlinLogging.logger {}
+    override val logger = logger<IssuanceService>()
 
     suspend fun useOfferRequest(
         offer: String, credentialWallet: TestCredentialWallet, clientId: String,
-        key: Key, did: String
     ) = let {
         logger.debug { "// -------- WALLET ----------" }
         logger.debug { "// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code" }
@@ -44,9 +41,7 @@ object IssuanceService : IssuanceServiceBase() {
                     AuthorizationRequest.fromHttpParametersAuto(
                         reqParams
                     )
-                ), credentialWallet,
-                did = did,
-                key = key
+                ), credentialWallet
             )
         } else {
             processCredentialOffer(
@@ -135,8 +130,6 @@ object IssuanceService : IssuanceServiceBase() {
         entraIssuanceRequest: EntraIssuanceRequest,
         credentialWallet: TestCredentialWallet,
         pin: String? = null,
-        did: String,
-        key: Key
     ): List<ProcessedCredentialOffer> {
         // *) Load key:
 //        val walletKey = getKeyByDid(credentialWallet.did)
@@ -150,7 +143,7 @@ object IssuanceService : IssuanceServiceBase() {
             pin
         )
 
-        val responseToken = credentialWallet.signToken(TokenTarget.TOKEN, responseObject, privKey = key)
+        val responseToken = credentialWallet.signToken(TokenTarget.TOKEN, responseObject, keyId = credentialWallet.did)
 
         // *) POST response JWT token to return address found in manifest
         val resp = http.post(entraIssuanceRequest.issuerReturnAddress) {
@@ -195,7 +188,7 @@ object IssuanceService : IssuanceServiceBase() {
                 contentType(ContentType.Application.Json)
                 setBody(issuanceCompletionResponse)
             }.also {
-                logger.debug { runBlocking { "Entra issuance completion callback response: ${it.status}: ${it.bodyAsText()}" } }
+                logger.debug { "Entra issuance completion callback response: ${it.status}: ${it.bodyAsText()}" }
             }
         } else logger.debug { "No authorization request state or redirectUri found in Entra issuance request, skipping completion response callback" }
     }
