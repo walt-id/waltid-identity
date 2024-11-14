@@ -37,7 +37,22 @@ The Auth Method is what holds the implementation that checks authentication.
       everyone (and thus NOT global to the flow), but different for every user -> thus it is AuthMethodStoredData (stored for every user
       individually)
 
-## Let's see the code
+## Code example
+
+In this example, we add a new Auth Method (specifically a: global (= defined by flow instead of user), implicit-allowed (= doesn't require
+explicit session start), **multi-step** (= see below)) method.
+
+This is a multi-step method, because it contains more than a single stage/step when using the auth method. This means:
+
+- Some auth methods, like UserPass, consist of a single request (`POST /login {username=alice, password=123456}`), and that is the full
+  login (the response to `/login` is already the auth token)
+- More complex auth methods, like OIDC or challenge/response mechanisms, consist of multiple steps
+
+Here we opt for an example demo of a very simple challenge/response mechanism, which will consist of two steps:
+- GET /nonce
+  - Retrieve a nonce (= *challenge*) to sign
+- POST /signed
+  - Post the signed nonce (= *response*)
 
 ### Identifier
 
@@ -116,7 +131,7 @@ object MultiStepExample : AuthenticationMethod("multistep-example") {
             get("nonce") { // Step 1
                 context.respond(makeNonce())
             }
-            
+
             post<MultiStepExampleSigned>("signed", { // Step 2
                 request { body<MultiStepExampleSigned>() }
             }) { req ->
@@ -125,7 +140,7 @@ object MultiStepExample : AuthenticationMethod("multistep-example") {
                 verifiySignature(req) // Verification
 
                 // Verification was successful:
-                
+
                 val identifier = MultiStepExampleIdentifier(req.publicKey) // select identifier (= who logged in with this method now?)
 
                 context.handleAuthSuccess(session, identifier.resolveToAccountId()) // handleAuthSuccess() -> session is now logged in
