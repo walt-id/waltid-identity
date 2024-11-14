@@ -39,10 +39,7 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.WaltIdJWTCryptoProvider
-import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession
-import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession
-import id.walt.webwallet.service.credentials.CredentialsService
-import id.walt.webwallet.service.keys.KeysService
+import id.walt.wallet.core.utils.SessionAttributes
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -72,7 +69,6 @@ class TestCredentialWallet(
     private val sessionCache = mutableMapOf<String, VPresentationSession>() // TODO not stateless because of oidc4vc library
 
     private val ktorClient = getHttpClient()
-    private val credentialsService = CredentialsService()
 
     private suspend fun resolveDidAuthentication(did: String): String {
         return DidService.resolve(did).getOrElse {
@@ -171,9 +167,9 @@ class TestCredentialWallet(
         println("=== GENERATING PRESENTATION FOR VP TOKEN - Session: $session")
 
         val selectedCredentials =
-            HACK_outsideMappedSelectedCredentialsPerSession[session.authorizationRequest!!.state + session.authorizationRequest.presentationDefinition?.id]!!
+            SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[session.authorizationRequest!!.state + session.authorizationRequest.presentationDefinition?.id]!!
         val selectedDisclosures =
-            HACK_outsideMappedSelectedDisclosuresPerSession[session.authorizationRequest.state + session.authorizationRequest.presentationDefinition?.id]
+            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[session.authorizationRequest.state + session.authorizationRequest.presentationDefinition?.id]
 
         println("Selected credentials: $selectedCredentials")
 //        val matchedCredentials = walletService.getCredentialsByIds(selectedCredentials)
