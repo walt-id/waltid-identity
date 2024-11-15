@@ -1,9 +1,9 @@
 package id.walt.wallet.core.service.oidc4vc
 
+import id.walt.crypto.keys.Key
 import id.walt.oid4vc.providers.SIOPSession
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.wallet.core.service.exchange.CredentialDataResult
-import id.walt.wallet.core.utils.WalletCredential
 import kotlinx.datetime.Instant
 
 data class VPresentationSession(
@@ -11,4 +11,5 @@ data class VPresentationSession(
     override val authorizationRequest: AuthorizationRequest?,
     override val expirationTimestamp: Instant,
     val selectedCredentials: Set<CredentialDataResult>,
+    val key: Key
 ) : SIOPSession(id, authorizationRequest, expirationTimestamp)

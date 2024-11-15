@@ -25,9 +25,12 @@ import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.oid4vc.OpenID4VP
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.OpenIDProviderMetadata
+import id.walt.oid4vc.data.ResponseType
+import id.walt.oid4vc.data.VpTokenParameter
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
+import id.walt.oid4vc.errors.TokenError
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.interfaces.SimpleHttpResponse
 import id.walt.oid4vc.providers.CredentialWalletConfig
@@ -35,6 +38,8 @@ import id.walt.oid4vc.providers.OpenIDCredentialWallet
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
+import id.walt.oid4vc.responses.TokenErrorCode
+import id.walt.oid4vc.responses.TokenResponse
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import id.walt.wallet.core.service.exchange.CredentialDataResult
@@ -98,19 +103,20 @@ class TestCredentialWallet(
             key.signJws(payloadToSign, headersToSign)
         }
 
-    override fun signCWTToken(target: TokenTarget, payload: MapElement, header: MapElement?, keyId: String?, privKey: Key?): String = runBlocking {
-        fun debugStateMsg() = "(target: $target, payload: $payload, header: $header)"
+    override fun signCWTToken(target: TokenTarget, payload: MapElement, header: MapElement?, keyId: String?, privKey: Key?): String =
+        runBlocking {
+            fun debugStateMsg() = "(target: $target, payload: $payload, header: $header)"
 
-        val key = privKey ?: error("Missing priv key")
+            val key = privKey ?: error("Missing priv key")
 
-        val ecKey = ECKey.parseFromPEMEncodedObjects(key.exportPEM()).toECKey()
-        val cryptoProvider = SimpleCOSECryptoProvider(
-            listOf(
-                COSECryptoProviderKeyInfo(key.getKeyId(), AlgorithmID.ECDSA_256, ecKey.toECPublicKey(), ecKey.toECPrivateKey())
+            val ecKey = ECKey.parseFromPEMEncodedObjects(key.exportPEM()).toECKey()
+            val cryptoProvider = SimpleCOSECryptoProvider(
+                listOf(
+                    COSECryptoProviderKeyInfo(key.getKeyId(), AlgorithmID.ECDSA_256, ecKey.toECPublicKey(), ecKey.toECPrivateKey())
+                )
             )
-        )
-        return@runBlocking cryptoProvider.sign1(payload.toCBOR(), header, null, key.getKeyId()).toCBOR().encodeToBase64Url()
-    }
+            return@runBlocking cryptoProvider.sign1(payload.toCBOR(), header, null, key.getKeyId()).toCBOR().encodeToBase64Url()
+        }
 
     override fun verifyTokenSignature(target: TokenTarget, token: String): Boolean {
         println("VERIFYING TOKEN: ($target) $token")
@@ -154,6 +160,45 @@ class TestCredentialWallet(
         TODO("Not yet implemented")
     }
 
+    override fun generateTokenResponse(session: VPresentationSession, tokenRequest: TokenRequest): TokenResponse {
+        println("SIOPCredentialProvider generateTokenResponse")
+        val presentationDefinition = session.authorizationRequest?.presentationDefinition ?: throw TokenError(
+            tokenRequest,
+            TokenErrorCode.invalid_request
+        )
+        val result = generatePresentationForVPToken(session, tokenRequest)
+        val holderDid = getDidFor(session)
+        val idToken = if (session.authorizationRequest?.responseType?.contains(ResponseType.IdToken) == true) {
+            signToken(TokenTarget.TOKEN, buildJsonObject {
+                put("iss", "https://self-issued.me/v2/openid-vc")
+                put("sub", holderDid)
+                put("aud", session.authorizationRequest!!.clientId)
+                put("exp", Clock.System.now().plus(5.minutes).epochSeconds)
+                put("iat", Clock.System.now().epochSeconds)
+                put("state", session.id)
+                put("nonce", session.nonce)
+                put("_vp_token", buildJsonObject {
+                    put("presentation_submission", result.presentationSubmission.toJSON())
+                })
+            }, keyId = resolveDID(holderDid), privKey = session.key)
+        } else null
+        return if (result.presentations.size == 1) {
+            TokenResponse.success(
+                result.presentations.first().let { VpTokenParameter.fromJsonElement(it) },
+                if (idToken == null) result.presentationSubmission else null,
+                idToken = idToken,
+                state = session.authorizationRequest?.state
+            )
+        } else {
+            TokenResponse.success(
+                JsonArray(result.presentations).let { VpTokenParameter.fromJsonElement(it) },
+                if (idToken == null) result.presentationSubmission else null,
+                idToken = idToken,
+                state = session.authorizationRequest?.state
+            )
+        }
+    }
+
     override fun generatePresentationForVPToken(session: VPresentationSession, tokenRequest: TokenRequest): PresentationResult {
         println("=== GENERATING PRESENTATION FOR VP TOKEN - Session: $session")
 
@@ -163,9 +208,8 @@ class TestCredentialWallet(
             SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[session.authorizationRequest.state + session.authorizationRequest.presentationDefinition?.id]
         val selectedDisclosures = selectedDisclosures2?.entries?.associate { it.key.id to it.value }
         val key = SessionAttributes
-            .HACK_outsideMappedKey[
-            session.authorizationRequest.state
-                    + session.authorizationRequest.presentationDefinition?.id] ?: error("Missing outside mapped key for this presentation session: ${SessionAttributes.HACK_outsideMappedKey}")
+            .HACK_outsideMappedKey[session.authorizationRequest.state]
+            ?: error("Missing outside mapped key for this presentation session: ${SessionAttributes.HACK_outsideMappedKey}")
 
         println("Selected credentials: $selectedCredentials")
 //        val matchedCredentials = walletService.getCredentialsByIds(selectedCredentials)
@@ -183,7 +227,7 @@ class TestCredentialWallet(
                 val documentWithDisclosures = if (selectedDisclosures?.containsKey(it.id) == true) {
                     it.document + "~${selectedDisclosures[it.id]!!.joinToString("~")}"
                 } else {
-                   it.document
+                    it.document
                 }
 
                 SDJwtVC.parse(documentWithDisclosures).present(
@@ -273,12 +317,14 @@ class TestCredentialWallet(
                             credential.document,
                             rootPathMDoc,
                         )
+
                         CredentialFormat.sd_jwt_vc -> buildDescriptorMappingSDJwtVC(
                             session.presentationDefinition,
                             index,
                             credential.document,
                             "$",
                         )
+
                         else -> buildDescriptorMappingJwtVP(
                             session.presentationDefinition,
                             index,
@@ -323,7 +369,12 @@ class TestCredentialWallet(
         id: String,
         authorizationRequest: AuthorizationRequest?,
         expirationTimestamp: Instant,
-    ) = VPresentationSession(id, authorizationRequest, expirationTimestamp, setOf())
+    ): VPresentationSession {
+        val key = SessionAttributes.HACK_outsideMappedKey[authorizationRequest!!.state]
+            ?: error("Missing hacked in key: ${SessionAttributes.HACK_outsideMappedKey}, auth req local: $authorizationRequest")
+
+        return VPresentationSession(id, authorizationRequest, expirationTimestamp, setOf(), key)
+    }
 
     override fun getDidFor(session: VPresentationSession): String {
         return did
