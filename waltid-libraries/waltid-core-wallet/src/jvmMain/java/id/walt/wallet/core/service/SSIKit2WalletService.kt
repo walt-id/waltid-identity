@@ -99,6 +99,9 @@ class SSIKit2WalletService(
             AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(parameter.request).encodedQuery).toMap())
         logger.debug { "Auth req: $authReq" }
 
+        SessionAttributes.HACK_outsideMappedKey[authReq.state ?: error("missing required state")] =
+            parameter.key
+
         logger.debug { "Using presentation request, selected credentials: ${parameter.selectedCredentials}" }
 
         val presentationSession =
@@ -109,8 +112,7 @@ class SSIKit2WalletService(
 
         SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
             parameter.selectedCredentials
-        SessionAttributes.HACK_outsideMappedKey[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
-            parameter.key
+
 
         if (parameter.disclosures != null) {
             SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
