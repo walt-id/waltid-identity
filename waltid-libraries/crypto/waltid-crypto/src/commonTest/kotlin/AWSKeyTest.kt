@@ -59,6 +59,10 @@ class AWSKeyTest {
 
             println("Testing sign & verify JWS (payload: ${Config.payloadJWS})...")
             awsTestSignJws()
+
+
+            println("Testing key deletion...")
+            awsTestDeleteKey()
         }
     }
 
@@ -108,4 +112,12 @@ class AWSKeyTest {
             assertEquals(payloadJWS, verified.getOrThrow(), "JWS payload mismatch after verification")
         }
     }
+
+    private suspend fun  awsTestDeleteKey() {
+        keys.forEach { key ->
+            println("Deleting key: ${key.getKeyId()}")
+            key.deleteKey()
+        }
+    }
+
 }
