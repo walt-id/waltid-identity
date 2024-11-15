@@ -291,11 +291,8 @@ class AWSKey(
             }
             setBody(body)
         }
-
         logger.debug { "Key $id scheduled for deletion" }
-
-        println("response: ${response.bodyAsText()}")
-        return true
+        return response.status == HttpStatusCode.OK
     }
 
 
