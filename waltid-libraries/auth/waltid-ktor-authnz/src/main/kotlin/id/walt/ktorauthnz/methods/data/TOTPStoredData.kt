@@ -10,4 +10,8 @@ data class TOTPStoredData(
     val secret: String,
 ) : AuthMethodStoredData {
     override fun authMethod() = TOTP
+
+    companion object {
+        val EXAMPLE = TOTPStoredData("secret")
+    }
 }

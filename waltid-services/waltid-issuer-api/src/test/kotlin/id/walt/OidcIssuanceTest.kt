@@ -1,7 +1,10 @@
 package id.walt
 
+import id.walt.IssuerApiTest.Companion.TEST_ISSUER_DID
 import id.walt.commons.config.ConfigManager
 import id.walt.issuer.issuance.CIProvider
+import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import kotlin.test.Test
@@ -17,12 +20,18 @@ class OidcIssuanceTest {
         // -------- CREDENTIAL ISSUER ----------
         // as CI provider, initialize credential offer for user
         val issuanceSession = ciTestProvider.initializeCredentialOffer(
-            CredentialOffer.Builder(ciTestProvider.baseUrl).addOfferedCredential("VerifiableId"),
+            listOf(IssuanceRequest(
+                issuerKey = IssuerApiTest.jsonKeyObj,
+                credentialData = IssuerApiTest.jsonVCObj,
+                credentialConfigurationId = "VerifiableId",
+                mapping = IssuerApiTest.jsonMappingObj,
+                issuerDid = TEST_ISSUER_DID
+            )),
             5.minutes, allowPreAuthorized = false
         )
 
         val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
-        val offerUri = ciTestProvider.getCredentialOfferRequestUrl(offerRequest)
+        val offerUri = OpenID4VCI.getCredentialOfferRequestUrl(offerRequest)
         println("Offer URI: $offerUri")
     }
 

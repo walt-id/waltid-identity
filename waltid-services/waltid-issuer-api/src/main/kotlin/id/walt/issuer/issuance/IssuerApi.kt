@@ -5,7 +5,7 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.did.dids.DidService
 import id.walt.issuer.issuance.OidcApi.getFormatByCredentialConfigurationId
-import id.walt.issuer.issuance.OidcApi.getVctByCredentialConfigurationId
+import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
@@ -39,32 +39,18 @@ suspend fun createCredentialOfferUri(
     val overwrittenIssuanceRequests = issuanceRequests.map {
         it.copy(
             credentialFormat = credentialFormat,
-            vct = if (credentialFormat == CredentialFormat.sd_jwt_vc) getVctByCredentialConfigurationId(it.credentialConfigurationId) ?: throw IllegalArgumentException("VCT not found") else null)
+            vct = if (credentialFormat == CredentialFormat.sd_jwt_vc) OidcApi.metadata.getVctByCredentialConfigurationId(it.credentialConfigurationId) ?: throw IllegalArgumentException("VCT not found") else null)
     }
 
-    val credentialOfferBuilder =
-        OidcIssuance.issuanceRequestsToCredentialOfferBuilder(overwrittenIssuanceRequests)
-
     val issuanceSession = OidcApi.initializeCredentialOffer(
-        credentialOfferBuilder = credentialOfferBuilder,
+        issuanceRequests = overwrittenIssuanceRequests,
         expiresIn,
         allowPreAuthorized = when (overwrittenIssuanceRequests[0].authenticationMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> true
             else -> false
-        }
+        },
+        callbackUrl = callbackUrl
     )
-
-    OidcApi.setIssuanceDataForIssuanceId(issuanceSession.id, overwrittenIssuanceRequests.map {
-        val key = KeyManager.resolveSerializedKey(it.issuerKey)
-
-        CIProvider.IssuanceSessionData(
-            id = issuanceSession.id,
-            issuerKey = key,
-            issuerDid = it.issuerDid,
-            request = it,
-            callbackUrl = callbackUrl
-        )
-    })  // TODO: Hack as this is non stateless because of oidc4vc lib API
 
     logger.debug { "issuanceSession: $issuanceSession" }
 
@@ -72,8 +58,7 @@ suspend fun createCredentialOfferUri(
         CredentialOfferRequest(null, "${OidcApi.baseUrl}/openid4vc/credentialOffer?id=${issuanceSession.id}")
     logger.debug { "offerRequest: $offerRequest" }
 
-    val offerUri = OidcApi.getCredentialOfferRequestUrl(
-        offerRequest,
+    val offerUri = OpenID4VCI.getCredentialOfferRequestUrl(offerRequest,
         CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix("https://").removePrefix("http://") + "/"
     )
     logger.debug { "Offer URI: $offerUri" }
@@ -530,8 +515,11 @@ fun Application.issuerApi() {
                     val credentialOffer = issuanceSession.credentialOffer
                         ?: throw BadRequestException("Session has no credential offer set")
 
-                    OidcApi.sessionCredentialPreMapping[sessionId]?.first()
-                        ?.sendCallback("resolved_credential_offer", credentialOffer.toJSON())
+                    issuanceSession.callbackUrl?.let {
+                        CIProvider.sendCallback(
+                            sessionId, "resolved_credential_offer", credentialOffer.toJSON(), it
+                        )
+                    }
 
                     context.respond(credentialOffer.toJSON())
                 }

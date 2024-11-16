@@ -1,6 +1,8 @@
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
+import id.walt.oid4vc.OpenID4VC
+import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.ResponseType.Companion.getResponseTypeString
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -31,28 +33,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     abstract val metadata: OpenIDProviderMetadata
     abstract val config: OpenIDProviderConfig
 
-    protected open fun createDefaultProviderMetadata() = OpenIDProviderMetadata(
-        issuer = baseUrl,
-        authorizationEndpoint = "$baseUrl/authorize",
-        pushedAuthorizationRequestEndpoint = "$baseUrl/par",
-        tokenEndpoint = "$baseUrl/token",
-        credentialEndpoint = "$baseUrl/credential",
-        batchCredentialEndpoint = "$baseUrl/batch_credential",
-        deferredCredentialEndpoint = "$baseUrl/credential_deferred",
-        jwksUri = "$baseUrl/jwks",
-        grantTypesSupported = setOf(GrantType.authorization_code, GrantType.pre_authorized_code),
-        requestUriParameterSupported = true,
-        subjectTypesSupported = setOf(SubjectType.public),
-        authorizationServer = baseUrl,
-        credentialIssuer = baseUrl, // (EBSI) this should be just "$baseUrl"  https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-11.2.1
-        responseTypesSupported = setOf(
-            "code",
-            "vp_token",
-            "id_token"
-        ),  // (EBSI) this is required one  https://www.rfc-editor.org/rfc/rfc8414.html#section-2
-        idTokenSigningAlgValuesSupported = setOf("ES256"), // (EBSI) https://openid.net/specs/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-
-        codeChallengeMethodsSupported = listOf("S256")
-    )
+    protected open fun createDefaultProviderMetadata() = OpenID4VCI.createDefaultProviderMetadata(baseUrl)
 
     fun getCommonProviderMetadataUrl(): String {
         return URLBuilder(baseUrl).apply {
@@ -344,7 +325,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     }
 
     fun getPushedAuthorizationSuccessResponse(authorizationSession: S) = PushedAuthorizationResponse.success(
-        requestUri = "urn:ietf:params:oauth:request_uri:${authorizationSession.id}",
+        requestUri = "${OpenID4VC.PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX}${authorizationSession.id}",
         expiresIn = authorizationSession.expirationTimestamp - Clock.System.now()
     )
 
@@ -358,7 +339,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     fun getPushedAuthorizationSession(authorizationRequest: AuthorizationRequest): S {
         val session = authorizationRequest.requestUri?.let {
             getVerifiedSession(
-                it.substringAfter("urn:ietf:params:oauth:request_uri:")
+                it.substringAfter(OpenID4VC.PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX)
             ) ?: throw AuthorizationError(
                 authorizationRequest,
                 AuthorizationErrorCode.invalid_request,
