@@ -519,8 +519,12 @@ class SSIKit2WalletService(
         val key = KeysService.get(walletId, alias)
         key?.let {
             val resolvedKey = KeyManager.resolveSerializedKey(it.document)
-            resolvedKey.deleteKey()
-            KeysService.delete(walletId, alias)
+            val deleteRemoteKey = resolvedKey.deleteKey()
+            if (deleteRemoteKey) {
+                KeysService.delete(walletId, alias)
+            } else {
+                throw IllegalStateException("Failed to delete remote key : $alias")
+            }
             eventUseCase.log(
                 action = EventType.Key.Delete,
                 originator = "wallet",
