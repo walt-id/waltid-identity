@@ -60,7 +60,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
 
 /**
- * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
+ * OIDC for Verifiable Credential Issuance service provider
  */
 @OptIn(ExperimentalUuidApi::class)
 open class CIProvider(

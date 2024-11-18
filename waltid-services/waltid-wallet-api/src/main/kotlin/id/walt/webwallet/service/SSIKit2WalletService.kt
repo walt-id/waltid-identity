@@ -17,6 +17,7 @@ import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
+import id.walt.oid4vc.OpenID4VP
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.errors.AuthorizationError
@@ -196,32 +197,33 @@ class SSIKit2WalletService(
         val credentialWallet = getCredentialWallet(parameter.did)
 
         val authReq =
-            AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(parameter.request).encodedQuery).toMap())
+            AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(parameter.request).encodedQuery).toMap()).let {
+                OpenID4VP.resolveVPAuthorizationParameters(it)
+            }
         logger.debug { "Auth req: $authReq" }
 
         logger.debug { "Using presentation request, selected credentials: ${parameter.selectedCredentials}" }
 
-        val presentationSession =
-            credentialWallet.initializeAuthorization(authReq, 60.seconds, parameter.selectedCredentials.toSet())
-        logger.debug { "Initialized authorization (VPPresentationSession): $presentationSession" }
+        if(!OpenID4VP.validateOID4VPAuthorizationRequest(authReq))
+            throw AuthorizationError(authReq, AuthorizationErrorCode.invalid_request, "Invalid VP authorization request")
+        logger.debug { "VP authorization request validated: $authReq" }
 
-        logger.debug { "Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}" }
+        logger.debug { "Resolved presentation definition: ${authReq.presentationDefinition!!.toJSONString()}" }
 
-        SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
+        SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[authReq.state + authReq.presentationDefinition?.id] =
             parameter.selectedCredentials
         if (parameter.disclosures != null) {
-            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
+            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[authReq.state + authReq.presentationDefinition?.id] =
                 parameter.disclosures
         }
 
-        val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest!!)
-        val submitFormParams = getFormParameters(presentationSession.authorizationRequest, tokenResponse, presentationSession)
+        val tokenResponse = credentialWallet.processImplicitFlowAuthorization(authReq)
+        val submitFormParams = getFormParameters(authReq, tokenResponse)
 
         val resp = this.http.submitForm(
-            presentationSession.authorizationRequest.responseUri
-                ?: presentationSession.authorizationRequest.redirectUri ?: throw AuthorizationError(
-                    presentationSession.authorizationRequest,
-                    AuthorizationErrorCode.invalid_request,
+            authReq.responseUri
+                ?: authReq.redirectUri ?: throw AuthorizationError(
+                    authReq, AuthorizationErrorCode.invalid_request,
                     "No response_uri or redirect_uri found on authorization request"
                 ), parameters {
                     submitFormParams.forEach { entry ->
@@ -238,7 +240,7 @@ class SSIKit2WalletService(
             credentialService.get(walletId, it)?.run {
                 eventUseCase.log(
                     action = EventType.Credential.Present,
-                    originator = presentationSession.authorizationRequest.clientMetadata?.clientName
+                    originator = authReq.clientMetadata?.clientName
                         ?: EventDataNotAvailable,
                     tenant = tenant,
                     accountId = accountId,
@@ -609,16 +611,14 @@ class SSIKit2WalletService(
 
     private fun getFormParameters(
         authorizationRequest: AuthorizationRequest,
-        tokenResponse: TokenResponse,
-        presentationSession: VPresentationSession
+        tokenResponse: TokenResponse
     ) = if (authorizationRequest.responseMode == ResponseMode.direct_post_jwt) {
-        directPostJwtParameters(authorizationRequest, tokenResponse, presentationSession)
+        directPostJwtParameters(authorizationRequest, tokenResponse)
     } else tokenResponse.toHttpParameters()
 
     private fun directPostJwtParameters(
         authorizationRequest: AuthorizationRequest,
-        tokenResponse: TokenResponse,
-        presentationSession: VPresentationSession
+        tokenResponse: TokenResponse
     ): Map<String, List<String>> {
         val encKey = authorizationRequest.clientMetadata?.jwks?.get("keys")?.jsonArray?.first { jwk ->
             JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false
@@ -630,7 +630,7 @@ class SSIKit2WalletService(
             enc = authorizationRequest.clientMetadata!!.authorizationEncryptedResponseEnc!!,
             mapOf(
                 "epk" to runBlocking { ephemeralWalletKey.getPublicKey().exportJWKObject() },
-                "apu" to JsonPrimitive(Base64URL.encode(presentationSession.nonce).toString()),
+                "apu" to JsonPrimitive(Base64URL.encode(authorizationRequest.nonce).toString()),
                 "apv" to JsonPrimitive(Base64URL.encode(authorizationRequest.nonce!!).toString())
             )
         )

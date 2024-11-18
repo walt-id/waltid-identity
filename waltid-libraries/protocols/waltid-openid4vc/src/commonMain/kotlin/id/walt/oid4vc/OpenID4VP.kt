@@ -11,12 +11,15 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.http
+import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import org.kotlincrypto.hash.sha2.SHA256
 
 object OpenID4VP {
@@ -174,5 +177,39 @@ object OpenID4VP {
             ByteStringElement(SHA256().digest(responseUriToHash.toCBOR())),
             StringElement(authorizationRequest.nonce ?: throw AuthorizationError(authorizationRequest, AuthorizationErrorCode.invalid_request, "Authorization request has no nonce, which is required for generating MDoc-OID4VPHandover"))
         ))
+    }
+
+    fun validateOID4VPAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean {
+        return ((authorizationRequest.responseType.contains(ResponseType.VpToken) ||
+            authorizationRequest.responseType.contains(ResponseType.IdToken)) &&
+            authorizationRequest.presentationDefinition != null)
+    }
+
+    suspend fun resolveVPAuthorizationParameters(authorizationRequest: AuthorizationRequest): AuthorizationRequest {
+        try {
+            return authorizationRequest.copy(
+                presentationDefinition = authorizationRequest.presentationDefinition
+                    ?: authorizationRequest.presentationDefinitionUri?.let {
+                        resolvePresentationDefinition(authorizationRequest)
+                    } ?: authorizationRequest.claims?.get("vp_token")?.jsonObject?.get("presentation_definition")?.jsonObject?.let {
+                        PresentationDefinition.fromJSON(it)
+                    } ?: throw AuthorizationError(
+                        authorizationRequest,
+                        AuthorizationErrorCode.invalid_request,
+                        message = "Presentation definition could not be resolved from presentation_definition or presentation_definition_uri parameters"
+                    ),
+                clientMetadata = authorizationRequest.clientMetadata
+                    ?: authorizationRequest.clientMetadataUri?.let { uri ->
+                        http.get(Url(uri)).bodyAsText().let { OpenIDClientMetadata.fromJSONString(it) }
+                    }
+            )
+        } catch (exc: SerializationException) {
+            exc.printStackTrace()
+            throw AuthorizationError(
+                authorizationRequest,
+                AuthorizationErrorCode.invalid_presentation_definition_reference,
+                "Invalid presentation definition reference, deserialization failed due to: ${exc.message}"
+            )
+        }
     }
 }
