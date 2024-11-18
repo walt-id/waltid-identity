@@ -42,7 +42,7 @@ class W3CTest : BaseTest() {
         return receivedCredentials
     }
 
-    @Test
+    // @Test //BLOCKED: Waiting for openid changes
     fun testW3CFlow() = runTest {
         w3cFlowIssuance()
         val verificationRequest = getVerificationRequest()
