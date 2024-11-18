@@ -1,9 +1,10 @@
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
+    id("maven-publish")
 }
 
-group = "id.walt"
+group = "id.walt.wallet"
 
 repositories {
     mavenCentral()
@@ -68,6 +69,32 @@ kotlin {
                 implementation("org.junit.jupiter:junit-jupiter-api:5.11.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 implementation("org.slf4j:slf4j-simple:2.0.16")
+            }
+        }
+    }
+}
+
+publishing {
+    repositories {
+        maven {
+            url = uri("https://maven.waltid.dev/releases")
+            val envUsername = System.getenv("MAVEN_USERNAME")
+            val envPassword = System.getenv("MAVEN_PASSWORD")
+
+            val usernameFile = File("$rootDir/secret_maven_username.txt")
+            val passwordFile = File("$rootDir/secret_maven_password.txt")
+
+            val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
+            //println("Deploy username length: ${secretMavenUsername.length}")
+            val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+
+            //if (secretMavenPassword.isBlank()) {
+            //   println("WARNING: Password is blank!")
+            //}
+
+            credentials {
+                username = secretMavenUsername
+                password = secretMavenPassword
             }
         }
     }
