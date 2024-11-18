@@ -102,7 +102,7 @@ object ExampleAccountStore : EditableAccountStore {
     override suspend fun lookupAccountUuid(identifier: AccountIdentifier): String {
         println("Lookup account uuid by identifier: $identifier")
         println("Account ids is: $wip_accounts")
-        return wip_account_ids[identifier] ?: error("No account for account id: $this")
+        return wip_account_ids[identifier] ?: error("No account for account id: $identifier")
     }
 
 }
