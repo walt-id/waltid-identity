@@ -2,9 +2,11 @@ package id.walt.ktorauthnz.flows
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import org.intellij.lang.annotations.Language
+import kotlin.time.Duration
 
 private operator fun String.times(index: Int): String {
     val sb = StringBuilder()
@@ -22,7 +24,13 @@ data class AuthFlow(
     @SerialName("continue")
     val continueWith: Set<AuthFlow>? = null,
     val ok: Boolean = false,
+    /** set how long this auth flow result will be valid for */
+    val expiration: String? = null
 ) {
+
+    @Transient
+    val parsedDuration = expiration?.let { Duration.parse(it) }
+
     init {
         check(ok || continueWith != null) { "No end condition in auth flow with method $method" }
         check(ok xor (continueWith != null)) { "Multiple end conditions in auth flow with method $method: OK and ${continueWith!!.methods()}" }
