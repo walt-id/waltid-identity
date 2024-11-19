@@ -17,6 +17,7 @@ class JwtTokenHandler : TokenHandler {
         val payload = buildJsonObject {
             put("sub", session.accountId)
             put("session", session.id)
+            if (session.expiration != null) put("exp", session.expiration!!.epochSeconds)
         }.toString().toByteArray()
 
         return signingKey.signJws(payload)
