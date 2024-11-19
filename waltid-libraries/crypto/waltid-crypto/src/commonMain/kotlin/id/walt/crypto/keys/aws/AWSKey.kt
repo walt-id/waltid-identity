@@ -48,6 +48,7 @@ private val logger = KotlinLogging.logger { }
 data class AWSAuthConfiguration(
     val accessKeyId: String?,
     val secretAccessKey: String?,
+    val region: String?,
     val sessionToken: String?,
     val expiration: String?
 )
@@ -272,7 +273,13 @@ class AWSKey(
                 config.auth.accessKeyId?.isNotEmpty() == true && config.auth.secretAccessKey?.isNotEmpty() == true
 
             if (isAccessDataProvided) {
-                _accessAWS = AWSAuthConfiguration(config.auth.accessKeyId, config.auth.secretAccessKey, null, null)
+                _accessAWS = AWSAuthConfiguration(
+                    config.auth.accessKeyId,
+                    config.auth.secretAccessKey,
+                    config.auth.region,
+                    null,
+                    null
+                )
                 timeoutAt = null
             } else {
                 val token = getIMDSv2Token()
@@ -280,7 +287,7 @@ class AWSKey(
                     config.auth.roleName?.isNotEmpty() == true -> config.auth.roleName
                     else -> getRoleName(token)
                 }
-                _accessAWS = getTemporaryCredentials(token, roleName)
+                _accessAWS = getTemporaryCredentials(token, roleName, config.auth.region.toString())
                 timeoutAt = Clock.System.now().plus(3600.seconds)
             }
         }
@@ -305,7 +312,10 @@ class AWSKey(
 
         // Generate Signature Key
         fun getSignatureKey(config: AWSKeyMetadata, dateStamp: String): ByteArray {
-            val kDate = hmacSHA256("AWS4${config.auth.secretAccessKey}".toByteArray(), dateStamp)
+            val kDate = hmacSHA256(
+                "AWS4${_accessAWS?.secretAccessKey ?: config.auth.secretAccessKey!!}".toByteArray(),
+                dateStamp
+            )
             val kRegion = hmacSHA256(kDate, config.auth.region.toString())
             val kService = hmacSHA256(kRegion, "kms")
             return hmacSHA256(kService, "aws4_request")
@@ -378,7 +388,6 @@ ${sha256Hex(canonicalRequest)}
                 "content-type:application/x-amz-json-1.1\nhost:kms.${config.auth.region}.amazonaws.com\nx-amz-date:$amzDate\n"
             val signedHeaders = "content-type;host;x-amz-date"
             val credentialScope = "$dateStamp/${config.auth.region}/kms/aws4_request"
-
             val canonicalRequest = createCanonicalRequest(
                 method, canonicalUri, canonicalQueryString, canonicalHeaders, signedHeaders, payload
             )
@@ -392,7 +401,7 @@ ${sha256Hex(canonicalRequest)}
             return mapOf(
                 "Authorization" to createAuthorizationHeader(
                     "AWS4-HMAC-SHA256",
-                    config.auth.accessKeyId.toString(),
+                    _accessAWS?.accessKeyId ?: config.auth.accessKeyId!!,
                     credentialScope,
                     signedHeaders,
                     signature
@@ -431,7 +440,7 @@ ${sha256Hex(canonicalRequest)}
 
         // Function to get temporary credentials using role name
         @JsExport.Ignore
-        suspend fun getTemporaryCredentials(token: String, roleName: String): AWSAuthConfiguration {
+        suspend fun getTemporaryCredentials(token: String, roleName: String, region: String): AWSAuthConfiguration {
             val url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/$roleName"
             val response = client.get(url) {
                 headers {
@@ -450,9 +459,17 @@ ${sha256Hex(canonicalRequest)}
             val expiration =
                 json["Expiration"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Expiration not found")
 
+
+            println("accessKeyId: $accessKeyId")
+            println("secretAccessKey: $secretAccessKey")
+            println("sessionToken: $sessionToken")
+            println("expiration: $expiration")
+
+
             return AWSAuthConfiguration(
                 accessKeyId = accessKeyId,
                 secretAccessKey = secretAccessKey,
+                region = region,
                 sessionToken = sessionToken,
                 expiration = expiration
             )
@@ -541,14 +558,11 @@ $public
 
         @JsExport.Ignore
         override suspend fun generate(type: KeyType, config: AWSKeyMetadata): AWSKey {
-            println(
-                "AWSKeyCreator.generate: type: $type, config: $config"
-            )
 
             if (config.auth.accessKeyId.isNullOrBlank() && config.auth.secretAccessKey.isNullOrBlank()) {
-                println("authAccess is empty")
                 getAccess(config)
             }
+
 
             val keyType = keyTypeToAwsKeyMapping(type)
             val body =
@@ -562,6 +576,8 @@ $public
                 payload = body,
                 config = config
             )
+            println("config: $config")
+            println("headers: $headers")
             val awsKmsUrl = "kms.${config.auth.region}.amazonaws.com"
 
             logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.CreateKey" }
