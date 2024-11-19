@@ -46,6 +46,8 @@ val modules = listOf(
         "waltid-idpkit"
     ),
 
+    "$libraries:waltid-core-wallet",
+
     /*
     * "$libraries:util".group(
         "waltid-reporting"
