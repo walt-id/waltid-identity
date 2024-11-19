@@ -541,9 +541,12 @@ $public
 
         @JsExport.Ignore
         override suspend fun generate(type: KeyType, config: AWSKeyMetadata): AWSKey {
+            println(
+                "AWSKeyCreator.generate: type: $type, config: $config"
+            )
 
-
-            if (config.auth.accessKeyId?.isEmpty() == true && config.auth.secretAccessKey?.isEmpty() == true) {
+            if (config.auth.accessKeyId.isNullOrBlank() && config.auth.secretAccessKey.isNullOrBlank()) {
+                println("authAccess is empty")
                 getAccess(config)
             }
 
