@@ -78,7 +78,7 @@ class AWSKey(
     override val hasPrivateKey: Boolean
         get() = false
 
-    override fun toString(): String = "[AWS ${keyType.name} key @AWS ${config.region} - $id]"
+    override fun toString(): String = "[AWS ${keyType.name} key @AWS ${config.auth.region} - $id]"
 
     @JvmBlocking
     @JvmAsync
@@ -139,14 +139,14 @@ class AWSKey(
             config = config
         )
 
-        val awsKmsUrl = "kms.${config.region}.amazonaws.com"
+        val awsKmsUrl = "kms.${config.auth.region}.amazonaws.com"
 
         logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.Sign" }
 
         val signature = client.post("https://$awsKmsUrl/") {
             headers {
                 headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
-                append(HttpHeaders.Host, "kms.${config.region}.amazonaws.com")
+                append(HttpHeaders.Host, "kms.${config.auth.region}.amazonaws.com")
                 append("X-Amz-Target", "TrentService.Sign") // Specific KMS action for CreateKey
             }
             setBody(body) // Set the JSON body
@@ -205,7 +205,7 @@ class AWSKey(
             config = config
         )
 
-        val awsKmsUrl = "kms.${config.region}.amazonaws.com"
+        val awsKmsUrl = "kms.${config.auth.region}.amazonaws.com"
 
         logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.Verify" }
 
@@ -268,10 +268,11 @@ class AWSKey(
 
         @JsExport.Ignore
         suspend fun authAccess(config: AWSKeyMetadata) {
-            val isAccessDataProvided = config.accessKeyId.isNotEmpty() && config.secretAccessKey.isNotEmpty()
+            val isAccessDataProvided =
+                config.auth.accessKeyId?.isNotEmpty() == true && config.auth.secretAccessKey?.isNotEmpty() == true
 
             if (isAccessDataProvided) {
-                _accessAWS = AWSAuthConfiguration(config.accessKeyId, config.secretAccessKey, null, null)
+                _accessAWS = AWSAuthConfiguration(config.auth.accessKeyId, config.auth.secretAccessKey, null, null)
                 timeoutAt = null
             } else {
                 val token = getIMDSv2Token()
@@ -301,8 +302,8 @@ class AWSKey(
 
         // Generate Signature Key
         fun getSignatureKey(config: AWSKeyMetadata, dateStamp: String): ByteArray {
-            val kDate = hmacSHA256("AWS4${config.secretAccessKey}".toByteArray(), dateStamp)
-            val kRegion = hmacSHA256(kDate, config.region)
+            val kDate = hmacSHA256("AWS4${config.auth.secretAccessKey}".toByteArray(), dateStamp)
+            val kRegion = hmacSHA256(kDate, config.auth.region.toString())
             val kService = hmacSHA256(kRegion, "kms")
             return hmacSHA256(kService, "aws4_request")
         }
@@ -371,9 +372,9 @@ ${sha256Hex(canonicalRequest)}
             val canonicalUri = "/"
             val canonicalQueryString = ""
             val canonicalHeaders =
-                "content-type:application/x-amz-json-1.1\nhost:kms.${config.region}.amazonaws.com\nx-amz-date:$amzDate\n"
+                "content-type:application/x-amz-json-1.1\nhost:kms.${config.auth.region}.amazonaws.com\nx-amz-date:$amzDate\n"
             val signedHeaders = "content-type;host;x-amz-date"
-            val credentialScope = "$dateStamp/${config.region}/kms/aws4_request"
+            val credentialScope = "$dateStamp/${config.auth.region}/kms/aws4_request"
 
             val canonicalRequest = createCanonicalRequest(
                 method, canonicalUri, canonicalQueryString, canonicalHeaders, signedHeaders, payload
@@ -388,7 +389,7 @@ ${sha256Hex(canonicalRequest)}
             return mapOf(
                 "Authorization" to createAuthorizationHeader(
                     "AWS4-HMAC-SHA256",
-                    config.accessKeyId,
+                    config.auth.accessKeyId.toString(),
                     credentialScope,
                     signedHeaders,
                     signature
@@ -473,7 +474,7 @@ ${sha256Hex(canonicalRequest)}
                 config = config
             )
 
-            val awsKmsUrl = "kms.${config.region}.amazonaws.com"
+            val awsKmsUrl = "kms.${config.auth.region}.amazonaws.com"
 
             logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.GetPublicKey" }
 
@@ -539,7 +540,7 @@ $public
         override suspend fun generate(type: KeyType, config: AWSKeyMetadata): AWSKey {
 
 
-            if (config.accessKeyId.isEmpty() && config.secretAccessKey.isEmpty()) {
+            if (config.auth.accessKeyId?.isEmpty() == true && config.auth.secretAccessKey?.isEmpty() == true) {
                 getAccess(config)
             }
 
@@ -555,7 +556,7 @@ $public
                 payload = body,
                 config = config
             )
-            val awsKmsUrl = "kms.${config.region}.amazonaws.com"
+            val awsKmsUrl = "kms.${config.auth.region}.amazonaws.com"
 
             logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.CreateKey" }
 
