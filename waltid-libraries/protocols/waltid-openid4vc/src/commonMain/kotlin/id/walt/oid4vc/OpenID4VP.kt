@@ -1,12 +1,17 @@
 package id.walt.oid4vc
 
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.ListElement
 import id.walt.mdoc.dataelement.StringElement
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.interfaces.PresentationResult
+import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
@@ -16,11 +21,13 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
+import kotlinx.datetime.Clock
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
+import kotlin.math.sign
+import kotlin.time.Duration.Companion.minutes
 
 object OpenID4VP {
 
@@ -209,6 +216,68 @@ object OpenID4VP {
                 authorizationRequest,
                 AuthorizationErrorCode.invalid_presentation_definition_reference,
                 "Invalid presentation definition reference, deserialization failed due to: ${exc.message}"
+            )
+        }
+    }
+
+    private suspend fun signToken(payload: JsonObject, header: JsonObject?, privKey: Key, keyId: String? = null): String {
+        val authKeyId = keyId ?: privKey.getKeyId()
+        val payloadToSign = Json.encodeToString(payload).encodeToByteArray()
+        val headersToSign = mapOf("typ" to "JWT".toJsonElement(), "kid" to authKeyId.toJsonElement()).plus(
+            header?.toMap() ?: mapOf()
+        )
+        return privKey.signJws(payloadToSign, headersToSign)
+    }
+
+    private suspend fun getSIOPIDTokenPayload(authorizationRequest: AuthorizationRequest, sub: String,
+                                              holderJWKKey: JWKKey?, presentationSubmission: PresentationSubmission?): JsonObject {
+        return buildJsonObject {
+            put("iss", sub)
+            put("sub", sub)
+            put("aud", authorizationRequest.clientId)
+            put("exp", Clock.System.now().plus(5.minutes).epochSeconds)
+            put("iat", Clock.System.now().epochSeconds)
+            put("state", authorizationRequest.state)
+            put("nonce", authorizationRequest.nonce)
+            if(holderJWKKey != null) {
+                put("sub_jwk", holderJWKKey.getPublicKey().exportJWKObject())
+            }
+            if(presentationSubmission != null) {
+                put("_vp_token", buildJsonObject {
+                    put("presentation_submission", presentationSubmission.toJSON())
+                })
+            }
+        }
+    }
+
+    suspend fun generateSIOPIdToken(authorizationRequest: AuthorizationRequest, holderDid: String,
+                                    privKey: Key, presentationSubmission: PresentationSubmission? = null): String {
+        val payload = getSIOPIDTokenPayload(authorizationRequest, holderDid, null, presentationSubmission)
+        return signToken(payload, null, privKey)
+    }
+
+    suspend fun generateSIOPIdToken(authorizationRequest: AuthorizationRequest, holderJWKKey: JWKKey,
+                                    presentationSubmission: PresentationSubmission? = null): String {
+        val payload = getSIOPIDTokenPayload(authorizationRequest, holderJWKKey.getPublicKey().getThumbprint(), holderJWKKey, presentationSubmission)
+        return signToken(payload, null, holderJWKKey)
+    }
+
+    suspend fun generateOID4VPTokenResponse(authorizationRequest: AuthorizationRequest,
+                                            presentationResult: PresentationResult,
+                                            siopIdToken: String? = null): TokenResponse {
+        return if (presentationResult.presentations.size == 1) {
+            TokenResponse.success(
+                presentationResult.presentations.first().let { VpTokenParameter.fromJsonElement(it) },
+                if (siopIdToken == null) presentationResult.presentationSubmission else null,
+                idToken = siopIdToken,
+                state = authorizationRequest.state
+            )
+        } else {
+            TokenResponse.success(
+                JsonArray(presentationResult.presentations).let { VpTokenParameter.fromJsonElement(it) },
+                if (siopIdToken == null) presentationResult.presentationSubmission else null,
+                idToken = siopIdToken,
+                state = authorizationRequest.state
             )
         }
     }
