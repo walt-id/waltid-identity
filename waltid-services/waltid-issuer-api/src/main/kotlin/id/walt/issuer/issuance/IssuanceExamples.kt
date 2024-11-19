@@ -897,7 +897,8 @@ object IssuanceExamples {
                     "config":
                     {
                        "auth": {
-                            "roleName": "access"
+                            "roleName": "access",
+                            "region": "eu-central-1"
                        }
                       
                     }
