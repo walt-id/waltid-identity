@@ -53,7 +53,7 @@ data class AWSAuth(
 
     private fun requireAuthenticationMethod() {
         val usingAccessKey = accessKeyId != null && secretAccessKey != null && region != null
-        val instanceAuth = roleName != null
+        val instanceAuth = roleName != null && region != null
         if (!usingAccessKey && !instanceAuth) {
             throw IllegalArgumentException("AWSAuth requires either accessKeyId, secretAccessKey, and region or roleName")
         }
