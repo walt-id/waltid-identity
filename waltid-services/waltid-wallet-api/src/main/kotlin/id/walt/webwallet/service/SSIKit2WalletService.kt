@@ -217,6 +217,17 @@ class SSIKit2WalletService(
                 parameter.disclosures
         }
 
+        /** steps to implement:
+         * get selected credentials
+         * group by format / holder key (?)
+         * create presentations
+         * create presentation submission object
+         * optionally cretae id_token
+         * create token response
+        */
+//        val selectedCredentials = credentialService.get(parameter.selectedCredentials)
+//        selectedCredentials.groupBy { it.format }.forEach { format, credentials ->  }
+
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(authReq)
         val submitFormParams = getFormParameters(authReq, tokenResponse)
 
