@@ -276,8 +276,11 @@ class AWSKey(
                 timeoutAt = null
             } else {
                 val token = getIMDSv2Token()
-                val role = getRoleName(token)
-                _accessAWS = getTemporaryCredentials(token, role)
+                val roleName = when {
+                    config.auth.roleName?.isNotEmpty() == true -> config.auth.roleName
+                    else -> getRoleName(token)
+                }
+                _accessAWS = getTemporaryCredentials(token, roleName)
                 timeoutAt = Clock.System.now().plus(3600.seconds)
             }
         }
