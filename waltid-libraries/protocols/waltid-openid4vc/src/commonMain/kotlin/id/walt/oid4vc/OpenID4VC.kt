@@ -26,8 +26,6 @@ import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.*
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 object OpenID4VC {
   private val log = KotlinLogging.logger { }
@@ -137,7 +135,6 @@ object OpenID4VC {
   }
 
   // Create an ID or VP Token request using JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
-  @OptIn(ExperimentalUuidApi::class)
   suspend fun processCodeFlowAuthorizationWithAuthorizationRequest(
     authorizationRequest: AuthorizationRequest,
     responseType: ResponseType,
@@ -157,8 +154,8 @@ object OpenID4VC {
       )
 
     // Bind authentication request with state
-    val authorizationRequestServerState = Uuid.random().toString()
-    val authorizationRequestServerNonce = Uuid.random().toString()
+    val authorizationRequestServerState = randomUUID()
+    val authorizationRequestServerNonce = randomUUID()
     val authorizationResponseServerMode = ResponseMode.direct_post
 
     val clientId = providerMetadata.issuer!!
