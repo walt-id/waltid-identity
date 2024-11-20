@@ -48,7 +48,8 @@ suspend fun createCredentialOfferUri(
             AuthenticationMethod.PRE_AUTHORIZED -> true
             else -> false
         },
-        callbackUrl = callbackUrl
+        callbackUrl = callbackUrl,
+        standardVersion = overwrittenIssuanceRequests.first().standardVersion!!
     )
 
     logger.debug { "issuanceSession: $issuanceSession" }

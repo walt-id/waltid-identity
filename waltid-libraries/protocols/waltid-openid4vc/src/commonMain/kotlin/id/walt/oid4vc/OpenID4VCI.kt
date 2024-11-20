@@ -99,13 +99,19 @@ object OpenID4VCI {
 
     suspend fun parseAndResolveCredentialOfferRequestUrl(credOfferReqUrl: String): CredentialOffer {
         val offerReq = parseCredentialOfferRequestUrl(credOfferReqUrl)
-        return offerReq.credentialOffer
-            ?: if (!offerReq.credentialOfferUri.isNullOrEmpty()) {
 
+        return when {
+
+            offerReq.credentialOfferUri != null -> {
                 http.get(offerReq.credentialOfferUri).bodyAsText().let {
                     CredentialOffer.fromJSONString(it)
                 }
-            } else throw Exception("Credential offer request has no credential offer object set by value or reference.")
+            }
+
+            offerReq.credentialOffer != null -> offerReq.credentialOffer
+
+            else -> throw IllegalStateException("Credential Offer does not contain a Credential Offer Object nor a Credential Offer URI")
+        }
     }
 
     fun getCIProviderMetadataUrl(credOffer: CredentialOffer): String {
@@ -138,10 +144,13 @@ object OpenID4VCI {
             is OpenIDProviderMetadata.Draft13 -> providerMetadata.credentialConfigurationsSupported ?: mapOf()
         }
 
-        return credentialOffer.credentialConfigurationIds.mapNotNull { c ->
-            supportedCredentials[c]?.let {
-                OfferedCredential.fromProviderMetadata(it)
-            }
+        val credentialIds = when (credentialOffer) {
+            is CredentialOffer.Draft13 -> credentialOffer.credentialConfigurationIds
+            is CredentialOffer.Draft10 -> credentialOffer.credentials
+        }
+
+        return credentialIds.mapNotNull { id ->
+            supportedCredentials[id]?.let { OfferedCredential.fromProviderMetadata(it) }
         }
     }
 

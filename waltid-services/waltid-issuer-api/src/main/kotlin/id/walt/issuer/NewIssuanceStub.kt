@@ -97,7 +97,7 @@ suspend fun main() {
 
 
 
-    val credOffer = CredentialOffer.Builder(url)
+    val credOffer = CredentialOffer.Draft13.Builder(url)
         .addOfferedCredential("VerifiableId")
         .addAuthorizationCodeGrant("test-state")
         .build()

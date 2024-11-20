@@ -483,10 +483,11 @@ open class CIProvider(
         callbackUrl: String? = null,
         txCode: TxCode? = null,
         txCodeValue: String? = null,
+        standardVersion: OpenID4VCIVersion = OpenID4VCIVersion.D13
     ): IssuanceSession = runBlocking {
         val sessionId = randomUUID()
 
-        val credentialOfferBuilder = OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
+        val credentialOfferBuilder = OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests, standardVersion )
 
         credentialOfferBuilder.addAuthorizationCodeGrant(sessionId)
 
