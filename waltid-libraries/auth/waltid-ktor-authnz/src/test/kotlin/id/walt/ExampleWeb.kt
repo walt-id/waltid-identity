@@ -1,18 +1,24 @@
 package id.walt
 
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.ktorauthnz.AuthContext
+import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.auth.getAuthToken
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.ktorauthnz.auth.ktorAuthnz
 import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.methods.*
 import id.walt.ktorauthnz.sessions.SessionManager
+import id.walt.ktorauthnz.tokens.jwttoken.JwtTokenHandler
+import id.walt.ktorauthnz.tokens.ktorauthnztoken.KtorAuthNzTokenHandler
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
+import kotlinx.coroutines.runBlocking
 import org.intellij.lang.annotations.Language
 
 fun Route.globalImplicitSingleStep() {
@@ -21,7 +27,8 @@ fun Route.globalImplicitSingleStep() {
         val flowConfig = """
             {
                 "method": "userpass",
-                "ok": true
+                "ok": true,
+                "expiration": "1d"
             }
         """.trimIndent()
         val authFlow = AuthFlow.fromConfig(flowConfig)
@@ -189,10 +196,17 @@ fun Route.authFlowRoutes() {
     //accountImplicitMultiStep()
 }
 
-fun Application.testApp() {
+fun Application.testApp(jwt: Boolean) {
     install(Authentication) {
-        ktorAuthnz("ktor-authnz") {
+        KtorAuthnzManager.tokenHandler = when {
+            jwt -> JwtTokenHandler().apply {
+                signingKey = runBlocking { JWKKey.generate(KeyType.Ed25519) }
+                verificationKey = signingKey
+            }
+            else -> KtorAuthNzTokenHandler()
+        }
 
+        ktorAuthnz("ktor-authnz") {
         }
     }
 

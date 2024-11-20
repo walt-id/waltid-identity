@@ -13,11 +13,12 @@ import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
 
-fun main() {
-    startExample()
-}
+var isLoggingSetup = false
 
-fun startExample(wait: Boolean = true) {
+fun loggingSetup() {
+    if (isLoggingSetup) return
+
+    isLoggingSetup = true
     loggingConfiguration(true) {
         sink("stdout", RENDER_ANSI, STDOUT)
         sink("stderr", RENDER_ANSI, STDERR)
@@ -44,12 +45,15 @@ fun startExample(wait: Boolean = true) {
         }
         minDirectLogLevel(Level.TRACE)
     }
+}
 
-    embeddedServer(CIO, port = 8088, host = "0.0.0.0", module = Application::module)
+fun startExample(wait: Boolean = true, jwt: Boolean): ApplicationEngine {
+    loggingSetup()
+    return embeddedServer(CIO, port = 8088, host = "0.0.0.0", module = { this.module(jwt) })
         .start(wait = wait)
 }
 
-fun Application.module() {
+fun Application.module(jwt: Boolean) {
     // configureSecurity()
     // configureHTTP()
     configureMonitoring()
@@ -57,7 +61,7 @@ fun Application.module() {
     configureRouting()
     configureOpenApi()
 
-    testApp()
+    testApp(jwt)
 
     collectRoutes().forEach {
         println(it)
