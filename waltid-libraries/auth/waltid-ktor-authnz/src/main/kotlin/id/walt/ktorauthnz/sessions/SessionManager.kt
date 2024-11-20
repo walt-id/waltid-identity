@@ -2,6 +2,7 @@ package id.walt.ktorauthnz.sessions
 
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.flows.AuthFlow
+import kotlinx.datetime.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -14,7 +15,8 @@ object SessionManager {
         val newSession = AuthSession(
             id = sessionId,
             status = AuthSessionStatus.CONTINUE_NEXT_STEP,
-            flows = setOf(authFlow)
+            flows = setOf(authFlow),
+            expiration = authFlow.expiration?.let { Clock.System.now() + authFlow.parsedDuration!! }
         )
 
         KtorAuthnzManager.sessionStore.store(newSession)
