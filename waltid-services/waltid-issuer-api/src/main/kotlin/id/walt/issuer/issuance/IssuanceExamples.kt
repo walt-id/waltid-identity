@@ -861,7 +861,7 @@ object IssuanceExamples {
 
 
     //language=JSON
-    val issuerOnboardingRequestAwsRestApiExample = typedValueExampleDescriptorDsl<OnboardingRequest>(
+    val issuerOnboardingRequestAwsRestApiExampleWithDirectAccess = typedValueExampleDescriptorDsl<OnboardingRequest>(
         """
             {
                 "key":
@@ -870,9 +870,36 @@ object IssuanceExamples {
                     "keyType": "secp256r1",
                     "config":
                     {
-                        "accessKeyId": "AKIA........QU5F",
-                        "secretAccessKey": "6YDr..................7Sr",
-                        "region": "eu-central-1"
+                       "auth": {
+                            "accessKeyId": "AKIA........QU5F",
+                            "secretAccessKey": "6YDr..................7Sr",
+                            "region": "eu-central-1"
+                       }
+                      
+                    }
+                },
+                "did":
+                {
+                    "method": "jwk"
+                }
+            }
+        """.trimIndent()
+    )
+
+    //language=JSON
+    val issuerOnboardingRequestAwsRestApiExampleWithRole = typedValueExampleDescriptorDsl<OnboardingRequest>(
+        """
+            {
+                "key":
+                {
+                    "backend": "aws",
+                    "keyType": "secp256r1",
+                    "config":
+                    {
+                       "auth": {
+                            "roleName": "access",
+                            "region": "eu-central-1"
+                       }
                       
                     }
                 },
