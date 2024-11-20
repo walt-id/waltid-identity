@@ -18,6 +18,7 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.responses.PushedAuthorizationResponse
+import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.JWTVCIssuerMetadata
 import id.walt.sdjwt.SDJWTVCTypeMetadata
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -163,8 +164,13 @@ object OidcApi : CIProvider() {
                                 }
 
                                 AuthenticationMethod.ID_TOKEN -> {
+                                    val authServerState = randomUUID()
+
+                                    initializeIssuanceSession(authReq, 5.minutes, authServerState)
+
                                     OpenID4VC.processCodeFlowAuthorizationWithAuthorizationRequest(
                                         authorizationRequest = authReq,
+                                        authServerState = authServerState,
                                         responseType = ResponseType.IdToken,
                                         providerMetadata = metadata,
                                         tokenKey = CI_TOKEN_KEY,
