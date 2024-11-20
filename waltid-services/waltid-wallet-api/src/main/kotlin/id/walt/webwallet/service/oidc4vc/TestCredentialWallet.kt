@@ -274,6 +274,15 @@ class TestCredentialWallet(
         // DONE: set root path of descriptor mapping based on whether there are multiple presentations or just one ("$" or "$[idx]")
         val presentations = listOf(signedJwtVP, deviceResponse).filterNotNull().plus(sdJwtVCsPresented).map { JsonPrimitive(it) }
         println("presentations: $presentations")
+        // new code to replace above ---:
+//        val presentationMap = mapOf(
+//            VCFormat.jwt_vp to listOf(signedJwtVP).filterNotNull(),
+//            VCFormat.mso_mdoc to listOf(deviceResponse).filterNotNull(),
+//            VCFormat.sd_jwt_vc to sdJwtVCsPresented
+//        )
+//        val presentationSubmission = OpenID4VP.generatePresentationSubmission(session.presentationDefinition!!, presentationMap)
+//        println(presentationSubmission.toJSON().toString())
+        // --- new code ---
 
         val rootPathVP = "$" + (if (presentations.size == 2) "[0]" else "")
         val rootPathMDoc = "$" + (if (presentations.size == 2) "[1]" else "")

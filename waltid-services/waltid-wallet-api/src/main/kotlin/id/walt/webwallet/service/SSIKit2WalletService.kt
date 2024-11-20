@@ -20,7 +20,9 @@ import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
 import id.walt.oid4vc.OpenID4VP
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.ResponseMode
+import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.errors.AuthorizationError
+import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -222,11 +224,18 @@ class SSIKit2WalletService(
          * group by format / holder key (?)
          * create presentations
          * create presentation submission object
-         * optionally cretae id_token
+         * optionally create id_token
          * create token response
         */
+        // TODO: replace credentialWallet.processImplicitFlowAuthorization(...) by the following lines:
 //        val selectedCredentials = credentialService.get(parameter.selectedCredentials)
 //        selectedCredentials.groupBy { it.format }.forEach { format, credentials ->  }
+//
+//        val presentationResult: PresentationResult = TODO()
+//        val idToken = if(authReq.responseType.contains(ResponseType.IdToken))
+//                OpenID4VP.generateSIOPIdToken(TODO(), TODO(), presentationResult.presentationSubmission)
+//            else null
+//        val tokenResponse = OpenID4VP.generateOID4VPTokenResponse(authReq, presentationResult, idToken)
 
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(authReq)
         val submitFormParams = getFormParameters(authReq, tokenResponse)

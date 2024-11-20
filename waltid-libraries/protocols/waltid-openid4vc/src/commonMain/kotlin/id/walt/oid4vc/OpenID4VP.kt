@@ -1,21 +1,29 @@
 package id.walt.oid4vc
 
+import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.mdoc.dataelement.ByteStringElement
-import id.walt.mdoc.dataelement.ListElement
-import id.walt.mdoc.dataelement.StringElement
+import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.mdoc.dataelement.*
+import id.walt.mdoc.dataretrieval.DeviceResponse
+import id.walt.mdoc.doc.MDoc
+import id.walt.mdoc.docrequest.MDocRequestBuilder
+import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
+import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.http
+import id.walt.sdjwt.SDJwtVC
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -28,6 +36,7 @@ import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.math.sign
 import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.Uuid
 
 object OpenID4VP {
 
@@ -262,7 +271,7 @@ object OpenID4VP {
         return signToken(payload, null, holderJWKKey)
     }
 
-    suspend fun generateOID4VPTokenResponse(authorizationRequest: AuthorizationRequest,
+    fun generateOID4VPTokenResponse(authorizationRequest: AuthorizationRequest,
                                             presentationResult: PresentationResult,
                                             siopIdToken: String? = null): TokenResponse {
         return if (presentationResult.presentations.size == 1) {
@@ -281,4 +290,59 @@ object OpenID4VP {
             )
         }
     }
+
+    private fun getDescriptorId(
+        type: String,
+        presentationDefinition: PresentationDefinition,
+    ) =
+        presentationDefinition.inputDescriptors.find {
+            (it.name ?: it.id) == type
+        }?.id
+
+    fun buildDescriptorMappingsJwtVP(
+        presentationDefinition: PresentationDefinition,
+        vpJwt: String,
+        rootPath: String = "$",
+    ): List<DescriptorMapping> {
+        val vp = vpJwt.base64UrlToBase64().decodeJws()
+        val vcs = vp.payload["vp"]!!.jsonObject["verifiableCredential"]!!.jsonArray
+        return vcs.mapIndexed { idx, vc ->
+            val vcJws = vc.jsonPrimitive.content.base64UrlToBase64().decodeJws()
+            val type = vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
+                ?: "VerifiableCredential"
+            val descMappingId = getDescriptorId(type, presentationDefinition)
+
+            DescriptorMapping(
+                id = descMappingId,
+                format = VCFormat.jwt_vp,
+                path = "$rootPath.vp",
+                pathNested = DescriptorMapping(
+                    id = descMappingId,
+                    format = VCFormat.jwt_vc_json,
+                    path = "$rootPath.vp.verifiableCredential[$idx]"
+                )
+            )
+        }.toList()
+    }
+
+    fun generatePresentationSubmission(presentationDefinition: PresentationDefinition,
+                                       presentations: Map<VCFormat, List<String>>): PresentationSubmission {
+        val totalNumPresentations = presentations.values.flatten().size
+        val descriptorMappings = presentations.entries.flatMapIndexed { presentationIdx, presentationEntry ->
+            val rootPath = "$" + (if(totalNumPresentations > 1) "[$presentationIdx]" else "")
+            when(presentationEntry.key) {
+                VCFormat.jwt_vp -> presentationEntry.value.flatMap { vp_jwt ->
+                    buildDescriptorMappingsJwtVP(presentationDefinition, vp_jwt, rootPath)
+                }
+                // TODO: add support for other presentation types
+                else -> listOf()
+            }
+        }
+        return PresentationSubmission(
+            id = presentationDefinition.id,
+            definitionId = presentationDefinition.id,
+            descriptorMap = descriptorMappings
+        )
+    }
+
 }
