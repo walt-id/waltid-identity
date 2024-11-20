@@ -4,54 +4,57 @@
       <p class="text-base font-semibold">Generate key</p>
       <div>
         <div
-          class="mt-1 space-y-8 border-gray-900/10 pb-12 sm:space-y-0 sm:divide-y sm:divide-gray-900/10 sm:border-t sm:pb-0"
+            class="mt-1 space-y-8 border-gray-900/10 pb-12 sm:space-y-0 sm:divide-y sm:divide-gray-900/10 sm:border-t sm:pb-0"
         >
           <div>
+            <!-- Key Generation Request -->
             <div class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-4">
               <label
-                class="block text-sm font-medium leading-6 text-gray-900 sm:pt-1.5"
-                for="format"
-                >KMS</label
+                  class="block text-sm font-medium leading-6 text-gray-900 sm:pt-1.5"
+                  for="keyGenerationRequest"
               >
+                KMS
+              </label>
               <div class="mt-2 sm:col-span-2 sm:mt-0">
                 <select
-                  id="format"
-                  v-model="data.keyGenerationRequest.type"
-                  @change="data.keyGenerationRequest.config = {}"
-                  class="block px-2 w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:max-w-xs sm:text-sm sm:leading-6"
-                  name="format"
+                    id="keyGenerationRequest"
+                    v-model="data.keyGenerationRequest.type"
+                    @change="data.keyGenerationRequest.config = {}"
+                    class="block px-2 w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:max-w-xs sm:text-sm sm:leading-6"
                 >
                   <option
-                    v-for="option in options"
-                    :key="option.keyGenerationRequest[1]"
-                    :value="option.keyGenerationRequest[1]"
+                      v-for="option in options"
+                      :key="option.keyGenerationRequest[1]"
+                      :value="option.keyGenerationRequest[1]"
                   >
                     {{ option.keyGenerationRequest[0] }}
                   </option>
                 </select>
               </div>
             </div>
+
+            <!-- Key Type -->
             <div class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-4">
               <label
-                class="block text-sm font-medium leading-6 text-gray-900 sm:pt-1.5"
-                for="format"
-                >Key type</label
+                  class="block text-sm font-medium leading-6 text-gray-900 sm:pt-1.5"
+                  for="keyType"
               >
+                Key Type
+              </label>
               <div class="mt-2 sm:col-span-2 sm:mt-0">
                 <select
-                  id="format"
-                  v-model="data.type"
-                  class="block px-2 w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:max-w-xs sm:text-sm sm:leading-6"
-                  name="format"
+                    id="keyType"
+                    v-model="data.type"
+                    class="block px-2 w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:max-w-xs sm:text-sm sm:leading-6"
                 >
                   <option
-                    v-for="keyType in options.find(
+                      v-for="keyType in options.find(
                       (option) =>
                         option.keyGenerationRequest[1] ==
-                        data.keyGenerationRequest.type,
+                        data.keyGenerationRequest.type
                     )?.keyType"
-                    :key="keyType[1]"
-                    :value="keyType[1]"
+                      :key="keyType[1]"
+                      :value="keyType[1]"
                   >
                     {{ keyType[0] }}
                   </option>
@@ -60,79 +63,106 @@
             </div>
           </div>
         </div>
+
+        <!-- Config Fields -->
         <div
-          v-if="
-            options.find(
-              (option) =>
-                option.keyGenerationRequest[1] ==
-                data.keyGenerationRequest.type,
-            )?.config?.length
-          "
-          class="mt-1 space-y-8 border-gray-900/10 pb-12 sm:space-y-0 sm:divide-gray-900/10 sm:border-t sm:pb-0"
+            v-if="options.find(
+            (option) =>
+              option.keyGenerationRequest[1] ==
+              data.keyGenerationRequest.type
+          )?.config?.length"
+            class="mt-1 space-y-8 border-gray-900/10 pb-12 sm:space-y-0 sm:divide-gray-900/10 sm:border-t sm:pb-0"
         >
           <div
-            class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-2"
-            v-for="config in options.find(
+              class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-2"
+              v-for="config in options.find(
               (option) =>
                 option.keyGenerationRequest[1] ==
-                data.keyGenerationRequest.type,
+                data.keyGenerationRequest.type
             )?.config"
+              :key="config"
           >
             <label
-              class="block text-sm font-medium leading-6 text-gray-900 sm:pt-1.5"
+                class="block text-sm font-medium leading-6 text-gray-900 sm:pt-1.5"
             >
               {{ config.charAt(0).toUpperCase() + config.slice(1) }}
             </label>
             <template v-if="config === 'signingKeyPem'">
               <textarea
-                v-model="data.keyGenerationRequest.config[config]"
-                class="px-2 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:max-w-xs sm:text-sm sm:leading-6"
-                rows="4"
+                  v-model="data.keyGenerationRequest.config[config]"
+                  class="px-2 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:max-w-xs sm:text-sm sm:leading-6"
+                  rows="4"
               ></textarea>
             </template>
             <template v-else>
               <input
-                v-model="data.keyGenerationRequest.config[config]"
-                class="px-2 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:max-w-xs sm:text-sm sm:leading-6"
-                type="text"
+                  v-model="data.keyGenerationRequest.config[config]"
+                  class="px-2 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:max-w-xs sm:text-sm sm:leading-6"
+                  type="text"
               />
             </template>
           </div>
         </div>
+
+        <!-- AWS Special Case for Nested Config -->
+        <div
+            v-if="data.keyGenerationRequest.type === 'aws'"
+            class="mt-1 space-y-8 border-gray-900/10 pb-12 sm:space-y-0 sm:divide-gray-900/10 sm:border-t sm:pb-0"
+        >
+          <div
+              class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-2"
+              v-for="authConfig in options.find(
+              (option) => option.keyGenerationRequest[1] === 'aws'
+            )?.config.auth"
+              :key="authConfig"
+          >
+            <label
+                class="block text-sm font-medium leading-6 text-gray-900 sm:pt-1.5"
+            >
+              {{ authConfig.charAt(0).toUpperCase() + authConfig.slice(1) }}
+            </label>
+            <input
+                v-model="data.keyGenerationRequest.config[authConfig]"
+                class="px-2 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:max-w-xs sm:text-sm sm:leading-6"
+                type="text"
+            />
+          </div>
+        </div>
       </div>
     </div>
+
+    <!-- Submit Button -->
     <div class="mt-2 flex items-center justify-end gap-x-6">
       <button
-        class="inline-flex justify-center bg-blue-500 hover:bg-blue-600 focus-visible:outline-blue-600 rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-        @click="generateKey"
+          class="inline-flex justify-center bg-blue-500 hover:bg-blue-600 focus-visible:outline-blue-600 rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          @click="generateKey"
       >
         <span class="inline-flex place-items-center gap-1">
-          <KeyIcon v-if="!loading" class="w-5 h-5 mr-1" />
-          <InlineLoadingCircle v-else class="mr-1" />
+          <KeyIcon v-if="!loading" class="w-5 h-5 mr-1"/>
+          <InlineLoadingCircle v-else class="mr-1"/>
           Generate key
         </span>
       </button>
     </div>
-    <div v-if="response && response != ''" class="mt-6 border p-4 rounded-2xl">
-      <p class="text-base font-semibold">Response</p>
 
+    <!-- Response Section -->
+    <div v-if="response && response !== ''" class="mt-6 border p-4 rounded-2xl">
+      <p class="text-base font-semibold">Response</p>
       <div
-        class="mt-1 space-y-6 border-gray-900/10 pb-6 sm:space-y-0 sm:divide-y sm:divide-gray-900/10 sm:border-t sm:pb-0"
+          class="mt-1 space-y-6 border-gray-900/10 pb-6 sm:space-y-0 sm:divide-y sm:divide-gray-900/10 sm:border-t sm:pb-0"
       >
         <p
-          class="mt-2 flex items-center bg-green-100 p-3 rounded-xl overflow-x-scroll"
+            class="mt-2 flex items-center bg-green-100 p-3 rounded-xl overflow-x-scroll"
         >
-          <CheckIcon class="w-5 h-5 mr-1 text-green-600" />
-          <span class="text-green-800"
-            >Generated key: <code>{{ response }}</code></span
-          >
+          <CheckIcon class="w-5 h-5 mr-1 text-green-600"/>
+          <span class="text-green-800">Generated key: <code>{{ response }}</code></span>
         </p>
         <div class="pt-3 flex justify-end">
           <NuxtLink :to="`/wallet/${currentWallet}/settings/keys`">
             <button
-              class="mb-2 border rounded-xl p-2 bg-blue-500 text-white flex flex-row justify-center items-center"
+                class="mb-2 border rounded-xl p-2 bg-blue-500 text-white flex flex-row justify-center items-center"
             >
-              <ArrowUturnLeftIcon class="h-5 pr-1" />
+              <ArrowUturnLeftIcon class="h-5 pr-1"/>
               Return back
             </button>
           </NuxtLink>
@@ -141,6 +171,7 @@
     </div>
   </CenterMain>
 </template>
+
 
 <script lang="ts" setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
@@ -192,11 +223,28 @@ const options = ref([
   },
   {
     keyGenerationRequest: ["AWS", "aws"],
-    keyType: [["ECDSA_Secp256r1", "secp256r1"], ["ECDSA_Secp256k1", "secp256k1"], ["RSA", "RSA"]],
-    config: ["accessKeyId", "secretAccessKey", "region"],
+    keyType: [
+      ["ECDSA_Secp256r1", "secp256r1"],
+      ["ECDSA_Secp256k1", "secp256k1"],
+      ["RSA", "RSA"]
+    ],
+    config: {
+      auth: ["accessKeyId", "secretAccessKey", "region"]
+    }
   },
 ]);
 
+/*const data = reactive({
+  keyGenerationRequest: {
+    type: options.value[0].keyGenerationRequest[1],
+    config: options.value[0]?.config?.reduce((acc, key) => {
+      acc[key] = ""; // Initialize each config key with an empty string
+      return acc;
+    }, {}),
+  },
+  type: options.value[0].keyType[0][1],
+});
+*/
 const data = reactive({
   keyGenerationRequest: {
     type: options.value[0].keyGenerationRequest[1],
@@ -205,31 +253,52 @@ const data = reactive({
   type: options.value[0].keyType[0][1],
 });
 
+console.log(data);
 const currentWallet = useCurrentWallet();
 
 async function generateKey() {
+
   const body = {
     backend: data.keyGenerationRequest.type,
     keyType: data.type,
-    config: toRaw(data.keyGenerationRequest.config),
+    config: {
+      // If AWS, wrap config keys in an 'auth' object, otherwise leave them in the config
+      ...(data.keyGenerationRequest.type === "aws"
+          ? {
+            auth: {
+              accessKeyId: data.keyGenerationRequest.config.accessKeyId,
+              secretAccessKey: data.keyGenerationRequest.config.secretAccessKey,
+              region: data.keyGenerationRequest.config.region,
+            },
+          }
+          : {
+            // If not AWS, keep keys in the config directly
+            ...data.keyGenerationRequest.config,
+          }),
+    },
   };
-
+  console.log(body);
   loading.value = true;
 
-  response.value = await $fetch(
-    `/wallet-api/wallet/${currentWallet.value}/keys/generate`,
-    {
-      method: "POST",
-      body: body,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    },
-  ).catch((e) => {
-    alert(e.message);
-  });
-  loading.value = false;
+  try {
+    response.value = await $fetch(
+        `/wallet-api/wallet/${currentWallet.value}/keys/generate`,
+        {
+          method: "POST",
+          body: JSON.stringify(body), // Ensure the body is a JSON string
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+    );
+  } catch (e) {
+    console.error("Error generating key:", e);
+    alert("Failed to generate key: " + e.message);
+  } finally {
+    loading.value = false;
+  }
 }
+
 
 useHead({
   title: "Generate key - walt.id",
