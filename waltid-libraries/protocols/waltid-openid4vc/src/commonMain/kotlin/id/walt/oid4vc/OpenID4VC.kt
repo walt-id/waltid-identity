@@ -137,6 +137,7 @@ object OpenID4VC {
   // Create an ID or VP Token request using JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
   suspend fun processCodeFlowAuthorizationWithAuthorizationRequest(
     authorizationRequest: AuthorizationRequest,
+    authServerState: String,
     responseType: ResponseType,
     providerMetadata: OpenIDProviderMetadata,
     tokenKey: Key,
@@ -153,8 +154,6 @@ object OpenID4VC {
         message = "Invalid response type ${authorizationRequest.responseType}, for authorization code flow."
       )
 
-    // Bind authentication request with state
-    val authorizationRequestServerState = randomUUID()
     val authorizationRequestServerNonce = randomUUID()
     val authorizationResponseServerMode = ResponseMode.direct_post
 
@@ -162,11 +161,8 @@ object OpenID4VC {
     val redirectUri = providerMetadata.issuer + "/direct_post"
     val scope = setOf("openid")
 
-    // Create a session with the state of the ID Token request since it is needed in the direct_post endpoint
-    //initializeAuthorization(authorizationRequest, 5.minutes, authorizationRequestServerState)
-
     return AuthorizationCodeWithAuthorizationRequestResponse.success(
-      state = authorizationRequestServerState,
+      state = authServerState,
       clientId = clientId,
       redirectUri = redirectUri,
       responseType = getResponseTypeString(responseType),
@@ -175,14 +171,13 @@ object OpenID4VC {
       nonce = authorizationRequestServerNonce,
       requestUri = null,
       request = when (isJar) {
-        // Create a jwt as request object as defined in JAR OAuth2.0 specification
         true -> signToken(
-          TokenTarget.TOKEN,
-          buildJsonObject {
+          target = TokenTarget.TOKEN,
+          payload = buildJsonObject {
             put(JWTClaims.Payload.issuer, providerMetadata.issuer)
             put(JWTClaims.Payload.audience, authorizationRequest.clientId)
             put(JWTClaims.Payload.nonce, authorizationRequestServerNonce)
-            put("state", authorizationRequestServerState)
+            put("state", authServerState)
             put("client_id", clientId)
             put("redirect_uri", redirectUri)
             put("response_type", getResponseTypeString(responseType))
@@ -192,7 +187,9 @@ object OpenID4VC {
               ResponseType.VpToken -> put("presentation_definition", presentationDefinition!!.toJSON())
               else -> null
             }
-          }, tokenKey)
+          },
+          privKey = tokenKey
+        )
 
         else -> null
       },
