@@ -35,19 +35,12 @@ import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.minutes
-
-
-@Serializable
-data class UserData(val email: String, val password: String, val id: String? = null)
 
 object OidcApi : CIProvider() {
 
     private val logger = KotlinLogging.logger { }
-
 
     private fun Application.oidcRoute(build: Route.() -> Unit) {
         routing {
@@ -61,7 +54,6 @@ object OidcApi : CIProvider() {
         //}
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     fun Application.oidcApi() = oidcRoute {
         route("", {
             tags = listOf("oidc")
