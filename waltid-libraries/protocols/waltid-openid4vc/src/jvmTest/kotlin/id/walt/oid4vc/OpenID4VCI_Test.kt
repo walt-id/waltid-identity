@@ -72,7 +72,7 @@ class OpenID4VCI_Test {
   fun testCredentialIssuanceIsolatedFunctions() = runTest {
     println("// -------- CREDENTIAL ISSUER ----------")
     // init credential offer for full authorization code flow
-    val credOffer = CredentialOffer.Builder(ISSUER_BASE_URL)
+    val credOffer = CredentialOffer.Draft13.Builder(ISSUER_BASE_URL)
       .addOfferedCredential("VerifiableId")
       .addAuthorizationCodeGrant("test-state")
       .build()
@@ -206,7 +206,7 @@ class OpenID4VCI_Test {
     // Available authentication methods are: NONE, ID_TOKEN, VP_TOKEN, PWD(Handled by third party authorization server), PRE_AUTHORIZED. The response for each method is a redirect to the proper location.
     println("// --Authentication method is NONE--")
     var issuerState = "test-state-none-auth"
-    var credOffer = CredentialOffer.Builder(ISSUER_BASE_URL)
+    var credOffer = CredentialOffer.Draft13.Builder(ISSUER_BASE_URL)
       .addOfferedCredential(issuedCredentialId)
       .addAuthorizationCodeGrant(issuerState)
       .build()
@@ -322,7 +322,7 @@ class OpenID4VCI_Test {
     println("// --Authentication method is ID_TOKEN--")
     issuerState = "test-state-idtoken-auth"
     val credOfferUrl = testIsolatedFunctionsCreateCredentialOffer(ISSUER_BASE_URL, issuerState, issuedCredentialId)
-    credOffer = CredentialOfferRequest.fromHttpQueryString(Url(credOfferUrl).encodedQuery).credentialOffer!!
+    credOffer = CredentialOfferRequest.fromHttpQueryString(Url(credOfferUrl).encodedQuery).credentialOffer!! as CredentialOffer.Draft13
 
     // Issuer Client shows credential offer request as QR code
     println(OpenID4VCI.getCredentialOfferRequestUrl(credOffer))
@@ -465,7 +465,7 @@ class OpenID4VCI_Test {
     // ----------------------------------
     println("// --Authentication method is VP_TOKEN--")
     issuerState = "test-state-vptoken-auth"
-    credOffer = CredentialOffer.Builder(ISSUER_BASE_URL)
+    credOffer = CredentialOffer.Draft13.Builder(ISSUER_BASE_URL)
       .addOfferedCredential(issuedCredentialId)
       .addAuthorizationCodeGrant(issuerState)
       .build()
@@ -618,7 +618,7 @@ class OpenID4VCI_Test {
     // ----------------------------------
     println("// --Authentication method is PRE_AUTHORIZED--")
     val preAuthCode = randomUUID()
-    credOffer = CredentialOffer.Builder(ISSUER_BASE_URL)
+    credOffer = CredentialOffer.Draft13.Builder(ISSUER_BASE_URL)
       .addOfferedCredential(issuedCredentialId)
       .addPreAuthorizedCodeGrant(preAuthCode)
       .build()
@@ -628,7 +628,7 @@ class OpenID4VCI_Test {
     println(issueReqUrl)
 
     println("// -------- WALLET ----------")
-    credOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl)
+    credOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl) as CredentialOffer.Draft13
     //providerMetadata = OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer)
     assertEquals(expected = credOffer.credentialIssuer, actual = providerMetadata.credentialIssuer)
 
