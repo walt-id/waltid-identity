@@ -227,12 +227,28 @@ open class CIProvider(
                 val holderKeyJWK =  JWKKey.importJWK(holderKey.toString()).getOrNull()?.exportJWKObject()?.plus("kid" to JWKKey.importJWK(holderKey.toString()).getOrThrow().getKeyId())?.toJsonObject()
 
                 when (credentialFormat) {
-                    CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(credentialRequest, vc, request.mapping,
-                        request.selectiveDisclosure, vct = metadata.credentialConfigurationsSupported?.get(request.credentialConfigurationId)?.vct ?: throw ConfigurationException(
+                    CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(
+                        credentialRequest = credentialRequest,
+                        credentialData = vc,
+                        dataMapping = request.mapping,
+                        selectiveDisclosure = request.selectiveDisclosure,
+                        vct = metadata.credentialConfigurationsSupported?.get(request.credentialConfigurationId)?.vct ?: throw ConfigurationException(
                             ConfigException("No vct configured for given credential configuration id: ${request.credentialConfigurationId}")
-                        ), issuerDid ?: baseUrl, issuerDid, request.x5Chain, resolvedIssuerKey).toString()
-                  else -> OpenID4VCI.generateW3CJwtVC(credentialRequest, vc, request.mapping, request.selectiveDisclosure,
-                        issuerDid, request.x5Chain, resolvedIssuerKey)
+                        ),
+                        issuerId = issuerDid ?: baseUrl,
+                        issuerDid = issuerDid,
+                        x5Chain = request.x5Chain,
+                        issuerKey = resolvedIssuerKey
+                    ).toString()
+                  else -> OpenID4VCI.generateW3CJwtVC(
+                      credentialRequest = credentialRequest,
+                      credentialData = vc,
+                      dataMapping = request.mapping,
+                      selectiveDisclosure = request.selectiveDisclosure,
+                      issuerDid = issuerDid,
+                      x5Chain = request.x5Chain,
+                      issuerKey = resolvedIssuerKey
+                  )
               }
             }.also { log.debug { "Respond VC: $it" } }
         }))
