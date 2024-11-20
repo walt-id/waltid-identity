@@ -50,7 +50,8 @@ data class AWSAuthConfiguration(
     val secretAccessKey: String?,
     val region: String?,
     val sessionToken: String?,
-    val expiration: String?
+    val expiration: String?,
+    val roleName: String? = null
 )
 
 var _accessAWS: AWSAuthConfiguration? = null
@@ -149,6 +150,9 @@ class AWSKey(
                 headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
                 append(HttpHeaders.Host, "kms.${config.auth.region}.amazonaws.com")
                 append("X-Amz-Target", "TrentService.Sign") // Specific KMS action for CreateKey
+                _accessAWS?.sessionToken?.takeIf { it.isNotEmpty() }?.let {
+                    append("X-Amz-Security-Token", it)
+                }
             }
             setBody(body) // Set the JSON body
         }.awsJsonDataBody()
@@ -215,6 +219,9 @@ class AWSKey(
                 headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
                 append(HttpHeaders.Host, awsKmsUrl)
                 append("X-Amz-Target", "TrentService.Verify") // Specific KMS action for CreateKey
+                _accessAWS?.sessionToken?.takeIf { it.isNotEmpty() }?.let {
+                    append("X-Amz-Security-Token", it)
+                }
             }
             setBody(body) // Set the JSON body
         }.awsJsonDataBody()
@@ -278,23 +285,29 @@ class AWSKey(
                     config.auth.secretAccessKey,
                     config.auth.region,
                     null,
+                    null,
                     null
                 )
                 timeoutAt = null
             } else {
                 val token = getIMDSv2Token()
-                val roleName = when {
-                    config.auth.roleName?.isNotEmpty() == true -> config.auth.roleName
-                    else -> getRoleName(token)
+                val actualRoleName = getRoleName(token)
+                val providedRoleName = config.auth.roleName
+
+
+                if (providedRoleName?.isNotEmpty() == true && providedRoleName != actualRoleName) {
+                    throw IllegalArgumentException(
+                        "Role name mismatch please check the role name provided."
+                    )
                 }
-                _accessAWS = getTemporaryCredentials(token, roleName, config.auth.region.toString())
+                _accessAWS = getTemporaryCredentials(token, providedRoleName.toString(), config.auth.region.toString())
                 timeoutAt = Clock.System.now().plus(3600.seconds)
             }
         }
 
         @JsExport.Ignore
         suspend fun getAccess(config: AWSKeyMetadata): AWSAuthConfiguration? {
-            if (_accessAWS == null || (timeoutAt != null && timeoutAt!! <= Clock.System.now())) {
+            if (_accessAWS == null || (timeoutAt != null && timeoutAt!! <= Clock.System.now()) || config.auth.roleName != _accessAWS?.roleName) {
                 authAccess(config)
             }
 
@@ -442,11 +455,18 @@ ${sha256Hex(canonicalRequest)}
         @JsExport.Ignore
         suspend fun getTemporaryCredentials(token: String, roleName: String, region: String): AWSAuthConfiguration {
             val url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/$roleName"
+
             val response = client.get(url) {
                 headers {
                     append("X-aws-ec2-metadata-token", token)
                 }
             }
+
+            if (response.status != HttpStatusCode.OK) {
+                throw IllegalArgumentException("AWS server returned an invalid response: ${response.status} - please check the role name and region")
+            }
+
+
             val json = Json.parseToJsonElement(response.bodyAsText()).jsonObject
 
 
@@ -459,19 +479,13 @@ ${sha256Hex(canonicalRequest)}
             val expiration =
                 json["Expiration"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Expiration not found")
 
-
-            println("accessKeyId: $accessKeyId")
-            println("secretAccessKey: $secretAccessKey")
-            println("sessionToken: $sessionToken")
-            println("expiration: $expiration")
-
-
             return AWSAuthConfiguration(
                 accessKeyId = accessKeyId,
                 secretAccessKey = secretAccessKey,
                 region = region,
                 sessionToken = sessionToken,
-                expiration = expiration
+                expiration = expiration,
+                roleName = roleName
             )
         }
 
@@ -503,6 +517,9 @@ ${sha256Hex(canonicalRequest)}
                     headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
                     append(HttpHeaders.Host, awsKmsUrl)
                     append("X-Amz-Target", "TrentService.GetPublicKey") // Specific KMS action for ListKeys
+                    _accessAWS?.sessionToken?.takeIf { it.isNotEmpty() }?.let {
+                        append("X-Amz-Security-Token", it)
+                    }
                 }
                 setBody(
                     body
@@ -576,17 +593,17 @@ $public
                 payload = body,
                 config = config
             )
-            println("config: $config")
-            println("headers: $headers")
             val awsKmsUrl = "kms.${config.auth.region}.amazonaws.com"
 
             logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.CreateKey" }
-
             val key = client.post("https://$awsKmsUrl/") {
                 headers {
                     headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
                     append(HttpHeaders.Host, awsKmsUrl)
                     append("X-Amz-Target", "TrentService.CreateKey") // Specific KMS action for CreateKey
+                    _accessAWS?.sessionToken?.takeIf { it.isNotEmpty() }?.let {
+                        append("X-Amz-Security-Token", it)
+                    }
                 }
                 setBody(body) // Set the JSON body
             }.awsJsonDataBody()
