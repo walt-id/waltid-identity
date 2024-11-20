@@ -164,10 +164,11 @@ object OidcApi : CIProvider() {
 
                                 AuthenticationMethod.ID_TOKEN -> {
                                     OpenID4VC.processCodeFlowAuthorizationWithAuthorizationRequest(
-                                        authReq,
-                                        ResponseType.IdToken,
-                                        metadata, CI_TOKEN_KEY,
-                                        issuanceSession.issuanceRequests.first().useJar
+                                        authorizationRequest = authReq,
+                                        responseType = ResponseType.IdToken,
+                                        providerMetadata = metadata,
+                                        tokenKey = CI_TOKEN_KEY,
+                                        isJar = issuanceSession.issuanceRequests.first().useJar
                                     )
                                 }
 

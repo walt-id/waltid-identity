@@ -232,7 +232,7 @@ fun Application.exchange() = walletRoute {
             val request = call.receiveText()
             val reqParams = Url(request).parameters.toMap()
             val parsedOffer = wallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams))
-            context.respond(parsedOffer)
+            context.respond(parsedOffer as CredentialOffer.Draft13)
         }
         get("resolveVctUrl", {
             summary = "Receive an verifiable credential type (VCT) URL and return resolved vct object as described in IETF SD-JWT VC"
