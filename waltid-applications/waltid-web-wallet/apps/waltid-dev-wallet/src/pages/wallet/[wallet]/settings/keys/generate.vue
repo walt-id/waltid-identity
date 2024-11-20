@@ -222,7 +222,7 @@ const options = ref([
     config: ["vaultId", "compartmentId"],
   },
   {
-    keyGenerationRequest: ["AWS", "aws"],
+    keyGenerationRequest: ["AWS with AccessKey auth", "aws"],
     keyType: [
       ["ECDSA_Secp256r1", "secp256r1"],
       ["ECDSA_Secp256k1", "secp256k1"],
@@ -232,19 +232,21 @@ const options = ref([
       auth: ["accessKeyId", "secretAccessKey", "region"]
     }
   },
+
+  {
+    keyGenerationRequest: ["AWS with RoleName auth", "role"],
+    keyType: [
+      ["ECDSA_Secp256r1", "secp256r1"],
+      ["ECDSA_Secp256k1", "secp256k1"],
+      ["RSA", "RSA"]
+    ],
+    config: {
+      auth: ["roleName", "region"]
+    }
+  },
 ]);
 
-/*const data = reactive({
-  keyGenerationRequest: {
-    type: options.value[0].keyGenerationRequest[1],
-    config: options.value[0]?.config?.reduce((acc, key) => {
-      acc[key] = ""; // Initialize each config key with an empty string
-      return acc;
-    }, {}),
-  },
-  type: options.value[0].keyType[0][1],
-});
-*/
+
 const data = reactive({
   keyGenerationRequest: {
     type: options.value[0].keyGenerationRequest[1],
@@ -277,7 +279,6 @@ async function generateKey() {
           }),
     },
   };
-  console.log(body);
   loading.value = true;
 
   try {
