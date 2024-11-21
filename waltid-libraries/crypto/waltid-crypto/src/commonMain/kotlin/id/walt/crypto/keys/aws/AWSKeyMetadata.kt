@@ -5,8 +5,13 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class AWSKeyMetadata(
-    val accessKeyId: String,
-    val secretAccessKey: String,
-    val region: String
-)
+    val auth: AWSAuth,
+) {
+    constructor(
+        accessKeyId: String? = null,
+        secretAccessKey: String? = null,
+        region: String? = null,
+        roleName: String? = null,
+    ) : this(AWSAuth(accessKeyId, secretAccessKey, region, roleName))
+}
 

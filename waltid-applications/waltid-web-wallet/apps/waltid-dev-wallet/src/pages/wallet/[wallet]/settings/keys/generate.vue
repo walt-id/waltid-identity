@@ -87,7 +87,8 @@
     <div v-if="response && response !== ''" class="mt-6 border p-4 rounded-2xl">
       <p class="text-base font-semibold">Response</p>
       <div
-          class="mt-1 space-y-6 border-gray-900/10 pb-6 sm:space-y-0 sm:divide-y sm:divide-gray-900/10 sm:border-t sm:pb-0">
+
+        class="mt-1 space-y-6 border-gray-900/10 pb-6 sm:space-y-0 sm:divide-y sm:divide-gray-900/10 sm:border-t sm:pb-0">
         <p class="mt-2 flex items-center bg-green-100 p-3 rounded-xl overflow-x-scroll">
           <CheckIcon class="w-5 h-5 mr-1 text-green-600" />
           <span class="text-green-800">Generated key: <code>{{ response }}</code></span>
@@ -107,8 +108,8 @@
 
 <script lang="ts" setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import {ArrowUturnLeftIcon, CheckIcon, KeyIcon,} from "@heroicons/vue/24/outline";
-import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
+import { ArrowUturnLeftIcon, CheckIcon, KeyIcon, } from "@heroicons/vue/24/outline";
+import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
 import InlineLoadingCircle from "@waltid-web-wallet/components/loading/InlineLoadingCircle.vue";
 
 const loading = ref(false);
