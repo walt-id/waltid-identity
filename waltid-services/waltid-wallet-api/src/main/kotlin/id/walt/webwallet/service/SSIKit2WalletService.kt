@@ -524,7 +524,7 @@ class SSIKit2WalletService(
             if (deleteRemoteKey) {
                 KeysService.delete(walletId, alias)
             } else {
-                throw IllegalStateException("Failed to delete remote key : $alias")
+                throw WebException(HttpStatusCode.BadRequest, "Failed to delete remote key : $alias")
             }
             eventUseCase.log(
                 action = EventType.Key.Delete,
@@ -538,7 +538,7 @@ class SSIKit2WalletService(
                     kmsType = EventDataNotAvailable
                 )
             )
-        } ?: throw IllegalArgumentException("Key not found for alias: $alias")
+        } ?: throw NotFoundException("Key not found for alias: $alias")
 
     }.fold(
         onSuccess = { true },
@@ -566,7 +566,7 @@ class SSIKit2WalletService(
                     kmsType = EventDataNotAvailable
                 )
             )
-        } ?: throw IllegalArgumentException("Key not found for alias: $alias")
+        } ?: throw NotFoundException("Key not found for alias: $alias")
 
     }.fold(
         onSuccess = { true },
