@@ -230,24 +230,19 @@ open class CIProvider(
                     CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(
                         credentialRequest = credentialRequest,
                         credentialData = vc,
-                        dataMapping = request.mapping,
-                        selectiveDisclosure = request.selectiveDisclosure,
-                        vct = metadata.credentialConfigurationsSupported?.get(request.credentialConfigurationId)?.vct ?: throw ConfigurationException(
-                            ConfigException("No vct configured for given credential configuration id: ${request.credentialConfigurationId}")
-                        ),
                         issuerId = issuerDid ?: baseUrl,
-                        issuerDid = issuerDid,
-                        x5Chain = request.x5Chain,
-                        issuerKey = resolvedIssuerKey
-                    ).toString()
+                        issuerKey = resolvedIssuerKey,
+                        selectiveDisclosure = request.selectiveDisclosure,
+                        dataMapping = request.mapping,
+                        x5Chain = request.x5Chain)
                   else -> OpenID4VCI.generateW3CJwtVC(
                       credentialRequest = credentialRequest,
                       credentialData = vc,
-                      dataMapping = request.mapping,
-                      selectiveDisclosure = request.selectiveDisclosure,
+                      issuerKey = resolvedIssuerKey,
                       issuerDid = issuerDid,
-                      x5Chain = request.x5Chain,
-                      issuerKey = resolvedIssuerKey
+                      selectiveDisclosure = request.selectiveDisclosure,
+                      dataMapping = request.mapping,
+                      x5Chain = request.x5Chain
                   )
               }
             }.also { log.debug { "Respond VC: $it" } }
