@@ -325,16 +325,36 @@ object OpenID4VP {
         }.toList()
     }
 
+    fun buildDescriptorMappingsSDJwtVC(
+        presentationDefinition: PresentationDefinition,
+        sdJwtVCStr: String,
+        rootPath: String = "$",
+    ): List<DescriptorMapping> {
+        val vc = sdJwtVCStr.base64UrlToBase64().decodeJws()
+        val vct = vc.payload["vct"]?.jsonPrimitive?.content
+        return DescriptorMapping(
+            id = vct?.let { getDescriptorId(it, presentationDefinition) },
+            format = VCFormat.sd_jwt_vc,
+            path = rootPath
+        ).let { listOf(it) }
+    }
+
     fun generatePresentationSubmission(presentationDefinition: PresentationDefinition,
-                                       presentations: Map<VCFormat, List<String>>): PresentationSubmission {
-        val totalNumPresentations = presentations.values.flatten().size
-        val descriptorMappings = presentations.entries.flatMapIndexed { presentationIdx, presentationEntry ->
+                                       w3cVP: String?, mdocDeviceResponse: String?, sdJwtVCs: Set<String>?): PresentationSubmission {
+        val presentationsMap = setOf(
+            w3cVP?.let { Pair(VCFormat.jwt_vp, it) },
+            mdocDeviceResponse?.let { Pair(VCFormat.mso_mdoc, it) }
+        ).filterNotNull().plus(sdJwtVCs?.map { Pair(VCFormat.sd_jwt_vc, it) } ?: emptyList())
+        val totalNumPresentations = presentationsMap.size
+        val descriptorMappings = presentationsMap.flatMapIndexed { presentationIdx, presentationEntry ->
             val rootPath = "$" + (if(totalNumPresentations > 1) "[$presentationIdx]" else "")
-            when(presentationEntry.key) {
-                VCFormat.jwt_vp -> presentationEntry.value.flatMap { vp_jwt ->
-                    buildDescriptorMappingsJwtVP(presentationDefinition, vp_jwt, rootPath)
-                }
+            when(presentationEntry.first) {
+                VCFormat.jwt_vp ->
+                    buildDescriptorMappingsJwtVP(presentationDefinition, presentationEntry.second, rootPath)
+                //VCFormat.sd_jwt_vc -> presentationEntry.value
                 // TODO: add support for other presentation types
+                // TODO: find correct presentation definition input descriptor, if multiple match the credential type
+                // see also: getDescriptorId(...)
                 else -> listOf()
             }
         }

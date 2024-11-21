@@ -274,7 +274,7 @@ class TestCredentialWallet(
         // DONE: set root path of descriptor mapping based on whether there are multiple presentations or just one ("$" or "$[idx]")
         val presentations = listOf(signedJwtVP, deviceResponse).filterNotNull().plus(sdJwtVCsPresented).map { JsonPrimitive(it) }
         println("presentations: $presentations")
-        // new code to replace above ---:
+        // new code to replace above and below ---:
 //        val presentationMap = mapOf(
 //            VCFormat.jwt_vp to listOf(signedJwtVP).filterNotNull(),
 //            VCFormat.mso_mdoc to listOf(deviceResponse).filterNotNull(),
@@ -286,7 +286,7 @@ class TestCredentialWallet(
 
         val rootPathVP = "$" + (if (presentations.size == 2) "[0]" else "")
         val rootPathMDoc = "$" + (if (presentations.size == 2) "[1]" else "")
-        return PresentationResult(
+        val result = PresentationResult(
             presentations, PresentationSubmission(
                 id = presentationId,
                 definitionId = presentationId,
@@ -314,6 +314,7 @@ class TestCredentialWallet(
                 }
             )
         )
+        return result
     }
 
     val keyMapping = HashMap<String, Key>() // TODO: Hack as this is non stateless because of oidc4vc lib API
