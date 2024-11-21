@@ -5,6 +5,7 @@ import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.flows.methods
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
+import kotlinx.datetime.Instant
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -36,8 +37,10 @@ data class AuthSession(
     var accountId: String? = null,
 
     var token: String? = null,
+
+    var expiration: Instant? = null
 ) {
-    fun toInformation() = AuthSessionInformation(id, status, flows?.methods(), token)
+    fun toInformation() = AuthSessionInformation(id, status, flows?.methods(), token, expiration)
     suspend fun progressFlow(method: AuthenticationMethod) {
         check(flows!!.any { it.method == method.id }) { "Trying to progress flow with wrong authentication method. Allowed methods: ${flows!!.methods()}, tried method: ${method.id}" }
 
@@ -95,4 +98,7 @@ data class AuthSessionInformation(
 
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val token: String? = null,
+
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val expiration: Instant? = null
 )
