@@ -7,6 +7,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.ConflictException
 import id.walt.commons.web.UnsupportedMediaTypeException
+import id.walt.commons.web.WebException
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
@@ -543,7 +544,7 @@ class SSIKit2WalletService(
         onSuccess = { true },
         onFailure = {
             logger.error(it) { "Failed to delete key: ${it.message}" }
-            throw IllegalArgumentException("Failed to delete key: ${it.message}")
+            throw WebException(HttpStatusCode.BadRequest, "Failed to delete key: ${it.message}")
         }
     )
 
@@ -571,7 +572,7 @@ class SSIKit2WalletService(
         onSuccess = { true },
         onFailure = {
             logger.error(it) { "Failed to delete key: ${it.message}" }
-            throw IllegalArgumentException("Failed to delete key: ${it.message}")
+            throw WebException(HttpStatusCode.BadRequest, "Failed to delete key: ${it.message}")
         }
     )
 
