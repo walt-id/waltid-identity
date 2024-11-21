@@ -15,6 +15,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.putJsonObject
 import org.jetbrains.exposed.sql.transactions.transaction
 
 fun Application.keys() = walletRoute {
@@ -105,9 +106,11 @@ fun Application.keys() = walletRoute {
                             backend = "aws",
                             keyType = KeyType.secp256r1,
                             config = buildJsonObject {
-                                put("accessKeyId", JsonPrimitive("accessKey"))
-                                put("secretAccessKey", JsonPrimitive("secretKey"))
-                                put("region", JsonPrimitive("eu-central-1"))
+                                putJsonObject("auth") {
+                                    put("accessKeyId", JsonPrimitive("accessKey"))
+                                    put("secretAccessKey", JsonPrimitive("secretKey"))
+                                    put("region", JsonPrimitive("eu-central-1"))
+                                }
                             }
                         )
                     }
