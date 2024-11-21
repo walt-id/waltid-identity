@@ -547,6 +547,35 @@ class SSIKit2WalletService(
         }
     )
 
+
+    override suspend fun removeKey(alias: String): Boolean = runCatching {
+        val key = KeysService.get(walletId, alias)
+        key?.let {
+            val resolvedKey = KeyManager.resolveSerializedKey(it.document)
+            KeysService.delete(walletId, alias)
+            eventUseCase.log(
+                action = EventType.Key.Delete,
+                originator = "wallet",
+                tenant = tenant,
+                accountId = accountId,
+                walletId = walletId,
+                data = eventUseCase.keyEventData(
+                    id = alias,
+                    algorithm = resolvedKey.keyType.name,
+                    kmsType = EventDataNotAvailable
+                )
+            )
+        } ?: throw IllegalArgumentException("Key not found for alias: $alias")
+
+    }.fold(
+        onSuccess = { true },
+        onFailure = {
+            logger.error(it) { "Failed to delete key: ${it.message}" }
+            throw IllegalArgumentException("Failed to delete key: ${it.message}")
+        }
+    )
+
+
     override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> =
         WalletOperationHistories.selectAll()
             .where { WalletOperationHistories.wallet eq walletId.toJavaUuid() }
