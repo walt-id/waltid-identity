@@ -221,7 +221,7 @@ fun Application.keys() = walletRoute {
             }
 
             delete({
-                summary = "Delete a specific key"
+                summary = "Delete a specific key (hard delete)"
                 response {
                     HttpStatusCode.Accepted to { description = "Key deleted" }
                     HttpStatusCode.BadRequest to { description = "Key could not be deleted" }
@@ -230,6 +230,22 @@ fun Application.keys() = walletRoute {
                 val keyId = context.parameters["keyId"] ?: throw IllegalArgumentException("No key id provided.")
 
                 val success = getWalletService().deleteKey(keyId)
+                context.respond(if (success) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+            }
+
+            delete("remove", {
+                summary = "Remove a specific key (soft delete)"
+                response {
+                    HttpStatusCode.Accepted to { description = "Key removed" }
+                    HttpStatusCode.BadRequest to { description = "Failed to remove the key" }
+                }
+            }) {
+                val keyId = context.parameters["keyId"] ?: return@delete context.respond(
+                    HttpStatusCode.BadRequest,
+                    "Key ID is missing"
+                )
+
+                val success = getWalletService().removeKey(keyId)
                 context.respond(if (success) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
             }
         }

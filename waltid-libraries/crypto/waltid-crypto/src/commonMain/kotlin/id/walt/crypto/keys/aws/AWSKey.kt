@@ -287,7 +287,7 @@ class AWSKey(
             config = config
         )
 
-        val awsKmsUrl = "kms.${config.region}.amazonaws.com"
+        val awsKmsUrl = "kms.${config.auth.region}.amazonaws.com"
 
         logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.ScheduleKeyDeletion" }
 
