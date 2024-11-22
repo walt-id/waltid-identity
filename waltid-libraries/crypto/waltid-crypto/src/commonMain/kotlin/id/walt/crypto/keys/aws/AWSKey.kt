@@ -270,6 +270,40 @@ class AWSKey(
     @JsExport.Ignore
     override suspend fun getMeta(): AwsKeyMeta = AwsKeyMeta(getKeyId())
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun deleteKey(): Boolean {
+        val body = """
+{
+"KeyId":"$id",
+"PendingWindowInDays":7
+}
+""".trimIndent().trimMargin()
+        val headers = buildSigV4Headers(
+            HttpMethod.Post,
+            payload = body,
+            config = config
+        )
+
+        val awsKmsUrl = "kms.${config.auth.region}.amazonaws.com"
+
+        logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.ScheduleKeyDeletion" }
+
+        val response = client.post("https://$awsKmsUrl/") {
+            headers {
+                headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
+                append(HttpHeaders.Host, awsKmsUrl)
+                append("X-Amz-Target", "TrentService.ScheduleKeyDeletion") // Specific KMS action for CreateKey
+            }
+            setBody(body)
+        }
+        logger.debug { "Key $id scheduled for deletion" }
+        return response.status == HttpStatusCode.OK
+    }
+
+
 
     companion object : AWSKeyCreator {
         val client = HttpClient()

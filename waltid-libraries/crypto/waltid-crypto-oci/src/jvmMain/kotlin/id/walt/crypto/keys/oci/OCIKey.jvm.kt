@@ -213,6 +213,10 @@ actual class OCIKey actual constructor(
         keyVersion = getKeyVersion(kmsManagementClient, id),
     )
 
+    override suspend fun deleteKey(): Boolean {
+        TODO("Not yet implemented")
+    }
+
 
     actual companion object {
 
