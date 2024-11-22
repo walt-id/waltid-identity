@@ -18,52 +18,52 @@ import java.util.BitSet
 
 @Serializable
 actual class RevocationPolicy : RevocationPolicyMp() {
-  @JvmBlocking
-  @JvmAsync
-  actual override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
-    val credentialStatus = data["vc"]?.jsonObject?.get("credentialStatus")
-      ?: return Result.success(
-        JsonObject(mapOf("policy_available" to JsonPrimitive(false)))
-      )
+    @JvmBlocking
+    @JvmAsync
+    actual override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
+        val credentialStatus = data["vc"]?.jsonObject?.get("credentialStatus")
+            ?: return Result.success(
+                JsonObject(mapOf("policy_available" to JsonPrimitive(false)))
+            )
 
-    val statusListIndex = credentialStatus.jsonObject["statusListIndex"]?.jsonPrimitive?.content?.toULong()
-    val statusListCredentialUrl = credentialStatus.jsonObject["statusListCredential"]?.jsonPrimitive?.content
+        val statusListIndex = credentialStatus.jsonObject["statusListIndex"]?.jsonPrimitive?.content?.toULong()
+        val statusListCredentialUrl = credentialStatus.jsonObject["statusListCredential"]?.jsonPrimitive?.content
 
-    val httpClient = HttpClient {
-      install(ContentNegotiation) {
-        json(Json { ignoreUnknownKeys = true })
-      }
+        val httpClient = HttpClient {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true })
+            }
+        }
+
+        val response = runCatching { httpClient.get(statusListCredentialUrl!!).bodyAsText() }
+
+        if (response.isFailure) {
+            return Result.failure(Throwable("Error when getting Status List Credential from  $statusListCredentialUrl"))
+        }
+
+        return try {
+            // response is a jwt
+            val payload = response.getOrThrow().substringAfter(".").substringBefore(".")
+                .let { Json.decodeFromString<JsonObject>(Base64Utils.decode(it).decodeToString()) }
+
+            val credentialSubject = payload["vc"]!!.jsonObject["credentialSubject"]?.jsonObject!!
+            val encodedList = credentialSubject["encodedList"]?.jsonPrimitive?.content ?: ""
+            val bitValue = get(encodedList, statusListIndex)
+            if (bitValue!![0].code == 0) {
+                Result.success(statusListCredentialUrl!!)
+            } else {
+                Result.failure(Throwable("Credential has been revoked"))
+            }
+        } catch (e: NumberFormatException) {
+            throw IllegalArgumentException()
+        }
     }
-
-    val response = runCatching { httpClient.get(statusListCredentialUrl!!).bodyAsText() }
-
-    if (response.isFailure) {
-      return Result.failure(Throwable("Error when getting Status List Credential from  $statusListCredentialUrl"))
-    }
-
-    return try {
-      // response is a jwt
-      val payload = response.getOrThrow().substringAfter(".").substringBefore(".")
-        .let { Json.decodeFromString<JsonObject>(Base64Utils.decode(it).decodeToString()) }
-
-      val credentialSubject = payload["vc"]!!.jsonObject["credentialSubject"]?.jsonObject!!
-      val encodedList = credentialSubject["encodedList"]?.jsonPrimitive?.content ?: ""
-      val bitValue = get(encodedList, statusListIndex)
-      if (bitValue!![0].code == 0) {
-        Result.success(statusListCredentialUrl!!)
-      } else {
-        Result.failure(Throwable("Credential has been revoked"))
-      }
-    } catch (e: NumberFormatException) {
-      throw IllegalArgumentException()
-    }
-  }
 
 }
 
 object Base64Utils {
-  fun decode(base64: String): ByteArray = Base64.getDecoder().decode(base64)
-  fun urlDecode(base64Url: String): ByteArray = Base64.getUrlDecoder().decode(base64Url)
+    fun decode(base64: String): ByteArray = Base64.getDecoder().decode(base64)
+    fun urlDecode(base64Url: String): ByteArray = Base64.getUrlDecoder().decode(base64Url)
 }
 
 object StreamUtils {
@@ -89,4 +89,4 @@ object StreamUtils {
 }
 
 fun get(bitstring: String, idx: ULong? = null, bitSize: Int = 1) =
-  idx?.let { StreamUtils.getBitValue(GZIPInputStream(Base64Utils.decode(bitstring).inputStream()), it, bitSize) }
+    idx?.let { StreamUtils.getBitValue(GZIPInputStream(Base64Utils.decode(bitstring).inputStream()), it, bitSize) }
