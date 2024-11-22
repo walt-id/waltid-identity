@@ -516,65 +516,41 @@ class SSIKit2WalletService(
         }
     }
 
-    override suspend fun deleteKey(alias: String): Boolean = runCatching {
-        val key = KeysService.get(walletId, alias)
-        key?.let {
-            val resolvedKey = KeyManager.resolveSerializedKey(it.document)
-            val deleteRemoteKey = resolvedKey.deleteKey()
-            if (deleteRemoteKey) {
-                KeysService.delete(walletId, alias)
-            } else {
-                throw WebException(HttpStatusCode.BadRequest, "Failed to delete remote key : $alias")
-            }
-            eventUseCase.log(
-                action = EventType.Key.Delete,
-                originator = "wallet",
-                tenant = tenant,
-                accountId = accountId,
-                walletId = walletId,
-                data = eventUseCase.keyEventData(
-                    id = alias,
-                    algorithm = resolvedKey.keyType.name,
-                    kmsType = EventDataNotAvailable
-                )
+    override suspend fun deleteKey(alias: String): Boolean =
+        performKeyDelete(alias = alias, isTotalDelete = true).getOrThrow().first
+
+
+    override suspend fun removeKey(alias: String): Boolean =
+        performKeyDelete(alias = alias, isTotalDelete = false).getOrThrow().first
+
+
+    private suspend fun performKeyDelete(alias: String, isTotalDelete: Boolean) = runCatching {
+        val key = getKey(alias)
+        val canDeleteFromStorage = isTotalDelete && key.deleteKey() || !isTotalDelete
+        val opSucceed = canDeleteFromStorage && KeysService.delete(walletId, alias)
+        if (isTotalDelete && !opSucceed) throw WebException(
+            HttpStatusCode.BadRequest,
+            "Failed to delete remote key : $alias"
+        )
+        Pair(opSucceed, key)
+    }.onSuccess {
+        eventUseCase.log(
+            action = (if (isTotalDelete) EventType.Key.Delete else EventType.Key.Remove),
+            originator = "wallet",
+            tenant = tenant,
+            accountId = accountId,
+            walletId = walletId,
+            data = eventUseCase.keyEventData(
+                id = alias,
+                algorithm = it.second.keyType.name,
+                kmsType = EventDataNotAvailable
             )
-        } ?: throw NotFoundException("Key not found for alias: $alias")
-
-    }.fold(
-        onSuccess = { true },
-        onFailure = {
-            logger.error(it) { "Failed to delete key: ${it.message}" }
-            throw WebException(HttpStatusCode.BadRequest, "Failed to delete key: ${it.message}")
-        }
-    )
-
-
-    override suspend fun removeKey(alias: String): Boolean = runCatching {
-        val key = KeysService.get(walletId, alias)
-        key?.let {
-            val resolvedKey = KeyManager.resolveSerializedKey(it.document)
-            KeysService.delete(walletId, alias)
-            eventUseCase.log(
-                action = EventType.Key.Delete,
-                originator = "wallet",
-                tenant = tenant,
-                accountId = accountId,
-                walletId = walletId,
-                data = eventUseCase.keyEventData(
-                    id = alias,
-                    algorithm = resolvedKey.keyType.name,
-                    kmsType = EventDataNotAvailable
-                )
-            )
-        } ?: throw NotFoundException("Key not found for alias: $alias")
-
-    }.fold(
-        onSuccess = { true },
-        onFailure = {
-            logger.error(it) { "Failed to delete key: ${it.message}" }
-            throw WebException(HttpStatusCode.BadRequest, "Failed to delete key: ${it.message}")
-        }
-    )
+        )
+    }.onFailure {
+        val errorMessage = "Failed to delete key: ${it.message}"
+        logger.error(it) { errorMessage }
+        throw WebException(HttpStatusCode.BadRequest, errorMessage)
+    }
 
 
     override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> =
