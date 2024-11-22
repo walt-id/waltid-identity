@@ -13,6 +13,7 @@ import java.io.BufferedReader
 import java.io.InputStream
 import java.util.Base64
 import java.util.zip.GZIPInputStream
+import java.util.BitSet
 
 
 @Serializable
@@ -66,23 +67,25 @@ object Base64Utils {
 }
 
 object StreamUtils {
-  fun getBitValue(inputStream: InputStream, index: ULong, bitSize: Int) =
-    inputStream.bufferedReader().use { buffer ->
-      buffer.skip((index * bitSize.toULong()).toLong())
-      extractBitValue(buffer, index, bitSize.toULong())
+    fun getBitValue(inputStream: InputStream, index: ULong, bitSize: Int): List<Char> = inputStream.use { stream ->
+        //TODO: bitSize constraints
+        val bitStartPosition = index * bitSize.toUInt()
+        val byteStart = bitStartPosition / 8u
+        stream.skip(byteStart.toLong())
+        val bytesToRead = (bitSize - 1) / 8 + 1
+        extractBitValue(stream.readNBytes(bytesToRead), index, bitSize.toUInt())
     }
 
-  private fun extractBitValue(it: BufferedReader, index: ULong, bitSize: ULong): List<Char> {
-    var int = 0
-    var count = index * bitSize
-    val result = mutableListOf<Char>()
-    while (count < index * bitSize + bitSize) {
-      int = it.read().takeIf { it != -1 } ?: error("Reached end of stream")
-      result.add(int.digitToChar())
-      count += 1.toULong()
+    private fun extractBitValue(bytes: ByteArray, index: ULong, bitSize: UInt): List<Char> {
+        val bitSet = BitSet.valueOf(bytes)
+        val bitStart = index * bitSize % 8u
+        val result = mutableListOf<Char>()
+        for (i in bitStart..<bitStart + bitSize) {
+            val b = bitSet[i.toInt()].takeIf { it }?.let { 1 } ?: 0
+            result.add(b.digitToChar())
+        }
+        return result
     }
-    return result
-  }
 }
 
 fun get(bitstring: String, idx: ULong? = null, bitSize: Int = 1) =
