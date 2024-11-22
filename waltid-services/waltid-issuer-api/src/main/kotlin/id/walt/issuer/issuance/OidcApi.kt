@@ -171,13 +171,20 @@ object OidcApi : CIProvider() {
                                 }
 
                                 AuthenticationMethod.VP_TOKEN -> {
+                                    val authServerState = randomUUID()
+
+                                    initializeIssuanceSession(authReq, 5.minutes, authServerState)
+
                                     val vpProfile = issuanceSession.issuanceRequests.first().vpProfile ?: OpenId4VPProfile.DEFAULT
-                                    val credFormat = issuanceSession.issuanceRequests.first().credentialFormat ?: when(vpProfile) {
-                                        OpenId4VPProfile.HAIP -> CredentialFormat.sd_jwt_vc
-                                        OpenId4VPProfile.ISO_18013_7_MDOC -> CredentialFormat.mso_mdoc
-                                        OpenId4VPProfile.EBSIV3 -> CredentialFormat.jwt_vc
-                                        else -> CredentialFormat.jwt_vc_json
-                                    }
+
+                                    val credFormat = issuanceSession.issuanceRequests.first().credentialFormat
+                                        ?: when(vpProfile) {
+                                            OpenId4VPProfile.HAIP -> CredentialFormat.sd_jwt_vc
+                                            OpenId4VPProfile.ISO_18013_7_MDOC -> CredentialFormat.mso_mdoc
+                                            OpenId4VPProfile.EBSIV3 -> CredentialFormat.jwt_vc
+                                            else -> CredentialFormat.jwt_vc_json
+                                        }
+
                                     val vpRequestValue = issuanceSession.issuanceRequests.first().vpRequestValue
                                         ?: throw IllegalArgumentException("missing vpRequestValue parameter")
 
@@ -190,14 +197,20 @@ object OidcApi : CIProvider() {
                                             else -> throw IllegalArgumentException("Invalid JSON type for requested credential: $it")
                                         } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
                                     }
-                                    val presentationDefinition =
-                                        PresentationDefinition.defaultGenerationFromVcTypesForCredentialFormat(requestedTypes, credFormat)
+
+                                    val presentationDefinition = PresentationDefinition.defaultGenerationFromVcTypesForCredentialFormat(
+                                        types = requestedTypes,
+                                        format = credFormat
+                                    )
 
                                     OpenID4VC.processCodeFlowAuthorizationWithAuthorizationRequest(
-                                        authReq,
-                                        ResponseType.VpToken, metadata, CI_TOKEN_KEY,
-                                        issuanceSession.issuanceRequests.first().useJar,
-                                        presentationDefinition
+                                        authorizationRequest = authReq,
+                                        authServerState = authServerState,
+                                        responseType = ResponseType.VpToken,
+                                        providerMetadata = metadata,
+                                        tokenKey =  CI_TOKEN_KEY,
+                                        isJar = issuanceSession.issuanceRequests.first().useJar,
+                                        presentationDefinition = presentationDefinition
                                     )
                                 }
 
