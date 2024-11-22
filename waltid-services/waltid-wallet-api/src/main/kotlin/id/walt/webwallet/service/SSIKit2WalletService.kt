@@ -526,14 +526,18 @@ class SSIKit2WalletService(
 
     private suspend fun performKeyDelete(alias: String, isTotalDelete: Boolean) = runCatching {
         val key = getKey(alias)
+
         val canDeleteFromStorage = isTotalDelete && key.deleteKey() || !isTotalDelete
-        val opSucceed = canDeleteFromStorage && KeysService.delete(walletId, alias)
-        if (isTotalDelete && !opSucceed) throw WebException(
+        val operationSucceeded = canDeleteFromStorage && KeysService.delete(walletId, alias)
+
+        if (isTotalDelete && !operationSucceeded) throw WebException(
             HttpStatusCode.BadRequest,
             "Failed to delete remote key : $alias"
         )
-        Pair(opSucceed, key)
-    }.onSuccess {
+        Pair(operationSucceeded, key)
+    }.onSuccess { result ->
+        val (operationSucceeded, key) = result
+        if (operationSucceeded) {
         eventUseCase.log(
             action = (if (isTotalDelete) EventType.Key.Delete else EventType.Key.Remove),
             originator = "wallet",
@@ -542,10 +546,14 @@ class SSIKit2WalletService(
             walletId = walletId,
             data = eventUseCase.keyEventData(
                 id = alias,
-                algorithm = it.second.keyType.name,
+                algorithm = key.keyType.name,
                 kmsType = EventDataNotAvailable
             )
         )
+        } else {
+            logger.warn { "Key delete operation not performed for alias: $alias" }
+            throw WebException(HttpStatusCode.BadRequest, "Failed to delete key: $alias")
+        }
     }.onFailure {
         val errorMessage = "Failed to delete key: ${it.message}"
         logger.error(it) { errorMessage }
