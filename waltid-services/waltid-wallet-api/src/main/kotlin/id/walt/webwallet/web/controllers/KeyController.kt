@@ -11,6 +11,7 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.server.util.getOrFail
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -221,16 +222,29 @@ fun Application.keys() = walletRoute {
             }
 
             delete({
-                summary = "Delete a specific key"
+                summary =
+                    "Delete a specific key , will delete the key (AWS , OCI , TSE) and its reference in the wallet"
                 response {
                     HttpStatusCode.Accepted to { description = "Key deleted" }
                     HttpStatusCode.BadRequest to { description = "Key could not be deleted" }
                 }
             }) {
-                val keyId = context.parameters["keyId"] ?: throw IllegalArgumentException("No key id provided.")
+                val keyId = context.parameters.getOrFail("keyId")
 
                 val success = getWalletService().deleteKey(keyId)
+                context.respond(if (success) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+            }
 
+            delete("remove", {
+                summary = "Remove a specific key from the wallet"
+                response {
+                    HttpStatusCode.Accepted to { description = "Key removed" }
+                    HttpStatusCode.BadRequest to { description = "Failed to remove the key" }
+                }
+            }) {
+                val keyId = context.parameters.getOrFail("keyId")
+
+                val success = getWalletService().removeKey(keyId)
                 context.respond(if (success) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
             }
         }
