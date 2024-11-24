@@ -175,7 +175,7 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
         @SerialName("dpop_signing_alg_values_supported") override val dpopSigningAlgValuesSupported: Set<String>? = null,
 
         // OID4VCI 10
-        @SerialName("credentials_supported") @Serializable(CredentialSupportedMapSerializer::class) val credentialSupported: Map<String, CredentialSupported>? = null,
+        @SerialName("credentials_supported") @Serializable(CredentialSupportedArraySerializer::class) val credentialSupported: Map<String, CredentialSupported>? = null,
         @SerialName("authorization_server") val authorizationServer: String? = null,
 
         override val customParameters: Map<String, JsonElement> = mapOf()
