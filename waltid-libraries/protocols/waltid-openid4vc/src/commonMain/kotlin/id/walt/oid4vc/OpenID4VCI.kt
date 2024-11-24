@@ -130,9 +130,14 @@ object OpenID4VCI {
             appendPathSegments(".well-known", "oauth-authorization-server")
         }.buildString()
 
-    fun getJWTIssuerProviderMetadataUrl(baseUrl: String) = URLBuilder(Url(baseUrl).protocolWithAuthority).apply {
+    fun getJWTIssuerProviderMetadataUrl(baseUrl: String) = Url(baseUrl).let { URLBuilder(it.protocolWithAuthority).apply {
         appendPathSegments(".well-known", "jwt-vc-issuer")
+
+        if(it.fullPath.isNotEmpty())
+            appendPathSegments(it.fullPath.trim('/'))
+
         }.buildString()
+    }
 
     suspend fun resolveCIProviderMetadata(credOffer: CredentialOffer) = http.get(getCIProviderMetadataUrl(credOffer)).bodyAsText().let {
         OpenIDProviderMetadata.fromJSONString(it)

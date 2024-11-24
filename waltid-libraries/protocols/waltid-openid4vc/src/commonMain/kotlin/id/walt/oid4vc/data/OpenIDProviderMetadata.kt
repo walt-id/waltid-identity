@@ -2,6 +2,7 @@ package id.walt.oid4vc.data
 
 import id.walt.oid4vc.*
 import id.walt.oid4vc.definitions.*
+import io.ktor.http.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
@@ -273,7 +274,7 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
             baseUrl: String,
             credType: String
         ): CredentialSupported {
-            val expectedVct = "$baseUrl/$credType"
+            val expectedVct = "${URLBuilder(Url(baseUrl).protocolWithAuthority)}/$credType"
 
             credentialConfigurationsSupported?.entries?.forEach { entry ->
                 if (getVctByCredentialConfigurationId(entry.key) == expectedVct) {

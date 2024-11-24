@@ -94,7 +94,7 @@ object OidcApi : CIProvider() {
                 call.respond(metadata.toJSON())
             }
 
-            get("/.well-known/jwt-vc-issuer") {
+            get("/.well-known/jwt-vc-issuer/{standardVersion}") {
                 call.respond(HttpStatusCode.OK, JWTVCIssuerMetadata(issuer = metadata.issuer, jwksUri = metadata.jwksUri))
             }
 
