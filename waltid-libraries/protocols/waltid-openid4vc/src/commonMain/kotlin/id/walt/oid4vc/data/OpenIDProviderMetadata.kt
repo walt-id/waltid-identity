@@ -104,16 +104,14 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
     abstract val opPolicyUri: String?
     abstract val opTosUri: String?
 
-    // OID4VCI properties
+    // OID4VCI Draft 10 and Draft 13 properties
     abstract val credentialIssuer: String?
     abstract val credentialEndpoint: String?
     abstract val batchCredentialEndpoint: String?
     abstract val deferredCredentialEndpoint: String?
-    abstract val authorizationServers: Set<String>?
     abstract val display: List<DisplayProperties>?
     abstract val presentationDefinitionUriSupported: Boolean?
     abstract val clientIdSchemesSupported: List<String>?
-    abstract val authorizationServer: String?
     abstract val codeChallengeMethodsSupported: List<String>?
     abstract val requirePushedAuthorizationRequests: Boolean?
     abstract val dpopSigningAlgValuesSupported: Set<String>?
@@ -169,17 +167,16 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
         @SerialName("credential_endpoint") override val credentialEndpoint: String? = null,
         @SerialName("batch_credential_endpoint") override val batchCredentialEndpoint: String? = null,
         @SerialName("deferred_credential_endpoint") override val deferredCredentialEndpoint: String? = null,
-        @SerialName("authorization_servers") override val authorizationServers: Set<String>? = null,
         @SerialName("display") @Serializable(DisplayPropertiesListSerializer::class) override val display: List<DisplayProperties>? = null,
         @SerialName("presentation_definition_uri_supported") override val presentationDefinitionUriSupported: Boolean? = null,
         @SerialName("client_id_schemes_supported") override val clientIdSchemesSupported: List<String>? = null,
-        @SerialName("authorization_server") override val authorizationServer: String? = authorizationServers?.firstOrNull(),
         @SerialName("code_challenge_methods_supported") override val codeChallengeMethodsSupported: List<String>? = null,
         @SerialName("require_pushed_authorization_requests") override val requirePushedAuthorizationRequests: Boolean? = null,
         @SerialName("dpop_signing_alg_values_supported") override val dpopSigningAlgValuesSupported: Set<String>? = null,
 
         // OID4VCI 10
         @SerialName("credentials_supported") @Serializable(CredentialSupportedMapSerializer::class) val credentialSupported: Map<String, CredentialSupported>? = null,
+        @SerialName("authorization_server") val authorizationServer: String? = null,
 
         override val customParameters: Map<String, JsonElement> = mapOf()
 
@@ -251,17 +248,16 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
         @SerialName("credential_endpoint") override val credentialEndpoint: String? = null,
         @SerialName("batch_credential_endpoint") override val batchCredentialEndpoint: String? = null,
         @SerialName("deferred_credential_endpoint") override val deferredCredentialEndpoint: String? = null,
-        @SerialName("authorization_servers") override val authorizationServers: Set<String>? = null,
         @SerialName("display") @Serializable(DisplayPropertiesListSerializer::class) override val display: List<DisplayProperties>? = null,
         @SerialName("presentation_definition_uri_supported") override val presentationDefinitionUriSupported: Boolean? = null,
         @SerialName("client_id_schemes_supported") override val clientIdSchemesSupported: List<String>? = null,
-        @SerialName("authorization_server") override val authorizationServer: String? = authorizationServers?.firstOrNull(),
         @SerialName("code_challenge_methods_supported") override val codeChallengeMethodsSupported: List<String>? = null,
         @SerialName("require_pushed_authorization_requests") override val requirePushedAuthorizationRequests: Boolean? = null,
         @SerialName("dpop_signing_alg_values_supported") override val dpopSigningAlgValuesSupported: Set<String>? = null,
 
         // OID4VCI 13
         @SerialName("credential_configurations_supported") @Serializable(CredentialSupportedMapSerializer::class) val credentialConfigurationsSupported: Map<String, CredentialSupported>? = null,
+        @SerialName("authorization_servers") val authorizationServers: Set<String>? = null,
 
         override val customParameters: Map<String, JsonElement> = mapOf()
 

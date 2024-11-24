@@ -337,7 +337,6 @@ object OpenID4VCI {
                 grantTypesSupported = setOf(GrantType.authorization_code, GrantType.pre_authorized_code),
                 requestUriParameterSupported = true,
                 subjectTypesSupported = setOf(SubjectType.public),
-                authorizationServer = baseUrl,
                 credentialIssuer = baseUrl, // (EBSI) this should be just "$baseUrl"  https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-11.2.1
                 responseTypesSupported = setOf(
                     "code",
@@ -361,7 +360,6 @@ object OpenID4VCI {
                 grantTypesSupported = setOf(GrantType.authorization_code, GrantType.pre_authorized_code),
                 requestUriParameterSupported = true,
                 subjectTypesSupported = setOf(SubjectType.public),
-                authorizationServer = baseUrl,
                 credentialIssuer = baseUrl, // (EBSI) this should be just "$baseUrl"  https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-11.2.1
                 responseTypesSupported = setOf(
                     "code",
