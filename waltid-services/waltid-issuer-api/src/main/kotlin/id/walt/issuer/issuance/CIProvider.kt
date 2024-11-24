@@ -30,6 +30,7 @@ import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.*
+import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.definitions.OPENID_CREDENTIAL_AUTHORIZATION_TYPE
 import id.walt.oid4vc.errors.AuthorizationError
@@ -584,4 +585,30 @@ open class CIProvider(
             state = session.authorizationRequest?.state
         )
     }
+
+    private fun resolveBaseUrl(version: OpenID4VCIVersion): String {
+        return when (version) {
+            OpenID4VCIVersion.D13 -> baseUrl
+            OpenID4VCIVersion.D10 -> baseUrlD10
+            else -> throw IllegalArgumentException("Unsupported version: $version")
+        }
+    }
+
+    fun buildCredentialOfferUri(standardVersion: OpenID4VCIVersion, issuanceSessionId: String): String {
+        val baseUrl = resolveBaseUrl(standardVersion)
+        return "$baseUrl/credentialOffer?id=$issuanceSessionId"
+    }
+
+    fun buildOfferUri(
+        standardVersion: OpenID4VCIVersion,
+        offerRequest: CredentialOfferRequest
+    ): String {
+        val baseUrl = resolveBaseUrl(standardVersion)
+        val sanitizedBaseUrl = baseUrl.removePrefix("https://").removePrefix("http://")
+        return OpenID4VCI.getCredentialOfferRequestUrl(
+            credOfferReq = offerRequest,
+            credentialOfferEndpoint = "$CROSS_DEVICE_CREDENTIAL_OFFER_URL$sanitizedBaseUrl/"
+        )
+    }
+
 }
