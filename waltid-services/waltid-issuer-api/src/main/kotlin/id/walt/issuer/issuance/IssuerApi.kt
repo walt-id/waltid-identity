@@ -4,11 +4,11 @@ import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.did.dids.DidService
+import id.walt.issuer.issuance.OidcApi.buildCredentialOfferUri
+import id.walt.issuer.issuance.OidcApi.buildOfferUri
 import id.walt.issuer.issuance.OidcApi.getFormatByCredentialConfigurationId
-import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRequest
@@ -56,15 +56,12 @@ suspend fun createCredentialOfferUri(
 
     val offerRequest = CredentialOfferRequest(
         credentialOffer = null,
-        credentialOfferUri = "${OidcApi.baseUrl}/credentialOffer?id=${issuanceSession.id}"
+        credentialOfferUri = buildCredentialOfferUri(overwrittenIssuanceRequests.first().standardVersion!!, issuanceSession.id)
     )
 
     logger.debug { "offerRequest: $offerRequest" }
 
-    val offerUri = OpenID4VCI.getCredentialOfferRequestUrl(
-        credOfferReq = offerRequest,
-        credentialOfferEndpoint = CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix("https://").removePrefix("http://") + "/"
-    )
+    val offerUri = buildOfferUri(overwrittenIssuanceRequests.first().standardVersion!!, offerRequest)
 
     logger.debug { "Offer URI: $offerUri" }
 
