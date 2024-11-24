@@ -251,8 +251,8 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
                 CredentialOfferErrorCode.invalid_issuer,
                 "Could not resolve issuer provider metadata from $issuerMetadataUrl"
             )
-        val authorizationServerMetadata = issuerMetadata.authorizationServer?.let { authServer ->
-            httpGetAsJson(Url(getCommonProviderMetadataUrl(authServer)))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) }
+        val authorizationServerMetadata = issuerMetadata.authorizationServers?.let { authServer ->
+            httpGetAsJson(Url(getCommonProviderMetadataUrl(authServer.first())))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) }
         } ?: issuerMetadata
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, issuerMetadata)
 
@@ -282,8 +282,8 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
                 CredentialOfferErrorCode.invalid_issuer,
                 "Could not resolve issuer provider metadata from $issuerMetadataUrl"
             )
-        val authorizationServerMetadata = issuerMetadata.authorizationServer?.let { authServer ->
-            httpGetAsJson(Url(getCommonProviderMetadataUrl(authServer)))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadata.Draft13}
+        val authorizationServerMetadata = issuerMetadata.authorizationServers?.let { authServer ->
+            httpGetAsJson(Url(getCommonProviderMetadataUrl(authServer.first())))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadata.Draft13}
         } ?: issuerMetadata as OpenIDProviderMetadata.Draft13
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, issuerMetadata)
         val codeVerifier = if (client.useCodeChallenge) randomUUID() else null
@@ -441,7 +441,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
             }
         } else {
             // execute batch credential request
-            executeBatchCredentialRequest(issuerMetadata.batchCredentialEndpoint, tokenResp.accessToken, offeredCredentials.map {
+            executeBatchCredentialRequest(issuerMetadata.batchCredentialEndpoint!!, tokenResp.accessToken, offeredCredentials.map {
                 CredentialRequest.forOfferedCredential(it, generateDidProof(holderDid, credentialOffer.credentialIssuer, nonce, client))
             })
         }
