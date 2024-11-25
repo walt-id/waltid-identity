@@ -4,9 +4,9 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.tokens.TokenHandler
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.serialization.json.*
 
 class JwtTokenHandler : TokenHandler {
 
@@ -17,12 +17,24 @@ class JwtTokenHandler : TokenHandler {
         val payload = buildJsonObject {
             put("sub", session.accountId)
             put("session", session.id)
+            if (session.expiration != null) put("exp", session.expiration!!.epochSeconds)
         }.toString().toByteArray()
 
         return signingKey.signJws(payload)
     }
 
+    /** Check JWT `exp` if in token */
+    fun checkExpirationIfExists(jwtPayload: JsonObject) {
+        jwtPayload["exp"]?.jsonPrimitive?.long?.let { exp ->
+            val expirationDate = Instant.fromEpochSeconds(exp)
+            val now = Clock.System.now()
+            check(now < expirationDate) { "JWT Token expired since: ${now - expirationDate}" }
+        }
+    }
+
     override suspend fun validateToken(token: String): Boolean {
+        checkExpirationIfExists(token.decodeJws().payload)
+
         return verificationKey.verifyJws(token).isSuccess
     }
 
