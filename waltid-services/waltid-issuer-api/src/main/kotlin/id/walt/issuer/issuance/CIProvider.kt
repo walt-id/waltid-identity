@@ -611,4 +611,15 @@ open class CIProvider(
         )
     }
 
+    fun getMetadataForVersion(
+        standardVersion: String?,
+    ): OpenIDProviderMetadata {
+        val version = OpenID4VCIVersion.from(standardVersion ?: throw IllegalArgumentException("standardVersion parameter is required"))
+
+        return when (version) {
+            OpenID4VCIVersion.Draft10 -> metadataDraft10
+            OpenID4VCIVersion.Draft13 -> metadata
+        }
+    }
+
 }
