@@ -594,7 +594,7 @@ private suspend fun executeCredentialSigning(body: JsonObject) = run {
         {
             vc.signJws(
                 issuerKey = issuerKey,
-                issuerDid = issuerDid,
+                issuerId = issuerDid,
                 subjectDid = subjectDid
             )
         }

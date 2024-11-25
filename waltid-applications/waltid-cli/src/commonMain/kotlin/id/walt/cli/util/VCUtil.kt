@@ -37,7 +37,7 @@ class VCUtil {
             val jws =
                 vc.mergingJwtIssue(
                     issuerKey = key,
-                    issuerDid = issuerDid,
+                    issuerId = issuerDid,
                     subjectDid = subjectDid,
                     mappings = JsonObject(emptyMap()),
                     additionalJwtHeader = emptyMap(),

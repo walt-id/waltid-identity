@@ -67,7 +67,7 @@ class VcApiTest {
         // Sign VC
         val jws = vc.signJws(
             issuerKey = key,
-            issuerDid = did,
+            issuerId = did,
             subjectDid = did
         )
         println(jws)

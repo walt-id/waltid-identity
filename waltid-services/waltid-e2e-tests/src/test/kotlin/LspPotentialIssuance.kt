@@ -30,6 +30,7 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
+import id.walt.sdjwt.JWTVCIssuerMetadata
 import id.walt.sdjwt.SDJwtVC
 import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
 import io.ktor.client.*
@@ -248,11 +249,11 @@ class LspPotentialIssuance(val client: HttpClient) {
 
         // ### get issuer metadata, steps 7-10
         val providerMetadataUri = OpenID4VCI.getCIProviderMetadataUrl(parsedOffer.credentialIssuer)
-        val jwtIssuerMetadataUri = OpenID4VCI.getJWTIssuerProviderMetadataUrl(parsedOffer.credentialIssuer)
+        val jwtIssuerMetadataUri = OpenID4VCI.getJWTVCIssuerProviderMetadataUrl(parsedOffer.credentialIssuer)
         val oAuthMetadataUri = OpenID4VCI.getOAuthProviderMetadataUrl(parsedOffer.credentialIssuer)
         val providerMetadata = client.get(providerMetadataUri).bodyAsText().let { OpenIDProviderMetadata.fromJSONString(it) }
         val oauthMetadata = client.get(oAuthMetadataUri).body<OpenIDProviderMetadata>()
-        val jwtIssuerMetadata = client.get(jwtIssuerMetadataUri).body<OpenIDProviderMetadata>()
+        val jwtIssuerMetadata = client.get(jwtIssuerMetadataUri).body<JWTVCIssuerMetadata>()
         assertNotNull(providerMetadata.credentialConfigurationsSupported)
         assertNotNull(providerMetadata.credentialEndpoint)
         assertNotNull(jwtIssuerMetadata.issuer)
