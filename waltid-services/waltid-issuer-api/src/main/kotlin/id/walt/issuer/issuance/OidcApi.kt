@@ -63,8 +63,8 @@ object OidcApi : CIProvider() {
                 val version = OpenID4VCIVersion.from(standardVersion)
 
                 val metadata = when (version) {
-                    OpenID4VCIVersion.D10 -> metadataD10
-                    OpenID4VCIVersion.D13 -> metadata
+                    OpenID4VCIVersion.Draft10 -> metadataDraft10
+                    OpenID4VCIVersion.Draft13 -> metadata
                 }
 
                 call.respond(metadata.toJSON())
@@ -75,8 +75,8 @@ object OidcApi : CIProvider() {
                 val version = OpenID4VCIVersion.from(standardVersion)
 
                 val metadata = when (version) {
-                    OpenID4VCIVersion.D10 -> metadataD10
-                    OpenID4VCIVersion.D13 -> metadata
+                    OpenID4VCIVersion.Draft10 -> metadataDraft10
+                    OpenID4VCIVersion.Draft13 -> metadata
                 }
 
                 call.respond(metadata.toJSON())
@@ -87,8 +87,8 @@ object OidcApi : CIProvider() {
                 val version = OpenID4VCIVersion.from(standardVersion)
 
                 val metadata = when (version) {
-                    OpenID4VCIVersion.D10 -> metadataD10
-                    OpenID4VCIVersion.D13 -> metadata
+                    OpenID4VCIVersion.Draft10 -> metadataDraft10
+                    OpenID4VCIVersion.Draft13 -> metadata
                 }
 
                 call.respond(metadata.toJSON())

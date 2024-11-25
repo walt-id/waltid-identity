@@ -66,18 +66,18 @@ import kotlin.uuid.ExperimentalUuidApi
  */
 @OptIn(ExperimentalUuidApi::class)
 open class CIProvider(
-    val baseUrl: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.D13.versionString}"},
-    val baseUrlD10: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.D10.versionString}"},
+    val baseUrl: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.Draft13.versionString}"},
+    val baseUrlDraft10: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.Draft10.versionString}"},
 
     val config: CredentialIssuerConfig = CredentialIssuerConfig(credentialConfigurationsSupported = ConfigManager.getConfig<CredentialTypeConfig>().parse())
 ) {
     private val log = KotlinLogging.logger { }
 
     val metadata
-        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrl, config.credentialConfigurationsSupported, OpenID4VCIVersion.D13) as OpenIDProviderMetadata.Draft13)
+        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrl, config.credentialConfigurationsSupported, OpenID4VCIVersion.Draft13) as OpenIDProviderMetadata.Draft13)
 
-    val metadataD10
-        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrlD10, config.credentialConfigurationsSupported, OpenID4VCIVersion.D10) as OpenIDProviderMetadata.Draft10)
+    val metadataDraft10
+        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrlDraft10, config.credentialConfigurationsSupported, OpenID4VCIVersion.Draft10) as OpenIDProviderMetadata.Draft10)
 
     companion object {
 
@@ -484,7 +484,7 @@ open class CIProvider(
         callbackUrl: String? = null,
         txCode: TxCode? = null,
         txCodeValue: String? = null,
-        standardVersion: OpenID4VCIVersion = OpenID4VCIVersion.D13
+        standardVersion: OpenID4VCIVersion = OpenID4VCIVersion.Draft13
     ): IssuanceSession = runBlocking {
         val sessionId = randomUUID()
 
@@ -588,8 +588,8 @@ open class CIProvider(
 
     private fun resolveBaseUrl(version: OpenID4VCIVersion): String {
         return when (version) {
-            OpenID4VCIVersion.D13 -> baseUrl
-            OpenID4VCIVersion.D10 -> baseUrlD10
+            OpenID4VCIVersion.Draft13 -> baseUrl
+            OpenID4VCIVersion.Draft10 -> baseUrlDraft10
             else -> throw IllegalArgumentException("Unsupported version: $version")
         }
     }

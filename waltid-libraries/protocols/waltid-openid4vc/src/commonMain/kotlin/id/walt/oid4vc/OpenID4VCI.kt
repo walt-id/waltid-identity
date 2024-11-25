@@ -325,7 +325,7 @@ object OpenID4VCI {
 
 
         return when (version) {
-            OpenID4VCIVersion.D13 -> OpenIDProviderMetadata.Draft13(
+            OpenID4VCIVersion.Draft13 -> OpenIDProviderMetadata.Draft13(
                 issuer = baseUrl,
                 authorizationEndpoint = "$baseUrl/authorize",
                 pushedAuthorizationRequestEndpoint = "$baseUrl/par",
@@ -348,7 +348,7 @@ object OpenID4VCI {
                 credentialConfigurationsSupported = credentialSupported
             )
 
-            OpenID4VCIVersion.D10 -> OpenIDProviderMetadata.Draft10(
+            OpenID4VCIVersion.Draft10 -> OpenIDProviderMetadata.Draft10(
                 issuer = baseUrl,
                 authorizationEndpoint = "$baseUrl/authorize",
                 pushedAuthorizationRequestEndpoint = "$baseUrl/par",
@@ -529,8 +529,8 @@ object OpenID4VCI {
 
 
 enum class OpenID4VCIVersion(val versionString: String) {
-    D10("d10"),
-    D13("d13");
+    Draft10("draft10"),
+    Draft13("draft13");
 
     companion object {
         fun from(version: String): OpenID4VCIVersion {

@@ -144,7 +144,7 @@ companion object {
         ConfigManager.testWithConfigs(testConfigs)
         val offerUri = createCredentialOfferUri(listOf(issueRequest), CredentialFormat.jwt_vc_json)
 
-        assertEquals(true, offerUri.contains("//localhost:7002/d13/?credential_offer"))
+        assertEquals(true, offerUri.contains("//localhost:7002/draft13/?credential_offer"))
     }
 
 
@@ -167,7 +167,7 @@ companion object {
         ConfigManager.testWithConfigs(testConfigs)
         val offerUri = createCredentialOfferUri(listOf(issueRequest), CredentialFormat.jwt_vc_json)
 
-        assertEquals(true, offerUri.contains("//localhost:7002/d13/?credential_offer"))
+        assertEquals(true, offerUri.contains("//localhost:7002/draft13/?credential_offer"))
     }
 
     @Test
@@ -213,7 +213,7 @@ companion object {
         ConfigManager.loadConfigs(emptyArray())
         val offerUri = createCredentialOfferUri(issuanceRequests, CredentialFormat.jwt_vc_json)
 
-        assertEquals(true, offerUri.contains("//localhost:7002/d13/?credential_offer"))
+        assertEquals(true, offerUri.contains("//localhost:7002/draft13/?credential_offer"))
 
     }
 
