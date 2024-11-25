@@ -59,37 +59,25 @@ object OidcApi : CIProvider() {
             tags = listOf("oidc")
         }) {
             get("{standardVersion}/.well-known/openid-configuration") {
-                val standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required")
-                val version = OpenID4VCIVersion.from(standardVersion)
-
-                val metadata = when (version) {
-                    OpenID4VCIVersion.Draft10 -> metadataDraft10
-                    OpenID4VCIVersion.Draft13 -> metadata
-                }
+                val metadata = getMetadataForVersion(
+                    standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required"),
+                )
 
                 call.respond(metadata.toJSON())
             }
 
             get("{standardVersion}/.well-known/openid-credential-issuer") {
-                val standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required")
-                val version = OpenID4VCIVersion.from(standardVersion)
-
-                val metadata = when (version) {
-                    OpenID4VCIVersion.Draft10 -> metadataDraft10
-                    OpenID4VCIVersion.Draft13 -> metadata
-                }
+                val metadata = getMetadataForVersion(
+                    standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required"),
+                )
 
                 call.respond(metadata.toJSON())
             }
 
             get("{standardVersion}/.well-known/oauth-authorization-server") {
-                val standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required")
-                val version = OpenID4VCIVersion.from(standardVersion)
-
-                val metadata = when (version) {
-                    OpenID4VCIVersion.Draft10 -> metadataDraft10
-                    OpenID4VCIVersion.Draft13 -> metadata
-                }
+                val metadata = getMetadataForVersion(
+                    standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required"),
+                )
 
                 call.respond(metadata.toJSON())
             }
