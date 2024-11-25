@@ -423,9 +423,10 @@ object OpenID4VCI {
         )
         val undisclosedPayload = sdPayload.undisclosedPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
         val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
+        val issuerDid = if(DidUtils.isDidUrl(issuerId)) issuerId else null
 
         val headers = mapOf(
-            "kid" to getKidHeader(issuerKey, null),
+            "kid" to getKidHeader(issuerKey, issuerDid),
             "typ" to SD_JWT_VC_TYPE_HEADER
         ).plus(x5Chain?.let {
             mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
