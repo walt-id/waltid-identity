@@ -122,7 +122,7 @@ object OpenID4VCI {
             appendPathSegments(".well-known", "openid-credential-issuer")
         }.buildString()
 
-    fun getCommonProviderMetadataUrl(baseUrl: String) = URLBuilder(baseUrl).apply {
+    fun getOpenIdProviderMetadataUrl(baseUrl: String) = URLBuilder(baseUrl).apply {
             appendPathSegments(".well-known", "openid-configuration")
         }.buildString()
 
