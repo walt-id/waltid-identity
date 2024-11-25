@@ -332,6 +332,10 @@ class WaltidServicesE2ETests {
         val authorizationCodeFlow = AuthorizationCodeFlow(testHttpClient(doFollowRedirects = false))
         authorizationCodeFlow.testIssuerAPI()
 
+        // Test Issuer Draft 10
+        val issuerDraft10 = IssuerDraft10(testHttpClient(doFollowRedirects = false))
+        issuerDraft10.testIssuerAPIDraft10()
+
         // Test External Signature API Endpoints
         //In the context of these test cases, a new wallet is created and initialized
         //accordingly, i.e., the default wallet that is employed by all the other test
