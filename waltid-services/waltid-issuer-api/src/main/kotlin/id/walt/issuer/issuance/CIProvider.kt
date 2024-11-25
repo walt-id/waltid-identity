@@ -49,6 +49,7 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -239,7 +240,8 @@ open class CIProvider(
                       credentialRequest = credentialRequest,
                       credentialData = vc,
                       issuerKey = resolvedIssuerKey,
-                      issuerDid = issuerDid,
+                      issuerId = issuerDid
+                          ?: throw BadRequestException("Issuer API currently supports only issuer DID for issuer ID property in W3C credentials. Issuer DID was not given in issuance request."),
                       selectiveDisclosure = request.selectiveDisclosure,
                       dataMapping = request.mapping,
                       x5Chain = request.x5Chain
