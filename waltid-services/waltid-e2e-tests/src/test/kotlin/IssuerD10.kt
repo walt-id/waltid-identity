@@ -26,7 +26,7 @@ class IssuerDraft10(private val client: HttpClient)  {
 
         val issuanceReq = Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-id-token.json")).copy(
             credentialConfigurationId = "OpenBadgeCredential_jwt_vc",
-            standardVersion = OpenID4VCIVersion.D10,
+            standardVersion = OpenID4VCIVersion.Draft10,
             useJar = true
         )
 

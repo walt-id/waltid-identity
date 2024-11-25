@@ -23,7 +23,7 @@ class AuthorizationCodeFlow(private val client: HttpClient) {
         lateinit var offerUrl: String
         lateinit var issuerState: String
         val issuerApi = IssuerApi(client)
-        val authorizeEndpoint = "d13/authorize"
+        val authorizeEndpoint = "draft13/authorize"
 
         //
         // Issue credential with Authorized Code Flow and Id Token request
