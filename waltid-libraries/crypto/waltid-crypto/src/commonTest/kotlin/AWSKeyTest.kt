@@ -1,5 +1,6 @@
 import AWSKeyTest.Config.payloadJWS
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.aws.AWSAuth
 import id.walt.crypto.keys.aws.AWSKey
 import id.walt.crypto.keys.aws.AWSKeyMetadata
 import io.ktor.utils.io.core.*
@@ -59,14 +60,20 @@ class AWSKeyTest {
 
             println("Testing sign & verify JWS (payload: ${Config.payloadJWS})...")
             awsTestSignJws()
+
+
+            println("Testing key deletion...")
+            awsTestDeleteKey()
         }
     }
 
     private suspend fun awsTestKeyCreation() {
         val awsMetadata = AWSKeyMetadata(
-            region = Config.region,
-            secretAccessKey = Config.secretAccessKey,
-            accessKeyId = Config.accessKeyId
+            auth = AWSAuth(
+                accessKeyId = Config.accessKeyId,
+                secretAccessKey = Config.secretAccessKey,
+                region = Config.region
+            )
         )
 
         keys = Config.TESTABLE_KEY_TYPES.map {
@@ -108,4 +115,12 @@ class AWSKeyTest {
             assertEquals(payloadJWS, verified.getOrThrow(), "JWS payload mismatch after verification")
         }
     }
+
+    private suspend fun  awsTestDeleteKey() {
+        keys.forEach { key ->
+            println("Deleting key: ${key.getKeyId()}")
+            key.deleteKey()
+        }
+    }
+
 }

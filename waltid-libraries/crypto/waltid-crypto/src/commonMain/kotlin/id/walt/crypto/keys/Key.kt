@@ -174,6 +174,15 @@ abstract class Key {
     @Throws(Exception::class)
     abstract suspend fun getMeta(): KeyMeta
 
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    @Throws(Exception::class)
+    abstract suspend fun deleteKey(): Boolean
+
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
