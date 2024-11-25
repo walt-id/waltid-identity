@@ -4,9 +4,9 @@ package id.walt.issuer.issuance
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.oid4vc.OpenID4VC
-import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.data.dif.PresentationDefinition.Companion.generateDefaultEBSIV3InputDescriptor
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.*
@@ -136,8 +136,8 @@ object OidcApi : CIProvider() {
                                     call.response.apply {
                                         status(HttpStatusCode.Found)
                                         header(
-                                            HttpHeaders.Location,
-                                            "${metadata.issuer}/external_login/${authReq.toHttpQueryString()}"
+                                            name = HttpHeaders.Location,
+                                            value = "${metadata.issuer}/external_login/${authReq.toHttpQueryString()}"
                                         )
                                     }
                                     return@get
@@ -161,7 +161,11 @@ object OidcApi : CIProvider() {
                                 AuthenticationMethod.VP_TOKEN -> {
                                     val authServerState = randomUUID()
 
-                                    initializeIssuanceSession(authReq, 5.minutes, authServerState)
+                                    initializeIssuanceSession(
+                                        authorizationRequest = authReq,
+                                        expiresIn = 5.minutes,
+                                        authServerState = authServerState
+                                    )
 
                                     val vpProfile = issuanceSession.issuanceRequests.first().vpProfile ?: OpenId4VPProfile.DEFAULT
 
@@ -186,7 +190,19 @@ object OidcApi : CIProvider() {
                                         } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
                                     }
 
-                                    val presentationDefinition = PresentationDefinition.defaultGenerationFromVcTypesForCredentialFormat(
+                                    val presentationDefinition = when(vpProfile) {
+                                        OpenId4VPProfile.EBSIV3 -> PresentationDefinition(
+                                            inputDescriptors = requestedTypes.map { type ->
+                                                generateDefaultEBSIV3InputDescriptor(type)
+                                            }
+                                        )
+                                        else ->  PresentationDefinition.defaultGenerationFromVcTypesForCredentialFormat(
+                                            types = requestedTypes,
+                                            format = credFormat
+                                        )
+                                    }
+
+                                    PresentationDefinition.defaultGenerationFromVcTypesForCredentialFormat(
                                         types = requestedTypes,
                                         format = credFormat
                                     )
@@ -203,12 +219,16 @@ object OidcApi : CIProvider() {
                                 }
 
                                 AuthenticationMethod.NONE -> OpenID4VC.processCodeFlowAuthorization(
-                                    authReq, issuanceSession.id, metadata, CI_TOKEN_KEY)
+                                    authorizationRequest = authReq,
+                                    sessionId = issuanceSession.id,
+                                    providerMetadata = metadata,
+                                    tokenKey = CI_TOKEN_KEY)
+
                                 else -> {
                                     throw AuthorizationError(
-                                        authReq,
-                                        AuthorizationErrorCode.invalid_request,
-                                        "Request Authentication Method is invalid"
+                                        authorizationRequest = authReq,
+                                        errorCode = AuthorizationErrorCode.invalid_request,
+                                        message = "Request Authentication Method is invalid"
                                     )
                                 }
                             }
@@ -245,26 +265,34 @@ object OidcApi : CIProvider() {
                     logger.info { "Redirect Uri is: $redirectUri" }
 
                     call.response.apply {
+
                         status(HttpStatusCode.Found)
-                        val defaultResponseMode =
-                            if (authReq.responseType.contains(ResponseType.Code)) ResponseMode.query else ResponseMode.fragment
+
+                        val defaultResponseMode = if (authReq.responseType.contains(ResponseType.Code)) ResponseMode.query else ResponseMode.fragment
+
                         authResp as IHTTPDataObject
+
                         header(
-                            HttpHeaders.Location,
-                            authResp.toRedirectUri(redirectUri, authReq.responseMode ?: defaultResponseMode)
+                            name = HttpHeaders.Location,
+                            value = authResp.toRedirectUri(redirectUri, authReq.responseMode ?: defaultResponseMode)
                         )
                     }
                 } catch (authExc: AuthorizationError) {
                     logger.error(authExc) { "Authorization error: " }
+
                     call.response.apply {
+
                         status(HttpStatusCode.Found)
-                        header(HttpHeaders.Location, URLBuilder(authExc.authorizationRequest.redirectUri!!).apply {
-                            parameters.appendAll(
-                                parametersOf(
-                                    authExc.toAuthorizationErrorResponse().toHttpParameters()
+
+                        header(
+                            name = HttpHeaders.Location,
+                            value = URLBuilder(authExc.authorizationRequest.redirectUri!!).apply {
+                                parameters.appendAll(
+                                    parametersOf(
+                                        authExc.toAuthorizationErrorResponse().toHttpParameters()
+                                    )
                                 )
-                            )
-                        }.buildString())
+                            }.buildString())
                     }
                 }
             }
