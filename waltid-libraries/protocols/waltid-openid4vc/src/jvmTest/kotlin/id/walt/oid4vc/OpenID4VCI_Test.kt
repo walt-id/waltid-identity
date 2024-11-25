@@ -191,6 +191,11 @@ class OpenID4VCI_Test {
       ISSUER_DID, WALLET_DID
     )
     assertTrue(actual = JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess)
+
+    // test jwt-vc-issuer well-known url with URL path segments
+    val issuerUrl = "http://waltid.enterprise.localhost:3000/v1/waltid.tenant1.issuer1/issuer-service-api/openid4vc/"
+    val wellKnownVCIssuerUrl = "http://waltid.enterprise.localhost:3000/.well-known/jwt-vc-issuer/v1/waltid.tenant1.issuer1/issuer-service-api/openid4vc"
+    assertEquals(wellKnownVCIssuerUrl, OpenID4VCI.getJWTVCIssuerProviderMetadataUrl(issuerUrl))
   }
 
   // Test case for available authentication methods are: NONE, ID_TOKEN, VP_TOKEN, PRE_AUTHORIZED PWD(Handled by third party authorization server)

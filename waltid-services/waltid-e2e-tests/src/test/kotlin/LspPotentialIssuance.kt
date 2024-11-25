@@ -249,7 +249,7 @@ class LspPotentialIssuance(val client: HttpClient) {
 
         // ### get issuer metadata, steps 7-10
         val providerMetadataUri = OpenID4VCI.getCIProviderMetadataUrl(parsedOffer.credentialIssuer)
-        val jwtIssuerMetadataUri = OpenID4VCI.getJWTIssuerProviderMetadataUrl(parsedOffer.credentialIssuer)
+        val jwtIssuerMetadataUri = OpenID4VCI.getJWTVCIssuerProviderMetadataUrl(parsedOffer.credentialIssuer)
         val oAuthMetadataUri = OpenID4VCI.getOAuthProviderMetadataUrl(parsedOffer.credentialIssuer)
         val providerMetadata = client.get(providerMetadataUri).bodyAsText().let { OpenIDProviderMetadata.fromJSONString(it) } as OpenIDProviderMetadata.Draft13
         val oauthMetadata = client.get(oAuthMetadataUri).body<OpenIDProviderMetadata.Draft13>()

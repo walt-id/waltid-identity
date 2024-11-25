@@ -94,10 +94,10 @@ data class AuthorizationRequest(
      * If response_uri and redirect_uri are empty and client_id_scheme is "redirect_uri", the response_uri or redirect_uri (depending on the response_mode) are taken from the client_id parameter
      */
     fun getRedirectOrResponseUri(): String? {
-        return when(responseMode) {
+        return when (responseMode) {
             ResponseMode.direct_post -> responseUri
             else -> redirectUri
-        } ?: when(clientIdScheme) {
+        } ?: when (clientIdScheme) {
             ClientIdScheme.RedirectUri -> clientId
             else -> null
         }
@@ -150,7 +150,7 @@ data class AuthorizationRequest(
             codeChallengeMethod?.let { put("code_challenge_method", JsonPrimitive(it)) }
             idTokenHint?.let { put("id_token_hint", JsonPrimitive(it)) }
             customParameters.forEach { (key, value) ->
-                when(value.size) {
+                when (value.size) {
                     1 -> put(key, JsonPrimitive(value.first()))
                     else -> put(key, JsonArray(value.map { JsonPrimitive(it) }))
                 }
@@ -226,7 +226,10 @@ data class AuthorizationRequest(
 
         suspend fun fromRequestObjectByReference(requestUri: String): AuthorizationRequest {
             println("Request object by reference: $requestUri")
-            return fromRequestObject(id.walt.oid4vc.util.http.get(requestUri).bodyAsText())
+            val body = id.walt.oid4vc.util.http.get(requestUri).bodyAsText()
+            println("Reference resolves to: $body")
+
+            return fromRequestObject(body)
         }
 
         fun fromRequestObject(request: String): AuthorizationRequest {

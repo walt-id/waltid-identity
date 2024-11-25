@@ -74,15 +74,24 @@ actual class JWKKey actual constructor(
     actual override suspend fun getPublicKeyRepresentation(): ByteArray = when (keyType) {
         KeyType.Ed25519 -> _internalJwk.toOctetKeyPair().decodedX
         KeyType.RSA -> getRsaPublicKeyBytes(_internalJwk.toRSAKey().toPublicKey())
-        KeyType.secp256k1, KeyType.secp256r1 ->  getECPublicKeyBytes(_internalJwk.toECKey().toECPublicKey())
+        KeyType.secp256k1, KeyType.secp256r1 -> getECPublicKeyBytes(_internalJwk.toECKey().toECPublicKey())
     }
 
     actual override suspend fun getMeta(): JwkKeyMeta = JwkKeyMeta(getKeyId())
+    actual override suspend fun deleteKey() = true
 
     actual override suspend fun exportJWK(): String = _internalJwk.toJSONString()
 
     actual override suspend fun exportJWKObject(): JsonObject =
-        JsonObject(_internalJwk.toJSONObject().mapValues { JsonPrimitive(it.value as String) })
+        JsonObject(_internalJwk.toJSONObject().mapValues {
+            val value = it.value
+            when (value) {
+                is String -> JsonPrimitive(value)
+                is Number -> JsonPrimitive(value)
+                else -> throw IllegalArgumentException("Unsupported value type: ${value::class.simpleName} in field ${it.key}")
+
+            }
+        })
 
     actual override suspend fun exportPEM(): String {
         val pemObjects = ArrayList<PemObject>()
@@ -343,7 +352,8 @@ actual class JWKKey actual constructor(
         val curveName = Curve.forECParameterSpec(key.params).name
         return ECNamedCurveTable.getParameterSpec(curveName)
             .curve.createPoint(key.w.affineX, key.w.affineY)
-            .getEncoded(true) }
+            .getEncoded(true)
+    }
 
     private fun getPrivateKey() = when (keyType) {
         KeyType.secp256r1, KeyType.secp256k1 -> _internalJwk.toECKey().toPrivateKey()

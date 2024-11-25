@@ -59,7 +59,7 @@ private suspend fun testDidMethod(didMethod: String, key: JWKKey) {
     // Sign VC with did method (JWS)
     val jws = vc.signJws(
         issuerKey = key,
-        issuerDid = did,
+        issuerId = did,
         subjectDid = did
     )
     assertNotNull(jws)
@@ -102,7 +102,7 @@ private suspend fun testWeb(key: JWKKey) {
     // Sign VC with WEB
     val jws = vc.signJws(
         issuerKey = key,
-        issuerDid = didWebResult.did,
+        issuerId = didWebResult.did,
         subjectDid = didWebResult.did
     )
 
@@ -133,7 +133,7 @@ suspend fun testCheqd(key: JWKKey) {
 
     val jws = vc.signJws(
         issuerKey = key,
-        issuerDid = cheqdid,
+        issuerId = cheqdid,
         subjectDid = cheqdid
     )
     assertNotNull(jws)

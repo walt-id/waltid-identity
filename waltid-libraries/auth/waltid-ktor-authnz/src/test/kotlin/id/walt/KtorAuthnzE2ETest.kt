@@ -2,6 +2,8 @@ package id.walt
 
 import com.atlassian.onetime.core.TOTPGenerator
 import com.atlassian.onetime.model.TOTPSecret
+import id.walt.ktorauthnz.KtorAuthnzManager
+import id.walt.ktorauthnz.accounts.ExampleAccountStore
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import id.walt.ktorauthnz.sessions.AuthSessionStatus
 import io.klogging.logger
@@ -16,11 +18,16 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.seconds
 
 class KtorAuthnzE2ETest {
+
+    init {
+        KtorAuthnzManager.accountStore = ExampleAccountStore
+    }
 
     private val log = logger("KtorAuthnzE2ETest")
 
@@ -53,7 +60,8 @@ class KtorAuthnzE2ETest {
         check(status == AuthSessionStatus.OK)
         check(nextStep == null)
         check(token != null)
-        testProtected(token!!)
+        check(expiration != null && Clock.System.now() < expiration)
+        testProtected(token)
     }
 
     suspend fun explicit2Test() {
@@ -62,17 +70,17 @@ class KtorAuthnzE2ETest {
         check(r1.status == AuthSessionStatus.CONTINUE_NEXT_STEP)
         check(r1.nextStep == listOf("userpass"))
 
-        log.info { "Continuing with step: ${r1.nextStep!!.first()}..." }
-        val r2 = http.post("/auth/flows/global-explicit2/${r1.id}/${r1.nextStep!!.first()}") {
+        log.info { "Continuing with step: ${r1.nextStep.first()}..." }
+        val r2 = http.post("/auth/flows/global-explicit2/${r1.id}/${r1.nextStep.first()}") {
             setBody(mapOf("username" to "alice1", "password" to "123456"))
         }.body<AuthSessionInformation>()
         check(r2.status == AuthSessionStatus.CONTINUE_NEXT_STEP)
         check(r2.nextStep == listOf("totp"))
 
         // TOTP secret:
-        log.info { "Continuing with step: ${r1.nextStep!!.first()}..." }
+        log.info { "Continuing with step: ${r1.nextStep.first()}..." }
         val totp = TOTPGenerator().generateCurrent(TOTPSecret.fromBase32EncodedString("JBSWY3DPEHPK3PXP")).value
-        val r3Str = http.post("/auth/flows/global-explicit2/${r2.id}/${r2.nextStep!!.first()}") {
+        val r3Str = http.post("/auth/flows/global-explicit2/${r2.id}/${r2.nextStep.first()}") {
             setBody(mapOf("code" to totp))
         }.bodyAsText()
         log.info { "Body response: $r3Str" }
@@ -86,11 +94,23 @@ class KtorAuthnzE2ETest {
     }
 
     @Test
-    fun test() = runTest(timeout = 10.seconds) {
-        startExample(wait = false)
+    fun testNonJwt() = runTest(timeout = 10.seconds) {
+        val s = startExample(wait = false, jwt = false)
 
         implicit1Test()
         explicit2Test()
+
+        s.stop()
+    }
+
+    @Test
+    fun testJwt() = runTest(timeout = 10.seconds) {
+        val s = startExample(wait = false, jwt = true)
+
+        implicit1Test()
+        explicit2Test()
+
+        s.stop()
     }
 
 }
