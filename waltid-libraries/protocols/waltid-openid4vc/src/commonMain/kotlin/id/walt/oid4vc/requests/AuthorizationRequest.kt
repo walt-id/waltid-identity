@@ -40,6 +40,7 @@ data class AuthorizationRequest(
     val userHint: String? = null,
     val issuerState: String? = null,
     val requestUri: String? = null,
+    val request: String? = null,
     val presentationDefinition: PresentationDefinition? = null,
     val presentationDefinitionUri: String? = null,
     val clientIdScheme: ClientIdScheme? = null,
@@ -73,6 +74,7 @@ data class AuthorizationRequest(
             userHint?.let { put("user_hint", listOf(it)) }
             issuerState?.let { put("issuer_state", listOf(it)) }
             requestUri?.let { put("request_uri", listOf(it)) }
+            request?.let { put("request", listOf(it)) }
             presentationDefinition?.let { put("presentation_definition", listOf(it.toJSONString())) }
             presentationDefinitionUri?.let { put("presentation_definition_uri", listOf(it)) }
             clientIdScheme?.let { put("client_id_scheme", listOf(it.value)) }
@@ -136,6 +138,7 @@ data class AuthorizationRequest(
             userHint?.let { put("user_hint", JsonPrimitive(it)) }
             issuerState?.let { put("issuer_state", JsonPrimitive(it)) }
             requestUri?.let { put("request_uri", JsonPrimitive(it)) }
+            request?.let { put("request", JsonPrimitive(it)) }
             presentationDefinition?.let { put("presentation_definition", it.toJSON()) }
             presentationDefinitionUri?.let { put("presentation_definition_uri", JsonPrimitive(it)) }
             clientIdScheme?.let { put("client_id_scheme", JsonPrimitive(it.value)) }
@@ -267,6 +270,7 @@ data class AuthorizationRequest(
                 parameters["user_hint"]?.firstOrNull(),
                 parameters["issuer_state"]?.firstOrNull(),
                 parameters["request_uri"]?.firstOrNull(),
+                parameters["request"]?.firstOrNull(),
                 parameters["presentation_definition"]?.firstOrNull()?.let { PresentationDefinition.fromJSONString(it) },
                 parameters["presentation_definition_uri"]?.firstOrNull(),
                 parameters["client_id_scheme"]?.firstOrNull()?.let { ClientIdScheme.fromValue(it) },
