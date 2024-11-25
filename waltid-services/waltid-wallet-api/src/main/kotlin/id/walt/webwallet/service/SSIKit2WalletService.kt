@@ -7,6 +7,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.ConflictException
 import id.walt.commons.web.UnsupportedMediaTypeException
+import id.walt.commons.web.WebException
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
@@ -237,8 +238,10 @@ class SSIKit2WalletService(
 //            else null
 //        val tokenResponse = OpenID4VP.generateOID4VPTokenResponse(authReq, presentationResult, idToken)
 
-        val tokenResponse = credentialWallet.processImplicitFlowAuthorization(authReq)
-        val submitFormParams = getFormParameters(authReq, tokenResponse)
+        val tokenResponse =
+            credentialWallet.processImplicitFlowAuthorization(authReq)
+        val submitFormParams =
+            getFormParameters(authReq, tokenResponse)
 
         val resp = this.http.submitForm(
             authReq.responseUri
@@ -246,9 +249,9 @@ class SSIKit2WalletService(
                     authReq, AuthorizationErrorCode.invalid_request,
                     "No response_uri or redirect_uri found on authorization request"
                 ), parameters {
-                    submitFormParams.forEach { entry ->
-                        entry.value.forEach { append(entry.key, it) }
-                    }
+                submitFormParams.forEach { entry ->
+                    entry.value.forEach { append(entry.key, it) }
+                }
             })
         val httpResponseBody = runCatching { resp.bodyAsText() }.getOrNull()
         val isResponseRedirectUrl = httpResponseBody != null && httpResponseBody.take(10).lowercase().let {
@@ -298,7 +301,8 @@ class SSIKit2WalletService(
                     PresentationError(
                         message =
                         httpResponseBody?.let {
-                            if (it.couldBeJsonObject()) it.parseAsJsonObject().getOrNull()?.get("message")?.jsonPrimitive?.content
+                            if (it.couldBeJsonObject()) it.parseAsJsonObject().getOrNull()
+                                ?.get("message")?.jsonPrimitive?.content
                                 ?: "Presentation failed"
                             else it
                         } ?: "Presentation failed",
@@ -389,7 +393,7 @@ class SSIKit2WalletService(
         return result.did
     }
 
-    override suspend fun listDids() =  DidsService.list(walletId)
+    override suspend fun listDids() = DidsService.list(walletId)
 
     override suspend fun loadDid(did: String): JsonObject =
         DidsService.get(walletId, did)?.let { Json.parseToJsonElement(it.document).jsonObject }
@@ -534,26 +538,50 @@ class SSIKit2WalletService(
         }
     }
 
-    override suspend fun deleteKey(alias: String): Boolean = runCatching {
-        KeysService.get(walletId, alias)?.let { Json.parseToJsonElement(it.document) }?.run {
-            eventUseCase.log(
-                action = EventType.Key.Delete,
-                originator = "wallet",
-                tenant = tenant,
-                accountId = accountId,
-                walletId = walletId,
-                data = eventUseCase.keyEventData(
-                    id = this.jsonObject["jwk"]?.jsonObject?.get("kid")?.jsonPrimitive?.content
-                        ?: EventDataNotAvailable,
-                    algorithm = this.jsonObject["jwk"]?.jsonObject?.get("kty")?.jsonPrimitive?.content
-                        ?: EventDataNotAvailable,
-                    kmsType = EventDataNotAvailable
-                )
+    override suspend fun deleteKey(alias: String): Boolean =
+        performKeyDelete(alias = alias, isTotalDelete = true).getOrThrow().first
+
+
+    override suspend fun removeKey(alias: String): Boolean =
+        performKeyDelete(alias = alias, isTotalDelete = false).getOrThrow().first
+
+
+    private suspend fun performKeyDelete(alias: String, isTotalDelete: Boolean) = runCatching {
+        val key = getKey(alias)
+
+        val canDeleteFromStorage = isTotalDelete && key.deleteKey() || !isTotalDelete
+        val operationSucceeded = canDeleteFromStorage && KeysService.delete(walletId, alias)
+
+        if (isTotalDelete && !operationSucceeded) throw WebException(
+            HttpStatusCode.BadRequest,
+            "Failed to delete remote key : $alias"
+        )
+        Pair(operationSucceeded, key)
+    }.onSuccess { result ->
+        val (operationSucceeded, key) = result
+        if (operationSucceeded) {
+        eventUseCase.log(
+            action = (if (isTotalDelete) EventType.Key.Delete else EventType.Key.Remove),
+            originator = "wallet",
+            tenant = tenant,
+            accountId = accountId,
+            walletId = walletId,
+            data = eventUseCase.keyEventData(
+                id = alias,
+                algorithm = key.keyType.name,
+                kmsType = EventDataNotAvailable
             )
+        )
+        } else {
+            logger.warn { "Key delete operation not performed for alias: $alias" }
+            throw WebException(HttpStatusCode.BadRequest, "Failed to delete key: $alias")
         }
-    }.let {
-        KeysService.delete(walletId, alias)
+    }.onFailure {
+        val errorMessage = "Failed to delete key: ${it.message}"
+        logger.error(it) { errorMessage }
+        throw WebException(HttpStatusCode.BadRequest, errorMessage)
     }
+
 
     override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> =
         WalletOperationHistories.selectAll()
@@ -613,7 +641,7 @@ class SSIKit2WalletService(
             "key" ->
                 DidKeyCreateOptions(
                     args["key"]?.let { enumValueIgnoreCase<KeyType>(it.content) } ?: KeyType.Ed25519,
-                    args["useJwkJcsPub"]?.let { it.content.toBoolean() } ?: false)
+                    args["useJwkJcsPub"]?.let { it.content.toBoolean() } == true)
 
             "jwk" -> DidJwkCreateOptions()
             "web" ->
@@ -641,7 +669,7 @@ class SSIKit2WalletService(
         tokenResponse: TokenResponse
     ): Map<String, List<String>> {
         val encKey = authorizationRequest.clientMetadata?.jwks?.get("keys")?.jsonArray?.first { jwk ->
-            JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false
+            JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) == true
         }?.jsonObject ?: throw Exception("No ephemeral reader key found")
         val ephemeralWalletKey = runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
         return tokenResponse.toDirecPostJWTParameters(

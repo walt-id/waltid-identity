@@ -357,11 +357,26 @@ class WaltidServicesE2ETests {
         lspPotentialVerification.testPotentialInteropTrack4()
     }*/
 
-    /* @Test
-    fun testExternalSignatureAPIs() = testBlock(defaultTestTimeout) {
+    //@Test
+    fun testExternalSignatureAPIs() = E2ETest.testBlock(
+        config = ServiceConfiguration("e2e-test"),
+        features = listOf(id.walt.issuer.FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
+        featureAmendments = mapOf(
+            CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
+            // CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
+        ),
+        init = {
+            id.walt.webwallet.webWalletSetup()
+            id.walt.did.helpers.WaltidServices.minimalInit()
+            id.walt.webwallet.db.Db.start()
+        },
+        module = e2eTestModule,
+        timeout = defaultTestTimeout
+    ) {
         ExchangeExternalSignatures().executeTestCases()
-    }*/
+    }
 
+    @OptIn(ExperimentalUuidApi::class)
     suspend fun setupTestWallet(): LspPotentialWallet {
         var client = testHttpClient()
         client.post("/wallet-api/auth/login") {

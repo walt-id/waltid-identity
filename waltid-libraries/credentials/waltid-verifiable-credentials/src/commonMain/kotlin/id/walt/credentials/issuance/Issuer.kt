@@ -8,6 +8,7 @@ import id.walt.credentials.utils.W3CVcUtils.update
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.did.dids.DidUtils
 import id.walt.sdjwt.SDMap
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.JsonElement
@@ -33,7 +34,7 @@ object Issuer {
     @JsExport.Ignore
     suspend fun W3CVC.baseIssue(
         key: Key,
-        did: String,
+        issuerId: String,
         subject: String,
 
         dataOverwrites: Map<String, JsonElement>,
@@ -47,7 +48,7 @@ object Issuer {
 
         return signJws(
             issuerKey = key,
-            issuerDid = did,
+            issuerId = issuerId,
             subjectDid = subject,
             additionalJwtHeader = additionalJwtHeaders,
             additionalJwtOptions = additionalJwtOptions
@@ -60,7 +61,7 @@ object Issuer {
     @JsExport.Ignore
     suspend fun W3CVC.mergingJwtIssue(
         issuerKey: Key,
-        issuerDid: String?,
+        issuerId: String,
         subjectDid: String,
 
         mappings: JsonObject,
@@ -70,14 +71,15 @@ object Issuer {
 
         completeJwtWithDefaultCredentialData: Boolean = true,
     ) = mergingToVc(
-        issuerDid = issuerDid,
+        issuerId = issuerId,
         subjectDid = subjectDid,
         mappings = mappings,
         completeJwtWithDefaultCredentialData
     ).run {
+        val issuerDid = if(DidUtils.isDidUrl(issuerId)) issuerId else null
         w3cVc.signJws(
             issuerKey = issuerKey,
-            issuerDid = issuerDid,
+            issuerId = issuerId,
             issuerKid = getKidHeader(issuerKey, issuerDid),
             subjectDid = subjectDid,
             additionalJwtHeader = additionalJwtHeader.toMutableMap().apply {
@@ -95,7 +97,7 @@ object Issuer {
     @JsExport.Ignore
     suspend fun W3CVC.mergingSdJwtIssue(
         issuerKey: Key,
-        issuerDid: String?,
+        issuerId: String,
         subjectDid: String,
 
         mappings: JsonObject,
@@ -106,11 +108,12 @@ object Issuer {
         completeJwtWithDefaultCredentialData: Boolean = true,
         disclosureMap: SDMap
     ) = mergingToVc(
-        issuerDid = issuerDid,
+        issuerId = issuerId,
         subjectDid = subjectDid,
         mappings = mappings,
         completeJwtWithDefaultCredentialData
     ).run {
+        val issuerDid = if(DidUtils.isDidUrl(issuerId)) issuerId else null
         w3cVc.signSdJwt(
             issuerKey = issuerKey,
             issuerKeyId = getKidHeader(issuerKey, issuerDid),
@@ -138,7 +141,7 @@ object Issuer {
     @JsPromise
     @JsExport.Ignore
     suspend fun W3CVC.mergingToVc(
-        issuerDid: String?,
+        issuerId: String,
         subjectDid: String,
 
         mappings: JsonObject,
@@ -146,7 +149,8 @@ object Issuer {
         completeJwtWithDefaultCredentialData: Boolean = true,
     ): IssuanceInformation {
         val context = mapOf(
-            "issuerDid" to issuerDid,
+            "issuerId" to issuerId,
+            "issuerDid" to (if(DidUtils.isDidUrl(issuerId)) issuerId else null),
             "subjectDid" to subjectDid
         ).filterValues { !it.isNullOrEmpty() }.mapValues { JsonPrimitive(it.value) }
 

@@ -2,6 +2,8 @@ package id.walt
 
 import com.atlassian.onetime.core.TOTPGenerator
 import com.atlassian.onetime.model.TOTPSecret
+import id.walt.ktorauthnz.KtorAuthnzManager
+import id.walt.ktorauthnz.accounts.ExampleAccountStore
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import id.walt.ktorauthnz.sessions.AuthSessionStatus
 import io.klogging.logger
@@ -16,11 +18,16 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.seconds
 
 class KtorAuthnzE2ETest {
+
+    init {
+        KtorAuthnzManager.accountStore = ExampleAccountStore
+    }
 
     private val log = logger("KtorAuthnzE2ETest")
 
@@ -53,6 +60,7 @@ class KtorAuthnzE2ETest {
         check(status == AuthSessionStatus.OK)
         check(nextStep == null)
         check(token != null)
+        check(expiration != null && Clock.System.now() < expiration!!)
         testProtected(token!!)
     }
 
@@ -86,11 +94,23 @@ class KtorAuthnzE2ETest {
     }
 
     @Test
-    fun test() = runTest(timeout = 10.seconds) {
-        startExample(wait = false)
+    fun testNonJwt() = runTest(timeout = 10.seconds) {
+        val s = startExample(wait = false, jwt = false)
 
         implicit1Test()
         explicit2Test()
+
+        s.stop()
+    }
+
+    @Test
+    fun testJwt() = runTest(timeout = 10.seconds) {
+        val s = startExample(wait = false, jwt = true)
+
+        implicit1Test()
+        explicit2Test()
+
+        s.stop()
     }
 
 }

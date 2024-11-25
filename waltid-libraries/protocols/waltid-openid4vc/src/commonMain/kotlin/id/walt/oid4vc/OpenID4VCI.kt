@@ -128,7 +128,7 @@ object OpenID4VCI {
     fun getJWTVCIssuerProviderMetadataUrl(issUrl: String) = Url(issUrl).let { URLBuilder(it.protocolWithAuthority).apply {
             appendPathSegments(".well-known", "jwt-vc-issuer")
             if(it.fullPath.isNotEmpty())
-                appendPathSegments(it.fullPath.substringAfter("/"))
+                appendPathSegments(it.fullPath.trim('/'))
         }.buildString() }
 
     suspend fun resolveCIProviderMetadata(credOffer: CredentialOffer) = http.get(getCIProviderMetadataUrl(credOffer)).bodyAsText().let {
@@ -387,10 +387,9 @@ object OpenID4VCI {
     }
 
     suspend fun generateSdJwtVC(credentialRequest: CredentialRequest,
-                                credentialData: JsonObject, dataMapping: JsonObject?,
-                                selectiveDisclosure: SDMap?, vct: String, issuerId: String,
-                                issuerDid: String?, x5Chain: List<String>?,
-                                issuerKey: Key): String {
+                                credentialData: JsonObject, issuerId: String, issuerKey: Key,
+                                selectiveDisclosure: SDMap? = null,
+                                dataMapping: JsonObject? = null, x5Chain: List<String>? = null): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
             credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
         )
@@ -408,7 +407,6 @@ object OpenID4VCI {
             credentialData.mergeSDJwtVCPayloadWithMapping(
                 mapping = dataMapping ?: JsonObject(emptyMap()),
                 context = mapOf(
-                    "issuerDid" to issuerDid,
                     "subjectDid" to holderDid
                 ).filterValues { !it.isNullOrEmpty() }.mapValues { JsonPrimitive(it.value) },
                 dataFunctions
@@ -420,9 +418,12 @@ object OpenID4VCI {
         ?: throw IllegalArgumentException("Either holderKey or holderDid must be given")
 
         val defaultPayloadProperties = defaultPayloadProperties(
-             issuerId, cnf, vct, null, null, null, null)
+             issuerId, cnf, credentialRequest.vct
+                ?: throw CredentialError(credentialRequest, CredentialErrorCode.invalid_request, "VCT must be set on credential request")
+        )
         val undisclosedPayload = sdPayload.undisclosedPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
         val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
+        val issuerDid = if(DidUtils.isDidUrl(issuerId)) issuerId else null
 
         val headers = mapOf(
             "kid" to getKidHeader(issuerKey, issuerDid),
@@ -439,9 +440,9 @@ object OpenID4VCI {
     }
 
     suspend fun generateW3CJwtVC(credentialRequest: CredentialRequest,
-                                credentialData: JsonObject, dataMapping: JsonObject?,
-                                selectiveDisclosure: SDMap?, issuerDid: String?,
-                                 x5Chain: List<String>?, issuerKey: Key): String {
+                                 credentialData: JsonObject, issuerKey: Key, issuerId: String,
+                                 selectiveDisclosure: SDMap? = null,
+                                 dataMapping: JsonObject? = null, x5Chain: List<String>? = null): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
             credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
         )
@@ -453,7 +454,7 @@ object OpenID4VCI {
         return W3CVC(credentialData).let { vc -> when(selectiveDisclosure.isNullOrEmpty()) {
             true -> vc.mergingJwtIssue(
                 issuerKey = issuerKey,
-                issuerDid = issuerDid,
+                issuerId = issuerId,
                 subjectDid = holderDid ?: "",
                 mappings = dataMapping ?: JsonObject(emptyMap()),
                 additionalJwtHeader = additionalJwtHeaders,
@@ -461,7 +462,7 @@ object OpenID4VCI {
             )
             else -> vc.mergingSdJwtIssue(
                 issuerKey = issuerKey,
-                issuerDid = issuerDid,
+                issuerId = issuerId,
                 subjectDid = holderDid ?: "",
                 mappings = dataMapping ?: JsonObject(emptyMap()),
                 additionalJwtHeaders = additionalJwtHeaders,

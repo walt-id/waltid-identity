@@ -78,6 +78,7 @@ actual class JWKKey actual constructor(
     }
 
     actual override suspend fun getMeta(): JwkKeyMeta = JwkKeyMeta(getKeyId())
+    actual override suspend fun deleteKey() = true
 
     actual override suspend fun exportJWK(): String = _internalJwk.toJSONString()
 
