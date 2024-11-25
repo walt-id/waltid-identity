@@ -2,6 +2,8 @@ package id.walt
 
 import com.atlassian.onetime.core.TOTPGenerator
 import com.atlassian.onetime.model.TOTPSecret
+import id.walt.ktorauthnz.KtorAuthnzManager
+import id.walt.ktorauthnz.accounts.ExampleAccountStore
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import id.walt.ktorauthnz.sessions.AuthSessionStatus
 import io.klogging.logger
@@ -22,6 +24,10 @@ import kotlin.test.Test
 import kotlin.time.Duration.Companion.seconds
 
 class KtorAuthnzE2ETest {
+
+    init {
+        KtorAuthnzManager.accountStore = ExampleAccountStore
+    }
 
     private val log = logger("KtorAuthnzE2ETest")
 
