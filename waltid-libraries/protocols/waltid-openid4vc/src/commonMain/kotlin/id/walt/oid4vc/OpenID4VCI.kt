@@ -439,7 +439,7 @@ object OpenID4VCI {
     }
 
     suspend fun generateW3CJwtVC(credentialRequest: CredentialRequest,
-                                 credentialData: JsonObject, issuerKey: Key, issuerDid: String?,
+                                 credentialData: JsonObject, issuerKey: Key, issuerId: String,
                                  selectiveDisclosure: SDMap? = null,
                                  dataMapping: JsonObject? = null, x5Chain: List<String>? = null): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
@@ -453,7 +453,7 @@ object OpenID4VCI {
         return W3CVC(credentialData).let { vc -> when(selectiveDisclosure.isNullOrEmpty()) {
             true -> vc.mergingJwtIssue(
                 issuerKey = issuerKey,
-                issuerDid = issuerDid,
+                issuerId = issuerId,
                 subjectDid = holderDid ?: "",
                 mappings = dataMapping ?: JsonObject(emptyMap()),
                 additionalJwtHeader = additionalJwtHeaders,
@@ -461,7 +461,7 @@ object OpenID4VCI {
             )
             else -> vc.mergingSdJwtIssue(
                 issuerKey = issuerKey,
-                issuerDid = issuerDid,
+                issuerId = issuerId,
                 subjectDid = holderDid ?: "",
                 mappings = dataMapping ?: JsonObject(emptyMap()),
                 additionalJwtHeaders = additionalJwtHeaders,
