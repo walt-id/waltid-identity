@@ -273,6 +273,14 @@ class OCIKeyRestApi(
         keyVersion = getKeyVersion(id, vaultKeyId, config.managementEndpoint, config.signingKeyPem)
     )
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun deleteKey(): Boolean {
+        TODO("Not yet implemented")
+    }
+
     companion object {
 
         private fun keyTypeToOciKeyMapping(type: KeyType) = when (type) {

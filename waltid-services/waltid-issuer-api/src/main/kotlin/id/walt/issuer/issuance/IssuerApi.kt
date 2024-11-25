@@ -114,8 +114,12 @@ fun Application.issuerApi() {
                             IssuanceExamples.issuerOnboardingRequestOciRestApiExample
                         )
                         example(
-                            "did:jwk + AWS REST API key  (AWS - Secp256r1)",
-                            IssuanceExamples.issuerOnboardingRequestAwsRestApiExample
+                            "did:jwk + AWS REST API key  (AWS - Secp256r1) + AccessKey (Auth)",
+                            IssuanceExamples.issuerOnboardingRequestAwsRestApiExampleWithDirectAccess
+                        )
+                        example(
+                            "did:jwk + AWS REST API key  (AWS - Secp256r1) + Role (Auth)",
+                            IssuanceExamples.issuerOnboardingRequestAwsRestApiExampleWithRole
                         )
                         required = true
                     }

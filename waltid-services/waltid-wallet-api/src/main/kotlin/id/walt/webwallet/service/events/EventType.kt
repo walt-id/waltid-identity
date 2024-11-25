@@ -15,6 +15,7 @@ sealed interface EventType {
         data object Import : Action(this.javaClass.simpleName)
         data object Export : Action(this.javaClass.simpleName)
         data object Sign : Action(this.javaClass.simpleName)
+        data object Remove : Action(this.javaClass.simpleName)
     }
 
     data object Did : EventType {
