@@ -255,7 +255,6 @@ actual class JWKKey actual constructor(
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
         check(detachedPlaintext != null) { "Detached plaintext is required." }
 
-
         if (keyType == KeyType.Ed25519) {
             val tinkVerifier = Ed25519Verify(_internalJwk.toOctetKeyPair().toPublicJWK().decodedX)
             return runCatching { tinkVerifier.verify(signed, detachedPlaintext) }.map { detachedPlaintext }

@@ -5,10 +5,11 @@ import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyMeta
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyUtils.rawSignaturePayloadForJws
+import id.walt.crypto.keys.KeyUtils.signJwsWithRawSignature
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.jwsSigningAlgorithm
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -21,7 +22,6 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -39,10 +39,10 @@ var _accessAzureToken: String? = null
 @Suppress("TRANSIENT_IS_REDUNDANT")
 @Serializable
 @SerialName("azure")
-class AZUREKEY(
+class AzureKey(
     private var _publicKey: String? = null,
     private var _keyType: KeyType? = null,
-    val config: AZUREKeyMetadata,
+    val config: AzureKeyMetadata,
     val id: String
 ) : Key() {
 
@@ -56,7 +56,7 @@ class AZUREKEY(
     override val hasPrivateKey: Boolean
         get() = false
 
-    override fun toString(): String = "[AZURE ${keyType.name} key @AZURE-Vault ${config.auth.keyVaultUrl} - $id]"
+    override fun toString(): String = "[Azure ${keyType.name} key @Azure-Vault ${config.auth.keyVaultUrl} - $id]"
 
     @JvmBlocking
     @JvmAsync
@@ -101,12 +101,14 @@ class AZUREKEY(
     @JsPromise
     @JsExport.Ignore
     @OptIn(ExperimentalStdlibApi::class)
-    override suspend fun signRaw(plaintext: ByteArray): ByteArray {
-
+    /**
+     * Executes Azure sign operation, and converts Azure signature to DER by default (for ECC keys)
+     * @param ieeeP1363Signature set to true to leave signature in Azure IEEE P1363 format (no conversion)
+     */
+    suspend fun signRaw(plaintext: ByteArray, ieeeP1363Signature: Boolean): ByteArray {
         val sha256Digest: ByteArray = SHA256().digest(plaintext)
         val base64UrlEncoded: String = sha256Digest.encodeToBase64Url()
 
-        println("digest for signing: $base64UrlEncoded")
         val accessToken = getAzureAccessToken(
             config.auth.tenantId.toString(),
             config.auth.clientId.toString(), config.auth.clientSecret.toString()
@@ -117,15 +119,31 @@ class AZUREKEY(
             put("alg", JsonPrimitive(signingAlgorithm))
             put("value", JsonPrimitive(base64UrlEncoded))
         }
-        val signature = client.post("$id/sign?api-version=7.4") {
+        val signatureResponse = client.post("$id/sign?api-version=7.4") {
             contentType(ContentType.Application.Json)
             bearerAuth(accessToken)
             setBody(
                 body
             )
         }
-        println("signature: ${signature.bodyAsText()}")
-        return signature.azureJsonDataBody()["value"]!!.jsonPrimitive.content.decodeFromBase64Url()
+        var signature = signatureResponse.azureJsonDataBody()["value"]!!.jsonPrimitive.content.decodeFromBase64Url()
+
+        // Convert signature from Azure IEEE P1363 to default DER format for raw sign
+        // if not explicitly asked to leave it in IEEE P1363 with `ieeeP1363Signature`
+        if (!ieeeP1363Signature && keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) {
+            signature = EccUtils.convertP1363toDER(signature)
+        }
+
+        return signature
+    }
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    @OptIn(ExperimentalStdlibApi::class)
+    override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+        return signRaw(plaintext, ieeeP1363Signature = false)
     }
 
     @JvmBlocking
@@ -137,22 +155,9 @@ class AZUREKEY(
         plaintext: ByteArray,
         headers: Map<String, JsonElement>
     ): String {
-        val appendedHeader = HashMap(headers).apply {
-            put("alg", jwsSigningAlgorithm(keyType).toJsonElement())
-        }
-
-        val header = Json.encodeToString(appendedHeader).encodeToByteArray().encodeToBase64Url()
-        val payload = plaintext.encodeToBase64Url()
-
-        var rawSignature = signRaw("$header.$payload".encodeToByteArray())
-
-        println("the key type used here is: $keyType")
-        if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) {
-            rawSignature = EccUtils.convertDERtoIEEEP1363(rawSignature)
-        }
-
-        val encodedSignature = rawSignature.encodeToBase64Url()
-        val jws = "$header.$payload.$encodedSignature"
+        val (header, payload, toSign) = rawSignaturePayloadForJws(plaintext, headers, keyType)
+        val rawSignature = signRaw(toSign, ieeeP1363Signature = true)
+        val jws = signJwsWithRawSignature(rawSignature, header, payload)
 
         return jws
     }
@@ -236,9 +241,9 @@ class AZUREKEY(
     )
 
 
-    companion object : AZUREKeyCreator {
+    companion object : AzureKeyCreator {
         private suspend fun HttpResponse.azureJsonDataBody(): JsonObject {
-            val baseMsg = { "AZURE server (URL: ${this.request.url}) returned an invalid response: " }
+            val baseMsg = { "Azure server (URL: ${this.request.url}) returned an invalid response: " }
 
             return runCatching {
                 // First, get the body as a string
@@ -296,7 +301,6 @@ class AZUREKEY(
             else -> throw KeyTypeNotSupportedException(type.name)
         }
 
-
         private fun azureKeyToKeyTypeMapping(crv: String, kty: String): KeyType = when (kty) {
             "EC" -> when (crv) {
                 "P-256" -> KeyType.secp256r1  // Mapping P-256 curve to secp256r1
@@ -310,7 +314,7 @@ class AZUREKEY(
 
 
         @JsExport.Ignore
-        override suspend fun generate(type: KeyType, keyName: String?, metadata: AZUREKeyMetadata): AZUREKEY {
+        override suspend fun generate(type: KeyType, keyName: String?, metadata: AzureKeyMetadata): AzureKey {
 
 
             val accessToken = getAzureAccessToken(
@@ -342,7 +346,7 @@ class AZUREKEY(
 
 
             val keyId = key.azureJsonDataBody()["key"]?.jsonObject?.get("kid")?.jsonPrimitive?.content
-                ?: throw IllegalArgumentException("AZURE server returned an invalid response: key ID not found")
+                ?: throw IllegalArgumentException("Azure server returned an invalid response: key ID not found")
 
             val keyType = key.azureJsonDataBody()["key"]?.jsonObject?.get("kty")?.jsonPrimitive?.content!!
             val crvFromResponse = key.azureJsonDataBody()["key"]?.jsonObject?.get("crv")?.jsonPrimitive?.content
@@ -351,7 +355,7 @@ class AZUREKEY(
                 "Generated key with ID: $keyId, type: $keyType, curve: $crvFromResponse, metadata: $metadata"
             )
 
-            return AZUREKEY(
+            return AzureKey(
                 _keyType = azureKeyToKeyTypeMapping(crvFromResponse ?: "", keyType),
                 config = metadata,
                 id = keyId,
@@ -359,7 +363,4 @@ class AZUREKEY(
             )
         }
     }
-
-
 }
-

@@ -4,7 +4,7 @@ import id.walt.crypto.exceptions.KeyBackendNotSupportedException
 import id.walt.crypto.exceptions.KeyTypeMissingException
 import id.walt.crypto.exceptions.KeyTypeNotSupportedException
 import id.walt.crypto.keys.aws.AWSKey
-import id.walt.crypto.keys.azure.AZUREKEY
+import id.walt.crypto.keys.azure.AzureKey
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.oci.OCIKeyRestApi
 import id.walt.crypto.keys.tse.TSEKey
@@ -45,8 +45,8 @@ object KeyManager {
             )
         }
 
-        register<AZUREKEY>("azure") { generateRequest: KeyGenerationRequest ->
-            AZUREKEY.generate(
+        register<AzureKey>("azure") { generateRequest: KeyGenerationRequest ->
+            AzureKey.generate(
                 generateRequest.keyType,
                 keyName = null,
                 Json.decodeFromJsonElement(generateRequest.config!!)

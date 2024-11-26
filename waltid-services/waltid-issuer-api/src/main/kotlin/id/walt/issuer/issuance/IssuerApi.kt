@@ -125,7 +125,7 @@ fun Application.issuerApi() {
                             IssuanceExamples.issuerOnboardingRequestAwsRestApiExampleWithRole
                         )
                         example(
-                            "did:jwk + AZURE REST API key  (Azure - RSA)",
+                            "did:jwk + Azure REST API key  (Azure - RSA)",
                             IssuanceExamples.issuerOnboardingRequestAzureRestApiExample
                         )
                         required = true
