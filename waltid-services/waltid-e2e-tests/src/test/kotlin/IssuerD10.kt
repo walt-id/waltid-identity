@@ -1,9 +1,11 @@
-import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
+import id.walt.credentials.utils.VCFormat
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.OpenID4VCI.getCIProviderMetadataUrl
-import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.ktor.client.*
@@ -18,17 +20,12 @@ import kotlin.test.*
 
 class IssuerDraft10(private val client: HttpClient)  {
 
-    fun testIssuerAPIDraft10() = runBlocking {
+    fun testIssuerAPIDraft10AuthFlowWithJar(issuanceReq: IssuanceRequest) = runBlocking {
         lateinit var offerUrl: String
         lateinit var issuerState: String
+        lateinit var authJarTokenRequest: AuthorizationRequest
 
         val issuerApi = IssuerApi(client)
-
-        val issuanceReq = Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-id-token.json")).copy(
-            credentialConfigurationId = "OpenBadgeCredential_jwt_vc",
-            standardVersion = OpenID4VCIVersion.Draft10,
-            useJar = true
-        )
 
         issuerApi.jwt(issuanceReq) {
             offerUrl = it
@@ -122,12 +119,62 @@ class IssuerDraft10(private val client: HttpClient)  {
 
         client.get("${issuerMetadata.authorizationEndpoint}?${authorizationRequest.toHttpQueryString()}") {}
             .expectRedirect().apply {
-                val idTokenRequest = AuthorizationRequest.fromHttpQueryString(headers["location"]!!)
-                assert(idTokenRequest.responseType == setOf(ResponseType.IdToken)) { "response type should be id_token" }
-                assert(idTokenRequest.responseMode == ResponseMode.direct_post) { "response mode should be direct post" }
-                assertNotNull(idTokenRequest.request)
+                authJarTokenRequest = AuthorizationRequest.fromHttpQueryString(headers["location"]!!)
             }
 
+        assert(authJarTokenRequest.responseMode == ResponseMode.direct_post) { "response mode should be direct post" }
+        assertNotNull(authJarTokenRequest.request)
+
+        // Verify Token
+        val requestJwt = authJarTokenRequest.request!!.decodeJws()
+
+        println(requestJwt)
+
+        val keyId = requestJwt.header["kid"]!!.jsonPrimitive.content
+        assertNotNull(keyId)
+
+        val jwksResponse = client.get(issuerMetadata.jwksUri!!).bodyAsText()
+
+        val jwks = Json.parseToJsonElement(jwksResponse).jsonObject
+
+        val matchingKey = jwks["keys"]?.jsonArray?.firstOrNull { key ->
+            key.jsonObject["kid"]?.jsonPrimitive?.content == keyId
+        }
+
+        assertNotNull(matchingKey)
+
+        val signingKey = JWKKey.importJWK(matchingKey.toString()).getOrThrow()
+
+        assertTrue {signingKey.verifyJws(authJarTokenRequest.request!!).isSuccess}
+
+        when (issuanceReq.authenticationMethod) {
+            AuthenticationMethod.ID_TOKEN -> {
+                assert(authJarTokenRequest.responseType == setOf(ResponseType.IdToken)) { "response type should be id_token" }
+            }
+
+            AuthenticationMethod.VP_TOKEN -> {
+                assert(authJarTokenRequest.responseType == setOf(ResponseType.VpToken)) { "response type should be vp_token" }
+
+                val presentationDefinitionJ = requestJwt.payload["presentation_definition"]
+                assertNotNull(presentationDefinitionJ)
+
+                val presentationDefinition = PresentationDefinition.fromJSON(
+                    presentationDefinitionJ.jsonObject
+                )
+
+                val inputDescriptors = presentationDefinition.inputDescriptors
+
+                assertEquals(1, inputDescriptors.size)
+
+                val theInputDescriptor = inputDescriptors.first()
+
+                assertNotNull(theInputDescriptor.format, "theInputDescriptor format should not be null")
+                assertTrue(theInputDescriptor.format!!.containsKey(VCFormat.jwt_vc), "theInputDescriptor should be jwt_vc")
+                assertTrue(theInputDescriptor.format!![VCFormat.jwt_vc]?.alg?.contains("ES256") == true, "theInputDescriptor alg should be ES256")
+            }
+
+            else -> throw AssertionError("Unexpected authentication method ${issuanceReq.authenticationMethod}")
+        }
     }
 
 }
