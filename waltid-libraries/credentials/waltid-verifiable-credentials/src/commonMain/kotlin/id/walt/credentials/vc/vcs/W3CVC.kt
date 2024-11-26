@@ -7,6 +7,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.SDMapBuilder
 import id.walt.sdjwt.SDPayload
 import io.ktor.utils.io.core.*
 import kotlinx.serialization.KSerializer
@@ -51,7 +52,8 @@ data class W3CVC(
     @JsExport.Ignore
     suspend fun signSdJwt(
         issuerKey: Key,
-        issuerKeyId: String,
+        issuerId: String,
+        issuerKid: String?,
         subjectDid: String,
         disclosureMap: SDMap,
         /** Set additional options in the JWT header */
@@ -59,13 +61,21 @@ data class W3CVC(
         /** Set additional options in the JWT payload */
         additionalJwtOptions: Map<String, JsonElement> = emptyMap()
     ): String {
-        val vc = this.toJsonObject(additionalJwtOptions)
+        val kid = issuerKid ?: issuerKey.getKeyId()
+        val payload = JwsSignatureScheme().toPayload(
+            data = this.toJsonObject(),
+            jwtOptions = mapOf(
+                JwsOption.ISSUER to JsonPrimitive(issuerId),
+                JwsOption.SUBJECT to JsonPrimitive(subjectDid),
+                *(additionalJwtOptions.entries.map { it.toPair() }.toTypedArray())
+            ))
 
-        val sdPayload = SDPayload.createSDPayload(vc, disclosureMap)
+        val sdPayload = SDPayload.createSDPayload(payload,
+            SDMapBuilder(disclosureMap.decoyMode).addField(JwsOption.VC, sd=false, children = disclosureMap).build())
         val signable = Json.encodeToString(sdPayload.undisclosedPayload).toByteArray()
 
         val signed = issuerKey.signJws(signable, additionalJwtHeaders.plus(mapOf(
-                "kid" to issuerKeyId.toJsonElement())
+            JwsHeader.KEY_ID to kid.toJsonElement())
         ))
         return SDJwt.createFromSignedJwt(signed, sdPayload).toString()
     }
