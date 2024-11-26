@@ -4,14 +4,14 @@ import kotlinx.serialization.Serializable
 
 
 @Serializable
-data class AZUREKeyMetadata(
-    val auth: AZUREAuth,
+data class AzureKeyMetadata(
+    val auth: AzureAuth,
 ) {
     constructor(
         clientId: String,
         clientSecret: String,
         keyVaultUrl: String,
         tenantId: String,
-    ) : this(AZUREAuth(clientId, clientSecret, tenantId, keyVaultUrl))
+    ) : this(AzureAuth(clientId, clientSecret, tenantId, keyVaultUrl))
 }
 

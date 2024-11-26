@@ -8,7 +8,7 @@ import kotlin.js.JsExport
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
-data class AZUREAuth(
+data class AzureAuth(
     val clientId: String? = null,
     val clientSecret: String? = null,
     val tenantId: String? = null,
@@ -23,7 +23,7 @@ data class AZUREAuth(
 
 
         if (!servicePrincipal) {
-            throw IllegalArgumentException("AZUREAuth requires clientId, clientSecret, and tenantId")
+            throw IllegalArgumentException("AzureAuth requires clientId, clientSecret, and tenantId")
         }
     }
 }
