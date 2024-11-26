@@ -88,6 +88,7 @@ actual class JWKKey actual constructor(
             when (value) {
                 is String -> JsonPrimitive(value)
                 is Number -> JsonPrimitive(value)
+                is ArrayList<*> -> JsonPrimitive(value.toString())
                 else -> throw IllegalArgumentException("Unsupported value type: ${value::class.simpleName} in field ${it.key}")
 
             }
