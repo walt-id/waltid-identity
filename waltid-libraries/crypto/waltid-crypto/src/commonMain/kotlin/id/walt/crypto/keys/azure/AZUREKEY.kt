@@ -58,21 +58,40 @@ class AZUREKEY(
 
     override fun toString(): String = "[AZURE ${keyType.name} key @AZURE-Vault ${config.auth.keyVaultUrl} - $id]"
 
-
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getKeyId(): String {
         TODO("Not yet implemented")
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getThumbprint(): String {
         TODO("Not yet implemented")
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun exportJWK(): String {
         TODO("Not yet implemented")
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun exportJWKObject(): JsonObject = Json.parseToJsonElement(_publicKey!!).jsonObject
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun exportPEM(): String {
         TODO("Not yet implemented")
     }
@@ -184,14 +203,26 @@ class AZUREKEY(
         else -> getPublicKey()
     }.also { newBackedKey -> backedKey = newBackedKey }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getPublicKeyRepresentation(): ByteArray {
         TODO("Not yet implemented")
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun getMeta(): KeyMeta {
         TODO("Not yet implemented")
     }
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     override suspend fun deleteKey(): Boolean {
         TODO("Not yet implemented")
     }
@@ -233,6 +264,10 @@ class AZUREKEY(
         @Serializable
         data class AzureTokenResponse(val access_token: String)
 
+        @JvmBlocking
+        @JvmAsync
+        @JsPromise
+        @JsExport.Ignore
         suspend fun getAzureAccessToken(tenantId: String, clientId: String, clientSecret: String): String {
 
             val response: HttpResponse = client.post("https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token") {
@@ -274,6 +309,7 @@ class AZUREKEY(
         }
 
 
+        @JsExport.Ignore
         override suspend fun generate(type: KeyType, keyName: String, metadata: AZUREKeyMetadata): Key {
 
 
