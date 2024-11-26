@@ -105,7 +105,7 @@ class AzureKey(
      * Executes Azure sign operation, and converts Azure signature to DER by default (for ECC keys)
      * @param ieeeP1363Signature set to true to leave signature in Azure IEEE P1363 format (no conversion)
      */
-    suspend fun signRaw(plaintext: ByteArray, ieeeP1363Signature: Boolean): ByteArray {
+    suspend fun signRawAzure(plaintext: ByteArray, ieeeP1363Signature: Boolean): ByteArray {
         val sha256Digest: ByteArray = SHA256().digest(plaintext)
         val base64UrlEncoded: String = sha256Digest.encodeToBase64Url()
 
@@ -143,7 +143,7 @@ class AzureKey(
     @JsExport.Ignore
     @OptIn(ExperimentalStdlibApi::class)
     override suspend fun signRaw(plaintext: ByteArray): ByteArray {
-        return signRaw(plaintext, ieeeP1363Signature = false)
+        return signRawAzure(plaintext, ieeeP1363Signature = false)
     }
 
     @JvmBlocking
@@ -156,7 +156,7 @@ class AzureKey(
         headers: Map<String, JsonElement>
     ): String {
         val (header, payload, toSign) = rawSignaturePayloadForJws(plaintext, headers, keyType)
-        val rawSignature = signRaw(toSign, ieeeP1363Signature = true)
+        val rawSignature = signRawAzure(toSign, ieeeP1363Signature = true)
         val jws = signJwsWithRawSignature(rawSignature, header, payload)
 
         return jws
