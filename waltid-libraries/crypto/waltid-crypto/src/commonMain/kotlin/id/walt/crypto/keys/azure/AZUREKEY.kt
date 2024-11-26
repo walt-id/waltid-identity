@@ -310,7 +310,7 @@ class AZUREKEY(
 
 
         @JsExport.Ignore
-        override suspend fun generate(type: KeyType, keyName: String, metadata: AZUREKeyMetadata): Key {
+        override suspend fun generate(type: KeyType, keyName: String?, metadata: AZUREKeyMetadata): AZUREKEY {
 
 
             val accessToken = getAzureAccessToken(
