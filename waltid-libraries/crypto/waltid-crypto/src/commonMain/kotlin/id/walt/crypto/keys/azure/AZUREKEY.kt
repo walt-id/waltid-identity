@@ -6,6 +6,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyMeta
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.jwsSigningAlgorithm
@@ -94,8 +95,8 @@ class AZUREKEY(
         val signingAlgorithm = jwsSigningAlgorithm(keyType)
 
         val body = buildJsonObject {
-            put("alg", JsonPrimitive(signingAlgorithm))  // Use JsonPrimitive to serialize the string
-            put("value", JsonPrimitive(base64UrlEncoded))  // Also serialize the base64UrlEncoded string
+            put("alg", JsonPrimitive(signingAlgorithm))
+            put("value", JsonPrimitive(base64UrlEncoded))
         }
         val signature = client.post("$id/sign?api-version=7.4") {
             contentType(ContentType.Application.Json)
@@ -105,7 +106,7 @@ class AZUREKEY(
             )
         }
         println("signature: ${signature.bodyAsText()}")
-        return signature.azureJsonDataBody()["value"]!!.jsonPrimitive.content.encodeToByteArray()
+        return signature.azureJsonDataBody()["value"]!!.jsonPrimitive.content.decodeFromBase64Url()
     }
 
     @JvmBlocking
@@ -149,6 +150,8 @@ class AZUREKEY(
 
         val publicKey = getPublicKey()
         println("public key to verify with: $publicKey")
+        println("signed data: $signed")
+        println("detached plaintext: $detachedPlaintext")
         val verification = publicKey.verifyRaw(signed, detachedPlaintext)
         return Result.success(
             verification.getOrThrow()
@@ -197,6 +200,7 @@ class AZUREKEY(
     data class KeyCreateRequest(
         val kty: String,
         val crv: String? = null,
+        val key_size: Int? = null,
         val key_ops: List<String>,
     )
 
@@ -281,7 +285,8 @@ class AZUREKEY(
             val keyRequestBody = if (kty == "RSA") {
                 KeyCreateRequest(
                     kty = kty,
-                    key_ops = listOf("sign", "verify")
+                    key_ops = listOf("sign", "verify"),
+                    key_size = 2048
                 )
             } else {
                 KeyCreateRequest(
