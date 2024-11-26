@@ -5,7 +5,10 @@ import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
 
 object IssuanceExamples {
 
@@ -912,6 +915,33 @@ object IssuanceExamples {
     )
 
     //language=JSON
+    val issuerOnboardingRequestAzureRestApiExample = typedValueExampleDescriptorDsl<OnboardingRequest>(
+        """
+            {
+                "key":
+                {
+                    "backend": "azure",
+                    "keyType": "RSA",
+                    "config":
+                    {
+                       "auth": {
+                            "clientId": "client id",
+                            "clientSecret": "cleint secret",
+                            "tenantId": "tenant id",
+                            "keyVaultUrl": "url to the vault"
+                       }
+                      
+                    }
+                },
+                "did":
+                {
+                    "method": "jwk"
+                }
+            }
+        """.trimIndent()
+    )
+
+    //language=JSON
     val issuerOnboardingResponseOciRestApiExample = typedValueExampleDescriptorDsl<IssuerOnboardingResponse>(
         """
             {
@@ -1002,6 +1032,7 @@ object IssuanceExamples {
             }
         """.trimIndent()
     )
+
 
     // language=JSON
     val issuerOnboardingResponseTseExample = typedValueExampleDescriptorDsl<IssuerOnboardingResponse>(
