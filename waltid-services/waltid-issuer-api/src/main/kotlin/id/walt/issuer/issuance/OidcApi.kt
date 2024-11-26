@@ -125,7 +125,9 @@ object OidcApi : CIProvider() {
             }
 
             get("{standardVersion}/authorize") {
+                val standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required")
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
+
                 try {
                     val issuanceSession = authReq.issuerState?.let { getSession(it) } ?: error("No issuance session found for given issuer state, or issuer state was empty: ${authReq.issuerState}")
                     val authMethod = issuanceSession.issuanceRequests.firstOrNull()?.authenticationMethod ?: AuthenticationMethod.NONE
@@ -152,7 +154,7 @@ object OidcApi : CIProvider() {
                                         authorizationRequest = authReq,
                                         authServerState = authServerState,
                                         responseType = ResponseType.IdToken,
-                                        providerMetadata = metadata,
+                                        providerMetadata = getMetadataForVersion(standardVersion),
                                         tokenKey = CI_TOKEN_KEY,
                                         isJar = issuanceSession.issuanceRequests.first().useJar
                                     )
@@ -211,7 +213,7 @@ object OidcApi : CIProvider() {
                                         authorizationRequest = authReq,
                                         authServerState = authServerState,
                                         responseType = ResponseType.VpToken,
-                                        providerMetadata = metadata,
+                                        providerMetadata = getMetadataForVersion(standardVersion),
                                         tokenKey =  CI_TOKEN_KEY,
                                         isJar = issuanceSession.issuanceRequests.first().useJar,
                                         presentationDefinition = presentationDefinition
