@@ -11,6 +11,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuerModule
 import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
+import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
@@ -334,7 +335,23 @@ class WaltidServicesE2ETests {
 
         // Test Issuer Draft 10
         val issuerDraft10 = IssuerDraft10(testHttpClient(doFollowRedirects = false))
-        issuerDraft10.testIssuerAPIDraft10()
+
+        val idTokenIssuanceReq = Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-id-token.json")).copy(
+            credentialConfigurationId = "OpenBadgeCredential_jwt_vc",
+            standardVersion = OpenID4VCIVersion.Draft10,
+            useJar = true
+        )
+
+        issuerDraft10.testIssuerAPIDraft10AuthFlowWithJar(idTokenIssuanceReq)
+
+        val vpTokenIssuanceReq = Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-vp-token.json")).copy(
+            credentialConfigurationId = "OpenBadgeCredential_jwt_vc",
+            standardVersion = OpenID4VCIVersion.Draft10,
+            useJar = true
+        )
+
+        issuerDraft10.testIssuerAPIDraft10AuthFlowWithJar(vpTokenIssuanceReq)
+
 
         // Test External Signature API Endpoints
         //In the context of these test cases, a new wallet is created and initialized
