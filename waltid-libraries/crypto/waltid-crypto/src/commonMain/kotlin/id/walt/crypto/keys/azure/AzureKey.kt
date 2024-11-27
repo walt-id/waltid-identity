@@ -30,6 +30,7 @@ import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.random.Random
 
 private val logger = KotlinLogging.logger { }
 var _accessAzureToken: String? = null
@@ -312,9 +313,9 @@ class AzureKey(
 
 
         @JsExport.Ignore
-        override suspend fun generate(type: KeyType, keyName: String?, metadata: AzureKeyMetadata): AzureKey {
+        override suspend fun generate(type: KeyType, metadata: AzureKeyMetadata): AzureKey {
 
-
+            val keyName = "waltid${Random(1000).nextInt()}"
             val accessToken = getAzureAccessToken(
                 metadata.auth.tenantId.toString(),
                 metadata.auth.clientId.toString(), metadata.auth.clientSecret.toString()
