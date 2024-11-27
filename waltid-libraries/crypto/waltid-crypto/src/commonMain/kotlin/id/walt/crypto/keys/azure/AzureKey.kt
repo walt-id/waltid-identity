@@ -324,7 +324,7 @@ class AzureKey(
         @JsExport.Ignore
         override suspend fun generate(type: KeyType, metadata: AzureKeyMetadata): AzureKey {
 
-            val keyName = "waltid${Random(1000).nextInt()}"
+            val keyName = "waltid${Random.nextInt()}"
             val accessToken = getAzureAccessToken(
                 metadata.auth.tenantId.toString(),
                 metadata.auth.clientId.toString(), metadata.auth.clientSecret.toString()
