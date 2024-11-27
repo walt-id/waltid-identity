@@ -232,12 +232,6 @@ async function generateKey() {
     body.config = {...config};
   }
 
-              : {
-                // If not AWS, keep keys in the config directly
-                ...data.keyGenerationRequest.config,
-              }),
-    },
-  };
   loading.value = true;
 
   try {
