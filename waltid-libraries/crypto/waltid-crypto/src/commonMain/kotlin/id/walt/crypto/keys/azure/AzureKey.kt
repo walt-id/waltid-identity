@@ -62,9 +62,7 @@ class AzureKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun getKeyId(): String {
-        TODO("Not yet implemented")
-    }
+    override suspend fun getKeyId(): String = getPublicKey().getKeyId()
 
     @JvmBlocking
     @JvmAsync
