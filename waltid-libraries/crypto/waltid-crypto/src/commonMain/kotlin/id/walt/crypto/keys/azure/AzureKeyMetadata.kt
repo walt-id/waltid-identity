@@ -12,6 +12,7 @@ data class AzureKeyMetadata(
         clientSecret: String,
         keyVaultUrl: String,
         tenantId: String,
+        keyName: String = "waltid"
     ) : this(AzureAuth(clientId, clientSecret, tenantId, keyVaultUrl))
 }
 
