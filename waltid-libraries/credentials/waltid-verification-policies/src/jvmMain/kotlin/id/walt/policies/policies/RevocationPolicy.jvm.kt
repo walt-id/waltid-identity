@@ -65,18 +65,20 @@ object Base64Utils {
 }
 
 object StreamUtils {
+    private const val BITS_PER_BYTE = 8u
+
     fun getBitValue(inputStream: InputStream, index: ULong, bitSize: Int): List<Char> = inputStream.use { stream ->
         //TODO: bitSize constraints
         val bitStartPosition = index * bitSize.toUInt()
-        val byteStart = bitStartPosition / 8u
+        val byteStart = bitStartPosition / BITS_PER_BYTE
         stream.skip(byteStart.toLong())
-        val bytesToRead = (bitSize - 1) / 8 + 1
+        val bytesToRead = (bitSize - 1) / BITS_PER_BYTE.toInt() + 1
         extractBitValue(stream.readNBytes(bytesToRead), index, bitSize.toUInt())
     }
 
     private fun extractBitValue(bytes: ByteArray, index: ULong, bitSize: UInt): List<Char> {
         val bitSet = BitSet.valueOf(bytes)
-        val bitStart = index * bitSize % 8u
+        val bitStart = index * bitSize % BITS_PER_BYTE
         val result = mutableListOf<Char>()
         for (i in bitStart..<bitStart + bitSize) {
             val b = bitSet[i.toInt()].takeIf { it }?.let { 1 } ?: 0
