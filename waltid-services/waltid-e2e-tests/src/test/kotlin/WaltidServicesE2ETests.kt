@@ -357,7 +357,7 @@ class WaltidServicesE2ETests {
         lspPotentialVerification.testPotentialInteropTrack4()
     }*/
 
-    //@Test
+    @Test
     fun testExternalSignatureAPIs() = E2ETest.testBlock(
         config = ServiceConfiguration("e2e-test"),
         features = listOf(id.walt.issuer.FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
