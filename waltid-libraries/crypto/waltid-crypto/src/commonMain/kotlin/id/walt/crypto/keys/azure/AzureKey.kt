@@ -228,7 +228,16 @@ class AzureKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun deleteKey(): Boolean {
-        TODO("Not yet implemented")
+
+        val accessToken = getAzureAccessToken(
+            config.auth.tenantId.toString(),
+            config.auth.clientId.toString(), config.auth.clientSecret.toString()
+        )
+        val response = client.delete("$id?api-version=7.4") {
+            contentType(ContentType.Application.Json)
+            bearerAuth(accessToken)
+        }
+        return response.status.isSuccess()
     }
 
     @Serializable
