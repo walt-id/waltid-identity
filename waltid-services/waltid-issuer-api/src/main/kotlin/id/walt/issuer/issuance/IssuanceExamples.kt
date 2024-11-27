@@ -921,12 +921,12 @@ object IssuanceExamples {
                 "key":
                 {
                     "backend": "azure",
-                    "keyType": "RSA",
+                    "keyType": "secp256r1",
                     "config":
                     {
                        "auth": {
                             "clientId": "client id",
-                            "clientSecret": "cleint secret",
+                            "clientSecret": "client secret",
                             "tenantId": "tenant id",
                             "keyVaultUrl": "url to the vault"
                        }
