@@ -172,6 +172,15 @@ const options = ref([
     ],
     config: ["roleName", "region"]
   },
+  {
+    keyGenerationRequest: ["Azure with Client access key", "azure"],
+    keyType: [
+      ["ECDSA_Secp256r1", "secp256r1"],
+      ["ECDSA_Secp256k1", "secp256k1"],
+      ["RSA", "RSA"]
+    ],
+    config: ["clientId", "clientSecret", "tenantId", "keyVaultUrl"]
+  },
 ]);
 
 const data = reactive<{
