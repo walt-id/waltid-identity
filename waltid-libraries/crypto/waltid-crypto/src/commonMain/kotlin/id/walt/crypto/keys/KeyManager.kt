@@ -48,7 +48,6 @@ object KeyManager {
         register<AzureKey>("azure") { generateRequest: KeyGenerationRequest ->
             AzureKey.generate(
                 generateRequest.keyType,
-                keyName = null,
                 Json.decodeFromJsonElement(generateRequest.config!!)
             )
         }
