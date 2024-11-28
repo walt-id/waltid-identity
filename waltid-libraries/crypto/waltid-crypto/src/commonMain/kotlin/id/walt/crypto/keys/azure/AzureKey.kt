@@ -204,7 +204,7 @@ class AzureKey(
             JWKKey.importJWK(it).getOrThrow()
         }
 
-        else -> getPublicKey()
+        else -> getPublicKeyFromAzureKms(metadata = config, keyId = id)
     }.also { newBackedKey -> backedKey = newBackedKey }
 
     @JvmBlocking
@@ -318,6 +318,31 @@ class AzureKey(
 
             "RSA" -> KeyType.RSA  // Mapping RSA key type
             else -> throw KeyTypeNotSupportedException(kty)
+        }
+
+
+        @JvmBlocking
+        @JvmAsync
+        @JsPromise
+        suspend fun getPublicKeyFromAzureKms(metadata: AzureKeyMetadata, keyId: String): Key {
+            val accessToken = getAzureAccessToken(
+                metadata.auth.tenantId.toString(),
+                metadata.auth.clientId.toString(), metadata.auth.clientSecret.toString()
+            )
+            val publicKey = client.get("$keyId?api-version=7.4") {
+                contentType(ContentType.Application.Json)
+                bearerAuth(accessToken)
+            }.azureJsonDataBody()
+
+            val keyType = publicKey["key"]?.jsonObject?.get("kty")?.jsonPrimitive?.content!!
+            val crvFromResponse = publicKey["key"]?.jsonObject?.get("crv")?.jsonPrimitive?.content
+
+            return AzureKey(
+                _keyType = azureKeyToKeyTypeMapping(crvFromResponse ?: "", keyType),
+                config = metadata,
+                id = keyId,
+                _publicKey = publicKey["key"].toString()
+            )
         }
 
 
