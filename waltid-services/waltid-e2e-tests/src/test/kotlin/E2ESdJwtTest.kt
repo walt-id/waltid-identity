@@ -1,7 +1,9 @@
 import WaltidServicesE2ETests.Companion.nameFieldSchemaPresentationRequestPayload
 import WaltidServicesE2ETests.Companion.sdjwtCredential
+import id.walt.credentials.schemes.JwsSignatureScheme
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.util.JwtUtils
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.ktor.http.*
@@ -11,6 +13,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.assertContains
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -40,6 +43,7 @@ class E2ESdJwtTest(
         exchangeApi.useOfferRequest(wallet, offerUrl, 1) {
             newCredential = it.first()
         }
+        assertContains(JwtUtils.parseJWTPayload(newCredential.document).keys, JwsSignatureScheme.JwsOption.VC)
         //endregion -Exchange / claim-
 
         //region -Verifier / request url-
