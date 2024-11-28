@@ -321,9 +321,7 @@ class AzureKey(
         }
 
 
-        @JvmBlocking
-        @JvmAsync
-        @JsPromise
+        @JsExport.Ignore
         suspend fun getPublicKeyFromAzureKms(metadata: AzureKeyMetadata, keyId: String): Key {
             val accessToken = getAzureAccessToken(
                 metadata.auth.tenantId.toString(),
