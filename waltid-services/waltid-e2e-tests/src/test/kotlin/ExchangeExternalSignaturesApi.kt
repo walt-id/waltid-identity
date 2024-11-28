@@ -249,9 +249,9 @@ class ExchangeExternalSignatures {
 
     suspend fun executeTestCases() {
         initializeWallet()
-        //regularJwtVcJsonTestCases()
-        //mDocTestCases()
-        //w3cSdJwtVcTestCases()
+        regularJwtVcJsonTestCases()
+        mDocTestCases()
+        w3cSdJwtVcTestCases()
         ietfSdJwtVcTestCases()
     }
 
@@ -330,6 +330,7 @@ class ExchangeExternalSignatures {
         )
         testOID4VP(openbadgeSdJwtPresentationRequest)
         testOID4VP(openbadgeSdJwtPresentationRequest, true)
+        testOID4VP(openbadgeSdJwtPresentationRequest, true, true)
         clearWalletCredentials()
     }
 
@@ -495,6 +496,7 @@ class ExchangeExternalSignatures {
     private suspend fun testOID4VP(
         presentationRequest: String,
         addDisclosures: Boolean = false,
+        forgeDisclosures: Boolean = false,
     ) {
         lateinit var presentationRequestURL: String
         lateinit var verificationID: String
@@ -527,7 +529,9 @@ class ExchangeExternalSignatures {
             presentationRequest = presentationRequestURL,
             selectedCredentialIdList = matchedCredentialList.map { it.id },
             disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }.associate {
-                Pair(it.id, listOf(it.disclosures!!))
+                Pair(it.id, listOf(
+                    if(forgeDisclosures) forgeSDisclosureString(it.disclosures!!) else it.disclosures!!
+                ))
             } else null,
         )
         println(prepareRequest)
@@ -535,10 +539,12 @@ class ExchangeExternalSignatures {
             setBody(prepareRequest)
         }.expectSuccess()
         val prepareResponse = response.body<PrepareOID4VPResponse>()
-        client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/submit") {
+        val submitResponse = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/submit") {
             setBody(SubmitOID4VPRequest.build(prepareResponse,
                 disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }.associate {
-                    Pair(it.id, listOf(it.disclosures!!))
+                    Pair(it.id, listOf(
+                        if(forgeDisclosures) forgeSDisclosureString(it.disclosures!!) else it.disclosures!!
+                    ))
                 } else null,
                 w3cJwtVpProof = prepareResponse.w3CJwtVpProofParameters?.let { params ->
                     holderKey.signJws(
@@ -555,12 +561,16 @@ class ExchangeExternalSignatures {
                     )
                 })
             )
-        }.expectSuccess()
+        }
+        if(!forgeDisclosures)
+            submitResponse.expectSuccess()
+        else
+            submitResponse.expectFailure()
         verifierSessionApi.get(verificationID) { sessionInfo ->
             assert(sessionInfo.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
             assert(sessionInfo.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
 
-            assert(sessionInfo.verificationResult == true) { "overall verification should be valid" }
+            assert(sessionInfo.verificationResult == !forgeDisclosures) { "overall verification should be ${!forgeDisclosures}" }
             sessionInfo.policyResults.let {
                 require(it != null) { "policyResults should be available after running policies" }
                 assert(it.size > 1) { "no policies have run" }
