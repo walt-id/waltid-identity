@@ -68,7 +68,8 @@ private suspend fun testDidMethod(didMethod: String, key: JWKKey) {
     // Sign VC with did method (SD-JWT)
     val sdJwt = vc.signSdJwt(
         issuerKey = key,
-        issuerKeyId = did,
+        issuerId = did,
+        issuerKid = did,
         subjectDid = did,
         SDMap(emptyMap()) // empty selective disclosure map, we'll test this elsewhere
     )
@@ -112,7 +113,8 @@ private suspend fun testWeb(key: JWKKey) {
     // Sign VC with WEB (SD-JWT)
     val sdJwt = vc.signSdJwt(
         issuerKey = key,
-        issuerKeyId = didWebResult.did,
+        issuerId = didWebResult.did,
+        issuerKid = didWebResult.did,
         subjectDid = didWebResult.did,
         SDMap(emptyMap()) // empty selective disclosure map, we'll test this elsewhere
     )
@@ -142,7 +144,8 @@ suspend fun testCheqd(key: JWKKey) {
     // Sign VC with CHEQD (SD-JWT)
     val sdJwt = vc.signSdJwt(
         issuerKey = key,
-        issuerKeyId = cheqdid,
+        issuerId = cheqdid,
+        issuerKid = cheqdid,
         subjectDid = cheqdid,
         SDMap(emptyMap()) // empty selective disclosure map, we'll test this elsewhere
     )
