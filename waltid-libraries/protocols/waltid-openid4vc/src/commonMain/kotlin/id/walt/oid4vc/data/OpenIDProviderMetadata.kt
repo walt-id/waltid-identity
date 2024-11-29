@@ -116,6 +116,9 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
     abstract val requirePushedAuthorizationRequests: Boolean?
     abstract val dpopSigningAlgValuesSupported: Set<String>?
 
+    inline fun <reified T : OpenIDProviderMetadata> castOrNull(): T? {
+        return this as? T
+    }
 
     @Serializable
     data class Draft10(

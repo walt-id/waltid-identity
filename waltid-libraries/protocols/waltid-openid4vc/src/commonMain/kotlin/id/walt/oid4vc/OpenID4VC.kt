@@ -145,7 +145,9 @@ object OpenID4VC {
     presentationDefinition: PresentationDefinition? = null,
   ): AuthorizationCodeWithAuthorizationRequestResponse {
 
-    providerMetadata as OpenIDProviderMetadata.Draft13
+    providerMetadata.castOrNull<OpenIDProviderMetadata.Draft10>()
+      ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
+      ?: error("Unknown metadata type: $providerMetadata")
 
     if (!authorizationRequest.responseType.contains(ResponseType.Code))
       throw AuthorizationError(
