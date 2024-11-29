@@ -59,10 +59,12 @@ class AzureKey(
         _keyType = _publicKey?.key?.keyType
     }
 
+    @JsExport.Ignore
     suspend fun fetchAndUpdatePublicKey() {
         _publicKey = DirectSerializedKey(getPublicKeyFromAzureKms(getKeyId()))
     }
 
+    @JsExport.Ignore
     suspend fun updateAccessToken() {
         val accessTokenResponse = fetchAccessToken(auth)
 
@@ -70,12 +72,14 @@ class AzureKey(
         accessTokenExpiration = accessTokenResponse.expiration
     }
 
+    @JsExport.Ignore
     suspend fun ensureAccessTokenValid() {
         if (!this::accessToken.isInitialized || accessTokenExpiration >= Clock.System.now()) {
             updateAccessToken()
         }
     }
 
+    @JsExport.Ignore
     override suspend fun init() {
         ensureAccessTokenValid()
 
