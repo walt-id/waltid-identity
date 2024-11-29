@@ -309,7 +309,7 @@ class AzureKey(
             val crvFromResponse = publicKeyJson["crv"]?.jsonPrimitive?.content
 
             val publicKey = JWKKey.importJWK(publicKeyJson.toString())
-                .getOrElse { exception -> throw IllegalArgumentException("Invalid JWK in public key") }
+                .getOrElse { exception -> throw IllegalArgumentException("Invalid JWK in public key: $publicKeyJson", exception) }
 
             val keyType = azureKeyToKeyTypeMapping(crvFromResponse ?: "", azureKeyType)
 
@@ -356,7 +356,8 @@ class AzureKey(
                 val bodyStr = this.bodyAsText() // Get the body in case of an exception
                 throw IllegalArgumentException(
                     baseMsg.invoke() + if (bodyStr.isEmpty()) "empty response (instead of JSON data)"
-                    else "invalid response: $bodyStr"
+                    else "invalid response: $bodyStr",
+                    it
                 )
             }
         }
