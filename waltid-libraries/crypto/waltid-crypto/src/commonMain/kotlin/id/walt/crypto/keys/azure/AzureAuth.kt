@@ -9,21 +9,8 @@ import kotlin.js.JsExport
 @JsExport
 @Serializable
 data class AzureAuth(
-    val clientId: String? = null,
-    val clientSecret: String? = null,
-    val tenantId: String? = null,
-    val keyVaultUrl: String? = null,
-) {
-    init {
-        requireAuthenticationMethod()
-    }
-
-    private fun requireAuthenticationMethod() {
-        val servicePrincipal = clientId != null && clientSecret != null && tenantId != null
-
-
-        if (!servicePrincipal) {
-            throw IllegalArgumentException("AzureAuth requires clientId, clientSecret, and tenantId")
-        }
-    }
-}
+    val clientId: String,
+    val clientSecret: String,
+    val tenantId: String,
+    val keyVaultUrl: String,
+)
