@@ -41,41 +41,22 @@ class IssuerDraft10(private val client: HttpClient)  {
         assertNotNull(credOffer.credentials)
         assertNotNull(credOffer.grants)
 
-        val issuerMetadataUrl = getCIProviderMetadataUrl(credOffer.credentialIssuer)
 
+        val issuerMetadataUrl = getCIProviderMetadataUrl(credOffer.credentialIssuer)
         val rawJsonMetadata = client.get(issuerMetadataUrl).bodyAsText()
         val jsonElementMetadata = Json.parseToJsonElement(rawJsonMetadata)
-        assertTrue(jsonElementMetadata.jsonObject["credentials_supported"] is JsonArray, "Expected credentials_supported to be a JsonArray")
+        assertTrue(jsonElementMetadata.jsonObject["credentials_supported"] is JsonArray, "Expected credentials_supported in Open ID Provider Metadata to be a JsonArray")
 
         val issuerMetadata = OpenIDProviderMetadata.fromJSONString(rawJsonMetadata) as OpenIDProviderMetadata.Draft10
-
+        assertNull(issuerMetadata.authorizationServer)
+        assertContains(issuerMetadata.grantTypesSupported, GrantType.authorization_code)
+        assertContains(issuerMetadata.grantTypesSupported, GrantType.pre_authorized_code)
+        assertNotNull(issuerMetadata.jwksUri)
         assertTrue(issuerMetadata.credentialSupported!!.keys.all { it.toIntOrNull() != null }, "Expected credentials_supported keys to be array indices (e.g., '0', '1')")
 
         assertEquals(issuerMetadata.issuer, credOffer.credentialIssuer)
         assertEquals(issuerMetadata.credentialIssuer, credOffer.credentialIssuer)
         assertEquals(issuerMetadata.credentialIssuer, credOffer.credentialIssuer)
-
-        val matchingCredential = issuerMetadata.credentialSupported
-            ?.values
-            ?.find { it.id == issuanceReq.credentialConfigurationId }
-            ?: throw AssertionError("No matching credential found for the credentialConfigurationId '${issuanceReq.credentialConfigurationId}'.")
-
-        assertEquals(
-            matchingCredential.id,
-            issuanceReq.credentialConfigurationId
-        )
-
-        assertEquals(
-            CredentialFormat.jwt_vc,
-            matchingCredential.format
-        )
-
-        assertNull(issuerMetadata.authorizationServer)
-
-        assertContains(issuerMetadata.grantTypesSupported, GrantType.authorization_code)
-        assertContains(issuerMetadata.grantTypesSupported, GrantType.pre_authorized_code)
-
-        assertNotNull(issuerMetadata.jwksUri)
 
         val rawJsonJwks = client.get(issuerMetadata.jwksUri!!).bodyAsText()
 
@@ -92,9 +73,25 @@ class IssuerDraft10(private val client: HttpClient)  {
             "JWKS must contain at least one key with 'kty': 'EC' and 'crv': 'P-256'"
         )
 
-        issuerState = credOffer.grants["authorization_code"]!!.issuerState!!
 
-        println(issuerState)
+        val matchingCredential = issuerMetadata.credentialSupported
+            ?.values
+            ?.find { it.id == issuanceReq.credentialConfigurationId }
+            ?: throw AssertionError("No matching credential found for the credentialConfigurationId '${issuanceReq.credentialConfigurationId}'.")
+
+        assertEquals(
+            matchingCredential.id,
+            issuanceReq.credentialConfigurationId
+        )
+
+        assertEquals(
+            CredentialFormat.jwt_vc,
+            matchingCredential.format
+        )
+
+
+        issuerState = credOffer.grants[GrantType.authorization_code.name]!!.issuerState!!
+
         val authorizationRequest = AuthorizationRequest(
             issuerState = issuerState,
             clientId = "did:key:xzy",
@@ -127,8 +124,6 @@ class IssuerDraft10(private val client: HttpClient)  {
         // Verify Authorization Request and JAR Token
         assertNotNull(authJarTokenRequest.request)
         val requestJwt = authJarTokenRequest.request!!.decodeJws()
-
-        println(requestJwt)
 
         val keyId = requestJwt.header[JWTClaims.Header.keyID]!!.jsonPrimitive.content
         assertNotNull(keyId)
