@@ -148,7 +148,11 @@ object OidcApi : CIProvider() {
                                 AuthenticationMethod.ID_TOKEN -> {
                                     val authServerState = randomUUID()
 
-                                    initializeIssuanceSession(authReq, 5.minutes, authServerState)
+                                    initializeIssuanceSession(
+                                        authorizationRequest = authReq,
+                                        expiresIn = 5.minutes,
+                                        authServerState = authServerState
+                                    )
 
                                     OpenID4VC.processCodeFlowAuthorizationWithAuthorizationRequest(
                                         authorizationRequest = authReq,
@@ -237,31 +241,33 @@ object OidcApi : CIProvider() {
                         }
 
                         ResponseType.Token in authReq.responseType -> OpenID4VC.processImplicitFlowAuthorization(
-                            authReq, issuanceSession.id, metadata, CI_TOKEN_KEY)
+                            authorizationRequest = authReq,
+                            sessionId = issuanceSession.id,
+                            providerMetadata = metadata,
+                            tokenKey = CI_TOKEN_KEY
+                        )
 
                         else -> {
                             throw AuthorizationError(
-                                authReq,
-                                AuthorizationErrorCode.unsupported_response_type,
-                                "Response type not supported"
+                                authorizationRequest = authReq,
+                                errorCode = AuthorizationErrorCode.unsupported_response_type,
+                                message = "Response type not supported"
                             )
                         }
                     }
 
                     val redirectUri = when (authMethod) {
-                        AuthenticationMethod.VP_TOKEN, AuthenticationMethod.ID_TOKEN -> authReq.clientMetadata!!.customParameters["authorization_endpoint"]?.jsonPrimitive?.content
-                            ?: "openid://"
-
+                        AuthenticationMethod.VP_TOKEN, AuthenticationMethod.ID_TOKEN -> authReq.clientMetadata!!.customParameters["authorization_endpoint"]?.jsonPrimitive?.content ?: "openid://"
                         else -> if (authReq.isReferenceToPAR) {
-                            val pushedSession = getPushedAuthorizationSession(authReq)
-                            pushedSession.authorizationRequest?.redirectUri
-                        } else {
-                            authReq.redirectUri
-                        } ?: throw AuthorizationError(
-                            authReq,
-                            AuthorizationErrorCode.invalid_request,
-                            "No redirect_uri found for this authorization request"
-                        )
+                                    val pushedSession = getPushedAuthorizationSession(authReq)
+                                    pushedSession.authorizationRequest?.redirectUri
+                                } else {
+                                    authReq.redirectUri
+                                } ?: throw AuthorizationError(
+                                        authorizationRequest = authReq,
+                                        errorCode = AuthorizationErrorCode.invalid_request,
+                                        message = "No redirect_uri found for this authorization request"
+                                )
                     }
 
                     logger.info { "Redirect Uri is: $redirectUri" }
@@ -276,9 +282,13 @@ object OidcApi : CIProvider() {
 
                         header(
                             name = HttpHeaders.Location,
-                            value = authResp.toRedirectUri(redirectUri, authReq.responseMode ?: defaultResponseMode)
+                            value = authResp.toRedirectUri(
+                                redirectUri = redirectUri,
+                                responseMode = authReq.responseMode ?: defaultResponseMode
+                            )
                         )
                     }
+
                 } catch (authExc: AuthorizationError) {
                     logger.error(authExc) { "Authorization error: " }
 
@@ -325,27 +335,36 @@ object OidcApi : CIProvider() {
                         val policies = Json.parseToJsonElement("""["signature", "expired", "not-before"]""").jsonArray.parsePolicyRequests()
 
                         Verifier.verifyPresentation(
-                            presentationFormat,
+                            format = presentationFormat,
                             vpToken = vpToken,
                             vpPolicies = policies,
                             globalVcPolicies = policies,
                             specificCredentialPolicies = emptyMap(),
-                            mapOf("presentationSubmission" to presSub)
+                            presentationContext = mapOf("presentationSubmission" to presSub)
                         )
                     }
 
                     // Process response
                     val session = getSessionByAuthServerState(state) ?: throw IllegalStateException("No session found for given state parameter")
                     val resp = OpenID4VC.processDirectPost(
-                        session.authorizationRequest ?: throw IllegalStateException("Session for given state has no authorization request"),
-                        session.id, metadata, CI_TOKEN_KEY)
+                        authorizationRequest = session.authorizationRequest ?: throw IllegalStateException("Session for given state has no authorization request"),
+                        sessionId = session.id,
+                        providerMetadata = metadata,
+                        tokenKey = CI_TOKEN_KEY
+                    )
 
                     // Get the authorization_endpoint parameter which is the redirect_uri from the Authorization Request Parameter
                     val redirectUri = getSessionByAuthServerState(state)!!.authorizationRequest!!.redirectUri!!
 
                     call.response.apply {
                         status(HttpStatusCode.Found)
-                        header(HttpHeaders.Location, resp.toRedirectUri(redirectUri, ResponseMode.query))
+                        header(
+                            name = HttpHeaders.Location,
+                            value = resp.toRedirectUri(
+                                redirectUri = redirectUri,
+                                responseMode = ResponseMode.query
+                            )
+                        )
                     }
 
                 } catch (exc: TokenError) {
