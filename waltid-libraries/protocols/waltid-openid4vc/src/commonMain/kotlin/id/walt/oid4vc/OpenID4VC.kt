@@ -127,7 +127,13 @@ object OpenID4VC {
 
       else -> throw TokenError(tokenRequest, TokenErrorCode.unsupported_grant_type, "Grant type not supported")
     }
-    return verifyAndParseToken(code, issuer, TokenTarget.TOKEN, tokenKey) ?: throw TokenError(
+
+    return verifyAndParseToken(
+      token = code,
+      issuer = issuer,
+      target = TokenTarget.TOKEN,
+      tokenKey = tokenKey
+    ) ?: throw TokenError(
       tokenRequest = tokenRequest,
       errorCode = TokenErrorCode.invalid_grant,
       message = "Authorization code could not be verified"
