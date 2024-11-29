@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods.virtual
 
+/*
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
@@ -47,4 +48,4 @@ object IdentifyEmail : IdentifyVirtualAuth("identify") {
             SessionManager.updateSession(session)
         }
     }
-}
+}*/

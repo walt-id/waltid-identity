@@ -1,8 +1,9 @@
 package id.walt.sdjwt
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-
+private val log = KotlinLogging.logger { }
 /**
  * Selective disclosure map, that describes for each payload field recursively, whether it should be selectively disclosable / selected for disclosure.
  * @param fields  map of field keys to SD field descriptors
@@ -134,7 +135,7 @@ class SDMap(
         }
 
         fun fromJSON(json: JsonObject): SDMap {
-            println("Parsing SDMap from: $json")
+            log.trace { "Parsing SDMap from: $json" }
             return SDMap(
                 fields = json["fields"]?.jsonObject?.entries?.associate { entry ->
                     Pair(entry.key, SDField.fromJSON(entry.value))

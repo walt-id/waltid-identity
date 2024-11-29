@@ -47,9 +47,9 @@ object JwsUtils {
     }
 
     private fun checkJwsPreconditions(jws: String, allowMissingSignature: Boolean) {
-        check(jws.startsWith("ey")) { "String does not look like JWS: $this" }
+        require(jws.startsWith("ey")) { "String does not look like JWS: $jws" }
         val dots = jws.count { it == '.' }
-        check(
+        require(
             dots == 2
                     || (allowMissingSignature && dots == 1)
         ) { "String does not have correct JWS part amount (dots=$dots, allowMissingSignature=$allowMissingSignature): $this" }

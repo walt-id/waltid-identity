@@ -102,6 +102,10 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 }
 
+kotlin {
+    jvmToolchain(21)
+}
+
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {
