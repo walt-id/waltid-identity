@@ -151,8 +151,8 @@ object OpenID4VC {
 
     if (!authorizationRequest.responseType.contains(ResponseType.Code))
       throw AuthorizationError(
-        authorizationRequest,
-        AuthorizationErrorCode.invalid_request,
+        authorizationRequest = authorizationRequest,
+        errorCode = AuthorizationErrorCode.invalid_request,
         message = "Invalid response type ${authorizationRequest.responseType}, for authorization code flow."
       )
 
@@ -247,9 +247,17 @@ object OpenID4VC {
     // Generate code and proceed as regular authorization request
     val mappedState = mapOf("state" to listOf(authorizationRequest.state!!))
     val issuer = providerMetadata.issuer ?: throw AuthorizationError(authorizationRequest, AuthorizationErrorCode.server_error,"No issuer configured in given provider metadata")
-    val code = generateAuthorizationCodeFor(sessionId, issuer, tokenKey)
 
-    return AuthorizationCodeResponse.success(code, mappedState)
+    val code = generateAuthorizationCodeFor(
+      sessionId = sessionId,
+      issuer = issuer,
+      tokenKey = tokenKey
+    )
+
+    return AuthorizationCodeResponse.success(
+      code = code,
+      customParameters = mappedState
+    )
   }
 
   const val PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX = "urn:ietf:params:oauth:request_uri:"
