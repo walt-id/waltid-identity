@@ -1,3 +1,4 @@
+import com.nimbusds.jose.JWSAlgorithm
 import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -6,6 +7,7 @@ import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.OpenID4VCI.getCIProviderMetadataUrl
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.ktor.client.*
@@ -122,15 +124,13 @@ class IssuerDraft10(private val client: HttpClient)  {
                 authJarTokenRequest = AuthorizationRequest.fromHttpQueryString(headers["location"]!!)
             }
 
-        assert(authJarTokenRequest.responseMode == ResponseMode.direct_post) { "response mode should be direct post" }
+        // Verify Authorization Request and JAR Token
         assertNotNull(authJarTokenRequest.request)
-
-        // Verify Token
         val requestJwt = authJarTokenRequest.request!!.decodeJws()
 
         println(requestJwt)
 
-        val keyId = requestJwt.header["kid"]!!.jsonPrimitive.content
+        val keyId = requestJwt.header[JWTClaims.Header.keyID]!!.jsonPrimitive.content
         assertNotNull(keyId)
 
         val jwksResponse = client.get(issuerMetadata.jwksUri!!).bodyAsText()
@@ -138,7 +138,7 @@ class IssuerDraft10(private val client: HttpClient)  {
         val jwks = Json.parseToJsonElement(jwksResponse).jsonObject
 
         val matchingKey = jwks["keys"]?.jsonArray?.firstOrNull { key ->
-            key.jsonObject["kid"]?.jsonPrimitive?.content == keyId
+            key.jsonObject[JWTClaims.Header.keyID]?.jsonPrimitive?.content == keyId
         }
 
         assertNotNull(matchingKey)
@@ -146,6 +146,16 @@ class IssuerDraft10(private val client: HttpClient)  {
         val signingKey = JWKKey.importJWK(matchingKey.toString()).getOrThrow()
 
         assertTrue {signingKey.verifyJws(authJarTokenRequest.request!!).isSuccess}
+
+        val jarPayload = requestJwt.payload
+        assertNotNull(jarPayload)
+
+        validateAuthorizationData(
+            issuerMetadata = issuerMetadata,
+            holderAuthorizationRequest = authorizationRequest,
+            jarPayload = jarPayload,
+            issuerAuthorizationRequest = authJarTokenRequest
+        )
 
         when (issuanceReq.authenticationMethod) {
             AuthenticationMethod.ID_TOKEN -> {
@@ -170,10 +180,56 @@ class IssuerDraft10(private val client: HttpClient)  {
 
                 assertNotNull(theInputDescriptor.format, "theInputDescriptor format should not be null")
                 assertTrue(theInputDescriptor.format!!.containsKey(VCFormat.jwt_vc), "theInputDescriptor should be jwt_vc")
-                assertTrue(theInputDescriptor.format!![VCFormat.jwt_vc]?.alg?.contains("ES256") == true, "theInputDescriptor alg should be ES256")
+
+                assertTrue(theInputDescriptor.format!![VCFormat.jwt_vc]?.alg?.contains(JWSAlgorithm.ES256.name) == true, "theInputDescriptor alg should be ES256")
             }
 
             else -> throw AssertionError("Unexpected authentication method ${issuanceReq.authenticationMethod}")
+        }
+    }
+
+    private fun validateAuthorizationData(
+        issuerMetadata: OpenIDProviderMetadata. Draft10,
+        holderAuthorizationRequest: AuthorizationRequest,
+        jarPayload: Map<String, Any?>? = null,
+        issuerAuthorizationRequest: AuthorizationRequest? = null
+    ) {
+
+        val commonData = mapOf(
+            "client_id" to issuerMetadata.issuer,
+            "redirect_uri" to "${issuerMetadata.issuer}/direct_post",
+            "response_mode" to ResponseMode.direct_post.name
+        )
+
+        val jarSpecificData = mapOf(
+            JWTClaims.Payload.issuer to issuerMetadata.issuer,
+            JWTClaims.Payload.audience to holderAuthorizationRequest.clientId
+        )
+
+        jarPayload?.let {
+            validateData(
+                expectedData = commonData + jarSpecificData,
+                actualData = it
+            )
+        }
+
+        issuerAuthorizationRequest?.let {
+            validateData(
+                expectedData =commonData,
+                actualData = mapOf(
+                    "client_id" to it.clientId,
+                    "redirect_uri" to it.redirectUri,
+                    "response_mode" to it.responseMode
+                ),
+
+            )
+        }
+    }
+
+    private fun validateData(expectedData: Map<String, String?>, actualData: Map<String, Any?>) {
+        expectedData.forEach { (key, expectedValue) ->
+            val actualValue = actualData[key]?.toJsonElement()?.jsonPrimitive?.content
+            assertEquals(expectedValue, actualValue, "Validation failed for key: $key")
         }
     }
 
