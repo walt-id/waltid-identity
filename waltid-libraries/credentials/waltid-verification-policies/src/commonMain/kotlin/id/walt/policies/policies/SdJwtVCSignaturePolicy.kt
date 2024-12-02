@@ -3,6 +3,7 @@ package id.walt.policies.policies
 import id.walt.credentials.schemes.JwsSignatureScheme
 import id.walt.credentials.utils.VCFormat
 import id.walt.credentials.utils.randomUUID
+import id.walt.crypto.exceptions.VerificationException
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -58,7 +59,12 @@ class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
         requiresHolderKeyBinding = true,
         context["clientId"]?.toString(),
         context["challenge"]?.toString()
-      ).let { Result.success(sdJwtVC.undisclosedPayload) }
+      ).let {
+        if(it.verified)
+          Result.success(sdJwtVC.undisclosedPayload)
+        else
+          Result.failure(VerificationException("SD-JWT verification failed"))
+      }
     }
   }
 

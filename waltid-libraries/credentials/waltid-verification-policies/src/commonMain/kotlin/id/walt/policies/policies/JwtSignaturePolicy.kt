@@ -3,7 +3,7 @@ package id.walt.policies.policies
 import id.walt.credentials.schemes.JwsSignatureScheme
 import id.walt.credentials.utils.VCFormat
 import id.walt.policies.JwtVerificationPolicy
-import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.SDJwt
 import kotlinx.serialization.Serializable
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -26,6 +26,17 @@ class JwtSignaturePolicy : JwtVerificationPolicy(
     @JsPromise
     @JsExport.Ignore
     override suspend fun verify(credential: String, args: Any?, context: Map<String, Any>): Result<Any> {
-        return JwsSignatureScheme().verify(credential)
+        return JwsSignatureScheme().let {
+            if(SDJwt.isSDJwt(credential, sdOnly = true)) {
+                val keyInfo = it.getIssuerKeyInfo(credential)
+                it.verifySDJwt(
+                    credential, JWTCryptoProviderManager.getDefaultJWTCryptoProvider(
+                        mapOf(keyInfo.keyId to keyInfo.key)
+                    )
+                )
+            }
+            else
+                it.verify(credential)
+        }
     }
 }
