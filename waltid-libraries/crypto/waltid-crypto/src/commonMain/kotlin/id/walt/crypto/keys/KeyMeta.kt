@@ -29,3 +29,8 @@ data class AwsKeyMeta(
     override val keyId: String,
     val keySize: Int? = null,
 ) : KeyMeta()
+
+@Serializable
+data class AzureKeyMeta(
+    override val keyId: String
+) : KeyMeta()

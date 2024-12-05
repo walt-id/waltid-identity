@@ -108,8 +108,8 @@
 
 <script lang="ts" setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import { ArrowUturnLeftIcon, CheckIcon, KeyIcon, } from "@heroicons/vue/24/outline";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {ArrowUturnLeftIcon, CheckIcon, KeyIcon,} from "@heroicons/vue/24/outline";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 import InlineLoadingCircle from "@waltid-web-wallet/components/loading/InlineLoadingCircle.vue";
 
 const loading = ref(false);
@@ -172,6 +172,15 @@ const options = ref([
     ],
     config: ["roleName", "region"]
   },
+  {
+    keyGenerationRequest: ["Azure with Client access key", "azure"],
+    keyType: [
+      ["ECDSA_Secp256r1", "secp256r1"],
+      ["ECDSA_Secp256k1", "secp256k1"],
+      ["RSA", "RSA"]
+    ],
+    config: ["clientId", "clientSecret", "tenantId", "keyVaultUrl"]
+  },
 ]);
 
 const data = reactive<{
@@ -188,54 +197,59 @@ const data = reactive<{
 const currentWallet = useCurrentWallet();
 
 async function generateKey() {
-  const body = {
-    backend: data.keyGenerationRequest.type.includes("aws") ? "aws" : data.keyGenerationRequest.type,
+  const keyGenerationRequest = data.keyGenerationRequest;
+  const type = keyGenerationRequest?.type;
+  const config = keyGenerationRequest?.config;
+
+  // Build the body based on the key generation type and config
+  const body: any = {
+    backend: type?.includes("aws") ? "aws" : type,
     keyType: data.type,
-    config: {
-      // If AWS, wrap config keys in an 'auth' object, otherwise leave them in the config
-      ...(data.keyGenerationRequest.type === "aws-access-key"
-          ? {
-            auth: {
-              accessKeyId: data.keyGenerationRequest.config.accessKeyId,
-              secretAccessKey: data.keyGenerationRequest.config.secretAccessKey,
-              region: data.keyGenerationRequest.config.region,
-
-            },
-          }
-          : data.keyGenerationRequest.type === "aws-role-name"
-              ? {
-                auth: {
-                  roleName: data.keyGenerationRequest.config.roleName,
-                  region: data.keyGenerationRequest.config.region,
-                },
-              }
-
-              : {
-                // If not AWS, keep keys in the config directly
-                ...data.keyGenerationRequest.config,
-              }),
-    },
+    config: {},
   };
+
+  // Configure the 'config' object depending on the type (AWS, Azure, etc.)
+  if (type === "aws-access-key") {
+    body.config.auth = {
+      accessKeyId: config?.accessKeyId,
+      secretAccessKey: config?.secretAccessKey,
+      region: config?.region,
+    };
+  } else if (type === "aws-role-name") {
+    body.config.auth = {
+      roleName: config?.roleName,
+      region: config?.region,
+    };
+  } else if (type === "azure") {
+    body.config.auth = {
+      clientId: config?.clientId,
+      clientSecret: config?.clientSecret,
+      tenantId: config?.tenantId,
+      keyVaultUrl: config?.keyVaultUrl,
+    };
+  } else {
+    // For other types, just include the config directly
+    body.config = {...config};
+  }
+
   loading.value = true;
 
   try {
-    response.value = await $fetch(
-        `/wallet-api/wallet/${currentWallet.value}/keys/generate`,
-        {
-          method: "POST",
-          body: JSON.stringify(body), // Ensure the body is a JSON string
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-    );
+    response.value = await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys/generate`, {
+      method: "POST",
+      body, // fetch automatically handles JSON conversion
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
   } catch (e: any) {
     console.error("Error generating key:", e);
-    alert("Failed to generate key: " + e.message);
+    alert("Failed to generate key: " + (e.message || e));
   } finally {
     loading.value = false;
   }
 }
+
 
 useHead({
   title: "Generate key - walt.id",

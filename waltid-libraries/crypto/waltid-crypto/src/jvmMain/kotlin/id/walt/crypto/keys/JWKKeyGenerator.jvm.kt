@@ -13,6 +13,10 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jose.util.Base64URL
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.jwk.JWKKeyCreator
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import org.bouncycastle.asn1.ASN1BitString
 import org.bouncycastle.asn1.ASN1Integer
 import org.bouncycastle.asn1.ASN1Sequence
@@ -22,6 +26,7 @@ import org.bouncycastle.math.ec.ECPoint
 import java.security.KeyFactory
 import java.security.interfaces.RSAPublicKey
 import java.security.spec.RSAPublicKeySpec
+import java.text.ParseException
 
 object JvmJWKKeyCreator : JWKKeyCreator {
 
@@ -52,8 +57,30 @@ object JvmJWKKeyCreator : JWKKeyCreator {
             }
         )
 
+    /**
+     * Parse JWK with the Nimbus library, and rewrite Secp256k1 if required.
+     *
+     * This rewriter is required due to Microsoft Azure Key Vault not adhering to [RFC 8812 section 3.1](https://datatracker.ietf.org/doc/html/rfc8812#section-3.1)
+     * and instead using a non-standard string [Azure Key Vault docs](https://learn.microsoft.com/en-us/rest/api/keyvault/keys/create-key/create-key?view=rest-keyvault-keys-7.4&tabs=HTTP#jsonwebkeycurvename)
+     */
+    private fun nimbusJwkParsing(jwkString: String): JWK {
+        try {
+            return JWK.parse(jwkString)
+        } catch (e: ParseException) {
+            if (e.message == "Unknown / unsupported curve: P-256K") {
+                var jsonObject = Json.decodeFromString<JsonObject>(jwkString)
+                if (jsonObject["crv"]?.jsonPrimitive?.content?.uppercase() == "P-256K") {
+                    jsonObject = JsonObject(jsonObject.toMutableMap().apply {
+                        this["crv"] = JsonPrimitive("secp256k1")
+                    })
+                    return JWK.parse(jsonObject.toString())
+                } else throw e
+            } else throw e
+        }
+    }
+
     override suspend fun importJWK(jwk: String): Result<JWKKey> =
-        runCatching { JWKKey(JWK.parse(jwk)) }
+        runCatching { JWKKey(nimbusJwkParsing(jwk)) }
 
     override suspend fun importPEM(pem: String): Result<JWKKey> =
         runCatching { JWKKey(JWK.parseFromPEMEncodedObjects(pem)) }
