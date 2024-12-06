@@ -222,6 +222,15 @@ class IosKey private constructor(
     override suspend fun getMeta(): KeyMeta {
         error("Not yet implemented")
     }
+
+    override suspend fun deleteKey(): Boolean = kotlin.runCatching {
+        when (options.keyType) {
+            KeyType.secp256r1 -> P256.PrivateKey.deleteFromKeychain(options.kid)
+            KeyType.Ed25519 -> Ed25519.PrivateKey.deleteFromKeychain(options.kid)
+            KeyType.RSA -> RSA.PrivateKey.deleteFromKeychain(options.kid)
+            else -> error("Not implemented")
+        }
+    }.isSuccess
 }
 
 // utility functions for swift
