@@ -1,6 +1,8 @@
 package id.walt.webwallet.web.controllers.exchange
 
+import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.CredentialOffer
+import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.sdjwt.SDJWTVCTypeMetadata
@@ -18,6 +20,7 @@ import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.util.*
@@ -260,6 +263,21 @@ fun Application.exchange() = walletRoute {
                 error.printStackTrace()
                 context.respond(HttpStatusCode.BadRequest, error.message ?: "Unknown error")
             }
+        }
+        get("resolveIssuerOpenIDMetadata", {
+            summary = "Resolved Issuer OpenID Metadata"
+            request {
+                queryParameter<String>("issuer")
+            }
+            response {
+                HttpStatusCode.OK to {
+                    description = "Resolved Issuer OpenID Metadata"
+                    body<OpenIDProviderMetadata>()
+                }
+            }
+        }) {
+            val issuer = call.request.queryParameters["issuer"] ?: throw BadRequestException("Issuer base url not set")
+            context.respond(HttpStatusCode.OK, OpenID4VCI.resolveCIProviderMetadata(issuer).toJSON())
         }
     }
 }

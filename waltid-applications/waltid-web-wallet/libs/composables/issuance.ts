@@ -47,7 +47,7 @@ export async function useIssuance(query: any) {
         issuerHost = issuer;
     }
 
-    const credential_issuer: { credential_configurations_supported: Array<{ types: Array<String>; }>; } = await $fetch(`${issuer}/.well-known/openid-credential-issuer`)
+    const credential_issuer: { credential_configurations_supported: Array<{ types: Array<String>; }>; } = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolveIssuerOpenIDMetadata?issuer=${issuer}`)
     const credentialList = credentialOffer.credential_configuration_ids.map((id) => credential_issuer.credential_configurations_supported[id]);
 
     let credentialTypes: String[] = [];
