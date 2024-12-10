@@ -21,11 +21,11 @@ import io.ktor.http.*
 import io.ktor.util.*
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toInstant
-import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.*
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.readLine
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -36,14 +36,26 @@ import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import org.kotlincrypto.hash.sha2.SHA256
 import org.kotlincrypto.macs.hmac.sha2.HmacSHA256
-import kotlin.collections.component1
-import kotlin.collections.component2
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Duration.Companion.seconds
 
+
 private val logger = KotlinLogging.logger { }
+
+@Serializable
+data class AssumeRoleWithWebIdentityResponse(
+    val Credentials: TemporaryCredentials
+)
+
+@Serializable
+data class TemporaryCredentials(
+    val AccessKeyId: String,
+    val SecretAccessKey: String,
+    val SessionToken: String,
+    val Expiration: String
+)
 
 data class AWSAuthConfiguration(
     val accessKeyId: String?,
@@ -51,7 +63,8 @@ data class AWSAuthConfiguration(
     val region: String?,
     val sessionToken: String?,
     val expiration: String?,
-    val roleName: String? = null
+    val roleName: String? = null,
+    val kubernetesRoleArn: String? = null
 )
 
 var _accessAWS: AWSAuthConfiguration? = null
@@ -304,7 +317,6 @@ class AWSKey(
     }
 
 
-
     companion object : AWSKeyCreator {
         val client = HttpClient()
 
@@ -324,18 +336,58 @@ class AWSKey(
                 )
                 timeoutAt = null
             } else {
-                val token = getIMDSv2Token()
-                val actualRoleName = getRoleName(token)
-                val providedRoleName = config.auth.roleName
 
 
-                if (providedRoleName?.isNotEmpty() == true && providedRoleName != actualRoleName) {
-                    throw IllegalArgumentException(
-                        "Role name mismatch please check the role name provided."
+                if (config.auth.roleArn != null) {
+                    val tokenFilePath = "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+                    val webIdentityToken = SystemFileSystem.source(Path(tokenFilePath)).buffered().use {
+                        it.readLine()
+                    }
+                    val stsEndpoint = "https://sts.amazonaws.com/"
+                    val response = HttpClient().use { client ->
+                        client.get(stsEndpoint) {
+                            parameter("Action", "AssumeRoleWithWebIdentity")
+                            parameter("RoleArn", config.auth.roleArn)
+                            parameter("RoleSessionName", "KtorSession")
+                            parameter("WebIdentityToken", webIdentityToken)
+                            parameter("Version", "2011-06-15")
+                            accept(ContentType.Application.Xml)
+                        }
+                    }
+
+                    val responseBody = response.bodyAsText()
+                    // Deserialize XML or JSON response into `AssumeRoleWithWebIdentityResponse`
+                    val assumeRoleWithWebIdentityResponse = Json.decodeFromString(
+                        AssumeRoleWithWebIdentityResponse.serializer(),
+                        responseBody
                     )
+                    _accessAWS = AWSAuthConfiguration(
+                        assumeRoleWithWebIdentityResponse.Credentials.AccessKeyId,
+                        assumeRoleWithWebIdentityResponse.Credentials.SecretAccessKey,
+                        config.auth.region,
+                        assumeRoleWithWebIdentityResponse.Credentials.SessionToken,
+                        assumeRoleWithWebIdentityResponse.Credentials.Expiration,
+                        null,
+                        config.auth.roleArn
+                    )
+                    timeoutAt = Clock.System.now().plus(3600.seconds)
+                } else {
+                    val token = getIMDSv2Token()
+                    val actualRoleName = getRoleName(token)
+                    val providedRoleName = config.auth.roleName
+
+
+                    if (providedRoleName?.isNotEmpty() == true && providedRoleName != actualRoleName) {
+                        throw IllegalArgumentException(
+                            "Role name mismatch please check the role name provided."
+                        )
+                    }
+                    _accessAWS =
+                        getTemporaryCredentials(token, providedRoleName.toString(), config.auth.region.toString())
+                    timeoutAt = Clock.System.now().plus(3600.seconds)
                 }
-                _accessAWS = getTemporaryCredentials(token, providedRoleName.toString(), config.auth.region.toString())
-                timeoutAt = Clock.System.now().plus(3600.seconds)
+
+
             }
         }
 

@@ -5,7 +5,10 @@ import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
 
 object IssuanceExamples {
 
@@ -859,6 +862,32 @@ object IssuanceExamples {
         """.trimIndent()
     )
 
+
+    //language=JSON
+    val issuerOnboardingRequestAwsRestApiExampleWithKubernetesRoleArn =
+        typedValueExampleDescriptorDsl<OnboardingRequest>(
+            """
+            {
+                "key":
+                {
+                    "backend": "aws",
+                    "keyType": "secp256r1",
+                    "config":
+                    {
+                       "auth": {
+                            "roleArn": "arn:aws:iam::123456789012:role/eksctl-cluster-nodegroup-ng-1-NodeInstanceRole-1GZJ1ZQ5QU5F",
+                            "region": "eu-central-1"
+                       }
+                      
+                    }
+                },
+                "did":
+                {
+                    "method": "jwk"
+                }
+            }
+        """.trimIndent()
+        )
 
     //language=JSON
     val issuerOnboardingRequestAwsRestApiExampleWithDirectAccess = typedValueExampleDescriptorDsl<OnboardingRequest>(

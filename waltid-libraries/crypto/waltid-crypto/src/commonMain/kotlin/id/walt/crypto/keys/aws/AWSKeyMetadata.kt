@@ -12,6 +12,7 @@ data class AWSKeyMetadata(
         secretAccessKey: String? = null,
         region: String? = null,
         roleName: String? = null,
-    ) : this(AWSAuth(accessKeyId, secretAccessKey, region, roleName))
+        roleArn: String? = null
+    ) : this(AWSAuth(accessKeyId, secretAccessKey, region, roleName, roleArn))
 }
 

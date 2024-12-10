@@ -1,18 +1,13 @@
 package id.walt.crypto.keys.aws
 
 import io.github.reactivecircus.cache4k.Cache
-import io.github.reactivecircus.cache4k.Cache.Builder.Companion.invoke
-import io.ktor.client.HttpClient
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.defaultRequest
-import io.ktor.client.plugins.logging.DEFAULT
-import io.ktor.client.plugins.logging.LogLevel
-import io.ktor.client.plugins.logging.Logger
-import io.ktor.client.plugins.logging.Logging
-import io.ktor.client.request.header
-import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
-import io.ktor.serialization.kotlinx.json.json
+import io.ktor.client.*
+import io.ktor.client.plugins.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.Serializable
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
@@ -27,6 +22,7 @@ data class AWSAuth(
     val secretAccessKey: String? = null,
     val region: String? = null,
     val roleName: String? = null,
+    val roleArn: String? = null,
 ) {
     companion object {
         private val http = HttpClient {
@@ -54,7 +50,8 @@ data class AWSAuth(
     private fun requireAuthenticationMethod() {
         val usingAccessKey = accessKeyId != null && secretAccessKey != null && region != null
         val instanceAuth = roleName != null && region != null
-        if (!usingAccessKey && !instanceAuth) {
+        val kubernetesAuth = roleArn != null
+        if (!usingAccessKey && !instanceAuth && !kubernetesAuth) {
             throw IllegalArgumentException("AWSAuth requires either accessKeyId, secretAccessKey, and region or roleName")
         }
 
