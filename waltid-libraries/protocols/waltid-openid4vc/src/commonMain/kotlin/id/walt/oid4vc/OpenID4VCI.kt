@@ -131,7 +131,9 @@ object OpenID4VCI {
                 appendPathSegments(it.fullPath.trim('/'))
         }.buildString() }
 
-    suspend fun resolveCIProviderMetadata(credOffer: CredentialOffer) = http.get(getCIProviderMetadataUrl(credOffer)).bodyAsText().let {
+    suspend fun resolveCIProviderMetadata(credOffer: CredentialOffer) = resolveCIProviderMetadata(credOffer.credentialIssuer)
+
+    suspend fun resolveCIProviderMetadata(issuerBaseUrl: String) = http.get(getCIProviderMetadataUrl(issuerBaseUrl)).bodyAsText().let {
         OpenIDProviderMetadata.fromJSONString(it)
     }
 
