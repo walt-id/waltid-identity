@@ -8,6 +8,8 @@ import korlibs.crypto.SHA256
 import korlibs.crypto.encoding.ASCII
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.*
 
 class SDJwtTestJVM {
@@ -99,13 +101,31 @@ class SDJwtTestJVM {
         val isValid = parsedUndisclosedJwt.verify(cryptoProvider).verified
         println("Undisclosed SD-JWT verified: $isValid")
 
+        val disclosedJwt = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~WyJ4RFk5VjBtOG43am82ZURIUGtNZ1J3Iiwic3ViIiwiMTIzIl0~"
         val parsedDisclosedJwtVerifyResult = SDJwt.verifyAndParse(
-            "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~WyJ4RFk5VjBtOG43am82ZURIUGtNZ1J3Iiwic3ViIiwiMTIzIl0~",
+            disclosedJwt,
             cryptoProvider
         )
         // print full payload with disclosed fields
         println("Disclosed JWT payload:")
         println(parsedDisclosedJwtVerifyResult.sdJwt.fullPayload.toString())
+
+        val forgedDisclosure = parsedDisclosedJwtVerifyResult.sdJwt.jwt + "~" + forgeDislosure(parsedDisclosedJwtVerifyResult.sdJwt.disclosureObjects.first())
+        val forgedDisclosureVerifyResult = SDJwt.verifyAndParse(
+            forgedDisclosure, cryptoProvider
+        )
+        assertFalse(forgedDisclosureVerifyResult.verified)
+        assertTrue(forgedDisclosureVerifyResult.signatureVerified)
+        assertFalse(forgedDisclosureVerifyResult.disclosuresVerified)
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    fun forgeDislosure(disclosure: SDisclosure): String {
+        return Base64.UrlSafe.encode(buildJsonArray {
+            add(disclosure.salt)
+            add(disclosure.key)
+            add(JsonPrimitive("<forged>"))
+        }.toString().encodeToByteArray()).trimEnd('=')
     }
 
     @Test

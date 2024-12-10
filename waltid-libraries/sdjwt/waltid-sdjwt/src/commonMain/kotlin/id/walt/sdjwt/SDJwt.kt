@@ -145,7 +145,7 @@ open class SDJwt internal constructor(
      * @param jwtCryptoProvider JWT crypto provider, that implements standard JWT token verification on the target platform
      */
     fun verify(jwtCryptoProvider: JWTCryptoProvider, keyID: String? = null): VerificationResult<SDJwt> {
-        return jwtCryptoProvider.verify(jwt, keyID).let {
+        return jwtCryptoProvider.verify(jwt, keyID ?: this.keyID).let {
             VerificationResult(
                 sdJwt = this,
                 signatureVerified = it.verified,
@@ -265,8 +265,8 @@ open class SDJwt internal constructor(
         /**
          * Check the given string, whether it matches the pattern of an SD-JWT
          */
-        fun isSDJwt(value: String): Boolean {
-            return Regex(SD_JWT_PATTERN).matches(value)
+        fun isSDJwt(value: String, sdOnly: Boolean = false): Boolean {
+            return Regex(SD_JWT_PATTERN).matches(value) && (!sdOnly || value.contains("~"))
         }
     }
 }
