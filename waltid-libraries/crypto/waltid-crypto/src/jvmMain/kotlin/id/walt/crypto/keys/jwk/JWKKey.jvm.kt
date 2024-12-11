@@ -88,6 +88,7 @@ actual class JWKKey actual constructor(
             when (value) {
                 is String -> JsonPrimitive(value)
                 is Number -> JsonPrimitive(value)
+                is ArrayList<*> -> JsonPrimitive(value.toString())
                 else -> throw IllegalArgumentException("Unsupported value type: ${value::class.simpleName} in field ${it.key}")
 
             }
@@ -253,7 +254,6 @@ actual class JWKKey actual constructor(
 
     actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
         check(detachedPlaintext != null) { "Detached plaintext is required." }
-
 
         if (keyType == KeyType.Ed25519) {
             val tinkVerifier = Ed25519Verify(_internalJwk.toOctetKeyPair().toPublicJWK().decodedX)
