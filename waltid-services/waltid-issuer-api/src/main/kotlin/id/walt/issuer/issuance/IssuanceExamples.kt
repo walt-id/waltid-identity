@@ -941,6 +941,33 @@ object IssuanceExamples {
     )
 
     //language=JSON
+    val issuerOnboardingRequestAzureRestApiExample = typedValueExampleDescriptorDsl<OnboardingRequest>(
+        """
+            {
+                "key":
+                {
+                    "backend": "azure",
+                    "keyType": "secp256r1",
+                    "config":
+                    {
+                       "auth": {
+                            "clientId": "client id",
+                            "clientSecret": "client secret",
+                            "tenantId": "tenant id",
+                            "keyVaultUrl": "url to the vault"
+                       }
+                      
+                    }
+                },
+                "did":
+                {
+                    "method": "jwk"
+                }
+            }
+        """.trimIndent()
+    )
+
+    //language=JSON
     val issuerOnboardingResponseOciRestApiExample = typedValueExampleDescriptorDsl<IssuerOnboardingResponse>(
         """
             {
@@ -1031,6 +1058,7 @@ object IssuanceExamples {
             }
         """.trimIndent()
     )
+
 
     // language=JSON
     val issuerOnboardingResponseTseExample = typedValueExampleDescriptorDsl<IssuerOnboardingResponse>(

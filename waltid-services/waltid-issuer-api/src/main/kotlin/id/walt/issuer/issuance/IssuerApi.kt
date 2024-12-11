@@ -128,6 +128,10 @@ fun Application.issuerApi() {
                             "did:jwk + AWS REST API key  (AWS - Secp256r1) + KubernetesRoleArn (Auth)",
                             IssuanceExamples.issuerOnboardingRequestAwsRestApiExampleWithKubernetesRoleArn
                         )
+                        example(
+                            "did:jwk + Azure REST API key  (Azure - Secp256r1)",
+                            IssuanceExamples.issuerOnboardingRequestAzureRestApiExample
+                        )
                         required = true
                     }
                 }

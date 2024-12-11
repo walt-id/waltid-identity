@@ -318,7 +318,7 @@ class AWSKey(
 
 
     companion object : AWSKeyCreator {
-        val client = HttpClient()
+        private val client = HttpClient()
 
         @JsExport.Ignore
         suspend fun authAccess(config: AWSKeyMetadata) {

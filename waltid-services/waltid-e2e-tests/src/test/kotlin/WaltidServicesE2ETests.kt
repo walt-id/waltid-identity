@@ -225,7 +225,10 @@ class WaltidServicesE2ETests {
 
         //region -Issuer / offer url-
         lateinit var offerUrl: String
-        val issuerApi = IssuerApi(client)
+        val issuerApi = IssuerApi(client,
+        // uncomment the following line, to test status callbacks, update webhook id as required.
+        //    "https://webhook.site/d879094b-2275-4ae7-b1c5-ebfb9f08dfdb"
+        )
         val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(jwtCredential)
         println("issuance-request:")
         println(issuanceRequest)
