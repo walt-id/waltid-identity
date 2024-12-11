@@ -8,6 +8,11 @@ import id.walt.crypto.keys.AwsKeyMeta
 import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.aws.AWSKey.AwsKeyFunctions.awsJsonDataBody
+import id.walt.crypto.keys.aws.AWSKey.AwsKeyFunctions.awsKeyToKeyTypeMapping
+import id.walt.crypto.keys.aws.AWSKey.AwsKeyFunctions.buildSigV4Headers
+import id.walt.crypto.keys.aws.AWSKey.AwsKeyFunctions.getAccess
+import id.walt.crypto.keys.aws.AWSKey.AwsKeyFunctions.keyTypeToAwsKeyMapping
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -67,9 +72,6 @@ data class AWSAuthConfiguration(
     val kubernetesRoleArn: String? = null
 )
 
-var _accessAWS: AWSAuthConfiguration? = null
-var timeoutAt: Instant? = null
-
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -83,6 +85,11 @@ class AWSKey(
     private var _keyType: KeyType? = null
 ) : Key() {
 
+    @Transient
+    lateinit var _accessAWS: AWSAuthConfiguration
+
+    @Transient
+    lateinit var timeoutAt: Instant
 
     override var keyType: KeyType
         get() = _keyType!!
@@ -163,7 +170,7 @@ class AWSKey(
                 headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
                 append(HttpHeaders.Host, "kms.${config.auth.region}.amazonaws.com")
                 append("X-Amz-Target", "TrentService.Sign") // Specific KMS action for CreateKey
-                _accessAWS?.sessionToken?.takeIf { it.isNotEmpty() }?.let {
+                _accessAWS.sessionToken?.takeIf { it.isNotEmpty() }?.let {
                     append("X-Amz-Security-Token", it)
                 }
             }
@@ -232,7 +239,7 @@ class AWSKey(
                 headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
                 append(HttpHeaders.Host, awsKmsUrl)
                 append("X-Amz-Target", "TrentService.Verify") // Specific KMS action for CreateKey
-                _accessAWS?.sessionToken?.takeIf { it.isNotEmpty() }?.let {
+                _accessAWS.sessionToken?.takeIf { it.isNotEmpty() }?.let {
                     append("X-Amz-Security-Token", it)
                 }
             }
@@ -317,24 +324,57 @@ class AWSKey(
     }
 
 
-    companion object : AWSKeyCreator {
-        private val client = HttpClient()
+    object AwsKeyFunctions {
+
+
+        internal fun keyTypeToAwsKeyMapping(type: KeyType) = when (type) {
+            KeyType.secp256r1 -> "ECC_NIST_P256"
+            KeyType.secp256k1 -> "ECC_SECG_P256K1"
+            KeyType.RSA -> "RSA_2048"
+            else -> throw KeyTypeNotSupportedException(type.name)
+        }
+
+        internal fun awsKeyToKeyTypeMapping(type: String) = when (type) {
+            "ECC_NIST_P256" -> KeyType.secp256r1
+            "ECC_SECG_P256K1" -> KeyType.secp256k1
+            "RSA_2048" -> KeyType.RSA
+            else -> throw KeyTypeNotSupportedException(type)
+        }
+
+        internal suspend fun HttpResponse.awsJsonDataBody(): JsonObject {
+            val baseMsg = { "AWS server (URL: ${this.request.url}) returned an invalid response: " }
+
+            return runCatching {
+                // First, get the body as a string
+                val bodyStr = this.bodyAsText()
+
+                // Parse the string as JsonObject
+                Json.parseToJsonElement(bodyStr).jsonObject
+            }.getOrElse {
+                val bodyStr = this.bodyAsText() // Get the body in case of an exception
+                throw IllegalArgumentException(
+                    baseMsg.invoke() + if (bodyStr.isEmpty()) "empty response (instead of JSON data)"
+                    else "invalid response: $bodyStr"
+                )
+            }
+        }
+
 
         @JsExport.Ignore
-        suspend fun authAccess(config: AWSKeyMetadata) {
+        suspend fun authAccess(config: AWSKeyMetadata): AWSAuthConfiguration {
             val isAccessDataProvided =
                 config.auth.accessKeyId?.isNotEmpty() == true && config.auth.secretAccessKey?.isNotEmpty() == true
 
             if (isAccessDataProvided) {
-                _accessAWS = AWSAuthConfiguration(
+                return AWSAuthConfiguration(
                     config.auth.accessKeyId,
                     config.auth.secretAccessKey,
                     config.auth.region,
-                    null,
+                    Clock.System.now().plus(3600.seconds).toString(),
                     null,
                     null
                 )
-                timeoutAt = null
+
             } else {
 
 
@@ -361,7 +401,7 @@ class AWSKey(
                         AssumeRoleWithWebIdentityResponse.serializer(),
                         responseBody
                     )
-                    _accessAWS = AWSAuthConfiguration(
+                    return AWSAuthConfiguration(
                         assumeRoleWithWebIdentityResponse.Credentials.AccessKeyId,
                         assumeRoleWithWebIdentityResponse.Credentials.SecretAccessKey,
                         config.auth.region,
@@ -370,7 +410,6 @@ class AWSKey(
                         null,
                         config.auth.roleArn
                     )
-                    timeoutAt = Clock.System.now().plus(3600.seconds)
                 } else {
                     val token = getIMDSv2Token()
                     val actualRoleName = getRoleName(token)
@@ -382,9 +421,8 @@ class AWSKey(
                             "Role name mismatch please check the role name provided."
                         )
                     }
-                    _accessAWS =
-                        getTemporaryCredentials(token, providedRoleName.toString(), config.auth.region.toString())
-                    timeoutAt = Clock.System.now().plus(3600.seconds)
+                    return getTemporaryCredentials(token, providedRoleName.toString(), config.auth.region.toString())
+
                 }
 
 
@@ -393,11 +431,8 @@ class AWSKey(
 
         @JsExport.Ignore
         suspend fun getAccess(config: AWSKeyMetadata): AWSAuthConfiguration? {
-            if (_accessAWS == null || (timeoutAt != null && timeoutAt!! <= Clock.System.now()) || config.auth.roleName != _accessAWS?.roleName) {
-                authAccess(config)
-            }
 
-            return _accessAWS
+            return authAccess(config)
         }
 
 
@@ -412,7 +447,7 @@ class AWSKey(
         // Generate Signature Key
         fun getSignatureKey(config: AWSKeyMetadata, dateStamp: String): ByteArray {
             val kDate = hmacSHA256(
-                "AWS4${_accessAWS?.secretAccessKey ?: config.auth.secretAccessKey!!}".toByteArray(),
+                "AWS4${config.auth.secretAccessKey!!}".toByteArray(),
                 dateStamp
             )
             val kRegion = hmacSHA256(kDate, config.auth.region.toString())
@@ -474,7 +509,7 @@ ${sha256Hex(canonicalRequest)}
         fun buildSigV4Headers(
             method: HttpMethod,
             payload: String,
-            config: AWSKeyMetadata
+            config: AWSKeyMetadata,
         ): Map<String, String> {
             val currentDateTime = Clock.System.now().toLocalDateTime(TimeZone.UTC)
             val dateStamp = currentDateTime.date.toString().replace("-", "")
@@ -494,13 +529,13 @@ ${sha256Hex(canonicalRequest)}
                 "AWS4-HMAC-SHA256", amzDate, credentialScope, canonicalRequest
             )
 
-            val signingKey = getSignatureKey(config, dateStamp)
+            val signingKey = getSignatureKey(config, dateStamp )
             val signature = generateSignature(signingKey, stringToSign)
 
             return mapOf(
                 "Authorization" to createAuthorizationHeader(
                     "AWS4-HMAC-SHA256",
-                    _accessAWS?.accessKeyId ?: config.auth.accessKeyId!!,
+                    config.auth.accessKeyId!!,
                     credentialScope,
                     signedHeaders,
                     signature
@@ -576,12 +611,19 @@ ${sha256Hex(canonicalRequest)}
         }
 
 
+    }
+
+
+    companion object : AWSKeyCreator {
+        private val client = HttpClient()
+
+
         @JvmBlocking
         @JvmAsync
         @JsPromise
         @JsExport.Ignore
         @OptIn(ExperimentalEncodingApi::class)
-        suspend fun getPublicKey(config: AWSKeyMetadata, keyId: String): Key {
+        suspend fun getPublicKey(config: AWSKeyMetadata, keyId: String , sessionToken : String?): Key {
             val method = HttpMethod.Post
             val body = """
 {
@@ -603,7 +645,7 @@ ${sha256Hex(canonicalRequest)}
                     headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
                     append(HttpHeaders.Host, awsKmsUrl)
                     append("X-Amz-Target", "TrentService.GetPublicKey") // Specific KMS action for ListKeys
-                    _accessAWS?.sessionToken?.takeIf { it.isNotEmpty() }?.let {
+                    sessionToken?.takeIf { it.isNotEmpty() }?.let {
                         append("X-Amz-Security-Token", it)
                     }
                 }
@@ -626,44 +668,12 @@ $public
             return keyJWK.getOrThrow()
         }
 
-        private suspend fun HttpResponse.awsJsonDataBody(): JsonObject {
-            val baseMsg = { "AWS server (URL: ${this.request.url}) returned an invalid response: " }
-
-            return runCatching {
-                // First, get the body as a string
-                val bodyStr = this.bodyAsText()
-
-                // Parse the string as JsonObject
-                Json.parseToJsonElement(bodyStr).jsonObject
-            }.getOrElse {
-                val bodyStr = this.bodyAsText() // Get the body in case of an exception
-                throw IllegalArgumentException(
-                    baseMsg.invoke() + if (bodyStr.isEmpty()) "empty response (instead of JSON data)"
-                    else "invalid response: $bodyStr"
-                )
-            }
-        }
-
-        private fun keyTypeToAwsKeyMapping(type: KeyType) = when (type) {
-            KeyType.secp256r1 -> "ECC_NIST_P256"
-            KeyType.secp256k1 -> "ECC_SECG_P256K1"
-            KeyType.RSA -> "RSA_2048"
-            else -> throw KeyTypeNotSupportedException(type.name)
-        }
-
-        private fun awsKeyToKeyTypeMapping(type: String) = when (type) {
-            "ECC_NIST_P256" -> KeyType.secp256r1
-            "ECC_SECG_P256K1" -> KeyType.secp256k1
-            "RSA_2048" -> KeyType.RSA
-            else -> throw KeyTypeNotSupportedException(type)
-        }
-
 
         @JsExport.Ignore
         override suspend fun generate(type: KeyType, config: AWSKeyMetadata): AWSKey {
-
+             var _accessAWS: AWSAuthConfiguration? = null
             if (config.auth.accessKeyId.isNullOrBlank() && config.auth.secretAccessKey.isNullOrBlank()) {
-                getAccess(config)
+               _accessAWS = getAccess(config)
             }
 
 
@@ -698,7 +708,7 @@ $public
 
             if (keyId.isNullOrEmpty()) throw KeyNotFoundException(message = "Key ID could not be determined")
 
-            val publicKey = getPublicKey(config, keyId.toString())
+            val publicKey = getPublicKey(config, keyId.toString() , _accessAWS?.sessionToken )
 
             return AWSKey(
                 config = config,
