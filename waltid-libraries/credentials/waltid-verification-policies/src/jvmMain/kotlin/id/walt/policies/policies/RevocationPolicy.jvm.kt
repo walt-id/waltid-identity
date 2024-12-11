@@ -47,7 +47,7 @@ actual class RevocationPolicy : RevocationPolicyMp() {
             val credentialSubject = payload["vc"]!!.jsonObject["credentialSubject"]?.jsonObject!!
             val encodedList = credentialSubject["encodedList"]?.jsonPrimitive?.content ?: ""
             val bitValue = get(encodedList, statusListIndex)
-            if (bitValue!![0].code == 0) {
+            if (StreamUtils.binToInt(bitValue!!.joinToString("")) == 0) {
                 Result.success(statusListCredentialUrl!!)
             } else {
                 Result.failure(Throwable("Credential has been revoked"))
@@ -66,6 +66,8 @@ object Base64Utils {
 
 object StreamUtils {
     private const val BITS_PER_BYTE = 8u
+
+    fun binToInt(bin: String) = bin.toInt(2)
 
     fun getBitValue(inputStream: InputStream, index: ULong, bitSize: Int): List<Char> = inputStream.use { stream ->
         //TODO: bitSize constraints
