@@ -201,6 +201,8 @@ class AndroidKey() : Key() {
         TODO("Not yet implemented")
     }
 
+    override suspend fun deleteKey(): Boolean = kotlin.runCatching { keyStore.deleteEntry(internalKeyId) }.isSuccess
+
     private fun getSignature(): Signature {
         val sig = when (keyType) {
             KeyType.secp256k1 -> Signature.getInstance(
