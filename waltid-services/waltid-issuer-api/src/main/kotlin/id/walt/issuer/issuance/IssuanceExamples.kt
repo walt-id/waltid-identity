@@ -864,6 +864,32 @@ object IssuanceExamples {
 
 
     //language=JSON
+    val issuerOnboardingRequestAwsRestApiExampleWithKubernetesRoleArn =
+        typedValueExampleDescriptorDsl<OnboardingRequest>(
+            """
+            {
+                "key":
+                {
+                    "backend": "aws",
+                    "keyType": "secp256r1",
+                    "config":
+                    {
+                       "auth": {
+                            "roleArn": "arn:aws:iam::123456789012:role/eksctl-cluster-nodegroup-ng-1-NodeInstanceRole-1GZJ1ZQ5QU5F",
+                            "region": "eu-central-1"
+                       }
+                      
+                    }
+                },
+                "did":
+                {
+                    "method": "jwk"
+                }
+            }
+        """.trimIndent()
+        )
+
+    //language=JSON
     val issuerOnboardingRequestAwsRestApiExampleWithDirectAccess = typedValueExampleDescriptorDsl<OnboardingRequest>(
         """
             {

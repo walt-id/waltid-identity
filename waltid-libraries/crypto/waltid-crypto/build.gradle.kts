@@ -98,6 +98,7 @@ kotlin {
             dependencies {
                 // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.6.0")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
