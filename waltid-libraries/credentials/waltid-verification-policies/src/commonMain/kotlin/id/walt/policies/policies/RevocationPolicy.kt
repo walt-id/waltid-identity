@@ -9,7 +9,7 @@ import kotlinx.serialization.json.JsonObject
 abstract class RevocationPolicyMp : CredentialWrapperValidatorPolicy(
 ) {
 
-    override val name = "revoked_status_list"
+    override val name = "revoked-status-list"
     override val description = "Verifies Credential Status"
     override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc)
 
