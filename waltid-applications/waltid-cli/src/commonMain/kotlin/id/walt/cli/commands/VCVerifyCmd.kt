@@ -57,7 +57,7 @@ class VCVerifyCmd : CliktCommand(
             "signature",
             "expired",
             "not-before",
-            "revoked_status_list",
+            "revoked-status-list",
             "schema",
             "allowed-issuer",
             "webhook",
@@ -75,7 +75,7 @@ class VCVerifyCmd : CliktCommand(
             |signature| - |
             |expired| - |
             |not-before| - |
-            |revoked_status_list| - |
+            |revoked-status-list| - |
             |schema|schema=/path/to/schema.json|
             |allowed-issuer|issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV|
             |webhook|url=https://example.com|
@@ -145,7 +145,7 @@ class VCVerifyCmd : CliktCommand(
         args.putAll(getAllowedIssuerPolicyArguments())
         args.putAll(getWebhookPolicyArguments())
         args.putAll(getRevocationPolicyArguments())
-        for (noArgPolicyName in listOf("signature", "expired", "not-before", "revoked_status_list")) {
+        for (noArgPolicyName in listOf("signature", "expired", "not-before", "revoked-status-list")) {
             if (noArgPolicyName in policies) {
                 args[noArgPolicyName] = "".toJsonElement()
             }
@@ -205,7 +205,7 @@ class VCVerifyCmd : CliktCommand(
 
     private fun getRevocationPolicyArguments(): Map<out String, JsonElement> {
         val args = mutableMapOf<String, JsonElement>()
-        if ("revoked_status_list" in policies) {
+        if ("revoked-status-list" in policies) {
             args["vc"] = vc.readText().toJsonElement()
         }
 
