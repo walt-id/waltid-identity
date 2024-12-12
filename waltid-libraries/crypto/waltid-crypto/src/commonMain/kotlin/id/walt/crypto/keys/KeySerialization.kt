@@ -6,16 +6,19 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.oci.OCIKeyRestApi
 import id.walt.crypto.keys.tse.TSEKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
+import kotlinx.serialization.serializer
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.reflect.KClass
 
 // TODO: Deprecate this in favour of KeyManager
 
@@ -23,7 +26,7 @@ import kotlin.js.JsExport
 @JsExport
 object KeySerialization {
 
-    private val keySerializationModule = SerializersModule {
+    private var keySerializationModule = SerializersModule {
         polymorphic(Key::class) {
             subclass(JWKKey::class)
             subclass(TSEKey::class)
@@ -31,11 +34,30 @@ object KeySerialization {
             subclass(AWSKeyRestAPI::class)
             subclass(AzureKey::class)
         }
+
     }
 
-    private val keySerializationJson = Json {
+    private var keySerializationJson = Json {
         serializersModule =
             keySerializationModule
+    }
+
+    @OptIn(InternalSerializationApi::class)
+    fun <T : Key> registerExternalKeyType(keyClass: KClass<T>) {
+        keySerializationModule = SerializersModule {
+            polymorphic(Key::class) {
+                subclass(JWKKey::class)
+                subclass(TSEKey::class)
+                subclass(OCIKeyRestApi::class)
+                subclass(AWSKeyRestAPI::class)
+                subclass(AzureKey::class)
+                subclass(keyClass, keyClass.serializer())
+            }
+        }
+
+        keySerializationJson = Json {
+            serializersModule = keySerializationModule
+        }
     }
 
     fun serializeKey(key: Key): String = keySerializationJson.encodeToString(key)
