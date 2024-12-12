@@ -320,6 +320,7 @@ class WaltidServicesE2ETests {
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
         lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
+        lspPotentialWallet.testPresentationDefinitionCredentialMatching()
 
         //endregion -Exchange / presentation-
 
@@ -346,6 +347,12 @@ class WaltidServicesE2ETests {
         //region -External Signatures-
         ExchangeExternalSignatures().executeTestCases()
         //endregion -External Signatures-
+
+        // Input descriptor matching test
+        val inputDescTest = InputDescriptorMatchingTest(issuerApi, exchangeApi, sessionApi, verificationApi)
+        //cleanup credentials
+        credentialsApi.delete(wallet, newCredentialId)
+        inputDescTest.e2e(wallet, did)
     }
 
     /* @Test // enable to execute test selectively
