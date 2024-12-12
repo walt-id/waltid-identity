@@ -1,6 +1,6 @@
 package id.walt.crypto.keys
 
-import id.walt.crypto.keys.aws.AWSKey
+import id.walt.crypto.keys.aws.AWSKeyRestAPI
 import id.walt.crypto.keys.azure.AzureKey
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.oci.OCIKeyRestApi
@@ -28,7 +28,7 @@ object KeySerialization {
             subclass(JWKKey::class)
             subclass(TSEKey::class)
             subclass(OCIKeyRestApi::class)
-            subclass(AWSKey::class)
+            subclass(AWSKeyRestAPI::class)
             subclass(AzureKey::class)
         }
     }
