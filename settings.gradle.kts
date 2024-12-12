@@ -18,6 +18,7 @@ val modules = listOf(
     * "$libraries:crypto".group(
         "waltid-crypto",
         "waltid-crypto-oci",
+        "crypto:waltid-crypto-aws",
         "waltid-crypto-android" whenEnabled enableAndroidBuild,
         "waltid-crypto-ios" whenEnabled enableIosBuild,
         "waltid-target-ios" whenEnabled enableIosBuild,
