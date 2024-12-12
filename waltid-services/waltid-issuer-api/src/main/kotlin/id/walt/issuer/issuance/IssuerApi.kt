@@ -128,6 +128,10 @@ fun Application.issuerApi() {
                             "did:jwk + Azure REST API key  (Azure - Secp256r1)",
                             IssuanceExamples.issuerOnboardingRequestAzureRestApiExample
                         )
+                        example(
+                            "did:jwk + AWS SDK key  (AWS - Secp256r1)",
+                            IssuanceExamples.issuerOnboardingRequestAwsSdkExample
+                        )
                         required = true
                     }
                 }
