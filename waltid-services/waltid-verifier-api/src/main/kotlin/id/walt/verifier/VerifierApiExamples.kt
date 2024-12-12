@@ -114,7 +114,7 @@ object VerifierApiExamples {
         """
             {
                 "vp_policies": $vpPolicyMinMaxData,
-                "vc_policies": ${vcPoliciesData("\"revoked_status_list\"")},
+                "vc_policies": ${vcPoliciesData("\"revoked-status-list\"")},
                 "request_credentials":
                 [
                     { "format": "jwt_vc_json", "type": "OpenBadgeCredential" },
@@ -131,7 +131,7 @@ object VerifierApiExamples {
         """
             {
                 "vp_policies": $vpPolicyMinMaxData,
-                "vc_policies": ${vcPoliciesData("\"revoked_status_list\"")},
+                "vc_policies": ${vcPoliciesData("\"revoked-status-list\"")},
                 "request_credentials":
                 [
                     { "format": "jwt_vc_json", "type": "VerifiableId" },
@@ -157,7 +157,7 @@ object VerifierApiExamples {
         """
             {
                 "vp_policies": $vpPolicyMinMaxData,
-                "vc_policies": ${vcPoliciesData("\"revoked_status_list\"")},
+                "vc_policies": ${vcPoliciesData("\"revoked-status-list\"")},
                 "request_credentials":
                 [
                     { "format": "jwt_vc_json", "type": "VerifiableId" },
@@ -229,7 +229,7 @@ object VerifierApiExamples {
     val EbsiVerifiablePDA1 = jsonObjectValueExampleDescriptorDsl(
         """
             {
-                "vc_policies": ${vcPoliciesData("\"revoked_status_list\"")},
+                "vc_policies": ${vcPoliciesData("\"revoked-status-list\"")},
                 "request_credentials":
                 [
                     { "input_descriptor": {

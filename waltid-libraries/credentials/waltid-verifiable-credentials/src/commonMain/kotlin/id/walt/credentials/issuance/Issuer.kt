@@ -116,7 +116,8 @@ object Issuer {
         val issuerDid = if(DidUtils.isDidUrl(issuerId)) issuerId else null
         w3cVc.signSdJwt(
             issuerKey = issuerKey,
-            issuerKeyId = getKidHeader(issuerKey, issuerDid),
+            issuerId = issuerId,
+            issuerKid = getKidHeader(issuerKey, issuerDid),
             subjectDid = subjectDid,
             disclosureMap = disclosureMap,
             additionalJwtHeaders = additionalJwtHeaders.toMutableMap().apply {
