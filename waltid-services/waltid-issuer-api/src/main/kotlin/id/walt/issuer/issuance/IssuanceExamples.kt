@@ -870,7 +870,7 @@ object IssuanceExamples {
             {
                 "key":
                 {
-                    "backend": "aws",
+                    "backend": "aws-rest-api",
                     "keyType": "secp256r1",
                     "config":
                     {
@@ -919,7 +919,7 @@ object IssuanceExamples {
             {
                 "key":
                 {
-                    "backend": "aws",
+                    "backend": "aws-rest-api",
                     "keyType": "secp256r1",
                     "config":
                     {
