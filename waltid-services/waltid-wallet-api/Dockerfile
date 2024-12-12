@@ -7,6 +7,7 @@ COPY waltid-libraries/protocols/waltid-openid4vc/build.gradle.kts /work/waltid-l
 COPY waltid-libraries/sdjwt/waltid-sdjwt/build.gradle.kts /work/waltid-libraries/sdjwt/waltid-sdjwt/
 COPY waltid-libraries/crypto/waltid-crypto/build.gradle.kts /work/waltid-libraries/crypto/waltid-crypto/
 COPY waltid-libraries/crypto/waltid-crypto-oci/build.gradle.kts /work/waltid-libraries/crypto/waltid-crypto-oci/
+COPY waltid-libraries/crypto/waltid-crypto-aws/build.gradle.kts /work/waltid-libraries/crypto/waltid-crypto-aws/
 COPY waltid-libraries/waltid-did/build.gradle.kts /work/waltid-libraries/waltid-did/
 COPY waltid-libraries/credentials/waltid-mdoc-credentials/build.gradle.kts /work/waltid-libraries/credentials/waltid-mdoc-credentials/
 COPY waltid-libraries/credentials/waltid-verifiable-credentials/build.gradle.kts /work/waltid-libraries/credentials/waltid-verifiable-credentials/
@@ -27,6 +28,7 @@ COPY waltid-libraries/protocols/waltid-openid4vc/. /work/waltid-libraries/protoc
 COPY waltid-libraries/sdjwt/waltid-sdjwt/. /work/waltid-libraries/sdjwt/waltid-sdjwt
 COPY waltid-libraries/crypto/waltid-crypto/. /work/waltid-libraries/crypto/waltid-crypto
 COPY waltid-libraries/crypto/waltid-crypto-oci/. /work/waltid-libraries/crypto/waltid-crypto-oci
+COPY waltid-libraries/crypto/waltid-crypto-aws/build.gradle.kts /work/waltid-libraries/crypto/waltid-crypto-aws/
 COPY waltid-libraries/waltid-did/. /work/waltid-libraries/waltid-did
 COPY waltid-libraries/credentials/waltid-mdoc-credentials/. /work/waltid-libraries/credentials/waltid-mdoc-credentials
 COPY waltid-libraries/credentials/waltid-verifiable-credentials/. /work/waltid-libraries/credentials/waltid-verifiable-credentials
