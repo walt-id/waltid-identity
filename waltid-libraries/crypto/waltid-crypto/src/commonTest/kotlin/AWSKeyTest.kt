@@ -1,7 +1,7 @@
 import AWSKeyTest.Config.payloadJWS
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.aws.AWSAuth
-import id.walt.crypto.keys.aws.AWSKey
+import id.walt.crypto.keys.aws.AWSKeyRestAPI
 import id.walt.crypto.keys.aws.AWSKeyMetadata
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.test.runTest
@@ -43,7 +43,7 @@ class AWSKeyTest {
     }.fold(onSuccess = { it }, onFailure = { false })
 
 
-    lateinit var keys: List<AWSKey>
+    lateinit var keys: List<AWSKeyRestAPI>
 
 
     @Test
@@ -77,7 +77,7 @@ class AWSKeyTest {
         )
 
         keys = Config.TESTABLE_KEY_TYPES.map {
-            AWSKey.generate(it, awsMetadata).also { key ->
+            AWSKeyRestAPI.generate(it, awsMetadata).also { key ->
                 println("Generated key: ${key.keyType} - ${key.getKeyId()}")
                 assertNotNull(key, "Key generation failed for $it")
                 assertNotNull(key.getKeyId(), "Key ID should not be null")
