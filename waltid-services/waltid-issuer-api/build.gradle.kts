@@ -92,6 +92,8 @@ dependencies {
 
     // walt.id
     api(project(":waltid-libraries:crypto:waltid-crypto"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto-aws"))
+
     api(project(":waltid-libraries:waltid-did"))
 
     api(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
