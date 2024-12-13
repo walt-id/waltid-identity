@@ -18,7 +18,7 @@ val modules = listOf(
     * "$libraries:crypto".group(
         "waltid-crypto",
         "waltid-crypto-oci",
-        "crypto:waltid-crypto-aws",
+        "waltid-crypto-aws",
         "waltid-crypto-android" whenEnabled enableAndroidBuild,
         "waltid-crypto-ios" whenEnabled enableIosBuild,
         "waltid-target-ios" whenEnabled enableIosBuild,
@@ -95,5 +95,5 @@ plugins {
 }
 
 rootProject.name = "waltid-identity"
-include("waltid-libraries:crypto:waltid-crypto-aws")
-findProject(":waltid-libraries:crypto:waltid-crypto-aws")?.name = "waltid-crypto-aws"
+//include("waltid-libraries:crypto:waltid-crypto-aws")
+//findProject(":waltid-libraries:crypto:waltid-crypto-aws")?.name = "waltid-crypto-aws"
