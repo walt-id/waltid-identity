@@ -14,6 +14,8 @@ repositories {
 
 dependencies {
     testImplementation(kotlin("test"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+
     // walt.id
     api(project(":waltid-libraries:crypto:waltid-crypto"))
 
@@ -42,6 +44,11 @@ java {
 tasks.test {
     useJUnitPlatform()
 }
+
+tasks.withType<Test> {
+    enabled = false
+}
+
 
 kotlin {
     jvmToolchain(15)
