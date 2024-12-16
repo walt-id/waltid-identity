@@ -20,9 +20,9 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlin.test.*
 
-class IssuerDraft10(private val client: HttpClient)  {
+class IssuerDraft11(private val client: HttpClient)  {
 
-    fun testIssuerAPIDraft10AuthFlowWithJar(issuanceReq: IssuanceRequest) = runBlocking {
+    fun testIssuerAPIDraft11AuthFlowWithJar(issuanceReq: IssuanceRequest) = runBlocking {
         lateinit var offerUrl: String
         lateinit var issuerState: String
         lateinit var authJarTokenRequest: AuthorizationRequest
@@ -35,7 +35,7 @@ class IssuerDraft10(private val client: HttpClient)  {
 
         val offerUrlParams = Url(offerUrl).parameters.toMap()
         val offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)
-        val credOffer = client.get(offerObj.credentialOfferUri!!).body<CredentialOffer.Draft10>()
+        val credOffer = client.get(offerObj.credentialOfferUri!!).body<CredentialOffer.Draft11>()
 
         assertNotNull(credOffer.credentialIssuer)
         assertNotNull(credOffer.credentials)
@@ -47,7 +47,7 @@ class IssuerDraft10(private val client: HttpClient)  {
         val jsonElementMetadata = Json.parseToJsonElement(rawJsonMetadata)
         assertTrue(jsonElementMetadata.jsonObject["credentials_supported"] is JsonArray, "Expected credentials_supported in Open ID Provider Metadata to be a JsonArray")
 
-        val issuerMetadata = OpenIDProviderMetadata.fromJSONString(rawJsonMetadata) as OpenIDProviderMetadata.Draft10
+        val issuerMetadata = OpenIDProviderMetadata.fromJSONString(rawJsonMetadata) as OpenIDProviderMetadata.Draft11
         assertNull(issuerMetadata.authorizationServer)
         assertContains(issuerMetadata.grantTypesSupported, GrantType.authorization_code)
         assertContains(issuerMetadata.grantTypesSupported, GrantType.pre_authorized_code)
@@ -184,7 +184,7 @@ class IssuerDraft10(private val client: HttpClient)  {
     }
 
     private fun validateAuthorizationData(
-        issuerMetadata: OpenIDProviderMetadata. Draft10,
+        issuerMetadata: OpenIDProviderMetadata. Draft11,
         holderAuthorizationRequest: AuthorizationRequest,
         jarPayload: Map<String, Any?>? = null,
         issuerAuthorizationRequest: AuthorizationRequest? = null

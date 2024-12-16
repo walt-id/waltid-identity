@@ -7,9 +7,7 @@ import COSE.OneKey
 import cbor.Cbor
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
-import com.sksamuel.hoplite.ConfigException
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.config.ConfigurationException
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
@@ -68,7 +66,7 @@ import kotlin.uuid.ExperimentalUuidApi
 @OptIn(ExperimentalUuidApi::class)
 open class CIProvider(
     val baseUrl: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.Draft13.versionString}"},
-    val baseUrlDraft10: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.Draft10.versionString}"},
+    val baseUrlDraft11: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.Draft11.versionString}"},
 
     val config: CredentialIssuerConfig = CredentialIssuerConfig(credentialConfigurationsSupported = ConfigManager.getConfig<CredentialTypeConfig>().parse())
 ) {
@@ -76,8 +74,8 @@ open class CIProvider(
     val metadata
         get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrl, config.credentialConfigurationsSupported, OpenID4VCIVersion.Draft13) as OpenIDProviderMetadata.Draft13)
 
-    val metadataDraft10
-        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrlDraft10, config.credentialConfigurationsSupported, OpenID4VCIVersion.Draft10) as OpenIDProviderMetadata.Draft10)
+    val metadataDraft11
+        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrlDraft11, config.credentialConfigurationsSupported, OpenID4VCIVersion.Draft11) as OpenIDProviderMetadata.Draft11)
 
     companion object {
         private val log = KotlinLogging.logger { }
@@ -605,7 +603,7 @@ open class CIProvider(
     private fun resolveBaseUrl(version: OpenID4VCIVersion): String {
         return when (version) {
             OpenID4VCIVersion.Draft13 -> baseUrl
-            OpenID4VCIVersion.Draft10 -> baseUrlDraft10
+            OpenID4VCIVersion.Draft11 -> baseUrlDraft11
             else -> throw IllegalArgumentException("Unsupported version: $version")
         }
     }
@@ -633,7 +631,7 @@ open class CIProvider(
         val version = OpenID4VCIVersion.from(standardVersion ?: throw IllegalArgumentException("standardVersion parameter is required"))
 
         return when (version) {
-            OpenID4VCIVersion.Draft10 -> metadataDraft10
+            OpenID4VCIVersion.Draft11 -> metadataDraft11
             OpenID4VCIVersion.Draft13 -> metadata
         }
     }

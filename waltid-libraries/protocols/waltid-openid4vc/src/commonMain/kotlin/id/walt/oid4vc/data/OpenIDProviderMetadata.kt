@@ -104,7 +104,7 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
     abstract val opPolicyUri: String?
     abstract val opTosUri: String?
 
-    // OID4VCI Draft 10 and Draft 13 properties
+    // OID4VCI Draft 11 and Draft 13 properties
     abstract val credentialIssuer: String?
     abstract val credentialEndpoint: String?
     abstract val batchCredentialEndpoint: String?
@@ -121,7 +121,7 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
     }
 
     @Serializable
-    data class Draft10(
+    data class Draft11(
         @SerialName("issuer") override val issuer: String? = null,
         @SerialName("authorization_endpoint") override val authorizationEndpoint: String? = null,
         @SerialName("pushed_authorization_request_endpoint") override val pushedAuthorizationRequestEndpoint: String? = null,
@@ -177,7 +177,7 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
         @SerialName("require_pushed_authorization_requests") override val requirePushedAuthorizationRequests: Boolean? = null,
         @SerialName("dpop_signing_alg_values_supported") override val dpopSigningAlgValuesSupported: Set<String>? = null,
 
-        // OID4VCI 10
+        // OID4VCI 11
         @SerialName("credentials_supported") @Serializable(CredentialSupportedArraySerializer::class) val credentialSupported: Map<String, CredentialSupported>? = null,
         @SerialName("authorization_server") val authorizationServer: String? = null,
 
@@ -304,7 +304,7 @@ object OpenIDProviderMetadataSerializer : KSerializer<OpenIDProviderMetadata> {
 
         // TODO: ()
         return when {
-            "credentials_supported" in jsonObject -> Json.decodeFromJsonElement(OpenIDProviderMetadata.Draft10.serializer(), jsonObject)
+            "credentials_supported" in jsonObject -> Json.decodeFromJsonElement(OpenIDProviderMetadata.Draft11.serializer(), jsonObject)
             "credential_configurations_supported" in jsonObject -> Json.decodeFromJsonElement(OpenIDProviderMetadata.Draft13.serializer(), jsonObject)
             else -> throw IllegalArgumentException("Unknown OpenIDProviderMetadata version: missing expected fields")
         }
@@ -312,7 +312,7 @@ object OpenIDProviderMetadataSerializer : KSerializer<OpenIDProviderMetadata> {
 
     private val OpenIDProviderMetadataSerializersModule = SerializersModule {
         polymorphic(OpenIDProviderMetadata::class) {
-            subclass(OpenIDProviderMetadata.Draft10::class, OpenIDProviderMetadata.Draft10.serializer())
+            subclass(OpenIDProviderMetadata.Draft11::class, OpenIDProviderMetadata.Draft11.serializer())
             subclass(OpenIDProviderMetadata.Draft13::class, OpenIDProviderMetadata.Draft13.serializer())
         }
     }
