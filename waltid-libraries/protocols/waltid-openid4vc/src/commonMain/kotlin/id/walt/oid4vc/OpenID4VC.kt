@@ -151,7 +151,7 @@ object OpenID4VC {
     presentationDefinition: PresentationDefinition? = null,
   ): AuthorizationCodeWithAuthorizationRequestResponse {
 
-    providerMetadata.castOrNull<OpenIDProviderMetadata.Draft10>()
+    providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
       ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
       ?: error("Unknown metadata type: $providerMetadata")
 
@@ -216,7 +216,7 @@ object OpenID4VC {
         message = "Invalid response type ${authorizationRequest.responseType}, for authorization code flow."
       )
 
-    providerMetadata.castOrNull<OpenIDProviderMetadata.Draft10>()
+    providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
       ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
       ?: error("Unknown metadata type: $providerMetadata")
 
@@ -226,7 +226,7 @@ object OpenID4VC {
   }
 
   suspend fun processImplicitFlowAuthorization(authorizationRequest: AuthorizationRequest, sessionId: String, providerMetadata: OpenIDProviderMetadata, tokenKey: Key): TokenResponse {
-    providerMetadata.castOrNull<OpenIDProviderMetadata.Draft10>()
+    providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
       ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
       ?: error("Unknown metadata type: $providerMetadata")
 
@@ -249,7 +249,7 @@ object OpenID4VC {
   }
 
   suspend fun processDirectPost(authorizationRequest: AuthorizationRequest, sessionId: String, providerMetadata: OpenIDProviderMetadata, tokenKey: Key): AuthorizationCodeResponse {
-    providerMetadata.castOrNull<OpenIDProviderMetadata.Draft10>()
+    providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
       ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
       ?: error("Unknown metadata type: $providerMetadata")
 

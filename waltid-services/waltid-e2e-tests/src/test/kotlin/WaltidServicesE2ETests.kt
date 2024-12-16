@@ -340,24 +340,24 @@ class WaltidServicesE2ETests {
         val authorizationCodeFlow = AuthorizationCodeFlow(testHttpClient(doFollowRedirects = false))
         authorizationCodeFlow.testIssuerAPI()
 
-        // Test Issuer Draft 10
-        val issuerDraft10 = IssuerDraft10(testHttpClient(doFollowRedirects = false))
+        // Test Issuer Draft 11
+        val issuerDraft11 = IssuerDraft11(testHttpClient(doFollowRedirects = false))
 
         val idTokenIssuanceReq = Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-id-token.json")).copy(
             credentialConfigurationId = "OpenBadgeCredential_jwt_vc",
-            standardVersion = OpenID4VCIVersion.Draft10,
+            standardVersion = OpenID4VCIVersion.Draft11,
             useJar = true
         )
 
-        issuerDraft10.testIssuerAPIDraft10AuthFlowWithJar(idTokenIssuanceReq)
+        issuerDraft11.testIssuerAPIDraft11AuthFlowWithJar(idTokenIssuanceReq)
 
         val vpTokenIssuanceReq = Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-vp-token.json")).copy(
             credentialConfigurationId = "OpenBadgeCredential_jwt_vc",
-            standardVersion = OpenID4VCIVersion.Draft10,
+            standardVersion = OpenID4VCIVersion.Draft11,
             useJar = true
         )
 
-        issuerDraft10.testIssuerAPIDraft10AuthFlowWithJar(vpTokenIssuanceReq)
+        issuerDraft11.testIssuerAPIDraft11AuthFlowWithJar(vpTokenIssuanceReq)
 
 
         // Test External Signature API Endpoints

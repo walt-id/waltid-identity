@@ -29,7 +29,7 @@ object OidcIssuance {
     fun issuanceRequestsToCredentialOfferBuilder(vararg issuanceRequests: IssuanceRequest, standardVersion: OpenID4VCIVersion): CredentialOffer.Builder<*> {
         val builder = when (standardVersion) {
             OpenID4VCIVersion.Draft13 -> CredentialOffer.Draft13.Builder(OidcApi.baseUrl)
-            OpenID4VCIVersion.Draft10 -> CredentialOffer.Draft10.Builder(OidcApi.baseUrlDraft10)
+            OpenID4VCIVersion.Draft11 -> CredentialOffer.Draft11.Builder(OidcApi.baseUrlDraft11)
         }
 
         issuanceRequests.forEach { issuanceRequest ->

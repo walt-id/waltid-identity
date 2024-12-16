@@ -68,9 +68,9 @@ data class CredentialSupported(
     val scope: String? = null,
     @SerialName("vct") val vct: String? = null,
     @SerialName("cryptographic_binding_methods_supported") val cryptographicBindingMethodsSupported: Set<String>? = null,
-    @SerialName("id") val id: String? = null, // for draft 10
-    @SerialName("cryptographic_suites_supported") val cryptographicSuitesSupported: Set<String>? = null,  // for draft 10
-    val types: List<String>? = null, // for draft 10
+    @SerialName("id") val id: String? = null, // for draft 11
+    @SerialName("cryptographic_suites_supported") val cryptographicSuitesSupported: Set<String>? = null,  // for draft 11
+    val types: List<String>? = null, // for draft 11
     @SerialName("credential_signing_alg_values_supported") val credentialSigningAlgValuesSupported: Set<String>? = null,
     @SerialName("proof_types_supported") val proofTypesSupported: Map<ProofType, ProofTypeMetadata>? = null,
     @Serializable(DisplayPropertiesListSerializer::class) val display: List<DisplayProperties>? = null,
@@ -111,7 +111,7 @@ object CredentialSupportedMapSerializer : KSerializer<Map<String, CredentialSupp
 
 /**
  * The JsonDecoder attempts to deserialize the `credentials_supported` field.
- * For Draft10, the `credentials_supported` field is represented as a JsonArray.
+ * For Draft11, the `credentials_supported` field is represented as a JsonArray.
  * However, the expected structure for a `Map<String, CredentialSupported>` is a JsonObject
  */
 

@@ -149,13 +149,13 @@ object OpenID4VCI {
 
     fun resolveOfferedCredentials(credentialOffer: CredentialOffer, providerMetadata: OpenIDProviderMetadata): List<OfferedCredential> {
         val supportedCredentials = when (providerMetadata) {
-            is OpenIDProviderMetadata.Draft10 -> providerMetadata.credentialSupported ?: mapOf()
+            is OpenIDProviderMetadata.Draft11 -> providerMetadata.credentialSupported ?: mapOf()
             is OpenIDProviderMetadata.Draft13 -> providerMetadata.credentialConfigurationsSupported ?: mapOf()
         }
 
         val credentialIds = when (credentialOffer) {
             is CredentialOffer.Draft13 -> credentialOffer.credentialConfigurationIds
-            is CredentialOffer.Draft10 -> credentialOffer.credentials
+            is CredentialOffer.Draft11 -> credentialOffer.credentials
         }
 
         return credentialIds.mapNotNull { id ->
@@ -351,7 +351,7 @@ object OpenID4VCI {
                 credentialConfigurationsSupported = credentialSupported
             )
 
-            OpenID4VCIVersion.Draft10 -> OpenIDProviderMetadata.Draft10(
+            OpenID4VCIVersion.Draft11 -> OpenIDProviderMetadata.Draft11(
                 issuer = baseUrl,
                 authorizationEndpoint = "$baseUrl/authorize",
                 pushedAuthorizationRequestEndpoint = "$baseUrl/par",
@@ -425,7 +425,7 @@ object OpenID4VCI {
         }
         val supportedCredentialFormats = when (openIDProviderMetadata) {
             is OpenIDProviderMetadata.Draft13 -> openIDProviderMetadata.credentialConfigurationsSupported?.values?.map { it.format }?.toSet() ?: setOf()
-            is OpenIDProviderMetadata.Draft10 -> openIDProviderMetadata.credentialSupported?.values?.map { it.format }?.toSet() ?: setOf()
+            is OpenIDProviderMetadata.Draft11 -> openIDProviderMetadata.credentialSupported?.values?.map { it.format }?.toSet() ?: setOf()
         }
 
         if (!supportedCredentialFormats.contains(credentialRequest.format))
@@ -531,13 +531,13 @@ object OpenID4VCI {
 
 
 enum class OpenID4VCIVersion(val versionString: String) {
-    Draft10("draft10"),
+    Draft11("draft11"),
     Draft13("draft13");
 
     companion object {
         fun from(version: String): OpenID4VCIVersion {
             return entries.find { it.versionString == version }
-                ?: throw IllegalArgumentException("Unsupported version: $version. Supported Versions are: Draft13 -> d13 and Draft10 -> d10")
+                ?: throw IllegalArgumentException("Unsupported version: $version. Supported Versions are: Draft13 -> draft13 and Draft11 -> draft11")
         }
     }
 }

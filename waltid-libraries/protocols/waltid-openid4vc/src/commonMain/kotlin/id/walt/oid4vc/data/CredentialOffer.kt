@@ -71,7 +71,7 @@ sealed class CredentialOffer() : JsonDataObject() {
     }
 
     @Serializable
-    data class Draft10 (
+    data class Draft11 (
         @SerialName("credential_issuer") override val credentialIssuer: String,
         @SerialName("grants") override val grants: Map<String, GrantDetails> = mapOf(),
 
@@ -80,9 +80,9 @@ sealed class CredentialOffer() : JsonDataObject() {
         override val customParameters: Map<String, JsonElement> = mapOf()
     ) : CredentialOffer() {
 
-        class Builder(credentialIssuer: String) : CredentialOffer.Builder<Draft10>(credentialIssuer) {
+        class Builder(credentialIssuer: String) : CredentialOffer.Builder<Draft11>(credentialIssuer) {
 
-            override fun buildInternal() = Draft10(
+            override fun buildInternal() = Draft11(
                 credentialIssuer = credentialIssuer,
                 grants = grants,
                 credentials = supportedCredentialIds
@@ -107,14 +107,14 @@ object CredentialOfferSerializer : KSerializer<CredentialOffer> {
         // TODO: ()
         return when {
             "credential_configuration_ids" in jsonObject -> Json.decodeFromJsonElement(CredentialOffer.Draft13.serializer(), jsonObject)
-            "credentials" in jsonObject -> Json.decodeFromJsonElement(CredentialOffer.Draft10.serializer(), jsonObject)
+            "credentials" in jsonObject -> Json.decodeFromJsonElement(CredentialOffer.Draft11.serializer(), jsonObject)
             else -> throw IllegalArgumentException("Unknown CredentialOffer type: missing expected fields")
         }
     }
 
     private val CredentialOfferSerializersModule = SerializersModule {
         polymorphic(CredentialOffer::class) {
-            subclass(CredentialOffer.Draft10::class, CredentialOffer.Draft10.serializer())
+            subclass(CredentialOffer.Draft11::class, CredentialOffer.Draft11.serializer())
             subclass(CredentialOffer.Draft13::class, CredentialOffer.Draft13.serializer())
         }
     }
