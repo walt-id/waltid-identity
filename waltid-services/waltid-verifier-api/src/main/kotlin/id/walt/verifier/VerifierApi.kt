@@ -427,7 +427,7 @@ fun Application.verfierApi() {
                     add("signature")
                     add("expired")
                     add("not-before")
-                    add("revoked_status_list")
+                    add("revoked-status-list")
                 },
                 presentationDefinitionJson = when (scope.contains("openid ver_test:vp_token")) {
                     true -> Json.parseToJsonElement(fixedPresentationDefinitionForEbsiConformanceTest).jsonObject
@@ -458,7 +458,7 @@ private fun getErrorDescription(it: Throwable): String? = when (it.message) {
     "Verification policies did not succeed: not-before" ->
         "<\$presentation_submission.descriptor_map[x].id> is not yet valid"
 
-    "Verification policies did not succeed: revoked_status_list" ->
+    "Verification policies did not succeed: revoked-status-list" ->
         "<\$presentation_submission.descriptor_map[x].id> is revoked"
 
     else -> null

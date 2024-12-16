@@ -72,7 +72,6 @@ open class CIProvider(
 
     val config: CredentialIssuerConfig = CredentialIssuerConfig(credentialConfigurationsSupported = ConfigManager.getConfig<CredentialTypeConfig>().parse())
 ) {
-    private val log = KotlinLogging.logger { }
 
     val metadata
         get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrl, config.credentialConfigurationsSupported, OpenID4VCIVersion.Draft13) as OpenIDProviderMetadata.Draft13)
@@ -81,7 +80,7 @@ open class CIProvider(
         get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrlDraft10, config.credentialConfigurationsSupported, OpenID4VCIVersion.Draft10) as OpenIDProviderMetadata.Draft10)
 
     companion object {
-
+        private val log = KotlinLogging.logger { }
         private val http = HttpClient() {
             install(ContentNegotiation) {
                 json()
@@ -99,13 +98,14 @@ open class CIProvider(
 
         suspend fun sendCallback(sessionId: String, type: String, data: JsonObject, callbackUrl: String) {
             try {
-                http.post(callbackUrl.replace("\$id", sessionId)) {
+                val response = http.post(callbackUrl.replace("\$id", sessionId)) {
                     setBody(buildJsonObject {
                         put("id", sessionId)
                         put("type", type)
                         put("data", data)
                     })
                 }
+                log.trace { "Sent issuance status callback: $callbackUrl, $type, $sessionId; respone: ${response.status}" }
             } catch (ex: Exception) {
                 throw IllegalArgumentException("Error sending HTTP POST request to issuer callback url.", ex)
             }
@@ -241,7 +241,10 @@ open class CIProvider(
                         issuerKey = resolvedIssuerKey,
                         selectiveDisclosure = request.selectiveDisclosure,
                         dataMapping = request.mapping,
-                        x5Chain = request.x5Chain)
+                        x5Chain = request.x5Chain).also {
+                        if(!issuanceSession.callbackUrl.isNullOrEmpty())
+                            sendCallback(issuanceSession.id, "sdjwt_issue", buildJsonObject { put("sdjwt", it) }, issuanceSession.callbackUrl)
+                    }
                   else -> OpenID4VCI.generateW3CJwtVC(
                       credentialRequest = credentialRequest,
                       credentialData = vc,
@@ -251,7 +254,10 @@ open class CIProvider(
                       selectiveDisclosure = request.selectiveDisclosure,
                       dataMapping = request.mapping,
                       x5Chain = request.x5Chain
-                  )
+                  ).also {
+                      if(!issuanceSession.callbackUrl.isNullOrEmpty())
+                          sendCallback(issuanceSession.id, "jwt_issue", buildJsonObject { put("jwt", it) }, issuanceSession.callbackUrl)
+                  }
               }
             }.also { log.debug { "Respond VC: $it" } }
         }))
@@ -588,7 +594,12 @@ open class CIProvider(
             cNonce = generateProofOfPossessionNonceFor(session).cNonce,
             cNonceExpiresIn = session.expirationTimestamp - Clock.System.now(),
             state = session.authorizationRequest?.state
-        )
+        ).also {
+            if(!session.callbackUrl.isNullOrEmpty())
+                sendCallback(sessionId, "requested_token", buildJsonObject {
+                    put("request", Json.encodeToJsonElement(session.issuanceRequests.first()))
+                }, session.callbackUrl)
+        }
     }
 
     private fun resolveBaseUrl(version: OpenID4VCIVersion): String {

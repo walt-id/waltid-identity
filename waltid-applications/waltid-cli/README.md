@@ -512,7 +512,7 @@ Usage: waltid vc verify [<options>] <vc>
   ╰─────────────────────────────────────────────────────────────────────────────────────────╯
 
 Options:
-  -p, --policy=(signature|expired|not-before|revoked_status_list|schema|allowed-issuer|webhook)
+  -p, --policy=(signature|expired|not-before|revoked-status-list|schema|allowed-issuer|webhook)
                      Specify one, or more policies to be applied during the verification process of the VC (signature policy is always applied).
   -a, --arg=<value>  Argument required by some policies, namely:
 
@@ -525,7 +525,7 @@ Options:
                      ├─────────────────────┼─────────────────────────────────────────────────────────────────┤
                      │ not-before          │ -                                                               │
                      ├─────────────────────┼─────────────────────────────────────────────────────────────────┤
-                     │ revoked_status_list │ -                                                               │
+                     │ revoked-status-list │ -                                                               │
                      ├─────────────────────┼─────────────────────────────────────────────────────────────────┤
                      │ schema              │ schema=/path/to/schema.json                                     │
                      ├─────────────────────┼─────────────────────────────────────────────────────────────────┤
