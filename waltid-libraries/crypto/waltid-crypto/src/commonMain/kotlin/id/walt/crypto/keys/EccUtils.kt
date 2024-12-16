@@ -1,5 +1,7 @@
 package id.walt.crypto.keys
 
+import kotlin.experimental.and
+
 object EccUtils {
 
 
@@ -88,4 +90,51 @@ object EccUtils {
         return fixedLengthR + fixedLengthS
     }
 
+
+    fun convertP1363toDER(p1363Signature: ByteArray): ByteArray {
+        val keySize = p1363Signature.size / 2
+        if (p1363Signature.size % 2 != 0 || keySize == 0) {
+            throw IllegalArgumentException("Invalid P1363 signature format")
+        }
+
+        // Split P1363 signature into r and s values
+        val r = p1363Signature.sliceArray(0 until keySize)
+        val s = p1363Signature.sliceArray(keySize until p1363Signature.size)
+
+        // Convert r and s to ASN.1 integer encoding
+        val encodedR = encodeAsASN1Integer(r)
+        val encodedS = encodeAsASN1Integer(s)
+
+        // Combine r and s into a DER SEQUENCE
+        val sequenceLength = encodedR.size + encodedS.size
+        val der = mutableListOf<Byte>()
+
+        // DER Sequence: 0x30 [length] [encodedR] [encodedS]
+        der.add(0x30) // Sequence tag
+        der.add(sequenceLength.toByte()) // Length of the sequence
+        der.addAll(encodedR.toList()) // Add r
+        der.addAll(encodedS.toList()) // Add s
+
+        return der.toByteArray()
+    }
+
+    // Helper function to encode a byte array as ASN.1 INTEGER
+    private fun encodeAsASN1Integer(value: ByteArray): ByteArray {
+        val mutableValue = value.toMutableList()
+
+        // If the most significant bit of the first byte is set, prepend a 0x00 byte to avoid interpretation as negative
+        if (mutableValue[0] and 0x80.toByte() != 0.toByte()) {
+            mutableValue.add(0, 0x00)
+        }
+
+        val length = mutableValue.size
+        val asn1Integer = mutableListOf<Byte>()
+
+        // ASN.1 Integer: 0x02 [length] [value]
+        asn1Integer.add(0x02) // Integer tag
+        asn1Integer.add(length.toByte()) // Length of the integer
+        asn1Integer.addAll(mutableValue) // The value itself
+
+        return asn1Integer.toByteArray()
+    }
 }
