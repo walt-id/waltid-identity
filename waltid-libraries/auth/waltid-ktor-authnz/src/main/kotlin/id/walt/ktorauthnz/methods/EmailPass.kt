@@ -50,10 +50,17 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
         return identifier
     }
 
+    /*override val supportsRegistration = true
+    override suspend fun register(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
+        val identifier = EmailIdentifier(credential.name)
+
+    }*/
+
+
     @Serializable
     data class EmailPassCredentials(val email: String, val password: String)
 
-    override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.registerAuthenticationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
         post("emailpass", {
             request { body<EmailPassCredentials>() }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
@@ -67,4 +74,21 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
             context.handleAuthSuccess(session, identifier.resolveToAccountId())
         }
     }
+
+    /*override fun Route.registerRegistrationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+        post("emailpass", {
+            request { body<EmailPassCredentials>() }
+            response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
+        }) {
+            val session = getSession(authContext)
+
+            val credential = call.getUsernamePasswordFromRequest()
+
+            val identifier = register(session, credential, context)
+
+            context.handleAuthSuccess(session, identifier.resolveToAccountId())
+        }
+    }*/
+
+//    override val authenticationHandlesRegistration: Boolean = false
 }

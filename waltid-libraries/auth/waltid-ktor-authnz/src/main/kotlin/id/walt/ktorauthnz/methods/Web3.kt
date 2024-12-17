@@ -15,7 +15,7 @@ object Web3 : AuthenticationMethod("web3") {
 
     fun makeNonce() = "n" + Random.nextInt() // should be a JWT
 
-    fun verifiySignature(web3ExampleSigned: MultiStepExampleSigned) {
+    fun verifySignature(web3ExampleSigned: MultiStepExampleSigned) {
         web3ExampleSigned.challenge // check that the challenge comes from us (is a JWT made by us)
 
         // check that signed challenge verifies correctly
@@ -32,7 +32,7 @@ object Web3 : AuthenticationMethod("web3") {
         val publicKey: String
     )
 
-    override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.registerAuthenticationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
         route("web3") {
             get("nonce") { // Step 1
                 context.respond(makeNonce())
@@ -43,12 +43,11 @@ object Web3 : AuthenticationMethod("web3") {
             }) { req ->
                 val session = getSession(authContext)
 
-                verifiySignature(req) // Verification
+                verifySignature(req) // Verification
 
                 // Verification was successful:
 
-                val identifier =
-                    Web3Identifier(req.publicKey) // select identifier (= who logged in with this method now?)
+                val identifier = Web3Identifier(req.publicKey) // select identifier (= who logged in with this method now?)
 
                 context.handleAuthSuccess(
                     session,

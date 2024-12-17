@@ -38,7 +38,7 @@ object TOTP : AuthenticationMethod("totp") {
     @Serializable
     data class TOTPCode(val code: String)
 
-    override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.registerAuthenticationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
         post("totp", {
             request { body<TOTPCode>() }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
