@@ -135,7 +135,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         // === find matching credential ===
         val matchingCreds =
             client.post("/wallet-api/wallet/$walletId/exchange/matchCredentialsForPresentationDefinition") {
-                setBody(parsedRequest.presentationDefinition!!)
+                setBody(parsedRequest.presentationDefinition!!.toJSON())
             }.expectSuccess().body<List<WalletCredential>>()
         assertNotEquals(0, matchingCreds.size)
 
@@ -293,7 +293,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
             // === find matching credential ===
             val matchingCreds =
                 client.post("/wallet-api/wallet/$walletId/exchange/matchCredentialsForPresentationDefinition") {
-                    setBody(parsedRequest.presentationDefinition!!)
+                    setBody(parsedRequest.presentationDefinition!!.toJSON())
                 }.expectSuccess().body<List<WalletCredential>>()
             assertNotEquals(0, matchingCreds.size)
 
@@ -307,7 +307,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
 //    {"id":"tovqUq4ddXYC","input_descriptors":[{"id":"IdIsRequired","constraints":{"fields":[{"path":["${'$'}.type"],"filter":{"type":"string","pattern":"BankId"}},{"path":["${'$'}.credentialSubject.type"],"filter":{"type":"string","pattern":".*"}}],"limit_disclosure":"required"}}]}
 //        """.trimIndent()
         val presentationDefinition: String = """
-    {"id":"tovqUq4ddXYC","input_descriptors":[{"id":"IdIsRequired","constraints":{"fields":[{"path":["${'$'}.type"],"filter":{"type":"string","pattern":"BankId"}}],"limit_disclosure":"required"}}]}
+    {"id":"tovqUq4ddXYC","input_descriptors":[{"id":"IdIsRequired","constraints":{"fields":[{"path":["${'$'}.vct"],"filter":{"type":"string","pattern":".*/identity_credential"}}],"limit_disclosure":"required"}}]}
         """.trimIndent()
         // === find matching credential ===
         val matchingCreds =

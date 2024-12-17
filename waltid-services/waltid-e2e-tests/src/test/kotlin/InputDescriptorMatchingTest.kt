@@ -119,6 +119,31 @@ class InputDescriptorMatchingTest(
         "expirationDate": "<timestamp-in:365d>"
       }
     """.trimIndent()))
+    put("selectiveDisclosure", Json.decodeFromString("""
+      {
+        "fields": {
+          "credentialSubject": {
+            "sd": false,
+             "children": {
+               "fields": {
+                "degree": {
+                  "sd": false,
+                  "children": {
+                    "fields": {
+                      "type": {
+                        "sd": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "decoyMode": "NONE",
+        "decoys": 0
+      }
+    """.trimIndent()))
   })
 
   val presentationRequestUniversityDegree = """
