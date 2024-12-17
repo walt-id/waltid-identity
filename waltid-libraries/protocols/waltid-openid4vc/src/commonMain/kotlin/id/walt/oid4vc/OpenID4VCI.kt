@@ -328,7 +328,7 @@ object OpenID4VCI {
     fun createDefaultProviderMetadata(baseUrl: String, credentialSupported: Map<String, CredentialSupported>, version: OpenID4VCIVersion) : OpenIDProviderMetadata {
 
         return when (version) {
-            OpenID4VCIVersion.Draft13 -> OpenIDProviderMetadata.Draft13(
+            OpenID4VCIVersion.DRAFT13 -> OpenIDProviderMetadata.Draft13(
                 issuer = baseUrl,
                 authorizationEndpoint = "$baseUrl/authorize",
                 pushedAuthorizationRequestEndpoint = "$baseUrl/par",
@@ -351,7 +351,7 @@ object OpenID4VCI {
                 credentialConfigurationsSupported = credentialSupported
             )
 
-            OpenID4VCIVersion.Draft11 -> OpenIDProviderMetadata.Draft11(
+            OpenID4VCIVersion.DRAFT11 -> OpenIDProviderMetadata.Draft11(
                 issuer = baseUrl,
                 authorizationEndpoint = "$baseUrl/authorize",
                 pushedAuthorizationRequestEndpoint = "$baseUrl/par",
@@ -531,13 +531,13 @@ object OpenID4VCI {
 
 
 enum class OpenID4VCIVersion(val versionString: String) {
-    Draft11("draft11"),
-    Draft13("draft13");
+    DRAFT11("draft11"),
+    DRAFT13("draft13");
 
     companion object {
         fun from(version: String): OpenID4VCIVersion {
             return entries.find { it.versionString == version }
-                ?: throw IllegalArgumentException("Unsupported version: $version. Supported Versions are: Draft13 -> draft13 and Draft11 -> draft11")
+                ?: throw IllegalArgumentException("Unsupported version: $version. Supported Versions are: DRAFT13 -> draft13 and DRAFT11 -> draft11")
         }
     }
 }
