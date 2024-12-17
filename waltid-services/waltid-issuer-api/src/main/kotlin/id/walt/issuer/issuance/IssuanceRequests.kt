@@ -93,7 +93,7 @@ data class IssuanceRequest(
     val x5Chain: List<String>? = null,
     val trustedRootCAs: List<String>? = null,
     var credentialFormat: CredentialFormat? = null,
-    val standardVersion: OpenID4VCIVersion? = OpenID4VCIVersion.Draft13,
+    val standardVersion: OpenID4VCIVersion? = OpenID4VCIVersion.DRAFT13,
     ) {
     constructor(
         issuerKey: JsonObject,
@@ -110,7 +110,7 @@ data class IssuanceRequest(
         x5Chain: List<String>? = null,
         trustedRootCAs: List<String>? = null,
         credentialFormat: CredentialFormat? = null,
-        standardVersion: OpenID4VCIVersion? = OpenID4VCIVersion.Draft13,
+        standardVersion: OpenID4VCIVersion? = OpenID4VCIVersion.DRAFT13,
     ) :
         this(
             issuerKey,

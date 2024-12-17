@@ -34,7 +34,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     abstract val metadata: OpenIDProviderMetadata.Draft13
     abstract val config: OpenIDProviderConfig
 
-    protected open fun createDefaultProviderMetadata() = OpenID4VCI.createDefaultProviderMetadata(baseUrl, emptyMap(), OpenID4VCIVersion.Draft13)
+    protected open fun createDefaultProviderMetadata() = OpenID4VCI.createDefaultProviderMetadata(baseUrl, emptyMap(), OpenID4VCIVersion.DRAFT13)
 
     fun getCommonProviderMetadataUrl(): String {
         return URLBuilder(baseUrl).apply {
