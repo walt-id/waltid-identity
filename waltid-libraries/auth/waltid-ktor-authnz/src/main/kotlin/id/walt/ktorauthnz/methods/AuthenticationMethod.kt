@@ -31,9 +31,18 @@ sealed interface MethodInstance {
 }
 
 abstract class AuthenticationMethod(open val id: String) {
-    abstract fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext)
 
+    // Auth
 
+    /** Login routes */
+    abstract fun Route.registerAuthenticationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext)
+
+    /**
+     * Helper function, called when login was successful, will handle the proceeding actions.
+     * - progresses the auth flow of the provided auth session (switch to next method or handle auth success)
+     * - update session token cookie
+     * - respond with updated session information
+     * */
     suspend fun ApplicationCall.handleAuthSuccess(session: AuthSession, accountId: String?) {
         accountId?.let { session.accountId = it }
         session.progressFlow(this@AuthenticationMethod)
@@ -47,9 +56,35 @@ abstract class AuthenticationMethod(open val id: String) {
         this.respond(session.toInformation())
     }
 
+    // Registration
 
+    /**
+     * Select if this authentication method supports registration.
+     * If this method supports registration, either:
+     * - authentication and registration has to be a combined step ([authenticationHandlesRegistration] set to true), or
+     * - automatic registration routes have to be provided ([registerRegistrationRoutes] implemented)
+     */
+//    abstract val supportsRegistration: Boolean
+
+    /**
+     * Is login and registration a combined step (e.g.: most signature-based challenge-response methods)?
+     * -> in this case, no separate registration routes ([registerRegistrationRoutes]) are needed.
+     */
+//    open val authenticationHandlesRegistration: Boolean = false
+
+    /**
+     * Automatic registration routes (if this method supports automatic registration routes), requires:
+     * - [supportsRegistration] does this method support automatic registration (set to true)
+     * - [authenticationHandlesRegistration] Login & registration is not a combined step (set to false)
+     */
+/*    open fun Route.registerRegistrationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext): Unit =
+        throw NotImplementedError("Authentication method ${this::class.simpleName} does not offer registration routes. Authentication routes handle registration: $authenticationHandlesRegistration")*/
+
+
+    // Data functions
     suspend inline fun <reified V : AuthMethodStoredData> lookupAccountIdentifierStoredData(identifier: AccountIdentifier): V {
-        val storedData = KtorAuthnzManager.accountStore.lookupStoredDataForAccountIdentifier(identifier, this) ?: error("No stored data for method: $id")
+        val storedData =
+            KtorAuthnzManager.accountStore.lookupStoredDataForAccountIdentifier(identifier, this) ?: error("No stored data for method: $id")
         return (storedData as? V) ?: error("${storedData::class.simpleName} is not requested ${V::class.simpleName}")
     }
 
@@ -73,6 +108,7 @@ abstract class AuthenticationMethod(open val id: String) {
         return session
     }
 
+    // Relations
     open val relatedAuthMethodStoredData: KClass<out AuthMethodStoredData>? = null
     open val relatedAuthMethodConfiguration: KClass<out AuthMethodConfiguration>? = null
 }
@@ -84,7 +120,7 @@ fun Route.registerAuthenticationMethod(
 
     ) {
     method.apply {
-        register(authContext)
+        registerAuthenticationRoutes(authContext)
     }
 }
 
@@ -94,7 +130,7 @@ fun Route.registerAuthenticationMethods(
 ) {
     methods.forEach {
         it.apply {
-            register(authContext)
+            registerAuthenticationRoutes(authContext)
         }
     }
 }

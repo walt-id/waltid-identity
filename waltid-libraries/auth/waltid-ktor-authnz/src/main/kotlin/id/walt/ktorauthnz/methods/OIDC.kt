@@ -149,7 +149,7 @@ object OIDC : AuthenticationMethod("oidc") {
         }.body<JsonObject>()
     }
 
-    override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.registerAuthenticationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
 
 
         route("oidc") {

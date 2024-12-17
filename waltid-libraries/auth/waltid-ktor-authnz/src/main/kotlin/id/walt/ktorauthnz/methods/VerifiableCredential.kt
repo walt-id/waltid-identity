@@ -31,7 +31,7 @@ object VerifiableCredential : AuthenticationMethod("vc") {
     // TODO:
     val verifierUrl = "http://localhost:7003"
 
-    override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.registerAuthenticationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
         route("vc", {
 
         }) {

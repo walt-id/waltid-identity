@@ -15,6 +15,7 @@ import id.walt.webwallet.web.controllers.NotificationController.notifications
 import id.walt.webwallet.web.controllers.PushController.push
 import id.walt.webwallet.web.controllers.auth.defaultAuthRoutes
 import id.walt.webwallet.web.controllers.auth.keycloak.keycloakAuthRoutes
+import id.walt.webwallet.web.controllers.auth.ktorAuthnzRoutes
 import id.walt.webwallet.web.controllers.auth.oidc.oidcAuthRoutes
 import id.walt.webwallet.web.controllers.auth.x5c.x5cAuthRoutes
 import id.walt.webwallet.web.controllers.exchange.exchange
@@ -63,11 +64,22 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     if (withPlugins) {
         configurePlugins()
     }
-    defaultAuthRoutes()
-    keycloakAuthRoutes();
-    { oidcAuthRoutes() } whenFeature FeatureCatalog.oidcAuthenticationFeature
-    { x5cAuthRoutes() } whenFeature FeatureCatalog.x5cAuthFeature
+
+    // Auth
+    {
+        defaultAuthRoutes()
+        keycloakAuthRoutes();
+        { oidcAuthRoutes() } whenFeature FeatureCatalog.oidcAuthenticationFeature
+        { x5cAuthRoutes() } whenFeature FeatureCatalog.x5cAuthFeature
+    } whenFeature FeatureCatalog.legacyAuthenticationFeature
+
+    {
+        ktorAuthnzRoutes()
+    } whenFeature FeatureCatalog.ktorAuthnzAuthenticationFeature
+
+
     accounts();
+
     { push() } whenFeature FeatureCatalog.pushFeature
 
     // Wallet routes
