@@ -3,10 +3,13 @@ import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
+import kotlin.reflect.jvm.reflect
 import kotlin.test.assertContains
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -19,66 +22,112 @@ class InputDescriptorMatchingTest(
 ) {
   @OptIn(ExperimentalUuidApi::class)
   fun e2e(wallet: Uuid, did: String) = runTest {
+    /*
+    Issue credential:
+    {
+        type: [ "VerifiableCredential", "UniversityDegree" ]
+        ...
+        credentialSubject: {
+            degree: {
+                type: "BachelorDegree"
+            }
+        }
+    }
+     */
+    val newCredential1 = issueCredential(universityDegreeIssuanceRequest, wallet, false)
+    // issue second credential to test input descriptor matching on wallet (credential should not be found for the presentation definition below)
+    issueCredential(Json.decodeFromString(IssuanceExamples.sdJwtVCData), wallet, true)
+
+    // Presentation/Verification
+    // Request: $.type: "UniversityDegree",
+    // --> match should return 1, presentation should be accepted
+    verifyCredential(getPresentationRequestByType("UniversityDegree"), wallet, did, newCredential1, true)
+    // Request: $.type: "XYZ",
+    // --> match should return 0, presentation should be rejected
+    verifyCredential(getPresentationRequestByType("XYZ"), wallet, did, newCredential1, false)
+    // Request: $.type: "BachelorDegree",
+    // --> match should return 0, presentation should be rejected
+    verifyCredential(getPresentationRequestByType("BachelorDegree"), wallet, did, newCredential1, false)
+    // Request: $.type: "UniversityDegree" and $.credentialSubject.degree.type: "BachelorDegree",
+    // --> match should return 1, presentation should be accepted
+    verifyCredential(getPresentationRequestByType("UniversityDegree", "BachelorDegree"), wallet, did, newCredential1, true)
+    // Request: $.type: "BachelorDegree" and $.credentialSubject.degree.type: "UniversityDegree",
+    // --> match should return 0, presentation should be rejected
+    verifyCredential(getPresentationRequestByType("BachelorDegree", "UniversityDegree"), wallet, did, newCredential1, false)
+    // Request: $.credentialSubject.degree.type: "BachelorDegree",
+    // --> match should return 1, presentation should be accepted
+    verifyCredential(getPresentationRequestByDegreeType("BachelorDegree"), wallet, did, newCredential1, true)
+    // Request: $.credentialSubject.degree.type: "UniversityDegree",
+    // --> match should return 0, presentation should be rejected
+    verifyCredential(getPresentationRequestByDegreeType("UniversityDegree"), wallet, did, newCredential1, false)
+  }
+
+  @OptIn(ExperimentalUuidApi::class)
+  private suspend fun issueCredential(issuanceRequest: IssuanceRequest, wallet: Uuid, sdJwt: Boolean): WalletCredential {
     lateinit var offerUrl: String
-    issuerApi.jwt(issuanceRequest1) {
-      offerUrl = it
-      println("offer: $offerUrl")
+    if(sdJwt) {
+      issuerApi.sdjwt(issuanceRequest) {
+        offerUrl = it
+        println("offer: $offerUrl")
+      }
+    } else {
+      issuerApi.jwt(issuanceRequest) {
+        offerUrl = it
+        println("offer: $offerUrl")
+      }
     }
     //region -Exchange / claim-
-    lateinit var newCredential1: WalletCredential
+    lateinit var newCredential: WalletCredential
     exchangeApi.resolveCredentialOffer(wallet, offerUrl)
     exchangeApi.useOfferRequest(wallet, offerUrl, 1) {
-      newCredential1 = it.first()
+      newCredential = it.first()
     }
-    assertContains(JwtUtils.parseJWTPayload(newCredential1.document).keys, JwsSignatureScheme.JwsOption.VC)
+    if(sdJwt)
+      assertContains(JwtUtils.parseJWTPayload(newCredential.document).keys, "vct")
+    else
+      assertContains(JwtUtils.parseJWTPayload(newCredential.document).keys, JwsSignatureScheme.JwsOption.VC)
 
-    lateinit var newCredential2: WalletCredential
-    issuerApi.sdjwt(Json.decodeFromString(IssuanceExamples.sdJwtVCData)) {
-      offerUrl = it
-    }
-    exchangeApi.resolveCredentialOffer(wallet, offerUrl)
-    exchangeApi.useOfferRequest(wallet, offerUrl, 1) {
-      newCredential2 = it.first()
-    }
-    assertContains(JwtUtils.parseJWTPayload(newCredential2.document).keys, "vct")
-    //endregion -Exchange / claim-
+    return newCredential
+  }
 
+  @OptIn(ExperimentalUuidApi::class)
+  private suspend fun verifyCredential(presentationRequest: String, wallet: Uuid, did: String, credentialToPresent: WalletCredential, shouldBeSuccess: Boolean) {
     //region -Verifier / request url-
     lateinit var verificationUrl: String
     lateinit var verificationId: String
-    verificationApi.verify(presentationRequestUniversityDegree) {
+    verificationApi.verify(presentationRequest) {
       verificationUrl = it
       verificationId = Url(verificationUrl).parameters.getOrFail("state")
     }
     //endregion -Verifier / request url-
 
     //region -Exchange / match presentation 1-
-    lateinit var presentationDefinition1: String
+    lateinit var resolvedPresentationOfferString: String
+    lateinit var presentationDefinition: String
     exchangeApi.resolvePresentationRequest(wallet, verificationUrl) {
-      presentationDefinition1 = Url(it).parameters.getOrFail("presentation_definition")
+      resolvedPresentationOfferString = it
+      presentationDefinition = Url(it).parameters.getOrFail("presentation_definition")
     }
     exchangeApi.matchCredentialsForPresentationDefinition(
-      wallet, presentationDefinition1, listOf(newCredential1.id)
+      wallet, presentationDefinition,
+      if(shouldBeSuccess)
+        listOf(credentialToPresent.id)
+      else
+        listOf()
     )
+    // end region
 
-    //region -Exchange / match presentation 2-
-    lateinit var verificationUrl2: String
-    lateinit var verificationId2: String
-    verificationApi.verify(presentationRequestXYZ) {
-      verificationUrl2 = it
-      verificationId2 = Url(verificationUrl).parameters.getOrFail("state")
-    }
-    lateinit var presentationDefinition2: String
-    exchangeApi.resolvePresentationRequest(wallet, verificationUrl2) {
-      presentationDefinition2 = Url(it).parameters.getOrFail("presentation_definition")
-    }
-    exchangeApi.matchCredentialsForPresentationDefinition(
-      wallet, presentationDefinition2, listOf()
-    )
-
+    // region -Present credential-
+    val usePresentationReq = UsePresentationRequest(did, resolvedPresentationOfferString, listOf(credentialToPresent.id),
+      credentialToPresent.disclosures?.let { mapOf(credentialToPresent.id to listOf(it)) })
+    if(shouldBeSuccess)
+      exchangeApi.usePresentationRequest(wallet, usePresentationReq, expectSuccess)
+    else
+      exchangeApi.usePresentationRequest(wallet, usePresentationReq, expectFailure)
+    // end region
   }
 
-  val issuanceRequest1 = Json.decodeFromJsonElement<IssuanceRequest>(buildJsonObject {
+  val universityDegreeIssuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(buildJsonObject {
     put("issuerKey", Json.decodeFromString<JsonElement>(WaltidServicesE2ETests.issuerKey))
     put("issuerDid", WaltidServicesE2ETests.issuerDid)
     put("credentialConfigurationId", "UniversityDegree_jwt_vc_json")
@@ -146,7 +195,7 @@ class InputDescriptorMatchingTest(
     """.trimIndent()))
   })
 
-  val presentationRequestUniversityDegree = """
+  fun getPresentationRequestByType(type: String, degreeType: String = ".*") = """
     {
       "vp_policies": [
         "signature",
@@ -161,7 +210,7 @@ class InputDescriptorMatchingTest(
       ],
       "request_credentials": [
         {
-          "format": "vc+sd-jwt",
+          "format": "jwt_vc_json",
           "input_descriptor": {
             "id": "IdIsRequired",
             "constraints": {
@@ -172,7 +221,7 @@ class InputDescriptorMatchingTest(
                   ],
                   "filter": {
                     "type": "string",
-                    "pattern": "UniversityDegree"
+                    "pattern": "$type"
                   }
                 },
                 {
@@ -181,7 +230,7 @@ class InputDescriptorMatchingTest(
                   ],
                   "filter": {
                     "type": "string",
-                    "pattern": ".*"
+                    "pattern": "$degreeType"
                   }
                 }
               ],
@@ -193,7 +242,7 @@ class InputDescriptorMatchingTest(
     }
   """.trimIndent()
 
-  val presentationRequestXYZ = """
+  fun getPresentationRequestByDegreeType(degreeType: String) = """
     {
       "vp_policies": [
         "signature",
@@ -208,27 +257,18 @@ class InputDescriptorMatchingTest(
       ],
       "request_credentials": [
         {
-          "format": "vc+sd-jwt",
+          "format": "jwt_vc_json",
           "input_descriptor": {
             "id": "IdIsRequired",
             "constraints": {
               "fields": [
                 {
                   "path": [
-                    "${'$'}.type"
-                  ],
-                  "filter": {
-                    "type": "string",
-                    "pattern": "XYZ"
-                  }
-                },
-                {
-                  "path": [
                     "${'$'}.credentialSubject.degree.type"
                   ],
                   "filter": {
                     "type": "string",
-                    "pattern": ".*"
+                    "pattern": "$degreeType"
                   }
                 }
               ],
