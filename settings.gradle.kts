@@ -95,5 +95,3 @@ plugins {
 }
 
 rootProject.name = "waltid-identity"
-//include("waltid-libraries:crypto:waltid-crypto-aws")
-//findProject(":waltid-libraries:crypto:waltid-crypto-aws")?.name = "waltid-crypto-aws"

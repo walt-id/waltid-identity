@@ -27,8 +27,6 @@ dependencies {
 
     // AWS
     implementation("aws.sdk.kotlin:kms:1.3.91")
-    implementation("aws.sdk.kotlin:dynamodb:1.3.91")
-    implementation("aws.sdk.kotlin:secretsmanager:1.3.91")
 
     // JOSE
     implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
