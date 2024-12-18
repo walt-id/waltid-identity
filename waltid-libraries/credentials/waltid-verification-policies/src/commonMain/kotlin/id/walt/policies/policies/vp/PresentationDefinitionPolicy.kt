@@ -28,14 +28,19 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
         val presentationDefinition = context["presentationDefinition"]?.toJsonElement()
             ?.let { Json.decodeFromJsonElement<PresentationDefinition>(it) }
             ?: throw IllegalArgumentException("No presentationDefinition in context!")
+        require(presentationDefinition.inputDescriptors.isNotEmpty()) {
+            "No input descriptors were found. " +
+                    "At least one is required in the context of the presentation definition policy."
+        }
         val presentationSubmission = context["presentationSubmission"]?.toJsonElement()
             ?.let { Json.decodeFromJsonElement<PresentationSubmission>(it) }
             ?: throw IllegalArgumentException("No presentationSubmission in context!")
-        val format = presentationSubmission.descriptorMap.firstOrNull()?.format?.let { Json.decodeFromJsonElement<VCFormat>(it) }
+        val format =
+            presentationSubmission.descriptorMap.firstOrNull()?.format?.let { Json.decodeFromJsonElement<VCFormat>(it) }
 
         //val requestedTypes = presentationDefinition.primitiveVerificationGetTypeList()
 
-        val presentedTypes = when(format) {
+        val presentedTypes = when (format) {
             VCFormat.sd_jwt_vc -> listOf(data["vct"]!!.jsonPrimitive.content)
             else -> data["vp"]!!.jsonObject["verifiableCredential"]?.jsonArray?.mapNotNull {
                 it.jsonPrimitive.contentOrNull?.let { SDJwt.parse(it) }?.fullPayload
@@ -43,15 +48,17 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
             } ?: emptyList()
         }
 
-        val presentationDefinitionMatch = when(format) {
+        val presentationDefinitionMatch = when (format) {
             VCFormat.sd_jwt_vc -> PresentationDefinitionParser.matchCredentialsForInputDescriptor(
                 flowOf(data), presentationDefinition.inputDescriptors.first()
             ).toList().isNotEmpty()
-            else -> data["vp"]!!.jsonObject["verifiableCredential"]?.jsonArray?.mapIndexedNotNull { idx,cred ->
-                val payload = cred.jsonPrimitive.contentOrNull?.let { SDJwt.parse(it) }?.fullPayload ?: throw IllegalArgumentException("Credential $idx is not a valid JWT string")
+
+            else -> data["vp"]!!.jsonObject["verifiableCredential"]?.jsonArray?.mapIndexedNotNull { idx, cred ->
+                val payload = cred.jsonPrimitive.contentOrNull?.let { SDJwt.parse(it) }?.fullPayload
+                    ?: throw IllegalArgumentException("Credential $idx is not a valid JWT string")
 
                 PresentationDefinitionParser.matchCredentialsForInputDescriptor(
-                    flowOf(payload["vc"]?.jsonObject ?: payload),
+                    flowOf(payload),
                     presentationDefinition.inputDescriptors[idx]
                 ).toList().isNotEmpty()
             }!!.all { it }
@@ -68,11 +75,11 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
             log.debug { "Presented data: $data" }
 
             Result.failure(
-              id.walt.policies.PresentationDefinitionException(
-                /*missingCredentialTypes = requestedTypes.minus(
-                  presentedTypes.toSet()
-                ),*/ presentationDefinitionMatch
-              )
+                id.walt.policies.PresentationDefinitionException(
+                    /*missingCredentialTypes = requestedTypes.minus(
+                      presentedTypes.toSet()
+                    ),*/ presentationDefinitionMatch
+                )
             )
         }
     }
