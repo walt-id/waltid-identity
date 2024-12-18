@@ -4,12 +4,10 @@ import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
-import kotlin.reflect.jvm.reflect
 import kotlin.test.assertContains
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -217,7 +215,7 @@ class InputDescriptorMatchingTest(
               "fields": [
                 {
                   "path": [
-                    "${'$'}.type"
+                    "${'$'}.vc.type"
                   ],
                   "filter": {
                     "type": "string",
@@ -226,7 +224,7 @@ class InputDescriptorMatchingTest(
                 },
                 {
                   "path": [
-                    "${'$'}.credentialSubject.degree.type"
+                    "${'$'}.vc.credentialSubject.degree.type"
                   ],
                   "filter": {
                     "type": "string",
@@ -264,7 +262,7 @@ class InputDescriptorMatchingTest(
               "fields": [
                 {
                   "path": [
-                    "${'$'}.credentialSubject.degree.type"
+                    "${'$'}.vc.credentialSubject.degree.type"
                   ],
                   "filter": {
                     "type": "string",
