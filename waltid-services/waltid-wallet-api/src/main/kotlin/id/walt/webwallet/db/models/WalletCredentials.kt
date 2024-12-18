@@ -7,6 +7,7 @@ import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.mdoc.dataelement.toJsonElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.oid4vc.data.CredentialFormat
+import id.walt.sdjwt.SDJwt
 import id.walt.webwallet.manifest.provider.ManifestProvider
 import id.walt.webwallet.utils.JsonUtils
 import kotlinx.datetime.Instant
@@ -40,7 +41,7 @@ object WalletCredentials : Table("credentials") {
 }
 
 @Serializable
-data class WalletCredential(
+data class WalletCredential @OptIn(ExperimentalUuidApi::class) constructor(
     @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
     val wallet: Uuid,
     val id: String,
@@ -94,6 +95,16 @@ data class WalletCredential(
 
         fun getManifestIssuerName(manifest: JsonObject?) =
             manifest?.let { JsonUtils.tryGetData(it, "display.card.issuedBy")?.jsonPrimitive?.content }
+
+        fun parseFullDocument(document: String, disclosures: String?, id: String, format: CredentialFormat) = kotlin.runCatching {
+            when(format) {
+                CredentialFormat.jwt_vc, CredentialFormat.sd_jwt_vc, CredentialFormat.jwt_vc_json,
+                CredentialFormat.jwt_vc_json_ld -> SDJwt.parse(document + (disclosures?.let { "~$it" } ?: "")).fullPayload
+                    .run { jsonObject["vc"]?.jsonObject ?: jsonObject }
+                else -> parseDocument(document, id, format)
+            }
+        }.onFailure { it.printStackTrace() }
+            .getOrNull()
     }
 
 
