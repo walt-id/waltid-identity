@@ -1,4 +1,5 @@
 import com.nimbusds.jose.JWSAlgorithm
+import id.walt.credentials.schemes.JwsSignatureScheme
 import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -10,6 +11,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
+import id.walt.oid4vc.util.JwtUtils
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -19,8 +21,10 @@ import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlin.test.*
+import kotlin.uuid.Uuid
+import kotlin.uuid.ExperimentalUuidApi
 
-class IssuerDraft11(private val client: HttpClient)  {
+class Draft11(private val client: HttpClient)  {
 
     fun testIssuerAPIDraft11AuthFlowWithJar(issuanceReq: IssuanceRequest) = runBlocking {
         lateinit var offerUrl: String
@@ -181,6 +185,85 @@ class IssuerDraft11(private val client: HttpClient)  {
 
             else -> throw AssertionError("Unexpected authentication method ${issuanceReq.authenticationMethod}")
         }
+    }
+
+    @OptIn(ExperimentalUuidApi::class)
+    fun testIssuanceDraft11PreAuthFlow(issuanceReq: IssuanceRequest, wallet: Uuid) = runBlocking {
+        lateinit var offerUrl: String
+
+        val issuerApi = IssuerApi(client)
+
+        issuerApi.jwt(issuanceReq) {
+            offerUrl = it
+        }
+
+        val offerUrlParams = Url(offerUrl).parameters.toMap()
+        val offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)
+        val credOffer = client.get(offerObj.credentialOfferUri!!).body<CredentialOffer.Draft11>()
+
+        assertNotNull(credOffer.credentialIssuer)
+        assertNotNull(credOffer.credentials)
+        assertNotNull(credOffer.grants)
+
+        val issuerMetadataUrl = getCIProviderMetadataUrl(credOffer.credentialIssuer)
+        val rawJsonMetadata = client.get(issuerMetadataUrl).bodyAsText()
+        val jsonElementMetadata = Json.parseToJsonElement(rawJsonMetadata)
+        assertTrue(jsonElementMetadata.jsonObject["credentials_supported"] is JsonArray, "Expected credentials_supported in Open ID Provider Metadata to be a JsonArray")
+
+        val issuerMetadata = OpenIDProviderMetadata.fromJSONString(rawJsonMetadata) as OpenIDProviderMetadata.Draft11
+        assertNull(issuerMetadata.authorizationServer)
+        assertContains(issuerMetadata.grantTypesSupported, GrantType.authorization_code)
+        assertContains(issuerMetadata.grantTypesSupported, GrantType.pre_authorized_code)
+        assertNotNull(issuerMetadata.jwksUri)
+        assertTrue(issuerMetadata.credentialSupported!!.keys.all { it.toIntOrNull() != null }, "Expected credentials_supported keys to be array indices (e.g., '0', '1')")
+
+        assertEquals(issuerMetadata.issuer, credOffer.credentialIssuer)
+        assertEquals(issuerMetadata.credentialIssuer, credOffer.credentialIssuer)
+        assertEquals(issuerMetadata.credentialIssuer, credOffer.credentialIssuer)
+
+        val rawJsonJwks = client.get(issuerMetadata.jwksUri!!).bodyAsText()
+
+        val keysArray = Json.parseToJsonElement(rawJsonJwks).jsonObject["keys"]?.jsonArray
+            ?: throw AssertionError("JWKS response must contain a 'keys' array")
+
+        assertTrue(
+            keysArray.any { key ->
+                key.jsonObject.run {
+                    this["kty"]?.jsonPrimitive?.content == "EC" &&
+                            this["crv"]?.jsonPrimitive?.content == "P-256"
+                }
+            },
+            "JWKS must contain at least one key with 'kty': 'EC' and 'crv': 'P-256'"
+        )
+
+
+        val matchingCredential = issuerMetadata.credentialSupported
+            ?.values
+            ?.find { it.id == issuanceReq.credentialConfigurationId }
+            ?: throw AssertionError("No matching credential found for the credentialConfigurationId '${issuanceReq.credentialConfigurationId}'.")
+
+        assertEquals(
+            matchingCredential.id,
+            issuanceReq.credentialConfigurationId
+        )
+
+        assertEquals(
+            CredentialFormat.jwt_vc_json,
+            matchingCredential.format
+        )
+
+        val exchangeApi = ExchangeApi(client)
+        lateinit var newCredentialId: String
+        exchangeApi.resolveCredentialOffer(wallet, offerUrl)
+        exchangeApi.useOfferRequest(wallet, offerUrl, 1) {
+            assertNotNull(it)
+            val cred = it.first()
+            assertContains(JwtUtils.parseJWTPayload(cred.document).keys, JwsSignatureScheme.JwsOption.VC)
+            newCredentialId = cred.id
+        }
+
+        assertNotNull(newCredentialId)
+
     }
 
     private fun validateAuthorizationData(
