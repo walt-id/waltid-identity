@@ -22,7 +22,10 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import redis.clients.jedis.exceptions.JedisAccessControlException
 import redis.clients.jedis.exceptions.JedisConnectionException
 import kotlin.reflect.KClass
@@ -120,6 +123,14 @@ fun Application.issuerApi() {
                         example(
                             "did:jwk + AWS REST API key  (AWS - Secp256r1) + Role (Auth)",
                             IssuanceExamples.issuerOnboardingRequestAwsRestApiExampleWithRole
+                        )
+                        example(
+                            "did:jwk + Azure REST API key  (Azure - Secp256r1)",
+                            IssuanceExamples.issuerOnboardingRequestAzureRestApiExample
+                        )
+                        example(
+                            "did:jwk + AWS SDK key  (AWS - Secp256r1)",
+                            IssuanceExamples.issuerOnboardingRequestAwsSdkExample
                         )
                         required = true
                     }

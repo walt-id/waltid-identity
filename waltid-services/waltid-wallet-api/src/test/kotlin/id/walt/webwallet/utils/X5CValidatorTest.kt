@@ -14,10 +14,10 @@ import kotlin.test.assertTrue
 
 class X5CValidatorTest {
 
-    //we don't care about the bit size of the key, it's a test case (as long as it's bigger than 512)
+    //we don't care about the bit size of the key, it's a test case (as long as it's bigger than 1024)
     private val keyPairGenerator = KeyPairGenerator
         .getInstance("RSA").apply {
-            initialize(1024)
+            initialize(2048)
         }
 
     //x.509 certificate expiration dates
