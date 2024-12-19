@@ -52,8 +52,9 @@ class MSO (
       "deviceKeyInfo" to deviceKeyInfo.toMapElement(),
       "docType" to docType,
       "validityInfo" to validityInfo.toMapElement(),
-      statusElement?.let { "status" to it.toMapElement() } as Pair<String, DataElement>
-    ).toDataElement()
+    ).also {
+      if(statusElement != null) it["status"] = statusElement.toMapElement()
+    }.toDataElement()
   }
 
   /**
