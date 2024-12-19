@@ -706,7 +706,7 @@ vault secrets enable transit
 
 ### Working with AWSKey
 
-An AWS account is required in order to be able to use an `AWSKey` for signing and verification. This
+An AWS account is required in order to be able to use an `AWSKeyRestAPI` for signing and verification. This
 implies covering the following steps:
 
 1. [create an AWS account](https://aws.amazon.com/resources/create-account/)
@@ -715,16 +715,24 @@ implies covering the following steps:
 
 #### AwsKeyMetadata
 
-The `AWSKeyMetadata` class is used to specify the AWS access key ID, secret access key, and region.
-It is used when creating an `AWSKey` instance.
+The `AWSKeyMetadata` class is used to specify the AWS access key ID, secret access key, roleName and region.
+It is used when creating an `AWSKeyRestAPI` instance.
+
+
+
 
 ```kotlin
 @Serializable
 data class AWSKeyMetadata(
-  val accessKeyId: String,
-  val secretAccessKey: String,
-  val region: String
-)
+  val auth: AWSAuth,
+) {
+  constructor(
+    accessKeyId: String? = null,
+    secretAccessKey: String? = null,
+    region: String? = null,
+    roleName: String? = null,
+  ) : this(AWSAuth(accessKeyId, secretAccessKey, region, roleName))
+}
 ```
 
 For usage examples on _create_, _sign_, _verify_, _import_ and _export_ functions see

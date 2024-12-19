@@ -3,7 +3,7 @@ package id.walt.crypto.keys
 import id.walt.crypto.exceptions.KeyBackendNotSupportedException
 import id.walt.crypto.exceptions.KeyTypeMissingException
 import id.walt.crypto.exceptions.KeyTypeNotSupportedException
-import id.walt.crypto.keys.aws.AWSKey
+import id.walt.crypto.keys.aws.AWSKeyRestAPI
 import id.walt.crypto.keys.azure.AzureKey
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.oci.OCIKeyRestApi
@@ -38,8 +38,8 @@ object KeyManager {
                 Json.decodeFromJsonElement(generateRequest.config!!)
             )
         }
-        register<AWSKey>("aws") { generateRequest: KeyGenerationRequest ->
-            AWSKey.generate(
+        register<AWSKeyRestAPI>("aws-rest-api") { generateRequest: KeyGenerationRequest ->
+            AWSKeyRestAPI.generate(
                 generateRequest.keyType,
                 Json.decodeFromJsonElement(generateRequest.config!!)
             )
@@ -51,6 +51,7 @@ object KeyManager {
                 Json.decodeFromJsonElement(generateRequest.config!!)
             )
         }
+
     }
 
     fun registerByType(type: KType, typeId: String, createFunction: suspend (KeyGenerationRequest) -> Key) {

@@ -141,7 +141,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         // === find matching credential ===
         val matchingCreds =
             client.post("/wallet-api/wallet/$walletId/exchange/matchCredentialsForPresentationDefinition") {
-                setBody(parsedRequest.presentationDefinition!!)
+                setBody(parsedRequest.presentationDefinition!!.toJSON())
             }.expectSuccess().body<List<WalletCredential>>()
         assertNotEquals(0, matchingCreds.size)
 
@@ -299,7 +299,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
             // === find matching credential ===
             val matchingCreds =
                 client.post("/wallet-api/wallet/$walletId/exchange/matchCredentialsForPresentationDefinition") {
-                    setBody(parsedRequest.presentationDefinition!!)
+                    setBody(parsedRequest.presentationDefinition!!.toJSON())
                 }.expectSuccess().body<List<WalletCredential>>()
             assertNotEquals(0, matchingCreds.size)
 
@@ -308,5 +308,18 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
             }.expectSuccess()
         }
 
-
+    suspend fun testPresentationDefinitionCredentialMatching() = test("test presentation definition matching") {
+//        val presentationDefinition: String = """
+//    {"id":"tovqUq4ddXYC","input_descriptors":[{"id":"IdIsRequired","constraints":{"fields":[{"path":["${'$'}.type"],"filter":{"type":"string","pattern":"BankId"}},{"path":["${'$'}.credentialSubject.type"],"filter":{"type":"string","pattern":".*"}}],"limit_disclosure":"required"}}]}
+//        """.trimIndent()
+        val presentationDefinition: String = """
+    {"id":"tovqUq4ddXYC","input_descriptors":[{"id":"IdIsRequired","constraints":{"fields":[{"path":["${'$'}.vct"],"filter":{"type":"string","pattern":".*/identity_credential"}}],"limit_disclosure":"required"}}]}
+        """.trimIndent()
+        // === find matching credential ===
+        val matchingCreds =
+            client.post("/wallet-api/wallet/$walletId/exchange/matchCredentialsForPresentationDefinition") {
+                setBody(presentationDefinition)
+            }.expectSuccess().body<List<WalletCredential>>()
+        assertNotEquals(0, matchingCreds.size)
+    }
 }
