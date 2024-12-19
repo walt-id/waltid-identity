@@ -76,4 +76,40 @@ object PresentationRequests {
         }
     """.trimIndent()
 
+    val outOfOrderPresentationRequest1 = """
+        {
+           "vp_policies": [
+              "presentation-definition"
+           ],
+           "request_credentials": [
+              {
+                 "format": "jwt_vc_json",
+                 "type": "UniversityDegree"
+              },
+              {
+                 "format": "jwt_vc_json",
+                 "type": "PND91Credential"
+              }
+           ]
+        }
+    """.trimIndent()
+
+    val outOfOrderPresentationRequest2 = """
+        {
+           "vp_policies": [
+              "presentation-definition"
+           ],
+           "request_credentials": [
+              {
+                 "format": "jwt_vc_json",
+                 "type": "UniversityDegree"
+              },
+              {
+                 "format": "jwt_vc_json",
+                 "type": "PND91Credential"
+              }
+           ]
+        }
+    """.trimIndent()
+
 }
