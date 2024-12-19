@@ -36,7 +36,6 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.util.*
 import kotlinx.serialization.json.*
-import presentationexchange.PresentationDefinitionPolicyTests
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertNotNull
@@ -382,7 +381,7 @@ class WaltidServicesE2ETests {
         lspPotentialVerification.testPotentialInteropTrack4()
     }*/
 
-    //    @Test
+//        @Test
     fun e2ePresDefPolicyTests() = E2ETest.testBlock(
         config = ServiceConfiguration("e2e-pres-def-tests"),
         features = listOf(
