@@ -1,5 +1,6 @@
 package id.walt.webwallet.service.credentials.status
 
+import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.webwallet.service.BitStringValueParser
 import id.walt.webwallet.service.credentials.CredentialValidator
 import id.walt.webwallet.service.credentials.status.fetch.StatusListCredentialFetchFactory
@@ -29,7 +30,7 @@ class StatusListCredentialStatusService(
                 extractCredentialSubject(credential) ?: error("STATUS_RETRIEVAL_ERROR (-128)")
             credentialValidator.validate(entry.statusPurpose, subject.statusPurpose, subject.type, credential)
                 .takeIf { it }?.let {
-                    getStatusBit(subject.encodedList, entry.statusListIndex, subject.statusSize)?.let {
+                    getStatusBit(subject.encodedList.base64toBase64Url(), entry.statusListIndex, subject.statusSize)?.let {
                         val bit = it.joinToString("")
                         CredentialStatusResult(
                             type = entry.statusPurpose,
@@ -40,10 +41,13 @@ class StatusListCredentialStatusService(
                 } ?: error("STATUS_VERIFICATION_ERROR (-129)")
         } ?: error("Error parsing status list entry")
 
-    private fun extractCredentialSubject(credential: JsonObject): StatusListCredentialSubject? =
-        JsonUtils.tryGetData(credential, "credentialSubject")?.let {
-            json.decodeFromJsonElement(it)
-        }
+    private fun extractCredentialSubject(credential: JsonObject): StatusListCredentialSubject? = let {
+        JsonUtils.tryGetData(credential, "credentialSubject") ?: JsonUtils.tryGetData(
+            credential, "vc.credentialSubject"
+        )
+    }?.let {
+        json.decodeFromJsonElement(it)
+    }
 
     private fun getStatusBit(bitstring: String, idx: ULong, bitSize: Int) =
         bitStringValueParser.get(bitstring, idx, bitSize)
