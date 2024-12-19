@@ -29,6 +29,9 @@ object CredentialOfferProcessor {
       providerMetadata: OpenIDProviderMetadata,
       accessToken: String,
     ): List<ProcessedCredentialOffer> {
+
+        providerMetadata as OpenIDProviderMetadata.Draft13
+
         val batchCredentialRequest = BatchCredentialRequest(credReqs)
 
         val batchResponse = http.post(providerMetadata.batchCredentialEndpoint!!) {
@@ -52,6 +55,7 @@ object CredentialOfferProcessor {
       providerMetadata: OpenIDProviderMetadata,
       accessToken: String,
     ): List<ProcessedCredentialOffer> {
+
         val credReq = credReqs.first()
 
         val credentialResponse = http.post(providerMetadata.credentialEndpoint!!) {
