@@ -12,6 +12,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuerModule
 import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
+import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
@@ -344,6 +345,34 @@ class WaltidServicesE2ETests {
         // Test Authorization Code flow with available authentication methods in Issuer API
         val authorizationCodeFlow = AuthorizationCodeFlow(testHttpClient(doFollowRedirects = false))
         authorizationCodeFlow.testIssuerAPI()
+
+        // Test Issuer Draft 11
+        val draft11Issuer = Draft11(testHttpClient(doFollowRedirects = false))
+
+        val idTokenIssuanceReq = Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-id-token.json")).copy(
+            credentialConfigurationId = "OpenBadgeCredential_jwt_vc",
+            standardVersion = OpenID4VCIVersion.DRAFT11,
+            useJar = true
+        )
+
+        draft11Issuer.testIssuerAPIDraft11AuthFlowWithJar(idTokenIssuanceReq)
+
+        val vpTokenIssuanceReq = Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-vp-token.json")).copy(
+            credentialConfigurationId = "OpenBadgeCredential_jwt_vc",
+            standardVersion = OpenID4VCIVersion.DRAFT11,
+            useJar = true
+        )
+
+        draft11Issuer.testIssuerAPIDraft11AuthFlowWithJar(vpTokenIssuanceReq)
+
+        val draft11 = Draft11(client)
+
+        val preAuthFlowIssuanceReq = Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request.json")).copy(
+            standardVersion = OpenID4VCIVersion.DRAFT11,
+        )
+
+        draft11.testIssuanceDraft11PreAuthFlow(preAuthFlowIssuanceReq, wallet)
+
 
         // Test External Signature API Endpoints
         //In the context of these test cases, a new wallet is created and initialized

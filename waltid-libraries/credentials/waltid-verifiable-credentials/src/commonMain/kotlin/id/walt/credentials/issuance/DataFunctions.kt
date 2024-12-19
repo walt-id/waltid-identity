@@ -5,6 +5,7 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
@@ -22,9 +23,8 @@ val dataFunctions = mapOf<String, suspend (call: CredentialDataMergeUtils.Functi
 
     "context" to { it.context[it.args!!]!! },
 
-    // Add this because clock.now returns millis and the timestamps for exp etc claims must be identical
-    "timestamp-ebsi" to { JsonPrimitive(Clock.System.now().toString())},
-    "timestamp-ebsi-in" to { JsonPrimitive((Clock.System.now() + Duration.parse(it.args!!)).toString().replaceRange(19..28, "")) },
+    "timestamp-ebsi" to { JsonPrimitive(Clock.System.now().toIso8681WithoutSubSecondPrecision())},
+    "timestamp-ebsi-in" to { JsonPrimitive((Clock.System.now() + Duration.parse(it.args!!)).toIso8681WithoutSubSecondPrecision()) },
 
     "timestamp" to { JsonPrimitive(Clock.System.now().toString()) },
 
@@ -46,3 +46,6 @@ val dataFunctions = mapOf<String, suspend (call: CredentialDataMergeUtils.Functi
             ?: throw IllegalArgumentException("No such function in history or no history: ${it.args}")
     }
 )
+
+private fun Instant.toIso8681WithoutSubSecondPrecision(): String =
+    toString().substringBefore(".") + "Z"
