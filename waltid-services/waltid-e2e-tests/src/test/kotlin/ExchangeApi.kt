@@ -72,6 +72,7 @@ class ExchangeApi(private val client: HttpClient) {
             }
         }
 
+    @OptIn(ExperimentalUuidApi::class)
     suspend fun unmatchedCredentialsForPresentationDefinition(
         wallet: Uuid,
         presentationDefinition: String,

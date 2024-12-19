@@ -62,8 +62,8 @@ var timeoutAt: Instant? = null
 @JsExport
 @Suppress("TRANSIENT_IS_REDUNDANT")
 @Serializable
-@SerialName("aws")
-class AWSKey(
+@SerialName("aws-rest-api")
+class AWSKeyRestAPI(
     val config: AWSKeyMetadata,
     val id: String,
     private var _publicKey: String? = null,
@@ -306,7 +306,7 @@ class AWSKey(
 
 
     companion object : AWSKeyCreator {
-        val client = HttpClient()
+        private val client = HttpClient()
 
         @JsExport.Ignore
         suspend fun authAccess(config: AWSKeyMetadata) {
@@ -608,7 +608,7 @@ $public
 
 
         @JsExport.Ignore
-        override suspend fun generate(type: KeyType, config: AWSKeyMetadata): AWSKey {
+        override suspend fun generate(type: KeyType, config: AWSKeyMetadata): AWSKeyRestAPI {
 
             if (config.auth.accessKeyId.isNullOrBlank() && config.auth.secretAccessKey.isNullOrBlank()) {
                 getAccess(config)
@@ -648,7 +648,7 @@ $public
 
             val publicKey = getPublicKey(config, keyId.toString())
 
-            return AWSKey(
+            return AWSKeyRestAPI(
                 config = config,
                 id = keyId.toString(),
                 _publicKey = publicKey.exportJWK(),

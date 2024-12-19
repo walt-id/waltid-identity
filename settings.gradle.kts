@@ -18,6 +18,7 @@ val modules = listOf(
     * "$libraries:crypto".group(
         "waltid-crypto",
         "waltid-crypto-oci",
+        "waltid-crypto-aws",
         "waltid-crypto-android" whenEnabled enableAndroidBuild,
         "waltid-crypto-ios" whenEnabled enableIosBuild,
         "waltid-target-ios" whenEnabled enableIosBuild,
@@ -90,7 +91,7 @@ pluginManagement {
 }
 
 plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
+    id("org.gradle.toolchains.foojay-resolver-convention") version "0.9.0"
 }
 
 rootProject.name = "waltid-identity"
