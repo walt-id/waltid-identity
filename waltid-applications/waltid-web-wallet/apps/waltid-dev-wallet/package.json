@@ -13,7 +13,7 @@
     "@heroicons/vue": "^2.1.5",
     "@julr/unocss-preset-forms": "^0.1.0",
     "@pinia/nuxt": "^0.5.5",
-    "jsonpath-plus": "^10.0.0",
+    "jsonpath-plus": "^10.0.7",
     "pinia": "^2.2.4",
     "qr-scanner": "^1.4.2",
     "qrcode.vue": "^3.5.0",

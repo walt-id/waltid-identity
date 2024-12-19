@@ -7,6 +7,7 @@ COPY waltid-libraries/credentials/waltid-verifiable-credentials/build.gradle.kts
 COPY waltid-libraries/credentials/waltid-verification-policies/build.gradle.kts /work/waltid-libraries/credentials/waltid-verification-policies/
 COPY waltid-libraries/credentials/waltid-dif-definitions-parser/build.gradle.kts /work/waltid-libraries/credentials/waltid-dif-definitions-parser/
 COPY waltid-libraries/crypto/waltid-crypto/build.gradle.kts /work/waltid-libraries/crypto/waltid-crypto/
+COPY waltid-libraries/crypto/waltid-crypto-aws/build.gradle.kts /work/waltid-libraries/crypto/waltid-crypto-aws/
 COPY waltid-libraries/waltid-did/build.gradle.kts /work/waltid-libraries/waltid-did/
 COPY waltid-libraries/protocols/waltid-openid4vc/build.gradle.kts /work/waltid-libraries/protocols/waltid-openid4vc/
 COPY waltid-libraries/sdjwt/waltid-sdjwt/build.gradle.kts /work/waltid-libraries/sdjwt/waltid-sdjwt/
@@ -23,6 +24,7 @@ COPY waltid-libraries/credentials/waltid-verifiable-credentials/. /work/waltid-l
 COPY waltid-libraries/credentials/waltid-verification-policies/. /work/waltid-libraries/credentials/waltid-verification-policies
 COPY waltid-libraries/credentials/waltid-dif-definitions-parser/. /work/waltid-libraries/credentials/waltid-dif-definitions-parser
 COPY waltid-libraries/crypto/waltid-crypto/. /work/waltid-libraries/crypto/waltid-crypto
+COPY waltid-libraries/crypto/waltid-crypto-aws/. /work/waltid-libraries/crypto/waltid-crypto-aws
 COPY waltid-libraries/waltid-did/. /work/waltid-libraries/waltid-did
 COPY waltid-libraries/protocols/waltid-openid4vc/. /work/waltid-libraries/protocols/waltid-openid4vc
 COPY waltid-libraries/sdjwt/waltid-sdjwt/. /work/waltid-libraries/sdjwt/waltid-sdjwt

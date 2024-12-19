@@ -104,7 +104,7 @@ fun Application.keys() = walletRoute {
                     }
                     example("AWS key generation request") {
                         value = KeyGenerationRequest(
-                            backend = "aws",
+                            backend = "aws-rest-api",
                             keyType = KeyType.secp256r1,
                             config = buildJsonObject {
                                 putJsonObject("auth") {
@@ -126,6 +126,15 @@ fun Application.keys() = walletRoute {
                                     put("tenantId", JsonPrimitive("tenantId"))
                                     put("keyVaultUrl", JsonPrimitive("keyVaultUrl"))
                                 }
+                            }
+                        )
+                    }
+                    example("AWS key generation request SDK") {
+                        value = KeyGenerationRequest(
+                            backend = "aws",
+                            keyType = KeyType.secp256r1,
+                            config = buildJsonObject {
+                                put("region", JsonPrimitive("eu-central-1"))
                             }
                         )
                     }
