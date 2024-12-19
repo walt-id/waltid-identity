@@ -35,7 +35,6 @@ import io.ktor.server.util.*
 import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -119,7 +118,7 @@ private const val fixedPresentationDefinitionForEbsiConformanceTest =
 
 private val verificationUseCase = VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
 
-fun Application.verfierApi() {
+fun Application.verifierApi() {
     routing {
 
         route("openid4vc", {
@@ -261,7 +260,7 @@ fun Application.verfierApi() {
                             value = TokenResponseFormParam(
                                 JsonPrimitive("abc.def.ghi"), PresentationSubmissionFormParam(
                                     "1", "1", listOf(
-                                        DescriptorMappingFormParam("1", VCFormat.jwt_vc_json, "$.type")
+                                        DescriptorMappingFormParam("1", VCFormat.jwt_vc_json, "$.vc.type")
                                     )
                                 ), null
                             )

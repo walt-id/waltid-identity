@@ -5,10 +5,8 @@ import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.WebService
-import id.walt.policies.PolicyManager
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
-import id.walt.policies.policies.vp.PresentationDefinitionPolicy
 import id.walt.verifier.entra.entraVerifierApi
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.web.plugins.configureHTTP
@@ -42,7 +40,7 @@ fun Application.verifierModule(withPlugins: Boolean = true) {
     if (withPlugins) {
         configurePlugins()
     }
-    verfierApi();
+    verifierApi();
     { entraVerifierApi() } whenFeature FeatureCatalog.entra
     { lspPotentialVerificationTestApi() } whenFeature FeatureCatalog.lspPotential
 }
