@@ -58,7 +58,15 @@ object OidcApi : CIProvider() {
         route("", {
             tags = listOf("oidc")
         }) {
-            get("{standardVersion}/.well-known/openid-configuration") {
+            get("{standardVersion}/.well-known/openid-configuration", {
+                request {
+                    queryParameter<String>("standardVersion") {
+                        description = "The value of the standard version. Supported values are: draft13 and draft11"
+                        example("Example") { value = "draft13" }
+                        required = true
+                    }
+                }
+            }) {
                 val metadata = getMetadataForVersion(
                     standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required"),
                 )
@@ -66,7 +74,15 @@ object OidcApi : CIProvider() {
                 call.respond(metadata.toJSON())
             }
 
-            get("{standardVersion}/.well-known/openid-credential-issuer") {
+            get("{standardVersion}/.well-known/openid-credential-issuer", {
+                request {
+                    queryParameter<String>("standardVersion") {
+                        description = "The value of the standard version. Supported values are: draft13 and draft11"
+                        example("Example") { value = "draft13" }
+                        required = true
+                    }
+                }
+            }) {
                 val metadata = getMetadataForVersion(
                     standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required"),
                 )
@@ -74,7 +90,15 @@ object OidcApi : CIProvider() {
                 call.respond(metadata.toJSON())
             }
 
-            get("{standardVersion}/.well-known/oauth-authorization-server") {
+            get("{standardVersion}/.well-known/oauth-authorization-server", {
+                request {
+                    queryParameter<String>("standardVersion") {
+                        description = "The value of the standard version. Supported values are: draft13 and draft11"
+                        example("Example") { value = "draft13" }
+                        required = true
+                    }
+                }
+            }) {
                 val metadata = getMetadataForVersion(
                     standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required"),
                 )
@@ -82,7 +106,15 @@ object OidcApi : CIProvider() {
                 call.respond(metadata.toJSON())
             }
 
-            get("/.well-known/jwt-vc-issuer/{standardVersion}") {
+            get("/.well-known/jwt-vc-issuer/{standardVersion}", {
+                request {
+                    queryParameter<String>("standardVersion") {
+                        description = "The value of the standard version. Supported values are: draft13 and draft11"
+                        example("Example") { value = "draft13" }
+                        required = true
+                    }
+                }
+            }) {
                 call.respond(HttpStatusCode.OK, JWTVCIssuerMetadata(issuer = metadata.issuer, jwksUri = metadata.jwksUri))
             }
 
@@ -120,7 +152,15 @@ object OidcApi : CIProvider() {
                 }
             }
 
-            get("{standardVersion}/jwks") {
+            get("{standardVersion}/jwks", {
+                request {
+                    queryParameter<String>("standardVersion") {
+                        description = "The value of the standard version. Supported values are: draft13 and draft11"
+                        example("Example") { value = "draft13" }
+                        required = true
+                    }
+                }
+            }) {
                 call.respond(HttpStatusCode.OK, getJwksSessions())
             }
 
