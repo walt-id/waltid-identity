@@ -22,6 +22,7 @@ import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.JWTVCIssuerMetadata
 import id.walt.sdjwt.SDJWTVCTypeMetadata
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRequest
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
@@ -60,11 +61,7 @@ object OidcApi : CIProvider() {
         }) {
             get("{standardVersion}/.well-known/openid-configuration", {
                 request {
-                    queryParameter<String>("standardVersion") {
-                        description = "The value of the standard version. Supported values are: draft13 and draft11"
-                        example("Example") { value = "draft13" }
-                        required = true
-                    }
+                    standardVersionQueryParameter()
                 }
             }) {
                 val metadata = getMetadataForVersion(
@@ -76,11 +73,7 @@ object OidcApi : CIProvider() {
 
             get("{standardVersion}/.well-known/openid-credential-issuer", {
                 request {
-                    queryParameter<String>("standardVersion") {
-                        description = "The value of the standard version. Supported values are: draft13 and draft11"
-                        example("Example") { value = "draft13" }
-                        required = true
-                    }
+                    standardVersionQueryParameter()
                 }
             }) {
                 val metadata = getMetadataForVersion(
@@ -92,11 +85,7 @@ object OidcApi : CIProvider() {
 
             get("{standardVersion}/.well-known/oauth-authorization-server", {
                 request {
-                    queryParameter<String>("standardVersion") {
-                        description = "The value of the standard version. Supported values are: draft13 and draft11"
-                        example("Example") { value = "draft13" }
-                        required = true
-                    }
+                    standardVersionQueryParameter()
                 }
             }) {
                 val metadata = getMetadataForVersion(
@@ -108,11 +97,7 @@ object OidcApi : CIProvider() {
 
             get("/.well-known/jwt-vc-issuer/{standardVersion}", {
                 request {
-                    queryParameter<String>("standardVersion") {
-                        description = "The value of the standard version. Supported values are: draft13 and draft11"
-                        example("Example") { value = "draft13" }
-                        required = true
-                    }
+                    standardVersionQueryParameter()
                 }
             }) {
                 call.respond(HttpStatusCode.OK, JWTVCIssuerMetadata(issuer = metadata.issuer, jwksUri = metadata.jwksUri))
@@ -154,11 +139,7 @@ object OidcApi : CIProvider() {
 
             get("{standardVersion}/jwks", {
                 request {
-                    queryParameter<String>("standardVersion") {
-                        description = "The value of the standard version. Supported values are: draft13 and draft11"
-                        example("Example") { value = "draft13" }
-                        required = true
-                    }
+                    standardVersionQueryParameter()
                 }
             }) {
                 call.respond(HttpStatusCode.OK, getJwksSessions())
@@ -567,6 +548,12 @@ object OidcApi : CIProvider() {
                 }
             }
         }
+    }
+
+    private fun OpenApiRequest.standardVersionQueryParameter() = queryParameter<String>("standardVersion") {
+        description = "The value of the standard version. Supported values are: draft13 and draft11"
+        example("Example") { value = "draft13" }
+        required = true
     }
 
     private fun getPushedAuthorizationSession(authorizationRequest: AuthorizationRequest): IssuanceSession {
