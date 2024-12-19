@@ -210,7 +210,26 @@ class PresentationDefinitionPolicyTests {
             },
             evaluate = {
                 evaluatePresentationVerificationResult(
-                    presentationRequest = PresentationRequests.diploPresentationRequest,
+                    presentationRequest = PresentationRequests.outOfOrderPresentationRequest1,
+                    expectedVerificationResult = false,
+                )
+            },
+            cleanup = {
+            },
+        )
+
+        runTestScenario(
+            description = "OSS User issue",
+            setup = {
+                issueCredentialsToWallet(
+                    issuanceRequests = listOf(
+                        IssuanceRequests.universityDegree,
+                    )
+                )
+            },
+            evaluate = {
+                evaluatePresentationVerificationResult(
+                    presentationRequest = PresentationRequests.outOfOrderPresentationRequest2,
                     expectedVerificationResult = false,
                 )
             },
