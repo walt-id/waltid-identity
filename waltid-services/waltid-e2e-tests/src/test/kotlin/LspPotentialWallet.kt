@@ -66,9 +66,15 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         val offerUri = offerResp.bodyAsText()
 
         // === resolve credential offer ===
+        val resolvedOffer11 = client.post("/wallet-api/wallet/$walletId/exchange/resolveCredentialOffer") {
+            setBody(offerUri)
+        }.expectSuccess().body<JsonObject>()
+
+        println(resolvedOffer11)
+
         val resolvedOffer = client.post("/wallet-api/wallet/$walletId/exchange/resolveCredentialOffer") {
             setBody(offerUri)
-        }.expectSuccess().body<CredentialOffer>()
+        }.expectSuccess().body<CredentialOffer.Draft13>()
 
         assertEquals(1, resolvedOffer.credentialConfigurationIds.size)
         assertEquals("org.iso.18013.5.1.mDL", resolvedOffer.credentialConfigurationIds.first())
@@ -76,7 +82,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         // === resolve issuer metadata ===
         val issuerMetadata =
             client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess()
-                .body<OpenIDProviderMetadata>()
+                .body<OpenIDProviderMetadata.Draft13>()
         assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
         assertContains(
             issuerMetadata.credentialConfigurationsSupported!!.keys,
@@ -215,14 +221,14 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         // === resolve credential offer ===
         val resolvedOffer = client.post("/wallet-api/wallet/$walletId/exchange/resolveCredentialOffer") {
             setBody(offerUri)
-        }.expectSuccess().body<CredentialOffer>()
+        }.expectSuccess().body<CredentialOffer.Draft13>()
         assertEquals(1, resolvedOffer.credentialConfigurationIds.size)
         assertEquals("identity_credential_vc+sd-jwt", resolvedOffer.credentialConfigurationIds.first())
 
         // === resolve issuer metadata ===
         val issuerMetadata =
             client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess()
-                .body<OpenIDProviderMetadata>()
+                .body<OpenIDProviderMetadata.Draft13>()
         assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
         assertContains(
             issuerMetadata.credentialConfigurationsSupported!!.keys,

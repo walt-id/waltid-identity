@@ -233,8 +233,8 @@ class TestCredentialWallet(
         return true
     }
 
-    override val metadata: OpenIDProviderMetadata
-        get() = createDefaultProviderMetadata()
+    override val metadata
+        get() = createDefaultProviderMetadata() as OpenIDProviderMetadata.Draft13
 
     override fun getSession(id: String) = sessionCache[id]
     override fun getSessionByAuthServerState(authServerState: String): SIOPSession? {
