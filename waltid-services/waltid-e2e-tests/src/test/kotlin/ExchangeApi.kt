@@ -14,6 +14,7 @@ import kotlin.uuid.Uuid
 
 
 class ExchangeApi(private val client: HttpClient) {
+    @OptIn(ExperimentalUuidApi::class)
     suspend fun resolveCredentialOffer(wallet: Uuid, offerUrl: String, output: ((String) -> Unit)? = null) =
         test("/wallet-api/wallet/{wallet}/exchange/resolveCredentialOffer - resolve credential offer") {
             client.post("/wallet-api/wallet/$wallet/exchange/resolveCredentialOffer") {
@@ -23,6 +24,7 @@ class ExchangeApi(private val client: HttpClient) {
             }
         }
 
+    @OptIn(ExperimentalUuidApi::class)
     suspend fun useOfferRequest(
         wallet: Uuid,
         offerUrl: String,
@@ -39,6 +41,7 @@ class ExchangeApi(private val client: HttpClient) {
         }
     }
 
+    @OptIn(ExperimentalUuidApi::class)
     suspend fun resolvePresentationRequest(
         wallet: Uuid,
         presentationRequestUrl: String,
@@ -54,6 +57,7 @@ class ExchangeApi(private val client: HttpClient) {
         }
     }
 
+    @OptIn(ExperimentalUuidApi::class)
     suspend fun matchCredentialsForPresentationDefinition(
         wallet: Uuid,
         presentationDefinition: String,
@@ -89,6 +93,7 @@ class ExchangeApi(private val client: HttpClient) {
             }
         }
 
+    @OptIn(ExperimentalUuidApi::class)
     suspend fun usePresentationRequest(
         wallet: Uuid,
         request: UsePresentationRequest,
