@@ -121,8 +121,12 @@ dependencies {
 
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-oci"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto-aws"))
+
+
     implementation(project(":waltid-libraries:waltid-did"))
     implementation(project(":waltid-libraries:credentials:waltid-verification-policies"))
+    implementation(project(":waltid-libraries:credentials:waltid-dif-definitions-parser"))
 
     implementation(project(":waltid-libraries:auth:waltid-ktor-authnz"))
 

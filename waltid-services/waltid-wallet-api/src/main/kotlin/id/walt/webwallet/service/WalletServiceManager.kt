@@ -1,15 +1,19 @@
 package id.walt.webwallet.service
 
 import id.walt.commons.config.ConfigManager
+import id.walt.definitionparser.PresentationDefinitionParser
+import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.config.OidcConfiguration
 import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
+import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.Wallets
 import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.cache.EntityNameResolutionCacheService
 import id.walt.webwallet.service.category.CategoryServiceImpl
+import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialStatusServiceFactory
 import id.walt.webwallet.service.credentials.CredentialValidator
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -49,9 +53,12 @@ import id.walt.webwallet.usecase.notification.NotificationFilterUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
-
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -214,4 +221,16 @@ object WalletServiceManager {
             .selectAll().where { (AccountWalletMappings.tenant eq tenant) and (AccountWalletMappings.accountId eq account) }.map {
                 it[Wallets.id].value.toKotlinUuid()
             }
+
+    suspend fun matchCredentialsForPresentationDefinition(walletId: Uuid, presentationDefinition: PresentationDefinition): List<WalletCredential> {
+        val pd = Json.decodeFromJsonElement<id.walt.definitionparser.PresentationDefinition>(presentationDefinition.toJSON())
+        val matches = credentialService.list(walletId, CredentialFilterObject.default).filter { cred ->
+            val fullDoc = WalletCredential.parseFullDocument(cred.document, cred.disclosures, cred.id, cred.format)
+            fullDoc != null &&
+                pd.inputDescriptors.any { inputDesc ->
+                    PresentationDefinitionParser.matchCredentialsForInputDescriptor(flowOf(fullDoc), inputDesc).toList().isNotEmpty()
+                }
+        }
+        return matches
+    }
 }
