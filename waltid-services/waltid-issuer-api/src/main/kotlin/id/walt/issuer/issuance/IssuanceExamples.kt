@@ -12,9 +12,10 @@ import kotlinx.serialization.json.buildJsonArray
 
 object IssuanceExamples {
 
-    private inline fun <reified T> typedValueExampleDescriptorDsl(content: String): ValueExampleDescriptorDsl.() -> Unit = {
-        value = Json.decodeFromString<T>(content)
-    }
+    private inline fun <reified T> typedValueExampleDescriptorDsl(content: String): ValueExampleDescriptorDsl.() -> Unit =
+        {
+            value = Json.decodeFromString<T>(content)
+        }
 
     // language=json
     val openBadgeCredentialData = """
@@ -869,7 +870,7 @@ object IssuanceExamples {
             {
                 "key":
                 {
-                    "backend": "aws",
+                    "backend": "aws-rest-api",
                     "keyType": "secp256r1",
                     "config":
                     {
@@ -889,13 +890,36 @@ object IssuanceExamples {
         """.trimIndent()
     )
 
+
+    //language=JSON
+    val issuerOnboardingRequestAwsSdkExample = typedValueExampleDescriptorDsl<OnboardingRequest>(
+        """
+            {
+                "key":
+                {
+                    "backend": "aws",
+                    "keyType": "secp256r1",
+                    "config":
+                    {
+                        "region": "eu-central-1"
+                      
+                    }
+                },
+                "did":
+                {
+                    "method": "jwk"
+                }
+            }
+        """.trimIndent()
+    )
+
     //language=JSON
     val issuerOnboardingRequestAwsRestApiExampleWithRole = typedValueExampleDescriptorDsl<OnboardingRequest>(
         """
             {
                 "key":
                 {
-                    "backend": "aws",
+                    "backend": "aws-rest-api",
                     "keyType": "secp256r1",
                     "config":
                     {
@@ -940,6 +964,7 @@ object IssuanceExamples {
             }
         """.trimIndent()
     )
+
 
     //language=JSON
     val issuerOnboardingResponseOciRestApiExample = typedValueExampleDescriptorDsl<IssuerOnboardingResponse>(
