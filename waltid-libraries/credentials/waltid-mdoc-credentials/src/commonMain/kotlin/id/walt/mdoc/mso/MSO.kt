@@ -20,8 +20,7 @@ class MSO (
   val valueDigests: MapElement,
   val deviceKeyInfo: DeviceKeyInfo,
   val docType: StringElement,
-  val validityInfo: ValidityInfo,
-  val statusElement: StatusElement? = null
+  val validityInfo: ValidityInfo
 ) {
   /**
    * Get map from digestID to digest value, for the items of the given name space
@@ -44,17 +43,14 @@ class MSO (
   /**
    * Convert to CBOR map element
    */
-  fun toMapElement(): DataElement {
-    return mutableMapOf(
-      "version" to version,
-      "digestAlgorithm" to digestAlgorithm,
-      "valueDigests" to valueDigests,
-      "deviceKeyInfo" to deviceKeyInfo.toMapElement(),
-      "docType" to docType,
-      "validityInfo" to validityInfo.toMapElement(),
-      statusElement?.let { "status" to it.toMapElement() } as Pair<String, DataElement>
-    ).toDataElement()
-  }
+  fun toMapElement() = mapOf(
+    "version" to version,
+    "digestAlgorithm" to digestAlgorithm,
+    "valueDigests" to valueDigests,
+    "deviceKeyInfo" to deviceKeyInfo.toMapElement(),
+    "docType" to docType,
+    "validityInfo" to validityInfo.toMapElement()
+  ).toDataElement()
 
   /**
    * Decode and verify the given items of the given name space
@@ -92,9 +88,7 @@ class MSO (
                   deviceKeyInfo: DeviceKeyInfo,
                   docType: String,
                   validityInfo: ValidityInfo,
-                  statusElement: StatusElement? = null,
-                  digestAlgorithm: DigestAlgorithm = DigestAlgorithm.SHA256
-    ): MSO {
+                  digestAlgorithm: DigestAlgorithm = DigestAlgorithm.SHA256): MSO {
       return MSO(
         "1.0".toDataElement(),
         digestAlgorithm.value.toDataElement(),
@@ -110,8 +104,7 @@ class MSO (
         }.toDataElement(),
         deviceKeyInfo,
         docType.toDataElement(),
-        validityInfo,
-        statusElement
+        validityInfo
       )
     }
   }
