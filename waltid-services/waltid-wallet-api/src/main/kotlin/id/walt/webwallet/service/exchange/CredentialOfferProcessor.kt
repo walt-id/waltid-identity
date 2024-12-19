@@ -55,7 +55,6 @@ object CredentialOfferProcessor {
       providerMetadata: OpenIDProviderMetadata,
       accessToken: String,
     ): List<ProcessedCredentialOffer> {
-        providerMetadata as OpenIDProviderMetadata.Draft13
 
         val credReq = credReqs.first()
 
