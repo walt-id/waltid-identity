@@ -149,8 +149,8 @@ object OpenID4VCI {
 
     fun resolveOfferedCredentials(credentialOffer: CredentialOffer, providerMetadata: OpenIDProviderMetadata): List<OfferedCredential> {
         val supportedCredentials = when (providerMetadata) {
-            is OpenIDProviderMetadata.Draft11 -> providerMetadata.credentialSupported ?: mapOf()
             is OpenIDProviderMetadata.Draft13 -> providerMetadata.credentialConfigurationsSupported ?: mapOf()
+            is OpenIDProviderMetadata.Draft11 -> providerMetadata.credentialSupported?.values?.associateBy { it.id } ?: mapOf()
         }
 
         val credentialIds = when (credentialOffer) {

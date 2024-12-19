@@ -65,7 +65,7 @@ object IssuanceService: IssuanceServiceBase() {
         val providerMetadata = getCredentialIssuerOpenIDMetadata(
             credentialOffer.credentialIssuer,
             credentialWallet,
-        ) as OpenIDProviderMetadata.Draft13
+        )
 
         logger.debug { "providerMetadata: $providerMetadata" }
 
