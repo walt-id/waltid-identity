@@ -360,7 +360,10 @@ class PresentationDefinitionPolicyTests {
         )
 
         runTestScenario(
-            description = "Presentation Definition Policy Scenario - IETF SD-JWT VC Identity Credential, ",
+            description = "Presentation Definition Policy Scenario - IETF SD-JWT VC Identity Credential, " +
+                    "presentation request with two input descriptors, " +
+                    "second input descriptor requires is_over_65 to be true, " +
+                    "verification should succeed",
             setup = {
                 issueCredentialsToWallet(
                     issuanceRequests = listOf(
@@ -370,7 +373,82 @@ class PresentationDefinitionPolicyTests {
             },
             evaluate = {
                 evaluatePresentationVerificationResult(
-                    presentationRequest = PresentationRequests.identityCredential,
+                    presentationRequest = PresentationRequests.getIdentityCredentialWithTwoInputDescriptors(),
+                    expectedVerificationResult = true,
+                    provideDisclosures = true,
+                )
+            },
+            cleanup = {
+                deleteWalletCredentials()
+            },
+        )
+
+        runTestScenario(
+            description = "Presentation Definition Policy Scenario - IETF SD-JWT VC Identity Credential, " +
+                    "presentation request with two input descriptors, " +
+                    "second input descriptor requires is_over_65 to be false, " +
+                    "verification should fail",
+            setup = {
+                issueCredentialsToWallet(
+                    issuanceRequests = listOf(
+                        IssuanceRequests.identityCredential,
+                    )
+                )
+            },
+            evaluate = {
+                evaluatePresentationVerificationResult(
+                    presentationRequest = PresentationRequests.getIdentityCredentialWithTwoInputDescriptors(false),
+                    expectedVerificationResult = false,
+                    provideDisclosures = true,
+                )
+            },
+            cleanup = {
+                deleteWalletCredentials()
+            },
+        )
+
+        runTestScenario(
+            description = "Presentation Definition Policy Scenario - UniversityDegree and PDA1 credentials, " +
+                    "presentation request with two input descriptors, " +
+                    "one for each credential, " +
+                    "verification should succeed",
+            setup = {
+                issueCredentialsToWallet(
+                    issuanceRequests = listOf(
+                        IssuanceRequests.universityDegreeW3CVcTypeSd,
+                        IssuanceRequests.pda1Credential,
+                    )
+                )
+            },
+            evaluate = {
+                evaluatePresentationVerificationResult(
+                    presentationRequest = PresentationRequests.getUniversityDegreePda1ToSeparateInputDescriptors(),
+                    expectedVerificationResult = true,
+                    provideDisclosures = true,
+                )
+            },
+            cleanup = {
+                deleteWalletCredentials()
+            },
+        )
+
+        runTestScenario(
+            description = "Presentation Definition Policy Scenario - UniversityDegree and PDA1 credentials, " +
+                    "presentation request with two input descriptors, " +
+                    "one for each credential, " +
+                    "value for sex field of PDA1 cannot be satisfied by the wallet, " +
+                    "verification should fail",
+            setup = {
+                issueCredentialsToWallet(
+                    issuanceRequests = listOf(
+                        IssuanceRequests.universityDegreeW3CVcTypeSd,
+                        IssuanceRequests.pda1Credential,
+                    )
+                )
+            },
+            evaluate = {
+                evaluatePresentationVerificationResult(
+                    presentationRequest = PresentationRequests.getUniversityDegreePda1ToSeparateInputDescriptors("XXX"),
                     expectedVerificationResult = false,
                     provideDisclosures = true,
                 )
@@ -662,7 +740,9 @@ class PresentationDefinitionPolicyTests {
         }            
         """.trimIndent()
 
-        val identityCredential = """
+        fun getIdentityCredentialWithTwoInputDescriptors(
+            isOver65: Boolean = true,
+        ) = """
             {
               "request_credentials": [
                 {
@@ -701,7 +781,7 @@ class PresentationDefinitionPolicyTests {
                             "${'$'}.is_over_65"
                           ],
                           "filter": {
-                            "const": false
+                            "const": $isOver65
                           }
                         }
                       ]
@@ -711,6 +791,73 @@ class PresentationDefinitionPolicyTests {
               ],
               "vp_policies": [
                 "presentation-definition"
+              ]
+            }
+        """.trimIndent()
+
+        fun getUniversityDegreePda1ToSeparateInputDescriptors(
+            sex: String = "01",
+        ) = """
+            {
+              "vp_policies": [
+                "signature",
+                "expired",
+                "not-before",
+                "presentation-definition"
+              ],
+              "vc_policies": [
+                "signature",
+                "expired",
+                "not-before"
+              ],
+              "request_credentials": [
+                {
+                  "format": "jwt_vc_json",
+                  "input_descriptor": {
+                    "id": "some-id",
+                    "constraints": {
+                      "fields": [
+                        {
+                          "path": [
+                            "${'$'}.vc.credentialSubject.degree.type"
+                          ],
+                          "filter": {
+                            "type": "string",
+                            "pattern": "BachelorDegree"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "format": "jwt_vc_json",
+                  "input_descriptor": {
+                    "id": "some-id-1",
+                    "constraints": {
+                      "fields": [
+                        {
+                          "path": [
+                            "${'$'}.vc.type"
+                          ],
+                          "filter": {
+                            "type": "string",
+                            "pattern": "VerifiablePortableDocumentA1"
+                          }
+                        },
+                        {
+                          "path": [
+                            "${'$'}.vc.credentialSubject.section1.sex"
+                          ],
+                          "filter": {
+                            "type": "string",
+                            "pattern": "$sex"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
               ]
             }
         """.trimIndent()
@@ -841,6 +988,291 @@ class PresentationDefinitionPolicyTests {
           }
         }
     """.trimIndent()
+
+        val pda1Credential = """
+            {
+              "issuerKey": {
+                "type": "jwk",
+                "jwk": {
+                  "kty": "EC",
+                  "x": "SgfOvOk1TL5yiXhK5Nq7OwKfn_RUkDizlIhAf8qd2wE",
+                  "y": "u_y5JZOsw3SrnNPydzJkoaiqb8raSdCNE_nPovt1fNI",
+                  "crv": "P-256",
+                  "d": "UqSi2MbJmPczfRmwRDeOJrdivoEy-qk4OEDjFwJYlUI"
+                }
+              },
+              "credentialConfigurationId": "VerifiablePortableDocumentA1_jwt_vc",
+              "credentialData": {
+                "@context": [
+                  "https://www.w3.org/2018/credentials/v1"
+                ],
+                "id": "https://www.w3.org/2018/credentials/v1",
+                "type": [
+                  "VerifiableCredential",
+                  "VerifiableAttestation",
+                  "VerifiablePortableDocumentA1"
+                ],
+                "issuer": "did:ebsi:zf39qHTXaLrr6iy3tQhT3UZ",
+                "issuanceDate": "2020-03-10T04:24:12Z",
+                "credentialSubject": {
+                  "id": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrvQgsKodq2xnfBMYGk99qtunHHQuvvi35kRvbH9SDnue2ZNJqcnaU7yAxeKqEqDX4qFzeKYCj6rdbFnTsf4c8QjFXcgGYS21Db9d2FhHxw9ZEnqt9KPgLsLbQHVAmNNZoz",
+                  "section1": {
+                    "personalIdentificationNumber": "1",
+                    "sex": "01",
+                    "surname": "Savvaidis",
+                    "forenames": "Charalampos",
+                    "dateBirth": "1985-08-15",
+                    "nationalities": [
+                      "BE"
+                    ],
+                    "stateOfResidenceAddress": {
+                      "streetNo": "sss, nnn ",
+                      "postCode": "ppp",
+                      "town": "ccc",
+                      "countryCode": "BE"
+                    },
+                    "stateOfStayAddress": {
+                      "streetNo": "sss, nnn ",
+                      "postCode": "ppp",
+                      "town": "ccc",
+                      "countryCode": "BE"
+                    }
+                  },
+                  "section2": {
+                    "memberStateWhichLegislationApplies": "DE",
+                    "startingDate": "2022-10-09",
+                    "endingDate": "2022-10-29",
+                    "certificateForDurationActivity": true,
+                    "determinationProvisional": false,
+                    "transitionRulesApplyAsEC8832004": false
+                  },
+                  "section3": {
+                    "postedEmployedPerson": false,
+                    "employedTwoOrMoreStates": false,
+                    "postedSelfEmployedPerson": true,
+                    "selfEmployedTwoOrMoreStates": true,
+                    "civilServant": true,
+                    "contractStaff": false,
+                    "mariner": false,
+                    "employedAndSelfEmployed": false,
+                    "civilAndEmployedSelfEmployed": true,
+                    "flightCrewMember": false,
+                    "exception": false,
+                    "exceptionDescription": "",
+                    "workingInStateUnder21": false
+                  },
+                  "section4": {
+                    "employee": false,
+                    "selfEmployedActivity": true,
+                    "nameBusinessName": "1",
+                    "registeredAddress": {
+                      "streetNo": "1, 1 1",
+                      "postCode": "1",
+                      "town": "1",
+                      "countryCode": "DE"
+                    }
+                  },
+                  "section5": {
+                    "noFixedAddress": true
+                  },
+                  "section6": {
+                    "name": "National Institute for the Social Security of the Self-employed (NISSE)",
+                    "address": {
+                      "streetNo": "Quai de Willebroeck 35",
+                      "postCode": "1000",
+                      "town": "Bruxelles",
+                      "countryCode": "BE"
+                    },
+                    "institutionID": "NSSIE/INASTI/RSVZ",
+                    "officeFaxNo": "",
+                    "officePhoneNo": "0800 12 018",
+                    "email": "info@rsvz-inasti.fgov.be",
+                    "date": "2022-10-28",
+                    "signature": "Official signature"
+                  }
+                }
+              },
+              "mapping": {
+                "id": "<uuid>",
+                "issuer": "<issuerDid>",
+                "credentialSubject": {
+                  "id": "<subjectDid>"
+                },
+                "issuanceDate": "<timestamp-ebsi>",
+                "issued": "<timestamp-ebsi>",
+                "validFrom": "<timestamp-ebsi>",
+                "expirationDate": "<timestamp-ebsi-in:365d>",
+                "credentialSchema": {
+                  "id": "https://api-conformance.ebsi.eu/trusted-schemas-registry/v3/schemas/z5qB8tydkn3Xk3VXb15SJ9dAWW6wky1YEoVdGzudWzhcW",
+                  "type": "FullJsonSchemaValidator2021"
+                }
+              },
+              "selectiveDisclosure": {
+                "fields": {
+                  "credentialSubject": {
+                    "sd": false,
+                    "children": {
+                      "fields": {
+                        "section1": {
+                          "sd": false,
+                          "children": {
+                            "fields": {
+                              "personalIdentificationNumber": {
+                                "sd": true
+                              },
+                              "sex": {
+                                "sd": true
+                              },
+                              "surname": {
+                                "sd": true
+                              },
+                              "forenames": {
+                                "sd": true
+                              },
+                              "dateBirth": {
+                                "sd": true
+                              },
+                              "nationalities": {
+                                "sd": true
+                              },
+                              "stateOfResidenceAddress": {
+                                "sd": true
+                              },
+                              "stateOfStayAddress": {
+                                "sd": true
+                              }
+                            },
+                            "decoyMode": "NONE",
+                            "decoys": 0
+                          }
+                        },
+                        "section3": {
+                          "sd": false,
+                          "children": {
+                            "fields": {
+                              "postedEmployedPerson": {
+                                "sd": true
+                              },
+                              "employedTwoOrMoreStates": {
+                                "sd": true
+                              },
+                              "postedSelfEmployedPerson": {
+                                "sd": true
+                              },
+                              "selfEmployedTwoOrMoreStates": {
+                                "sd": true
+                              },
+                              "civilServant": {
+                                "sd": true
+                              },
+                              "contractStaff": {
+                                "sd": true
+                              },
+                              "mariner": {
+                                "sd": true
+                              },
+                              "employedAndSelfEmployed": {
+                                "sd": true
+                              },
+                              "civilAndEmployedSelfEmployed": {
+                                "sd": true
+                              },
+                              "flightCrewMember": {
+                                "sd": true
+                              },
+                              "exception": {
+                                "sd": true
+                              },
+                              "exceptionDescription": {
+                                "sd": true
+                              },
+                              "workingInStateUnder21": {
+                                "sd": true
+                              }
+                            },
+                            "decoyMode": "NONE",
+                            "decoys": 0
+                          }
+                        },
+                        "section4": {
+                          "sd": false,
+                          "children": {
+                            "fields": {
+                              "employee": {
+                                "sd": true
+                              },
+                              "selfEmployedActivity": {
+                                "sd": true
+                              },
+                              "nameBusinessName": {
+                                "sd": true
+                              },
+                              "registeredAddress": {
+                                "sd": true
+                              }
+                            },
+                            "decoyMode": "NONE",
+                            "decoys": 0
+                          }
+                        },
+                        "section5": {
+                          "sd": false,
+                          "children": {
+                            "fields": {
+                              "noFixedAddress": {
+                                "sd": true
+                              }
+                            },
+                            "decoyMode": "NONE",
+                            "decoys": 0
+                          }
+                        },
+                        "section6": {
+                          "sd": false,
+                          "children": {
+                            "fields": {
+                              "name": {
+                                "sd": true
+                              },
+                              "address": {
+                                "sd": true
+                              },
+                              "institutionID": {
+                                "sd": true
+                              },
+                              "officeFaxNo": {
+                                "sd": true
+                              },
+                              "officePhoneNo": {
+                                "sd": true
+                              },
+                              "email": {
+                                "sd": true
+                              },
+                              "date": {
+                                "sd": true
+                              },
+                              "signature": {
+                                "sd": true
+                              }
+                            },
+                            "decoyMode": "NONE",
+                            "decoys": 0
+                          }
+                        }
+                      },
+                      "decoyMode": "NONE",
+                      "decoys": 0
+                    }
+                  }
+                },
+                "decoyMode": "NONE",
+                "decoys": 0
+              },
+              "authenticationMethod": "PRE_AUTHORIZED",
+              "issuerDid": "did:ebsi:zf39qHTXaLrr6iy3tQhT3UZ"
+            }
+        """.trimIndent()
 
         val identityCredential = """
         {
