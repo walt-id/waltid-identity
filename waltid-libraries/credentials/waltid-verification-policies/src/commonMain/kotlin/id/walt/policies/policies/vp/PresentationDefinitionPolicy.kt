@@ -47,25 +47,22 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy(
             } ?: emptyList()
         }
 
-        val success = when (format) {
-            VCFormat.sd_jwt_vc -> PresentationDefinitionParser.matchCredentialsForInputDescriptor(
-                flowOf(data), presentationDefinition.inputDescriptors.first()
-            ).toList().isNotEmpty()
+        val credentialsFlow = when (format) {
+            VCFormat.sd_jwt_vc -> flowOf(data)
 
-            else -> {
-                val vcArray = data["vp"]!!.jsonObject["verifiableCredential"]?.jsonArray?.mapNotNull { vc ->
-                    vc.jsonPrimitive.contentOrNull?.let { SDJwt.parse(it) }?.fullPayload
-                        ?: throw IllegalArgumentException("Credential $vc is not a valid (SD-)JWT string")
-                } ?: emptyList()
-                presentationDefinition.inputDescriptors.map { inputDescriptor ->
-                    PresentationDefinitionParser.matchCredentialsForInputDescriptor(
-                        vcArray.asFlow(),
-                        inputDescriptor,
-                    ).toList().isNotEmpty()
-                }.all { it }
-            }
+            else -> (data["vp"]!!.jsonObject["verifiableCredential"]?.jsonArray?.mapNotNull { vc ->
+                vc.jsonPrimitive.contentOrNull?.let { SDJwt.parse(it) }?.fullPayload
+                    ?: throw IllegalArgumentException("Credential $vc is not a valid (SD-)JWT string")
+            } ?: emptyList()).asFlow()
+
         }
 
+        val success = presentationDefinition.inputDescriptors.map { inputDescriptor ->
+            PresentationDefinitionParser.matchCredentialsForInputDescriptor(
+                credentialsFlow,
+                inputDescriptor,
+            ).toList().isNotEmpty()
+        }.all { it }
 
         return if (success)
             Result.success(presentedTypes)
