@@ -9,17 +9,22 @@ import id.walt.commons.web.plugins.httpJson
 import id.walt.credentials.schemes.JwsSignatureScheme
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
+import id.walt.issuer.config.CredentialTypeConfig
+import id.walt.issuer.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuerModule
 import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.providers.CredentialIssuerConfig
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.AccountWalletListing
+import id.walt.webwallet.service.issuers.IssuersService
+import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
@@ -36,10 +41,9 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.util.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import kotlin.test.Test
-import kotlin.test.assertContains
-import kotlin.test.assertNotNull
+import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -520,6 +524,21 @@ class WaltidServicesE2ETests {
         val inputDescTest = InputDescriptorMatchingTest(issuerApi, exchangeApi, sessionApi, verificationApi)
 
         inputDescTest.e2e(wallet, did)
+    }
+
+    //@Test
+    fun issuerCredentialsListTest() = runBlocking {
+        var client = testHttpClient()
+        assertFalse(
+            IssuerUseCaseImpl(IssuersService, client).
+                fetchCredentials("https://issuer.portal.walt-test.cloud/draft11/.well-known/openid-credential-issuer")
+                    .isEmpty()
+        )
+        assertFalse(
+            IssuerUseCaseImpl(IssuersService, client).
+            fetchCredentials("https://issuer.portal.walt-test.cloud/draft13/.well-known/openid-credential-issuer")
+                .isEmpty()
+        )
     }
 
     suspend fun setupTestWallet(): LspPotentialWallet {
