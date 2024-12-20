@@ -359,6 +359,27 @@ class PresentationDefinitionPolicyTests {
             },
         )
 
+        runTestScenario(
+            description = "Presentation Definition Policy Scenario - IETF SD-JWT VC Identity Credential, ",
+            setup = {
+                issueCredentialsToWallet(
+                    issuanceRequests = listOf(
+                        IssuanceRequests.identityCredential,
+                    )
+                )
+            },
+            evaluate = {
+                evaluatePresentationVerificationResult(
+                    presentationRequest = PresentationRequests.identityCredential,
+                    expectedVerificationResult = false,
+                    provideDisclosures = true,
+                )
+            },
+            cleanup = {
+                deleteWalletCredentials()
+            },
+        )
+
     }
 
     private suspend fun issueCredentialsToWallet(
@@ -641,6 +662,59 @@ class PresentationDefinitionPolicyTests {
         }            
         """.trimIndent()
 
+        val identityCredential = """
+            {
+              "request_credentials": [
+                {
+                  "format": "vc+sd-jwt",
+                  "input_descriptor": {
+                    "id": "some-id",
+                    "format": {
+                      "vc+sd-jwt": {}
+                    },
+                    "constraints": {
+                      "fields": [
+                        {
+                          "path": [
+                            "${'$'}.vct"
+                          ],
+                          "filter": {
+                            "type": "string",
+                            "pattern": "http://localhost:22222/identity_credential"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "format": "vc+sd-jwt",
+                  "input_descriptor": {
+                    "id": "some-id-1",
+                    "format": {
+                      "vc+sd-jwt": {}
+                    },
+                    "constraints": {
+                      "fields": [
+                        {
+                          "path": [
+                            "${'$'}.is_over_65"
+                          ],
+                          "filter": {
+                            "const": false
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "vp_policies": [
+                "presentation-definition"
+              ]
+            }
+        """.trimIndent()
+
     }
 
     object IssuanceRequests {
@@ -767,6 +841,64 @@ class PresentationDefinitionPolicyTests {
           }
         }
     """.trimIndent()
+
+        val identityCredential = """
+        {
+          "issuerKey": {
+            "type": "jwk",
+            "jwk": {
+              "kty": "EC",
+              "d": "KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ",
+              "crv": "P-256",
+              "x": "G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM",
+              "y": "ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"
+            }
+          },
+          "credentialConfigurationId": "identity_credential_vc+sd-jwt",
+          "credentialData": {
+            "given_name": "John",
+            "family_name": "Doe",
+            "email": "johndoe@example.com",
+            "phone_number": "+1-202-555-0101",
+            "address": {
+              "street_address": "123 Main St",
+              "locality": "Anytown",
+              "region": "Anystate",
+              "country": "US"
+            },
+            "birthdate": "1940-01-01",
+            "is_over_18": true,
+            "is_over_21": true,
+            "is_over_65": true
+          },
+          "mapping": {
+            "id": "<uuid>",
+            "iat": "<timestamp-seconds>",
+            "nbf": "<timestamp-seconds>",
+            "exp": "<timestamp-in-seconds:365d>"
+          },
+          "selectiveDisclosure": {
+            "fields": {
+              "birthdate": {
+                "sd": true
+              },
+              "family_name": {
+                "sd": false
+              }
+            },
+            "decoyMode": "NONE",
+            "decoys": 0
+          },
+          "authenticationMethod": "PRE_AUTHORIZED",
+          "x5Chain": [
+            "-----BEGIN CERTIFICATE-----\nMIIBRzCB7qADAgECAgg57ch6mnj5KjAKBggqhkjOPQQDAjAXMRUwEwYDVQQDDAxNRE9DIFJPT1QgQ0EwHhcNMjQwNTAyMTMxMzMwWhcNMjUwNTAyMTMxMzMwWjAbMRkwFwYDVQQDDBBNRE9DIFRlc3QgSXNzdWVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG0RINBiF+oQUD3d5DGnegQuXenI29JDaMGoMvioKRBN53d4UazakS2unu8BnsEtxutS2kqRhYBPYk9RAriU3gaMgMB4wDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwCgYIKoZIzj0EAwIDSAAwRQIhAI5wBBAA3ewqIwslhuzFn4rNFW9dkz2TY7xeImO7CraYAiAYhai1NzJ6abAiYg8HxcRdYpO4bu2Sej8E6CzFHK34Yw==\n-----END CERTIFICATE-----"
+          ],
+          "trustedRootCAs": [
+            "-----BEGIN CERTIFICATE-----\nMIIBQzCB66ADAgECAgjbHnT+6LsrbDAKBggqhkjOPQQDAjAYMRYwFAYDVQQDDA1NRE9DIFJPT1QgQ1NQMB4XDTI0MDUwMjEzMTMzMFoXDTI0MDUwMzEzMTMzMFowFzEVMBMGA1UEAwwMTURPQyBST09UIENBMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWP0sG+CkjItZ9KfM3sLF+rLGb8HYCfnlsIH/NWJjiXkTx57ryDLYfTU6QXYukVKHSq6MEebvQPqTJT1blZ/xeKMgMB4wDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCAQYwCgYIKoZIzj0EAwIDRwAwRAIgWM+JtnhdqbTzFD1S3byTvle0n/6EVALbkKCbdYGLn8cCICOoSETqwk1oPnJEEPjUbdR4txiNqkHQih8HKAQoe8t5\n-----END CERTIFICATE-----\n"
+          ]
+        }
+    """.trimIndent()
+
 
     }
 
