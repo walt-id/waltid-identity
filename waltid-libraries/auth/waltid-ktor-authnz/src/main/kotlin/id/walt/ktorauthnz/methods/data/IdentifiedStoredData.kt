@@ -1,7 +1,6 @@
-package id.walt.ktorauthnz.methods
+package id.walt.ktorauthnz.methods.data
 
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
-import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
 import kotlinx.serialization.Serializable
 
 @Serializable

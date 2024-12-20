@@ -53,8 +53,6 @@ abstract class UserPassBasedAuthMethod(
 
                 check(username?.isString == true) { "Invalid or missing $usernameName in JSON request. $EXPLANATION_MESSAGE" }
                 check(password?.isString == true) { "Invalid or missing $passwordName in JSON request. $EXPLANATION_MESSAGE" }
-                username!!
-                password!!
 
                 return UserPasswordCredential(username.content, password.content)
             }
@@ -64,6 +62,7 @@ abstract class UserPassBasedAuthMethod(
 
                 val username = form[usernameName] ?: form[DEFAULT_USER_NAME]
                 ?: error("Invalid or missing $usernameName in form post request. $EXPLANATION_MESSAGE")
+
                 val password = form[passwordName] ?: form[DEFAULT_PASSWORD_NAME]
                 ?: error("Invalid or missing $passwordName in form post request. $EXPLANATION_MESSAGE")
 
@@ -75,4 +74,6 @@ abstract class UserPassBasedAuthMethod(
     }
 
     abstract suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier
+    open suspend fun register(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier =
+        throw NotImplementedError("Register method is not implemented for this ${this::class.simpleName}")
 }

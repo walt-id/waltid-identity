@@ -21,6 +21,31 @@ import io.ktor.util.pipeline.*
 import kotlinx.coroutines.runBlocking
 import org.intellij.lang.annotations.Language
 
+
+fun Route.globalMultistepExample() {
+    route("web3") {
+        @Language("JSON")
+        val flowConfig = """
+        {
+            "method": "web3",
+            "ok": true
+        }
+    """.trimIndent()
+        val authFlow = AuthFlow.fromConfig(flowConfig)
+
+        val contextFunction: PipelineContext<Unit, ApplicationCall>.() -> AuthContext = {
+            AuthContext(
+                tenant = call.request.host(),
+                sessionId = call.parameters["sessionId"],
+                implicitSessionGeneration = true,
+                initialFlow = authFlow
+            )
+        }
+
+        registerAuthenticationMethod(Web3, contextFunction)
+    }
+}
+
 fun Route.globalImplicitSingleStep() {
     route("global-implicit1") {
         @Language("JSON")
