@@ -2,7 +2,9 @@ package id.walt.webwallet.web.controllers.exchange
 
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.CredentialOffer
+import id.walt.oid4vc.data.CredentialOfferSerializer
 import id.walt.oid4vc.data.OpenIDProviderMetadata
+import id.walt.oid4vc.data.OpenIDProviderMetadataSerializer
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.sdjwt.SDJWTVCTypeMetadata
@@ -25,6 +27,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.util.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlin.uuid.ExperimentalUuidApi
 
@@ -92,9 +95,7 @@ fun Application.exchange() = walletRoute {
             }
         }) {
             val presentationDefinition = PresentationDefinition.fromJSON(context.receive<JsonObject>())
-            val matchedCredentials = WalletServiceManager.matchPresentationDefinitionCredentialsUseCase.match(
-                getWalletId(), presentationDefinition
-            )
+            val matchedCredentials = WalletServiceManager.matchCredentialsForPresentationDefinition(getWalletId(), presentationDefinition)
             context.respond(matchedCredentials)
         }
         post("unmatchedCredentialsForPresentationDefinition", {
@@ -235,7 +236,10 @@ fun Application.exchange() = walletRoute {
             val request = call.receiveText()
             val reqParams = Url(request).parameters.toMap()
             val parsedOffer = wallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams))
-            context.respond(parsedOffer)
+
+            val serializedOffer = Json.encodeToString(CredentialOfferSerializer, parsedOffer)
+
+            context.respondText(serializedOffer, ContentType.Application.Json)
         }
         get("resolveVctUrl", {
             summary = "Receive an verifiable credential type (VCT) URL and return resolved vct object as described in IETF SD-JWT VC"
@@ -277,7 +281,8 @@ fun Application.exchange() = walletRoute {
             }
         }) {
             val issuer = call.request.queryParameters["issuer"] ?: throw BadRequestException("Issuer base url not set")
-            context.respond(HttpStatusCode.OK, OpenID4VCI.resolveCIProviderMetadata(issuer).toJSON())
+            val serializedMetadata = Json.encodeToString(OpenIDProviderMetadataSerializer, OpenID4VCI.resolveCIProviderMetadata(issuer))
+            context.respondText(serializedMetadata, ContentType.Application.Json)
         }
     }
 }

@@ -6,6 +6,7 @@ import id.walt.commons.ServiceMain
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.WebService
+import id.walt.crypto.keys.aws.WaltCryptoAws
 import id.walt.crypto.keys.oci.WaltCryptoOci
 import id.walt.did.helpers.WaltidServices
 import id.walt.webwallet.db.Db
@@ -40,6 +41,7 @@ suspend fun main(args: Array<String>) {
                 webWalletSetup()
                 WaltidServices.minimalInit()
                 WaltCryptoOci.init()
+                WaltCryptoAws.init()
                 Db.start()
             },
             run = WebService(Application::webWalletModule).run()

@@ -97,7 +97,7 @@ suspend fun main() {
 
 
 
-    val credOffer = CredentialOffer.Builder(url)
+    val credOffer = CredentialOffer.Draft13.Builder(url)
         .addOfferedCredential("VerifiableId")
         .addAuthorizationCodeGrant("test-state")
         .build()
@@ -114,7 +114,7 @@ suspend fun main() {
     check(credOffer.toJSONString() == parsedCredOffer.toJSONString())
 
     println("Resolve metadata from ${parsedCredOffer.credentialIssuer}")
-    val providerMetadata = runBlocking { OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer) }
+    val providerMetadata = runBlocking { OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer) as OpenIDProviderMetadata.Draft13 }
 
     check(parsedCredOffer.credentialIssuer == providerMetadata.credentialIssuer)
 

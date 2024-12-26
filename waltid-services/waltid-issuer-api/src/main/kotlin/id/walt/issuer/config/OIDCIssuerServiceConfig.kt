@@ -8,5 +8,5 @@ import kotlinx.coroutines.runBlocking
 
 data class OIDCIssuerServiceConfig(
     val baseUrl: String,
-    val ciTokenKey: String = runBlocking { KeySerialization.serializeKey(JWKKey.generate(KeyType.Ed25519)) },
+    val ciTokenKey: String = runBlocking { KeySerialization.serializeKey(JWKKey.generate(KeyType.secp256r1)) },
 ) : WaltConfig()

@@ -1,15 +1,21 @@
 package id.walt.webwallet.service
 
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.featureflag.FeatureManager.whenFeature
+import id.walt.definitionparser.PresentationDefinitionParser
+import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.OidcConfiguration
 import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
+import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.Wallets
 import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.cache.EntityNameResolutionCacheService
 import id.walt.webwallet.service.category.CategoryServiceImpl
+import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialStatusServiceFactory
 import id.walt.webwallet.service.credentials.CredentialValidator
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -49,9 +55,12 @@ import id.walt.webwallet.usecase.notification.NotificationFilterUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
-
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -69,7 +78,9 @@ object WalletServiceManager {
     private val categoryService = CategoryServiceImpl
     private val settingsService = SettingsService
     private val httpClient = getHttpClient()
-    private val trustConfig by lazy { ConfigManager.getConfig<TrustConfig>() }
+    private val trustConfig by lazy {
+        { ConfigManager.getConfig<TrustConfig>() } whenFeature FeatureCatalog.silentExchange
+    }
     private val credentialService = CredentialsService()
     private val credentialTypeSeeker = DefaultCredentialTypeSeeker()
     private val eventService = EventService()
@@ -89,8 +100,8 @@ object WalletServiceManager {
             bitStringValueParser = BitStringValueParser(),
         ),
     )
-    private val issuerNameResolutionService by lazy { DefaultNameResolutionService(httpClient, trustConfig.issuersRecord) }
-    private val verifierNameResolutionService by lazy { DefaultNameResolutionService(httpClient, trustConfig.verifiersRecord) }
+    private val issuerNameResolutionService by lazy { DefaultNameResolutionService(httpClient, trustConfig?.issuersRecord) }
+    private val verifierNameResolutionService by lazy { DefaultNameResolutionService(httpClient, trustConfig?.verifiersRecord) }
     private val issuerNameResolutionUseCase by lazy {
         EntityNameResolutionUseCase(
             EntityNameResolutionCacheService,
@@ -109,8 +120,8 @@ object WalletServiceManager {
     val eventUseCase by lazy { EventLogUseCase(eventService) }
     val eventFilterUseCase by lazy { EventFilterUseCase(eventService, issuerNameResolutionUseCase, verifierNameResolutionUseCase) }
     val oidcConfig by lazy { ConfigManager.getConfig<OidcConfiguration>() }
-    val issuerTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.issuersRecord) }
-    val verifierTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig.verifiersRecord) }
+    val issuerTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig?.issuersRecord) }
+    val verifierTrustValidationService by lazy { DefaultTrustValidationService(httpClient, trustConfig?.verifiersRecord) }
     val notificationUseCase by lazy { NotificationUseCase(NotificationService, notificationDataFormatter) }
     val notificationFilterUseCase by lazy { NotificationFilterUseCase(NotificationService, credentialService, notificationDataFormatter) }
     val matchPresentationDefinitionCredentialsUseCase = MatchPresentationDefinitionCredentialsUseCase(
@@ -214,4 +225,16 @@ object WalletServiceManager {
             .selectAll().where { (AccountWalletMappings.tenant eq tenant) and (AccountWalletMappings.accountId eq account) }.map {
                 it[Wallets.id].value.toKotlinUuid()
             }
+
+    suspend fun matchCredentialsForPresentationDefinition(walletId: Uuid, presentationDefinition: PresentationDefinition): List<WalletCredential> {
+        val pd = Json.decodeFromJsonElement<id.walt.definitionparser.PresentationDefinition>(presentationDefinition.toJSON())
+        val matches = credentialService.list(walletId, CredentialFilterObject.default).filter { cred ->
+            val fullDoc = WalletCredential.parseFullDocument(cred.document, cred.disclosures, cred.id, cred.format)
+            fullDoc != null &&
+                pd.inputDescriptors.any { inputDesc ->
+                    PresentationDefinitionParser.matchCredentialsForInputDescriptor(flowOf(fullDoc), inputDesc).toList().isNotEmpty()
+                }
+        }
+        return matches
+    }
 }
