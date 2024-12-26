@@ -1,8 +1,8 @@
-import { useLazyAsyncData, createError, navigateTo } from "nuxt/app";
-import { useCurrentWallet } from "./accountWallet.ts";
-import { decodeRequest } from "./siop-requests.ts";
-import { type Ref, ref, watch } from "vue";
-import { groupBy } from "./groupings.ts";
+import {createError, navigateTo, useLazyAsyncData} from "nuxt/app";
+import {useCurrentWallet} from "./accountWallet.ts";
+import {decodeRequest} from "./siop-requests.ts";
+import {type Ref, ref, watch} from "vue";
+import {groupBy} from "./groupings.ts";
 
 export async function useIssuance(query: any) {
     const currentWallet = useCurrentWallet()
@@ -19,6 +19,7 @@ export async function useIssuance(query: any) {
             const response: {
                 credential_issuer: string;
                 credential_configuration_ids: string[];
+                credentials: string[];
             } = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolveCredentialOffer`, {
                 method: "POST",
                 body: request
@@ -47,11 +48,32 @@ export async function useIssuance(query: any) {
         issuerHost = issuer;
     }
 
-    const credential_issuer: { credential_configurations_supported: Array<{ types: Array<String>; }>; } = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolveIssuerOpenIDMetadata?issuer=${issuer}`)
-    const credentialList = credentialOffer.credential_configuration_ids.map((id) => credential_issuer.credential_configurations_supported[id]);
+    const credential_issuer: {
+        credential_configurations_supported: Array<{ types: Array<String>; }>; // Draft13
+        credentials_supported?: Array<{ id: string; types: Array<String> }>; // Draft11
+    } = await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolveIssuerOpenIDMetadata?issuer=${issuer}`)
+
+
+    const credentialList = credentialOffer.credential_configuration_ids
+        // Draft13
+        ? credentialOffer.credential_configuration_ids.map((id) => credential_issuer.credential_configurations_supported[id])
+
+        // Draft11
+        :  credentialOffer.credentials.map((id) => {
+            return credential_issuer.credentials_supported?.find(
+                (credential_supported) => credential_supported.id === id
+            );
+        }).filter(Boolean);
+
 
     let credentialTypes: String[] = [];
     for (let credentialListElement of credentialList) {
+
+        if (typeof credentialListElement["types"] !== 'undefined') {
+            const typeList = credentialListElement["types"] as Array<String>;
+            const lastType = typeList[typeList.length - 1] as String;
+            credentialTypes.push(lastType);
+        }
 
         if (typeof credentialListElement["credential_definition"] !== 'undefined') {
             const typeList = credentialListElement["credential_definition"]["type"] as Array<String>;

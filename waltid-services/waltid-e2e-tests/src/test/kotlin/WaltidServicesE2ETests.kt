@@ -9,16 +9,22 @@ import id.walt.commons.web.plugins.httpJson
 import id.walt.credentials.schemes.JwsSignatureScheme
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
+import id.walt.issuer.config.CredentialTypeConfig
+import id.walt.issuer.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuerModule
 import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
+import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.providers.CredentialIssuerConfig
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.AccountWalletListing
+import id.walt.webwallet.service.issuers.IssuersService
+import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
@@ -35,10 +41,9 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.util.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import kotlin.test.Test
-import kotlin.test.assertContains
-import kotlin.test.assertNotNull
+import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -320,6 +325,7 @@ class WaltidServicesE2ETests {
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
         lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
+        lspPotentialWallet.testPresentationDefinitionCredentialMatching()
 
         //endregion -Exchange / presentation-
 
@@ -339,6 +345,34 @@ class WaltidServicesE2ETests {
         val authorizationCodeFlow = AuthorizationCodeFlow(testHttpClient(doFollowRedirects = false))
         authorizationCodeFlow.testIssuerAPI()
 
+        // Test Issuer Draft 11
+        val draft11Issuer = Draft11(testHttpClient(doFollowRedirects = false))
+
+        val idTokenIssuanceReq = Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-id-token.json")).copy(
+            credentialConfigurationId = "OpenBadgeCredential_jwt_vc",
+            standardVersion = OpenID4VCIVersion.DRAFT11,
+            useJar = true
+        )
+
+        draft11Issuer.testIssuerAPIDraft11AuthFlowWithJar(idTokenIssuanceReq)
+
+        val vpTokenIssuanceReq = Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-vp-token.json")).copy(
+            credentialConfigurationId = "OpenBadgeCredential_jwt_vc",
+            standardVersion = OpenID4VCIVersion.DRAFT11,
+            useJar = true
+        )
+
+        draft11Issuer.testIssuerAPIDraft11AuthFlowWithJar(vpTokenIssuanceReq)
+
+        val draft11 = Draft11(client)
+
+        val preAuthFlowIssuanceReq = Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request.json")).copy(
+            standardVersion = OpenID4VCIVersion.DRAFT11,
+        )
+
+        draft11.testIssuanceDraft11PreAuthFlow(preAuthFlowIssuanceReq, wallet)
+
+
         // Test External Signature API Endpoints
         //In the context of these test cases, a new wallet is created and initialized
         //accordingly, i.e., the default wallet that is employed by all the other test
@@ -346,6 +380,12 @@ class WaltidServicesE2ETests {
         //region -External Signatures-
         ExchangeExternalSignatures().executeTestCases()
         //endregion -External Signatures-
+
+        // Input descriptor matching test
+        val inputDescTest = InputDescriptorMatchingTest(issuerApi, exchangeApi, sessionApi, verificationApi)
+        //cleanup credentials
+        credentialsApi.delete(wallet, newCredentialId)
+        inputDescTest.e2e(wallet, did)
     }
 
     /* @Test // enable to execute test selectively
@@ -383,6 +423,83 @@ class WaltidServicesE2ETests {
         ExchangeExternalSignatures().executeTestCases()
     }
 
+    //@Test
+    fun inputDescriptorTest() = E2ETest.testBlock(
+        config = ServiceConfiguration("e2e-test"),
+        features = listOf(id.walt.issuer.FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
+        featureAmendments = mapOf(
+            CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
+            // CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
+        ),
+        init = {
+            id.walt.webwallet.webWalletSetup()
+            id.walt.did.helpers.WaltidServices.minimalInit()
+            id.walt.webwallet.db.Db.start()
+        },
+        module = e2eTestModule,
+        timeout = defaultTestTimeout
+    ) {
+        var client = testHttpClient()
+        lateinit var accountId: Uuid
+        lateinit var wallet: Uuid
+        var authApi = AuthApi(client)
+
+        // the e2e http request tests here
+
+        //region -Auth-
+
+        authApi.run {
+            userInfo(HttpStatusCode.Unauthorized)
+            login(defaultEmailAccount) {
+                client = testHttpClient(token = it["token"]!!.jsonPrimitive.content)
+                authApi = AuthApi(client)
+            }
+        }
+        authApi.run {
+            userInfo(HttpStatusCode.OK) {
+                accountId = it.id
+            }
+            userSession()
+            userWallets(accountId) {
+                wallet = it.wallets.first().id
+                println("Selected wallet: $wallet")
+            }
+        }
+        //region -Dids-
+        val didsApi = DidsApi(client)
+        lateinit var did: String
+        didsApi.list(wallet, DidsApi.DefaultDidOption.Any, 1) {
+            assert(it.first().default)
+            did = it.first().did
+        }
+
+        val issuerApi = IssuerApi(client)
+        val exchangeApi = ExchangeApi(client)
+        val credentialsApi = CredentialsApi(client)
+        val sessionApi = Verifier.SessionApi(client)
+        val verificationApi = Verifier.VerificationApi(client)
+
+        // Input descriptor matching test
+        val inputDescTest = InputDescriptorMatchingTest(issuerApi, exchangeApi, sessionApi, verificationApi)
+
+        inputDescTest.e2e(wallet, did)
+    }
+
+    //@Test
+    fun issuerCredentialsListTest() = runBlocking {
+        var client = testHttpClient()
+        assertFalse(
+            IssuerUseCaseImpl(IssuersService, client).
+                fetchCredentials("https://issuer.portal.walt-test.cloud/draft11/.well-known/openid-credential-issuer")
+                    .isEmpty()
+        )
+        assertFalse(
+            IssuerUseCaseImpl(IssuersService, client).
+            fetchCredentials("https://issuer.portal.walt-test.cloud/draft13/.well-known/openid-credential-issuer")
+                .isEmpty()
+        )
+    }
+
     suspend fun setupTestWallet(): LspPotentialWallet {
         var client = testHttpClient()
         client.post("/wallet-api/auth/login") {
@@ -405,7 +522,21 @@ class WaltidServicesE2ETests {
     }
 
     /* @Test // enable to execute test selectively
-    fun lspWalletTests() = testBlock(timeout = defaultTestTimeout) {
+    fun lspWalletTests() = E2ETest.testBlock(
+        config = ServiceConfiguration("e2e-test"),
+        features = listOf(id.walt.issuer.FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
+        featureAmendments = mapOf(
+            CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
+            // CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
+        ),
+        init = {
+            id.walt.webwallet.webWalletSetup()
+            id.walt.did.helpers.WaltidServices.minimalInit()
+            id.walt.webwallet.db.Db.start()
+        },
+        module = e2eTestModule,
+        timeout = defaultTestTimeout
+    ) {
         val lspPotentialWallet = setupTestWallet()
         lspPotentialWallet.testMDocIssuance()
         lspPotentialWallet.testMdocPresentation()
@@ -413,6 +544,7 @@ class WaltidServicesE2ETests {
         lspPotentialWallet.testSDJwtVCIssuance()
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
+        lspPotentialWallet.testPresentationDefinitionCredentialMatching()
     }*/
 
     /* @Test // enable to execute test selectively
