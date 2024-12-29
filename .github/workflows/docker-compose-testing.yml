@@ -16,7 +16,11 @@ jobs:
         config:
           - {
             collection: ./postman/Postman Collections/Issuance-Presentation Tests.postman_collection.json,
-            dataset: ./postman/Datasets/Issuance-Presentation Tests.postman_collection.csv
+            dataset: ./postman/Datasets/Issuance-Presentation/jwk.csv
+          }
+          - {
+            collection: ./postman/Postman Collections/Issuance-Presentation Tests.postman_collection.json,
+            dataset: ./postman/Datasets/Issuance-Presentation/tse.csv
           }
     steps:
       - name: Get dataset filename
@@ -63,6 +67,7 @@ jobs:
       - name: Ping services
         timeout-minutes: 5
         run: |
+          cd ./docker-compose
           chmod +x ./ping.sh
           ./ping.sh
       - name: Install node
