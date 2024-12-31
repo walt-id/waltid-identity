@@ -27,7 +27,7 @@ jobs:
 
       - name: Start ngrok tunnel
         run: |
-          docker run --net=host -d -it -e NGROK_AUTHTOKEN=${{ secrets.NGROK_AUTH_TOKEN }} ngrok/ngrok:latest http 7002           
+          docker run -p 4040:4040 -d -it -e NGROK_AUTHTOKEN=${{ secrets.NGROK_AUTH_TOKEN }} ngrok/ngrok:latest http 7002           
           sleep 2s
 
       - name: Update config files and start Issuer API
@@ -45,7 +45,7 @@ jobs:
           sed -i 's|baseUrl = ".*"|baseUrl = "'"${NGROK_URL}"'"|g' waltid-services/waltid-issuer-api/config/issuer-service.conf
 
           docker build -t waltid/issuer-api:latest -f waltid-services/waltid-issuer-api/Dockerfile .
-          docker run --net=host -d -v $PWD/waltid-services/waltid-issuer-api/config:/waltid-issuer-api/config --name waltid-issuer-api waltid/issuer-api:latest
+          docker run -p 7002:7002 -d -v $PWD/waltid-services/waltid-issuer-api/config:/waltid-issuer-api/config --name waltid-issuer-api waltid/issuer-api:latest
           
           curl --retry 5 --retry-delay 5 --retry-connrefused http://localhost:7002/livez
 
