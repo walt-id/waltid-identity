@@ -39,7 +39,6 @@ jobs:
           docker build -t waltid/issuer-api:latest -f waltid-services/waltid-issuer-api/Dockerfile .
           docker run --net=host  -d -p 7002:7002 -v $PWD/waltid-services/waltid-issuer-api/config:/waltid-issuer-api/config --name waltid-issuer-api waltid/issuer-api:latest
           sleep 2s
-
       - name: Execute test scripts
         env:
           EBSI_CT_PRIVATE_KEY_PARAM: "${{ secrets.EBSI_CT_PRIVATE_KEY_PARAM }}"
