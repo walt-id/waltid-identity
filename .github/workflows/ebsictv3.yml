@@ -38,6 +38,8 @@ jobs:
           sed -i 's|readonly ISSUER_URL=".*"|readonly ISSUER_URL="'"${NGROK_URL}"'"|g' .github/workflows/ebsictv3/EBSICTV3-IssueToHolder.sh
           sed -i 's|baseUrl = ".*"|baseUrl = "'"${NGROK_URL}"'"|g' waltid-services/waltid-issuer-api/config/issuer-service.conf
 
+      - name: Start Issuer API
+        run: |
           docker build -t waltid/issuer-api:latest -f waltid-services/waltid-issuer-api/Dockerfile .
           docker run --net=host  -d -p 7002:7002 -v $PWD/waltid-services/waltid-issuer-api/config:/waltid-issuer-api/config --name waltid-issuer-api waltid/issuer-api:latest
           
