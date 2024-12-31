@@ -28,7 +28,7 @@ jobs:
 
       - name: Start ngrok tunnel
         run: |
-          docker run --net=host -it -e NGROK_AUTHTOKEN=${{ secrets.NGROK_AUTH_TOKEN }} -d -p 4040:4040 ngrok/ngrok:latest http  --host-header=waltid-issuer-api 7002           
+          docker run --net=host -it -e NGROK_AUTHTOKEN=${{ secrets.NGROK_AUTH_TOKEN }} -d -p 4040:4040 ngrok/ngrok:latest http 7002           
 
       - name: Update config files and start Issuer API
         run: |
