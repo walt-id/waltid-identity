@@ -41,7 +41,6 @@ jobs:
           docker build -t waltid/issuer-api:latest -f waltid-services/waltid-issuer-api/Dockerfile .
           docker run --net=host  -d -p 7002:7002 -v $PWD/waltid-services/waltid-issuer-api/config:/waltid-issuer-api/config --name waltid-issuer-api waltid/issuer-api:latest
           sleep 2s
-          curl --retry 5 --retry-delay 5 --retry-connrefused  "${NGROK_URL}/.well-known/openid-configuration"
 
       - name: Execute test scripts
         env:
