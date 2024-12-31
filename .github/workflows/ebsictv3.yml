@@ -45,7 +45,7 @@ jobs:
 
           ISSUER_URL=$(curl --retry 5 --retry-delay 5 --retry-connrefused http://localhost:7002/draft11/.well-known/openid-credential-issuer | jq -r '.issuer')
 
-          if [[ "ISSUER_URL" == "${NGROK_URL}/draft11" ]]; then
+          if [[ "$ISSUER_URL" == "${NGROK_URL}/draft11" ]]; then
             echo "Issuer is valid: $result"
           else
             echo -e "\nIssuer is invalid (matches forbidden value): $ISSUER_URL" and "${NGROK_URL}/draft11"
