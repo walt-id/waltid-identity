@@ -29,6 +29,7 @@ jobs:
       - name: Start ngrok tunnel
         run: |
           docker run --net=host -it -e NGROK_AUTHTOKEN=${{ secrets.NGROK_AUTH_TOKEN }} -d -p 4040:4040 ngrok/ngrok:latest http 7002           
+          sleep 2s
 
       - name: Update config files and start Issuer API
         run: |
