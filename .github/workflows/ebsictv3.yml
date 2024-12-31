@@ -33,10 +33,9 @@ jobs:
       - name: Update config files and start Issuer API
         run: |
           NGROK_URL=$(curl --retry 5 --retry-delay 5 --retry-connrefused -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url')
+          echo "The ngork url is ${NGROK_URL}"       
           sed -i 's|readonly ISSUER_URL=".*"|readonly ISSUER_URL="'"${NGROK_URL}"'"|g' .github/workflows/ebsictv3/EBSICTV3-IssueToHolder.sh
           sed -i 's|baseUrl = ".*"|baseUrl = "'"${NGROK_URL}"'"|g' waltid-services/waltid-issuer-api/config/issuer-service.conf
-          echo "The ngork url is ${NGROK_URL}"       
-
           docker build -t waltid/issuer-api:latest -f waltid-services/waltid-issuer-api/Dockerfile .
           docker run --net=host  -d -p 7002:7002 -v $PWD/waltid-services/waltid-issuer-api/config:/waltid-issuer-api/config --name waltid-issuer-api waltid/issuer-api:latest
           sleep 2s
