@@ -1,16 +1,16 @@
 <template>
   <div class="flex min-h-full">
     <div
-      class="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:flex-none lg:px-20 xl:px-24 lg:bg-white lg:bg-opacity-50"
+        class="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:flex-none lg:px-20 xl:px-24 lg:bg-white lg:bg-opacity-50"
     >
       <div
-        class="mx-auto w-full max-w-sm lg:w-96 p-3 lg:backdrop-blur-md lg:rounded-3xl lg:shadow lg:bg-neutral-100 lg:bg-opacity-40"
+          class="mx-auto w-full max-w-sm lg:w-96 p-3 lg:backdrop-blur-md lg:rounded-3xl lg:shadow lg:bg-neutral-100 lg:bg-opacity-40"
       >
         <div class="">
           <img
-            :src="logoImg"
-            alt="walt.id logo"
-            class="h-24 lg:h-16 w-auto mx-auto mt-2"
+              :src="logoImg"
+              alt="walt.id logo"
+              class="h-24 lg:h-16 w-auto mx-auto mt-2"
           />
           <!-- TODO: i18n system -->
           <h2 class="mt-4 text-3xl font-bold tracking-tight text-gray-800">
@@ -19,9 +19,10 @@
           <p v-if="!isOidcLogin" class="mt-2 text-sm text-gray-600">
             Or {{ " " }}
             <NuxtLink
-              class="font-medium text-blue-600 hover:text-blue-500"
-              to="/signup"
-              >sign up for your SSI wallet</NuxtLink
+                class="font-medium text-blue-600 hover:text-blue-500"
+                to="/signup"
+            >sign up for your SSI wallet
+            </NuxtLink
             >
             !
           </p>
@@ -36,29 +37,29 @@
             <div class="flex h-14 gap-5 mx-1">
               <div class="w-full inline-flex justify-center">
                 <button
-                  class="relative inline-flex items-center justify-center p-4 px-6 py-3 overflow-hidden font-medium text-blue-600 transition duration-300 ease-out border-2 border-blue-600 rounded-full shadow-md group"
-                  @click="openWeb3()"
+                    class="relative inline-flex items-center justify-center p-4 px-6 py-3 overflow-hidden font-medium text-blue-600 transition duration-300 ease-out border-2 border-blue-600 rounded-full shadow-md group"
+                    @click="openWeb3()"
                 >
                   <span
-                    class="absolute inset-0 flex items-center justify-center w-full h-full text-white duration-300 -translate-x-full bg-blue-600 group-hover:translate-x-0 ease"
+                      class="absolute inset-0 flex items-center justify-center w-full h-full text-white duration-300 -translate-x-full bg-blue-600 group-hover:translate-x-0 ease"
                   >
                     <svg
-                      class="w-6 h-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
+                        class="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
                     >
                       <path
-                        d="M14 5l7 7m0 0l-7 7m7-7H3"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
+                          d="M14 5l7 7m0 0l-7 7m7-7H3"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
                       ></path>
                     </svg>
                   </span>
                   <span
-                    class="absolute flex items-center justify-center w-full h-full text-blue-600 transition-all duration-300 transform group-hover:translate-x-full ease"
+                      class="absolute flex items-center justify-center w-full h-full text-blue-600 transition-all duration-300 transform group-hover:translate-x-full ease"
                   >
                     Connect with web3
                   </span>
@@ -68,29 +69,29 @@
 
               <div class="w-full inline-flex justify-center">
                 <button
-                  class="relative inline-flex items-center justify-center p-4 px-6 py-3 overflow-hidden font-medium text-blue-600 transition duration-300 ease-out border-2 border-blue-600 rounded-full shadow-md group"
-                  @click="connectOidc()"
+                    class="relative inline-flex items-center justify-center p-4 px-6 py-3 overflow-hidden font-medium text-blue-600 transition duration-300 ease-out border-2 border-blue-600 rounded-full shadow-md group"
+                    @click="connectOidc()"
                 >
                   <span
-                    class="absolute inset-0 flex items-center justify-center w-full h-full text-white duration-300 -translate-x-full bg-blue-600 group-hover:translate-x-0 ease"
+                      class="absolute inset-0 flex items-center justify-center w-full h-full text-white duration-300 -translate-x-full bg-blue-600 group-hover:translate-x-0 ease"
                   >
                     <svg
-                      class="w-6 h-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
+                        class="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
                     >
                       <path
-                        d="M14 5l7 7m0 0l-7 7m7-7H3"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
+                          d="M14 5l7 7m0 0l-7 7m7-7H3"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
                       ></path>
                     </svg>
                   </span>
                   <span
-                    class="absolute flex items-center justify-center w-full h-full text-blue-600 transition-all duration-300 transform group-hover:translate-x-full ease"
+                      class="absolute flex items-center justify-center w-full h-full text-blue-600 transition-all duration-300 transform group-hover:translate-x-full ease"
                   >
                     Connect with OIDC
                   </span>
@@ -101,14 +102,14 @@
 
             <div class="relative mt-6">
               <div
-                aria-hidden="true"
-                class="absolute inset-0 flex items-center"
+                  aria-hidden="true"
+                  class="absolute inset-0 flex items-center"
               >
-                <div class="w-full border-t border-gray-300" />
+                <div class="w-full border-t border-gray-300"/>
               </div>
               <div class="relative flex justify-center text-sm">
                 <span class="bg-white px-2 text-gray-500 rounded-3xl"
-                  >Or continue with</span
+                >Or continue with</span
                 >
               </div>
             </div>
@@ -118,101 +119,101 @@
             <form class="space-y-6" @submit.prevent="login">
               <div>
                 <label
-                  class="block text-sm font-medium leading-6 text-gray-900"
-                  for="email"
+                    class="block text-sm font-medium leading-6 text-gray-900"
+                    for="email"
                 >
                   <span class="flex flex-row items-center">
-                    <EnvelopeIcon class="h-5 mr-1" />
+                    <EnvelopeIcon class="h-5 mr-1"/>
                     Email address
                   </span></label
                 >
                 <div class="mt-2">
                   <input
-                    id="email"
-                    v-model="emailInput"
-                    autocomplete="email"
-                    autofocus
-                    class="block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-2 text-gray-600"
-                    name="email"
-                    :required="true"
-                    type="email"
+                      id="email"
+                      v-model="emailInput"
+                      autocomplete="email"
+                      autofocus
+                      class="block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-2 text-gray-600"
+                      name="email"
+                      :required="true"
+                      type="email"
                   />
                 </div>
               </div>
 
               <div class="space-y-1">
                 <label
-                  class="block text-sm font-medium leading-6 text-gray-900"
-                  for="password"
+                    class="block text-sm font-medium leading-6 text-gray-900"
+                    for="password"
                 >
                   <span class="flex flex-row items-center">
-                    <IdentificationIcon class="h-5 mr-1" />
+                    <IdentificationIcon class="h-5 mr-1"/>
                     Password
                   </span></label
                 >
                 <div class="mt-2">
                   <input
-                    id="password"
-                    v-model="passwordInput"
-                    autocomplete="current-password"
-                    class="block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-2 text-gray-600"
-                    name="password"
-                    :required="true"
-                    type="password"
+                      id="password"
+                      v-model="passwordInput"
+                      autocomplete="current-password"
+                      class="block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-2 text-gray-600"
+                      name="password"
+                      :required="true"
+                      type="password"
                   />
                 </div>
               </div>
 
               <div class="flex flex-col gap-1.5">
                 <button
-                  :class="[
+                    :class="[
                     success
                       ? 'bg-green-500 hover:bg-green-600 animate-bounce'
                       : 'bg-blue-600  hover:bg-blue-500',
                   ]"
-                  class="flex w-full justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                  type="submit"
+                    class="flex w-full justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                    type="submit"
                 >
                   Sign in
                   <svg
-                    v-if="isLoggingIn"
-                    class="animate-spin ml-1.5 mr-3 h-5 w-5 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
+                      v-if="isLoggingIn"
+                      class="animate-spin ml-1.5 mr-3 h-5 w-5 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
                   >
                     <circle
-                      class="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      stroke-width="4"
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
                     ></circle>
                     <path
-                      class="opacity-75"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      fill="currentColor"
+                        class="opacity-75"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        fill="currentColor"
                     ></path>
                   </svg>
-                  <ArrowRightOnRectangleIcon v-else class="ml-1.5 h-5 w-5" />
+                  <ArrowRightOnRectangleIcon v-else class="ml-1.5 h-5 w-5"/>
                 </button>
               </div>
 
               <div class="flex items-center justify-between pb-2">
                 <div class="flex items-center">
                   <input
-                    id="remember-me"
-                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
-                    name="remember-me"
-                    type="checkbox"
+                      id="remember-me"
+                      class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                      name="remember-me"
+                      type="checkbox"
                   />
                   <label
-                    class="ml-2 block text-sm text-gray-900"
-                    for="remember-me"
+                      class="ml-2 block text-sm text-gray-900"
+                      for="remember-me"
                   >
                     <span class="flex flex-row items-center">
-                      <BookmarkSquareIcon class="-ml-0.5 mr-0.5 h-4 w-4" />
+                      <BookmarkSquareIcon class="-ml-0.5 mr-0.5 h-4 w-4"/>
                       Remember me
                     </span></label
                   >
@@ -220,11 +221,11 @@
 
                 <div class="text-sm">
                   <a
-                    class="font-medium text-blue-600 hover:text-blue-500"
-                    href="#"
+                      class="font-medium text-blue-600 hover:text-blue-500"
+                      href="#"
                   >
                     <span class="flex flex-row items-center">
-                      <QuestionMarkCircleIcon class="h-5 w-5 mr-0.5" />
+                      <QuestionMarkCircleIcon class="h-5 w-5 mr-0.5"/>
                       Forgot your password?
                     </span>
                   </a>
@@ -236,14 +237,14 @@
       </div>
     </div>
     <div
-      class="overflow-hidden max-h-screen absolute left-0 w-full h-full -z-10 hidden lg:block"
+        class="overflow-hidden max-h-screen absolute left-0 w-full h-full -z-10 hidden lg:block"
     >
       <img
-        ref="container"
-        :class="[isLoggingIn ? 'zoom-in' : 'zoom-out']"
-        :src="bgImg"
-        alt=""
-        class="absolute inset-0 h-full w-full object-cover hidden lg:block -z-10"
+          ref="container"
+          :class="[isLoggingIn ? 'zoom-in' : 'zoom-out']"
+          :src="bgImg"
+          alt=""
+          class="absolute inset-0 h-full w-full object-cover hidden lg:block -z-10"
       />
       <!-- src="https://images.unsplash.com/photo-1529144415895-6aaf8be872fb?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1980&q=80"/> -->
 
@@ -255,12 +256,12 @@
     </div>
 
     <div
-      v-if="showWaltidLoadingSpinner"
-      :class="[isLoggingIn ? 'animate-spin' : '']"
-      :style="cardStyle"
-      class="absolute bottom-3.5 right-3.5 w-10 lg:w-16 h-10 lg:h-16 overflow-hidden"
+        v-if="showWaltidLoadingSpinner"
+        :class="[isLoggingIn ? 'animate-spin' : '']"
+        :style="cardStyle"
+        class="absolute bottom-3.5 right-3.5 w-10 lg:w-16 h-10 lg:h-16 overflow-hidden"
     >
-      <img class="overflow-hidden" src="/svg/walt-s.svg" />
+      <img class="overflow-hidden" src="/svg/walt-s.svg"/>
     </div>
 
     <!--suppress PointlessBooleanExpressionJS -->
@@ -268,58 +269,58 @@
     <TransitionRoot :show="error.isError === true" as="template">
       <Dialog as="div" class="relative z-10" @close="closeModal">
         <TransitionChild
-          as="template"
-          enter="ease-out duration-300"
-          enter-from="opacity-0"
-          enter-to="opacity-100"
-          leave="ease-in duration-200"
-          leave-from="opacity-100"
-          leave-to="opacity-0"
+            as="template"
+            enter="ease-out duration-300"
+            enter-from="opacity-0"
+            enter-to="opacity-100"
+            leave="ease-in duration-200"
+            leave-from="opacity-100"
+            leave-to="opacity-0"
         >
           <div
-            class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+              class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
           />
         </TransitionChild>
 
         <div class="fixed inset-0 z-10 overflow-y-auto">
           <div
-            class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0"
+              class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0"
           >
             <TransitionChild
-              as="template"
-              enter="ease-out duration-300"
-              enter-from="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-              enter-to="opacity-100 translate-y-0 sm:scale-100"
-              leave="ease-in duration-200"
-              leave-from="opacity-100 translate-y-0 sm:scale-100"
-              leave-to="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                as="template"
+                enter="ease-out duration-300"
+                enter-from="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                enter-to="opacity-100 translate-y-0 sm:scale-100"
+                leave="ease-in duration-200"
+                leave-from="opacity-100 translate-y-0 sm:scale-100"
+                leave-to="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             >
               <DialogPanel
-                class="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6"
+                  class="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6"
               >
                 <div class="absolute right-0 top-0 hidden pr-4 pt-4 sm:block">
                   <button
-                    class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                    type="button"
-                    @click="closeModal"
+                      class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                      type="button"
+                      @click="closeModal"
                   >
                     <span class="sr-only">Close</span>
-                    <XMarkIcon aria-hidden="true" class="h-6 w-6" />
+                    <XMarkIcon aria-hidden="true" class="h-6 w-6"/>
                   </button>
                 </div>
                 <div class="sm:flex sm:items-start">
                   <div
-                    class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10"
+                      class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10"
                   >
                     <ExclamationCircleIcon
-                      aria-hidden="true"
-                      class="h-6 w-6 text-red-600"
+                        aria-hidden="true"
+                        class="h-6 w-6 text-red-600"
                     />
                   </div>
                   <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
                     <DialogTitle
-                      as="h3"
-                      class="text-base font-semibold leading-6 text-gray-900"
+                        as="h3"
+                        class="text-base font-semibold leading-6 text-gray-900"
                     >
                       Invalid login
                     </DialogTitle>
@@ -332,9 +333,9 @@
                 </div>
                 <div class="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
                   <button
-                    class="mt-3 inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-neutral-50 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-blue-700 sm:mt-0 sm:w-auto"
-                    type="button"
-                    @click="closeModal"
+                      class="mt-3 inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-neutral-50 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-blue-700 sm:mt-0 sm:w-auto"
+                      type="button"
+                      @click="closeModal"
                   >
                     Okay
                   </button>
@@ -382,14 +383,14 @@ let emailInput = "";
 let passwordInput = "";
 
 const userStore = useUserStore();
-const { user } = storeToRefs(userStore);
+const {user} = storeToRefs(userStore);
 
-const { status, data, signIn } = useAuth();
+const {status, data, signIn} = useAuth();
 
 const signInRedirectUrl = ref("/");
 
 async function connectOidc() {
-  navigateTo("/wallet-api/auth/oidc-login", { external: true });
+  navigateTo("/wallet-api/auth/oidc-login", {external: true});
 }
 
 async function login() {
@@ -403,76 +404,76 @@ async function login() {
 
   // try {
   await signIn(
-    { email: emailInput, password: passwordInput, type: "email" },
-    { callbackUrl: signInRedirectUrl.value },
+      {email: emailInput, password: passwordInput, type: "email"},
+      {callbackUrl: signInRedirectUrl.value},
   )
-    .then((data) => {
-      user.value = {
-        id: "",
-        email: userData.email,
-      };
-    })
-    .catch((err) => {
-      console.log("Could not sign in", err);
-      error.value = {
-        isError: true,
-        message:
-          "Please check that you have entered your correct email address and password!", //(await response.text())
-      };
-      isLoggingIn.value = false;
-    });
+      .then((data) => {
+        user.value = {
+          id: "",
+          email: userData.email,
+        };
+      })
+      .catch((err) => {
+        console.log("Could not sign in", err);
+        error.value = {
+          isError: true,
+          message:
+              "Please check that you have entered your correct email address and password!", //(await response.text())
+        };
+        isLoggingIn.value = false;
+      });
 }
 
 function closeModal() {
   error.value = {};
 }
 
+function decodeJWT(token) {
+  const payloadBase64 = token.split('.')[1]; // Extract the payload part
+  const decodedPayload = atob(payloadBase64); // Decode Base64
+  return JSON.parse(decodedPayload); // Parse JSON
+}
+
 async function openWeb3() {
-  const token = await fetch("http://localhost:7001/auth/account/web3/nonce", {
-    method: "GET"
-  });
+  const response = await fetch("http://localhost:7001/auth/account/web3/nonce", {method: "GET"});
+  const tokenText = await response.text();
 
-  const tokenText = await token.text();
-  console.log("text token : " + tokenText);
+  console.log("Token received from backend: ", tokenText);
 
+  const {nonce} = decodeJWT(tokenText); // Decode the JWT and extract nonce
+  console.log("Extracted nonce: ", nonce);
 
   const MMSDK = new MetaMaskSDK({
-    dappMetadata: {
-      name: "Example JavaScript Dapp",
-      url: window.location.href,
-    },
+    dappMetadata: {name: "Example Dapp", url: window.location.href},
     injectProvider: true,
-    // Other options
   });
 
-// You can also connect MMSDK.init() first to get access to the provider.
   await MMSDK.connect();
-
   const ethereum = MMSDK.getProvider();
-  ethereum.request({method: "eth_accounts", params: []});
+  const accounts = await ethereum.request({method: "eth_requestAccounts"});
+  const address = accounts[0];
 
-  const signdata = await ethereum.request({
+  const signature = await ethereum.request({
     method: "personal_sign",
-    params: [tokenText, ethereum.selectedAddress],
+    params: [nonce, address], // Pass the extracted nonce for signing
   });
-  console.log("signdata : " + signdata);
-  console.log("address : " + ethereum.selectedAddress);
 
-  const response = await fetch("http://localhost:7001/auth/account/web3/signed", {
+  console.log("Signature: ", signature);
+
+  const verificationResponse = await fetch("http://localhost:7001/auth/account/web3/signed", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: {"Content-Type": "application/json"},
     body: JSON.stringify({
-      publicKey: ethereum.selectedAddress,
-      signed: signdata,
-      challenge: tokenText,
+      publicKey: address,
+      signed: signature,
+      challenge: tokenText, // Send the full tokenText (JWT)
     }),
   });
 
-  const data = await response.json();
-  console.log("data : " + JSON.stringify(data));
+  const result = await verificationResponse.json();
+  console.log("Verification result: ", result);
 }
+
 
 definePageMeta({
   title: "Login to your wallet - walt.id",
@@ -513,35 +514,35 @@ async function tryLoginWithOidcSession() {
   console.log("text token : " + tokenText);
 
   await signIn(
-    {
-      email: emailInput,
-      token: tokenText,
-      type: "oidc",
-    },
-    { callbackUrl: signInRedirectUrl.value },
-  )
-    .then(() => {
-      console.log("Signed in with OIDC");
-      console.log("Token: " + decodeJwt(tokenText).sub);
-      user.value = {
+      {
+        email: emailInput,
         token: tokenText,
-        id: "",
-        email: decodeJwt(tokenText).email,
-        name: decodeJwt(tokenText).name,
-        oidcSession: true,
-      };
+        type: "oidc",
+      },
+      {callbackUrl: signInRedirectUrl.value},
+  )
+      .then(() => {
+        console.log("Signed in with OIDC");
+        console.log("Token: " + decodeJwt(tokenText).sub);
+        user.value = {
+          token: tokenText,
+          id: "",
+          email: decodeJwt(tokenText).email,
+          name: decodeJwt(tokenText).name,
+          oidcSession: true,
+        };
 
-      console.log("Wrote to user: " + JSON.stringify(user.value));
-    })
-    .catch((err) => {
-      console.log("Could not sign in", err);
-      error.value = {
-        isError: true,
-        message: "Your OIDC sign in failed.",
-      };
-      isLoggingIn.value = false;
-      isOidcLogin.value = false;
-    });
+        console.log("Wrote to user: " + JSON.stringify(user.value));
+      })
+      .catch((err) => {
+        console.log("Could not sign in", err);
+        error.value = {
+          isError: true,
+          message: "Your OIDC sign in failed.",
+        };
+        isLoggingIn.value = false;
+        isOidcLogin.value = false;
+      });
 }
 
 if (isOidcLogin.value) {
