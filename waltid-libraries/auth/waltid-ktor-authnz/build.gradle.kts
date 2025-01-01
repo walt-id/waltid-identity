@@ -29,7 +29,14 @@ repositories {
 
 dependencies {
     // Auth methods
+    // Core Web3j library
+    implementation("org.web3j:core:4.9.8")
 
+    // Optional: Web3j utils
+    implementation("org.web3j:utils:4.9.8")
+
+    // If you need contract wrappers
+    implementation("org.web3j:contracts:4.9.8")
     // RADIUS
     implementation("org.aaa4j.radius:aaa4j-radius-client:0.3.1")
 
