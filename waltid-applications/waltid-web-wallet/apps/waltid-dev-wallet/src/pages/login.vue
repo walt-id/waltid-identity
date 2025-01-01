@@ -26,7 +26,7 @@
             !
           </p>
           <p v-if="isOidcLogin" class="flex items-center">
-            <LoadingIndicator> OIDC Login processing... </LoadingIndicator>
+            <!--            <LoadingIndicator> OIDC Login processing... </LoadingIndicator>-->
           </p>
         </div>
 
@@ -356,20 +356,15 @@ import {
   IdentificationIcon,
   QuestionMarkCircleIcon,
 } from "@heroicons/vue/20/solid";
-import {
-  Dialog,
-  DialogPanel,
-  DialogTitle,
-  TransitionChild,
-  TransitionRoot,
-} from "@headlessui/vue";
-import { ExclamationCircleIcon, XMarkIcon } from "@heroicons/vue/24/outline";
-import { usePageLeave, useParallax } from "@vueuse/core";
+import {Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot,} from "@headlessui/vue";
+import {ExclamationCircleIcon, XMarkIcon} from "@heroicons/vue/24/outline";
+import {usePageLeave, useParallax} from "@vueuse/core";
 import useModalStore from "@waltid-web-wallet/stores/useModalStore.ts";
-import { useUserStore } from "@waltid-web-wallet/stores/user.ts";
-import { storeToRefs } from "pinia";
-import { useTenant } from "@waltid-web-wallet/composables/tenants.ts";
-import { decodeJwt } from "jose";
+import {useUserStore} from "@waltid-web-wallet/stores/user.ts";
+import {storeToRefs} from "pinia";
+import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
+import {decodeJwt} from "jose";
+import {MetaMaskSDK} from "@metamask/sdk"
 
 const store = useModalStore();
 
@@ -432,13 +427,51 @@ function closeModal() {
   error.value = {};
 }
 
-function openWeb3() {
-  console.log("open web3");
-  alert("Not supported in this version.");
+async function openWeb3() {
+  const token = await fetch("http://localhost:7001/auth/account/web3/nonce", {
+    method: "GET"
+  });
 
-  /*store.openModal({
-        component: ConnectWalletModal,
-    });*/
+  const tokenText = await token.text();
+  console.log("text token : " + tokenText);
+
+
+  const MMSDK = new MetaMaskSDK({
+    dappMetadata: {
+      name: "Example JavaScript Dapp",
+      url: window.location.href,
+    },
+    injectProvider: true,
+    // Other options
+  });
+
+// You can also connect MMSDK.init() first to get access to the provider.
+  await MMSDK.connect();
+
+  const ethereum = MMSDK.getProvider();
+  ethereum.request({method: "eth_accounts", params: []});
+
+  const signdata = await ethereum.request({
+    method: "personal_sign",
+    params: [tokenText, ethereum.selectedAddress],
+  });
+  console.log("signdata : " + signdata);
+  console.log("address : " + ethereum.selectedAddress);
+
+  const response = await fetch("http://localhost:7001/auth/account/web3/signed", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      publicKey: ethereum.selectedAddress,
+      signed: signdata,
+      challenge: tokenText,
+    }),
+  });
+
+  const data = await response.json();
+  console.log("data : " + JSON.stringify(data));
 }
 
 definePageMeta({
