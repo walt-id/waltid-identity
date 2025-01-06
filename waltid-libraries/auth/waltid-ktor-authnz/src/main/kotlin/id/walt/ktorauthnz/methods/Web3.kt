@@ -46,89 +46,99 @@ object Web3 : AuthenticationMethod("web3") {
         }.toString().toByteArray()
 
         return jwtHandler.signingKey.signJws(payload)
+
     }
+    fun debugEthereumSignature(
+        signature: String,
+        message: String,
+        expectedAddress: String
+    ) {
+        println("=== Ethereum Signature Debug ===")
+
+        // 1. Message formatting
+        val cleanMessage = message.removePrefix("0x")
+        val messageLength = cleanMessage.length.toString()
+        // The \u0019 prefix is important for Ethereum signed messages
+        val ethMessage = "\u0019Ethereum Signed Message:\n$messageLength$cleanMessage"
+
+        println("Original message: $message")
+        println("Clean message (no 0x): $cleanMessage")
+        println("Message length: $messageLength")
+        println("Formatted message (hex): ${ethMessage.toByteArray().toHexString()}")
+        println("Formatted message (text): $ethMessage")
+
+        // 2. Hash calculation
+        val messageHash = org.web3j.crypto.Hash.sha3(ethMessage.toByteArray())
+        println("\nMessage hash: ${Numeric.toHexString(messageHash)}")
+
+        // 3. Signature parsing
+        val cleanSignature = signature.removePrefix("0x")
+        val signatureBytes = Numeric.hexStringToByteArray(cleanSignature)
+
+        val r = signatureBytes.slice(0..31).toByteArray()
+        val s = signatureBytes.slice(32..63).toByteArray()
+        val v = signatureBytes[64]
+
+        println("\nSignature components:")
+        println("r: ${Numeric.toHexString(r)}")
+        println("s: ${Numeric.toHexString(s)}")
+        println("v: $v (decimal: ${v.toInt() and 0xFF})")
+
+        // 4. Address recovery
+        val recoveredKey = Sign.signedMessageHashToKey(
+            messageHash,
+            Sign.SignatureData(v, r, s)
+        )
+
+        val recoveredAddress = "0x" + Keys.getAddress(recoveredKey)
+        println("\nRecovered address: $recoveredAddress")
+        println("Expected address:  $expectedAddress")
+        println("Addresses match: ${recoveredAddress.equals(expectedAddress, ignoreCase = true)}")
+    }
+
+    fun ByteArray.toHexString() = joinToString("") { "%02x".format(it) }
+
 
 
     fun verifySignature(web3ExampleSigned: MultiStepExampleSigned) {
         try {
-
-            println("Received challenge: ${web3ExampleSigned.challenge}")
-            println("Received signature: ${web3ExampleSigned.signed}")
-            println("Received public key: ${web3ExampleSigned.publicKey}")
-
-            // Decode and validate JWT
-            val decodedJwtTest = web3ExampleSigned.challenge.decodeJws()
-            println("Decoded JWT payload: ${decodedJwtTest.payload}")
-
-
-            // Verify format of Ethereum address
-            authCheck(web3ExampleSigned.publicKey.startsWith("0x") && web3ExampleSigned.publicKey.length == 42) {
-                "Invalid Ethereum address format"
-            }
-
-            // Verify format of signature
-            authCheck(web3ExampleSigned.signed.startsWith("0x")) {
-                "Invalid signature format - must start with 0x"
-            }
-
-            // Verify and decode JWT
+            println("====DEBUG LOGS====")
             val decodedJwt = web3ExampleSigned.challenge.decodeJws()
             val jwtPayload = decodedJwt.payload.jsonObject
 
-            // Check JWT has required fields
-            authCheck(jwtPayload.containsKey("nonce")) {
-                "JWT missing nonce claim"
-            }
+            val nonce = jwtPayload["nonce"]?.jsonPrimitive?.content
+                ?: authFailure("No nonce in token")
 
-            // Get nonce from JWT
-            val nonce = jwtPayload["nonce"]?.jsonPrimitive?.content ?: authFailure("No nonce in token")
-            val message = "\u0019Ethereum Signed Message:\n${nonce.length}$nonce"
-            val messageHash = org.web3j.crypto.Hash.sha3(nonce.toByteArray())
-
-            println("Nonce: $nonce")
-            println("Message: $message")
-            println("Message hash: $messageHash")
+            // Remove 0x prefix for message formatting
+            val cleanNonce = nonce.removePrefix("0x")
+            val expectedMessage = "\u0019Ethereum Signed Message:\n${cleanNonce.length}$cleanNonce"
+            println("Formatted message: $expectedMessage") // Debug
 
 
-            // Parse signature
-            val signatureBytes = try {
-                Numeric.hexStringToByteArray(web3ExampleSigned.signed.removePrefix("0x"))
-            } catch (e: Exception) {
-                authFailure("Invalid signature format: ${e.message}")
-            }
+            debugEthereumSignature(
+                signature = web3ExampleSigned.signed,
+                message = nonce,
+                expectedAddress = web3ExampleSigned.publicKey
+            )
 
-            authCheck(signatureBytes.size == 65) {
-                "Invalid signature length: expected 65 bytes, got ${signatureBytes.size}"
-            }
+            val messageHash = org.web3j.crypto.Hash.sha3(expectedMessage.toByteArray())
 
+            val signatureBytes = Numeric.hexStringToByteArray(web3ExampleSigned.signed.removePrefix("0x"))
             val r = signatureBytes.slice(0..31).toByteArray()
             val s = signatureBytes.slice(32..63).toByteArray()
             val v = signatureBytes[64]
 
-
-            println("r: ${Numeric.toHexString(r)}")
-            println("s: ${Numeric.toHexString(s)}")
-            println("v: $v")
-
-
-            // Recover public key and address
-            val recoveredPublicKey = try {
-                Sign.signedMessageToKey(
-                    messageHash,
-                    Sign.SignatureData(v, r, s)
-                )
-            } catch (e: Exception) {
-                authFailure("Failed to recover public key from signature: ${e.message}")
-            }
-
+            // Try to recover the address
+            val recoveredPublicKey = Sign.signedMessageHashToKey(
+                messageHash,
+                Sign.SignatureData(v, r, s)
+            )
 
             val recoveredAddress = "0x" + Keys.getAddress(recoveredPublicKey)
 
-            // Compare addresses case-insensitively
             authCheck(recoveredAddress.equals(web3ExampleSigned.publicKey, ignoreCase = true)) {
                 "Recovered address ($recoveredAddress) does not match provided address (${web3ExampleSigned.publicKey})"
             }
-
         } catch (e: Exception) {
             when (e) {
                 is AuthenticationFailureException -> throw e
@@ -136,6 +146,7 @@ object Web3 : AuthenticationMethod("web3") {
             }
         }
     }
+
 
 //    fun verifySignature(web3ExampleSigned: MultiStepExampleSigned) {
 //        web3ExampleSigned.challenge // check that the challenge comes from us (is a JWT made by us)
