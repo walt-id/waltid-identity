@@ -437,11 +437,11 @@ function decodeJWT(token) {
 async function openWeb3() {
   const response = await fetch("http://localhost:7001/auth/account/web3/nonce", {method: "GET"});
   const tokenText = await response.text();
-
-  console.log("Token received from backend: ", tokenText);
+  console.log("====Frontend DEBUG LOGS====");
+  console.log("Received JWT:", tokenText);
 
   const {nonce} = decodeJWT(tokenText); // Decode the JWT and extract nonce
-  console.log("Extracted nonce: ", nonce);
+  console.log("Extracted nonce:", nonce);
 
   const MMSDK = new MetaMaskSDK({
     dappMetadata: {name: "Example Dapp", url: window.location.href},
@@ -452,13 +452,20 @@ async function openWeb3() {
   const ethereum = MMSDK.getProvider();
   const accounts = await ethereum.request({method: "eth_requestAccounts"});
   const address = accounts[0];
+  console.log("About to sign nonce:", nonce);
+
+  const cleanNonce = nonce.replace(/^0x/, "");
+  const message = `\u0019Ethereum Signed Message:\n${cleanNonce.length}${cleanNonce}`;
+  console.log("Formatted message:", message); // Debug
+
 
   const signature = await ethereum.request({
     method: "personal_sign",
-    params: [nonce, address], // Pass the extracted nonce for signing
+    params: [message, address],
   });
 
-  console.log("Signature: ", signature);
+  console.log("Signature:", signature);
+
 
   const verificationResponse = await fetch("http://localhost:7001/auth/account/web3/signed", {
     method: "POST",
@@ -468,6 +475,15 @@ async function openWeb3() {
       signed: signature,
       challenge: tokenText, // Send the full tokenText (JWT)
     }),
+  });
+  if (address.toLowerCase() !== "0xd5d42a7eea716ada481217f7438628e728c50c14".toLowerCase()) {
+    console.error("Warning: Selected account doesn't match expected address!");
+  }
+
+  console.log('Signing message:', {
+    nonce,
+    address,
+    messageToSign: nonce  // or however you're formatting it
   });
 
   const result = await verificationResponse.json();
