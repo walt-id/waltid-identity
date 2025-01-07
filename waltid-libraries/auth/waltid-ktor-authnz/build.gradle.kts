@@ -25,6 +25,7 @@ repositories {
     mavenLocal()
     mavenCentral()
     maven("https://maven.waltid.dev/releases")
+    maven("https://maven.walt.id/repository/waltid/")
 }
 
 dependencies {
@@ -37,6 +38,16 @@ dependencies {
 
     // If you need contract wrappers
     implementation("org.web3j:contracts:4.9.8")
+
+    // SIWE
+    implementation("id.walt:waltid-siwe:0.1.1") {
+        exclude("io.ktor")
+        exclude("ch.qos.logback")
+    }
+
+
+
+
     // RADIUS
     implementation("org.aaa4j.radius:aaa4j-radius-client:0.3.1")
 

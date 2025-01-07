@@ -366,6 +366,7 @@ import {storeToRefs} from "pinia";
 import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
 import {decodeJwt} from "jose";
 import {MetaMaskSDK} from "@metamask/sdk"
+import {Eip4361Message} from "@waltid-web-wallet/utils/Eip4361Message.ts";
 
 const store = useModalStore();
 
@@ -435,14 +436,6 @@ function decodeJWT(token) {
 }
 
 async function openWeb3() {
-  const response = await fetch("http://localhost:7001/auth/account/web3/nonce", {method: "GET"});
-  const tokenText = await response.text();
-  console.log("====Frontend DEBUG LOGS====");
-  console.log("Received JWT:", tokenText);
-
-  const {nonce} = decodeJWT(tokenText); // Decode the JWT and extract nonce
-  console.log("Extracted nonce:", nonce);
-
   const MMSDK = new MetaMaskSDK({
     dappMetadata: {name: "Example Dapp", url: window.location.href},
     injectProvider: true,
@@ -452,39 +445,43 @@ async function openWeb3() {
   const ethereum = MMSDK.getProvider();
   const accounts = await ethereum.request({method: "eth_requestAccounts"});
   const address = accounts[0];
-  console.log("About to sign nonce:", nonce);
 
-  const cleanNonce = nonce.replace(/^0x/, "");
-  const message = `\u0019Ethereum Signed Message:\n${cleanNonce.length}${cleanNonce}`;
-  console.log("Formatted message:", message); // Debug
+
+  const domain = window.location.host
+  const origin = window.location.origin
+  const description = "Sign in with Ethereum to the app."
+
+
+  const nonce = await $fetch("http://localhost:7001/auth/account/web3/nonce", {
+    method: "GET",
+  });
+
+  console.log("retrieved nonce:", nonce);
+
+
+  const eip4361msg = new Eip4361Message(domain, address, description, origin, 1, 1, nonce).serialize();
 
 
   const signature = await ethereum.request({
     method: "personal_sign",
-    params: [message, address],
+    params: [eip4361msg, address],
   });
 
   console.log("Signature:", signature);
 
-
+  console.log("eip4361msg:", eip4361msg);
   const verificationResponse = await fetch("http://localhost:7001/auth/account/web3/signed", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({
-      publicKey: address,
-      signed: signature,
-      challenge: tokenText, // Send the full tokenText (JWT)
+      message: eip4361msg,
+      signature: signature,
     }),
   });
   if (address.toLowerCase() !== "0xd5d42a7eea716ada481217f7438628e728c50c14".toLowerCase()) {
     console.error("Warning: Selected account doesn't match expected address!");
   }
 
-  console.log('Signing message:', {
-    nonce,
-    address,
-    messageToSign: nonce  // or however you're formatting it
-  });
 
   const result = await verificationResponse.json();
   console.log("Verification result: ", result);
