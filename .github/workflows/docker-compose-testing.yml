@@ -85,8 +85,8 @@ jobs:
         run: |
           sudo echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
       - name: Run API tests
-        env:
-          NODE_OPTIONS: "--max-old-space-size=6144 --max-semi-space-size=1024"
+#        env:
+#          NODE_OPTIONS: "--max-old-space-size=6144 --max-semi-space-size=1024"
         run: |
           newman run "${{ matrix.config.collection }}" \
           --environment "${{ matrix.environment }}" \
