@@ -26,8 +26,6 @@ import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.*
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 object OpenID4VC {
   private val log = KotlinLogging.logger { }
@@ -129,7 +127,13 @@ object OpenID4VC {
 
       else -> throw TokenError(tokenRequest, TokenErrorCode.unsupported_grant_type, "Grant type not supported")
     }
-    return verifyAndParseToken(code, issuer, TokenTarget.TOKEN, tokenKey) ?: throw TokenError(
+
+    return verifyAndParseToken(
+      token = code,
+      issuer = issuer,
+      target = TokenTarget.TOKEN,
+      tokenKey = tokenKey
+    ) ?: throw TokenError(
       tokenRequest = tokenRequest,
       errorCode = TokenErrorCode.invalid_grant,
       message = "Authorization code could not be verified"
@@ -137,36 +141,36 @@ object OpenID4VC {
   }
 
   // Create an ID or VP Token request using JAR OAuth2.0 specification https://www.rfc-editor.org/rfc/rfc9101.html
-  @OptIn(ExperimentalUuidApi::class)
   suspend fun processCodeFlowAuthorizationWithAuthorizationRequest(
     authorizationRequest: AuthorizationRequest,
+    authServerState: String,
     responseType: ResponseType,
     providerMetadata: OpenIDProviderMetadata,
     tokenKey: Key,
     isJar: Boolean? = true,
     presentationDefinition: PresentationDefinition? = null,
   ): AuthorizationCodeWithAuthorizationRequestResponse {
+
+    providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
+      ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
+      ?: error("Unknown metadata type: $providerMetadata")
+
     if (!authorizationRequest.responseType.contains(ResponseType.Code))
       throw AuthorizationError(
-        authorizationRequest,
-        AuthorizationErrorCode.invalid_request,
+        authorizationRequest = authorizationRequest,
+        errorCode = AuthorizationErrorCode.invalid_request,
         message = "Invalid response type ${authorizationRequest.responseType}, for authorization code flow."
       )
 
-    // Bind authentication request with state
-    val authorizationRequestServerState = Uuid.random().toString()
-    val authorizationRequestServerNonce = Uuid.random().toString()
+    val authorizationRequestServerNonce = randomUUID()
     val authorizationResponseServerMode = ResponseMode.direct_post
 
     val clientId = providerMetadata.issuer!!
     val redirectUri = providerMetadata.issuer + "/direct_post"
     val scope = setOf("openid")
 
-    // Create a session with the state of the ID Token request since it is needed in the direct_post endpoint
-    //initializeAuthorization(authorizationRequest, 5.minutes, authorizationRequestServerState)
-
     return AuthorizationCodeWithAuthorizationRequestResponse.success(
-      state = authorizationRequestServerState,
+      state = authServerState,
       clientId = clientId,
       redirectUri = redirectUri,
       responseType = getResponseTypeString(responseType),
@@ -175,14 +179,13 @@ object OpenID4VC {
       nonce = authorizationRequestServerNonce,
       requestUri = null,
       request = when (isJar) {
-        // Create a jwt as request object as defined in JAR OAuth2.0 specification
         true -> signToken(
-          TokenTarget.TOKEN,
-          buildJsonObject {
+          target = TokenTarget.TOKEN,
+          payload = buildJsonObject {
             put(JWTClaims.Payload.issuer, providerMetadata.issuer)
             put(JWTClaims.Payload.audience, authorizationRequest.clientId)
             put(JWTClaims.Payload.nonce, authorizationRequestServerNonce)
-            put("state", authorizationRequestServerState)
+            put("state", authServerState)
             put("client_id", clientId)
             put("redirect_uri", redirectUri)
             put("response_type", getResponseTypeString(responseType))
@@ -190,9 +193,11 @@ object OpenID4VC {
             put("scope", "openid")
             when (responseType) {
               ResponseType.VpToken -> put("presentation_definition", presentationDefinition!!.toJSON())
-              else -> null
+              else -> {}
             }
-          }, tokenKey)
+          },
+          privKey = tokenKey
+        )
 
         else -> null
       },
@@ -210,12 +215,21 @@ object OpenID4VC {
         AuthorizationErrorCode.invalid_request,
         message = "Invalid response type ${authorizationRequest.responseType}, for authorization code flow."
       )
+
+    providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
+      ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
+      ?: error("Unknown metadata type: $providerMetadata")
+
     val issuer = providerMetadata.issuer ?: throw AuthorizationError(authorizationRequest, AuthorizationErrorCode.server_error,"No issuer configured in given provider metadata")
     val code = generateAuthorizationCodeFor(sessionId, issuer, tokenKey)
     return AuthorizationCodeResponse.success(code, mapOf("state" to listOf(authorizationRequest.state ?: randomUUID())))
   }
 
   suspend fun processImplicitFlowAuthorization(authorizationRequest: AuthorizationRequest, sessionId: String, providerMetadata: OpenIDProviderMetadata, tokenKey: Key): TokenResponse {
+    providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
+      ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
+      ?: error("Unknown metadata type: $providerMetadata")
+
     log.debug { "> processImplicitFlowAuthorization for $authorizationRequest" }
     if (!authorizationRequest.responseType.contains(ResponseType.Token) && !authorizationRequest.responseType.contains(ResponseType.VpToken)
       && !authorizationRequest.responseType.contains(ResponseType.IdToken)
@@ -235,15 +249,27 @@ object OpenID4VC {
   }
 
   suspend fun processDirectPost(authorizationRequest: AuthorizationRequest, sessionId: String, providerMetadata: OpenIDProviderMetadata, tokenKey: Key): AuthorizationCodeResponse {
+    providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
+      ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
+      ?: error("Unknown metadata type: $providerMetadata")
+
     // Verify nonce - need to add Id token nonce session
     // if (payload[JWTClaims.Payload.nonce] != session.)
 
     // Generate code and proceed as regular authorization request
     val mappedState = mapOf("state" to listOf(authorizationRequest.state!!))
     val issuer = providerMetadata.issuer ?: throw AuthorizationError(authorizationRequest, AuthorizationErrorCode.server_error,"No issuer configured in given provider metadata")
-    val code = generateAuthorizationCodeFor(sessionId, issuer, tokenKey)
 
-    return AuthorizationCodeResponse.success(code, mappedState)
+    val code = generateAuthorizationCodeFor(
+      sessionId = sessionId,
+      issuer = issuer,
+      tokenKey = tokenKey
+    )
+
+    return AuthorizationCodeResponse.success(
+      code = code,
+      customParameters = mappedState
+    )
   }
 
   const val PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX = "urn:ietf:params:oauth:request_uri:"

@@ -7,9 +7,7 @@ import COSE.OneKey
 import cbor.Cbor
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
-import com.sksamuel.hoplite.ConfigException
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.config.ConfigurationException
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
@@ -28,7 +26,9 @@ import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
 import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.OpenID4VCI
+import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.*
+import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.definitions.OPENID_CREDENTIAL_AUTHORIZATION_TYPE
 import id.walt.oid4vc.errors.AuthorizationError
@@ -65,13 +65,17 @@ import kotlin.uuid.ExperimentalUuidApi
  */
 @OptIn(ExperimentalUuidApi::class)
 open class CIProvider(
-    val baseUrl: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl },
+    val baseUrl: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.DRAFT13.versionString}"},
+    val baseUrlDraft11: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.DRAFT11.versionString}"},
+
     val config: CredentialIssuerConfig = CredentialIssuerConfig(credentialConfigurationsSupported = ConfigManager.getConfig<CredentialTypeConfig>().parse())
 ) {
+
     val metadata
-        get() = OpenID4VCI.createDefaultProviderMetadata(baseUrl).copy(
-            credentialConfigurationsSupported = config.credentialConfigurationsSupported
-        )
+        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrl, config.credentialConfigurationsSupported, OpenID4VCIVersion.DRAFT13) as OpenIDProviderMetadata.Draft13)
+
+    val metadataDraft11
+        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrlDraft11, config.credentialConfigurationsSupported, OpenID4VCIVersion.DRAFT11) as OpenIDProviderMetadata.Draft11)
 
     companion object {
         private val log = KotlinLogging.logger { }
@@ -487,17 +491,22 @@ open class CIProvider(
         expiresIn: Duration,
         allowPreAuthorized: Boolean,
         callbackUrl: String? = null,
-        txCode: TxCode? = null, txCodeValue: String? = null,
+        txCode: TxCode? = null,
+        txCodeValue: String? = null,
+        standardVersion: OpenID4VCIVersion = OpenID4VCIVersion.DRAFT13
     ): IssuanceSession = runBlocking {
         val sessionId = randomUUID()
-        val credentialOfferBuilder =
-            OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests)
+
+        val credentialOfferBuilder = OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests, standardVersion )
+
         credentialOfferBuilder.addAuthorizationCodeGrant(sessionId)
+
         if (allowPreAuthorized)
             credentialOfferBuilder.addPreAuthorizedCodeGrant(
-                OpenID4VC.generateAuthorizationCodeFor(sessionId, metadata.issuer!!, CI_TOKEN_KEY),
-                txCode
+                preAuthCode = OpenID4VC.generateAuthorizationCodeFor(sessionId, metadata.issuer!!, CI_TOKEN_KEY),
+                txCode = txCode
             )
+
         return@runBlocking IssuanceSession(
             id = sessionId,
             authorizationRequest = null,
@@ -590,4 +599,41 @@ open class CIProvider(
                 }, session.callbackUrl)
         }
     }
+
+    private fun resolveBaseUrl(version: OpenID4VCIVersion): String {
+        return when (version) {
+            OpenID4VCIVersion.DRAFT13 -> baseUrl
+            OpenID4VCIVersion.DRAFT11 -> baseUrlDraft11
+            else -> throw IllegalArgumentException("Unsupported version: $version")
+        }
+    }
+
+    fun buildCredentialOfferUri(standardVersion: OpenID4VCIVersion, issuanceSessionId: String): String {
+        val baseUrl = resolveBaseUrl(standardVersion)
+        return "$baseUrl/credentialOffer?id=$issuanceSessionId"
+    }
+
+    fun buildOfferUri(
+        standardVersion: OpenID4VCIVersion,
+        offerRequest: CredentialOfferRequest
+    ): String {
+        val baseUrl = resolveBaseUrl(standardVersion)
+        val sanitizedBaseUrl = baseUrl.removePrefix("https://").removePrefix("http://")
+        return OpenID4VCI.getCredentialOfferRequestUrl(
+            credOfferReq = offerRequest,
+            credentialOfferEndpoint = "$CROSS_DEVICE_CREDENTIAL_OFFER_URL$sanitizedBaseUrl/"
+        )
+    }
+
+    fun getMetadataForVersion(
+        standardVersion: String?,
+    ): OpenIDProviderMetadata {
+        val version = OpenID4VCIVersion.from(standardVersion ?: throw IllegalArgumentException("standardVersion parameter is required"))
+
+        return when (version) {
+            OpenID4VCIVersion.DRAFT11 -> metadataDraft11
+            OpenID4VCIVersion.DRAFT13 -> metadata
+        }
+    }
+
 }
