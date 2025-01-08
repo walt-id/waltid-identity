@@ -30,6 +30,11 @@ jobs:
           filenameNoExtension=${filenameWithExtension%.*}
           echo "Will use filename $filenameNoExtension for reports"
           echo "dataset_filename=$filenameNoExtension" >> $GITHUB_ENV
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          docker-images: false
       - name: Checkout repo
         uses: actions/checkout@v4
       - name: Checkout waltid-identity-postman
