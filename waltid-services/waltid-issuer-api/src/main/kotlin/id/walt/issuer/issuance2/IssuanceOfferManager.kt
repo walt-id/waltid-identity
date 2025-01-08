@@ -56,10 +56,10 @@ object IssuanceOfferManager {
         issuanceRequest.issuer
 
 
-        var offerBuilder = CredentialOffer.Builder(baseUrl)
+        var offerBuilder = CredentialOffer.Draft13.Builder(baseUrl)
 
         issuanceRequest.credential.map { it.credentialData.getType().last() }.forEach {
-            offerBuilder = offerBuilder.addOfferedCredential(it)
+            offerBuilder = offerBuilder.addOfferedCredential(it) as CredentialOffer.Draft13.Builder
         }
 
         val sessionId = Uuid.random().toString()

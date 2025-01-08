@@ -3,6 +3,7 @@ package id.walt.oid4vc.providers
 import id.walt.crypto.keys.Key
 import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.OpenID4VCI
+import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.ResponseType.Companion.getResponseTypeString
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -30,10 +31,10 @@ import kotlin.uuid.Uuid
 abstract class OpenIDProvider<S : AuthorizationSession>(
     val baseUrl: String,
 ) : ISessionCache<S>, ITokenProvider {
-    abstract val metadata: OpenIDProviderMetadata
+    abstract val metadata: OpenIDProviderMetadata.Draft13
     abstract val config: OpenIDProviderConfig
 
-    protected open fun createDefaultProviderMetadata() = OpenID4VCI.createDefaultProviderMetadata(baseUrl)
+    protected open fun createDefaultProviderMetadata() = OpenID4VCI.createDefaultProviderMetadata(baseUrl, emptyMap(), OpenID4VCIVersion.DRAFT13)
 
     fun getCommonProviderMetadataUrl(): String {
         return URLBuilder(baseUrl).apply {

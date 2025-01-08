@@ -6,12 +6,10 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 
 /*
 @context: [...],      // json-ld only
@@ -70,12 +68,14 @@ data class CredentialSupported(
     val scope: String? = null,
     @SerialName("vct") val vct: String? = null,
     @SerialName("cryptographic_binding_methods_supported") val cryptographicBindingMethodsSupported: Set<String>? = null,
+    @SerialName("id") val id: String? = null, // for draft 11
+    @SerialName("cryptographic_suites_supported") val cryptographicSuitesSupported: Set<String>? = null,  // for draft 11
+    val types: List<String>? = null, // for draft 11
     @SerialName("credential_signing_alg_values_supported") val credentialSigningAlgValuesSupported: Set<String>? = null,
     @SerialName("proof_types_supported") val proofTypesSupported: Map<ProofType, ProofTypeMetadata>? = null,
     @Serializable(DisplayPropertiesListSerializer::class) val display: List<DisplayProperties>? = null,
     @SerialName("@context") val context: List<JsonElement>? = null,
     @SerialName("credential_definition") val credentialDefinition: CredentialDefinition? = null,
-    val types: List<String>? = null, // for draft 11
     @SerialName("doctype") val docType: String? = null,
     @Serializable(ClaimDescriptorMapSerializer::class) val credentialSubject: Map<String, ClaimDescriptor>? = null,
     @Serializable(ClaimDescriptorNamespacedMapSerializer::class) val claims: Map<String, Map<String, ClaimDescriptor>>? = null,
@@ -107,4 +107,39 @@ object CredentialSupportedMapSerializer : KSerializer<Map<String, CredentialSupp
     override val descriptor: SerialDescriptor = internalSerializer.descriptor
     override fun deserialize(decoder: Decoder) = internalSerializer.deserialize(decoder)
     override fun serialize(encoder: Encoder, value: Map<String, CredentialSupported>) = internalSerializer.serialize(encoder, value)
+}
+
+/**
+ * The JsonDecoder attempts to deserialize the `credentials_supported` field.
+ * For Draft11, the `credentials_supported` field is represented as a JsonArray.
+ * However, the expected structure for a `Map<String, CredentialSupported>` is a JsonObject
+ */
+
+object CredentialSupportedArraySerializer : KSerializer<Map<String, CredentialSupported>> {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("Array<CredentialSupported>")
+
+    override fun deserialize(decoder: Decoder): Map<String, CredentialSupported> {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: throw IllegalStateException("Invalid Decoder")
+
+        val jsonArray = jsonDecoder.decodeJsonElement() as? JsonArray
+            ?: throw IllegalStateException("Invalid Decoder")
+
+        return jsonArray.mapIndexed { index, element ->
+            val key = index.toString()
+            val value = Json.decodeFromJsonElement(CredentialSupported.serializer(), element)
+            key to value
+        }.toMap()
+    }
+
+    override fun serialize(encoder: Encoder, value: Map<String, CredentialSupported>) {
+        encoder as? JsonEncoder
+            ?: throw IllegalStateException("Invalid Decoder")
+
+        val jsonArray = value.values.map { credential ->
+            JsonObject(credential.toJSON().toMutableMap())
+        }
+
+        encoder.encodeJsonElement(JsonArray(jsonArray))
+    }
 }

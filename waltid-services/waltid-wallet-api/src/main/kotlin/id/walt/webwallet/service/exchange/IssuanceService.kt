@@ -12,12 +12,7 @@ import io.klogging.logger
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.util.*
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -71,6 +66,7 @@ object IssuanceService: IssuanceServiceBase() {
             credentialOffer.credentialIssuer,
             credentialWallet,
         )
+
         logger.debug { "providerMetadata: $providerMetadata" }
 
         logger.debug { "// resolve offered credentials" }
