@@ -100,7 +100,6 @@ data class WalletCredential @OptIn(ExperimentalUuidApi::class) constructor(
             when(format) {
                 CredentialFormat.jwt_vc, CredentialFormat.sd_jwt_vc, CredentialFormat.jwt_vc_json,
                 CredentialFormat.jwt_vc_json_ld -> SDJwt.parse(document + (disclosures?.let { "~$it" } ?: "")).fullPayload
-                    .run { jsonObject["vc"]?.jsonObject ?: jsonObject }
                 else -> parseDocument(document, id, format)
             }
         }.onFailure { it.printStackTrace() }
