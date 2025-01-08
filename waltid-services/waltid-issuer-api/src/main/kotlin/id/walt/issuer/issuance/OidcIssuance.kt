@@ -1,6 +1,7 @@
 package id.walt.issuer.issuance
 
 import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.CredentialOffer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -19,11 +20,18 @@ object OidcIssuance {
     }
 
 
-    fun issuanceRequestsToCredentialOfferBuilder(issuanceRequests: List<IssuanceRequest>) =
-        issuanceRequestsToCredentialOfferBuilder(*issuanceRequests.toTypedArray())
+    fun issuanceRequestsToCredentialOfferBuilder(issuanceRequests: List<IssuanceRequest>, standardVersion: OpenID4VCIVersion) =
+        issuanceRequestsToCredentialOfferBuilder(
+            issuanceRequests = *issuanceRequests.toTypedArray(),
+            standardVersion = standardVersion
+        )
 
-    fun issuanceRequestsToCredentialOfferBuilder(vararg issuanceRequests: IssuanceRequest): CredentialOffer.Builder {
-        val builder = CredentialOffer.Builder(OidcApi.baseUrl)
+    fun issuanceRequestsToCredentialOfferBuilder(vararg issuanceRequests: IssuanceRequest, standardVersion: OpenID4VCIVersion): CredentialOffer.Builder<*> {
+        val builder = when (standardVersion) {
+            OpenID4VCIVersion.DRAFT13 -> CredentialOffer.Draft13.Builder(OidcApi.baseUrl)
+            OpenID4VCIVersion.DRAFT11 -> CredentialOffer.Draft11.Builder(OidcApi.baseUrlDraft11)
+        }
+
         issuanceRequests.forEach { issuanceRequest ->
             builder.addOfferedCredential(issuanceRequest.credentialConfigurationId)
         }
