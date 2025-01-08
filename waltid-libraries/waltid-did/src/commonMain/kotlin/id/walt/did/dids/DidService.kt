@@ -166,7 +166,7 @@ object DidService {
 
     //@JvmBlocking
     //@JvmAsync
-    @JsPromise
+    //@JsPromise
     @JsExport.Ignore
     suspend fun registerByKey(
         method: String, key: Key, options: DidCreateOptions = DidCreateOptions(method, emptyMap()),
