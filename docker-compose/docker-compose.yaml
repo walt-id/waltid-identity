@@ -155,7 +155,6 @@ services:
       retries: 5
     volumes:
       - ./vault/config.hcl:/vault/config/config.hcl
-      - ./vault/init.sh:/vault/scripts/init.sh
       - vault_data:/vault/file
     ports:
       - "$VAULT_PORT:8200"
@@ -179,7 +178,7 @@ services:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c", "/vault/scripts/init.sh"]
     volumes:
-      - ./vault:/vault/scripts
+      - ./vault/init.sh:/vault/scripts/init.sh
 
   caddy:
     image: docker.io/caddy:2
