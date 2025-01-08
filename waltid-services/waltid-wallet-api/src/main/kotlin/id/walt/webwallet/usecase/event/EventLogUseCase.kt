@@ -4,10 +4,13 @@ package id.walt.webwallet.usecase.event
 
 import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.events.*
 import id.walt.webwallet.utils.JsonUtils
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.uuid.ExperimentalUuidApi
@@ -17,6 +20,11 @@ import kotlin.uuid.Uuid
 class EventLogUseCase(
     private val eventService: EventService,
 ) {
+    private val typePropertyNameByCredentialFormat = mapOf(
+        CredentialFormat.jwt_vc_json to "type",
+        CredentialFormat.sd_jwt_vc to "vct",
+        CredentialFormat.mso_mdoc to "docType"
+    )
 
     fun log(
         action: EventType.Action,
@@ -64,7 +72,7 @@ class EventLogUseCase(
     ) = CredentialEventData(
         ecosystem = EventDataNotAvailable,
         type = credential.parsedDocument?.let {
-            JsonUtils.tryGetData(it, "type")?.jsonArray?.last()?.jsonPrimitive?.content
+            getCredentialType(it, credential.format)
         } ?: EventDataNotAvailable,
         format = type ?: EventDataNotAvailable,
         proofType = EventDataNotAvailable,
@@ -111,6 +119,16 @@ class EventLogUseCase(
     fun keyEventData(id: String, algorithm: String, kmsType: String) = KeyEventData(
         id = id, algorithm = algorithm, keyManagementService = kmsType
     )
+
+    private fun getCredentialType(json: JsonObject, format: CredentialFormat) =
+        typePropertyNameByCredentialFormat[format]?.let {
+            JsonUtils.tryGetData(json, it)
+        }?.let {
+            when (it) {
+                is JsonArray -> it.jsonArray.last()
+                else -> it
+            }
+        }?.jsonPrimitive?.content
 
     data class EventFilterParameter(
         val accountId: Uuid,

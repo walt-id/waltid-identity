@@ -12,7 +12,7 @@ allprojects {
 }
 
 plugins {
-    val kotlinVersion = "2.0.21"
+    val kotlinVersion = "2.1.0"
     kotlin("multiplatform") version kotlinVersion apply false
     kotlin("jvm") version kotlinVersion
     kotlin("plugin.power-assert") version kotlinVersion apply false
@@ -21,6 +21,7 @@ plugins {
 
     kotlin("plugin.serialization") version kotlinVersion apply false
 
+    id("love.forte.plugin.suspend-transform") version "2.1.0-0.10.0" apply false
     id("com.android.library") version "8.7.3" apply false
     id("com.android.application") version "8.7.3" apply false
 
