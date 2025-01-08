@@ -25,7 +25,6 @@ repositories {
     mavenLocal()
     mavenCentral()
     maven("https://maven.waltid.dev/releases")
-    maven("https://maven.walt.id/repository/waltid/")
 }
 
 dependencies {

@@ -10,7 +10,6 @@ group = "id.walt"
 repositories {
     mavenLocal()
     mavenCentral()
-    maven("https://maven.walt.id/repository/waltid/")
 }
 
 dependencies {
