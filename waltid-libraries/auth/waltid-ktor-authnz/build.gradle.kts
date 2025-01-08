@@ -36,17 +36,6 @@ dependencies {
     // Optional: Web3j utils
     implementation("org.web3j:utils:4.9.8")
 
-    // If you need contract wrappers
-    implementation("org.web3j:contracts:4.9.8")
-
-    // SIWE
-    implementation("id.walt:waltid-siwe:0.1.1") {
-        exclude("io.ktor")
-        exclude("ch.qos.logback")
-    }
-
-
-
 
     // RADIUS
     implementation("org.aaa4j.radius:aaa4j-radius-client:0.3.1")

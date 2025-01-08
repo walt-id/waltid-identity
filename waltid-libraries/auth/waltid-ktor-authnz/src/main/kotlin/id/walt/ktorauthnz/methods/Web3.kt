@@ -1,49 +1,109 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.Web3Identifier
-import id.walt.siwe.SiweRequest
-import id.walt.siwe.Web3jSignatureVerifier
-import id.walt.siwe.eip4361.Eip4361Message
-import id.walt.siwe.nonceBlacklists
+import id.walt.ktorauthnz.exceptions.authCheck
+import id.walt.ktorauthnz.exceptions.authFailure
+import id.walt.ktorauthnz.tokens.jwttoken.JwtTokenHandler
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
-import java.util.*
+import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.*
+import org.web3j.crypto.ECDSASignature
+import org.web3j.crypto.Keys
+import org.web3j.crypto.Sign
+import org.web3j.utils.Numeric
+import java.math.BigInteger
+import java.security.SecureRandom
 
 
 object Web3 : AuthenticationMethod("web3") {
+    private val jwtHandler = JwtTokenHandler().apply {
 
-    fun makeNonce(): String {
-        val newNonce = UUID.randomUUID().toString()
-        return newNonce
+        signingKey = runBlocking { JWKKey.generate(KeyType.Ed25519) }
+        verificationKey = signingKey
+    }
+    private const val NONCE_VALIDITY_SECONDS = 300L // 5 minutes
+
+
+    suspend fun makeNonce(): String {
+        val nonce = ByteArray(32).apply { SecureRandom().nextBytes(this) }
+        val nonceHex = Numeric.toHexString(nonce)
+
+        val payload = buildJsonObject {
+            put("nonce", JsonPrimitive(nonceHex))
+            put("exp", JsonPrimitive(Clock.System.now().epochSeconds + NONCE_VALIDITY_SECONDS))
+        }.toString().toByteArray()
+
+        return jwtHandler.signingKey.signJws(payload)
+
     }
 
+    @Serializable
+    data class SiweRequest(
+        val challenge: String,
+        val signed: String,
+        val publicKey: String
+    )
 
     fun verifySiwe(siwe: SiweRequest): String {
+        val decodedJwt = siwe.challenge.decodeJws()
+        val jwtPayload = decodedJwt.payload.jsonObject
 
-        val eip4361msg = Eip4361Message.fromString(siwe.message)
-        println("EIP4361msg: $eip4361msg")
-        println("EIP nonce: ${eip4361msg.nonce}")
+        val nonce = jwtPayload["nonce"]?.jsonPrimitive?.content
+            ?: authFailure("No nonce in token")
 
-        if (nonceBlacklists.contains(eip4361msg.nonce)) {
-            throw IllegalArgumentException("Nonce reused.")
+        val exp = jwtPayload["exp"]?.jsonPrimitive?.long
+            ?: authFailure("No exp in token")
+
+        val now = Clock.System.now().epochSeconds
+        if (now > exp) {
+            authFailure("Token expired")
         }
 
-        val address = eip4361msg.address.lowercase()
-        val signature = siwe.signature
-        val origMsg = eip4361msg.toString()
+        // formatting the message according to the EIP-191 standard
+        val prefix = "\u0019Ethereum Signed Message:\n"
+        val messageLength = nonce.length.toString()
+        val prefixedMessage = prefix + messageLength + nonce
+
+        val messageHash = Sign.getEthereumMessageHash(prefixedMessage.toByteArray())
+
+        // Parse signature components
+        val signatureBytes = Numeric.hexStringToByteArray(siwe.signed.removePrefix("0x"))
+        val r = BigInteger(1, signatureBytes.copyOfRange(0, 32))
+        val s = BigInteger(1, signatureBytes.copyOfRange(32, 64))
+
+        // The v value is the last byte, convert it to the correct format
+        // MetaMask adds 27 to v, so we need to subtract it
+        val v = (signatureBytes[64].toInt() and 0xFF) - 27
 
 
-        val signatureVerification = Web3jSignatureVerifier.verifySignature(address, signature, origMsg)
-        if (!signatureVerification) {
-            throw IllegalArgumentException("Invalid signature.")
+        val signature = ECDSASignature(r, s)
+
+        // Recover the public key
+        val recoveredKey = Sign.recoverFromSignature(
+            v.toByte().toInt(),
+            signature,
+            messageHash
+        ) ?: authFailure("Could not recover public key from signature")
+
+
+        val recoveredAddress = "0x" + Keys.getAddress(recoveredKey)
+
+        authCheck(recoveredAddress.equals(siwe.publicKey, ignoreCase = true)) {
+            "Recovered address ($recoveredAddress) does not match provided address (${siwe.publicKey})"
         }
-        nonceBlacklists.add(eip4361msg.nonce!!)
 
-        return address
+
+        return recoveredAddress
     }
 
 
