@@ -737,3 +737,13 @@ data class AWSKeyMetadata(
 
 For usage examples on _create_, _sign_, _verify_, _import_ and _export_ functions see
 [Working with JWKKey](#working-with-jwkKey).
+
+## Join the community
+
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [Twitter](https://mobile.twitter.com/walt_id)
+* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+
+
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-mdoc/blob/master/LICENSE)
