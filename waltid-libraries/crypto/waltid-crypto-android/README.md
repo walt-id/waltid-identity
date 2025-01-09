@@ -27,4 +27,4 @@ with `enableAndroidBuild=true` in `gradle.properties`.
 
 ## License
 
-Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-mdoc/blob/master/LICENSE)
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)

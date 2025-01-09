@@ -746,4 +746,4 @@ For usage examples on _create_, _sign_, _verify_, _import_ and _export_ function
 
 ## License
 
-Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-mdoc/blob/master/LICENSE)
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
