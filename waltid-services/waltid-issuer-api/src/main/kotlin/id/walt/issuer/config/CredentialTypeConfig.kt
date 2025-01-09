@@ -79,7 +79,7 @@ data class CredentialTypeConfig(
                 format = CredentialFormat.sd_jwt_vc,
                 cryptographicBindingMethodsSupported = setOf("did", "jwk"),
                 credentialSigningAlgValuesSupported = setOf("ES256"),
-                vct = "https://example.com/my_custom_vct",
+                vct = baseUrl.plus("/my_custom_vct"),
             )
         )
     ),
