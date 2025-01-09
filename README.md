@@ -66,7 +66,7 @@ git clone https://github.com/walt-id/waltid-identity.git && cd waltid-identity
 cd docker-compose && docker compose up
 ```
 
-Learn more about the exposed ports [here](https://github.com/walt-id/waltid-identity/tree/main/docker-compose).
+Learn more about the docker settings & exposed ports [here](https://github.com/walt-id/waltid-identity/tree/main/docker-compose).
 
 ## Use the Command Line Tool
 
