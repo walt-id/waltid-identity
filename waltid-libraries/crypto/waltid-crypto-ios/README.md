@@ -53,3 +53,13 @@ val key = IosKey.create("kid", KeyType.secp256r1)
 #### Implementation details
 
 Module references `:waltid-libraries:waltid-target-ios` that is exposing functionality from static library built by `:waltid-libraries:waltid-target-ios:implementation' module. This module acts as an umbrella for iOS related functionaltiy - for now only crypto things. 
+
+## Join the community
+
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [Twitter](https://mobile.twitter.com/walt_id)
+* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+
+
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-mdoc/blob/master/LICENSE)
