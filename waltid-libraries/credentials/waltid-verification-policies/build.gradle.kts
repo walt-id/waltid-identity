@@ -106,6 +106,9 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
                 implementation("org.slf4j:slf4j-simple:2.0.13")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.0-M2")
+                implementation("io.ktor:ktor-server-test-host:$ktor_version")
+                implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
+                implementation("io.ktor:ktor-server-netty:$ktor_version")
             }
         }
 
