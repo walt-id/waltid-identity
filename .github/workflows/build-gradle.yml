@@ -47,9 +47,9 @@ jobs:
         id: set-publish-arguments
         run: |
           if [ "${{ inputs.publish }}" ]; then
-            echo "::set-output name=arguments::publish"
+            echo "arguments=publish" >> $GITHUB_OUTPUT
           else
-            echo "::set-output name=arguments::"
+            echo "arguments::" >> $GITHUB_OUTPUT
           fi
       - name: Running gradle build
         uses: eskatos/gradle-command-action@v3

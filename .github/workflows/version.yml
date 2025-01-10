@@ -1,0 +1,33 @@
+name: Calculate release version (reusable workflow)
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "release version"
+        required: false
+        type: string
+    outputs:
+      release_version:
+        description: "The computed release version"
+        value: ${{ jobs.compute.outputs.result }}
+
+jobs:
+  compute:
+    name: "Compute"
+    runs-on: self-hosted
+    outputs:
+      result: ${{ steps.release_version.outputs.release_version }}
+    steps:
+      - name: Calculate release version
+        id: release_version
+        run: |
+          if [ "${{ inputs.version }}" == "" ]; then
+            echo "Using computed value"
+            BRANCH=$(echo ${{ github.ref }} | sed -e 's/refs\/heads\///' -e 's/\//-/g')
+            echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+            echo "release_version=1.0.$(date +'%g%m%d%H%M')-${BRANCH}" >> $GITHUB_OUTPUT
+          else
+            echo "Using provided input"
+            echo "release_version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          fi
