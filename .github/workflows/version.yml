@@ -3,8 +3,12 @@ name: Calculate release version (reusable workflow)
 on:
   workflow_call:
     inputs:
-      version:
-        description: "release version"
+      preferred:
+        description: "preferred release version"
+        required: false
+        type: string
+      suffix:
+        description: "version suffix (defaults to branch name)"
         required: false
         type: string
     outputs:
@@ -22,12 +26,16 @@ jobs:
       - name: Calculate release version
         id: release_version
         run: |
-          if [ "${{ inputs.version }}" == "" ]; then
+          if [ "${{ inputs.preferred }}" == "" ]; then
             echo "Using computed value"
+            SUFFIX=${{ inputs.suffix }}
             BRANCH=$(echo ${{ github.ref }} | sed -e 's/refs\/heads\///' -e 's/\//-/g')
-            echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
-            echo "release_version=1.0.$(date +'%g%m%d%H%M')-${BRANCH}" >> $GITHUB_OUTPUT
+            if [ "${SUFFIX}" == "" ]; then
+               SUFFIX="-${BRANCH}"
+            fi
+            echo "SUFFIX=${SUFFIX}" >> $GITHUB_ENV
+            echo "release_version=1.0.$(date +'%g%m%d%H%M')${SUFFIX}" >> $GITHUB_OUTPUT
           else
             echo "Using provided input"
-            echo "release_version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+            echo "release_version=${{ inputs.preferred }}" >> $GITHUB_OUTPUT
           fi
