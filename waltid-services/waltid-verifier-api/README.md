@@ -39,7 +39,7 @@ can be found in the table below:
         <!-- w3c -->
         <!-- jwt -->
         <tr>
-            <td align="center" rowspan="2">w3c</td>
+            <td align="center" rowspan="2">W3C</td>
             <td align="center">jwt</td>
             <td align="center">&check;</td>
             <td align="center">&cross;</td>
@@ -50,9 +50,15 @@ can be found in the table below:
             <td align="center">&check;</td>
             <td align="center">&cross;</td>
         </tr>
+        <!-- SD-JWT VC (IETF) -->
+        <tr>
+            <td align="center" colspan="2">SD-JWT VC (IETF)</td>
+            <td align="center">&check;</td>
+            <td align="center">&cross;</td>
+        </tr>
         <!-- mdoc -->
         <tr>
-            <td align="center" colspan="2">mdoc</td>
+            <td align="center" colspan="2">mDL/mdoc</td>
             <td align="center">&cross;</td>
             <td align="center">&dash;</td>
         </tr>
@@ -131,3 +137,13 @@ https://verifier.portal.walt-test.cloud/swagger/index.html
       ```jsx
       mdoc-openid4vp://?response_type=vp_token&client_id=&response_mode=direct_post.jwt&state=AqkYhRmbHpEX&presentation_definition_uri=http%3A%2F%2Flocalhost%3A7003%2Fopenid4vc%2Fpd%2FAqkYhRmbHpEX&client_id_scheme=redirect_uri&client_metadata=%7B%22jwks%22%3A%7B%22keys%22%3A%5B%7B%22kty%22%3A%22EC%22%2C%22crv%22%3A%22P-256%22%2C%22kid%22%3A%22b6ERrLYBSfsJ_nFLMgw6jtPGgzWSxyZX91RlRTvL-c4%22%2C%22x%22%3A%22lZMnJXRAgZ3YQAtFpqSaAywEb34XsWkP2aN3C9ZJwz8%22%2C%22y%22%3A%22rHNeTy9wUOmb4RH2R8YRKZxMadc55qWe_0TGUwgc0Hk%22%2C%22use%22%3A%22enc%22%2C%22alg%22%3A%22ECDH-ES%22%7D%5D%7D%2C%22authorization_encrypted_response_alg%22%3A%22ECDH-ES%22%2C%22authorization_encrypted_response_enc%22%3A%22A256GCM%22%7D&nonce=af1b4ddd-db15-47b8-bcf7-7773c4d75e82&response_uri=http%3A%2F%2Flocalhost%3A7003%2Fopenid4vc%2Fverify%2FAqkYhRmbHpEX
       ```
+
+## Join the community
+
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [Twitter](https://mobile.twitter.com/walt_id)
+* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+
+
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
