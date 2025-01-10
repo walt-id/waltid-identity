@@ -1,7 +1,6 @@
 package id.walt.verifier.oidc
 
 import id.walt.credentials.utils.VCFormat
-import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.dif.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -60,7 +59,7 @@ data class RequestedCredential(
       else -> InputDescriptorConstraints(
         listOf(
           InputDescriptorField(
-            path = listOf("$.type"), filter = JsonObject(
+            path = listOf("$.vc.type"), filter = JsonObject(
               mapOf(
                 "type" to JsonPrimitive("string"), "pattern" to JsonPrimitive(type)
               )

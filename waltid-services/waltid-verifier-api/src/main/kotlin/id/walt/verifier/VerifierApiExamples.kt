@@ -185,7 +185,7 @@ object VerifierApiExamples {
                                     {
                                         "path":
                                         [
-                                            "${'$'}.type"
+                                            "${'$'}.vc.type"
                                         ],
                                         "filter":
                                         {
@@ -241,7 +241,7 @@ object VerifierApiExamples {
                                     {
                                         "path":
                                         [
-                                            "${'$'}.type"
+                                            "${'$'}.vc.type"
                                         ],
                                         "filter":
                                         {
