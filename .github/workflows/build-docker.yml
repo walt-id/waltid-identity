@@ -23,6 +23,33 @@ jobs:
   build:
     name: "Build"
     runs-on: self-hosted
+    strategy:
+      matrix:
+        services:
+          - {
+            folder: waltid-services/waltid-issuer-api,
+            image: issuer-api
+          }
+          - {
+              folder: waltid-services/waltid-verifier-api,
+              image: verifier-api
+          }
+          - {
+            folder: waltid-services/waltid-wallet-api,
+            image: wallet-api
+          }
+          - {
+            folder: waltid-applications/waltid-web-wallet/apps/waltid-demo-wallet,
+            image: waltid-demo-wallet
+          }
+          - {
+            folder:  waltid-applications/waltid-web-wallet/apps/waltid-dev-wallet,
+            image: waltid-dev-wallet
+          }
+          - {
+            folder: waltid-applications/waltid-web-portal,
+            image: portal
+          }
     steps:
       - uses: actions/checkout@v3
       - name: Login to Docker Hub
@@ -34,39 +61,9 @@ jobs:
       - name: Set up Docker Buildx
         if: ${{ !inputs.publish }}
         uses: docker/setup-buildx-action@v2
-      - name: Build and push Docker images (issuer)
+      - name: Build and push Docker images (${{ matrix.services.image }})
         uses: docker/build-push-action@v6
         with:
           push: ${{ inputs.publish }}
-          file: waltid-services/waltid-issuer-api/Dockerfile
-          tags: waltid/issuer-api:${{ inputs.tag }}, waltid/issuer-api:${{ inputs.version }}
-      - name: Build and push Docker images (verifier)
-        uses: docker/build-push-action@v6
-        with:
-          push: ${{ inputs.publish }}
-          file: waltid-services/waltid-verifier-api/Dockerfile
-          tags: waltid/verifier-api:${{ inputs.tag }}, waltid/verifier-api:${{ inputs.version }}
-      - name: Build and push Docker images (wallet-api)
-        uses: docker/build-push-action@v6
-        with:
-          push: ${{ inputs.publish }}
-          file: waltid-services/waltid-wallet-api/Dockerfile
-          tags: waltid/wallet-api:${{ inputs.tag }}, waltid/wallet-api:${{ inputs.version }}
-      - name: Build and push Docker images (waltid-demo-wallet)
-        uses: docker/build-push-action@v6
-        with:
-          push: ${{ inputs.publish }}
-          file: waltid-applications/waltid-web-wallet/apps/waltid-demo-wallet/Dockerfile
-          tags: waltid/waltid-demo-wallet:${{ inputs.tag }}, waltid/waltid-demo-wallet:${{ inputs.version }}
-      - name: Build and push Docker images (waltid-dev-wallet)
-        uses: docker/build-push-action@v6
-        with:
-          push: ${{ inputs.publish }}
-          file: waltid-applications/waltid-web-wallet/apps/waltid-dev-wallet/Dockerfile
-          tags: waltid/waltid-dev-wallet:${{ inputs.tag }}, waltid/waltid-dev-wallet:${{ inputs.version }}
-      - name: Build and push Docker images (wallet-portal)
-        uses: docker/build-push-action@v6
-        with:
-          push: ${{ inputs.publish }}
-          file: waltid-applications/waltid-web-portal/Dockerfile
-          tags: waltid/portal:${{ inputs.tag }}, waltid/portal:${{ inputs.version }}
+          file: ${{ matrix.services.folder }}/Dockerfile
+          tags: waltid/${{ matrix.services.image }}:${{ inputs.tag }}, waltid/${{ matrix.services.image }}:${{ inputs.version }}
