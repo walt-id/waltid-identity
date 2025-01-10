@@ -52,11 +52,19 @@ class IssuerUseCaseImpl(
             }
         }
 
-    private suspend fun fetchCredentials(url: String): List<CredentialDataTransferObject> =
-        fetchConfiguration(url).jsonObject["credential_configurations_supported"]?.jsonObject?.entries?.mapNotNull { (key, value) ->
+    suspend fun fetchCredentials(url: String): List<CredentialDataTransferObject> {
+        val issuerConfiguration = fetchConfiguration(url).jsonObject
+        val credentialConfigurations = (
+            issuerConfiguration["credential_configurations_supported"]?.jsonObject?.entries
+            ?: issuerConfiguration["credentials_supported"]?.jsonArray?.associateBy { it.jsonObject["id"]!!.jsonPrimitive.content }?.entries
+            )
+        return credentialConfigurations?.mapNotNull { (key, value) ->
             value.jsonObject.let { jsonObject ->
                 val format = jsonObject["format"]?.jsonPrimitive?.content
                 val types = jsonObject["types"]?.jsonArray?.map { it.jsonPrimitive.content }
+                    ?: jsonObject["credential_definition"]?.jsonObject?.get("type")?.jsonArray?.map { it.jsonPrimitive.content }
+                    ?: jsonObject["vct"]?.jsonPrimitive?.content?.let { listOf(it) }
+                    ?: jsonObject["doctype"]?.jsonPrimitive?.content?.let { listOf(it) }
 
                 if (format != null && types != null) {
                     CredentialDataTransferObject(id = key, format = format, types = types)
@@ -65,6 +73,7 @@ class IssuerUseCaseImpl(
                 }
             }
         } ?: emptyList()
+    }
 
     private suspend fun fetchConfiguration(url: String): JsonObject = let {
         json.parseToJsonElement(http.get(url).bodyAsText()).jsonObject
