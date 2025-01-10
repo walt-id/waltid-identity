@@ -22,34 +22,9 @@ jobs:
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
-      tag: latest
       publish: true
-  release:
-    name: "Pre-release"
-    runs-on: ubuntu-latest
-    needs: [version, gradle-build, docker-build]
-    steps:
-      - run: |
-          git tag v${{ needs.version.outputs.release_version }}
-          git push --tags
-      - name: Changelog
-        uses: ardalanamini/auto-changelog@v4
-        id: changelog
-        with:
-          github-token: ${{ github.token }}
-          default-commit-type: Other Changes
-          release-name: v${{ needs.version.outputs.release_version }}
-          mention-authors: true
-          mention-new-contributors: true
-          include-compare-link: true
-          use-github-autolink: true
-          semver: true
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ needs.version.outputs.release_version }}
-          body: |
-            ${{ steps.changelog.outputs.changelog }}
-          prerelease: ${{ steps.changelog.outputs.prerelease }}
+  pre-release:
+    uses: walt-id/waltid-identity/.github/workflows/changelog.yml@feat/test-self-hosted-runners
+    needs: [ version, deploy ]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
