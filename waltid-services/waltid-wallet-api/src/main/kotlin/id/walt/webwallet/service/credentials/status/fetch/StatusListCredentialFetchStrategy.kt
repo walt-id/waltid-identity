@@ -12,7 +12,7 @@ class StatusListCredentialFetchFactory(
 ) {
     private val didPattern = "^did:([^:]+):(.+)"
     private val urlPattern =
-        "^((https?:)(\\/\\/\\/?)([\\w]*(?::[\\w]*)?@)?([\\d\\w\\.-]+)(?::(\\d+))?)?([\\/\\\\w\\.()-]*)?(?:([?][^#]*)?(#.*)?)*"
+        "^https?:\\/\\/(?:www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,}\\.[a-zA-Z0-9()]{1,}\\b(?:[-a-zA-Z0-9()@:%_\\+.~#?&\\/=]*)\$"
 
     fun new(url: String) = when {
         didPattern.toRegex().matches(url) -> entraStrategy

@@ -1,5 +1,6 @@
 package id.walt.webwallet.service.credentials.status.fetch
 
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -11,8 +12,9 @@ class DefaultStatusListCredentialFetchStrategy(
 ) : StatusListCredentialFetchStrategy {
 
     private val json = Json { ignoreUnknownKeys = true }
-    override suspend fun fetch(url: String): JsonObject = http.get(url).bodyAsText().let {
-        json.decodeFromString(it)
+    override suspend fun fetch(url: String): JsonObject = http.get(url).bodyAsText().let { content ->
+        runCatching { content.decodeJws().payload }.fold(onSuccess = { it }, onFailure = {
+            json.decodeFromString(content)
+        })
     }
-
 }
