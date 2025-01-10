@@ -1,0 +1,21 @@
+name: Build on every push except main branch
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  version:
+    name: Calculate release version
+    uses: walt-id/waltid-identity/.github/workflows/version.yml@feat/test-self-hosted-runners
+  gradle-build:
+    uses: walt-id/waltid-identity/.github/workflows/build-gradle.yml@feat/test-self-hosted-runners
+    needs: version
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+  docker-build:
+    uses: walt-id/waltid-identity/.github/workflows/build-docker.yml@feat/test-self-hosted-runners
+    needs: version
+    with:
+      version: ${{ needs.version.outputs.release_version }}
