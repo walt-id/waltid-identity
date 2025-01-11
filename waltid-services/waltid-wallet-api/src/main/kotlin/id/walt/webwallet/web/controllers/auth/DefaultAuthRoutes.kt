@@ -7,6 +7,7 @@ import id.walt.commons.web.UnauthorizedException
 import id.walt.webwallet.db.models.Account
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
+import id.walt.webwallet.web.plugins.authConfigNames
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
@@ -24,7 +25,7 @@ val defaultAuthTags = listOf("Authentication")
 
 fun Application.defaultAuthRoutes() = webWalletRoute {
     route(defaultAuthPath, { tags = defaultAuthTags }) {
-        authenticate("auth-session", "auth-bearer", "auth-bearer-alternative") {
+        authenticate(*authConfigNames) {
             get("user-info", {
                 summary = "Return user ID if logged in"
                 response {

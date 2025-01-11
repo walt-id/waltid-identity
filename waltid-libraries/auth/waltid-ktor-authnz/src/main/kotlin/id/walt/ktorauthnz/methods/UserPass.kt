@@ -42,7 +42,7 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
         return identifier
     }
 
-    override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.registerAuthenticationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
         post("userpass", {
             request { body<UserPassCredentials>() }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }

@@ -28,7 +28,7 @@ object JWT : AuthenticationMethod("jwt") {
         return JWTIdentifier(id)
     }
 
-    override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.registerAuthenticationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
         post("jwt", {
             request { body<String>() }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
