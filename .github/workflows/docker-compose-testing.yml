@@ -69,7 +69,7 @@ jobs:
       - name: Run stack
         run: |
           cd ./docker-compose
-          docker compose up wallet-api issuer-api verifier-api --build -d
+          docker compose --profile all up wallet-api issuer-api verifier-api --build -d
       - name: Ping services
         timeout-minutes: 5
         run: |
