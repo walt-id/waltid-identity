@@ -7,28 +7,28 @@ on:
 
 jobs:
   version:
-    uses: walt-id/waltid-identity/.github/workflows/version.yml@feat/test-self-hosted-runners
+    uses: walt-id/waltid-identity/.github/workflows/version.yml@c69d2155372700071dad887fa6339b51e0266be5
     with:
       suffix: -SNAPSHOT
   gradle-build:
-    uses: walt-id/waltid-identity/.github/workflows/build-gradle.yml@feat/test-self-hosted-runners
+    uses: walt-id/waltid-identity/.github/workflows/build-gradle.yml@c69d2155372700071dad887fa6339b51e0266be5
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
       publish: true
   docker-build:
-    uses: walt-id/waltid-identity/.github/workflows/build-docker.yml@feat/test-self-hosted-runners
+    uses: walt-id/waltid-identity/.github/workflows/build-docker.yml@c69d2155372700071dad887fa6339b51e0266be5
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
       publish: true
   deploy:
-    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@feat/test-self-hosted-runners
+    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@c69d2155372700071dad887fa6339b51e0266be5
     needs: [ version, gradle-build, docker-build ]
     with:
       version: ${{ needs.version.outputs.release_version }}
   pre-release:
-    uses: walt-id/waltid-identity/.github/workflows/changelog.yml@feat/test-self-hosted-runners
+    uses: walt-id/waltid-identity/.github/workflows/changelog.yml@c69d2155372700071dad887fa6339b51e0266be5
     needs: [ version, deploy ]
     with:
       version: ${{ needs.version.outputs.release_version }}
