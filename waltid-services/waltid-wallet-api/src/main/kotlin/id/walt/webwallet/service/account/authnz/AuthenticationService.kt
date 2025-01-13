@@ -1,11 +1,17 @@
-import AccountIdentifiers.userId
+package id.walt.webwallet.service.account.authnz
+
 import id.walt.ktorauthnz.accounts.EditableAccountStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
+import id.walt.webwallet.service.account.authnz.AccountIdentifiers.userId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.jetbrains.exposed.sql.*
+import kotlinx.serialization.json.Json
+import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.json.json
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.*
 import kotlin.uuid.ExperimentalUuidApi
@@ -31,20 +37,16 @@ object StoredData : Table() {
     val id = uuid("id").autoGenerate()
     val accountId = uuid("account_id").references(Users.id)
     val method = varchar("method", 50)
-    val data = text("data")
+    val data = json("data", Json, AuthMethodStoredData.serializer())
 
     override val primaryKey = PrimaryKey(id)
 }
 
 
 @OptIn(ExperimentalUuidApi::class)
-class AuthenticationService(private val database: Database) {
+class AuthenticationService {
 
-    init {
-        transaction(database) {
-            SchemaUtils.create(Users, AccountIdentifiers, StoredData)
-        }
-    }
+
 
 
     val editableAccountStore = object : EditableAccountStore {
@@ -52,7 +54,7 @@ class AuthenticationService(private val database: Database) {
             accountId: String,
             newAccountIdentifier: AccountIdentifier
         ): Unit = withContext(Dispatchers.IO) {
-            transaction(database) {
+            transaction {
                 AccountIdentifiers.insert {
                     it[userId] = UUID.fromString(accountId)
                     it[identifier] = newAccountIdentifier.accountIdentifierName
@@ -70,7 +72,8 @@ class AuthenticationService(private val database: Database) {
             method: String,
             data: AuthMethodStoredData
         ): Unit = withContext(Dispatchers.IO) {
-            transaction(database) {
+            val savableStoredData = data.transformSavable()
+            transaction {
                 val userId = AccountIdentifiers
                     .select(userId)
                     .where { AccountIdentifiers.identifier eq accountIdentifier.accountIdentifierName }
@@ -80,11 +83,11 @@ class AuthenticationService(private val database: Database) {
                 StoredData.insert {
                     it[accountId] = userId
                     it[StoredData.method] = method
-                    it[StoredData.data] = data.toString()
+                    it[StoredData.data] = savableStoredData
                 }
-                Unit
             }
         }
+
 
 
         override suspend fun addAccountStoredData(
@@ -92,13 +95,13 @@ class AuthenticationService(private val database: Database) {
             method: String,
             data: AuthMethodStoredData
         ): Unit = withContext(Dispatchers.IO) {
-            transaction(database) {
+            val savableStoredData = data.transformSavable()
+            transaction {
                 StoredData.insert {
                     it[StoredData.accountId] = UUID.fromString(accountId)
                     it[StoredData.method] = method
-                    it[StoredData.data] = data.toString()
+                    it[StoredData.data] = savableStoredData
                 }
-                Unit
             }
         }
 
@@ -146,7 +149,7 @@ class AuthenticationService(private val database: Database) {
 
         override suspend fun lookupAccountUuid(identifier: AccountIdentifier): String =
             withContext(Dispatchers.IO) {
-                transaction(database) {
+                transaction {
                     AccountIdentifiers
                         .selectAll().where { AccountIdentifiers.identifier eq identifier.accountIdentifierName }
                         .map { it[userId].toString() }
@@ -159,20 +162,15 @@ class AuthenticationService(private val database: Database) {
             identifier: AccountIdentifier,
             method: AuthenticationMethod
         ): Boolean = withContext(Dispatchers.IO) {
-            transaction(database) {
-                val userId = AccountIdentifiers
-                    .select(userId)
-                    .map { it[userId] }
-                    .firstOrNull() ?: return@transaction false
-
-                StoredData.selectAll().where {
-                    (StoredData.accountId eq userId) and (StoredData.method eq method.id)
-                }.count() > 0
+            transaction {
+                StoredData
+                    .selectAll().where { StoredData.method eq method.toString() }
+                    .count() > 0
             }
         }
 
         suspend fun createOrGetUserByPublicKey(publicKey: String): String = withContext(Dispatchers.IO) {
-            transaction(database) {
+            transaction {
                 val existingUser = Users
                     .selectAll().where { Users.publicKey eq publicKey }
                     .map { it[Users.id].toString() }
