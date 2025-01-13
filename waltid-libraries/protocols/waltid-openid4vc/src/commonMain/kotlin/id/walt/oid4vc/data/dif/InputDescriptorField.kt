@@ -28,10 +28,11 @@ data class InputDescriptorField(
     }
 
     fun addToMdocRequest(mDocRequestBuilder: MDocRequestBuilder, intentToRetain: Boolean = false): MDocRequestBuilder {
-        path.firstOrNull()?.trimStart('$')?.replace("['", "")?.replace("']", ".")?.trimEnd('.')?.split('.')
-            ?.also { pathSegments ->
-            mDocRequestBuilder.addDataElementRequest(pathSegments.first(), pathSegments.last(), intentToRetain)
-        }
+        path.firstOrNull()?.trimStart('$')?.replace("['", "")?.replace("']", ".")?.trimEnd('.')
+            ?.let { it.substringBeforeLast('.') to it.substringAfterLast('.') }
+            ?.also { (namespace, lastSegment) ->
+                mDocRequestBuilder.addDataElementRequest(namespace, lastSegment, intentToRetain)
+            }
         return mDocRequestBuilder
     }
 }
