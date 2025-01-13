@@ -13,6 +13,7 @@ import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.config.KtorAuthnzConfig
 import id.walt.webwallet.service.OidcLoginService
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
+import id.walt.webwallet.service.account.authnz.AuthenticationService
 import id.walt.webwallet.web.controllers.auth.*
 import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.web.model.KeycloakAccountRequest
@@ -97,7 +98,7 @@ fun Application.configureSecurity() {
 val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
 
     if (FeatureManager.isFeatureEnabled(FeatureCatalog.ktorAuthnzAuthenticationFeature)) {
-        //KtorAuthnzManager.accountStore = AuthenticationService.editableAccountStore
+        KtorAuthnzManager.accountStore = AuthenticationService().editableAccountStore
 
         val config = ConfigManager.getConfig<KtorAuthnzConfig>()
         val configSigningKey = config.configuredSigningKey
