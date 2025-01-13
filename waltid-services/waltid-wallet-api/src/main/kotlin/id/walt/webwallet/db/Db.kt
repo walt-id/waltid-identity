@@ -6,6 +6,9 @@ import id.walt.commons.config.ConfigManager
 import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.account.AccountsService
+import id.walt.webwallet.service.account.authnz.AccountIdentifiers
+import id.walt.webwallet.service.account.authnz.StoredData
+import id.walt.webwallet.service.account.authnz.Users
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
@@ -81,7 +84,7 @@ object Db {
 
             SchemaUtils.drop(*(tables.reversedArray()))
             SchemaUtils.create(*tables)
-
+            SchemaUtils.create(Users, AccountIdentifiers, StoredData)
             runBlocking {
 
                 AccountsService.register(request = EmailAccountRequest("Max Mustermann", "string@string.string", "string"))
