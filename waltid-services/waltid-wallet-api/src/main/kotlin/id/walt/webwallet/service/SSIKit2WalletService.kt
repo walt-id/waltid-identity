@@ -581,7 +581,7 @@ class SSIKit2WalletService(
             )
         )
 
-        return signature.toString()
+        return signature
     }
 
     override suspend fun verify(alias: String, signature: String): Boolean {
