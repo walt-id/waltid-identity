@@ -61,6 +61,8 @@ abstract class WalletService(val tenant: String, val accountId: Uuid, val wallet
     abstract suspend fun importKey(jwkOrPem: String): String
     abstract suspend fun deleteKey(alias: String): Boolean
     abstract suspend fun removeKey(alias: String): Boolean
+    abstract suspend fun sign(alias: String, data: JsonObject): String
+    abstract suspend fun verify(alias: String, signature: String): Boolean
 
     // History
     abstract fun getHistory(limit: Int = 10, offset: Long = 0): List<WalletOperationHistory>
