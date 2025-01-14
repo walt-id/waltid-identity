@@ -290,6 +290,14 @@ class TSEKey(
     @JsExport.Ignore
     override suspend fun getMeta(): TseKeyMeta = TseKeyMeta(getKeyId())
 
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun deleteKey(): Boolean {
+        TODO("Not yet implemented")
+    }
+
     override fun toString(): String = "[TSE ${keyType.name} key @ $server]"
 
     @JvmBlocking

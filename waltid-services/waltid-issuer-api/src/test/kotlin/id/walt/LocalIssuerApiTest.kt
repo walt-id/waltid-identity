@@ -180,7 +180,7 @@ companion object {
         val w3cVc = W3CVC(jsonVCObj.toMap())
 
         val sign = w3cVc.signJws(
-            issuerKey = key, issuerDid = TEST_ISSUER_DID, subjectDid = subjectDid
+            issuerKey = key, issuerId = TEST_ISSUER_DID, subjectDid = subjectDid
         )
 
         assertEquals(true, sign.isNotEmpty())

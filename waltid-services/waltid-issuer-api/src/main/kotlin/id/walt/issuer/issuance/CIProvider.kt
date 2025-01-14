@@ -49,6 +49,7 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -224,23 +225,27 @@ open class CIProvider(
             val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
 
             request.run {
-              var issuerKid = issuerDid ?: resolvedIssuerKey.getKeyId()
-              if(!issuerDid.isNullOrEmpty()) {
-                if (issuerDid.startsWith("did:key") && issuerDid.length == 186) // EBSI conformance corner case when issuer uses did:key instead of did:ebsi and no trust framework is defined
-                  issuerKid = issuerDid + "#" + issuerDid.removePrefix("did:key:")
-                else if (issuerDid.startsWith("did:ebsi"))
-                  issuerKid = issuerDid + "#" + resolvedIssuerKey.getKeyId()
-              }
-
                 val holderKeyJWK =  JWKKey.importJWK(holderKey.toString()).getOrNull()?.exportJWKObject()?.plus("kid" to JWKKey.importJWK(holderKey.toString()).getOrThrow().getKeyId())?.toJsonObject()
 
                 when (credentialFormat) {
-                    CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(credentialRequest, vc, request.mapping,
-                        request.selectiveDisclosure, vct = metadata.credentialConfigurationsSupported?.get(request.credentialConfigurationId)?.vct ?: throw ConfigurationException(
-                            ConfigException("No vct configured for given credential configuration id: ${request.credentialConfigurationId}")
-                        ), issuerDid, issuerKid, request.x5Chain, resolvedIssuerKey).toString()
-                  else -> OpenID4VCI.generateW3CJwtVC(credentialRequest, vc, request.mapping, request.selectiveDisclosure,
-                        issuerDid, issuerKid, request.x5Chain, resolvedIssuerKey)
+                    CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(
+                        credentialRequest = credentialRequest,
+                        credentialData = vc,
+                        issuerId = issuerDid ?: baseUrl,
+                        issuerKey = resolvedIssuerKey,
+                        selectiveDisclosure = request.selectiveDisclosure,
+                        dataMapping = request.mapping,
+                        x5Chain = request.x5Chain)
+                  else -> OpenID4VCI.generateW3CJwtVC(
+                      credentialRequest = credentialRequest,
+                      credentialData = vc,
+                      issuerKey = resolvedIssuerKey,
+                      issuerId = issuerDid
+                          ?: throw BadRequestException("Issuer API currently supports only issuer DID for issuer ID property in W3C credentials. Issuer DID was not given in issuance request."),
+                      selectiveDisclosure = request.selectiveDisclosure,
+                      dataMapping = request.mapping,
+                      x5Chain = request.x5Chain
+                  )
               }
             }.also { log.debug { "Respond VC: $it" } }
         }))

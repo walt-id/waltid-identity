@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods.data
 
+/*
 import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.methods.virtual.GlobalIdentify
 import kotlinx.serialization.SerialName
@@ -12,4 +13,4 @@ data class FlowAmendmentData(
     var replaceFlow: Set<AuthFlow>? = null,
 ) : AuthMethodStoredData {
     override fun authMethod() = GlobalIdentify
-}
+}*/

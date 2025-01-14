@@ -10,7 +10,7 @@ import id.walt.ktorauthnz.tokens.ktorauthnztoken.KtorAuthNzTokenHandler
 object KtorAuthnzManager {
 
     var passwordHashingConfig = PasswordHashingConfiguration()
-    var accountStore: EditableAccountStore = ExampleAccountStore
+    lateinit var accountStore: EditableAccountStore
     var sessionStore = InMemorySessionStore()
 
     var tokenHandler: TokenHandler = KtorAuthNzTokenHandler()

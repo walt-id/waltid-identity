@@ -6,6 +6,7 @@ import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.testing.E2ETest
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import id.walt.commons.web.plugins.httpJson
+import id.walt.credentials.schemes.JwsSignatureScheme
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.issuance.IssuanceRequest
@@ -13,6 +14,7 @@ import id.walt.issuer.issuerModule
 import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.util.JwtUtils
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.config.RegistrationDefaultsConfig
@@ -35,6 +37,7 @@ import io.ktor.server.application.*
 import io.ktor.server.util.*
 import kotlinx.serialization.json.*
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
@@ -238,6 +241,7 @@ class WaltidServicesE2ETests {
         exchangeApi.resolveCredentialOffer(wallet, offerUrl)
         exchangeApi.useOfferRequest(wallet, offerUrl, 1) {
             val cred = it.first()
+            assertContains(JwtUtils.parseJWTPayload(cred.document).keys, JwsSignatureScheme.JwsOption.VC)
             newCredentialId = cred.id
         }
         //endregion -Exchange / claim-
@@ -357,10 +361,24 @@ class WaltidServicesE2ETests {
         lspPotentialVerification.testPotentialInteropTrack4()
     }*/
 
-    /* @Test
-    fun testExternalSignatureAPIs() = testBlock(defaultTestTimeout) {
+    //@Test
+    fun testExternalSignatureAPIs() = E2ETest.testBlock(
+        config = ServiceConfiguration("e2e-test"),
+        features = listOf(id.walt.issuer.FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
+        featureAmendments = mapOf(
+            CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
+            // CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
+        ),
+        init = {
+            id.walt.webwallet.webWalletSetup()
+            id.walt.did.helpers.WaltidServices.minimalInit()
+            id.walt.webwallet.db.Db.start()
+        },
+        module = e2eTestModule,
+        timeout = defaultTestTimeout
+    ) {
         ExchangeExternalSignatures().executeTestCases()
-    }*/
+    }
 
     suspend fun setupTestWallet(): LspPotentialWallet {
         var client = testHttpClient()

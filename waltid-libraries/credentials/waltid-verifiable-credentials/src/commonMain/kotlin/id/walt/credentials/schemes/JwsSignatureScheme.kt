@@ -1,6 +1,7 @@
 package id.walt.credentials.schemes
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
@@ -35,6 +36,14 @@ class JwsSignatureScheme : SignatureScheme {
     const val VC = "vc"
   }
 
+  fun toPayload(data: JsonObject, jwtOptions: Map<String, JsonElement> = emptyMap()) =
+    mapOf(
+      JwsOption.ISSUER to jwtOptions[JwsOption.ISSUER],
+      JwsOption.SUBJECT to jwtOptions[JwsOption.SUBJECT],
+      JwsOption.VC to data,
+      *(jwtOptions.entries.map { it.toPair() }.toTypedArray())
+    ).toJsonObject()
+
   /**
    * args:
    * - kid: Key ID
@@ -53,12 +62,7 @@ class JwsSignatureScheme : SignatureScheme {
     jwtOptions: Map<String, JsonElement> = emptyMap(),
   ): String {
     val payload = Json.encodeToString(
-      mapOf(
-        JwsOption.ISSUER to jwtOptions[JwsOption.ISSUER],
-        JwsOption.SUBJECT to jwtOptions[JwsOption.SUBJECT],
-        JwsOption.VC to data,
-        *(jwtOptions.entries.map { it.toPair() }.toTypedArray())
-      )
+      toPayload(data, jwtOptions)
     ).encodeToByteArray()
 
     return key.signJws(payload, jwtHeaders)
