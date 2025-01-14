@@ -48,7 +48,10 @@ actual class RevocationPolicy : RevocationPolicyMp() {
             val credentialSubject = payload["vc"]!!.jsonObject["credentialSubject"]?.jsonObject!!
             val encodedList = credentialSubject["encodedList"]?.jsonPrimitive?.content ?: ""
             val bitValue = get(encodedList, statusListIndex)
-            if (StreamUtils.binToInt(bitValue!!.joinToString("")) == 0) {
+            // ensure bitValue always consists of valid binary characters (0,1)
+            require(!bitValue.isNullOrEmpty()) { "Null or empty bit value" }
+            require(isBinaryValue(bitValue)) { "Invalid bit value" }
+            if (StreamUtils.binToInt(bitValue.joinToString("")) == 0) {
                 Result.success(statusListCredentialUrl!!)
             } else {
                 Result.failure(Throwable("Credential has been revoked"))
@@ -93,3 +96,7 @@ object StreamUtils {
 
 fun get(bitstring: String, idx: ULong? = null, bitSize: Int = 1) =
     idx?.let { StreamUtils.getBitValue(GZIPInputStream(Base64Utils.decode(bitstring).inputStream()), it, bitSize) }
+
+fun isBinaryValue(value: List<Char>) = setOf('0', '1').let { valid ->
+    value.all { it in valid }
+}
