@@ -269,7 +269,7 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
             baseUrl: String,
             credType: String
         ): CredentialSupported {
-            val expectedVct = "${URLBuilder(Url(baseUrl).protocolWithAuthority)}/$credType"
+            val expectedVct = "$baseUrl/$credType"
 
             credentialConfigurationsSupported?.entries?.forEach { entry ->
                 if (getVctByCredentialConfigurationId(entry.key) == expectedVct) {
