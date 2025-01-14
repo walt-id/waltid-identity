@@ -4,50 +4,19 @@ import id.walt.ktorauthnz.accounts.EditableAccountStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
-import id.walt.webwallet.service.account.authnz.AccountIdentifiers.userId
+import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers
+import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers.userId
+import id.walt.webwallet.db.models.authnz.AuthnzStoredData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.json.json
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.util.*
+import java.util.UUID
 import kotlin.uuid.ExperimentalUuidApi
-
-object Users : Table() {
-    val id = uuid("id").autoGenerate()
-    val publicKey = varchar("public_key", 42).uniqueIndex() // Ethereum addresses are 42 chars including '0x'
-
-    override val primaryKey = PrimaryKey(id)
-}
-
-object AccountIdentifiers : Table() {
-    val id = uuid("id").autoGenerate()
-    val userId = uuid("user_id").references(Users.id)
-    val identifier = varchar("identifier", 255)
-    val method = varchar("method", 50)
-
-    override val primaryKey = PrimaryKey(id)
-}
-
-
-object StoredData : Table() {
-    val id = uuid("id").autoGenerate()
-    val accountId = uuid("account_id").references(Users.id)
-    val method = varchar("method", 50)
-    val data = json("data", Json, AuthMethodStoredData.serializer())
-
-    override val primaryKey = PrimaryKey(id)
-}
-
 
 @OptIn(ExperimentalUuidApi::class)
 class AuthenticationService {
-
-
-
 
     val editableAccountStore = object : EditableAccountStore {
         override suspend fun addAccountIdentifierToAccount(
@@ -55,9 +24,10 @@ class AuthenticationService {
             newAccountIdentifier: AccountIdentifier
         ): Unit = withContext(Dispatchers.IO) {
             transaction {
-                AccountIdentifiers.insert {
-                    it[userId] = UUID.fromString(accountId)
-                    it[identifier] = newAccountIdentifier.accountIdentifierName
+                AuthnzAccountIdentifiers.insert {
+                    it[AuthnzAccountIdentifiers.userId] = UUID.fromString(accountId)
+                    it[AuthnzAccountIdentifiers.identifier] = newAccountIdentifier.accountIdentifierName
+                    //it[AuthnzAccountIdentifiers.method] =
                 }
                 Unit // Explicitly return Unit
             }
@@ -74,20 +44,19 @@ class AuthenticationService {
         ): Unit = withContext(Dispatchers.IO) {
             val savableStoredData = data.transformSavable()
             transaction {
-                val userId = AccountIdentifiers
-                    .select(userId)
-                    .where { AccountIdentifiers.identifier eq accountIdentifier.accountIdentifierName }
-                    .singleOrNull()?.get(AccountIdentifiers.userId)
+                val userId = AuthnzAccountIdentifiers
+                    .select(AuthnzAccountIdentifiers.userId)
+                    .where { AuthnzAccountIdentifiers.identifier eq accountIdentifier.accountIdentifierName }
+                    .singleOrNull()?.get(AuthnzAccountIdentifiers.userId)
                     ?: throw IllegalStateException("Account not found")
 
-                StoredData.insert {
+                AuthnzStoredData.insert {
                     it[accountId] = userId
-                    it[StoredData.method] = method
-                    it[StoredData.data] = savableStoredData
+                    it[AuthnzStoredData.method] = method
+                    it[AuthnzStoredData.data] = savableStoredData
                 }
             }
         }
-
 
 
         override suspend fun addAccountStoredData(
@@ -97,10 +66,10 @@ class AuthenticationService {
         ): Unit = withContext(Dispatchers.IO) {
             val savableStoredData = data.transformSavable()
             transaction {
-                StoredData.insert {
-                    it[StoredData.accountId] = UUID.fromString(accountId)
-                    it[StoredData.method] = method
-                    it[StoredData.data] = savableStoredData
+                AuthnzStoredData.insert {
+                    it[AuthnzStoredData.accountId] = UUID.fromString(accountId)
+                    it[AuthnzStoredData.method] = method
+                    it[AuthnzStoredData.data] = savableStoredData
                 }
             }
         }
@@ -147,41 +116,26 @@ class AuthenticationService {
             TODO("Not yet implemented")
         }
 
-        override suspend fun lookupAccountUuid(identifier: AccountIdentifier): String =
+        override suspend fun lookupAccountUuid(identifier: AccountIdentifier): String? =
             withContext(Dispatchers.IO) {
                 transaction {
-                    AccountIdentifiers
-                        .selectAll().where { AccountIdentifiers.identifier eq identifier.accountIdentifierName }
+                    AuthnzAccountIdentifiers
+                        .selectAll().where { AuthnzAccountIdentifiers.identifier eq identifier.accountIdentifierName }
                         .map { it[userId].toString() }
-                        .firstOrNull() ?: throw IllegalStateException("Account not found")
+                        .firstOrNull()
                 }
             }
-
 
         override suspend fun hasStoredDataFor(
             identifier: AccountIdentifier,
             method: AuthenticationMethod
         ): Boolean = withContext(Dispatchers.IO) {
             transaction {
-                StoredData
-                    .selectAll().where { StoredData.method eq method.toString() }
+                AuthnzStoredData
+                    .selectAll().where { AuthnzStoredData.method eq method.toString() }
                     .count() > 0
             }
         }
-
-        suspend fun createOrGetUserByPublicKey(publicKey: String): String = withContext(Dispatchers.IO) {
-            transaction {
-                val existingUser = Users
-                    .selectAll().where { Users.publicKey eq publicKey }
-                    .map { it[Users.id].toString() }
-                    .firstOrNull()
-
-                existingUser ?: Users.insert {
-                    it[Users.publicKey] = publicKey
-                }[Users.id].toString()
-            }
-        }
     }
-
 }
 

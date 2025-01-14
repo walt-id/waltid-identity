@@ -39,7 +39,9 @@ data class KtorAuthnzConfig(
     /** (waltid-crypto) Key for signing the login token */
     val signingKey: JsonObject?,
     /** (waltid-crypto) Key for verifying received login tokens */
-    val verificationKey: JsonObject
+    val verificationKey: JsonObject,
+
+    val cookieDomain: String?
 ) {
     val configuredSigningKey by lazy { signingKey?.let { KeyManager.resolveSerializedKeyBlocking(it.toString()) } }
     val configuredVerificationKey by lazy { KeyManager.resolveSerializedKeyBlocking(verificationKey.toString()) }

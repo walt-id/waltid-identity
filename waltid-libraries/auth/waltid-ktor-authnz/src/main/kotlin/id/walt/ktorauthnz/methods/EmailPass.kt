@@ -4,6 +4,7 @@ import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
+import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.data.EmailPassStoredData
 import id.walt.ktorauthnz.security.PasswordHash
@@ -60,7 +61,10 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
     @Serializable
     data class EmailPassCredentials(val email: String, val password: String)
 
-    override fun Route.registerAuthenticationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.registerAuthenticationRoutes(
+        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
+    ) {
         post("emailpass", {
             request { body<EmailPassCredentials>() }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }

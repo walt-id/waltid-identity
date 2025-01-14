@@ -3,6 +3,7 @@ package id.walt.ktorauthnz.methods
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.RADIUSIdentifier
+import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.config.RADIUSConfiguration
 import id.walt.ktorauthnz.sessions.AuthSession
@@ -54,7 +55,10 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
     }
 
 
-    override fun Route.registerAuthenticationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.registerAuthenticationRoutes(
+        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
+    ) {
         post("radius", {
             request { body<UserPassCredentials>() }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }

@@ -3,6 +3,7 @@ package id.walt.ktorauthnz.methods
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.LDAPIdentifier
+import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authFailure
 import id.walt.ktorauthnz.methods.config.LDAPConfiguration
 import id.walt.ktorauthnz.sessions.AuthSession
@@ -43,7 +44,10 @@ object LDAP : UserPassBasedAuthMethod("ldap") {
         }
     }
 
-    override fun Route.registerAuthenticationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.registerAuthenticationRoutes(
+        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
+    ) {
         post("ldap", {
             request { body<UserPassCredentials>() }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }

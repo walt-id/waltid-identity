@@ -3,6 +3,7 @@ package id.walt.ktorauthnz.methods
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
+import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
 import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
 import id.walt.ktorauthnz.sessions.AuthSession
@@ -35,7 +36,10 @@ abstract class AuthenticationMethod(open val id: String) {
     // Auth
 
     /** Login routes */
-    abstract fun Route.registerAuthenticationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext)
+    abstract fun Route.registerAuthenticationRoutes(
+        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>? = null
+    )
 
     /**
      * Helper function, called when login was successful, will handle the proceeding actions.
@@ -64,21 +68,21 @@ abstract class AuthenticationMethod(open val id: String) {
      * - authentication and registration has to be a combined step ([authenticationHandlesRegistration] set to true), or
      * - automatic registration routes have to be provided ([registerRegistrationRoutes] implemented)
      */
-//    abstract val supportsRegistration: Boolean
+    open val supportsRegistration: Boolean = false
 
     /**
      * Is login and registration a combined step (e.g.: most signature-based challenge-response methods)?
      * -> in this case, no separate registration routes ([registerRegistrationRoutes]) are needed.
      */
-//    open val authenticationHandlesRegistration: Boolean = false
+    open val authenticationHandlesRegistration: Boolean = supportsRegistration
 
     /**
      * Automatic registration routes (if this method supports automatic registration routes), requires:
      * - [supportsRegistration] does this method support automatic registration (set to true)
      * - [authenticationHandlesRegistration] Login & registration is not a combined step (set to false)
      */
-/*    open fun Route.registerRegistrationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext): Unit =
-        throw NotImplementedError("Authentication method ${this::class.simpleName} does not offer registration routes. Authentication routes handle registration: $authenticationHandlesRegistration")*/
+    open fun Route.registerRegistrationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext): Unit =
+        throw NotImplementedError("Authentication method ${this::class.simpleName} does not offer registration routes. Authentication routes handle registration: $authenticationHandlesRegistration")
 
 
     // Data functions
@@ -117,20 +121,21 @@ abstract class AuthenticationMethod(open val id: String) {
 fun Route.registerAuthenticationMethod(
     method: AuthenticationMethod,
     authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
-
-    ) {
+    functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>? = null
+) {
     method.apply {
-        registerAuthenticationRoutes(authContext)
+        registerAuthenticationRoutes(authContext, functionAmendments)
     }
 }
 
 fun Route.registerAuthenticationMethods(
     methods: List<AuthenticationMethod>,
     authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+    functionAmendments: Map<AuthenticationMethod, Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>>? = null
 ) {
-    methods.forEach {
-        it.apply {
-            registerAuthenticationRoutes(authContext)
+    methods.forEach { method ->
+        method.apply {
+            registerAuthenticationRoutes(authContext, functionAmendments?.get(method))
         }
     }
 }
