@@ -4,6 +4,7 @@ import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.UsernameIdentifier
+import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.data.UserPassStoredData
 import id.walt.ktorauthnz.security.PasswordHash
@@ -42,7 +43,10 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
         return identifier
     }
 
-    override fun Route.registerAuthenticationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.registerAuthenticationRoutes(
+        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
+    ) {
         post("userpass", {
             request { body<UserPassCredentials>() }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }

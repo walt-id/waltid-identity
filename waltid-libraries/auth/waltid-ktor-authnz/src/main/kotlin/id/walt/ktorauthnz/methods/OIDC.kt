@@ -2,6 +2,7 @@ package id.walt.ktorauthnz.methods
 
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
+import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.methods.config.OidcAuthConfiguration
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.client.*
@@ -149,7 +150,10 @@ object OIDC : AuthenticationMethod("oidc") {
         }.body<JsonObject>()
     }
 
-    override fun Route.registerAuthenticationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.registerAuthenticationRoutes(
+        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
+    ) {
 
 
         route("oidc") {

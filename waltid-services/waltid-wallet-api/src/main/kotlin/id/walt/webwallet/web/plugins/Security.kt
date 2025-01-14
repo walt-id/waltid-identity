@@ -34,7 +34,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 
-private val KTOR_AUTHNZ_CONFIG_NAME: String? = null
+val KTOR_AUTHNZ_CONFIG_NAME: String? = null
 
 val authConfigNames by lazy {
     when {
@@ -112,7 +112,7 @@ val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
         }
 
         val webConfig = ConfigManager.getConfig<WebConfig>()
-        SessionTokenCookieHandler.domain = webConfig.webHost
+        SessionTokenCookieHandler.domain = config.cookieDomain
 
         // if not in dev mode, add extra cookie security:
         if (!FeatureManager.isFeatureEnabled(FeatureCatalog.devModeFeature)) {

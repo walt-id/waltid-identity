@@ -42,7 +42,7 @@ fun Route.globalMultistepExample() {
             )
         }
 
-        registerAuthenticationMethod(Web3, contextFunction)
+        registerAuthenticationMethod(Web3, contextFunction, functionAmendments)
     }
 }
 
@@ -68,7 +68,7 @@ fun Route.globalImplicitSingleStep() {
             )
         }
 
-        registerAuthenticationMethod(UserPass, contextFunction)
+        registerAuthenticationMethod(UserPass, contextFunction, functionAmendments)
     }
 }
 
@@ -96,9 +96,9 @@ fun Route.globalImplicitMultiStep() {
             )
         }
 
-        registerAuthenticationMethod(UserPass, contextFunction)
+        registerAuthenticationMethod(UserPass, contextFunction, functionAmendments)
         route("{sessionId}") {
-            registerAuthenticationMethod(TOTP, contextFunction)
+            registerAuthenticationMethod(TOTP, contextFunction, functionAmendments)
         }
     }
 }
@@ -165,7 +165,7 @@ fun Route.globalImplicitVc() {
             )
         }
 
-        registerAuthenticationMethod(VerifiableCredential, contextFunction)
+        registerAuthenticationMethod(VerifiableCredential, contextFunction, functionAmendments)
     }
 
 

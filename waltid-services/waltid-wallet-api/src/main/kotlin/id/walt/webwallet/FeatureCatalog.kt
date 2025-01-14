@@ -62,6 +62,8 @@ object FeatureCatalog : ServiceFeatureCatalog {
         databaseFeature
     )
     override val optionalFeatures = listOf(
+        devModeFeature,
+
         legacyAuthenticationFeature,
         ktorAuthnzAuthenticationFeature,
 
