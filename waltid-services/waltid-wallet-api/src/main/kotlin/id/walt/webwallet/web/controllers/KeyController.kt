@@ -270,6 +270,25 @@ fun Application.keys() = walletRoute {
                 val success = getWalletService().removeKey(keyId)
                 context.respond(if (success) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
             }
+
+            post("sign", {
+                summary = "Sign a message with a specific key"
+                request {
+                    body<JsonObject> { description = "The message to sign" }
+                }
+                response {
+                    HttpStatusCode.OK to {
+                        description = "The signature"
+                        body<String>()
+                    }
+                }
+            }) {
+                val keyId = context.parameters.getOrFail("keyId")
+                val message = context.receive<JsonObject>()
+
+                context.respond(getWalletService().sign(keyId, message))
+            }
+
         }
     }
 }
