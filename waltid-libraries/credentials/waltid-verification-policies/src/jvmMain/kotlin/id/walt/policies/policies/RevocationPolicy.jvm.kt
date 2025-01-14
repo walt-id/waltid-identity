@@ -34,31 +34,37 @@ actual class RevocationPolicy : RevocationPolicyMp() {
             }
         }
 
-        val response = runCatching { httpClient.get(statusListCredentialUrl!!).bodyAsText() }
-
-        if (response.isFailure) {
+        val response = runCatching { httpClient.get(statusListCredentialUrl!!).bodyAsText() }.getOrElse {
             return Result.failure(Throwable("Error when getting Status List Credential from  $statusListCredentialUrl"))
         }
-
-        return try {
-            // response is a jwt
-            val payload = response.getOrThrow().substringAfter(".").substringBefore(".")
-                .let { Json.decodeFromString<JsonObject>(Base64Utils.decode(it).decodeToString()) }
-
-            val credentialSubject = payload["vc"]!!.jsonObject["credentialSubject"]?.jsonObject!!
-            val encodedList = credentialSubject["encodedList"]?.jsonPrimitive?.content ?: ""
-            val bitValue = get(encodedList, statusListIndex)
-            // ensure bitValue always consists of valid binary characters (0,1)
-            require(!bitValue.isNullOrEmpty()) { "Null or empty bit value" }
-            require(isBinaryValue(bitValue)) { "Invalid bit value" }
-            if (StreamUtils.binToInt(bitValue.joinToString("")) == 0) {
-                Result.success(statusListCredentialUrl!!)
-            } else {
-                Result.failure(Throwable("Credential has been revoked"))
-            }
-        } catch (e: NumberFormatException) {
-            throw IllegalArgumentException()
+        // response is a jwt
+        val bitValue = getRevocationStatusValue(response, statusListIndex).getOrElse {
+            return Result.failure(Throwable(it.cause))
         }
+        checkStatus(bitValue).getOrElse {
+            return Result.failure(Throwable("Credential has been revoked"))
+        }
+        return Result.success(statusListCredentialUrl!!)
+    }
+
+    private fun checkStatus(it: List<Char>) = runCatching {
+        require(StreamUtils.binToInt(it.joinToString("")) == 0)
+    }
+
+    private fun getRevocationStatusValue(
+        response: String,
+        statusListIndex: ULong?
+    ) = runCatching {
+        val payload = response.substringAfter(".").substringBefore(".")
+            .let { Json.decodeFromString<JsonObject>(Base64Utils.decode(it).decodeToString()) }
+
+        val credentialSubject = payload["vc"]!!.jsonObject["credentialSubject"]?.jsonObject!!
+        val encodedList = credentialSubject["encodedList"]?.jsonPrimitive?.content ?: ""
+        val bitValue = get(encodedList, statusListIndex)
+        // ensure bitValue always consists of valid binary characters (0,1)
+        require(!bitValue.isNullOrEmpty()) { "Null or empty bit value" }
+        require(isBinaryValue(bitValue)) { "Invalid bit value: $bitValue" }
+        bitValue
     }
 
 }
