@@ -181,6 +181,40 @@ fun Application.keys() = walletRoute {
                 }
 
         }
+        post("verify", {
+            summary = "Verify a signature with a specific key"
+            request {
+                queryParameter<String>("JWK") {
+                    description = "The public key to verify the signature"
+                    example("Example") {
+                        value = """
+                {
+                  "kty": "OKP",
+                  "d": "mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI",
+                  "crv": "Ed25519",
+                  "kid": "Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8",
+                  "x": "T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM"
+                }
+                """.trimIndent()
+                    }
+                }
+                body<String> {
+                    description = "The signature to verify"
+                }
+            }
+            response {
+                HttpStatusCode.OK to {
+                    description = "The verification result"
+                    body<Boolean>()
+                }
+            }
+        }) {
+            val jwk = context.request.queryParameters["JWK"] ?: error("No JWK provided")
+            val signature = context.receive<String>()
+            context.respond(getWalletService().verify(jwk, signature))
+
+        }
+
         route("{keyId}", {
             request {
                 pathParameter<String>("keyId") {
