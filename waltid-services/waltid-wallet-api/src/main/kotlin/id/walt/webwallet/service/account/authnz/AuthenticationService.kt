@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.util.UUID
+import java.util.*
 import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalUuidApi::class)
@@ -35,7 +35,7 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
         }
 
         override suspend fun removeAccountIdentifierFromAccount(accountIdentifier: AccountIdentifier) {
-            TODO("Not yet implemented")
+            throw NotImplementedError("removeAccountIdentifierFromAccount")
         }
 
         override suspend fun addAccountIdentifierStoredData(
@@ -80,7 +80,7 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
             method: String,
             data: AuthMethodStoredData
         ) {
-            TODO("Not yet implemented")
+            throw NotImplementedError("updateAccountIdentifierStoredData")
         }
 
         override suspend fun updateAccountStoredData(
@@ -88,25 +88,25 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
             method: String,
             data: AuthMethodStoredData
         ) {
-            TODO("Not yet implemented")
+            throw NotImplementedError("updateAccountStoredData")
         }
 
         override suspend fun deleteAccountIdentifierStoredData(
             accountIdentifier: AccountIdentifier,
             method: String
         ) {
-            TODO("Not yet implemented")
+            throw NotImplementedError("deleteAccountIdentifierStoredData")
         }
 
         override suspend fun deleteAccountStoredData(accountId: String, method: String) {
-            TODO("Not yet implemented")
+            throw NotImplementedError("deleteAccountStoredData")
         }
 
         override suspend fun lookupStoredDataForAccount(
             accountId: String,
             method: AuthenticationMethod
         ): AuthMethodStoredData? {
-            TODO()
+            throw NotImplementedError("lookupStoredDataForAccount")
         }
 
 
@@ -114,7 +114,7 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
             identifier: AccountIdentifier,
             method: AuthenticationMethod
         ): AuthMethodStoredData? {
-            TODO("Not yet implemented")
+            throw NotImplementedError("lookupStoredDataForAccountIdentifier")
         }
 
         override suspend fun lookupAccountUuid(identifier: AccountIdentifier): String? =
