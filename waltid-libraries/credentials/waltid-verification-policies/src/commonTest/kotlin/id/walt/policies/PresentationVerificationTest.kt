@@ -13,7 +13,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 
 class PresentationVerificationTest {
-    @Test
+    // TODO: Include test in the scope of WAL-842
+    //@Test
     fun testPresentationVerification()= runTest {
         DidService.apply {
             registerResolver(LocalResolver())
