@@ -90,8 +90,8 @@ class EBSITestWallet(
         expirationTimestamp: Instant,
     ) = SIOPSession(id, authorizationRequest, expirationTimestamp)
 
-    override val metadata: OpenIDProviderMetadata
-        get() = createDefaultProviderMetadata()
+    override val metadata
+        get() = createDefaultProviderMetadata() as OpenIDProviderMetadata.Draft13
 
     override fun getSession(id: String): SIOPSession? = sessionCache[id]
     override fun getSessionByAuthServerState(authServerState: String): SIOPSession? {

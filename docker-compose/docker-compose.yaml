@@ -1,6 +1,9 @@
 services:
   wallet-api:
     image: docker.io/waltid/wallet-api:${VERSION_TAG:-latest}
+    profiles:
+      - identity
+      - all
     pull_policy: always
     build:
       context: ../
@@ -23,6 +26,9 @@ services:
   issuer-api:
     platform: linux/x86_64
     image: docker.io/waltid/issuer-api:${VERSION_TAG:-latest}
+    profiles:
+      - identity
+      - all
     pull_policy: always
     build:
       context: ../
@@ -37,6 +43,9 @@ services:
   verifier-api:
     platform: linux/x86_64
     image: docker.io/waltid/verifier-api:${VERSION_TAG:-latest}
+    profiles:
+      - identity
+      - all
     pull_policy: always
     build:
       context: ../
@@ -50,6 +59,9 @@ services:
 
   waltid-demo-wallet:
     image: docker.io/waltid/waltid-demo-wallet:${VERSION_TAG:-latest}
+    profiles:
+      - identity
+      - all
     pull_policy: always
     build:
       context: ../
@@ -64,6 +76,9 @@ services:
 
   waltid-dev-wallet:
     image: docker.io/waltid/waltid-dev-wallet:${VERSION_TAG:-latest}
+    profiles:
+      - identity
+      - all
     pull_policy: always
     build:
       context: ../
@@ -79,6 +94,9 @@ services:
   web-portal:
     platform: linux/x86_64
     image: docker.io/waltid/portal:${VERSION_TAG:-latest}
+    profiles:
+      - identity
+      - all
     pull_policy: always
     build:
       context: ../
@@ -95,6 +113,9 @@ services:
   vc-repo:
     platform: linux/x86_64
     image: docker.io/waltid/vc-repository:latest
+    profiles:
+      - identity
+      - all
     pull_policy: always
     depends_on:
       - caddy
@@ -104,7 +125,8 @@ services:
   postgres:
     image: postgres
     profiles:
-      - postgres
+      - identity
+      - all
     healthcheck:
       test: [ "CMD", "pg_isready", "-q", "-U", "$DB_USERNAME" ]
       interval: 5s
@@ -119,6 +141,44 @@ services:
       - wallet-api-db:/waltid-wallet-api/data
     ports:
       - $POSTGRES_DB_PORT:5432 #TODO: tcp/udp proxy with caddy
+
+  vault:
+    image: hashicorp/vault:latest
+    profiles:
+      - tse
+      - all
+    container_name: vault
+    healthcheck:
+      test: ["CMD-SHELL", "vault status || exit 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+    volumes:
+      - ./vault/config.hcl:/vault/config/config.hcl
+      - vault_data:/vault/file
+    ports:
+      - "$VAULT_PORT:8200"
+    environment:
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:$VAULT_PORT"
+      VAULT_ADDR: "http://127.0.0.1:$VAULT_PORT"
+    command: server -config=/vault/config/config.hcl -dev -dev-root-token-id="dev-only-token"
+    restart: always
+
+  vault-init:
+    image: hashicorp/vault:latest
+    profiles:
+      - tse
+      - all
+    container_name: vault-init
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "dev-only-token"
+      VAULT_ADDR: "http://vault:$VAULT_PORT"
+    depends_on:
+      vault:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c", "/vault/scripts/init.sh"]
+    volumes:
+      - ./vault/init.sh:/vault/scripts/init.sh
 
   caddy:
     image: docker.io/caddy:2
@@ -173,3 +233,4 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile
 volumes:
   wallet-api-db:
+  vault_data:

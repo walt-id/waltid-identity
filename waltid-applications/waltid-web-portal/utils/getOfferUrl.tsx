@@ -16,7 +16,7 @@ const getOfferUrl = async (
   vpProfile?: string
 ) => {
   const data = await fetch(
-    `${NEXT_PUBLIC_ISSUER}/.well-known/openid-credential-issuer`
+    `${NEXT_PUBLIC_ISSUER}/draft13/.well-known/openid-credential-issuer`
   ).then((data) => {
     return data.json();
   });

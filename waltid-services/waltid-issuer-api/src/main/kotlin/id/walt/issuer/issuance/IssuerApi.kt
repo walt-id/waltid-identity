@@ -4,15 +4,14 @@ import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.did.dids.DidService
+import id.walt.issuer.issuance.OidcApi.buildCredentialOfferUri
+import id.walt.issuer.issuance.OidcApi.buildOfferUri
 import id.walt.issuer.issuance.OidcApi.getFormatByCredentialConfigurationId
-import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRequest
-import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
@@ -22,7 +21,10 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import redis.clients.jedis.exceptions.JedisAccessControlException
 import redis.clients.jedis.exceptions.JedisConnectionException
 import kotlin.reflect.KClass
@@ -44,24 +46,28 @@ suspend fun createCredentialOfferUri(
 
     val issuanceSession = OidcApi.initializeCredentialOffer(
         issuanceRequests = overwrittenIssuanceRequests,
-        expiresIn,
+        expiresIn = expiresIn,
         allowPreAuthorized = when (overwrittenIssuanceRequests[0].authenticationMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> true
             else -> false
         },
-        callbackUrl = callbackUrl
+        callbackUrl = callbackUrl,
+        standardVersion = overwrittenIssuanceRequests.first().standardVersion!!
     )
 
     logger.debug { "issuanceSession: $issuanceSession" }
 
-    val offerRequest =
-        CredentialOfferRequest(null, "${OidcApi.baseUrl}/openid4vc/credentialOffer?id=${issuanceSession.id}")
+    val offerRequest = CredentialOfferRequest(
+        credentialOffer = null,
+        credentialOfferUri = buildCredentialOfferUri(overwrittenIssuanceRequests.first().standardVersion!!, issuanceSession.id)
+    )
+
     logger.debug { "offerRequest: $offerRequest" }
 
-    val offerUri = OpenID4VCI.getCredentialOfferRequestUrl(offerRequest,
-        CROSS_DEVICE_CREDENTIAL_OFFER_URL + OidcApi.baseUrl.removePrefix("https://").removePrefix("http://") + "/"
-    )
+    val offerUri = buildOfferUri(overwrittenIssuanceRequests.first().standardVersion!!, offerRequest)
+
     logger.debug { "Offer URI: $offerUri" }
+
     return offerUri
 }
 
@@ -120,6 +126,14 @@ fun Application.issuerApi() {
                         example(
                             "did:jwk + AWS REST API key  (AWS - Secp256r1) + Role (Auth)",
                             IssuanceExamples.issuerOnboardingRequestAwsRestApiExampleWithRole
+                        )
+                        example(
+                            "did:jwk + Azure REST API key  (Azure - Secp256r1)",
+                            IssuanceExamples.issuerOnboardingRequestAzureRestApiExample
+                        )
+                        example(
+                            "did:jwk + AWS SDK key  (AWS - Secp256r1)",
+                            IssuanceExamples.issuerOnboardingRequestAwsSdkExample
                         )
                         required = true
                     }
@@ -507,26 +521,6 @@ fun Application.issuerApi() {
                     }
                 }
 
-                get("credentialOffer", {
-                    summary = "Gets a credential offer based on the session id"
-                    request {
-                        queryParameter<String>("id") { required = true }
-                    }
-                }) {
-                    val sessionId = call.parameters["id"] ?: throw BadRequestException("Missing parameter \"id\"")
-                    val issuanceSession = OidcApi.getSession(sessionId)
-                        ?: throw NotFoundException("No active issuance session found by the given id")
-                    val credentialOffer = issuanceSession.credentialOffer
-                        ?: throw BadRequestException("Session has no credential offer set")
-
-                    issuanceSession.callbackUrl?.let {
-                        CIProvider.sendCallback(
-                            sessionId, "resolved_credential_offer", credentialOffer.toJSON(), it
-                        )
-                    }
-
-                    context.respond(credentialOffer.toJSON())
-                }
             }
         }
     }

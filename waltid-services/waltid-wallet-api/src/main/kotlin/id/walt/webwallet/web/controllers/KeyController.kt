@@ -11,7 +11,7 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
-import io.ktor.server.util.getOrFail
+import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -104,7 +104,7 @@ fun Application.keys() = walletRoute {
                     }
                     example("AWS key generation request") {
                         value = KeyGenerationRequest(
-                            backend = "aws",
+                            backend = "aws-rest-api",
                             keyType = KeyType.secp256r1,
                             config = buildJsonObject {
                                 putJsonObject("auth") {
@@ -112,6 +112,29 @@ fun Application.keys() = walletRoute {
                                     put("secretAccessKey", JsonPrimitive("secretKey"))
                                     put("region", JsonPrimitive("eu-central-1"))
                                 }
+                            }
+                        )
+                    }
+                    example("Azure key generation request") {
+                        value = KeyGenerationRequest(
+                            backend = "azure",
+                            keyType = KeyType.secp256r1,
+                            config = buildJsonObject {
+                                putJsonObject("auth") {
+                                    put("clientId", JsonPrimitive("clientId"))
+                                    put("clientSecret", JsonPrimitive("clientSecret"))
+                                    put("tenantId", JsonPrimitive("tenantId"))
+                                    put("keyVaultUrl", JsonPrimitive("keyVaultUrl"))
+                                }
+                            }
+                        )
+                    }
+                    example("AWS key generation request SDK") {
+                        value = KeyGenerationRequest(
+                            backend = "aws",
+                            keyType = KeyType.secp256r1,
+                            config = buildJsonObject {
+                                put("region", JsonPrimitive("eu-central-1"))
                             }
                         )
                     }
