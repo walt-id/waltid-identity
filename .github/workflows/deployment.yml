@@ -22,6 +22,11 @@ on:
         required: false
         type: string
         default: "dev"
+      kubeconfig_secret:
+        description: "The name of the kubeconfig secret to use (defaults to 'KUBE_CONFIG')"
+        required: false
+        type: string
+        default: "KUBE_CONFIG"
 
 jobs:
   deploy:
@@ -51,6 +56,6 @@ jobs:
       - name: Continuous deployment - ${{ matrix.services.name }}
         uses: actions-hub/kubectl@master
         env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+          KUBE_CONFIG: ${{ secrets[inputs.kubeconfig_secret] }}
         with:
           args: apply -n ${{ matrix.services.namespace }} -f ${{ matrix.services.kube }}/deployment_mod.yaml
