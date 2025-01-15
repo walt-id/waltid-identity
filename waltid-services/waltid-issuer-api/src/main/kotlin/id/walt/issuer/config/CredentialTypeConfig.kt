@@ -80,6 +80,14 @@ data class CredentialTypeConfig(
                 cryptographicBindingMethodsSupported = setOf("did", "jwk"),
                 credentialSigningAlgValuesSupported = setOf("ES256"),
                 vct = "https://example.com/my_custom_vct",
+                sdJwtVcTypeMetadata = SDJWTVCTypeMetadata(
+                    vct = "https://example.com/my_custom_vct",
+                    name = "THE vct VALUE SHOULD BE UPDATED TO A RESOLVABLE AUTHORITY DOMAIN",
+                    description = """
+                        This is an example to show that custom VCT 'registries' could also be used here.
+                        Warning! Example purpose only. Not intended for real use.
+                    """.trimIndent()
+                ),
             )
         )
     ),

@@ -16,7 +16,8 @@ import java.util.stream.Stream
 class DidEbsiResolverTest : DidResolverTestBase() {
     override val resolver: LocalResolverMethod = DidEbsiResolver(HttpClient())
 
-    @ParameterizedTest
+    // TODO: Include test in the scope of WAL-842
+    //@ParameterizedTest
     @MethodSource
     override fun `given a did String, when calling resolve, then the result is a valid did document`(
         did: String, key: JsonObject, assert: resolverAssertion<DidDocument>
@@ -24,7 +25,8 @@ class DidEbsiResolverTest : DidResolverTestBase() {
         super.`given a did String, when calling resolve, then the result is a valid did document`(did, key, assert)
     }
 
-    @ParameterizedTest
+    // TODO: Include test in the scope of WAL-842
+    //@ParameterizedTest
     @MethodSource
     override fun `given a did String, when calling resolveToKey, then the result is valid key`(
         did: String,

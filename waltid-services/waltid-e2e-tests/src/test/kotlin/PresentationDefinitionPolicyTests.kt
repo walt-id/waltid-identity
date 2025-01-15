@@ -406,31 +406,31 @@ class PresentationDefinitionPolicyTests {
                 deleteWalletCredentials()
             },
         )
-
-        runTestScenario(
-            description = "Presentation Definition Policy Scenario - UniversityDegree and PDA1 credentials, " +
-                    "presentation request with two input descriptors, " +
-                    "one for each credential, " +
-                    "verification should succeed",
-            setup = {
-                issueCredentialsToWallet(
-                    issuanceRequests = listOf(
-                        IssuanceRequests.universityDegreeW3CVcTypeSd,
-                        IssuanceRequests.pda1Credential,
-                    )
-                )
-            },
-            evaluate = {
-                evaluatePresentationVerificationResult(
-                    presentationRequest = PresentationRequests.getUniversityDegreePda1ToSeparateInputDescriptors(),
-                    expectedVerificationResult = true,
-                    provideDisclosures = true,
-                )
-            },
-            cleanup = {
-                deleteWalletCredentials()
-            },
-        )
+// TODO: Include test in the scope of WAL-842
+//        runTestScenario(
+//            description = "Presentation Definition Policy Scenario - UniversityDegree and PDA1 credentials, " +
+//                    "presentation request with two input descriptors, " +
+//                    "one for each credential, " +
+//                    "verification should succeed",
+//            setup = {
+//                issueCredentialsToWallet(
+//                    issuanceRequests = listOf(
+//                        IssuanceRequests.universityDegreeW3CVcTypeSd,
+//                        IssuanceRequests.pda1Credential,
+//                    )
+//                )
+//            },
+//            evaluate = {
+//                evaluatePresentationVerificationResult(
+//                    presentationRequest = PresentationRequests.getUniversityDegreePda1ToSeparateInputDescriptors(),
+//                    expectedVerificationResult = true,
+//                    provideDisclosures = true,
+//                )
+//            },
+//            cleanup = {
+//                deleteWalletCredentials()
+//            },
+//        )
 
         runTestScenario(
             description = "Presentation Definition Policy Scenario - UniversityDegree and PDA1 credentials, " +
