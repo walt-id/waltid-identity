@@ -14,6 +14,7 @@ import io.ktor.server.auth.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.date.*
 import kotlinx.serialization.json.*
 
 fun Application.ktorAuthnzFrontendRoutes() {
@@ -38,14 +39,13 @@ fun Application.ktorAuthnzFrontendRoutes() {
                 }
             }
 
-            post("login") { // also in authenticate {} block as it just relays authnz auth
-                //call.sessions.set(LoginTokenSession(token))
-
+            post("login") {
                 val providedToken = call.receiveText()
                 println("providedToken: $providedToken")
 
                 val (account, token) = if (providedToken.isNotEmpty()) {
-                    val token = Json.decodeFromString<JsonObject>(providedToken)["token"]?.jsonPrimitive?.content ?: error("Missing token")
+                    val token =
+                        Json.decodeFromString<JsonObject>(providedToken)["token"]?.jsonPrimitive?.content ?: error("Missing token")
                     val session = KtorAuthnzManager.tokenHandler.resolveTokenToSession(token)
                     val account = session.accountId
                     val sessionToken = session.token
@@ -63,6 +63,13 @@ fun Application.ktorAuthnzFrontendRoutes() {
                         put("token", token)
                     }
                 )
+            }
+
+            post("logout") {
+                call.response.cookies.append("ktor-authnz-auth", "", CookieEncoding.URI_ENCODING, 0L, GMTDate())
+                call.response.cookies.append("auth.token", "", CookieEncoding.URI_ENCODING, 0L, GMTDate())
+
+                context.respond(HttpStatusCode.OK)
             }
         }
     }
