@@ -7,6 +7,7 @@ import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers.userId
 import id.walt.webwallet.db.models.authnz.AuthnzStoredData
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.sql.insert
@@ -16,13 +17,13 @@ import java.util.UUID
 import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalUuidApi::class)
-class AuthenticationService {
+class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispatchers.IO) {
 
     val editableAccountStore = object : EditableAccountStore {
         override suspend fun addAccountIdentifierToAccount(
             accountId: String,
             newAccountIdentifier: AccountIdentifier
-        ): Unit = withContext(Dispatchers.IO) {
+        ): Unit = withContext(dispatcher) {
             transaction {
                 AuthnzAccountIdentifiers.insert {
                     it[AuthnzAccountIdentifiers.userId] = UUID.fromString(accountId)
@@ -41,7 +42,7 @@ class AuthenticationService {
             accountIdentifier: AccountIdentifier,
             method: String,
             data: AuthMethodStoredData
-        ): Unit = withContext(Dispatchers.IO) {
+        ): Unit = withContext(dispatcher) {
             val savableStoredData = data.transformSavable()
             transaction {
                 val userId = AuthnzAccountIdentifiers
@@ -63,7 +64,7 @@ class AuthenticationService {
             accountId: String,
             method: String,
             data: AuthMethodStoredData
-        ): Unit = withContext(Dispatchers.IO) {
+        ): Unit = withContext(dispatcher) {
             val savableStoredData = data.transformSavable()
             transaction {
                 AuthnzStoredData.insert {
@@ -117,7 +118,7 @@ class AuthenticationService {
         }
 
         override suspend fun lookupAccountUuid(identifier: AccountIdentifier): String? =
-            withContext(Dispatchers.IO) {
+            withContext(dispatcher) {
                 transaction {
                     AuthnzAccountIdentifiers
                         .selectAll().where { AuthnzAccountIdentifiers.identifier eq identifier.accountIdentifierName }
@@ -129,7 +130,7 @@ class AuthenticationService {
         override suspend fun hasStoredDataFor(
             identifier: AccountIdentifier,
             method: AuthenticationMethod
-        ): Boolean = withContext(Dispatchers.IO) {
+        ): Boolean = withContext(dispatcher) {
             transaction {
                 AuthnzStoredData
                     .selectAll().where { AuthnzStoredData.method eq method.toString() }
