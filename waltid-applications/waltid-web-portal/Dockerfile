@@ -1,5 +1,5 @@
 # BUILD
-FROM docker.io/gplane/pnpm:8.6 as buildstage
+FROM docker.io/gplane/pnpm:8.6 AS buildstage
 
 COPY waltid-applications/waltid-web-portal/. /build
 
