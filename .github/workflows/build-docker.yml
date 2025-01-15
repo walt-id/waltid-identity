@@ -1,60 +1,69 @@
-name: Build docker on every push except main branch
+name: Build and/or push docker (reusable workflow)
 
 on:
-  push:
-    branches-ignore:
-      - main
+  workflow_call:
+    inputs:
+      version:
+        description: "release version"
+        required: true
+        type: string
+      tag:
+        description: "desired tag, e.g. latest, dev (defaults to dev)"
+        required: false
+        type: string
+        default: "dev"
+      publish:
+        description: "Specifies whether to publish the images (defaults to false)"
+        required: false
+        type: boolean
+        default: false
 
 
 jobs:
   build:
-    name: "Build"
-    runs-on: "ubuntu-latest"
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        services:
+          - {
+            folder: waltid-services/waltid-issuer-api,
+            image: issuer-api
+          }
+          - {
+              folder: waltid-services/waltid-verifier-api,
+              image: verifier-api
+          }
+          - {
+            folder: waltid-services/waltid-wallet-api,
+            image: wallet-api
+          }
+          - {
+            folder: waltid-applications/waltid-web-wallet/apps/waltid-demo-wallet,
+            image: waltid-demo-wallet
+          }
+          - {
+            folder:  waltid-applications/waltid-web-wallet/apps/waltid-dev-wallet,
+            image: waltid-dev-wallet
+          }
+          - {
+            folder: waltid-applications/waltid-web-portal,
+            image: portal
+          }
     steps:
       - uses: actions/checkout@v3
-      - name: Setup cache
-        uses: actions/cache@v4
+      - name: Login to Docker Hub
+        if: ${{ inputs.publish }}
+        uses: docker/login-action@v2
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-      - name: Build and push Docker images (issuer)
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Set up Docker Buildx
+        if: ${{ !inputs.publish }}
+        uses: docker/setup-buildx-action@v2
+      - name: Build and push Docker images (${{ matrix.services.image }})
         uses: docker/build-push-action@v6
         with:
-          push: false
-          file: waltid-services/waltid-issuer-api/Dockerfile
-          #tags: waltid/issuer-api:latest, waltid/issuer-api:${{ env.release_version }}
-      - name: Build and push Docker images (verifier)
-        uses: docker/build-push-action@v6
-        with:
-          push: false
-          file: waltid-services/waltid-verifier-api/Dockerfile
-          #tags: waltid/verifier-api:latest, waltid/verifier-api:${{ env.release_version }}
-      - name: Build and push Docker images (wallet-api)
-        uses: docker/build-push-action@v6
-        with:
-          push: false
-          file: waltid-services/waltid-wallet-api/Dockerfile
-          #tags: waltid/wallet-api:latest, waltid/wallet-api:${{ env.release_version }}
-      - name: Build and push Docker images (waltid-dev-wallet)
-        uses: docker/build-push-action@v6
-        with:
-          push: false
-          file: waltid-applications/waltid-web-wallet/apps/waltid-dev-wallet/Dockerfile
-          #tags: waltid/waltid-dev-wallet:latest, waltid/waltid-dev-wallet:${{ env.release_version }}
-      - name: Build and push Docker images (waltid-demo-wallet)
-        uses: docker/build-push-action@v6
-        with:
-          push: false
-          file: waltid-applications/waltid-web-wallet/apps/waltid-demo-wallet/Dockerfile
-          #tags: waltid/waltid-demo-wallet:latest, waltid/waltid-demo-wallet:${{ env.release_version }}
-      - name: Build and push Docker images (wallet-portal)
-        uses: docker/build-push-action@v6
-        with:
-          push: false
-          file: waltid-applications/waltid-web-portal/Dockerfile
-          #tags: waltid/portal:latest, waltid/portal:${{ env.release_version }}
-
+          push: ${{ inputs.publish }}
+          file: ${{ matrix.services.folder }}/Dockerfile
+          tags: waltid/${{ matrix.services.image }}:${{ inputs.tag }}, waltid/${{ matrix.services.image }}:${{ inputs.version }}
