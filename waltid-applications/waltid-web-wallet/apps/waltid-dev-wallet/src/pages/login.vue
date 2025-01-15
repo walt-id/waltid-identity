@@ -21,10 +21,8 @@
                         <NuxtLink
                             class="font-medium text-blue-600 hover:text-blue-500"
                             to="/signup"
-                        >sign up for your SSI wallet
-                        </NuxtLink
-                        >
-                        !
+                        >sign up for your SSI wallet!
+                        </NuxtLink>
                     </p>
                     <p v-if="isOidcLogin" class="flex items-center">
                         <!--            <LoadingIndicator> OIDC Login processing... </LoadingIndicator>-->
@@ -407,7 +405,7 @@ async function login() {
         { email: emailInput, password: passwordInput, type: "email" },
         { callbackUrl: signInRedirectUrl.value }
     )
-        .then(() =>{
+        .then(() => {
             user.value = {
                 id: "",
                 friendlyName: userData.email
@@ -488,7 +486,7 @@ async function openWeb3() {
 
     const result = await verificationResponse.json();
     console.log("Verification result: ", result);
-    await authnzLogin(address, result.token)
+    await authnzLogin(address, result.token);
 }
 
 definePageMeta({
