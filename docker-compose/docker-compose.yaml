@@ -2,6 +2,7 @@ services:
   wallet-api:
     image: docker.io/waltid/wallet-api:${VERSION_TAG:-latest}
     profiles:
+      - services
       - identity
       - all
     pull_policy: always
@@ -27,6 +28,7 @@ services:
     platform: linux/x86_64
     image: docker.io/waltid/issuer-api:${VERSION_TAG:-latest}
     profiles:
+      - services
       - identity
       - all
     pull_policy: always
@@ -44,6 +46,7 @@ services:
     platform: linux/x86_64
     image: docker.io/waltid/verifier-api:${VERSION_TAG:-latest}
     profiles:
+      - services
       - identity
       - all
     pull_policy: always
@@ -62,6 +65,7 @@ services:
   waltid-demo-wallet:
     image: docker.io/waltid/waltid-demo-wallet:${VERSION_TAG:-latest}
     profiles:
+      - apps
       - identity
       - all
     pull_policy: always
@@ -79,6 +83,7 @@ services:
   waltid-dev-wallet:
     image: docker.io/waltid/waltid-dev-wallet:${VERSION_TAG:-latest}
     profiles:
+      - apps
       - identity
       - all
     pull_policy: always
@@ -97,6 +102,7 @@ services:
     platform: linux/x86_64
     image: docker.io/waltid/portal:${VERSION_TAG:-latest}
     profiles:
+      - apps
       - identity
       - all
     pull_policy: always
@@ -116,6 +122,7 @@ services:
     platform: linux/x86_64
     image: docker.io/waltid/vc-repository:latest
     profiles:
+      - services
       - identity
       - all
     pull_policy: always
@@ -126,9 +133,6 @@ services:
 
   postgres:
     image: postgres
-    profiles:
-      - identity
-      - all
     healthcheck:
       test: [ "CMD", "pg_isready", "-q", "-U", "$DB_USERNAME" ]
       interval: 5s
