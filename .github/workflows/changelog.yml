@@ -1,0 +1,39 @@
+name: Create changelog with tag (reusable workflow)
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "release version"
+        required: true
+        type: string
+
+jobs:
+  build:
+    name: Create
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          git tag v${{ inputs.version }}
+          git push --tags
+      - name: Changelog
+        uses: ardalanamini/auto-changelog@v4
+        id: changelog
+        with:
+          github-token: ${{ github.token }}
+          default-commit-type: Other Changes
+          release-name: v${{ inputs.version }}
+          mention-authors: true
+          mention-new-contributors: true
+          include-compare-link: true
+          use-github-autolink: true
+          semver: true
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ inputs.version }}
+#          body: |
+#            ${{ steps.changelog.outputs.changelog }}
+          prerelease: ${{ steps.changelog.outputs.prerelease }}
