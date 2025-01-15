@@ -56,7 +56,7 @@
               </svg>
               <span
                 class="ml-1 hidden text-sm font-medium text-gray-700 lg:block"
-                >{{ user.email }}</span
+                >{{ user.friendlyName }}</span
               >
               <ChevronDownIcon
                 aria-hidden="true"

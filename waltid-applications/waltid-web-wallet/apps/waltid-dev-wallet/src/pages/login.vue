@@ -407,10 +407,10 @@ async function login() {
         { email: emailInput, password: passwordInput, type: "email" },
         { callbackUrl: signInRedirectUrl.value }
     )
-        .then((data) => {
+        .then(() =>{
             user.value = {
                 id: "",
-                email: userData.email
+                friendlyName: userData.email
             };
         })
         .catch((err) => {
@@ -488,7 +488,7 @@ async function openWeb3() {
 
     const result = await verificationResponse.json();
     console.log("Verification result: ", result);
-    await authnzLogin(result.token)
+    await authnzLogin(address, result.token)
 }
 
 definePageMeta({
@@ -521,7 +521,7 @@ if (route.redirectedFrom != undefined) {
 
 const isOidcLogin = ref(route.query.oidc_login == "true");
 
-async function authnzLogin(token) {
+async function authnzLogin(address, token) {
     console.log("authnz: logging in");
     isLoggingIn.value = true;
 
@@ -535,10 +535,10 @@ async function authnzLogin(token) {
         { token: token /*email: emailInput, password: passwordInput, type: "email"*/ },
         { callbackUrl: signInRedirectUrl.value }
     )
-        .then((data) => {
+        .then(() => {
             user.value = {
-                id: ""
-                // email: userData.email
+                id: "",
+                friendlyName: address
             };
         })
         .catch((err) => {
