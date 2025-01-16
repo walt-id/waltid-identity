@@ -16,6 +16,7 @@ import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.uuid.ExperimentalUuidApi
@@ -61,8 +62,8 @@ abstract class WalletService(val tenant: String, val accountId: Uuid, val wallet
     abstract suspend fun importKey(jwkOrPem: String): String
     abstract suspend fun deleteKey(alias: String): Boolean
     abstract suspend fun removeKey(alias: String): Boolean
-    abstract suspend fun sign(alias: String, data: JsonObject): String
-    abstract suspend fun verify(alias: String, signature: String): Boolean
+    abstract suspend fun sign(alias: String, data: JsonElement): String
+    abstract suspend fun verify(jwk: String, signature: String): Boolean
 
     // History
     abstract fun getHistory(limit: Int = 10, offset: Long = 0): List<WalletOperationHistory>
