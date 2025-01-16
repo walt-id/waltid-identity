@@ -433,7 +433,7 @@ function decodeJWT(token) {
 }
 
 async function openWeb3() {
-    const response = await fetch("http://localhost:7001/auth/account/web3/nonce", { method: "GET" });
+  const response = await fetch("/wallet-api/auth/account/web3/nonce", {method: "GET"});
     const tokenText = await response.text();
     console.log("====Frontend DEBUG LOGS====");
     console.log("Received JWT:", tokenText);
@@ -465,7 +465,7 @@ async function openWeb3() {
     console.log("Signature:", signature);
 
 
-    const verificationResponse = await fetch("http://localhost:7001/auth/account/web3/signed", {
+  const verificationResponse = await fetch("/wallet-api/auth/account/web3/signed", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
