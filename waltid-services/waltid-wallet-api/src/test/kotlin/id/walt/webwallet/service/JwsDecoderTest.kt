@@ -31,8 +31,8 @@ class JwsDecoderTest {
         @JvmStatic
         fun payload(): Stream<Arguments> = Stream.of(
             getArgument("revocation-list-with-status-message", "revocation-list-with-status-message", false),
-            getArgument("revocation-list-vc-wrapped", "revocation-list-with-status-message", true),
-            getArgument("revocation-list-jwt", "revocation-list-with-status-message", true),
+            getArgument("revocation-list-with-status-message-vc-wrapped", "revocation-list-with-status-message", true),
+            getArgument("revocation-list-with-status-message-jwt", "revocation-list-with-status-message", true),
         )
 
         private fun getArgument(filename: String, expected: String, unwrap: Boolean) = Arguments.of(

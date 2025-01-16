@@ -48,8 +48,8 @@ class DefaultStatusListCredentialFetchStrategyTest {
     @ValueSource(
         strings = [
             "revocation-list-with-status-message",
-            "revocation-list-vc-wrapped",
-            "revocation-list-jwt",
+            "revocation-list-with-status-message-vc-wrapped",
+            "revocation-list-with-status-message-jwt",
         ]
     )
     fun test(id: String) = runTest {
