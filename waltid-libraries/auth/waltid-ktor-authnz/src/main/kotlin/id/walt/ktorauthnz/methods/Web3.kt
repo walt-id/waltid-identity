@@ -116,7 +116,7 @@ object Web3 : AuthenticationMethod("web3") {
 
         // Step 2: Decode the signature
         val signatureBytes = Numeric.hexStringToByteArray(signature)
-        if (signatureBytes.size != 65) throw IllegalArgumentException("Invalid signature length")
+        require(signatureBytes.size == 65) { "Invalid signature length" }
 
         val r = signatureBytes.copyOfRange(0, 32)
         val s = signatureBytes.copyOfRange(32, 64)

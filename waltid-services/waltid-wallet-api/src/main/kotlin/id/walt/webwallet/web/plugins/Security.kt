@@ -45,7 +45,7 @@ val authConfigNames by lazy {
             "auth-bearer-alternative"
         )
 
-        else -> throw IllegalStateException("Neither the waltid-ktor-authnz authentication system nor the legacy authentication system were enabled.")
+        else -> error("Neither the waltid-ktor-authnz authentication system nor the legacy authentication system were enabled.")
     }.toTypedArray()
 }
 
