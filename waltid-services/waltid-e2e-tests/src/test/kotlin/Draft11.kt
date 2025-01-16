@@ -39,6 +39,9 @@ class Draft11(private val client: HttpClient)  {
 
         val offerUrlParams = Url(offerUrl).parameters.toMap()
         val offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)
+        assertTrue(offerObj.credentialOfferUri!!.contains("draft11"))
+        assertFalse(offerObj.credentialOfferUri!!.contains("draft13"))
+
         val credOffer = client.get(offerObj.credentialOfferUri!!).body<CredentialOffer.Draft11>()
 
         assertNotNull(credOffer.credentialIssuer)
