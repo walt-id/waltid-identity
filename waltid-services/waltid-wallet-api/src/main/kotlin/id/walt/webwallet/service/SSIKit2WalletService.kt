@@ -584,8 +584,8 @@ class SSIKit2WalletService(
         return signature
     }
 
-    override suspend fun verify(alias: String, signature: String): Boolean {
-        val key = JWKKey.importJWK(alias).getOrNull() ?: throw IllegalArgumentException("Key import failed")
+    override suspend fun verify(jwk: String, signature: String): Boolean {
+        val key = JWKKey.importJWK(jwk).getOrNull() ?: throw IllegalArgumentException("Key import failed")
 
         val signature = key.verifyJws(signature)
         eventUseCase.log(
@@ -595,7 +595,7 @@ class SSIKit2WalletService(
             accountId = accountId,
             walletId = walletId,
             data = eventUseCase.keyEventData(
-                id = alias,
+                id = jwk,
                 algorithm = key.keyType.name,
                 kmsType = EventDataNotAvailable
             )
