@@ -587,7 +587,7 @@ class SSIKit2WalletService(
     override suspend fun verify(jwk: String, signature: String): Boolean {
         val key = JWKKey.importJWK(jwk).getOrNull() ?: throw IllegalArgumentException("Key import failed")
 
-        val signature = key.verifyJws(signature)
+        val verify = key.verifyJws(signature)
         eventUseCase.log(
             action = EventType.Key.Verify,
             originator = "wallet",
@@ -600,7 +600,7 @@ class SSIKit2WalletService(
                 kmsType = EventDataNotAvailable
             )
         )
-        return signature.isSuccess
+        return verify.isSuccess
     }
 
     override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> =
