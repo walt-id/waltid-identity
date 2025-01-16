@@ -208,7 +208,7 @@ fun Application.keys() = walletRoute {
                 }
             }
         }) {
-            val jwk = context.request.queryParameters["JWK"] ?: error("No JWK provided")
+            val jwk = context.request.queryParameters.getOrFail("JWK")
             val signature = context.receive<String>()
             context.respond(getWalletService().verify(jwk, signature))
 
