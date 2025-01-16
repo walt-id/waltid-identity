@@ -19,7 +19,7 @@ on:
 jobs:
   compute:
     name: Compute
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     outputs:
       result: ${{ steps.release_version.outputs.release_version }}
     steps:
