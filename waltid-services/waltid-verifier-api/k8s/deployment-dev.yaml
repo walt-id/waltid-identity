@@ -11,12 +11,12 @@ data:
     webHost = "0.0.0.0"
     webPort = 3000
   verifier-service.conf: |
-    baseUrl = "https://verifier.portal.walt-test.cloud"
+    baseUrl = "https://verifier.portal.test.waltid.cloud"
     requestSigningKeyFile = "/waltid-verifier-api/request-signing-secret/ec.key"
     requestSigningCertFile = "/waltid-verifier-api/request-signing-secret/ec.crt"
-    x509SanDnsClientId = "verifier.portal.walt-test.cloud"
+    x509SanDnsClientId = "verifier.portal.test.waltid.cloud"
   entra.conf: |
-    callbackUrl = "https://verifier.portal.walt-test.cloud/entra/verification-callback/"
+    callbackUrl = "https://verifier.portal.test.waltid.cloud/entra/verification-callback/"
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -78,10 +78,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - verifier.portal.walt-test.cloud
+        - verifier.portal.test.waltid.cloud
       secretName: verifier-tls-secret
   rules:
-    - host: verifier.portal.walt-test.cloud
+    - host: verifier.portal.test.waltid.cloud
       http:
         paths:
           - path: /
