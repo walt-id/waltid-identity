@@ -61,7 +61,7 @@ private val authMethodFunctionAmendments: Map<AuthenticationMethod, Map<AuthMeth
 
 fun Application.ktorAuthnzRoutes() {
     routing {
-        route("auth", {
+        route("wallet-api/auth", {
             tags("Authentication")
         }) {
             route("account", {
