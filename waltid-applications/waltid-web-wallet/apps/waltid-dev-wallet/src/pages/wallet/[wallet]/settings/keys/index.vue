@@ -5,6 +5,16 @@
 
       <div class="flex justify-between gap-2">
         <button
+            class="inline-flex items-center bg-blue-500 hover:bg-blue-600 focus-visible:outline-blue-600 rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            @click="signAndverify"
+        >
+          <HashtagIcon
+              aria-hidden="true"
+              class="h-5 w-5 text-white mr-1"
+          />
+          <span>Sign & Verify</span>
+        </button>
+        <button
           class="inline-flex items-center bg-blue-500 hover:bg-blue-600 focus-visible:outline-blue-600 rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           @click="importKey"
         >
@@ -91,13 +101,8 @@
 
 <script lang="ts" setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
-import {
-  ArrowUturnLeftIcon,
-  CheckIcon,
-  InboxArrowDownIcon,
-  KeyIcon,
-} from "@heroicons/vue/24/outline";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
+import {ArrowUturnLeftIcon, CheckIcon, HashtagIcon, InboxArrowDownIcon, KeyIcon} from "@heroicons/vue/24/outline";
 
 const currentWallet = useCurrentWallet();
 
@@ -112,6 +117,10 @@ function generateKey() {
 
 function importKey() {
   navigateTo("keys/import");
+}
+
+function signAndverify() {
+  navigateTo("keys/sign-verify");
 }
 
 useHead({
