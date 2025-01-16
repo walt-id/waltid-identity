@@ -188,13 +188,12 @@ fun Application.keys() = walletRoute {
                     description = "The public key to verify the signature"
                     example("Example") {
                         value = """
-                {
-                  "kty": "OKP",
-                  "d": "mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI",
-                  "crv": "Ed25519",
-                  "kid": "Vzx7l5fh56F3Pf9aR3DECU5BwfrY6ZJe05aiWYWzan8",
-                  "x": "T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM"
-                }
+                    {
+                      "kty": "OKP",
+                      "crv": "Ed25519",
+                      "kid": "viEJuASRBd06MPJW-XEEDkWahYnGmp6WIMjdkGKZezY",
+                      "x": "7lTgGVKIeZdP9aEofIFwSTdyBGmxYqo4AhumkCLn3vs"
+                    }
                 """.trimIndent()
                     }
                 }
