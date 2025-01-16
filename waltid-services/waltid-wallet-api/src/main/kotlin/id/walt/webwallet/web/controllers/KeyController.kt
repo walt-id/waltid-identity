@@ -13,10 +13,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.*
 import org.jetbrains.exposed.sql.transactions.transaction
 
 fun Application.keys() = walletRoute {
@@ -307,7 +304,7 @@ fun Application.keys() = walletRoute {
             post("sign", {
                 summary = "Sign a message with a specific key"
                 request {
-                    body<JsonObject> { description = "The message to sign" }
+                    body<JsonElement> { description = "The message to sign" }
                 }
                 response {
                     HttpStatusCode.OK to {
@@ -317,8 +314,7 @@ fun Application.keys() = walletRoute {
                 }
             }) {
                 val keyId = context.parameters.getOrFail("keyId")
-                val message = context.receive<JsonObject>()
-
+                val message = context.receive<JsonElement>()
                 context.respond(getWalletService().sign(keyId, message))
             }
 

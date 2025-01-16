@@ -560,7 +560,7 @@ class SSIKit2WalletService(
         throw WebException(HttpStatusCode.BadRequest, errorMessage)
     }
 
-    override suspend fun sign(alias: String, data: JsonObject): String {
+    override suspend fun sign(alias: String, data: JsonElement): String {
         val key = getKey(alias)
         val headers = mapOf(
             "kid" to key.getKeyId()
