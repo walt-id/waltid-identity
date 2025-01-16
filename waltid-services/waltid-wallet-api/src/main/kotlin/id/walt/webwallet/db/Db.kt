@@ -3,6 +3,8 @@ package id.walt.webwallet.db
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.featureflag.FeatureManager
+import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.models.*
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers
@@ -76,7 +78,6 @@ object Db {
         EntityNameResolutionCache,
     ).toTypedArray()
 
-
     @OptIn(ExperimentalUuidApi::class)
     private fun recreateDatabase() {
         transaction {
@@ -84,7 +85,9 @@ object Db {
 
             SchemaUtils.drop(*(tables.reversedArray()))
             SchemaUtils.create(*tables)
-            SchemaUtils.create(AuthnzUsers, AuthnzAccountIdentifiers, AuthnzStoredData)
+            if (FeatureManager.isFeatureEnabled(FeatureCatalog.ktorAuthnzAuthenticationFeature)) {
+                SchemaUtils.create(AuthnzUsers, AuthnzAccountIdentifiers, AuthnzStoredData)
+            }
             runBlocking {
 
                 AccountsService.register(request = EmailAccountRequest("Max Mustermann", "string@string.string", "string"))
