@@ -246,6 +246,9 @@ class WaltidServicesE2ETests {
             offerUrl = it
             println("offer: $offerUrl")
         }
+        assertTrue(offerUrl.contains("draft13"))
+        assertFalse(offerUrl.contains("draft11"))
+
         //endregion -Issuer / offer url-
 
         //region -Exchange / claim-

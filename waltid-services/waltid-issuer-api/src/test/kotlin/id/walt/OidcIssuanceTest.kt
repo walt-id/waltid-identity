@@ -5,7 +5,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.issuer.issuance.CIProvider
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.data.CredentialOffer
+import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.minutes
@@ -20,14 +20,17 @@ class OidcIssuanceTest {
         // -------- CREDENTIAL ISSUER ----------
         // as CI provider, initialize credential offer for user
         val issuanceSession = ciTestProvider.initializeCredentialOffer(
-            listOf(IssuanceRequest(
-                issuerKey = IssuerApiTest.jsonKeyObj,
-                credentialData = IssuerApiTest.jsonVCObj,
-                credentialConfigurationId = "VerifiableId",
-                mapping = IssuerApiTest.jsonMappingObj,
-                issuerDid = TEST_ISSUER_DID
-            )),
-            5.minutes, allowPreAuthorized = false
+            issuanceRequests = listOf(
+                IssuanceRequest(
+                    issuerKey = IssuerApiTest.jsonKeyObj,
+                    credentialData = IssuerApiTest.jsonVCObj,
+                    credentialConfigurationId = "VerifiableId",
+                    mapping = IssuerApiTest.jsonMappingObj,
+                    issuerDid = TEST_ISSUER_DID,
+                    authenticationMethod = AuthenticationMethod.NONE,
+                )
+            ),
+            expiresIn = 5.minutes
         )
 
         val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
