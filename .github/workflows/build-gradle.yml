@@ -42,19 +42,16 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
       - name: Gradle wrapper validation
-        uses: gradle/wrapper-validation-action@v3
-      - name: Set gradle build publish arguments
-        id: publish-arguments
-        run: |
-          if [ "${{ inputs.publish }}" == "true" ]; then
-            echo "arguments=publish" >> $GITHUB_OUTPUT
-          else
-            echo "arguments=" >> $GITHUB_OUTPUT
-          fi
-      - name: Running gradle build
-        uses: eskatos/gradle-command-action@v3
+        uses: gradle/actions/wrapper-validation@v4
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Assemble the project
+        run: ./gradlew assemble --no-daemon
+      - name: Run the tests
+        run: ./gradlew test --no-daemon
+      - name: Publish
+        if: ${{ inputs.publish }}
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-        with:
-          arguments: build ${{ steps.publish-arguments.outputs.arguments }} --no-daemon
+        run: ./gradlew publish --no-daemon
