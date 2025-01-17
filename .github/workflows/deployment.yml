@@ -46,7 +46,7 @@ jobs:
           { k8s: waltid-applications/waltid-web-portal/k8s, name: portal, namespace: $PORTALS }
         ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Prepare CD - ${{ matrix.services.name }}
         run: |
           modified_deployment=$(sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" ${{ matrix.services.k8s }}/deployment-${{ inputs.deployment }}.yaml | \
