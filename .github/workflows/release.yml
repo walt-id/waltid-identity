@@ -9,18 +9,18 @@ on:
 
 jobs:
   version:
-    uses: walt-id/waltid-identity/.github/workflows/version.yml@c69d2155372700071dad887fa6339b51e0266be5
+    uses: walt-id/waltid-identity/.github/workflows/version.yml@3bf15fcc1152a2a8f97df759e39e3d755c3dc346
     with:
       preferred: ${{ inputs.release_version }}
   gradle-build:
-    uses: walt-id/waltid-identity/.github/workflows/build-gradle.yml@c69d2155372700071dad887fa6339b51e0266be5
+    uses: walt-id/waltid-identity/.github/workflows/build-gradle.yml@3bf15fcc1152a2a8f97df759e39e3d755c3dc346
     secrets: inherit
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
       publish: true
   docker-build:
-    uses: walt-id/waltid-identity/.github/workflows/build-docker.yml@c69d2155372700071dad887fa6339b51e0266be5
+    uses: walt-id/waltid-identity/.github/workflows/build-docker.yml@3bf15fcc1152a2a8f97df759e39e3d755c3dc346
     secrets: inherit
     needs: version
     with:
@@ -28,7 +28,7 @@ jobs:
       tag: latest
       publish: true
   deploy:
-    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@c69d2155372700071dad887fa6339b51e0266be5
+    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@3bf15fcc1152a2a8f97df759e39e3d755c3dc346
     secrets: inherit
     needs: [ version, gradle-build, docker-build ]
     with:
@@ -37,12 +37,12 @@ jobs:
       namespace: default
       portals: portals
   tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@854a65fa2d05b330917b33846441e410b3c8034c
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@3bf15fcc1152a2a8f97df759e39e3d755c3dc346
     needs: [ version, deploy ]
     with:
       version: ${{ needs.version.outputs.release_version }}
   release:
-    uses: walt-id/waltid-identity/.github/workflows/changelog.yml@fix/changelog
+    uses: walt-id/waltid-identity/.github/workflows/changelog.yml@3bf15fcc1152a2a8f97df759e39e3d755c3dc346
     secrets: inherit
     needs: [ tag ]
     with:
