@@ -36,9 +36,14 @@ jobs:
       deployment: prod
       namespace: default
       portals: portals
-  release:
-    uses: walt-id/waltid-identity/.github/workflows/changelog.yml@c69d2155372700071dad887fa6339b51e0266be5
-    secrets: inherit
+  tag:
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@854a65fa2d05b330917b33846441e410b3c8034c
     needs: [ version, deploy ]
     with:
       version: ${{ needs.version.outputs.release_version }}
+  release:
+    uses: walt-id/waltid-identity/.github/workflows/changelog.yml@fix/changelog
+    secrets: inherit
+    needs: [ tag ]
+    with:
+      tag: ${{ needs.tag.outputs.tag }}

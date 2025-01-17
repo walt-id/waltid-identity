@@ -24,9 +24,14 @@ jobs:
     with:
       version: ${{ needs.version.outputs.release_version }}
       publish: true
-  pre-release:
-    uses: walt-id/waltid-identity/.github/workflows/changelog.yml@c69d2155372700071dad887fa6339b51e0266be5
-    secrets: inherit
-    needs: [ version ]
+  tag:
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@854a65fa2d05b330917b33846441e410b3c8034c
+    needs: [ version, gradle-build, docker-build ]
     with:
       version: ${{ needs.version.outputs.release_version }}
+  pre-release:
+    uses: walt-id/waltid-identity/.github/workflows/changelog.yml@fix/changelog
+    secrets: inherit
+    needs: [ tag ]
+    with:
+      tag: ${{ needs.tag.outputs.tag }}

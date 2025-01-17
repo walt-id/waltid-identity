@@ -31,10 +31,7 @@ jobs:
     with:
       version: ${{ needs.version.outputs.release_version }}
   tag:
-    name: Create tag
-    runs-on: ubuntu-latest
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@854a65fa2d05b330917b33846441e410b3c8034c
     needs: [ version, deploy ]
-    steps:
-      - run: |
-          git tag v${{ needs.version.outputs.release_version }}
-          git push --tags
+    with:
+      version: ${{ needs.version.outputs.release_version }}
