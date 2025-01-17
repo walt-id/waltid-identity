@@ -46,12 +46,15 @@ jobs:
           { kube: waltid-applications/waltid-web-portal/k8s, name: portal, namespace: $PORTALS }
         ]
     steps:
+      - uses: actions/checkout@v3
       - name: Prepare CD - ${{ matrix.services.name }}
         run: |
-          sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" ${{ matrix.services.kube }}/deployment-${{ inputs.deployment }}.yaml > ${{ matrix.services.kube }}/deployment_mod.yaml |
-          sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" > ${{ matrix.services.kube }}/deployment_mod.yaml |
+          modified_deployment=$(sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" ${{ matrix.services.kube }}/deployment-${{ inputs.deployment }}.yaml | \
+                                sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g")
           if [ "${{ matrix.services.keycloak }}" != "" ]; then
-            sed "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/${{ matrix.services.keycloak }}/g" > ${{ matrix.services.kube }}/deployment_mod.yaml
+            echo "$modified_deployment" | sed "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/${{ matrix.services.keycloak }}/g" > ${{ matrix.services.kube }}/deployment_mod.yaml
+          else
+            echo "$modified_deployment" > ${{ matrix.services.kube }}/deployment_mod.yaml
           fi
       - name: Continuous deployment - ${{ matrix.services.name }}
         uses: actions-hub/kubectl@master
