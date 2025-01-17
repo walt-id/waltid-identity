@@ -10,6 +10,7 @@ import id.walt.commons.web.UnsupportedMediaTypeException
 import id.walt.commons.web.WebException
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.LocalRegistrar
 import id.walt.did.dids.registrar.dids.DidCheqdCreateOptions
@@ -70,11 +71,10 @@ import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import kotlin.collections.set
+import java.nio.charset.StandardCharsets
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -278,12 +278,12 @@ class SSIKit2WalletService(
                 Result.failure(
                     PresentationError(
                         message =
-                        httpResponseBody?.let {
-                            if (it.couldBeJsonObject()) it.parseAsJsonObject().getOrNull()
-                                ?.get("message")?.jsonPrimitive?.content
-                                ?: "Presentation failed"
-                            else it
-                        } ?: "Presentation failed",
+                            httpResponseBody?.let {
+                                if (it.couldBeJsonObject()) it.parseAsJsonObject().getOrNull()
+                                    ?.get("message")?.jsonPrimitive?.content
+                                    ?: "Presentation failed"
+                                else it
+                            } ?: "Presentation failed",
                         redirectUri = ""
                     )
                 )
@@ -538,18 +538,18 @@ class SSIKit2WalletService(
     }.onSuccess { result ->
         val (operationSucceeded, key) = result
         if (operationSucceeded) {
-        eventUseCase.log(
-            action = (if (isTotalDelete) EventType.Key.Delete else EventType.Key.Remove),
-            originator = "wallet",
-            tenant = tenant,
-            accountId = accountId,
-            walletId = walletId,
-            data = eventUseCase.keyEventData(
-                id = alias,
-                algorithm = key.keyType.name,
-                kmsType = EventDataNotAvailable
+            eventUseCase.log(
+                action = (if (isTotalDelete) EventType.Key.Delete else EventType.Key.Remove),
+                originator = "wallet",
+                tenant = tenant,
+                accountId = accountId,
+                walletId = walletId,
+                data = eventUseCase.keyEventData(
+                    id = alias,
+                    algorithm = key.keyType.name,
+                    kmsType = EventDataNotAvailable
+                )
             )
-        )
         } else {
             logger.warn { "Key delete operation not performed for alias: $alias" }
             throw WebException(HttpStatusCode.BadRequest, "Failed to delete key: $alias")
@@ -560,6 +560,48 @@ class SSIKit2WalletService(
         throw WebException(HttpStatusCode.BadRequest, errorMessage)
     }
 
+    override suspend fun sign(alias: String, data: JsonElement): String {
+        val key = getKey(alias)
+        val headers = mapOf(
+            "kid" to key.getKeyId()
+        ).toJsonObject()
+
+        val dataBytes = data.toString().toByteArray(StandardCharsets.UTF_8)
+        val signature = key.signJws(dataBytes, headers)
+        eventUseCase.log(
+            action = EventType.Key.Sign,
+            originator = "wallet",
+            tenant = tenant,
+            accountId = accountId,
+            walletId = walletId,
+            data = eventUseCase.keyEventData(
+                id = alias,
+                algorithm = key.keyType.name,
+                kmsType = EventDataNotAvailable
+            )
+        )
+
+        return signature
+    }
+
+    override suspend fun verify(jwk: String, signature: String): Boolean {
+        val key = JWKKey.importJWK(jwk).getOrNull() ?: throw IllegalArgumentException("Key import failed")
+
+        val verify = key.verifyJws(signature)
+        eventUseCase.log(
+            action = EventType.Key.Verify,
+            originator = "wallet",
+            tenant = tenant,
+            accountId = accountId,
+            walletId = walletId,
+            data = eventUseCase.keyEventData(
+                id = jwk,
+                algorithm = key.keyType.name,
+                kmsType = EventDataNotAvailable
+            )
+        )
+        return verify.isSuccess
+    }
 
     override fun getHistory(limit: Int, offset: Long): List<WalletOperationHistory> =
         WalletOperationHistories.selectAll()
