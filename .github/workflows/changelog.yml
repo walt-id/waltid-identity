@@ -1,10 +1,10 @@
-name: Create changelog with tag (reusable workflow)
+name: Create changelog (reusable workflow)
 
 on:
   workflow_call:
     inputs:
-      version:
-        description: "release version"
+      tag:
+        description: "tag name"
         required: true
         type: string
 
@@ -13,16 +13,13 @@ jobs:
     name: Create
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          git tag v${{ inputs.version }}
-          git push --tags
       - name: Changelog
         uses: ardalanamini/auto-changelog@v4
         id: changelog
         with:
-          github-token: ${{ github.token }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           default-commit-type: Other Changes
-          release-name: v${{ inputs.version }}
+          release-name: ${{ inputs.tag }}
           mention-authors: true
           mention-new-contributors: true
           include-compare-link: true
@@ -33,7 +30,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ inputs.version }}
+          tag_name: ${{ inputs.tag }}
 #          body: |
 #            ${{ steps.changelog.outputs.changelog }}
           prerelease: ${{ steps.changelog.outputs.prerelease }}
