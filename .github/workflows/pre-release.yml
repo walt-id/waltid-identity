@@ -27,6 +27,6 @@ jobs:
   pre-release:
     uses: walt-id/waltid-identity/.github/workflows/changelog.yml@c69d2155372700071dad887fa6339b51e0266be5
     secrets: inherit
-    needs: [ version, deploy ]
+    needs: [ version ]
     with:
       version: ${{ needs.version.outputs.release_version }}
