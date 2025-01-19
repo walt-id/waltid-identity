@@ -1,0 +1,27 @@
+name: Android CI
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Configure gradle
+        uses: ./.github/actions/gradle-setup-action
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Configure sdk.dir
+        run: echo "sdk.dir=${HOME}/.android/sdk" > local.properties
+      - name: Enable android build
+        run: |
+          if grep -q "enableAndroidBuild" gradle.properties; then
+            sed -i 's/enableAndroidBuild=.*/enableAndroidBuild=true/' gradle.properties
+          else
+            echo "enableAndroidBuild=true" >> gradle.properties
+          fi
+      - name: Build
+        run: ./gradlew --no-daemon build
