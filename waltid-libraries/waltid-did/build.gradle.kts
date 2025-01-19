@@ -49,6 +49,7 @@ kotlin {
             compileTaskProvider.configure {
                 compilerOptions {
                     freeCompilerArgs.add("-Xexpect-actual-classes")
+                    freeCompilerArgs.add("-Xsuppress-warnings")
                 }
             }
         }
@@ -129,6 +130,9 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
+                // algorand
+                implementation ("com.algorand:algosdk:2.2.0")
+                
                 // Ktor client
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 

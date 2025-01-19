@@ -7,6 +7,7 @@ import id.walt.did.dids.registrar.local.cheqd.DidCheqdRegistrar
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
+import id.walt.did.dids.registrar.local.algo.DidAlgoRegistrar
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -23,13 +24,15 @@ class LocalRegistrar : DidRegistrar {
         DidKeyRegistrar(),
         DidWebRegistrar(),
         DidCheqdRegistrar(),
+        DidAlgoRegistrar()
     ).associateBy { it.method }
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun getSupportedMethods() = Result.success(setOf("key", "jwk", "web", "cheqd" /*"ebsi",*/))
+    override suspend fun getSupportedMethods() = Result.success(setOf("key", "jwk", "web", "cheqd", "algo" /*"ebsi",*/))
+    //override suspend fun getSupportedMethods() = Result.success(setOf("key", "jwk", "web", "cheqd" /*"ebsi",*/))
     //override suspend fun getSupportedMethods() = Result.success(registrarMethods.values.toSet())
 
     private fun getRegistrarForMethod(method: String) =
