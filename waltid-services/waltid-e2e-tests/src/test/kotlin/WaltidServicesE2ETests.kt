@@ -9,17 +9,22 @@ import id.walt.commons.web.plugins.httpJson
 import id.walt.credentials.schemes.JwsSignatureScheme
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
+import id.walt.issuer.config.CredentialTypeConfig
+import id.walt.issuer.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuerModule
 import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.providers.CredentialIssuerConfig
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.AccountWalletListing
+import id.walt.webwallet.service.issuers.IssuersService
+import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
@@ -36,10 +41,9 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.util.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import kotlin.test.Test
-import kotlin.test.assertContains
-import kotlin.test.assertNotNull
+import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -101,7 +105,11 @@ class WaltidServicesE2ETests {
     @Test
     fun e2e() = E2ETest.testBlock(
         config = ServiceConfiguration("e2e-test"),
-        features = listOf(id.walt.issuer.FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
+        features = listOf(
+            id.walt.issuer.FeatureCatalog,
+            id.walt.verifier.FeatureCatalog,
+            id.walt.webwallet.FeatureCatalog
+        ),
         featureAmendments = mapOf(
             CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
             // CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
@@ -226,9 +234,10 @@ class WaltidServicesE2ETests {
 
         //region -Issuer / offer url-
         lateinit var offerUrl: String
-        val issuerApi = IssuerApi(client,
-        // uncomment the following line, to test status callbacks, update webhook id as required.
-        //    "https://webhook.site/d879094b-2275-4ae7-b1c5-ebfb9f08dfdb"
+        val issuerApi = IssuerApi(
+            client,
+            // uncomment the following line, to test status callbacks, update webhook id as required.
+            //    "https://webhook.site/d879094b-2275-4ae7-b1c5-ebfb9f08dfdb"
         )
         val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(jwtCredential)
         println("issuance-request:")
@@ -237,6 +246,9 @@ class WaltidServicesE2ETests {
             offerUrl = it
             println("offer: $offerUrl")
         }
+        assertTrue(offerUrl.contains("draft13"))
+        assertFalse(offerUrl.contains("draft11"))
+
         //endregion -Issuer / offer url-
 
         //region -Exchange / claim-
@@ -377,11 +389,16 @@ class WaltidServicesE2ETests {
         ExchangeExternalSignatures().executeTestCases()
         //endregion -External Signatures-
 
-        // Input descriptor matching test
+        //region -Input Descriptor Matching (Wallet)-
         val inputDescTest = InputDescriptorMatchingTest(issuerApi, exchangeApi, sessionApi, verificationApi)
         //cleanup credentials
         credentialsApi.delete(wallet, newCredentialId)
         inputDescTest.e2e(wallet, did)
+        //endregion -Input Descriptor Matching (Wallet)-
+
+        //region -Presentation Definition Policy (Verifier)-
+        PresentationDefinitionPolicyTests().runTests()
+        //endregion -Presentation Definition Policy (Verifier)-
     }
 
     /* @Test // enable to execute test selectively
@@ -400,10 +417,37 @@ class WaltidServicesE2ETests {
         lspPotentialVerification.testPotentialInteropTrack4()
     }*/
 
+//        @Test
+    fun e2ePresDefPolicyTests() = E2ETest.testBlock(
+        config = ServiceConfiguration("e2e-pres-def-tests"),
+        features = listOf(
+            id.walt.issuer.FeatureCatalog,
+            id.walt.verifier.FeatureCatalog,
+            id.walt.webwallet.FeatureCatalog
+        ),
+        featureAmendments = mapOf(
+            CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
+            // CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
+        ),
+        init = {
+            id.walt.webwallet.webWalletSetup()
+            id.walt.did.helpers.WaltidServices.minimalInit()
+            id.walt.webwallet.db.Db.start()
+        },
+        module = e2eTestModule,
+        timeout = defaultTestTimeout,
+    ) {
+        PresentationDefinitionPolicyTests().runTests()
+    }
+
     //@Test
     fun testExternalSignatureAPIs() = E2ETest.testBlock(
         config = ServiceConfiguration("e2e-test"),
-        features = listOf(id.walt.issuer.FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
+        features = listOf(
+            id.walt.issuer.FeatureCatalog,
+            id.walt.verifier.FeatureCatalog,
+            id.walt.webwallet.FeatureCatalog
+        ),
         featureAmendments = mapOf(
             CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
             // CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
@@ -422,7 +466,11 @@ class WaltidServicesE2ETests {
     //@Test
     fun inputDescriptorTest() = E2ETest.testBlock(
         config = ServiceConfiguration("e2e-test"),
-        features = listOf(id.walt.issuer.FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
+        features = listOf(
+            id.walt.issuer.FeatureCatalog,
+            id.walt.verifier.FeatureCatalog,
+            id.walt.webwallet.FeatureCatalog
+        ),
         featureAmendments = mapOf(
             CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
             // CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
@@ -479,6 +527,21 @@ class WaltidServicesE2ETests {
         val inputDescTest = InputDescriptorMatchingTest(issuerApi, exchangeApi, sessionApi, verificationApi)
 
         inputDescTest.e2e(wallet, did)
+    }
+
+    //@Test
+    fun issuerCredentialsListTest() = runBlocking {
+        var client = testHttpClient()
+        assertFalse(
+            IssuerUseCaseImpl(IssuersService, client).
+                fetchCredentials("https://issuer.portal.walt-test.cloud/draft11/.well-known/openid-credential-issuer")
+                    .isEmpty()
+        )
+        assertFalse(
+            IssuerUseCaseImpl(IssuersService, client).
+            fetchCredentials("https://issuer.portal.walt-test.cloud/draft13/.well-known/openid-credential-issuer")
+                .isEmpty()
+        )
     }
 
     suspend fun setupTestWallet(): LspPotentialWallet {

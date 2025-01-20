@@ -1,0 +1,42 @@
+name: Build gradle and/or publish (reusable workflow)
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "release version"
+        required: true
+        type: string
+      publish:
+        description: "Specifies whether to publish the artifacts (defaults to false)"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          docker-images: false
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Configure gradle
+        uses: ./.github/actions/gradle-setup-action@266f5c09359450c39019a6da38f2b331e7122918
+      - name: Set version
+        run: |
+          sed -i "s/1.0.0-SNAPSHOT/${{ inputs.version }}/g" build.gradle.kts
+      - name: Assemble the project
+        run: ./gradlew assemble --no-daemon
+      - name: Run the tests
+        run: ./gradlew test --no-daemon
+      - name: Publish
+        if: ${{ inputs.publish }}
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+        run: ./gradlew publish --no-daemon
