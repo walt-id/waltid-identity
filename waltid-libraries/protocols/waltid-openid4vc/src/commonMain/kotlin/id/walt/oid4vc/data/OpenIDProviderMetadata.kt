@@ -8,13 +8,10 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.json.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.ClassDiscriminatorMode
 
 /**
  * OpenID Provider metadata object, according to
@@ -266,14 +263,13 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
 
     ) : OpenIDProviderMetadata()
     {
-        // TODO: make them abstract in the sealed class
         fun getVctByCredentialConfigurationId(credentialConfigurationId: String) = credentialConfigurationsSupported?.get(credentialConfigurationId)?.vct
 
         fun getVctBySupportedCredentialConfiguration(
             baseUrl: String,
             credType: String
         ): CredentialSupported {
-            val expectedVct = "${URLBuilder(Url(baseUrl).protocolWithAuthority)}/$credType"
+            val expectedVct = "$baseUrl/$credType"
 
             credentialConfigurationsSupported?.entries?.forEach { entry ->
                 if (getVctByCredentialConfigurationId(entry.key) == expectedVct) {
@@ -293,36 +289,57 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
     }
 }
 
+object OpenIDProviderMetadataJsonSerializer : JsonDataObjectSerializer<OpenIDProviderMetadata>(OpenIDProviderMetadataSerializer) {
+    public override fun transformSerialize(element: JsonElement) = JsonObject(super.transformSerialize(element).jsonObject)
+    public override fun transformDeserialize(element: JsonElement): JsonElement {return JsonObject(super.transformDeserialize(element).jsonObject)
+    }
+}
+
 object OpenIDProviderMetadataSerializer : KSerializer<OpenIDProviderMetadata> {
 
-    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("OpenIDProviderMetadata")
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("OpenIDProviderMetadata") {
+        val seenElements = mutableSetOf<String>()
 
-    override fun deserialize(decoder: Decoder): OpenIDProviderMetadata {
-        val jsonDecoder = decoder as? JsonDecoder ?: throw IllegalStateException("Invalid Decoder")
+        val subclassDescriptors = listOf(
+            OpenIDProviderMetadata.Draft11.serializer().descriptor,
+            OpenIDProviderMetadata.Draft13.serializer().descriptor
+        )
 
-        val jsonObject = jsonDecoder.decodeJsonElement().jsonObject
-
-        // TODO: ()
-        return when {
-            "credentials_supported" in jsonObject -> Json.decodeFromJsonElement(OpenIDProviderMetadata.Draft11.serializer(), jsonObject)
-            "credential_configurations_supported" in jsonObject -> Json.decodeFromJsonElement(OpenIDProviderMetadata.Draft13.serializer(), jsonObject)
-            else -> throw IllegalArgumentException("Unknown OpenIDProviderMetadata version: missing expected fields")
-        }
-    }
-
-    private val OpenIDProviderMetadataSerializersModule = SerializersModule {
-        polymorphic(OpenIDProviderMetadata::class) {
-            subclass(OpenIDProviderMetadata.Draft11::class, OpenIDProviderMetadata.Draft11.serializer())
-            subclass(OpenIDProviderMetadata.Draft13::class, OpenIDProviderMetadata.Draft13.serializer())
+        for (subDescriptor in subclassDescriptors) {
+            for (index in 0 until subDescriptor.elementsCount) {
+                val name = subDescriptor.getElementName(index)
+                if (seenElements.add(name)) {
+                    element(name, subDescriptor.getElementDescriptor(index))
+                }
+            }
         }
     }
 
     override fun serialize(encoder: Encoder, value: OpenIDProviderMetadata) {
-        val json by lazy { Json { serializersModule = OpenIDProviderMetadataSerializersModule; classDiscriminatorMode = ClassDiscriminatorMode.NONE } }
-        val jsonElement = json.encodeToJsonElement(OpenIDProviderMetadata.serializer(), value)
-        encoder as? JsonEncoder ?: throw IllegalStateException("Invalid Encoder")
-        encoder.encodeJsonElement(jsonElement)
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw IllegalStateException("This serializer can only be used with a JSON encoder")
+
+        val jsonElement = when (value) {
+            is OpenIDProviderMetadata.Draft11 -> Json.encodeToJsonElement(OpenIDProviderMetadata.Draft11.serializer(), value)
+            is OpenIDProviderMetadata.Draft13 -> Json.encodeToJsonElement(OpenIDProviderMetadata.Draft13.serializer(), value)
+        }
+
+        jsonEncoder.encodeJsonElement(OpenIDProviderMetadataJsonSerializer.transformSerialize(jsonElement))
     }
 
+    override fun deserialize(decoder: Decoder): OpenIDProviderMetadata {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: throw IllegalStateException("This serializer can only be used with a JSON decoder")
+
+        val rawJsonElement = jsonDecoder.decodeJsonElement()
+
+        val transformedElement = OpenIDProviderMetadataJsonSerializer.transformDeserialize(rawJsonElement)
+
+        return when {
+            "credentials_supported" in transformedElement.jsonObject -> Json.decodeFromJsonElement(OpenIDProviderMetadata.Draft11.serializer(), transformedElement)
+            "credential_configurations_supported" in transformedElement.jsonObject -> Json.decodeFromJsonElement(OpenIDProviderMetadata.Draft13.serializer(), transformedElement)
+            else -> throw IllegalArgumentException("Unknown OpenIDProviderMetadata version: missing expected fields")
+        }
+    }
 }
 

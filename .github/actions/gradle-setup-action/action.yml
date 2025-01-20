@@ -1,0 +1,23 @@
+name: Configure gradle
+description: Composite Action to setup gradle
+runs:
+  using: "composite"
+  steps:
+    - name: Setup cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+    - name: Setup JDK
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+    - name: Gradle wrapper validation
+      uses: gradle/actions/wrapper-validation@v4
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4

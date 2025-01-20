@@ -35,7 +35,6 @@ import io.ktor.server.util.*
 import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -117,9 +116,10 @@ val verifiableIdPresentationDefinitionExample = JsonObject(
 private const val fixedPresentationDefinitionForEbsiConformanceTest =
     "{\"id\":\"any\",\"format\":{\"jwt_vp\":{\"alg\":[\"ES256\"]}},\"input_descriptors\":[{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}}]}"
 
-private val verificationUseCase = VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
+private val verificationUseCase =
+    VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
 
-fun Application.verfierApi() {
+fun Application.verifierApi() {
     routing {
 
         route("openid4vc", {
@@ -145,12 +145,14 @@ fun Application.verfierApi() {
                         required = false
                     }
                     headerParameter<String>("successRedirectUri") {
-                        description = "Redirect URI to return when all policies passed. \"\$id\" will be replaced with the session id."
+                        description =
+                            "Redirect URI to return when all policies passed. \"\$id\" will be replaced with the session id."
                         // example = ""
                         required = false
                     }
                     headerParameter<String>("errorRedirectUri") {
-                        description = "Redirect URI to return when a policy failed. \"\$id\" will be replaced with the session id."
+                        description =
+                            "Redirect URI to return when a policy failed. \"\$id\" will be replaced with the session id."
                         // example = ""
                         required = false
                     }
@@ -182,16 +184,28 @@ fun Application.verfierApi() {
                         example("Minimal example", VerifierApiExamples.minimal)
                         example("Example with VP policies", VerifierApiExamples.vpPolicies)
                         example("Example with VP & global VC policies", VerifierApiExamples.vpGlobalVcPolicies)
-                        example("Example with VP, VC & specific credential policies", VerifierApiExamples.vcVpIndividualPolicies)
+                        example(
+                            "Example with VP, VC & specific credential policies",
+                            VerifierApiExamples.vcVpIndividualPolicies
+                        )
                         example(
                             "Example with VP, VC & specific policies, and explicit input_descriptor(s)  (maximum example)",
                             VerifierApiExamples.maxExample
                         )
-                        example("Example with presentation definition policy", VerifierApiExamples.presentationDefinitionPolicy)
-                        example("Example with EBSI PDA1 Presentation Definition", VerifierApiExamples.EbsiVerifiablePDA1)
+                        example(
+                            "Example with presentation definition policy",
+                            VerifierApiExamples.presentationDefinitionPolicy
+                        )
+                        example(
+                            "Example with EBSI PDA1 Presentation Definition",
+                            VerifierApiExamples.EbsiVerifiablePDA1
+                        )
                         example("MDoc verification example", VerifierApiExamples.lspPotentialMdocExample)
                         example("SD-JWT-VC verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
-                        example("SD-JWT-VC verification example with mandatory fields", VerifierApiExamples.sdJwtVCExampleWithRequiredFields)
+                        example(
+                            "SD-JWT-VC verification example with mandatory fields",
+                            VerifierApiExamples.sdJwtVCExampleWithRequiredFields
+                        )
                     }
                 }
 
@@ -261,7 +275,7 @@ fun Application.verfierApi() {
                             value = TokenResponseFormParam(
                                 JsonPrimitive("abc.def.ghi"), PresentationSubmissionFormParam(
                                     "1", "1", listOf(
-                                        DescriptorMappingFormParam("1", VCFormat.jwt_vc_json, "$.type")
+                                        DescriptorMappingFormParam("1", VCFormat.jwt_vc_json, "$.vc.type")
                                     )
                                 ), null
                             )
@@ -446,7 +460,12 @@ fun Application.verfierApi() {
                 },
                 openId4VPProfile = OpenId4VPProfile.EBSIV3
             )
-            context.respondRedirect("openid://?${session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(SERVER_URL.let { "$it/openid4vc/request/${session.id}" })}")
+            context.respondRedirect(
+                "openid://?${
+                    session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(
+                        SERVER_URL.let { "$it/openid4vc/request/${session.id}" })
+                }"
+            )
         }
     }
 }
@@ -464,35 +483,42 @@ private fun getErrorDescription(it: Throwable): String? = when (it.message) {
     else -> null
 }
 
-private suspend fun PipelineContext<Unit, ApplicationCall>.processError(
+private fun PipelineContext<Unit, ApplicationCall>.processError(
     sessionId: String,
     error: Throwable
 ) {
     val session = verificationUseCase.getSession(sessionId)
     if (session.walletInitiatedAuthState != null) {
         val state = session.walletInitiatedAuthState
-        context.respondRedirect(
-            "openid://?state=$state&error=invalid_request&error_description=${getErrorDescription(error)}"
-        )
+        runBlocking {
+            context.respondRedirect(
+                "openid://?state=$state&error=invalid_request&error_description=${getErrorDescription(error)}"
+            )
+        }
     } else if (error is VerificationUseCase.FailedVerificationException && error.redirectUrl != null) {
-        context.respond(HttpStatusCode.BadRequest, error.redirectUrl)
+        runBlocking {
+            context.respond(HttpStatusCode.BadRequest, error.redirectUrl)
+        }
+
     } else {
         throw error
     }
 }
 
-private suspend fun PipelineContext<Unit, ApplicationCall>.processVerificationFailureResult(
+private fun PipelineContext<Unit, ApplicationCall>.processVerificationFailureResult(
     sessionId: String?,
     error: Throwable,
 ) {
-    logger.debug(error) { "Verification failed ($error)" }
+    runBlocking { logger.debug(error) { "Verification failed ($error)" } }
     val errorDescription = error.message ?: "Verification failed"
-    logger.error { "Error: $errorDescription" }
+    runBlocking { logger.error { "Error: $errorDescription" } }
     if (sessionId != null) {
         processError(sessionId, error)
     } else {
-        logger.error(error) { "/verify error: $errorDescription" }
-        call.respond(HttpStatusCode.BadRequest, errorDescription)
+        runBlocking {
+            logger.error(error) { "/verify error: $errorDescription" }
+            call.respond(HttpStatusCode.BadRequest, errorDescription)
+        }
     }
 }
 
