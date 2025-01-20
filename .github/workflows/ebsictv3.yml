@@ -2,8 +2,6 @@ name: EBSI Conformance Test v3.2
 
 on:
   push:
-    branches-ignore:
-      - main
     paths:
       - 'waltid-libraries/credentials/**'
       - 'waltid-libraries/crypto/**'
@@ -19,6 +17,18 @@ jobs:
       - name: The EBSI Conformance Test v3.2 job is starting
         run: |
           echo -e "🔎 The EBSI Conformance Test v3.2 job is starting\n"
+
+      - name: Check EBSI Conformance API Status
+        run: |
+          echo "Checking if the API is available..."
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://api-conformance.ebsi.eu/did-registry/v5/identifiers/did:ebsi:zf39qHTXaLrr6iy3tQhT3UZ)
+          if [ "$RESPONSE" -ne 200 ]; then
+            echo "EBSI Conformance API is down. Exiting workflow with success. ✅"
+            exit 0  # Exit the workflow successfully
+          else
+            echo "EBSI Conformance API is up. Proceeding with tests."
+          fi
+
       - name: Docker
         run: docker --version
 
