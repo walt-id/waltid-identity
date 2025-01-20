@@ -1,14 +1,17 @@
 {
-  "type": [
+  "type":
+  [
     "VerifiableCredential",
-    "StatusList2021Credential"
+    "RevocationList2020"
   ],
-  "credentialSubject": {
+  "credentialSubject":
+  {
     "id": "urn:uuid:cca8bd0a-83c2-4ae1-9f43-e99943cdfa5c",
-    "type": "RevocationList2021",
+    "type": "RevocationList2020",
     "statusPurpose": "status",
     "statusSize": 2,
-    "statusMessage": [
+    "statusMessage":
+    [
       {
         "status": "0x0",
         "message": "valid"
