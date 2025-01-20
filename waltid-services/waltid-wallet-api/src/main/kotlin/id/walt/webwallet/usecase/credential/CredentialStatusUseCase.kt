@@ -22,10 +22,12 @@ class CredentialStatusUseCase(
             }
         } ?: error("Credential not found or invalid document for id: $credentialId")
 
+    private val jsonModule = Json { ignoreUnknownKeys = true }
+
     private fun getStatusEntry(json: JsonObject) = json.jsonObject["credentialStatus"]?.let {
         when (it) {
-            is JsonArray -> Json.decodeFromJsonElement<List<StatusListEntry>>(it)
-            is JsonObject -> listOf(Json.decodeFromJsonElement<StatusListEntry>(it))
+            is JsonArray -> jsonModule.decodeFromJsonElement<List<StatusListEntry>>(it)
+            is JsonObject -> listOf(jsonModule.decodeFromJsonElement<StatusListEntry>(it))
             else -> null
         }
     } ?: emptyList()
