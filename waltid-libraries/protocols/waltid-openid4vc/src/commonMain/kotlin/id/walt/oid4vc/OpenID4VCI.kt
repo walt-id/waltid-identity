@@ -325,7 +325,7 @@ object OpenID4VCI {
         return payload
     }
 
-    fun createDefaultProviderMetadata(baseUrl: String, credentialSupported: Map<String, CredentialSupported>, version: OpenID4VCIVersion) : OpenIDProviderMetadata {
+    fun createDefaultProviderMetadata(baseUrl: String, credentialSupported: Map<String, CredentialSupported>? = null, version: OpenID4VCIVersion, customParameters: Map<String, JsonElement>? = emptyMap()) : OpenIDProviderMetadata {
 
         return when (version) {
             OpenID4VCIVersion.DRAFT13 -> OpenIDProviderMetadata.Draft13(
@@ -348,7 +348,8 @@ object OpenID4VCI {
                 ),  // (EBSI) this is required one  https://www.rfc-editor.org/rfc/rfc8414.html#section-2
                 idTokenSigningAlgValuesSupported = setOf("ES256"), // (EBSI) https://openid.net/specs/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-
                 codeChallengeMethodsSupported = listOf("S256"),
-                credentialConfigurationsSupported = credentialSupported
+                credentialConfigurationsSupported = credentialSupported,
+                customParameters = customParameters!!
             )
 
             OpenID4VCIVersion.DRAFT11 -> OpenIDProviderMetadata.Draft11(
@@ -371,13 +372,14 @@ object OpenID4VCI {
                 ),  // (EBSI) this is required one  https://www.rfc-editor.org/rfc/rfc8414.html#section-2
                 idTokenSigningAlgValuesSupported = setOf("ES256"), // (EBSI) https://openid.net/specs/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-
                 codeChallengeMethodsSupported = listOf("S256"),
-                credentialSupported = credentialSupported.
+                credentialSupported = credentialSupported?.
                     filterValues { credential ->
                         credential.format == CredentialFormat.jwt_vc || credential.format == CredentialFormat.jwt_vc_json
-                    }.
+                    }?.
                     mapValues {
                         (_, credential) -> credential.copy(types = credential.credentialDefinition?.type, credentialDefinition = null)
-                    }
+                    },
+                customParameters = customParameters!!
             )
         }
     }
