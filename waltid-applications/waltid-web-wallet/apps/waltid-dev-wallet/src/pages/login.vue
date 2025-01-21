@@ -439,10 +439,9 @@ async function openWeb3() {
     console.log("Received JWT:", tokenText);
 
     const { nonce } = decodeJWT(tokenText); // Decode the JWT and extract nonce
-    console.log("Extracted nonce:", nonce);
 
     const MMSDK = new MetaMaskSDK({
-        dappMetadata: { name: "Example Dapp", url: window.location.href },
+      dappMetadata: {name: "Walt.id Web Wallet", url: window.location.href},
         injectProvider: true
     });
 
@@ -450,11 +449,9 @@ async function openWeb3() {
     const ethereum = MMSDK.getProvider();
     const accounts = await ethereum.request({ method: "eth_requestAccounts" });
     const address = accounts[0];
-    console.log("About to sign nonce:", nonce);
 
 
     const message = `\u0019Ethereum Signed Message:\n${nonce.length}${nonce}`;
-    console.log("Formatted message:", message); // Debug
 
 
     const signature = await ethereum.request({
