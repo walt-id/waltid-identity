@@ -60,13 +60,8 @@ object Web3 : AuthenticationMethod("web3") {
         val publicKey: String
     )
 
-    suspend fun verifyEthereum2(nonce: String, signature: String, expectedAddress: String): String {
-        // formatting the message according to the EIP-191 standard
-        val prefix = "\u0019Ethereum Signed Message:\n"
-        val messageLength = nonce.length.toString()
-        val prefixedMessage = prefix + messageLength + nonce
-
-        val messageHash = Sign.getEthereumMessageHash(prefixedMessage.toByteArray())
+    suspend fun verifyEthereum2(challenge: String, signature: String, expectedAddress: String): String {
+        val messageHash = Sign.getEthereumMessageHash(challenge.toByteArray())
 
         // Parse signature components
         val signatureBytes = Numeric.hexStringToByteArray(signature.removePrefix("0x"))
@@ -94,59 +89,6 @@ object Web3 : AuthenticationMethod("web3") {
             "Recovered address ($recoveredAddress) does not match provided address (${expectedAddress})"
         }
 
-
-        return recoveredAddress
-    }
-
-    suspend fun verifyEthereum(nonce: String, signature: String, expectedAddress: String): String {
-        log.trace { "Provided signature (hex): $signature" }
-
-        // Step 1: Compute the Ethereum message hash
-        log.trace { "Challenge nonce: $nonce" }
-        val messageHashX = Sign.getEthereumMessageHash(nonce.toByteArray())
-
-        val prefix = "\u0019Ethereum Signed Message:\n"
-        val prefixedMessage = prefix + nonce.length.toString() + nonce
-        val messageHash = Sign.getEthereumMessageHash(prefixedMessage.toByteArray())
-
-        log.trace { "Unprefixed message hash: ${messageHashX.toHexString()}" }
-        log.trace { "Prefixed message hash  : ${messageHash.toHexString()}" }
-
-        log.trace { "Ethereum hash (hex) for challenge nonce: ${messageHash.toHexString()}" }
-
-        // Step 2: Decode the signature
-        val signatureBytes = Numeric.hexStringToByteArray(signature)
-        require(signatureBytes.size == 65) { "Invalid signature length" }
-
-        val r = signatureBytes.copyOfRange(0, 32)
-        val s = signatureBytes.copyOfRange(32, 64)
-        val v = signatureBytes[64].toInt() and 0xFF
-
-        // Adjust `v` value to Ethereum standard (27 or 28)
-        val vCorrected = if (v < 27) v + 27 else v
-        log.trace { "Original v: $v, corrected v: $vCorrected" }
-
-
-        // Step 3: Recover the public key from the signature
-        val signatureData = Sign.SignatureData(vCorrected.toByte(), r, s)
-        log.trace { "Decoded signature, getting public key from signature..." }
-
-        val publicKey: BigInteger = try {
-            Sign.signedMessageToKey(messageHash, signatureData)
-        } catch (e: Exception) {
-            throw IllegalArgumentException("Invalid signature", e)
-        }
-
-        // Step 4: Derive the Ethereum address from the public key
-        val recoveredAddress = "0x" + Keys.getAddress(publicKey)
-        log.trace { "Recovered address from challenge signature: $recoveredAddress" }
-
-        // Step 5: Compare the recovered address to the expected address
-        authCheck(recoveredAddress.equals(expectedAddress, ignoreCase = true)) {
-            "Recovered address ($recoveredAddress) does not match provided address (${expectedAddress})"
-        }
-        log.trace { "Recovered address ($recoveredAddress) matches expected address." }
-
         return recoveredAddress
     }
 
@@ -162,7 +104,7 @@ object Web3 : AuthenticationMethod("web3") {
         val decodedJwt = challenge.decodeJws()
         val jwtPayload = decodedJwt.payload.jsonObject
 
-        val nonce = jwtPayload["nonce"]?.jsonPrimitive?.content ?: authFailure("No nonce in token")
+        //val nonce = jwtPayload["nonce"]?.jsonPrimitive?.content ?: authFailure("No nonce in token")
         val exp = jwtPayload["exp"]?.jsonPrimitive?.long ?: authFailure("No exp in token")
 
         val now = Clock.System.now().epochSeconds
@@ -172,47 +114,8 @@ object Web3 : AuthenticationMethod("web3") {
 
         log.trace { "Challenge did not yet expire. Verifying challenge signature..." }
 
-        val address = verifyEthereum2(nonce, siweReq.signed, siweReq.publicKey)
+        val address = verifyEthereum2(challenge, siweReq.signed, siweReq.publicKey)
         return address
-
-        /*// formatting the message according to the EIP-191 standard
-        val prefix = "\u0019Ethereum Signed Message:\n"
-        val messageLength = nonce.length.toString()
-        val prefixedMessage = prefix + messageLength + nonce
-
-        val messageHash = Sign.getEthereumMessageHash(prefixedMessage.toByteArray())
-
-        // Parse signature components
-        val signatureBytes = Numeric.hexStringToByteArray(siweReq.signed.removePrefix("0x"))
-        val r =  signatureBytes.copyOfRange(0, 32)
-        val s =  signatureBytes.copyOfRange(32, 64)
-        val vUncorrected = signatureBytes[64].toInt() and 0xFF
-
-        // Adjust `v` value to fit the Ethereum convention (27 or 28)
-        val v = if (vUncorrected < 27) vUncorrected + 27 else vUncorrected
-
-        val signatureData = Sign.SignatureData(v.toByte(), r, s)
-
-        val publicKey: BigInteger? = try {
-            Sign.signedMessageToKey(messageHash, signatureData)
-        } catch (e: Exception) {
-            null
-        }
-
-
-        val signature = ECDSASignature(r, s)
-
-        // Recover the public key
-        val recoveredPublicKey = Sign.recoverFromSignature(
-            v.toByte().toInt(), signature, messageHash
-        ) ?: authFailure("Could not recover public key from signature")
-
-
-        val recoveredAddress = "0x" + Keys.getAddress(recoveredPublicKey)
-
-        authCheck(recoveredAddress.equals(siweReq.publicKey, ignoreCase = true)) {
-            "Recovered address ($recoveredAddress) does not match provided address (${siweReq.publicKey})"
-        }*/
     }
 
     override fun Route.registerAuthenticationRoutes(
