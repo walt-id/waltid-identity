@@ -255,7 +255,7 @@ spec:
                 port:
                   name: http
           - path: /api.json
-            pathType: Prefix
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: wallet-api
@@ -307,7 +307,7 @@ spec:
                 port:
                   name: http
           - path: /api.json
-            pathType: Prefix
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: wallet-api
