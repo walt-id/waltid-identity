@@ -62,8 +62,6 @@ jobs:
           else
             echo "$modified_deployment" > ${{ matrix.services.k8s }}/deployment_mod.yaml
           fi
-          echo "$KEYCLOAK"
-          echo "$IMAGE_TAG"
       - name: Continuous deployment - ${{ matrix.services.name }}
         uses: actions-hub/kubectl@master
         env:
