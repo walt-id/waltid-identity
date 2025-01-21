@@ -47,7 +47,7 @@ jobs:
           - k8s: waltid-services/waltid-wallet-api/k8s
             name: web-wallet
             namespace: ${{ inputs.namespace }}
-#            keycloak: ${{ env.KEYCLOAK }}
+            keycloak: true
           - k8s: waltid-applications/waltid-web-portal/k8s
             name: portal
             namespace: ${{ inputs.portals }}
@@ -57,11 +57,13 @@ jobs:
         run: |
           modified_deployment=$(sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" ${{ matrix.services.k8s }}/deployment-${{ inputs.deployment }}.yaml | \
                                 sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g")
-          if [ "${{ matrix.services.keycloak }}" != "" ]; then
-            echo "$modified_deployment" | sed "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/${{ matrix.services.keycloak }}/g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
+          if [ "${{ matrix.services.keycloak }}" == true ]; then
+            echo "$modified_deployment" | sed "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/$KEYCLOAK/g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
           else
             echo "$modified_deployment" > ${{ matrix.services.k8s }}/deployment_mod.yaml
           fi
+          echo "$KEYCLOAK"
+          echo "$IMAGE_TAG"
       - name: Continuous deployment - ${{ matrix.services.name }}
         uses: actions-hub/kubectl@master
         env:
