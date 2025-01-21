@@ -30,7 +30,7 @@ class EntraStatusListCredentialFetchStrategyTest {
     fun test() = runTest {
         val did = Json.decodeFromString<JsonObject>(TestUtils.loadResource("credential-status/entra-did-doc.json"))
         val credential =
-            Json.decodeFromString<JsonObject>(TestUtils.loadResource("credential-status/status-list-credential/entra-missing-purpose.json"))
+            Json.decodeFromString<JsonObject>(TestUtils.loadResource("credential-status/status-list-credential/revocation-list-missing-purpose.json"))
         val serviceEndpointResponse = TestUtils.loadResource("credential-status/entra-service-endpoint-response.json")
         coEvery { didResolverServiceMock.resolve(any()) } returns did
         coEvery { serviceEndpointProviderMock.get(any(), any(), any()) } returns serviceEndpointResponse
