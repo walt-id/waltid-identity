@@ -65,11 +65,12 @@ kind: PersistentVolumeClaim
 metadata:
   name: wallet-data-volume-claim
 spec:
+  storageClassName: azure-managed-standardssd-retain
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
-      storage: 10Gi
+      storage: 1Gi
 ---
 kind: Deployment
 apiVersion: apps/v1
