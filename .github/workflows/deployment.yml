@@ -47,7 +47,7 @@ jobs:
           - k8s: waltid-services/waltid-wallet-api/k8s
             name: web-wallet
             namespace: ${{ inputs.namespace }}
-            keycloak: ${{ env.KEYCLOAK }}
+#            keycloak: ${{ env.KEYCLOAK }}
           - k8s: waltid-applications/waltid-web-portal/k8s
             name: portal
             namespace: ${{ inputs.portals }}
