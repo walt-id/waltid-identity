@@ -349,21 +349,21 @@
 
 <script lang="ts" setup>
 import {
-  ArrowRightOnRectangleIcon,
-  BookmarkSquareIcon,
-  EnvelopeIcon,
-  IdentificationIcon,
-  QuestionMarkCircleIcon
+    ArrowRightOnRectangleIcon,
+    BookmarkSquareIcon,
+    EnvelopeIcon,
+    IdentificationIcon,
+    QuestionMarkCircleIcon
 } from "@heroicons/vue/20/solid";
-import {Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot} from "@headlessui/vue";
-import {ExclamationCircleIcon, XMarkIcon} from "@heroicons/vue/24/outline";
-import {usePageLeave, useParallax} from "@vueuse/core";
+import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from "@headlessui/vue";
+import { ExclamationCircleIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import { usePageLeave, useParallax } from "@vueuse/core";
 import useModalStore from "@waltid-web-wallet/stores/useModalStore.ts";
-import {useUserStore} from "@waltid-web-wallet/stores/user.ts";
-import {storeToRefs} from "pinia";
-import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
-import {decodeJwt} from "jose";
-import {MetaMaskSDK} from "@metamask/sdk";
+import { useUserStore } from "@waltid-web-wallet/stores/user.ts";
+import { storeToRefs } from "pinia";
+import { useTenant } from "@waltid-web-wallet/composables/tenants.ts";
+import { decodeJwt } from "jose";
+import { MetaMaskSDK } from "@metamask/sdk";
 
 const store = useModalStore();
 
@@ -433,15 +433,13 @@ function decodeJWT(token) {
 }
 
 async function openWeb3() {
-  const response = await fetch("/wallet-api/auth/account/web3/nonce", {method: "GET"});
-    const tokenText = await response.text();
+    const response = await fetch("/wallet-api/auth/account/web3/nonce", { method: "GET" });
+    const challenge = await response.text();
     console.log("====Frontend DEBUG LOGS====");
-    console.log("Received JWT:", tokenText);
-
-    const { nonce } = decodeJWT(tokenText); // Decode the JWT and extract nonce
+    console.log("Received JWT:", challenge);
 
     const MMSDK = new MetaMaskSDK({
-      dappMetadata: {name: "Walt.id Web Wallet", url: window.location.href},
+        dappMetadata: { name: "Walt.id Web Wallet", url: window.location.href },
         injectProvider: true
     });
 
@@ -450,33 +448,29 @@ async function openWeb3() {
     const accounts = await ethereum.request({ method: "eth_requestAccounts" });
     const address = accounts[0];
 
-
-    const message = `\u0019Ethereum Signed Message:\n${nonce.length}${nonce}`;
-
-
     const signature = await ethereum.request({
         method: "personal_sign",
-        params: [message, address]
+        params: [challenge, address]
     });
 
     console.log("Signature:", signature);
 
 
-  const verificationResponse = await fetch("/wallet-api/auth/account/web3/signed", {
+    const verificationResponse = await fetch("/wallet-api/auth/account/web3/signed", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             publicKey: address,
             signed: signature,
-            challenge: tokenText // Send the full tokenText (JWT)
+            challenge: challenge // Send the full tokenText (JWT)
         })
     });
 
 
-  console.log("Signing message:", {
-        nonce,
+    console.log("Signing message:", {
+        challenge,
         address,
-        messageToSign: message
+        messageToSign: challenge
     });
 
     const result = await verificationResponse.json();
