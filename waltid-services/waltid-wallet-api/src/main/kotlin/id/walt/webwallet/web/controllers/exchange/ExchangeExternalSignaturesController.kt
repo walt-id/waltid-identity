@@ -360,7 +360,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                                 organization = eventUseCase.verifierData(authReq),
                                 type = null
                             ),
-                            credentialId = this.id,
+                            //credentialId = this.id,
                         )
                     }
                 }

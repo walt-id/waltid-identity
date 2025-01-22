@@ -60,7 +60,8 @@ class EventFilterUseCaseTest {
         assertEquals(expected = 1, actual = result.items.size)
         assertEquals(
             expected = "issuer-name",
-            actual = JsonUtils.tryGetData(result.items[0].data, "organization.name")!!.jsonPrimitive.content
+            actual = (result.items[0].data as? CredentialEventData)?.organization?.name ?: ""
+            //actual = JsonUtils.tryGetData(result.items[0].data, "organization.name")!!.jsonPrimitive.content
         )
     }
 
@@ -84,7 +85,8 @@ class EventFilterUseCaseTest {
         assertEquals(expected = 1, actual = result.items.size)
         assertEquals(
             expected = "verifier-name",
-            actual = JsonUtils.tryGetData(result.items[0].data, "organization.name")!!.jsonPrimitive.content
+            actual = (result.items[0].data as? CredentialEventData)?.organization?.name ?: ""
+            //actual = JsonUtils.tryGetData(result.items[0].data, "organization.name")!!.jsonPrimitive.content
         )
     }
 
@@ -109,7 +111,8 @@ class EventFilterUseCaseTest {
                 tenant = "",
                 account = account,
                 wallet = wallet,
-                data = Json.encodeToJsonElement(it).jsonObject
+                //data = Json.encodeToJsonElement(it).jsonObject
+                data = it
             )
         }
 }

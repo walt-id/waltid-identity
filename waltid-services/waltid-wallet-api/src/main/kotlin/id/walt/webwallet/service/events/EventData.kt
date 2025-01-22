@@ -50,10 +50,11 @@ sealed interface CredentialEventDataActor {
     //TODO better naming
     @Serializable
     sealed interface Organization : CredentialEventDataActor {
+        val name: String?
         @Serializable
         data class Issuer(
             val did: String,
-            val name: String? = null,
+            override val name: String? = null,
             val keyId: String,
             val keyType: String,
         ) : Organization
@@ -61,7 +62,7 @@ sealed interface CredentialEventDataActor {
         @Serializable
         data class Verifier(
             val did: String,
-            val name: String? = null,
+            override val name: String? = null,
             val policies: List<String>,
         ) : Organization
     }

@@ -124,7 +124,7 @@ class SilentClaimStrategy(
                 subject = eventUseCase.subjectData(it.first),
                 organization = eventUseCase.issuerData(it.first), type = it.second
             ),
-            credentialId = it.first.id,
+            //credentialId = it.first.id,
         )
     }
 

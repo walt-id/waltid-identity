@@ -30,8 +30,8 @@ data class Event(
     val account: Uuid,
     @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
     val wallet: Uuid? = null,
-    val credentialId: String? = null,
-    val data: JsonObject,
+    //val credentialId: String? = null,
+    val data: EventData,
     val note: String? = null,
 ) {
     constructor(
@@ -42,7 +42,7 @@ data class Event(
         account: Uuid,
         wallet: Uuid?,
         data: EventData,
-        credentialId: String? = null,
+        //credentialId: String? = null,
         note: String? = null,
     ) : this(
         id = id,
@@ -52,8 +52,8 @@ data class Event(
         originator = originator,
         account = account,
         wallet = wallet,
-        data = Json.encodeToJsonElement(data).jsonObject,
-        credentialId = credentialId,
+        data = data,
+        //credentialId = credentialId,
         note = note,
     )
 
@@ -66,8 +66,11 @@ data class Event(
         originator = row[Events.originator],
         account = row[Events.account],
         wallet = row[Events.wallet],
-        data = Json.parseToJsonElement(row[Events.data]).jsonObject,
-        credentialId = row[Events.credentialId],
+        data = Json.decodeFromString<EventData>(row[Events.data]),
+        //credentialId = row[Events.credentialId],
         note = row[Events.note]
     )
+
+    val credentialId: String?
+        get() = (data as? CredentialEventData)?.credentialId
 }

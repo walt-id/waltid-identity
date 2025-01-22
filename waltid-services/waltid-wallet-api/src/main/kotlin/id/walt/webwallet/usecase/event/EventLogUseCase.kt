@@ -33,7 +33,7 @@ class EventLogUseCase(
         accountId: Uuid,
         walletId: Uuid,
         data: EventData,
-        credentialId: String? = null,
+        //credentialId: String? = null,
         note: String? = null,
     ) = log(
         Event(
@@ -43,7 +43,7 @@ class EventLogUseCase(
             account = accountId,
             wallet = walletId,
             data = data,
-            credentialId = credentialId,
+            //credentialId = credentialId,
             note = note,
         )
     )

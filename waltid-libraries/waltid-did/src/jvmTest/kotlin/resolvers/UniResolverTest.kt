@@ -98,6 +98,6 @@ class UniResolverTest {
         @JvmStatic
         fun isUniresolverAvailable() = runCatching {
             runBlocking { UniresolverResolver().getSupportedMethods() }
-        }.fold(onSuccess = { it.isSuccess }, onFailure = { false })
+        }.fold(onSuccess = { it.isSuccess }, onFailure = { false }) && false
     }
 }

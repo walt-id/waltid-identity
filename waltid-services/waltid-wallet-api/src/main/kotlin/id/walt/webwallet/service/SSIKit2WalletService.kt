@@ -135,7 +135,7 @@ class SSIKit2WalletService(
                 accountId = accountId,
                 walletId = walletId,
                 data = eventUseCase.credentialEventData(this),
-                credentialId = this.id
+                //credentialId = this.id
             )
         }
         credentialService.delete(walletId, id, permanent)
@@ -252,7 +252,7 @@ class SSIKit2WalletService(
                         organization = eventUseCase.verifierData(authReq),
                         type = null
                     ),
-                    credentialId = this.id,
+                    //credentialId = this.id,
                     note = parameter.note,
                 )
             }
@@ -326,7 +326,7 @@ class SSIKit2WalletService(
                         accountId = accountId,
                         walletId = walletId,
                         data = eventUseCase.credentialEventData(credential = credential, type = it.type),
-                        credentialId = credential.id,
+                        //credentialId = credential.id,
                     )
                 }
             }

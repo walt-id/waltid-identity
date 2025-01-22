@@ -55,7 +55,7 @@ class EventFilterUseCase(
     }
 
     private suspend fun tryResolveEntityNames(items: List<Event>) = items.map { event ->
-        tryDecodeData<CredentialEventData>(event.data)?.let { data ->
+        (event.data as? CredentialEventData)?.let { data ->
             data.organization?.let { event.copy(data = updateEntityName(data, it)) }
         } ?: event
     }
@@ -75,8 +75,8 @@ class EventFilterUseCase(
             name = verifierNameResolutionUseCase.resolve(entity.did)
         )
     }.let {
-        json.encodeToJsonElement(
+        //json.encodeToJsonElement(
             data.copy(organization = it)
-        )
-    }.jsonObject
+        //)
+    }//.jsonObject
 }

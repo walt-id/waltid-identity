@@ -47,7 +47,7 @@ object ClaimCommons {
                 organization = eventUseCase.issuerData(credential),
                 type = credentialType
             ),
-            credentialId = credential.id,
+            //credentialId = credential.id,
         )
 
     fun storeWalletCredentials(
