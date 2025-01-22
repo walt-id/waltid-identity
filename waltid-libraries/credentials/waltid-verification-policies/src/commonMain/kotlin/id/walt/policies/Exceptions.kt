@@ -104,3 +104,8 @@ class NotAllowedIssuerException(
     val issuer: String,
     val allowedIssuers: List<String>,
 ) : id.walt.policies.SerializableRuntimeException()
+
+
+class DynamicPolicyException(
+    override val message: String
+) : Exception(message)
