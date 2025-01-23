@@ -64,7 +64,7 @@ data class AuthFlow(
 }
 
 @Language("json")
-val flowConfig = """
+private val flowConfigExample = """
 {
   "mid": {
     "method": "userpass",
@@ -118,14 +118,3 @@ val flowConfig = """
   }
 }
 """.trimIndent()
-
-fun main() {
-    val flows = Json.decodeFromString<Map<String, AuthFlow>>(flowConfig)
-
-    flows.forEach { (id, flow) ->
-        println("== Flow: $id ==")
-
-        println(flow)
-        println()
-    }
-}

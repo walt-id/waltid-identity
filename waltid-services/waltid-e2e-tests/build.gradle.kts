@@ -21,6 +21,7 @@ dependencies {
     testImplementation("io.ktor:ktor-client-content-negotiation:2.3.12")
     testImplementation("io.ktor:ktor-client-logging:2.3.12")
 
+
     // Command line formatting
     testImplementation("com.github.ajalt.mordant:mordant:2.7.1")
 
