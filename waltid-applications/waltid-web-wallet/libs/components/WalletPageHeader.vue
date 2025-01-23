@@ -17,7 +17,7 @@
 
                 <span v-else-if="now.getHours() >= 12">afternoon</span>
 
-                <span>,</span> {{ user.email }}
+                <span>,</span> {{ user.friendlyName }}
             </h1>
         </template>
 

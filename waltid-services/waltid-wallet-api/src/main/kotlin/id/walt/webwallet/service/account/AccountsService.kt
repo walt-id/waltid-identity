@@ -30,34 +30,29 @@ import kotlin.uuid.toKotlinUuid
 @OptIn(ExperimentalUuidApi::class)
 object AccountsService {
 
-    private suspend fun initializeUserAccount(tenant: String, name: String?, registrationResult: RegistrationResult) =
-        let {
-            val registeredUserId = registrationResult.id
-
-            val createdInitialWalletId = transaction {
-                WalletServiceManager.createWallet(tenant, registeredUserId)
-            }
-
-            val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
-            (suspend {
-                ConfigManager.getConfig<RegistrationDefaultsConfig>()
-            } whenFeatureSuspend (FeatureCatalog.registrationDefaultsFeature))?.run {
-                tryAddDefaultData(walletService, this)
-            }
-            registrationResult.also {
-                WalletServiceManager.eventUseCase.log(
-                    action = EventType.Account.Create,
-                    originator = "wallet",
-                    tenant = tenant,
-                    accountId = registeredUserId,
-                    walletId = createdInitialWalletId,
-                    data = AccountEventData(accountId = name)
-                )
-            }
+    internal suspend fun initializeUserAccount(tenant: String = "", name: String?, registeredUserId: Uuid) {
+        val createdInitialWalletId = transaction {
+            WalletServiceManager.createWallet(tenant, registeredUserId)
         }
 
-    suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> = runCatching {
-        when (request) {
+        val walletService = WalletServiceManager.getWalletService(tenant, registeredUserId, createdInitialWalletId)
+        (suspend {
+            ConfigManager.getConfig<RegistrationDefaultsConfig>()
+        } whenFeatureSuspend (FeatureCatalog.registrationDefaultsFeature))?.run {
+            tryAddDefaultData(walletService, this)
+        }
+        WalletServiceManager.eventUseCase.log(
+            action = EventType.Account.Create,
+            originator = "wallet",
+            tenant = tenant,
+            accountId = registeredUserId,
+            walletId = createdInitialWalletId,
+            data = AccountEventData(accountId = name)
+        )
+    }
+
+    suspend fun register(tenant: String = "", request: AccountRequest): Result<RegistrationResult> {
+        val result = when (request) {
             is EmailAccountRequest -> EmailAccountStrategy.register(tenant, request)
             // is AddressAccountRequest -> Web3WalletAccountStrategy.register(tenant, request)
             is OidcAccountRequest -> OidcAccountStrategy.register(tenant, request)
@@ -65,11 +60,8 @@ object AccountsService {
             is OidcUniqueSubjectRequest -> OidcUniqueSubjectStrategy.register(tenant, request)
             is X5CAccountRequest -> X5CAccountStrategy.register(tenant, request)
             else -> throw NotImplementedError("unknown auth method")
-        }.fold(onSuccess = {
-            initializeUserAccount(tenant, request.name, it)
-        }, onFailure = {
-            throw it
-        })
+        }
+        return result.also { initializeUserAccount(tenant, request.name, it.getOrThrow().id) }
     }
 
 
@@ -100,23 +92,23 @@ object AccountsService {
         AccountWalletListing(
             account,
             wallets =
-            transaction {
-                AccountWalletMappings.innerJoin(Wallets)
-                    .selectAll()
-                    .where {
-                        (AccountWalletMappings.tenant eq tenant) and
-                                (AccountWalletMappings.accountId eq account)
-                    }
-                    .map {
-                        AccountWalletListing.WalletListing(
-                            id = it[AccountWalletMappings.wallet].value.toKotlinUuid(),
-                            name = it[Wallets.name],
-                            createdOn = it[Wallets.createdOn].toKotlinInstant(),
-                            addedOn = it[AccountWalletMappings.addedOn].toKotlinInstant(),
-                            permission = it[AccountWalletMappings.permissions]
-                        )
-                    }
-            })
+                transaction {
+                    AccountWalletMappings.innerJoin(Wallets)
+                        .selectAll()
+                        .where {
+                            (AccountWalletMappings.tenant eq tenant) and
+                                    (AccountWalletMappings.accountId eq account)
+                        }
+                        .map {
+                            AccountWalletListing.WalletListing(
+                                id = it[AccountWalletMappings.wallet].value.toKotlinUuid(),
+                                name = it[Wallets.name],
+                                createdOn = it[Wallets.createdOn].toKotlinInstant(),
+                                addedOn = it[AccountWalletMappings.addedOn].toKotlinInstant(),
+                                permission = it[AccountWalletMappings.permissions]
+                            )
+                        }
+                })
 
     fun getAccountForWallet(wallet: Uuid) = transaction {
         AccountWalletMappings.select(AccountWalletMappings.accountId)
