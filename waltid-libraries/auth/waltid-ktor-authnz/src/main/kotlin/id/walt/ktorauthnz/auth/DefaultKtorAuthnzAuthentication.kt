@@ -33,7 +33,7 @@ class DefaultKtorAuthnzAuthentication internal constructor(
         val call = context.call
 
         val ktorAuthnzHeader = call.request.headers.get("ktor-authnz-auth")
-        val cookie = call.request.cookies.get("ktor-authnz-auth")
+        val cookie = call.request.cookies["ktor-authnz-auth"] ?: call.request.cookies["auth.token"]
         val authHeader = call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")
 
         val effectiveToken = ktorAuthnzHeader ?: cookie ?: authHeader
