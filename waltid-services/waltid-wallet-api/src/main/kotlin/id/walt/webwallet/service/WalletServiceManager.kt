@@ -180,7 +180,7 @@ object WalletServiceManager {
         }
 
     fun createWallet(tenant: String, forAccount: Uuid): Uuid {
-        val accountName = AccountsService.get(forAccount).email ?: "wallet name not defined"
+        val accountName = AccountsService.get(forAccount).name ?: "wallet name not defined"
 
         // TODO: remove testing code / lock behind dev-mode
         if (accountName.contains("multi-wallet")) {
