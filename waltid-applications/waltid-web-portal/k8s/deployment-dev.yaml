@@ -21,7 +21,7 @@ spec:
           imagePullPolicy: Always
           env:
             - name: NEXT_PUBLIC_VC_REPO
-              value: "https://vc-repo.walt-test.cloud"
+              value: "https://credentials.test.waltid.cloud"
             - name: NEXT_PUBLIC_ISSUER
               value: "https://issuer.portal.test.waltid.cloud"
             - name: NEXT_PUBLIC_VERIFIER
