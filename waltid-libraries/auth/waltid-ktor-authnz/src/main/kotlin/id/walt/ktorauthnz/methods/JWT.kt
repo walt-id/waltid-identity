@@ -4,6 +4,7 @@ import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.JWTIdentifier
+import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.config.JwtAuthConfiguration
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
@@ -28,7 +29,10 @@ object JWT : AuthenticationMethod("jwt") {
         return JWTIdentifier(id)
     }
 
-    override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.registerAuthenticationRoutes(
+        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
+    ) {
         post("jwt", {
             request { body<String>() }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
