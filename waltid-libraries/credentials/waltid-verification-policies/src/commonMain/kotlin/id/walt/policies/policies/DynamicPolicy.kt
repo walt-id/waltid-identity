@@ -59,29 +59,22 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
             ?: throw IllegalArgumentException("The 'rules' field is required.")
         val argument = (args)["argument"]?.jsonObject
             ?: throw IllegalArgumentException("The 'argument' field is required.")
+        val policyName = (args)["policy_name"]?.jsonPrimitive?.content
+            ?: throw IllegalArgumentException("The 'policy_name' field is required.")
+        val regoCode = rules["rego"]
+            ?: return Result.failure(Exception("The 'rego' code is required in the 'rules' field."))
 
 
         println("regoCode: $regoCode")
         println("argument: $argument")
 
 
-        val allowCondition = rules["allow"]
-            ?: return Result.failure(Exception("The 'allow' rule is missing in the provided rules map."))
-
-        println("allowCondition: $allowCondition")
-        val cleanAllowCondition = allowCondition.toString().trim('"')
-        println("cleanAllowCondition: $cleanAllowCondition")
-
-
-        val policyId = "policy_" + randomUUID().toString().replace("-", "_")
-        println("policyId: $policyId")
-        // rego policy
-        val regoPolicy = """
-            package vc.verification.$policyId
-
-            default allow = false
-
-            allow if $cleanAllowCondition
+        val cleanRegoCode = """
+            ${
+            regoCode.toString()
+                .trim('"')
+                .replace("\\n", "\n")
+        }
         """.trimIndent()
 
         // upload the policy to OPA
