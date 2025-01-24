@@ -2,7 +2,6 @@ package id.walt.policies.policies
 
 import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.utils.JsonUtils.toJsonObject
-import id.walt.did.utils.randomUUID
 import id.walt.policies.CredentialDataValidatorPolicy
 import id.walt.policies.DynamicPolicyException
 import io.ktor.client.*
@@ -13,10 +12,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -59,16 +55,13 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
         context: Map<String, Any>
     ): Result<Any> {
 
-        println("data: $data")
-        println("args: $args")
-        println("context: $context")
-
         val rules = (args as JsonObject)["rules"]?.jsonObject
             ?: throw IllegalArgumentException("The 'rules' field is required.")
         val argument = (args)["argument"]?.jsonObject
             ?: throw IllegalArgumentException("The 'argument' field is required.")
 
-        println("rules: $rules")
+
+        println("regoCode: $regoCode")
         println("argument: $argument")
 
 
@@ -91,29 +84,29 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
             allow if $cleanAllowCondition
         """.trimIndent()
 
-        println("regoPolicy: $regoPolicy")
-
         // upload the policy to OPA
-        val uploadPolicy: HttpResponse = http.put("http://localhost:8181/v1/policies/$policyId") {
+        val upload: HttpResponse = http.put("http://localhost:8181/v1/policies/$policyName") {
             contentType(ContentType.Text.Plain)
-            setBody(regoPolicy)
+            setBody(cleanRegoCode)
         }
 
-        println("upload policy: ${uploadPolicy.bodyAsText()}")
-
-
+        println("upload: ${upload.bodyAsText()}")
         val input = mapOf(
             "parameter" to argument,
             "credentialData" to data.toMap()
         ).toJsonObject()
 
+
+        println("input: $input")
+
         // verify the policy
-        val response: HttpResponse = http.post("http://localhost:8181/v1/data/vc/verification/$policyId") {
+        val response: HttpResponse = http.post("http://localhost:8181/v1/data/vc/verification/$policyName") {
             contentType(ContentType.Application.Json)
             setBody(mapOf("input" to input))
         }
 
         println("response: ${response.bodyAsText()}")
+
 
 
         val result = response.body<JsonObject>()["result"]?.jsonObject
@@ -128,13 +121,13 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
 
 
         // delete the policy from OPA
-        http.delete("http://localhost:8181/v1/policies/$policyId")
+        http.delete("http://localhost:8181/v1/policies/$policyName")
         return if (allow is JsonPrimitive && allow.booleanOrNull == true) {
             Result.success(result)
         } else {
             Result.failure(
                 DynamicPolicyException(
-                    message = "The policy condition was not met for policy ${cleanAllowCondition}."
+                    message = "The policy condition was not met for policy ${policyName}."
                 )
             )
         }
