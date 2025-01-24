@@ -13,7 +13,7 @@ interface AccountStore {
     /**
      * Resolve account uuid for account identifier
      */
-    suspend fun lookupAccountUuid(identifier: AccountIdentifier): String
+    suspend fun lookupAccountUuid(identifier: AccountIdentifier): String?
 
     suspend fun hasStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): Boolean
 }
