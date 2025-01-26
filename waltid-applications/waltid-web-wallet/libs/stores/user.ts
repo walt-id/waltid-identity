@@ -3,7 +3,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 
 export const useUserStore = defineStore("userStore", () => {
-    const user = ref(useLocalStorage("id/walt/wallet/user", { id: "", email: "n/a" }));
+    const user = ref(useLocalStorage("id/walt/wallet/user", { id: "", friendlyName: "n/a" }));
 
     return { user };
 });
