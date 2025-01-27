@@ -8,30 +8,30 @@ on:
         required: false
 jobs:
   version:
-    uses: walt-id/waltid-identity/.github/workflows/version.yml@266f5c09359450c39019a6da38f2b331e7122918
+    uses: walt-id/waltid-identity/.github/workflows/version.yml@cb51bb121eb21eba0f5c12c79c7bb34bbbaa86d5
     with:
       preferred: ${{ inputs.release_version }}
   gradle-build:
-    uses: walt-id/waltid-identity/.github/workflows/build-gradle.yml@266f5c09359450c39019a6da38f2b331e7122918
+    uses: walt-id/waltid-identity/.github/workflows/build-gradle.yml@cb51bb121eb21eba0f5c12c79c7bb34bbbaa86d5
     secrets: inherit
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
   docker-build:
-    uses: walt-id/waltid-identity/.github/workflows/build-docker.yml@266f5c09359450c39019a6da38f2b331e7122918
+    uses: walt-id/waltid-identity/.github/workflows/build-docker.yml@cb51bb121eb21eba0f5c12c79c7bb34bbbaa86d5
     secrets: inherit
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
       publish: true
   deploy:
-    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@dd9e94a2b08b2f9917d56543061963e6757def1f
+    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@cb51bb121eb21eba0f5c12c79c7bb34bbbaa86d5
     secrets: inherit
     needs: [ version, gradle-build, docker-build ]
     with:
       version: ${{ needs.version.outputs.release_version }}
   tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@266f5c09359450c39019a6da38f2b331e7122918
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@cb51bb121eb21eba0f5c12c79c7bb34bbbaa86d5
     needs: [ version, deploy ]
     with:
       version: ${{ needs.version.outputs.release_version }}
