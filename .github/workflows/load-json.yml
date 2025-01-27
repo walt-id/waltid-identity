@@ -1,0 +1,24 @@
+name: Load json
+
+on:
+  workflow_call:
+    inputs:
+      jsonpath:
+        description: "the json file path containing the matrix"
+        required: true
+        type: string
+    outputs:
+      json:
+        description: "The json data"
+        value: ${{ jobs.load-json.outputs.result }}
+
+jobs:
+  load-json:
+    runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.load-json.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: load-json
+        run: |
+          echo "matrix=$(jq -c . < ${{ inputs.jsonpath }})" >> $GITHUB_OUTPUT
