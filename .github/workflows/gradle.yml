@@ -14,8 +14,7 @@ on:
         default: false
 
 jobs:
-  build:
-    name: Build
+  gradle:
     runs-on: ubuntu-latest
     steps:
       - name: Free Disk Space (Ubuntu)
