@@ -15,8 +15,8 @@ import id.walt.policies.PolicyManager
 import id.walt.sdjwt.SimpleJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
-import id.walt.verifier.oidc.VerificationUseCase
 import id.walt.verifier.oidc.SwaggerPresentationSessionInfo
+import id.walt.verifier.oidc.VerificationUseCase
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
@@ -187,6 +187,10 @@ fun Application.verifierApi() {
                         example(
                             "Example with VP, VC & specific credential policies",
                             VerifierApiExamples.vcVpIndividualPolicies
+                        )
+                        example(
+                            "Example with Dynamic Policy applied to credential Data",
+                            VerifierApiExamples.dynamicPolicy
                         )
                         example(
                             "Example with VP, VC & specific policies, and explicit input_descriptor(s)  (maximum example)",
