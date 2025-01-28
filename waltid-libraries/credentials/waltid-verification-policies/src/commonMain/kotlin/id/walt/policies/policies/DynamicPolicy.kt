@@ -81,11 +81,6 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
         val regoCode = rules["rego"]
             ?: return Result.failure(Exception("The 'rego' code is required in the 'rules' field."))
 
-
-        println("regoCode: $regoCode")
-        println("argument: $argument")
-
-
         val cleanedRegoCode = """
             ${
             cleanCode(regoCode.jsonPrimitive.content)
@@ -98,14 +93,15 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
             setBody(cleanedRegoCode)
         }
 
-        println("upload: ${upload.bodyAsText()}")
+        check(upload.status.isSuccess()) {
+            "Failed to upload the policy to OPA. Check the policy code (rego) and try again."
+        }
+
         val input = mapOf(
             "parameter" to argument,
             "credentialData" to data.toMap()
         ).toJsonObject()
 
-
-        println("input: $input")
 
         // verify the policy
         val response: HttpResponse = http.post("$policyServer/v1/data/$policyQuery/$policyName") {
@@ -113,20 +109,12 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
             setBody(mapOf("input" to input))
         }
 
-        println("response: ${response.bodyAsText()}")
-
 
 
         val result = response.body<JsonObject>()["result"]?.jsonObject
-            ?: throw IllegalArgumentException("The response does not contain a 'result' field.")
+            ?: throw IllegalArgumentException("Something went wrong while verifying the policy.")
 
-        println("result: $result")
-
-
-        // check if the policy is passed
         val allow = result["allow"]
-        println("allow: $allow")
-
 
         // delete the policy from OPA
         http.delete("$policyServer/v1/policies/$policyName")
