@@ -70,6 +70,10 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
 
         val rules = (args as JsonObject)["rules"]?.jsonObject
             ?: throw IllegalArgumentException("The 'rules' field is required.")
+        val policyServer = (args)["policy_server"]?.jsonPrimitive?.content
+            ?: "http://localhost:8181"
+        val policyQuery = (args)["policy_query"]?.jsonPrimitive?.content
+            ?: "vc/verification"
         val argument = (args)["argument"]?.jsonObject
             ?: throw IllegalArgumentException("The 'argument' field is required.")
         val policyName = (args)["policy_name"]?.jsonPrimitive?.content
@@ -89,7 +93,7 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
         """.trimIndent()
 
         // upload the policy to OPA
-        val upload: HttpResponse = http.put("http://localhost:8181/v1/policies/$policyName") {
+        val upload: HttpResponse = http.put("$policyServer/v1/policies/$policyName") {
             contentType(ContentType.Text.Plain)
             setBody(cleanedRegoCode)
         }
@@ -104,7 +108,7 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
         println("input: $input")
 
         // verify the policy
-        val response: HttpResponse = http.post("http://localhost:8181/v1/data/vc/verification/$policyName") {
+        val response: HttpResponse = http.post("$policyServer/v1/data/$policyQuery/$policyName") {
             contentType(ContentType.Application.Json)
             setBody(mapOf("input" to input))
         }
@@ -125,7 +129,7 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
 
 
         // delete the policy from OPA
-        http.delete("http://localhost:8181/v1/policies/$policyName")
+        http.delete("$policyServer/v1/policies/$policyName")
         return if (allow is JsonPrimitive && allow.booleanOrNull == true) {
             Result.success(result)
         } else {
