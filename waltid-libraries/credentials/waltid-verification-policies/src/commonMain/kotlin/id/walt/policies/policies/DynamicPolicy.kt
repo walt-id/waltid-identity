@@ -45,6 +45,19 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
         }
     }
 
+    fun cleanCode(input: String): String {
+        // Replace \r\n with \n to normalize line endings
+        val normalized = input.replace("\r\n", "\n")
+
+        // Split the string into lines
+        val lines = normalized.split("\n")
+
+        // Remove any leading or trailing whitespace from each line
+        val cleanedLines = lines.map { it.trim() }
+
+        // Join the lines back together with proper line endings
+        return cleanedLines.joinToString("\n")
+    }
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -69,18 +82,16 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
         println("argument: $argument")
 
 
-        val cleanRegoCode = """
+        val cleanedRegoCode = """
             ${
-            regoCode.toString()
-                .trim('"')
-                .replace("\\n", "\n")
+            cleanCode(regoCode.jsonPrimitive.content)
         }
         """.trimIndent()
 
         // upload the policy to OPA
         val upload: HttpResponse = http.put("http://localhost:8181/v1/policies/$policyName") {
             contentType(ContentType.Text.Plain)
-            setBody(cleanRegoCode)
+            setBody(cleanedRegoCode)
         }
 
         println("upload: ${upload.bodyAsText()}")
