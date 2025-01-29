@@ -1,5 +1,6 @@
 package id.walt.policies.policies
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
@@ -17,6 +18,8 @@ import java.util.zip.GZIPInputStream
 
 @Serializable
 actual class RevocationPolicy : RevocationPolicyMp() {
+    private val logger = KotlinLogging.logger {}
+
     @JvmBlocking
     @JvmAsync
     actual override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
@@ -25,8 +28,11 @@ actual class RevocationPolicy : RevocationPolicyMp() {
                 JsonObject(mapOf("policy_available" to JsonPrimitive(false)))
             )
 
+        logger.debug { "Credential status: $credentialStatus" }
         val statusListIndex = credentialStatus.jsonObject["statusListIndex"]?.jsonPrimitive?.content?.toULong()
         val statusListCredentialUrl = credentialStatus.jsonObject["statusListCredential"]?.jsonPrimitive?.content
+        logger.debug { "Status list index: $statusListIndex" }
+        logger.debug { "Credential URL: $statusListCredentialUrl" }
 
         val httpClient = HttpClient {
             install(ContentNegotiation) {
@@ -37,10 +43,12 @@ actual class RevocationPolicy : RevocationPolicyMp() {
         val response = runCatching { httpClient.get(statusListCredentialUrl!!).bodyAsText() }.getOrElse {
             return Result.failure(Throwable("Error when getting Status List Credential from  $statusListCredentialUrl"))
         }
+        logger.debug { "Credential URL response: $response" }
         // response is a jwt
         val bitValue = getRevocationStatusValue(response, statusListIndex).getOrElse {
             return Result.failure(Throwable(it.cause))
         }
+
         checkStatus(bitValue).getOrElse {
             return Result.failure(Throwable("Credential has been revoked"))
         }
@@ -58,9 +66,13 @@ actual class RevocationPolicy : RevocationPolicyMp() {
         val payload = response.substringAfter(".").substringBefore(".")
             .let { Json.decodeFromString<JsonObject>(Base64Utils.decode(it).decodeToString()) }
 
+        logger.debug { "Payload: $payload" }
         val credentialSubject = payload["vc"]!!.jsonObject["credentialSubject"]?.jsonObject!!
+        logger.debug { "CredentialSubject: $credentialSubject" }
         val encodedList = credentialSubject["encodedList"]?.jsonPrimitive?.content ?: ""
+        logger.debug { "EncodedList: $encodedList" }
         val bitValue = get(encodedList, statusListIndex)
+        logger.debug { "EncodedList[$statusListIndex] = $bitValue" }
         // ensure bitValue always consists of valid binary characters (0,1)
         require(!bitValue.isNullOrEmpty()) { "Null or empty bit value" }
         require(isBinaryValue(bitValue)) { "Invalid bit value: $bitValue" }
