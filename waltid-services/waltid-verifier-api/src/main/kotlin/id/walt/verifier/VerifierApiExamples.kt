@@ -76,7 +76,7 @@ object VerifierApiExamples {
           "policy": "dynamic",
           "args":  {
             "policy_name": "test",
-            "policy_server":"http://localhost:8181",
+            "opa_server":"http://localhost:8181",
             "policy_query":"data",
             "rules": {
                    "rego": "package data.test\r\n\r\ndefault allow := false\r\n\r\nallow if {\r\ninput.parameter.name == input.credentialData.credentialSubject.achievement.name\r\n}"
