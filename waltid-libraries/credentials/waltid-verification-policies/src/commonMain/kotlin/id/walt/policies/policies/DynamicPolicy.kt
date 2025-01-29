@@ -59,8 +59,8 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
     }
 
     private fun validatePolicyName(policyName: String) {
-        require(policyName.matches(Regex("^[a-zA-Z0-9_-]+$"))) {
-            "Policy name contains invalid characters. Only alphanumeric characters, underscores, and hyphens are allowed."
+        require(policyName.matches(Regex("^[a-zA-Z]+$"))) {
+            "Policy name contains invalid characters."
         }
         require(policyName.length <= MAX_POLICY_NAME_LENGTH) {
             "Policy name exceeds maximum length of $MAX_POLICY_NAME_LENGTH characters"
