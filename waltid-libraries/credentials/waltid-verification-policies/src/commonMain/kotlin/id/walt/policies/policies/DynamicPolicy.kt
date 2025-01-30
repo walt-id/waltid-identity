@@ -195,8 +195,11 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
             uploadPolicy(config.opaServer, config.policyName, regoCode).getOrThrow()
 
             verifyPolicy(config, data).map { result ->
-                val allow = result["allow"]
-                if (allow is JsonPrimitive && allow.booleanOrNull == true) {
+
+                val decision = result.values.firstOrNull {
+                    it is JsonPrimitive && it.booleanOrNull == true
+                }
+                if (decision != null) {
                     result
                 } else {
                     throw DynamicPolicyException("The policy condition was not met for policy ${config.policyName}")
