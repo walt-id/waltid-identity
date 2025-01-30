@@ -25,7 +25,7 @@ plugins {
     id("com.android.library") version "8.7.3" apply false
     id("com.android.application") version "8.7.3" apply false
 
-    id("com.github.ben-manes.versions") version "0.51.0" apply false
+    id("com.github.ben-manes.versions") version "0.52.0" apply false
 }
 dependencies {
     implementation(kotlin("stdlib"))
