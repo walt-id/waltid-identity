@@ -29,8 +29,7 @@ class LocalRegistrar : DidRegistrar {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun getSupportedMethods() = Result.success(setOf("key", "jwk", "web", "cheqd" /*"ebsi",*/))
-    //override suspend fun getSupportedMethods() = Result.success(registrarMethods.values.toSet())
+    override suspend fun getSupportedMethods() = Result.success(registrarMethods.values.map { it.method }.toSet())
 
     private fun getRegistrarForMethod(method: String) =
         registrarMethods[method] ?: throw IllegalArgumentException("No local registrar for method: $method")
