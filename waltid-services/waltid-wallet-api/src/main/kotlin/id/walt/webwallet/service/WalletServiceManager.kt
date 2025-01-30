@@ -85,12 +85,13 @@ object WalletServiceManager {
     private val credentialTypeSeeker = DefaultCredentialTypeSeeker()
     private val eventService = EventService()
     private val filterParser = PresentationDefinitionFilterParser()
+    private val jwsDecoder = JwsDecoder()
     private val statusListCredentialFetchFactory = StatusListCredentialFetchFactory(
-        defaultStrategy = DefaultStatusListCredentialFetchStrategy(httpClient),
+        defaultStrategy = DefaultStatusListCredentialFetchStrategy(httpClient, jwsDecoder),
         entraStrategy = EntraStatusListCredentialFetchStrategy(
             serviceEndpointProvider = EntraServiceEndpointProvider(httpClient),
             didResolverService = DidResolverService(),
-            jwsDecoder = JwsDecoder()
+            jwsDecoder = jwsDecoder
         )
     )
     private val credentialStatusServiceFactory = CredentialStatusServiceFactory(
@@ -179,7 +180,7 @@ object WalletServiceManager {
         }
 
     fun createWallet(tenant: String, forAccount: Uuid): Uuid {
-        val accountName = AccountsService.get(forAccount).email ?: "wallet name not defined"
+        val accountName = AccountsService.get(forAccount).name ?: "wallet name not defined"
 
         // TODO: remove testing code / lock behind dev-mode
         if (accountName.contains("multi-wallet")) {

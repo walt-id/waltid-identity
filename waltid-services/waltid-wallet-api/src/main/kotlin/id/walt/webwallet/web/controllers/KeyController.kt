@@ -13,10 +13,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.*
 import org.jetbrains.exposed.sql.transactions.transaction
 
 fun Application.keys() = walletRoute {
@@ -181,6 +178,39 @@ fun Application.keys() = walletRoute {
                 }
 
         }
+        post("verify", {
+            summary = "Verify a signature with a specific key"
+            request {
+                queryParameter<String>("JWK") {
+                    description = "The public key to verify the signature"
+                    example("Example") {
+                        value = """
+                    {
+                      "kty": "OKP",
+                      "crv": "Ed25519",
+                      "kid": "viEJuASRBd06MPJW-XEEDkWahYnGmp6WIMjdkGKZezY",
+                      "x": "7lTgGVKIeZdP9aEofIFwSTdyBGmxYqo4AhumkCLn3vs"
+                    }
+                """.trimIndent()
+                    }
+                }
+                body<String> {
+                    description = "The signature to verify"
+                }
+            }
+            response {
+                HttpStatusCode.OK to {
+                    description = "The verification result"
+                    body<Boolean>()
+                }
+            }
+        }) {
+            val jwk = context.request.queryParameters.getOrFail("JWK")
+            val signature = context.receive<String>()
+            context.respond(getWalletService().verify(jwk, signature))
+
+        }
+
         route("{keyId}", {
             request {
                 pathParameter<String>("keyId") {
@@ -270,6 +300,24 @@ fun Application.keys() = walletRoute {
                 val success = getWalletService().removeKey(keyId)
                 context.respond(if (success) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
             }
+
+            post("sign", {
+                summary = "Sign a message with a specific key"
+                request {
+                    body<JsonElement> { description = "The message to sign" }
+                }
+                response {
+                    HttpStatusCode.OK to {
+                        description = "The signature"
+                        body<String>()
+                    }
+                }
+            }) {
+                val keyId = context.parameters.getOrFail("keyId")
+                val message = context.receive<JsonElement>()
+                context.respond(getWalletService().sign(keyId, message))
+            }
+
         }
     }
 }

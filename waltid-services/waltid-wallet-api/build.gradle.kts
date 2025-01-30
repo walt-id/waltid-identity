@@ -26,7 +26,7 @@ repositories {
 
 tasks.withType<KotlinCompile> {
     compilerOptions {
-        jvmTarget = JvmTarget.JVM_17
+        jvmTarget = JvmTarget.JVM_21
     }
 }
 
@@ -52,7 +52,11 @@ tasks.withType<ProcessResources> {
 }*/
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
 }
 
 dependencies {
@@ -180,10 +184,11 @@ dependencies {
     implementation("io.klogging:slf4j-klogging:0.7.2")
 
     // Test
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.0.20")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
+    testImplementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
-    testImplementation("io.mockk:mockk:1.13.12")
+    testImplementation("io.mockk:mockk:1.13.16")
     testImplementation("io.klogging:klogging-jvm:0.7.2")
 }

@@ -1,7 +1,7 @@
 <template>
   <CenterMain>
     <h1 class="font-semibold">Profile</h1>
-    <p>Username: {{ user.email }}</p>
+    <p>Username: {{ user.friendlyName }}</p>
     <!-- add-wallet -->
     <div class="items-center">
       <div class="mt-4">

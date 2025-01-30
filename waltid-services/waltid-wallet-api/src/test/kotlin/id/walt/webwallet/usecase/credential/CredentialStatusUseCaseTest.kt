@@ -97,7 +97,7 @@ class CredentialStatusUseCaseTest {
         }
 
     @Test
-    fun `given a credential having multiple status-list credential statu sentries, when getting status, then returns the status result for each entry`() =
+    fun `given a credential having multiple status-list credential status entries, when getting status, then returns the status result for each entry`() =
         runTest {
             val service = mockk<CredentialStatusService>()
             val statusListEntryRevocation = StatusListEntry(
