@@ -9,12 +9,15 @@ import com.nimbusds.jose.Payload
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.web.ForbiddenException
 import id.walt.commons.web.UnauthorizedException
 import id.walt.commons.web.WebException
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.oid4vc.definitions.JWTClaims
+import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
@@ -31,6 +34,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.sessions.*
 import io.ktor.util.pipeline.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.Serializable
@@ -162,9 +166,14 @@ fun PipelineContext<Unit, ApplicationCall>.getUserId() =
         ?: call.principal<UserIdPrincipal>() // bearer is registered with no name for some reason
         ?: throw UnauthorizedException("Could not find user authorization within request.")
 
-fun PipelineContext<Unit, ApplicationCall>.getUserUUID() =
-    runCatching { Uuid.parse(getUserId().name) }
-        .getOrElse { throw IllegalArgumentException("Invalid user id: $it") }
+suspend fun PipelineContext<Unit, ApplicationCall>.getUserUUID() =
+    runCatching {
+        when {
+            FeatureManager.isFeatureEnabled(FeatureCatalog.legacyAuthenticationFeature) -> Uuid.parse(getUserId().name)
+            FeatureManager.isFeatureEnabled(FeatureCatalog.ktorAuthnzAuthenticationFeature) -> Uuid.parse(getAuthenticatedAccount())
+            else -> error("No authentication feature enabled")
+        }
+    }.getOrElse { throw IllegalArgumentException("Invalid user id: $it") }
 
 fun PipelineContext<Unit, ApplicationCall>.getWalletId() =
     runCatching {
@@ -174,10 +183,10 @@ fun PipelineContext<Unit, ApplicationCall>.getWalletId() =
             ensurePermissionsForWallet(AccountWalletPermissions.READ_ONLY, walletId = it)
         }
 
-fun PipelineContext<Unit, ApplicationCall>.getWalletService(walletId: Uuid) =
+suspend fun PipelineContext<Unit, ApplicationCall>.getWalletService(walletId: Uuid) =
     WalletServiceManager.getWalletService("", getUserUUID(), walletId) // FIXME -> TENANT HERE
 
-fun PipelineContext<Unit, ApplicationCall>.getWalletService() =
+suspend fun PipelineContext<Unit, ApplicationCall>.getWalletService() =
     WalletServiceManager.getWalletService("", getUserUUID(), getWalletId()) // FIXME -> TENANT HERE
 
 fun PipelineContext<Unit, ApplicationCall>.getUsersSessionToken(): String? =
@@ -187,7 +196,7 @@ fun PipelineContext<Unit, ApplicationCall>.getUsersSessionToken(): String? =
 fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(
     required: AccountWalletPermissions,
 
-    userId: Uuid = getUserUUID(),
+    userId: Uuid = runBlocking { getUserUUID() },
     walletId: Uuid = getWalletId(),
 ): Boolean {
 

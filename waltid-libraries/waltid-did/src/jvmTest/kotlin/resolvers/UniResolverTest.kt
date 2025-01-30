@@ -3,6 +3,7 @@ package resolvers
 import id.walt.did.dids.resolver.UniresolverResolver
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.condition.EnabledIf
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
@@ -26,7 +27,7 @@ class UniResolverTest {
         println("Resolving: $did")
         val result = sut.resolve(did).getOrThrow()
 
-        check(document == result.toString()) { "Non equal: $document" }
+        check(Json.parseToJsonElement(document) == result) { "Non equal: $document  !=  $result" }
     }
 
     @ParameterizedTest

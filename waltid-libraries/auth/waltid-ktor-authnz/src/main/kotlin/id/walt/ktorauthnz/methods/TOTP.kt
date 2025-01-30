@@ -7,6 +7,7 @@ import com.atlassian.onetime.model.Issuer
 import com.atlassian.onetime.model.TOTPSecret
 import com.atlassian.onetime.service.DefaultTOTPService
 import id.walt.ktorauthnz.AuthContext
+import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.data.TOTPStoredData
 import id.walt.ktorauthnz.sessions.AuthSession
@@ -38,7 +39,10 @@ object TOTP : AuthenticationMethod("totp") {
     @Serializable
     data class TOTPCode(val code: String)
 
-    override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.registerAuthenticationRoutes(
+        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
+    ) {
         post("totp", {
             request { body<TOTPCode>() }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }

@@ -9,8 +9,12 @@ object FeatureCatalog : ServiceFeatureCatalog {
 
     val databaseFeature = BaseFeature("db", "Database manager", DatasourceConfiguration::class)
 
+    val devModeFeature = OptionalFeature("dev-mode", "Development mode", default = false)
+
+    val legacyAuthenticationFeature = OptionalFeature("auth", "Legacy authentication system", AuthConfig::class, true)
+    val ktorAuthnzAuthenticationFeature = OptionalFeature("ktor-authnz", "waltid-ktor-authnz authentication system", KtorAuthnzConfig::class, false)
     // val loginsMethodFeature = BaseFeature("logins", "Logins method management", LoginMethodsConfig::class)
-    val authenticationFeature = BaseFeature("auth", "Base authentication system", AuthConfig::class)
+
 
     val tenantFeature = OptionalFeature("tenant", "Cloud-based tenant management", TenantConfig::class, false)
     val pushFeature = OptionalFeature("push", "Push notifications", PushConfig::class, false)
@@ -55,11 +59,14 @@ object FeatureCatalog : ServiceFeatureCatalog {
     )
 
     override val baseFeatures = listOf(
-        databaseFeature,
-//        loginsMethodFeature,
-        authenticationFeature
+        databaseFeature
     )
     override val optionalFeatures = listOf(
+        devModeFeature,
+
+        legacyAuthenticationFeature,
+        ktorAuthnzAuthenticationFeature,
+
         web3,
         tenantFeature,
         pushFeature,
