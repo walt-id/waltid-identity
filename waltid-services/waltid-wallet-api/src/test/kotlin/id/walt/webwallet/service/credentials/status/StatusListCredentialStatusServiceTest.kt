@@ -31,7 +31,7 @@ class StatusListCredentialStatusServiceTest {
             val statusEntry =
                 Json.decodeFromString<StatusListEntry>(TestUtils.loadResource("credential-status/status-list-entry/entra-missing-purpose.json"))
             val credential =
-                Json.decodeFromString<JsonObject>(TestUtils.loadResource("credential-status/status-list-credential/entra-missing-purpose.json"))
+                Json.decodeFromString<JsonObject>(TestUtils.loadResource("credential-status/status-list-credential/revocation-list-missing-purpose.json"))
             val subjectType =
                 JsonUtils.tryGetData(credential, "credentialSubject.type")!!.jsonPrimitive.content
             val bitValue = listOf('0')
@@ -67,7 +67,7 @@ class StatusListCredentialStatusServiceTest {
             val statusEntry =
                 Json.decodeFromString<StatusListEntry>(TestUtils.loadResource("credential-status/status-list-entry/entra-with-status-message.json"))
             val credential =
-                Json.decodeFromString<JsonObject>(TestUtils.loadResource("credential-status/status-list-credential/entra-with-status-message.json"))
+                Json.decodeFromString<JsonObject>(TestUtils.loadResource("credential-status/status-list-credential/revocation-list-with-status-message.json"))
             val subjectType =
                 JsonUtils.tryGetData(credential, "credentialSubject.type")!!.jsonPrimitive.content
             every { bitParserMock.get(any(), any(), any()) } returns bitValue

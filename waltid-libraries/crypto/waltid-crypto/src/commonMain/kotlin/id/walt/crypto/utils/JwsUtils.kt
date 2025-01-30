@@ -24,7 +24,7 @@ object JwsUtils {
         KeyType.RSA -> "RS256" // TODO: RS384 RS512
     }
 
-    fun String.decodeJwsPart(): JsonObject =
+    private fun String.decodeJwsPart(): JsonObject =
         Json.parseToJsonElement(this.base64toBase64Url().decodeFromBase64Url().decodeToString()).jsonObject
 
     @Serializable

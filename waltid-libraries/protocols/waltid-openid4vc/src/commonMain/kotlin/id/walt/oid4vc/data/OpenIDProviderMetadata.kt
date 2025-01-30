@@ -269,7 +269,7 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
             baseUrl: String,
             credType: String
         ): CredentialSupported {
-            val expectedVct = "${URLBuilder(Url(baseUrl).protocolWithAuthority)}/$credType"
+            val expectedVct = "$baseUrl/$credType"
 
             credentialConfigurationsSupported?.entries?.forEach { entry ->
                 if (getVctByCredentialConfigurationId(entry.key) == expectedVct) {
@@ -343,3 +343,52 @@ object OpenIDProviderMetadataSerializer : KSerializer<OpenIDProviderMetadata> {
     }
 }
 
+object OpenIDProviderMetadataDraft13Serializer : KSerializer<OpenIDProviderMetadata.Draft13> {
+    override val descriptor: SerialDescriptor = OpenIDProviderMetadata.Draft13.serializer().descriptor
+
+    override fun serialize(encoder: Encoder, value: OpenIDProviderMetadata.Draft13) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw SerializationException("This serializer can only be used with a JSON encoder")
+
+        // Serialize Draft13 and delegate transformations
+        val jsonElement = Json.encodeToJsonElement(OpenIDProviderMetadata.Draft13.serializer(), value)
+        val transformedElement = OpenIDProviderMetadataJsonSerializer.transformSerialize(jsonElement)
+        jsonEncoder.encodeJsonElement(transformedElement)
+    }
+
+    override fun deserialize(decoder: Decoder): OpenIDProviderMetadata.Draft13 {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: throw SerializationException("This serializer can only be used with a JSON decoder")
+
+        // Deserialize Draft13 and delegate transformations
+        val rawJsonElement = jsonDecoder.decodeJsonElement()
+        val transformedElement = OpenIDProviderMetadataJsonSerializer.transformDeserialize(rawJsonElement)
+
+        return Json.decodeFromJsonElement(OpenIDProviderMetadata.Draft13.serializer(), transformedElement)
+    }
+}
+
+object OpenIDProviderMetadataDraft11Serializer : KSerializer<OpenIDProviderMetadata.Draft11> {
+    override val descriptor: SerialDescriptor = OpenIDProviderMetadata.Draft11.serializer().descriptor
+
+    override fun serialize(encoder: Encoder, value: OpenIDProviderMetadata.Draft11) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw SerializationException("This serializer can only be used with a JSON encoder")
+
+        // Serialize Draft13 and delegate transformations
+        val jsonElement = Json.encodeToJsonElement(OpenIDProviderMetadata.Draft11.serializer(), value)
+        val transformedElement = OpenIDProviderMetadataJsonSerializer.transformSerialize(jsonElement)
+        jsonEncoder.encodeJsonElement(transformedElement)
+    }
+
+    override fun deserialize(decoder: Decoder): OpenIDProviderMetadata.Draft11 {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: throw SerializationException("This serializer can only be used with a JSON decoder")
+
+        // Deserialize Draft13 and delegate transformations
+        val rawJsonElement = jsonDecoder.decodeJsonElement()
+        val transformedElement = OpenIDProviderMetadataJsonSerializer.transformDeserialize(rawJsonElement)
+
+        return Json.decodeFromJsonElement(OpenIDProviderMetadata.Draft11.serializer(), transformedElement)
+    }
+}
