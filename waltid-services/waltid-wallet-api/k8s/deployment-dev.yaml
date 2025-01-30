@@ -24,7 +24,7 @@ data:
     webHost = "0.0.0.0"
     webPort = 4545
   oidc.conf: |
-    publicBaseUrl = "https://wallet-dev.walt-test.cloud"
+    publicBaseUrl = "https://wallet-dev.test.waltid.cloud"
     providerName = keycloak
     oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
     oidcJwks = "${oidcRealm}/protocol/openid-connect/certs"
@@ -65,11 +65,12 @@ kind: PersistentVolumeClaim
 metadata:
   name: wallet-data-volume-claim
 spec:
+  storageClassName: azure-managed-standardssd-retain
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
-      storage: 10Gi
+      storage: 1Gi
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -87,6 +88,13 @@ spec:
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
+      initContainers:
+        - name: init-myservice
+          image: busybox
+          command: [ 'sh', '-c', 'chmod 777 /waltid-wallet-api/data/' ]
+          volumeMounts:
+            - mountPath: "/waltid-wallet-api/data/"
+              name: wallet-data
       containers:
         - name: wallet-api
           image: waltid/wallet-api:dev
@@ -160,9 +168,9 @@ spec:
           imagePullPolicy: Always
           env:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
-              value: "https://wallet-dev.walt-test.cloud"
+              value: "https://wallet-dev.test.waltid.cloud"
             - name: NUXT_PUBLIC_DEMO_WALLET_URL
-              value: "https://wallet.walt-test.cloud"
+              value: "https://wallet.test.waltid.cloud"
           ports:
             - containerPort: 7104
               name: http-api
@@ -189,9 +197,9 @@ spec:
           imagePullPolicy: Always
           env:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
-              value: "https://wallet.walt-test.cloud"
+              value: "https://wallet.test.waltid.cloud"
             - name: NUXT_PUBLIC_DEV_WALLET_URL
-              value: "https://wallet-dev.walt-test.cloud"
+              value: "https://wallet-dev.test.waltid.cloud"
             - name: NUXT_PUBLIC_CREDENTIALS_REPOSITORY_URL
               value: "https://vc-repo.walt-test.cloud"
           ports:
@@ -230,21 +238,13 @@ metadata:
   name: wallet-ingress
   annotations:
     kubernetes.io/ingress.class: "nginx"
-    cert-manager.io/cluster-issuer: letsencrypt-prod
     ingress.kubernetes.io/configuration-snippet: |
       if ($host ~ ^(.+)\.waltid\.org$) {
         return 301 https://$1.walt-test.cloud$request_uri;
       }
 spec:
-  tls:
-    - hosts:
-        - wallet.walt-test.cloud
-      secretName: test-wallet-demo-tls-secret
-    - hosts:
-        - wallet-dev.walt-test.cloud
-      secretName: test-wallet-dev-tls-secret
   rules:
-    - host: wallet-dev.walt-test.cloud
+    - host: wallet-dev.test.waltid.cloud
       http:
         paths:
           - path: /wallet-api/
@@ -262,7 +262,7 @@ spec:
                 port:
                   name: http
           - path: /api.json
-            pathType: Prefix
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: wallet-api
@@ -296,7 +296,7 @@ spec:
                 name: waltid-dev-wallet
                 port:
                   name: http
-    - host: wallet.walt-test.cloud
+    - host: wallet.test.waltid.cloud
       http:
         paths:
           - path: /wallet-api/
@@ -314,7 +314,7 @@ spec:
                 port:
                   name: http
           - path: /api.json
-            pathType: Prefix
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: wallet-api

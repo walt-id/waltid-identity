@@ -3,6 +3,7 @@ package id.walt.issuer.config
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.WaltConfig
 import id.walt.mdoc.doc.MDocTypes
+import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialSupported
 import id.walt.oid4vc.data.ProofType
@@ -14,7 +15,7 @@ import kotlinx.serialization.json.*
 
 private fun vc(vararg extra: String) = JsonArray(listOf(*extra).map { JsonPrimitive(it) })
 private fun vc(credentialSupported: CredentialSupported) = Json.encodeToJsonElement(credentialSupported)
-private var baseUrl = ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl
+private var baseUrl = ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl  + "/${OpenID4VCIVersion.DRAFT13.versionString}"
 
 @Serializable
 data class CredentialTypeConfig(
