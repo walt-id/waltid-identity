@@ -446,7 +446,7 @@ object OidcApi : CIProvider() {
                 } else {
                     val credReq = CredentialRequest.fromJSON(call.receive<JsonObject>())
                     try {
-                        val session = parsedToken.get(JWTClaims.Payload.subject)?.jsonPrimitive?.content?.let { getSession(it) }
+                        val session = parsedToken[JWTClaims.Payload.subject]?.jsonPrimitive?.content?.let { getSession(it) }
                             ?: throw CredentialError(credReq, CredentialErrorCode.invalid_request, "Session not found for access token")
                         call.respond(generateCredentialResponse(credReq, session).toJSON())
                     } catch (exc: CredentialError) {
@@ -482,7 +482,7 @@ object OidcApi : CIProvider() {
                 } else {
                     val req = BatchCredentialRequest.fromJSON(call.receive())
                     try {
-                        val session = parsedToken.get(JWTClaims.Payload.subject)?.jsonPrimitive?.content?.let { getSession(it) }
+                        val session = parsedToken[JWTClaims.Payload.subject]?.jsonPrimitive?.content?.let { getSession(it) }
                             ?: throw BatchCredentialError(req, CredentialErrorCode.invalid_request, "Session not found for access token")
                         call.respond(generateBatchCredentialResponse(req, session).toJSON())
                     } catch (exc: BatchCredentialError) {
