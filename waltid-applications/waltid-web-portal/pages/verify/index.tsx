@@ -41,11 +41,18 @@ export default function Verification() {
         return false;
       });
 
+      const standardVersion = 'draft13'; // ['draft13', 'draft11']
+      const issuerMetadataConfigSelector = {
+        'draft13': 'credential_configurations_supported',
+        'draft11': 'credentials_supported',
+      }
+
+      const issuerMetadata = await axios.get(`${env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER}/${standardVersion}/.well-known/openid-credential-issuer`);
       const request_credentials = credentials.map((credential) => {
         if (mapFormat(format) === 'vc+sd-jwt') {
-          let url = `${env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER}`;
+          let url = issuerMetadata.data[issuerMetadataConfigSelector[standardVersion]][`${credential.offer.type[credential.offer.type.length - 1]}_vc+sd-jwt`].vct;
           return {
-            vct: `${url}/${credential.offer.type[credential.offer.type.length - 1]}`,
+            vct: url,
             format: mapFormat(format),
           };
         } else {
@@ -75,7 +82,7 @@ export default function Verification() {
 
       const response = await axios.post(
         `${env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER}/openid4vc/verify`,
-          requestBody,
+        requestBody,
         {
           headers: {
             successRedirectUri: `${window.location.origin}/success/$id`,
