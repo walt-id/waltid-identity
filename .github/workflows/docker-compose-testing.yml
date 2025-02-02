@@ -14,7 +14,19 @@ jobs:
         config:
           - {
             collection: ./postman/Postman Collections/Issuance-Presentation Tests.postman_collection.json,
-            dataset: ./postman/Datasets/Issuance-Presentation/jwk.csv
+            dataset: ./postman/Datasets/Issuance-Presentation/jwk/jwt_vc_json.csv
+          }
+          - {
+            collection: ./postman/Postman Collections/Issuance-Presentation Tests.postman_collection.json,
+            dataset: ./postman/Datasets/Issuance-Presentation/jwk/sd-jwt-w3c.csv
+          }
+          - {
+            collection: ./postman/Postman Collections/Issuance-Presentation Tests.postman_collection.json,
+            dataset: ./postman/Datasets/Issuance-Presentation/jwk/vc+sd-jwt.csv
+          }
+          - {
+            collection: ./postman/Postman Collections/Issuance-Presentation Tests.postman_collection.json,
+            dataset: ./postman/Datasets/Issuance-Presentation/jwk/mso_mdoc.csv
           }
           - {
             collection: ./postman/Postman Collections/Issuance-Presentation Tests.postman_collection.json,
