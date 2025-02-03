@@ -1,8 +1,6 @@
 package id.walt.issuer.issuance
 
 
-import id.walt.policies.Verifier
-import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -19,6 +17,8 @@ import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.responses.PushedAuthorizationResponse
 import id.walt.oid4vc.util.randomUUID
+import id.walt.policies.Verifier
+import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.sdjwt.JWTVCIssuerMetadata
 import id.walt.sdjwt.SDJWTVCTypeMetadata
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -61,7 +61,7 @@ object OidcApi : CIProvider() {
         }) {
             get("{standardVersion}/.well-known/openid-configuration", {
                 request {
-                    standardVersionQueryParameter()
+                    standardVersionPathParameter()
                 }
             }) {
                 val metadata = getMetadataForVersion(
@@ -73,7 +73,7 @@ object OidcApi : CIProvider() {
 
             get("{standardVersion}/.well-known/openid-credential-issuer", {
                 request {
-                    standardVersionQueryParameter()
+                    standardVersionPathParameter()
                 }
             }) {
                 val metadata = getMetadataForVersion(
@@ -85,7 +85,7 @@ object OidcApi : CIProvider() {
 
             get("{standardVersion}/.well-known/oauth-authorization-server", {
                 request {
-                    standardVersionQueryParameter()
+                    standardVersionPathParameter()
                 }
             }) {
                 val metadata = getMetadataForVersion(
@@ -97,13 +97,18 @@ object OidcApi : CIProvider() {
 
             get("/.well-known/jwt-vc-issuer/{standardVersion}", {
                 request {
-                    standardVersionQueryParameter()
+                    standardVersionPathParameter()
                 }
             }) {
                 call.respond(HttpStatusCode.OK, JWTVCIssuerMetadata(issuer = metadata.issuer, jwksUri = metadata.jwksUri))
             }
 
-            get("/.well-known/vct/{standardVersion}/{type}") {
+            get("/.well-known/vct/{standardVersion}/{type}", {
+                request{
+                    standardVersionPathParameter()
+                    typePathParameter()
+                }
+            }) {
                 val credType = call.parameters["type"] ?: throw IllegalArgumentException("Type required")
 
                 // issuer api is the <authority>
@@ -139,7 +144,7 @@ object OidcApi : CIProvider() {
 
             get("{standardVersion}/jwks", {
                 request {
-                    standardVersionQueryParameter()
+                    standardVersionPathParameter()
                 }
             }) {
                 call.respond(HttpStatusCode.OK, getJwksSessions())
@@ -441,7 +446,7 @@ object OidcApi : CIProvider() {
                 } else {
                     val credReq = CredentialRequest.fromJSON(call.receive<JsonObject>())
                     try {
-                        val session = parsedToken.get(JWTClaims.Payload.subject)?.jsonPrimitive?.content?.let { getSession(it) }
+                        val session = parsedToken[JWTClaims.Payload.subject]?.jsonPrimitive?.content?.let { getSession(it) }
                             ?: throw CredentialError(credReq, CredentialErrorCode.invalid_request, "Session not found for access token")
                         call.respond(generateCredentialResponse(credReq, session).toJSON())
                     } catch (exc: CredentialError) {
@@ -477,7 +482,7 @@ object OidcApi : CIProvider() {
                 } else {
                     val req = BatchCredentialRequest.fromJSON(call.receive())
                     try {
-                        val session = parsedToken.get(JWTClaims.Payload.subject)?.jsonPrimitive?.content?.let { getSession(it) }
+                        val session = parsedToken[JWTClaims.Payload.subject]?.jsonPrimitive?.content?.let { getSession(it) }
                             ?: throw BatchCredentialError(req, CredentialErrorCode.invalid_request, "Session not found for access token")
                         call.respond(generateBatchCredentialResponse(req, session).toJSON())
                     } catch (exc: BatchCredentialError) {
@@ -550,9 +555,15 @@ object OidcApi : CIProvider() {
         }
     }
 
-    private fun OpenApiRequest.standardVersionQueryParameter() = queryParameter<String>("standardVersion") {
+    private fun OpenApiRequest.standardVersionPathParameter() = pathParameter<String>("standardVersion") {
         description = "The value of the standard version. Supported values are: draft13 and draft11"
         example("Example") { value = "draft13" }
+        required = true
+    }
+
+    private fun OpenApiRequest.typePathParameter() = pathParameter<String>("type") {
+        description = "The value of the credential type."
+        example("Example") { value = "identity_credential" }
         required = true
     }
 
