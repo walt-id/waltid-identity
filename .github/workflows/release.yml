@@ -36,6 +36,7 @@ jobs:
       deployment: prod
       namespace: default
       portals: portals
+      kubeconfig_secret: NL_KUBE_CONFIG
   tag:
     uses: walt-id/waltid-identity/.github/workflows/tag.yml@266f5c09359450c39019a6da38f2b331e7122918
     needs: [ version, deploy ]
