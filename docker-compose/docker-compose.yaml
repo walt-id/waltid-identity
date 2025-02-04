@@ -57,6 +57,8 @@ services:
       - .env
     volumes:
       - ./verifier-api/config:/waltid-verifier-api/config
+    environment:
+      OPA_SERVER_URL: "http://opa-server:8181"
 
   waltid-demo-wallet:
     image: docker.io/waltid/waltid-demo-wallet:${VERSION_TAG:-latest}
@@ -189,9 +191,9 @@ services:
       - all
     ports:
       - "8181:8181"
-    volumes:
-      - ./opa/policies:/policies
-    command: "run --server"
+    command: [ "run", "--server", "--addr", ":8181" ]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   caddy:
     image: docker.io/caddy:2
