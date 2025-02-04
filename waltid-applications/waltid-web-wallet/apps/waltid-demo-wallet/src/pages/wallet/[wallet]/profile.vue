@@ -19,7 +19,7 @@
         />
       </svg>
     </div>
-    <p class="text-center font-bold">{{ user.email }}</p>
+    <p class="text-center font-bold">{{ user.friendlyName }}</p>
     <div class="bg-white rounded-lg shadow-md p-4 mt-4">
       <div class="font-bold text-lg">DID</div>
       <p class="mt-2">

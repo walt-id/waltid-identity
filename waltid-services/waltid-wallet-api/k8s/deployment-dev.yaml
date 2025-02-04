@@ -201,7 +201,7 @@ spec:
             - name: NUXT_PUBLIC_DEV_WALLET_URL
               value: "https://wallet-dev.test.waltid.cloud"
             - name: NUXT_PUBLIC_CREDENTIALS_REPOSITORY_URL
-              value: "https://vc-repo.walt-test.cloud"
+              value: "https://credentials.test.waltid.cloud"
           ports:
             - containerPort: 7101
               name: http-api

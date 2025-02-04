@@ -28,8 +28,10 @@ Available for Kotlin/Java and JavaScript environments.
   implementation of the OID4VCI and OIDC4VP protocols.
 - **SD-JWT** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/sdjwt/waltid-sdjwt)) -
   create and verify Selective Disclosure JWTs.
+- **Ktor-Authnz** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/auth/waltid-ktor-authnz)) - Add various authentication methods (OIDC, Email/Password, ...) to Ktor projects.
+- **Permissions** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/auth/waltid-permissions)) - Enable fine-grained authorisation patterns in applications with waltid-permissions.
 
-### Services
+### REST Services
 
 A set of APIs to build issuer, verifier, and wallet capabilities into any app.
 
@@ -44,26 +46,41 @@ A set of APIs to build issuer, verifier, and wallet capabilities into any app.
 
 A set of white-label apps to get started in no time.
 
-- [Web-Wallet](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-web-wallet) - A custodial web-wallet (PWA)
-  solution for credentials and tokens.
-- [Portal](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-web-portal) - An issuer and verifier portal for
-  credentials, which are managed [here](https://github.com/walt-id/waltid-credentials).
+- **Web-Wallets** ([Demo](https://wallet.walt.id/login) | [Docs](https://docs.walt.id/community-stack/wallet/apps/web-wallet/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-web-wallet)) - Custodial web-wallet (PWA) solutions for credentials and tokens.
+- **Portal** ([Demo](https://portal.walt.id/) | [Docs](https://docs.walt.id/community-stack/issuer/apps/portal/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-web-portal)) - An issuer and verifier portal for credentials, which are managed [here](https://github.com/walt-id/waltid-credentials).
 
-## Use Services And Apps
 
-Use the [walt.id identity package](https://github.com/walt-id/waltid-identity/tree/main/docker-compose) to run all APIs and Apps with
-docker:
+## Use REST Services And Apps
+
+Use the [walt.id identity package](https://github.com/walt-id/waltid-identity/tree/main/docker-compose) to run all APIs and Apps with docker:
+
+**Clone walt.id identity**
 
 ```bash
-cd docker-compose && docker-compose up
+git clone https://github.com/walt-id/waltid-identity.git && cd waltid-identity
 ```
 
-Learn more about the exposed ports [here](https://github.com/walt-id/waltid-identity/tree/main/docker-compose).
+**Launch the services**
+
+```bash
+cd docker-compose && docker compose up
+```
+
+Learn more about the docker settings & exposed ports [here](https://github.com/walt-id/waltid-identity/tree/main/docker-compose).
 
 ## Use the Command Line Tool
 
-Use the [walt.id CLI](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-cli) to run the core functions from
+Use the [walt.id CLI](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-cli) to run the
+core functions from
 the command line. Make sure you have your Java Runtime set up.
+
+**Clone walt.id identity**
+
+```bash
+git clone https://github.com/walt-id/waltid-identity.git && cd waltid-identity
+```
+
+**Access CLI**
 
 ```bash
 cd waltid-applications/waltid-cli && ./waltid-cli.sh
@@ -74,15 +91,12 @@ cd waltid-applications/waltid-cli && ./waltid-cli.sh
 The walt.id identity repo is part of The Community Stack, walt.id's collection of open-source products to build identity and wallet
 solutions. Learn more [here](https://walt.id/blog/p/community-stack).
 
-![waltid-identity-architecture](https://github.com/user-attachments/assets/0400118b-3a38-421e-91dc-7293f6a44b6c)
+![waltid-identity-architecture](https://github.com/user-attachments/assets/98c020fe-dc37-46fd-9886-613ee8fc8760)
 
 ## Join the community
 
-* Connect and get the latest updates: <a href="https://discord.gg/AW8AgqJthZ">Discord</a> | <a href="https://walt.id/newsletter">
-  Newsletter</a> | <a href="https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA">
-  YouTube</a> | <a href="https://mobile.twitter.com/walt_id" target="_blank">Twitter</a>
-* Get help, request features and report bugs: <a href="https://github.com/walt-id/.github/discussions" target="_blank">GitHub
-  Discussions</a>
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [Twitter](https://mobile.twitter.com/walt_id)
+* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
 
 ## License
 

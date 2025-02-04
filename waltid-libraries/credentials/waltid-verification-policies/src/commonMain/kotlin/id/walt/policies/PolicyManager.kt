@@ -49,7 +49,8 @@ object PolicyManager {
             HolderBindingPolicy(),
             AllowedIssuerPolicy(),
             RevocationPolicy(),
-            PresentationDefinitionPolicy()
+            PresentationDefinitionPolicy(),
+            DynamicPolicy()
         )
     }
 

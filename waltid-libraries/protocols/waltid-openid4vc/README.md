@@ -414,10 +414,6 @@ For the full demo verifier implementation, refer to `/src/jvmTest/kotlin/id/walt
 
 #### Business logic
 
-## License
-
-Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-xyzkit/blob/master/LICENSE)
-
 # Example flows:
 
 ## EBSI conformance test: Credential issuance:
@@ -448,3 +444,13 @@ Issuer -->> Wallet: Credential (and updated c_nonce)
 end
 
 ```
+
+## Join the community
+
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [Twitter](https://mobile.twitter.com/walt_id)
+* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+
+
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
