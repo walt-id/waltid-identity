@@ -184,9 +184,6 @@ services:
   opa-server:
     image: openpolicyagent/opa:latest
     container_name: opa-server
-    profiles:
-      - identity
-      - all
     ports:
       - "8181:8181"
     volumes:
