@@ -1,4 +1,4 @@
-FROM docker.io/gradle:jdk17 AS buildstage
+FROM docker.io/gradle:jdk21 AS buildstage
 
 COPY gradle/ /work/gradle
 COPY settings.gradle.kts build.gradle.kts gradle.properties gradlew /work/
@@ -45,7 +45,7 @@ COPY waltid-services/waltid-wallet-api/build.gradle.kts waltid-services/waltid-w
 
 RUN gradle clean installDist
 
-FROM docker.io/eclipse-temurin:17
+FROM docker.io/eclipse-temurin:21
 
 # Non-root user
 RUN useradd --create-home waltid

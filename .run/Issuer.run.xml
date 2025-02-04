@@ -5,7 +5,7 @@
     <option name="MAIN_CLASS_NAME" value="id.walt.issuer.MainKt" />
     <module name="waltid-identity.waltid-services.waltid-issuer-api.main" />
     <option name="PROGRAM_PARAMETERS" value="-l trace" />
-    <shortenClasspath name="NONE" />
+    <shortenClasspath name="ARGS_FILE" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/waltid-services/waltid-issuer-api" />
     <method v="2">
       <option name="Make" enabled="true" />
