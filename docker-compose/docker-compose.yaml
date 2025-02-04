@@ -46,6 +46,7 @@ services:
     profiles:
       - identity
       - all
+      - opa
     pull_policy: always
     build:
       context: ../
@@ -187,10 +188,10 @@ services:
     image: openpolicyagent/opa:latest
     container_name: opa-server
     profiles:
-      - identity
+      - opa
       - all
     ports:
-      - "8181:8181"
+      - "$OPA_SERVER_PORT:8181"
     command: [ "run", "--server", "--addr", ":8181" ]
     extra_hosts:
       - "host.docker.internal:host-gateway"
