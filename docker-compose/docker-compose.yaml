@@ -53,7 +53,6 @@ services:
       dockerfile: waltid-services/waltid-verifier-api/Dockerfile
     depends_on:
       - caddy
-      - opa-server
     env_file:
       - .env
     volumes:
