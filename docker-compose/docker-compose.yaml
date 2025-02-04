@@ -46,7 +46,6 @@ services:
     profiles:
       - identity
       - all
-      - opa
     pull_policy: always
     build:
       context: ../
