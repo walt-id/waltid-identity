@@ -3,8 +3,13 @@ package id.walt.webwallet.db
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.featureflag.FeatureManager
+import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.db.models.*
+import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers
+import id.walt.webwallet.db.models.authnz.AuthnzStoredData
+import id.walt.webwallet.db.models.authnz.AuthnzUsers
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -36,8 +41,8 @@ object Db {
             log.info { "Will use sqlite database (${datasourceConfig.jdbcUrl}), working directory: ${Path(".").absolutePathString()}" }
         }
 
-        val hikariDataSourceConfig =runCatching {
-             createHikariDataSource(datasourceConfig.dataSource)
+        val hikariDataSourceConfig = runCatching {
+            createHikariDataSource(datasourceConfig.dataSource)
         }.getOrElse { ex ->
             throw IllegalArgumentException("Could not initialize hikari database connection pool configuration: ${ex.message}", ex)
         }
@@ -73,7 +78,6 @@ object Db {
         EntityNameResolutionCache,
     ).toTypedArray()
 
-
     @OptIn(ExperimentalUuidApi::class)
     private fun recreateDatabase() {
         transaction {
@@ -81,7 +85,9 @@ object Db {
 
             SchemaUtils.drop(*(tables.reversedArray()))
             SchemaUtils.create(*tables)
-
+            if (FeatureManager.isFeatureEnabled(FeatureCatalog.ktorAuthnzAuthenticationFeature)) {
+                SchemaUtils.create(AuthnzUsers, AuthnzAccountIdentifiers, AuthnzStoredData)
+            }
             runBlocking {
 
                 AccountsService.register(request = EmailAccountRequest("Max Mustermann", "string@string.string", "string"))

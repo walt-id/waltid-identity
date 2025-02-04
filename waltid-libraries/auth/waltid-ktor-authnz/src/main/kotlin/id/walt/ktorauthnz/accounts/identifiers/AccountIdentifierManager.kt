@@ -5,7 +5,10 @@ import id.walt.ktorauthnz.accounts.identifiers.methods.*
 object AccountIdentifierManager {
 
     private val defaultIdentifiers =
-        listOf(EmailIdentifier, JWTIdentifier, LDAPIdentifier, OIDCIdentifier, RADIUSIdentifier, UsernameIdentifier)
+        listOf(
+            EmailIdentifier, JWTIdentifier, LDAPIdentifier, OIDCIdentifier, RADIUSIdentifier, UsernameIdentifier,
+            Web3Identifier
+        )
 
     private val factories: MutableMap<String, AccountIdentifier.AccountIdentifierFactory<out AccountIdentifier>> =
         defaultIdentifiers.associateBy { it.identifierName }.toMutableMap()

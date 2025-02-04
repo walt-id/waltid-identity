@@ -26,7 +26,7 @@ repositories {
 
 tasks.withType<KotlinCompile> {
     compilerOptions {
-        jvmTarget = JvmTarget.JVM_17
+        jvmTarget = JvmTarget.JVM_21
     }
 }
 
@@ -52,7 +52,7 @@ tasks.withType<ProcessResources> {
 }*/
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
 
 tasks.withType<Test> {

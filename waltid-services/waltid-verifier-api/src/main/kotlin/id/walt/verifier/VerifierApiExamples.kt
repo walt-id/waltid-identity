@@ -71,6 +71,24 @@ object VerifierApiExamples {
     """.trimIndent()
 
     // language=json
+    private val dynamiPolicy = """
+        {
+          "policy": "dynamic",
+          "args":  {
+            "policy_name": "test",
+            "opa_server":"http://localhost:8181",
+            "policy_query":"data",
+            "rules": {
+                   "rego": "package data.test\r\n\r\ndefault allow := false\r\n\r\nallow if {\r\ninput.parameter.name == input.credentialData.credentialSubject.achievement.name\r\n}"
+            },
+            "argument": {
+                "name": "JFF x vc-edu PlugFest 3 Interoperability"
+            }
+          }
+        }
+    """.trimIndent()
+
+    // language=json
     private fun jwtFormat(alg: String) = """
         {
             "alg":
@@ -88,6 +106,26 @@ object VerifierApiExamples {
                 "request_credentials":
                 [
                     { "format": "jwt_vc_json", "type": "OpenBadgeCredential" }
+                ]
+            }
+        """.trimIndent()
+    )
+
+
+    //language=json
+    val dynamicPolicy = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "request_credentials":
+                [
+                    {
+                        "format": "jwt_vc_json",
+                        "type": "OpenBadgeCredential",
+                        "policies":
+                        [
+                            $dynamiPolicy
+                        ]
+                    }
                 ]
             }
         """.trimIndent()

@@ -50,7 +50,7 @@ can be found in the table below:
         <!-- w3c -->
         <!-- jwt -->
         <tr>
-            <td align="center" rowspan="2">w3c</td>
+            <td align="center" rowspan="2">W3C</td>
             <td align="center">jwt</td>
             <td align="center">&check;</td>
             <td align="center">&check;</td>
@@ -61,13 +61,21 @@ can be found in the table below:
         <tr>
             <td align="center">sd-jwt</td>
             <td align="center">&check;</td>
+            <td align="center">&check;</td>
             <td align="center">&cross;</td>
+            <td align="center">&cross;</td>
+        </tr>
+        <!-- SD-JWT VC (IETF) -->
+        <tr>
+            <td align="center" colspan="2">SD-JWT VC (IETF)</td>
+            <td align="center">&check;</td>
+            <td align="center">&check;</td>
             <td align="center">&cross;</td>
             <td align="center">&cross;</td>
         </tr>
         <!-- mdoc -->
         <tr>
-            <td align="center" colspan="2">mdoc</td>
+            <td align="center" colspan="2">mDL/mdoc</td>
             <td align="center">&dash;</td>
             <td align="center">&dash;</td>
             <td align="center">&cross;</td>
@@ -121,3 +129,13 @@ Or, run with local config directory:
 ```shell
 docker run -p 7002:7002 -v $PWD/waltid-services/waltid-issuer-api/config:/waltid-issuer-api/config -t waltid/issuer-api
 ```
+
+## Join the community
+
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [Twitter](https://mobile.twitter.com/walt_id)
+* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+
+
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)

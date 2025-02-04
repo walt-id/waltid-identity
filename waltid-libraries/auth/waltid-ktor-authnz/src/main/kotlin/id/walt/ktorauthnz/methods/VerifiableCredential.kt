@@ -3,6 +3,7 @@ package id.walt.ktorauthnz.methods
 import com.nfeld.jsonpathkt.JsonPath
 import com.nfeld.jsonpathkt.kotlinx.resolveAsStringOrNull
 import id.walt.ktorauthnz.AuthContext
+import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.methods.config.VerifiableCredentialAuthConfiguration
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.client.*
@@ -31,7 +32,10 @@ object VerifiableCredential : AuthenticationMethod("vc") {
     // TODO:
     val verifierUrl = "http://localhost:7003"
 
-    override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.registerAuthenticationRoutes(
+        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
+    ) {
         route("vc", {
 
         }) {
