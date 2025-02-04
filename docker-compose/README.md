@@ -107,6 +107,7 @@ profiles to start the services for. Currently, the services are available with 2
         - approle - for my-role, where role-id and secret-id will be output in the console<sup>1</sup>
         - userpass - for myuser with mypassword
         - access-token - with dev-only-token
+- opa - for the Open Policy Agent service
 
 Profiles can be combined, e.g. `COMPOSE_PROFILES=identity,tse` - will start the
 waltid-identity services and the vault (also can be done with the `all` profile).
@@ -138,6 +139,7 @@ docker-compose down -v
 - Issuer API: [http://localhost:7002](http://localhost:7002)
 - Verifier API: [http://localhost:7003](http://localhost:7003)
 - Hashicorp vault: [http://localhost:8200](http://localhost:8200)
+- Open Policy Agent: [http://localhost:8181](http://localhost:8181)
 
 ### Apps
 
