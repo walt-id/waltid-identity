@@ -52,6 +52,7 @@ services:
       dockerfile: waltid-services/waltid-verifier-api/Dockerfile
     depends_on:
       - caddy
+      - opa-server
     env_file:
       - .env
     volumes:
@@ -179,6 +180,18 @@ services:
     entrypoint: ["/bin/sh", "-c", "/vault/scripts/init.sh"]
     volumes:
       - ./vault/init.sh:/vault/scripts/init.sh
+
+  opa-server:
+    image: openpolicyagent/opa:latest
+    container_name: opa-server
+    profiles:
+      - identity
+      - all
+    ports:
+      - "8181:8181"
+    volumes:
+      - ./opa/policies:/policies
+    command: "run --server"
 
   caddy:
     image: docker.io/caddy:2
