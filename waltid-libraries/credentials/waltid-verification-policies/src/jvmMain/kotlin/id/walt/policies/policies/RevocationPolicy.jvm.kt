@@ -1,5 +1,6 @@
 package id.walt.policies.policies
 
+import id.walt.policies.policies.StreamUtils.getBitValue
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -87,34 +88,39 @@ object Base64Utils {
 }
 
 object StreamUtils {
-    private const val BITS_PER_BYTE = 8u
+    private const val BITS_PER_BYTE_UNSIGNED = 8u
 
     fun binToInt(bin: String) = bin.toInt(2)
 
     fun getBitValue(inputStream: InputStream, index: ULong, bitSize: Int): List<Char> = inputStream.use { stream ->
         //TODO: bitSize constraints
         val bitStartPosition = index * bitSize.toUInt()
-        val byteStart = bitStartPosition / BITS_PER_BYTE
+        val byteStart = bitStartPosition / BITS_PER_BYTE_UNSIGNED
         stream.skip(byteStart.toLong())
-        val bytesToRead = (bitSize - 1) / BITS_PER_BYTE.toInt() + 1
+        val bytesToRead = (bitSize - 1) / BITS_PER_BYTE_UNSIGNED.toInt() + 1
         extractBitValue(stream.readNBytes(bytesToRead), index, bitSize.toUInt())
     }
 
     private fun extractBitValue(bytes: ByteArray, index: ULong, bitSize: UInt): List<Char> {
-        val bitSet = BitSet.valueOf(bytes)
-        val bitStart = index * bitSize % BITS_PER_BYTE
-        val result = mutableListOf<Char>()
-        for (i in bitStart..<bitStart + bitSize) {
-            val b = bitSet[i.toInt()].takeIf { it }?.let { 1 } ?: 0
-            result.add(b.digitToChar())
+        val bits = bytes.toBitSequence()
+        val bitStartPosition = index * bitSize % BITS_PER_BYTE_UNSIGNED
+        val bitSet = bits.drop(bitStartPosition.toInt()).iterator()
+        val result = mutableListOf<Boolean>()
+        var b = 0u
+        while (b++ < bitSize) {
+            result.add(bitSet.next())
         }
-        return result
+        return result.map { if (it) '1' else '0' }
     }
 }
 
 fun get(bitstring: String, idx: ULong? = null, bitSize: Int = 1) =
-    idx?.let { StreamUtils.getBitValue(GZIPInputStream(Base64Utils.decode(bitstring).inputStream()), it, bitSize) }
+    idx?.let { getBitValue(GZIPInputStream(Base64Utils.decode(bitstring).inputStream()), it, bitSize) }
 
 fun isBinaryValue(value: List<Char>) = setOf('0', '1').let { valid ->
     value.all { it in valid }
+}
+
+fun ByteArray.toBitSequence(): Sequence<Boolean> = this.fold(emptySequence<Boolean>()) { acc, byte ->
+    acc + (7 downTo 0).map { i -> (byte.toUInt() shr i) and 1u == 1u }.asSequence()
 }
