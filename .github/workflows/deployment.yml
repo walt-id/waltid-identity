@@ -51,6 +51,10 @@ jobs:
           - k8s: waltid-applications/waltid-web-portal/k8s
             name: portal
             namespace: ${{ inputs.portals }}
+          - k8s: waltid-services/waltid-verifier-api/k8s/opa
+            name: opa
+            namespace: ${{ inputs.namespace }}
+
     steps:
       - uses: actions/checkout@v4
       - name: Prepare CD - ${{ matrix.services.name }}
