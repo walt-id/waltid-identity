@@ -36,8 +36,8 @@ spec:
     app: opa
   ports:
     - protocol: TCP
-      port: 8181
-      targetPort: 8181
+      port: 80
+      targetPort: http
       name: http
 ---
 

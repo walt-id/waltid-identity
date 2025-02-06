@@ -36,21 +36,19 @@ spec:
     app: opa
   ports:
     - protocol: TCP
-      port: 8181
-      targetPort: 8181
+      port: 80
+      targetPort: http
       name: http
 ---
-
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: opa-ingress
   annotations:
     kubernetes.io/ingress.class: "nginx"
-    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   rules:
-    - host: opa.walt-test.cloud
+    - host: opa.test.waltid.cloud
       http:
         paths:
           - path: /
