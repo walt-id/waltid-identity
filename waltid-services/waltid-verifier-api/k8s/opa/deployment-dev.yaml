@@ -20,6 +20,7 @@ spec:
           args:
             - "run"
             - "--server"
+            - "--addr=0.0.0.0:8181"
             - "--log-level=info"
           ports:
             - containerPort: 8181
