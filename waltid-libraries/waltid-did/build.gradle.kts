@@ -146,7 +146,7 @@ kotlin {
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.0")
                 implementation("io.ktor:ktor-server-test-host:$ktor_version")
                 implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
-                implementation("io.ktor:ktor-server-netty:2.3.12")
+                implementation("io.ktor:ktor-server-netty:$ktor_version")
             }
         }
         val jsMain by getting {
