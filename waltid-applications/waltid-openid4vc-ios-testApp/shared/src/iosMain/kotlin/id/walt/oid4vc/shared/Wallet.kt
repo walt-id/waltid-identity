@@ -13,7 +13,7 @@ import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
-import id.walt.oid4vc.data.dif.VCFormat
+import id.walt.credentials.utils.VCFormat
 import id.walt.oid4vc.errors.PresentationError
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.interfaces.SimpleHttpResponse
@@ -358,7 +358,7 @@ internal class TestCredentialWallet(
     }
 
     override val metadata: OpenIDProviderMetadata
-        get() = createDefaultProviderMetadata()
+        get() = createDefaultProviderMetadata() as OpenIDProviderMetadata.Draft13
 
     override fun getSession(id: String) = sessionCache[id]
     override fun getSessionByAuthServerState(authServerState: String): SIOPSession? {
