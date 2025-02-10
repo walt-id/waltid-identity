@@ -17,6 +17,9 @@ jobs:
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
+  android-build:
+    uses: walt-id/waltid-identity/.github/workflows/build-android.yml@e91ee212a8b9f60a9a39d839eafdc8a5d8f8b286
+    needs: gradle-build
   docker-matrix:
     uses: walt-id/waltid-identity/.github/workflows/load-json.yml@927c4233610e90dd8a57418662fad7293b7b29a4
     with:
