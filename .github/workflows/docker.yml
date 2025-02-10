@@ -44,7 +44,6 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Set up Docker Buildx
-        if: ${{ !inputs.publish }}
         uses: docker/setup-buildx-action@v3
       - name: Build and push Docker images (${{ matrix.image }})
         uses: docker/build-push-action@v6
@@ -52,11 +51,18 @@ jobs:
           push: ${{ inputs.publish }}
           file: ${{ matrix.folder }}/Dockerfile
           tags: waltid/${{ matrix.image }}:${{ inputs.tag }}, waltid/${{ matrix.image }}:${{ inputs.version }}
-          outputs: type=docker,dest=${{ runner.temp }}/${{ matrix.image }}.tar
+          load: true
+          build-args: |
+            --progress=plain
+        continue-on-error: false
+      - name: Save Docker Image to ${{ matrix.image }}.tar.gz
+        if: ${{ inputs.artifact }}
+        run: docker save waltid/${{ matrix.image }}:${{ inputs.version }} | gzip > ${{ runner.temp }}/${{ matrix.image }}.tar.gz
+        continue-on-error: false
       - name: Upload artifact
         if: ${{ inputs.artifact }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.image }}
-          path: ${{ runner.temp }}/${{ matrix.image }}.tar
+          path: ${{ runner.temp }}/${{ matrix.image }}.tar.gz
           retention-days: 1
