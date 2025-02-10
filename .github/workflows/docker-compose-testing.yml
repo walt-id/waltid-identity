@@ -1,14 +1,11 @@
-name: Docker compose testing
+name: Docker compose testing (reusable workflow)
 
 on:
-  push:
-    branches-ignore:
-      - main
+  workflow_call:
   workflow_dispatch:  # Allows manual triggering of the workflow
 
 jobs:
-  automated-api-tests:
-#    runs-on: self-hosted
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -31,11 +28,6 @@ jobs:
           filenameNoExtension=${filenameWithExtension%.*}
           echo "Will use filename $filenameNoExtension for reports"
           echo "dataset_filename=$filenameNoExtension" >> $GITHUB_ENV
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: false
-          docker-images: false
       - name: Checkout repo
         uses: actions/checkout@v4
       - name: Checkout waltid-identity-postman
@@ -86,8 +78,8 @@ jobs:
         run: |
           sudo echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
       - name: Run API tests
-#        env:
-#          NODE_OPTIONS: "--max-old-space-size=6144 --max-semi-space-size=1024"
+        env:
+          NODE_OPTIONS: "--max-old-space-size=6144 --max-semi-space-size=1024"
         run: |
           newman run "${{ matrix.config.collection }}" \
           --environment "${{ matrix.environment }}" \
