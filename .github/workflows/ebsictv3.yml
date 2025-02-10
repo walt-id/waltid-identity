@@ -1,18 +1,27 @@
 name: EBSI Conformance Test v3.2
 
 on:
-  push:
-    paths:
-      - 'waltid-libraries/credentials/**'
-      - 'waltid-libraries/crypto/**'
-      - 'waltid-libraries/protocols/**'
-      - 'waltid-libraries/waltid-did/**'
-      - 'waltid-services/services/waltid-issuer-api/**'
-      - '.github/workflows/**'
+  workflow_call:
+    inputs:
+      artifact:
+        description: "Load image from this artifact (defaults to empty)"
+        required: false
+        type: string
+      path:
+        description: "Specifies the artifact path (defaults to empty)"
+        required: false
+        type: string
+      tag:
+        description: "Use this docker image tag (defaults to empty)"
+        required: false
+        type: string
 
 jobs:
   EBSI-Conformance-Test-v3:
+    name: Run
     runs-on: ubuntu-latest
+    env:
+      use-artifact: ${{ inputs.artifact != '' && inputs.tag != '' }}
     steps:
       - name: The EBSI Conformance Test v3.2 job is starting
         run: |
@@ -31,6 +40,18 @@ jobs:
 
       - name: Docker
         run: docker --version
+
+      - name: Download artifact
+        if: ${{ env.use-artifact }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: ${{ runner.temp }}
+
+      - name: Load Docker image from tarball
+        if: ${{ env.use-artifact }}
+        run: |
+          docker load --input ${{ runner.temp }}/${{ inputs.artifact }}.tar
 
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -53,9 +74,14 @@ jobs:
 
           sed -i 's|readonly ISSUER_URL=".*"|readonly ISSUER_URL="'"${NGROK_URL}"'"|g' .github/workflows/ebsictv3/EBSICTV3-IssueToHolder.sh
           sed -i 's|baseUrl = ".*"|baseUrl = "'"${NGROK_URL}"'"|g' waltid-services/waltid-issuer-api/config/issuer-service.conf
-
-          docker build -t waltid/issuer-api:latest -f waltid-services/waltid-issuer-api/Dockerfile .
-          docker run --net=host -d -v $PWD/waltid-services/waltid-issuer-api/config:/waltid-issuer-api/config --name waltid-issuer-api waltid/issuer-api:latest
+          
+          image="${{ inputs.tag }}"
+          if [[ "${{ env.use-artifact }}" != "true" ]]; then
+            image="waltid/issuer-api:latest"
+            docker build -t $image -f waltid-services/waltid-issuer-api/Dockerfile .
+          fi
+          
+          docker run --net=host -d -v $PWD/waltid-services/waltid-issuer-api/config:/waltid-issuer-api/config --name waltid-issuer-api $image
           
           curl --retry 5 --retry-delay 5 --retry-connrefused http://localhost:7002/livez
 
