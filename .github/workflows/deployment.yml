@@ -30,7 +30,6 @@ on:
 
 jobs:
   deploy:
-    name: Deploy
     runs-on: ubuntu-latest
     env:
       IMAGE_TAG: ${{ inputs.version }}
