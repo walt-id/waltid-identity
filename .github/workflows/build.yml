@@ -7,14 +7,14 @@ on:
 
 jobs:
   version:
-    uses: walt-id/waltid-identity/.github/workflows/version.yml@266f5c09359450c39019a6da38f2b331e7122918
+    uses: walt-id/waltid-identity/.github/workflows/version.yml@18e3a1a28a87b355fb0fe9469d66eab24940fcf5
   gradle-build:
-    uses: walt-id/waltid-identity/.github/workflows/build-gradle.yml@266f5c09359450c39019a6da38f2b331e7122918
+    uses: walt-id/waltid-identity/.github/workflows/build-gradle.yml@18e3a1a28a87b355fb0fe9469d66eab24940fcf5
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
   docker-build:
-    uses: walt-id/waltid-identity/.github/workflows/build-docker.yml@266f5c09359450c39019a6da38f2b331e7122918
+    uses: walt-id/waltid-identity/.github/workflows/build-docker.yml@18e3a1a28a87b355fb0fe9469d66eab24940fcf5
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
