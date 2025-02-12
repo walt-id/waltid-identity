@@ -14,8 +14,7 @@ on:
         default: false
 
 jobs:
-  build:
-    name: Build
+  gradle:
     runs-on: ubuntu-latest
     steps:
       - name: Free Disk Space (Ubuntu)
@@ -26,7 +25,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Configure gradle
-        uses: ./.github/actions/gradle-setup-action@266f5c09359450c39019a6da38f2b331e7122918
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@f7b46c8ae1c27f1a0873a5ca8dfb0440c77381ec
       - name: Set version
         run: |
           sed -i "s/1.0.0-SNAPSHOT/${{ inputs.version }}/g" build.gradle.kts

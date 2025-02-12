@@ -1,0 +1,68 @@
+name: Build and/or push docker (reusable workflow)
+
+on:
+  workflow_call:
+    inputs:
+      images:
+        description: "The json array specifying image data (built with prepare-docker workflow)"
+        required: true
+        type: string
+      version:
+        description: "release version"
+        required: true
+        type: string
+      tag:
+        description: "desired tag, e.g. latest, dev (defaults to dev)"
+        required: false
+        type: string
+        default: "dev"
+      publish:
+        description: "Specifies whether to publish the images (defaults to false)"
+        required: false
+        type: boolean
+        default: false
+      artifact:
+        description: "Upload docker artifact (defaults to false)"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include: ${{ fromJSON(inputs.images) }}
+    steps:
+      - run: |
+          echo "${{ matrix.image }}::: ${{ inputs.tag }} / ${{ inputs.version }}"
+      - uses: actions/checkout@v4
+      - name: Login to Docker Hub
+        if: ${{ inputs.publish }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push Docker images (${{ matrix.image }})
+        uses: docker/build-push-action@v6
+        with:
+          push: ${{ inputs.publish }}
+          file: ${{ matrix.folder }}/Dockerfile
+          tags: waltid/${{ matrix.image }}:${{ inputs.tag }}, waltid/${{ matrix.image }}:${{ inputs.version }}
+          load: true
+          build-args: |
+            --progress=plain
+        continue-on-error: false
+      - name: Save Docker Image to ${{ matrix.image }}.tar.gz
+        if: ${{ inputs.artifact }}
+        run: docker save waltid/${{ matrix.image }}:${{ inputs.version }} | gzip > ${{ runner.temp }}/${{ matrix.image }}.tar.gz
+        continue-on-error: false
+      - name: Upload artifact
+        if: ${{ inputs.artifact }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.image }}
+          path: ${{ runner.temp }}/${{ matrix.image }}.tar.gz
+          retention-days: 1

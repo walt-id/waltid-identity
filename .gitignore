@@ -45,8 +45,8 @@ bin/
 
 # walt.id
 secret*
-*/data
-*/*/data
+**/data
+!.github/**/data/
 **/*.db
 /kotlin-js-store/
 .idea/misc.xml
