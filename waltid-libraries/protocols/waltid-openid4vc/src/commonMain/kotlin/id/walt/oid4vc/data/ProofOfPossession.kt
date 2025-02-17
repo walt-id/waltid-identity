@@ -142,7 +142,9 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
 object ProofOfPossessionSerializer : JsonDataObjectSerializer<ProofOfPossession>(ProofOfPossession.serializer())
 
 enum class ProofType {
-    jwt, cwt, ldp_vp
+    jwt,
+    cwt,
+    ldp_vp
 }
 
 @Serializable

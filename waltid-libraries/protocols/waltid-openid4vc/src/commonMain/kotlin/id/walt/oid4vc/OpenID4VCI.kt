@@ -335,12 +335,15 @@ object OpenID4VCI {
                 tokenEndpoint = "$baseUrl/token",
                 credentialEndpoint = "$baseUrl/credential",
                 batchCredentialEndpoint = "$baseUrl/batch_credential",
-                deferredCredentialEndpoint = "$baseUrl/credential_deferred",
+                deferredCredentialEndpoint = "$baseUrl/credential_deferred", // (EBSI)
                 jwksUri = "$baseUrl/jwks",
-                grantTypesSupported = setOf(GrantType.authorization_code, GrantType.pre_authorized_code),
+                grantTypesSupported = setOf(
+                    GrantType.authorization_code,
+                    GrantType.pre_authorized_code)
+                ,
                 requestUriParameterSupported = true,
                 subjectTypesSupported = setOf(SubjectType.public),
-                credentialIssuer = baseUrl, // (EBSI) this should be just "$baseUrl"  https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-11.2.1
+                credentialIssuer = baseUrl,
                 responseTypesSupported = setOf(
                     "code",
                     "vp_token",
@@ -364,7 +367,7 @@ object OpenID4VCI {
                 grantTypesSupported = setOf(GrantType.authorization_code, GrantType.pre_authorized_code),
                 requestUriParameterSupported = true,
                 subjectTypesSupported = setOf(SubjectType.public),
-                credentialIssuer = baseUrl, // (EBSI) this should be just "$baseUrl"  https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-11.2.1
+                credentialIssuer = baseUrl,
                 responseTypesSupported = setOf(
                     "code",
                     "vp_token",

@@ -27,13 +27,28 @@ sealed class CredentialOffer() : JsonDataObject() {
             supportedCredentialIds.add(supportedCredentialId)
         }
 
-        fun addAuthorizationCodeGrant(issuerState: String? = null, authorizationServer: String? = null) = this.also {
-            grants[GrantType.authorization_code.value] = GrantDetails(issuerState = issuerState, authorizationServer = authorizationServer)
+        fun addAuthorizationCodeGrant(
+            issuerState: String? = null,
+            authorizationServer: String? = null
+        ) = this.also {
+            grants[GrantType.authorization_code.value] = GrantDetails(
+                issuerState = issuerState,
+                authorizationServer = authorizationServer
+            )
         }
 
-        fun addPreAuthorizedCodeGrant(preAuthCode: String, txCode: TxCode? = null, interval: Int? = null, authorizationServer: String? = null) = this.also {
-            grants[GrantType.pre_authorized_code.value] =
-                GrantDetails(preAuthorizedCode = preAuthCode, txCode = txCode, interval = interval, authorizationServer = authorizationServer)
+        fun addPreAuthorizedCodeGrant(
+            preAuthCode: String,
+            txCode: TxCode? = null,
+            interval: Int? = null,
+            authorizationServer: String? = null
+        ) = this.also {
+            grants[GrantType.pre_authorized_code.value] = GrantDetails(
+                preAuthorizedCode = preAuthCode,
+                txCode = txCode,
+                interval = interval,
+                authorizationServer = authorizationServer
+            )
         }
 
         protected abstract fun buildInternal(): T
