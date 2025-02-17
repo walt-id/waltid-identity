@@ -24,8 +24,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import redis.clients.jedis.exceptions.JedisAccessControlException
-import redis.clients.jedis.exceptions.JedisConnectionException
 import kotlin.reflect.KClass
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -40,7 +38,9 @@ suspend fun createCredentialOfferUri(
     val overwrittenIssuanceRequests = issuanceRequests.map {
         it.copy(
             credentialFormat = credentialFormat,
-            vct = if (credentialFormat == CredentialFormat.sd_jwt_vc) OidcApi.metadata.getVctByCredentialConfigurationId(it.credentialConfigurationId) ?: throw IllegalArgumentException("VCT not found") else null)
+            vct = if (credentialFormat == CredentialFormat.sd_jwt_vc) OidcApi.metadata.getVctByCredentialConfigurationId(it.credentialConfigurationId)
+                ?: throw IllegalArgumentException("VCT not found") else null
+        )
     }
 
     val issuanceSession = OidcApi.initializeCredentialOffer(
@@ -166,7 +166,7 @@ fun Application.issuerApi() {
                     }
                 }
             }) {
-                val req = context.receive<OnboardingRequest>()
+                val req = call.receive<OnboardingRequest>()
                 val keyConfig = req.key.config?.mapValues { (key, value) ->
                     if (key == "signingKeyPem") {
                         JsonPrimitive(value.jsonPrimitive.content.trimIndent().replace(" ", ""))
@@ -200,7 +200,7 @@ fun Application.issuerApi() {
                 } else {
                     serializedKey
                 }
-                context.respond(
+                call.respond(
                     HttpStatusCode.OK, IssuerOnboardingResponse(issuanceKey, did)
                 )
             }
@@ -213,7 +213,7 @@ fun Application.issuerApi() {
                 required = false
             }
 
-            fun PipelineContext<Unit, ApplicationCall>.getCallbackUriHeader() = context.request.header("statusCallbackUri")
+            fun RoutingContext.getCallbackUriHeader() = call.request.header("statusCallbackUri")
 
             route("raw") {
                 route("jwt") {
@@ -266,15 +266,10 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-
-                        runCatching {
-                            val body = context.receive<JsonObject>()
-                            validateRawSignatureRequest(body)
-                            val signedCredential = executeCredentialSigning(body)
-                            context.respond(HttpStatusCode.OK, signedCredential)
-                        }.onFailure {
-                            throwError(it)
-                        }
+                        val body = call.receive<JsonObject>()
+                        validateRawSignatureRequest(body)
+                        val signedCredential = executeCredentialSigning(body)
+                        call.respond(HttpStatusCode.OK, signedCredential)
                     }
                 }
             }
@@ -344,14 +339,14 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-                        runCatching {
-                            val jwtIssuanceRequest = context.receive<IssuanceRequest>()
-                            val offerUri = createCredentialOfferUri(listOf(jwtIssuanceRequest), getFormatByCredentialConfigurationId(jwtIssuanceRequest.credentialConfigurationId) ?: throw IllegalArgumentException("Invalid Credential Configuration Id"), getCallbackUriHeader())
-                            context.respond(HttpStatusCode.OK, offerUri)
-                        }.onFailure {
-                            throwError(it)
-                        }
-
+                        val jwtIssuanceRequest = call.receive<IssuanceRequest>()
+                        val offerUri = createCredentialOfferUri(
+                            listOf(jwtIssuanceRequest),
+                            getFormatByCredentialConfigurationId(jwtIssuanceRequest.credentialConfigurationId)
+                                ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
+                            getCallbackUriHeader()
+                        )
+                        call.respond(HttpStatusCode.OK, offerUri)
                     }
                     post("issueBatch", {
                         summary = "Signs a list of credentials and starts an OIDC credential exchange flow."
@@ -380,16 +375,15 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-
-
-                        runCatching {
-                            val issuanceRequests = context.receive<List<IssuanceRequest>>()
-                            val offerUri = createCredentialOfferUri(issuanceRequests, getFormatByCredentialConfigurationId(issuanceRequests.first().credentialConfigurationId) ?: throw IllegalArgumentException("Invalid Credential Configuration Id"), getCallbackUriHeader())
-                            logger.debug { "Offer URI: $offerUri" }
-                            context.respond(HttpStatusCode.OK, offerUri)
-                        }.onFailure {
-                            throwError(it)
-                        }
+                        val issuanceRequests = call.receive<List<IssuanceRequest>>()
+                        val offerUri = createCredentialOfferUri(
+                            issuanceRequests,
+                            getFormatByCredentialConfigurationId(issuanceRequests.first().credentialConfigurationId)
+                                ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
+                            getCallbackUriHeader()
+                        )
+                        logger.debug { "Offer URI: $offerUri" }
+                        call.respond(HttpStatusCode.OK, offerUri)
                     }
                 }
 
@@ -407,7 +401,10 @@ fun Application.issuerApi() {
                                 example("W3C SD-JWT example", IssuanceExamples.sdJwtW3CExample)
                                 example("W3C SD-JWT PDA1 example", IssuanceExamples.sdJwtW3CPDA1Example)
                                 example("SD-JWT-VC example", IssuanceExamples.sdJwtVCExample)
-                                example("SD-JWT-VC example featuring selectively disclosable sub and iat claims", IssuanceExamples.sdJwtVCExampleWithSDSub)
+                                example(
+                                    "SD-JWT-VC example featuring selectively disclosable sub and iat claims",
+                                    IssuanceExamples.sdJwtVCExampleWithSDSub
+                                )
                                 example("SD-JWT-VC example with issuer DID", IssuanceExamples.sdJwtVCWithIssuerDidExample)
                                 required = true
                             }
@@ -425,20 +422,17 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-                        runCatching {
-                            val sdJwtIssuanceRequest = context.receive<IssuanceRequest>()
-                            val offerUri = createCredentialOfferUri(
-                                listOf(sdJwtIssuanceRequest),
-                                getFormatByCredentialConfigurationId(sdJwtIssuanceRequest.credentialConfigurationId) ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
-                                getCallbackUriHeader()
-                            )
+                        val sdJwtIssuanceRequest = call.receive<IssuanceRequest>()
+                        val offerUri = createCredentialOfferUri(
+                            listOf(sdJwtIssuanceRequest),
+                            getFormatByCredentialConfigurationId(sdJwtIssuanceRequest.credentialConfigurationId)
+                                ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
+                            getCallbackUriHeader()
+                        )
 
-                            context.respond(
-                                HttpStatusCode.OK, offerUri
-                            )
-                        }.onFailure {
-                            throwError(it)
-                        }
+                        call.respond(
+                            HttpStatusCode.OK, offerUri
+                        )
                     }
 
                     post("issueBatch", {
@@ -468,25 +462,20 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-
-
-                        runCatching {
-                            val sdJwtIssuanceRequests = context.receive<List<IssuanceRequest>>()
-                            val offerUri =
-                                createCredentialOfferUri(
-                                    sdJwtIssuanceRequests,
-                                    getFormatByCredentialConfigurationId(sdJwtIssuanceRequests.first().credentialConfigurationId) ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
-                                    getCallbackUriHeader()
-                                )
-
-                            logger.debug { "Offer URI: $offerUri" }
-
-                            context.respond(
-                                HttpStatusCode.OK, offerUri
+                        val sdJwtIssuanceRequests = call.receive<List<IssuanceRequest>>()
+                        val offerUri =
+                            createCredentialOfferUri(
+                                sdJwtIssuanceRequests,
+                                getFormatByCredentialConfigurationId(sdJwtIssuanceRequests.first().credentialConfigurationId)
+                                    ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
+                                getCallbackUriHeader()
                             )
-                        }.onFailure {
-                            throwError(it)
-                        }
+
+                        logger.debug { "Offer URI: $offerUri" }
+
+                        call.respond(
+                            HttpStatusCode.OK, offerUri
+                        )
                     }
                 }
 
@@ -504,13 +493,15 @@ fun Application.issuerApi() {
                             }
                         }
                     }) {
-                        val mdocIssuanceRequest = context.receive<IssuanceRequest>()
+                        val mdocIssuanceRequest = call.receive<IssuanceRequest>()
                         val offerUri = createCredentialOfferUri(
                             listOf(mdocIssuanceRequest),
-                            getFormatByCredentialConfigurationId(mdocIssuanceRequest.credentialConfigurationId) ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
-                            getCallbackUriHeader())
+                            getFormatByCredentialConfigurationId(mdocIssuanceRequest.credentialConfigurationId)
+                                ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
+                            getCallbackUriHeader()
+                        )
 
-                        context.respond(
+                        call.respond(
                             HttpStatusCode.OK, offerUri
                         )
                     }
@@ -518,24 +509,6 @@ fun Application.issuerApi() {
 
             }
         }
-    }
-}
-
-private suspend fun PipelineContext<Unit, ApplicationCall>.throwError(
-    it: Throwable
-) {
-    when (it) {
-        is JedisConnectionException -> context.respond(
-            HttpStatusCode.InternalServerError,
-            "Distributed session management couldn't be initialized : Cannot connect to redis server."
-        )
-
-        is JedisAccessControlException -> context.respond(
-            HttpStatusCode.InternalServerError,
-            "Distributed session management couldn't be initialized : Cannot access redis server, wrong username/password."
-        )
-
-        else -> throw it
     }
 }
 

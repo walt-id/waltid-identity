@@ -1,15 +1,17 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.subcommands
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
 
 class DidCmd : CliktCommand(
-    name = "did",
-    help = "DID management features.",
-    printHelpOnEmptyArgs = true
+    name = "did"
 ) {
+
+    override fun help(context: Context) = "DID management features."
+    override val printHelpOnEmptyArgs = true
 
     init {
         subcommands(DidCreateCmd(), DidResolveCmd())
@@ -21,5 +23,3 @@ class DidCmd : CliktCommand(
 
     override fun run(): Unit {}
 }
-
-fun main(args: Array<String>) = DidCmd().main(args)

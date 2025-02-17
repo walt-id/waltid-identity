@@ -16,18 +16,18 @@ object CredentialOfferProcessor {
     private val http = WalletHttpClients.getHttpClient()
     private val logger = logger<CredentialOfferProcessor>()
     suspend fun process(
-      credentialRequests: List<CredentialRequest>,
-      providerMetadata: OpenIDProviderMetadata,
-      accessToken: String,
+        credentialRequests: List<CredentialRequest>,
+        providerMetadata: OpenIDProviderMetadata,
+        accessToken: String,
     ) = when (credentialRequests.size) {
         1 -> processedSingleCredentialOffer(credentialRequests, providerMetadata, accessToken)
         else -> processBatchCredentialOffer(credentialRequests, providerMetadata, accessToken)
     }
 
     private suspend fun processBatchCredentialOffer(
-      credReqs: List<CredentialRequest>,
-      providerMetadata: OpenIDProviderMetadata,
-      accessToken: String,
+        credReqs: List<CredentialRequest>,
+        providerMetadata: OpenIDProviderMetadata,
+        accessToken: String,
     ): List<ProcessedCredentialOffer> {
 
         providerMetadata as OpenIDProviderMetadata.Draft13
@@ -51,9 +51,9 @@ object CredentialOfferProcessor {
     }
 
     private suspend fun processedSingleCredentialOffer(
-      credReqs: List<CredentialRequest>,
-      providerMetadata: OpenIDProviderMetadata,
-      accessToken: String,
+        credReqs: List<CredentialRequest>,
+        providerMetadata: OpenIDProviderMetadata,
+        accessToken: String,
     ): List<ProcessedCredentialOffer> {
 
         val credReq = credReqs.first()

@@ -47,8 +47,8 @@ fun Application.manifest() = walletRoute {
                 val credentialService = CredentialsService()
                 val manifest = callManifest(call.parameters) { getManifest(it, credentialService) }
                 when (manifest) {
-                    null -> context.respond(HttpStatusCode.NoContent)
-                    else -> context.respond(manifest)
+                    null -> call.respond(HttpStatusCode.NoContent)
+                    else -> call.respond(manifest)
                 }
             }
             get("display", {
@@ -75,8 +75,8 @@ fun Application.manifest() = walletRoute {
                 }?.toString()
 
                 when (manifest) {
-                    null -> context.respond(HttpStatusCode.NoContent)
-                    else -> context.respond(ManifestProvider.new(manifest).display())
+                    null -> call.respond(HttpStatusCode.NoContent)
+                    else -> call.respond(ManifestProvider.new(manifest).display())
                 }
             }
             get("issuer", {
@@ -103,8 +103,8 @@ fun Application.manifest() = walletRoute {
                 }?.toString()
 
                 when (manifest) {
-                    null -> context.respond(HttpStatusCode.NoContent)
-                    else -> context.respond(ManifestProvider.new(manifest).issuer())
+                    null -> call.respond(HttpStatusCode.NoContent)
+                    else -> call.respond(ManifestProvider.new(manifest).issuer())
                 }
             }
         }
@@ -140,8 +140,8 @@ fun Application.manifest() = walletRoute {
                 val manifest = callManifest(call.parameters) { extractManifest(it) }
 
                 when (manifest) {
-                    null -> context.respond(HttpStatusCode.NoContent)
-                    else -> context.respond(manifest)
+                    null -> call.respond(HttpStatusCode.NoContent)
+                    else -> call.respond(manifest)
                 }
             }
         }

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.service.settings.WalletSetting
@@ -10,6 +12,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import kotlinx.serialization.json.JsonObject
+import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.settings() = walletRoute {
     route("settings", {
@@ -25,10 +28,10 @@ fun Application.settings() = walletRoute {
                 HttpStatusCode.BadRequest to { description = "Error fetching wallet settings" }
             }
         }) {
-            runCatching { getWalletService().getSettings() }.onSuccess {
-                context.respond(HttpStatusCode.OK, it)
+            runCatching { call.getWalletService().getSettings() }.onSuccess {
+                call.respond(HttpStatusCode.OK, it)
             }.onFailure {
-                context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
             }
         }
         //put
@@ -44,11 +47,11 @@ fun Application.settings() = walletRoute {
         }) {
             runCatching {
                 val request = call.receive<JsonObject>()
-                getWalletService().setSettings(request)
+                call.getWalletService().setSettings(request)
             }.onSuccess {
-                context.respond(HttpStatusCode.Accepted)
+                call.respond(HttpStatusCode.Accepted)
             }.onFailure {
-                context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
             }
         }
     }

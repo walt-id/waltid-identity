@@ -1,7 +1,7 @@
 package id.walt.did.dids.document
 
 import id.walt.did.dids.DidUtils
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.finished.DidDocument
+import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.DidDocument
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName

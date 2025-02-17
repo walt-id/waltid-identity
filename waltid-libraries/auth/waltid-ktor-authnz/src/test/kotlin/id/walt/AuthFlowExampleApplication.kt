@@ -47,7 +47,7 @@ fun loggingSetup() {
     }
 }
 
-fun startExample(wait: Boolean = true, jwt: Boolean): ApplicationEngine {
+fun startExample(wait: Boolean = true, jwt: Boolean): EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration> {
     loggingSetup()
     return embeddedServer(CIO, port = 8088, host = "0.0.0.0", module = { this.module(jwt) })
         .start(wait = wait)
@@ -63,7 +63,7 @@ fun Application.module(jwt: Boolean) {
 
     testApp(jwt)
 
-    collectRoutes().forEach {
+    /*collectRoutes().forEach {
         println(it)
-    }
+    }*/
 }

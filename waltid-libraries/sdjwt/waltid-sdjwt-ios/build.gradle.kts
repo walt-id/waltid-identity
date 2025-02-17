@@ -2,6 +2,7 @@ plugins {
     kotlin("multiplatform")
     kotlin("native.cocoapods")
     kotlin("plugin.serialization")
+    id("com.github.ben-manes.versions")
 }
 
 kotlin {

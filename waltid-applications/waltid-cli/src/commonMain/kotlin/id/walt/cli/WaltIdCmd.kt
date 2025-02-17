@@ -1,15 +1,20 @@
 package id.walt.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.installMordantMarkdown
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import id.walt.cli.commands.*
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
 
 class WaltIdCmd : CliktCommand(
-    name = "waltid",
-    help = """walt.id CLI
+    name = "waltid"
+) {
+
+    override fun help(context: Context) = """
+        walt.id CLI
 
         The walt.id CLI is a command line tool that allows you to onboard and 
         use a SSI (Self-Sovereign-Identity) ecosystem. You can manage 
@@ -103,9 +108,15 @@ class WaltIdCmd : CliktCommand(
         -vppa=max=2 \
         -vpp minimum-credentials \
         -vppa=min=1
-        """,
-    printHelpOnEmptyArgs = true
-) {
+        """.replace("\n", "  \n")
+
+    init {
+        installMordantMarkdown()
+    }
+
+
+    override val printHelpOnEmptyArgs = true
+
     init {
         subcommands(KeyCmd(), DidCmd(), VCCmd(), VPCmd())
 

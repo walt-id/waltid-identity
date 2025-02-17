@@ -3,7 +3,7 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
 
-    id("com.github.ben-manes.versions") version "0.52.0"
+    id("com.github.ben-manes.versions")
 }
 
 group = "id.walt"
@@ -14,7 +14,7 @@ repositories {
 }
 
 object Versions {
-    const val KTOR_VERSION = "2.3.12" // also change 1 plugin
+    const val KTOR_VERSION = "3.1.0" // also change 1 plugin
 }
 
 dependencies {
@@ -23,7 +23,7 @@ dependencies {
     // Testing
     api(kotlin("test"))
     api("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
 
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
