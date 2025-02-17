@@ -15,7 +15,7 @@ import kotlinx.serialization.json.jsonObject
  */
 @Serializable
 data class LogoProperties(
-    val url: String? = null,
+    val uri: String? = null,
     @SerialName("alt_text") val altText: String? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
