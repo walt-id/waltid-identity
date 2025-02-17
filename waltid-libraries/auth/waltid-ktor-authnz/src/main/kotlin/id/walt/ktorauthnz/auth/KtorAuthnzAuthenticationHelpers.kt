@@ -4,7 +4,7 @@ import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.sessions.AuthSession
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
-import io.ktor.server.routing.RoutingContext
+import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
 
 fun ApplicationCall.getAuthToken(): String {

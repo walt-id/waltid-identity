@@ -10,7 +10,6 @@ import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

@@ -1,7 +1,6 @@
 package id.walt.did.dids.registrar.local.cheqd.models.job.didstates
 
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.modules.SerializersModule

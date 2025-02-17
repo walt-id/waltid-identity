@@ -1,4 +1,4 @@
-import Checkbox from '@/components/walt/forms/Checkbox';
+import Checkbox from "@/components/walt/forms/Checkbox";
 
 type Props = {
   name: string;

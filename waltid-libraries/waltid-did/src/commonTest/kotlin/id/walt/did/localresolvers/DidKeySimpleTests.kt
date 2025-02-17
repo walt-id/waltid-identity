@@ -6,7 +6,6 @@ import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.resolver.local.DidKeyResolver
 import id.walt.did.localresolvers.LocalResolverTestUtils.testDids
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class DidKeySimpleTests {

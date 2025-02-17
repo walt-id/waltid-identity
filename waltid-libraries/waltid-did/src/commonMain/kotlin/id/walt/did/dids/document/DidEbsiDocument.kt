@@ -1,7 +1,10 @@
 package id.walt.did.dids.document
 
 import id.walt.did.dids.DidUtils
-import kotlinx.serialization.*
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport

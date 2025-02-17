@@ -3,7 +3,10 @@ package id.walt.cli.presexch
 import id.walt.cli.models.Credential
 import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.oid4vc.data.dif.*
+import id.walt.oid4vc.data.dif.DescriptorMapping
+import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.data.dif.PresentationSubmission
+import id.walt.oid4vc.data.dif.PresentationSubmissionSerializer
 import kotlinx.serialization.json.*
 
 class PresentationSubmissionBuilder(
