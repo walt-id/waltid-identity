@@ -18,13 +18,13 @@ object IdentifyEmail : IdentifyVirtualAuth("identify") {
     @Serializable
     data class IdentifyEmailRequest(val email: String)
 
-    override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.register(authContext: ApplicationCall.() -> AuthContext) {
         post("identify-email", {
             request { body<IdentifyEmailRequest>() }
         }) {
             // TODO: support the others (form, etc)
 
-            val email = context.receive<IdentifyEmailRequest>().email
+            val email = call.receive<IdentifyEmailRequest>().email
             val identifier = EmailIdentifier(email)
 
             val store = KtorAuthnzManager.accountStore

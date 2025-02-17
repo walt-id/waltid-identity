@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.web.controllers.auth.getWalletService
@@ -7,6 +9,7 @@ import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.util.*
 import kotlinx.serialization.json.JsonObject
+import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.categories() = walletRoute {
     route("categories", {
@@ -21,7 +24,7 @@ fun Application.categories() = walletRoute {
                 }
             }
         }) {
-            context.respond(getWalletService().listCategories())
+            call.respond(call.getWalletService().listCategories())
         }
         route("{name}", {
             request {
@@ -38,9 +41,9 @@ fun Application.categories() = walletRoute {
                 }
             }) {
                 val name = call.parameters.getOrFail("name")
-                runCatching { getWalletService().addCategory(name) }.onSuccess {
-                    context.respond(if (it) HttpStatusCode.Created else HttpStatusCode.BadRequest)
-                }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+                runCatching { call.getWalletService().addCategory(name) }.onSuccess {
+                    call.respond(if (it) HttpStatusCode.Created else HttpStatusCode.BadRequest)
+                }.onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
             }
             delete({
                 summary = "Delete category"
@@ -50,9 +53,9 @@ fun Application.categories() = walletRoute {
                 }
             }) {
                 val name = call.parameters.getOrFail("name")
-                runCatching { getWalletService().deleteCategory(name) }.onSuccess {
-                    context.respond(if (it) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
-                }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+                runCatching { call.getWalletService().deleteCategory(name) }.onSuccess {
+                    call.respond(if (it) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+                }.onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
             }
             put("rename/{newName}", {
                 summary = "Rename category"
@@ -68,9 +71,9 @@ fun Application.categories() = walletRoute {
             }) {
                 val oldName = call.parameters.getOrFail("name")
                 val newName = call.parameters.getOrFail("newName")
-                runCatching { getWalletService().renameCategory(oldName, newName) }.onSuccess {
-                    context.respond(if (it) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
-                }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+                runCatching { call.getWalletService().renameCategory(oldName, newName) }.onSuccess {
+                    call.respond(if (it) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+                }.onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
             }
         }
     }

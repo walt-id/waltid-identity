@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
 
 object Versions {
-    const val KTOR_VERSION = "2.3.12" // also change 1 plugin
+    const val KTOR_VERSION = "3.1.0" // also change 1 plugin
     const val COROUTINES_VERSION = "1.9.0"
     const val HOPLITE_VERSION = "2.8.0"
 }
@@ -12,7 +12,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
 
-    id("io.ktor.plugin") version "2.3.12" // Versions.KTOR_VERSION
+    id("io.ktor.plugin") version "3.1.0" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.2.0"
     id("com.github.jk1.dependency-license-report") version "2.9"
     id("com.github.ben-manes.versions")
@@ -66,7 +66,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:${Versions.KTOR_VERSION}")
 
     // Date
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES_VERSION}")
@@ -80,8 +80,8 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.0")
     implementation("org.slf4j:jul-to-slf4j:2.0.16")
-    implementation("io.klogging:klogging-jvm:0.7.2")
-    implementation("io.klogging:slf4j-klogging:0.7.2")
+    implementation("io.klogging:klogging-jvm:0.9.1")
+    implementation("io.klogging:slf4j-klogging:0.9.1")
 
     // Test
     testImplementation(kotlin("test"))
@@ -106,7 +106,7 @@ dependencies {
     implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
 
     // Multiplatform / Hashes
-    testImplementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.5.3"))
+    testImplementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
     testImplementation("org.kotlincrypto.hash:sha2")
 }
 

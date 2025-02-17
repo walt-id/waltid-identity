@@ -326,7 +326,6 @@ class TSEKey(
             else -> throw KeyTypeNotSupportedException(type)
         }
 
-        @OptIn(InternalAPI::class)
         @JvmBlocking
         @JvmAsync
         @JsPromise

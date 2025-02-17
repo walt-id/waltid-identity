@@ -227,14 +227,17 @@ object WalletServiceManager {
                 it[Wallets.id].value.toKotlinUuid()
             }
 
-    suspend fun matchCredentialsForPresentationDefinition(walletId: Uuid, presentationDefinition: PresentationDefinition): List<WalletCredential> {
+    suspend fun matchCredentialsForPresentationDefinition(
+        walletId: Uuid,
+        presentationDefinition: PresentationDefinition
+    ): List<WalletCredential> {
         val pd = Json.decodeFromJsonElement<id.walt.definitionparser.PresentationDefinition>(presentationDefinition.toJSON())
         val matches = credentialService.list(walletId, CredentialFilterObject.default).filter { cred ->
             val fullDoc = WalletCredential.parseFullDocument(cred.document, cred.disclosures, cred.id, cred.format)
             fullDoc != null &&
-                pd.inputDescriptors.any { inputDesc ->
-                    PresentationDefinitionParser.matchCredentialsForInputDescriptor(flowOf(fullDoc), inputDesc).toList().isNotEmpty()
-                }
+                    pd.inputDescriptors.any { inputDesc ->
+                        PresentationDefinitionParser.matchCredentialsForInputDescriptor(flowOf(fullDoc), inputDesc).toList().isNotEmpty()
+                    }
         }
         return matches
     }

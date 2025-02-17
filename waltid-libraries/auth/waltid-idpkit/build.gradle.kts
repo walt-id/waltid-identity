@@ -1,6 +1,6 @@
 plugins {
     kotlin("jvm")
-    id("io.ktor.plugin") version "2.3.12"
+    id("io.ktor.plugin") version "3.1.0"
     kotlin("plugin.serialization")
     id("maven-publish")
 
@@ -38,8 +38,8 @@ dependencies {
     implementation("io.ktor:ktor-client-content-negotiation")
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
     implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
     // OIDC
@@ -47,14 +47,14 @@ dependencies {
     implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
 
     // for Ed25519
-    implementation("com.google.crypto.tink:tink:1.15.0") {
+    implementation("com.google.crypto.tink:tink:1.16.0") {
         exclude("org.slf4j.simple")
     }
 
 
     // Logging
-    implementation("io.klogging:klogging-jvm:0.7.2")
-    implementation("io.klogging:slf4j-klogging:0.7.2")
+    implementation("io.klogging:klogging-jvm:0.9.1")
+    implementation("io.klogging:slf4j-klogging:0.9.1")
 
     testImplementation("io.ktor:ktor-server-test-host-jvm")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")

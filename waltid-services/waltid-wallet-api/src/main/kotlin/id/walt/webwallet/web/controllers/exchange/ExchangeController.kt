@@ -16,8 +16,8 @@ import id.walt.webwallet.web.controllers.auth.getUserUUID
 import id.walt.webwallet.web.controllers.auth.getWalletId
 import id.walt.webwallet.web.controllers.auth.getWalletService
 import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeOpenApiCommons
-import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import id.walt.webwallet.web.controllers.walletRoute
+import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
@@ -47,7 +47,7 @@ fun Application.exchange() = walletRoute {
 
             response(ExchangeOpenApiCommons.useOfferRequestEndpointResponseParams())
         }) {
-            val wallet = getWalletService()
+            val wallet = call.getWalletService()
 
             val did = call.request.queryParameters["did"] ?: wallet.listDids().firstOrNull()?.did
             ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
@@ -58,7 +58,7 @@ fun Application.exchange() = walletRoute {
             runCatching {
                 WalletServiceManager.explicitClaimStrategy.claim(
                     tenant = wallet.tenant,
-                    account = getUserUUID(),
+                    account = call.getUserUUID(),
                     wallet = wallet.walletId,
                     did = did,
                     offer = offer,
@@ -74,10 +74,10 @@ fun Application.exchange() = walletRoute {
                     )
                 }
             }.onSuccess {
-                context.respond(HttpStatusCode.OK, it)
+                call.respond(HttpStatusCode.OK, it)
             }.onFailure { error ->
                 error.printStackTrace()
-                context.respond(HttpStatusCode.BadRequest, error.message ?: "Unknown error")
+                call.respond(HttpStatusCode.BadRequest, error.message ?: "Unknown error")
             }
         }
         post("matchCredentialsForPresentationDefinition", {
@@ -94,9 +94,10 @@ fun Application.exchange() = walletRoute {
                 }
             }
         }) {
-            val presentationDefinition = PresentationDefinition.fromJSON(context.receive<JsonObject>())
-            val matchedCredentials = WalletServiceManager.matchCredentialsForPresentationDefinition(getWalletId(), presentationDefinition)
-            context.respond(matchedCredentials)
+            val presentationDefinition = PresentationDefinition.fromJSON(call.receive<JsonObject>())
+            val matchedCredentials =
+                WalletServiceManager.matchCredentialsForPresentationDefinition(call.getWalletId(), presentationDefinition)
+            call.respond(matchedCredentials)
         }
         post("unmatchedCredentialsForPresentationDefinition", {
             summary =
@@ -113,11 +114,11 @@ fun Application.exchange() = walletRoute {
                 }
             }
         }) {
-            val presentationDefinition = PresentationDefinition.fromJSON(context.receive<JsonObject>())
+            val presentationDefinition = PresentationDefinition.fromJSON(call.receive<JsonObject>())
             val unmatchedCredentialTypes = WalletServiceManager.unmatchedPresentationDefinitionCredentialsUseCase.find(
-                getWalletId(), presentationDefinition
+                call.getWalletId(), presentationDefinition
             )
-            context.respond(unmatchedCredentialTypes)
+            call.respond(unmatchedCredentialTypes)
         }
 
         post("usePresentationRequest", {
@@ -128,7 +129,7 @@ fun Application.exchange() = walletRoute {
             }
             response(ExchangeOpenApiCommons.usePresentationRequestResponse())
         }) {
-            val wallet = getWalletService()
+            val wallet = call.getWalletService()
 
             val req = call.receive<UsePresentationRequest>()
             println("req: $req")
@@ -169,7 +170,7 @@ fun Application.exchange() = walletRoute {
                     )
                 )
 
-                context.respond(HttpStatusCode.OK, mapOf("redirectUri" to result.getOrThrow()))
+                call.respond(HttpStatusCode.OK, mapOf("redirectUri" to result.getOrThrow()))
             } else {
                 val err = result.exceptionOrNull()
                 println("Presentation failed: $err")
@@ -189,7 +190,7 @@ fun Application.exchange() = walletRoute {
                 )
                 when (err) {
                     is SSIKit2WalletService.PresentationError -> {
-                        context.respond(
+                        call.respond(
                             HttpStatusCode.BadRequest, mapOf(
                                 "redirectUri" to err.redirectUri,
                                 "errorMessage" to err.message
@@ -197,7 +198,7 @@ fun Application.exchange() = walletRoute {
                         )
                     }
 
-                    else -> context.respond(HttpStatusCode.BadRequest, mapOf("errorMessage" to err?.message))
+                    else -> call.respond(HttpStatusCode.BadRequest, mapOf("errorMessage" to err?.message))
                 }
             }
         }
@@ -213,10 +214,10 @@ fun Application.exchange() = walletRoute {
                 }
             }
         }) {
-            val wallet = getWalletService()
+            val wallet = call.getWalletService()
             val request = call.receiveText()
             val parsedRequest = wallet.resolvePresentationRequest(request)
-            context.respond(parsedRequest)
+            call.respond(parsedRequest)
         }
         post("resolveCredentialOffer", {
             summary = "Return resolved / parsed credential offer"
@@ -232,14 +233,14 @@ fun Application.exchange() = walletRoute {
                 }
             }
         }) {
-            val wallet = getWalletService()
+            val wallet = call.getWalletService()
             val request = call.receiveText()
             val reqParams = Url(request).parameters.toMap()
             val parsedOffer = wallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams))
 
             val serializedOffer = Json.encodeToString(CredentialOfferSerializer, parsedOffer)
 
-            context.respondText(serializedOffer, ContentType.Application.Json)
+            call.respondText(serializedOffer, ContentType.Application.Json)
         }
         get("resolveVctUrl", {
             summary = "Receive an verifiable credential type (VCT) URL and return resolved vct object as described in IETF SD-JWT VC"
@@ -258,14 +259,14 @@ fun Application.exchange() = walletRoute {
             }
         }) {
             val vct = call.request.queryParameters["vct"] ?: throw IllegalArgumentException("VCT not set")
-            val wallet = getWalletService()
+            val wallet = call.getWalletService()
             runCatching {
                 wallet.resolveVct(vct)
             }.onSuccess {
-                context.respond(HttpStatusCode.OK, it.toJSON())
+                call.respond(HttpStatusCode.OK, it.toJSON())
             }.onFailure { error ->
                 error.printStackTrace()
-                context.respond(HttpStatusCode.BadRequest, error.message ?: "Unknown error")
+                call.respond(HttpStatusCode.BadRequest, error.message ?: "Unknown error")
             }
         }
         get("resolveIssuerOpenIDMetadata", {
@@ -282,7 +283,7 @@ fun Application.exchange() = walletRoute {
         }) {
             val issuer = call.request.queryParameters["issuer"] ?: throw BadRequestException("Issuer base url not set")
             val serializedMetadata = Json.encodeToString(OpenIDProviderMetadataSerializer, OpenID4VCI.resolveCIProviderMetadata(issuer))
-            context.respondText(serializedMetadata, ContentType.Application.Json)
+            call.respondText(serializedMetadata, ContentType.Application.Json)
         }
     }
 }

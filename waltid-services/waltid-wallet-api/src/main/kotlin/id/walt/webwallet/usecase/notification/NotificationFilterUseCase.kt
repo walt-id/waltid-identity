@@ -26,7 +26,7 @@ class NotificationFilterUseCase(
         notificationFormatter.format(it)
     }
 
-    private fun parseSortOrder(sort: String) = sort.lowercase().takeIf { it == "asc" }?.let { true } ?: false
+    private fun parseSortOrder(sort: String) = sort.lowercase().takeIf { it == "asc" }?.let { true } == true
 
     private fun filterPending(notifications: List<Notification>, showPending: Boolean?) = showPending?.let { pending ->
         credentialService.get(notifications.mapNotNull { (it.data as? Notification.CredentialIssuanceData)?.credentialId })

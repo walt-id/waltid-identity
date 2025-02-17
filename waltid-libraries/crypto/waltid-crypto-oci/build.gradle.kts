@@ -74,17 +74,17 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
                 // Crypto
-                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.5.3"))
+                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
                 implementation("org.kotlincrypto.hash:sha2")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:7.0.0")
+                implementation("io.github.oshai:kotlin-logging:7.0.4")
 
                 // walt.id
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -94,16 +94,16 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
             }
         }
         val jvmMain by getting {
             dependencies {
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.10.1")
 
                 // OCI
-                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.49.0")
+                implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.57.1")
 
                 // JOSE
                 implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
@@ -114,15 +114,15 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 
                 // Logging
                 implementation("org.slf4j:slf4j-simple:2.0.16")
 
                 // Test
                 implementation(kotlin("test"))
-                implementation("org.junit.jupiter:junit-jupiter-api:5.11.0")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
             }
         }
 //        val androidMain by getting {
