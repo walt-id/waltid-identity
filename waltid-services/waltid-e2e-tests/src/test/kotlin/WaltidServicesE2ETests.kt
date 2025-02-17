@@ -43,6 +43,7 @@ import io.ktor.server.application.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
+import kotlin.system.exitProcess
 import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
