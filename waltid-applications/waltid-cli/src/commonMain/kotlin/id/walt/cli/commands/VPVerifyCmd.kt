@@ -1,17 +1,16 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.MissingOption
 import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.installMordantMarkdown
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.path
 import id.walt.cli.util.JsonUtils.toJsonPrimitive
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
-import id.walt.policies.models.PolicyRequest
-import id.walt.policies.models.PolicyResult
-import id.walt.policies.models.PresentationVerificationResponse
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -20,6 +19,9 @@ import id.walt.policies.ExpirationDatePolicyException
 import id.walt.policies.NotBeforePolicyException
 import id.walt.policies.PolicyManager
 import id.walt.policies.Verifier
+import id.walt.policies.models.PolicyRequest
+import id.walt.policies.models.PolicyResult
+import id.walt.policies.models.PresentationVerificationResponse
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -27,8 +29,9 @@ import kotlin.io.path.readText
 import kotlin.time.Duration
 
 class VPVerifyCmd : CliktCommand(
-    name = "verify",
-    help = """Apply a wide range of verification policies on a W3C Verifiable Presentation (VP).
+    name = "verify"
+) {
+    override fun help(context: Context) = """Apply a wide range of verification policies on a W3C Verifiable Presentation (VP).
         
         Example usage:
         ----------------
@@ -54,9 +57,13 @@ class VPVerifyCmd : CliktCommand(
         -vppa=min=1 \
         -vcp allowed-issuer \
         -vcpa=issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV
-    """,
-    printHelpOnEmptyArgs = true,
-) {
+    """.replace("\n", "  \n")
+
+    init {
+        installMordantMarkdown()
+    }
+
+    override val printHelpOnEmptyArgs = true
 
     init {
         context {
@@ -266,7 +273,8 @@ class VPVerifyCmd : CliktCommand(
     private fun verify(params: VpVerifyParameters): PresentationVerificationResponse {
         try {
             return runBlocking {
-                val presentationFormat = params.presentationSubmission.descriptorMap.firstOrNull()?.format ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
+                val presentationFormat = params.presentationSubmission.descriptorMap.firstOrNull()?.format
+                    ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
                 Verifier.verifyPresentation(
                     presentationFormat,
                     vpToken = params.vp,

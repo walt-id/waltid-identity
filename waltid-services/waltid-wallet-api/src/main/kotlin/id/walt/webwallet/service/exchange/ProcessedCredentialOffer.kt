@@ -5,7 +5,7 @@ import id.walt.oid4vc.requests.EntraIssuanceRequest
 import id.walt.oid4vc.responses.CredentialResponse
 
 data class ProcessedCredentialOffer(
-  val credentialResponse: CredentialResponse,
-  val credentialRequest: CredentialRequest?,
-  val entraIssuanceRequest: EntraIssuanceRequest? = null
+    val credentialResponse: CredentialResponse,
+    val credentialRequest: CredentialRequest?,
+    val entraIssuanceRequest: EntraIssuanceRequest? = null
 )

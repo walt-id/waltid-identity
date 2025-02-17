@@ -11,7 +11,6 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -30,8 +29,8 @@ class DynamicPolicyTest {
         return try {
             val response: HttpResponse = http.get("http://localhost:8181")
             response.status == HttpStatusCode.OK
-        } catch (e: Exception) {
-            println("Error connecting to OPA server: ${e.message}")
+        } catch (e: Throwable) {
+            println("OPA server is not available: ${e.stackTraceToString()}")
             false
         } finally {
             http.close()
@@ -42,7 +41,7 @@ class DynamicPolicyTest {
     @Test
     fun testPresentationVerificationWithDynamicPolicy() = runTest {
         if (!isOpaServerRunning()) {
-            println("Skipping test: OPA server is not running.")
+            println("Skipping test: OPA server is not available.")
             return@runTest
         }
         DidService.apply {

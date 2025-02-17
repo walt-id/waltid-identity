@@ -2,6 +2,7 @@
 
 package id.walt.webwallet.service.oidc4vc
 
+
 import COSE.AlgorithmID
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.utils.VCFormat
@@ -52,10 +53,7 @@ import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-
-
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
@@ -199,7 +197,7 @@ class TestCredentialWallet(
                 val documentWithDisclosures = if (selectedDisclosures?.containsKey(it.id) == true) {
                     it.document + "~${selectedDisclosures[it.id]!!.joinToString("~")}"
                 } else {
-                   it.document
+                    it.document
                 }
 
                 SDJwtVC.parse(documentWithDisclosures).present(
@@ -289,12 +287,14 @@ class TestCredentialWallet(
                             credential.document,
                             rootPathMDoc,
                         )
+
                         CredentialFormat.sd_jwt_vc -> buildDescriptorMappingSDJwtVC(
                             session.presentationDefinition,
                             index,
                             credential.document,
                             "$",
                         )
+
                         else -> buildDescriptorMappingJwtVP(
                             session.presentationDefinition,
                             index,
@@ -448,7 +448,7 @@ class TestCredentialWallet(
         rootPath: String = "$",
     ) = let {
         val vcJws = vcJwsStr.base64UrlToBase64().decodeJws()
-        val type = vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
+        vcJws.payload["vc"]?.jsonObject?.get("type")?.jsonArray?.last()?.jsonPrimitive?.contentOrNull
             ?: "VerifiableCredential"
 
         DescriptorMapping(

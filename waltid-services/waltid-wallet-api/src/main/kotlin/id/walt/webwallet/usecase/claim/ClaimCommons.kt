@@ -36,19 +36,19 @@ object ClaimCommons {
         credentialType: String,
         eventUseCase: EventLogUseCase,
     ) = eventUseCase.log(
-            action = EventType.Credential.Receive,
-            originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
-            tenant = tenant,
-            accountId = account,
-            walletId = wallet,
-            data = eventUseCase.credentialEventData(
-                credential = credential,
-                subject = eventUseCase.subjectData(credential),
-                organization = eventUseCase.issuerData(credential),
-                type = credentialType
-            ),
-            credentialId = credential.id,
-        )
+        action = EventType.Credential.Receive,
+        originator = "", //parsedOfferReq.credentialOffer!!.credentialIssuer,
+        tenant = tenant,
+        accountId = account,
+        walletId = wallet,
+        data = eventUseCase.credentialEventData(
+            credential = credential,
+            subject = eventUseCase.subjectData(credential),
+            organization = eventUseCase.issuerData(credential),
+            type = credentialType
+        ),
+        credentialId = credential.id,
+    )
 
     fun storeWalletCredentials(
         wallet: Uuid,

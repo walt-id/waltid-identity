@@ -3,6 +3,7 @@ package id.walt.cli.commands
 import com.github.ajalt.clikt.core.BadParameterValue
 import com.github.ajalt.clikt.core.IncorrectOptionValueCount
 import com.github.ajalt.clikt.core.PrintHelpMessage
+import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.testing.CliktCommandTestResult
 import com.github.ajalt.clikt.testing.test
 import id.walt.crypto.keys.KeyType

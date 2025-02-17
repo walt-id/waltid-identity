@@ -1,7 +1,9 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.installMordantMarkdown
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
@@ -14,15 +16,20 @@ import id.walt.cli.util.WaltIdCmdHelpOptionMessage
 import kotlinx.coroutines.runBlocking
 
 class DidResolveCmd : CliktCommand(
-    name = "resolve",
-    help = """Resolve the document associated with the input Decentralized Identifier (DID).
+    name = "resolve"
+) {
+    override fun help(context: Context) = """Resolve the document associated with the input Decentralized Identifier (DID).
         
         Example usage:
         --------------
         waltid did resolve -d did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV
-    """,
-    printHelpOnEmptyArgs = true
-) {
+    """.replace("\n", "  \n")
+
+    init {
+        installMordantMarkdown()
+    }
+
+    override val printHelpOnEmptyArgs = true
 
     init {
         context {
@@ -30,7 +37,7 @@ class DidResolveCmd : CliktCommand(
         }
     }
 
-    val print : PrettyPrinter = PrettyPrinter(this)
+    val print: PrettyPrinter = PrettyPrinter(this)
     private val did by option("-d", "-did")
         .help("The DID to be resolved.")
         .required()

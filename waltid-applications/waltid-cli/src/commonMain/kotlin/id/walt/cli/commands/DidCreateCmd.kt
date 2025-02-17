@@ -1,7 +1,9 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.installMordantMarkdown
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
@@ -15,7 +17,6 @@ import id.walt.cli.util.*
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.net.URLEncoder
 import kotlin.io.path.Path
@@ -24,8 +25,9 @@ import kotlin.io.path.exists
 import kotlin.io.path.writeText
 
 class DidCreateCmd : CliktCommand(
-    name = "create",
-    help = """Create a Decentralized Identifier (DID).
+    name = "create"
+) {
+    override fun help(context: Context) = """Create a Decentralized Identifier (DID).
         
         Example usage:
         --------------
@@ -34,8 +36,11 @@ class DidCreateCmd : CliktCommand(
         waltid did create -m jwk
         waltid did create -m web -wd example.com
         waltid did create -m web -wd example.com -wp /alice/bob
-    """
-) {
+    """.replace("\n", "  \n")
+
+    init {
+        installMordantMarkdown()
+    }
 
     init {
         context {

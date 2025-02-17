@@ -2,11 +2,11 @@ package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.MissingOption
 import com.github.ajalt.clikt.core.PrintHelpMessage
+import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.util.KeyUtil
 import id.walt.cli.util.VCUtil
 import io.ktor.http.*
-import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.response.*
@@ -56,7 +56,7 @@ class WaltIdVCVerifyCmdTest {
 
     val schemaFilePath = "${resourcesPath}/schema/OpenBadgeV3_schema.json"
 
-    private val webhookTestServer: NettyApplicationEngine
+    private val webhookTestServer: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>
     private val webhookTestServerURL: String
     private val webhookTestServerSuccessURL: String
     private val webhookTestServerFailURL: String
@@ -78,8 +78,8 @@ class WaltIdVCVerifyCmdTest {
             }
         }.start(false)
         runBlocking {
-            url = "http://" + webhookTestServer.resolvedConnectors()
-                .first().host + ":${webhookTestServer.resolvedConnectors().first().port}"
+            url = "http://" + webhookTestServer.engine.resolvedConnectors()
+                .first().host + ":${webhookTestServer.engine.resolvedConnectors().first().port}"
         }
         webhookTestServerURL = url
         webhookTestServerSuccessURL = "$webhookTestServerURL/success"

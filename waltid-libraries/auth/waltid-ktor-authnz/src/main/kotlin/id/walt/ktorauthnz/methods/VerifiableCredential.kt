@@ -20,7 +20,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
-import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
@@ -33,24 +32,24 @@ object VerifiableCredential : AuthenticationMethod("vc") {
     val verifierUrl = "http://localhost:7003"
 
     override fun Route.registerAuthenticationRoutes(
-        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        authContext: ApplicationCall.() -> AuthContext,
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
     ) {
         route("vc", {
 
         }) {
             get("start-presentation") {
-                val session = getSession(authContext)
+                val session = call.getAuthSession(authContext)
                 val config = session.lookupConfiguration<VerifiableCredentialAuthConfiguration>(this@VerifiableCredential)
 
-                val redirectUrl = context.request.uri.removeSuffix("/start-presentation") + "/callback"
+                val redirectUrl = call.request.uri.removeSuffix("/start-presentation") + "/callback"
 
                 val resp = Verifier.verify(verifierUrl, config.verification, redirectUrl)
 
-                context.respond(resp.presentationRequest)
+                call.respond(resp.presentationRequest)
             }
             get("callback") {
-                context.respond("handle further...")
+                call.respond("handle further...")
                 //val session = getSession(authContext)
                 //context.handleAuthSuccess(session, )
             }

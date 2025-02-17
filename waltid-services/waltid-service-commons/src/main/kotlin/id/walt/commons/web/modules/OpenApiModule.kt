@@ -9,13 +9,13 @@ import io.github.smiley4.ktorswaggerui.dsl.config.PluginConfigDsl
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.routing.openApiSpec
 import io.github.smiley4.ktorswaggerui.routing.swaggerUI
-import io.github.smiley4.schemakenerator.core.connectSubTypes
+/*import io.github.smiley4.schemakenerator.core.connectSubTypes
 import io.github.smiley4.schemakenerator.core.handleNameAnnotation
 import io.github.smiley4.schemakenerator.reflection.collectSubTypes
 import io.github.smiley4.schemakenerator.reflection.processReflection
 import io.github.smiley4.schemakenerator.serialization.processKotlinxSerialization
 import io.github.smiley4.schemakenerator.swagger.*
-import io.github.smiley4.schemakenerator.swagger.data.TitleType
+import io.github.smiley4.schemakenerator.swagger.data.TitleType*/
 import io.klogging.noCoLogger
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -39,7 +39,7 @@ object OpenApiModule {
         var custom: (PluginConfigDsl.() -> Unit)? = null
     }
 
-    private fun KType.processWithKotlinxSerializationGenerator() = processKotlinxSerialization()
+   /* private fun KType.processWithKotlinxSerializationGenerator() = processKotlinxSerialization()
         .connectSubTypes()
         .handleNameAnnotation()
         .generateSwaggerSchema()
@@ -55,7 +55,7 @@ object OpenApiModule {
             .generateSwaggerSchema()
             .handleCoreAnnotations()
             .withTitle(TitleType.SIMPLE)
-            .compileReferencingRoot()
+            .compileReferencingRoot()*/
 
     // Module
     fun Application.enable() {
@@ -83,7 +83,7 @@ object OpenApiModule {
             schemas {
                 val kotlinxPrefixes = listOf("id.walt")
 
-                generator = { type ->
+                /*generator = { type ->
 
                     if (kotlinxPrefixes.any { type.toString().startsWith(it) }) {
                         runCatching {
@@ -96,7 +96,7 @@ object OpenApiModule {
                             error("Could neither parse with kotlinx nor reflection: $type, due to $ex")
                         }
                     } else type.processWithReflectionGenerator()
-                }
+                }*/
             }
 
             info {
@@ -151,7 +151,7 @@ object OpenApiModule {
             get("/", {
                 summary = "Redirect to swagger interface for API documentation"
             }) {
-                context.respondRedirect("swagger")
+                call.respondRedirect("swagger")
             }
         }
     }

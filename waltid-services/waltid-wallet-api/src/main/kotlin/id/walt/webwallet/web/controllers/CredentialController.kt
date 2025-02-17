@@ -59,8 +59,8 @@ fun Application.credentials() = walletRoute {
             val showPending = call.request.queryParameters["showPending"]?.toBooleanStrictOrNull()
             val sortBy = call.request.queryParameters["sortBy"] ?: "addedOn"
             val descending = call.request.queryParameters["descending"].toBoolean()
-            context.respond(
-                getWalletService().listCredentials(
+            call.respond(
+                call.getWalletService().listCredentials(
                     CredentialFilterObject(
                         categories = categories,
                         showDeleted = showDeleted,
@@ -98,7 +98,7 @@ fun Application.credentials() = walletRoute {
                 }
             }) {
                 val credentialId = call.parameters.getOrFail("credentialId")
-                context.respond(getWalletService().getCredential(credentialId))
+                call.respond(call.getWalletService().getCredential(credentialId))
             }
             delete({
                 summary = "Delete a credential"
@@ -115,8 +115,8 @@ fun Application.credentials() = walletRoute {
             }) {
                 val credentialId = call.parameters.getOrFail("credentialId")
                 val permanent = call.request.queryParameters["permanent"].toBoolean()
-                context.respond(
-                    if (getWalletService().deleteCredential(
+                call.respond(
+                    if (call.getWalletService().deleteCredential(
                             credentialId, permanent
                         )
                     ) HttpStatusCode.Accepted else HttpStatusCode.BadRequest
@@ -135,8 +135,8 @@ fun Application.credentials() = walletRoute {
                 }
             }) {
                 val credentialId = call.parameters.getOrFail("credentialId")
-                runCatching { getWalletService().restoreCredential(credentialId) }.onSuccess {
-                    context.respond(HttpStatusCode.OK, it)
+                runCatching { call.getWalletService().restoreCredential(credentialId) }.onSuccess {
+                    call.respond(HttpStatusCode.OK, it)
                 }.onFailure {
                     throw it
                 }
@@ -149,8 +149,8 @@ fun Application.credentials() = walletRoute {
                 }
             }) {
                 val credentialId = call.parameters.getOrFail("credentialId")
-                runCatching { getWalletService().acceptCredential(CredentialRequestParameter(credentialId)) }.onSuccess {
-                    if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
+                runCatching { call.getWalletService().acceptCredential(CredentialRequestParameter(credentialId)) }.onSuccess {
+                    if (it) call.respond(HttpStatusCode.Accepted) else call.respond(HttpStatusCode.BadRequest)
                 }.onFailure {
                     throw it
                 }
@@ -172,15 +172,15 @@ fun Application.credentials() = walletRoute {
                 val credentialId = call.parameters.getOrFail("credentialId")
                 val requestParameter = call.receiveNullable<NoteRequestParameter>()
                 runCatching {
-                    getWalletService().rejectCredential(
+                    call.getWalletService().rejectCredential(
                         CredentialRequestParameter(
                             credentialId = credentialId, parameter = requestParameter
                         )
                     )
                 }.onSuccess {
-                    if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
+                    if (it) call.respond(HttpStatusCode.Accepted) else call.respond(HttpStatusCode.BadRequest)
                 }.onFailure {
-                    context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
             get("status", {
@@ -198,11 +198,11 @@ fun Application.credentials() = walletRoute {
             }) {
                 runCatching {
                     val credentialId = call.parameters.getOrFail("credentialId")
-                    WalletServiceManager.credentialStatusUseCase.get(getWalletId(), credentialId)
+                    WalletServiceManager.credentialStatusUseCase.get(call.getWalletId(), credentialId)
                 }.onSuccess {
-                    context.respond(it)
+                    call.respond(it)
                 }.onFailure {
-                    context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
             route("category", {
@@ -223,9 +223,9 @@ fun Application.credentials() = walletRoute {
                 }) {
                     val credentialId = call.parameters.getOrFail("credentialId")
                     val categories = call.receive<List<String>>()
-                    runCatching { getWalletService().attachCategory(credentialId, categories) }.onSuccess {
-                        if (it) context.respond(HttpStatusCode.Created) else context.respond(HttpStatusCode.BadRequest)
-                    }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+                    runCatching { call.getWalletService().attachCategory(credentialId, categories) }.onSuccess {
+                        if (it) call.respond(HttpStatusCode.Created) else call.respond(HttpStatusCode.BadRequest)
+                    }.onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
                 }
                 delete({
                     summary = "Detach category from credential"
@@ -237,9 +237,9 @@ fun Application.credentials() = walletRoute {
                 }) {
                     val credentialId = call.parameters.getOrFail("credentialId")
                     val categories = call.receive<List<String>>()
-                    runCatching { getWalletService().detachCategory(credentialId, categories) }.onSuccess {
-                        if (it) context.respond(HttpStatusCode.Accepted) else context.respond(HttpStatusCode.BadRequest)
-                    }.onFailure { context.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
+                    runCatching { call.getWalletService().detachCategory(credentialId, categories) }.onSuccess {
+                        if (it) call.respond(HttpStatusCode.Accepted) else call.respond(HttpStatusCode.BadRequest)
+                    }.onFailure { call.respond(HttpStatusCode.BadRequest, it.localizedMessage) }
                 }
             }
         }

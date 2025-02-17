@@ -17,6 +17,7 @@ import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.SwaggerPresentationSessionInfo
 import id.walt.verifier.oidc.VerificationUseCase
+import id.walt.verifier.oidc.VerificationUseCase.FailedVerificationException
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
@@ -30,14 +31,14 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.server.response.respond
+import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.*
-import io.ktor.util.pipeline.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -215,18 +216,18 @@ fun Application.verifierApi() {
 
             }) {
 
-                val authorizeBaseUrl = context.request.header("authorizeBaseUrl") ?: defaultAuthorizeBaseUrl
+                val authorizeBaseUrl = call.request.header("authorizeBaseUrl") ?: defaultAuthorizeBaseUrl
                 val responseMode =
-                    context.request.header("responseMode")?.let { ResponseMode.fromString(it) }
+                    call.request.header("responseMode")?.let { ResponseMode.fromString(it) }
                         ?: ResponseMode.direct_post
-                val successRedirectUri = context.request.header("successRedirectUri")
-                val errorRedirectUri = context.request.header("errorRedirectUri")
-                val statusCallbackUri = context.request.header("statusCallbackUri")
-                val statusCallbackApiKey = context.request.header("statusCallbackApiKey")
-                val stateId = context.request.header("stateId")
-                val openId4VPProfile = context.request.header("openId4VPProfile")
+                val successRedirectUri = call.request.header("successRedirectUri")
+                val errorRedirectUri = call.request.header("errorRedirectUri")
+                val statusCallbackUri = call.request.header("statusCallbackUri")
+                val statusCallbackApiKey = call.request.header("statusCallbackApiKey")
+                val stateId = call.request.header("stateId")
+                val openId4VPProfile = call.request.header("openId4VPProfile")
 
-                val body = context.receive<JsonObject>()
+                val body = call.receive<JsonObject>()
 
                 val session = verificationUseCase.createSession(
                     vpPoliciesJson = body["vp_policies"],
@@ -245,7 +246,7 @@ fun Application.verifierApi() {
                     trustedRootCAs = body["trusted_root_cas"]?.jsonArray
                 )
 
-                context.respond(
+                call.respond(
                     authorizeBaseUrl.plus("?").plus(
                         when (session.openId4VPProfile) {
                             OpenId4VPProfile.ISO_18013_7_MDOC -> session.authorizationRequest!!.toRequestObjectByReferenceHttpQueryString(
@@ -294,11 +295,43 @@ fun Application.verifierApi() {
                 logger.info { "POST verify/state" }
                 val sessionId = call.parameters.getOrFail("state")
                 logger.info { "State: $sessionId" }
-                verificationUseCase.verify(sessionId, context.request.call.receiveParameters().toMap())
+                verificationUseCase.verify(sessionId, call.request.call.receiveParameters().toMap())
                     .onSuccess {
-                        processVerificationSuccessResult(sessionId, it)
+                        val session = verificationUseCase.getSession(sessionId!!)
+                        if (session.walletInitiatedAuthState != null) {
+                            val state = session.walletInitiatedAuthState
+                            val code = Uuid.random().toString()
+                            call.respondRedirect("openid://?code=$code&state=$state")
+                        } else {
+                            call.respond(HttpStatusCode.OK, it)
+                        }
                     }.onFailure {
-                        processVerificationFailureResult(sessionId, it)
+                        runBlocking { logger.debug(it) { "Verification failed ($it)" } }
+                        val errorDescription = it.message ?: "Verification failed"
+                        runBlocking { logger.error { "Error: $errorDescription" } }
+                        if (sessionId != null) {
+                            val session = verificationUseCase.getSession(sessionId)
+                            if (session.walletInitiatedAuthState != null) {
+                                val state = session.walletInitiatedAuthState
+                                runBlocking {
+                                    this@post.call.respondRedirect(
+                                        "openid://?state=$state&error=invalid_request&error_description=${getErrorDescription(it)}"
+                                    )
+                                }
+                            } else if (it is FailedVerificationException && it.redirectUrl != null) {
+                                runBlocking {
+                                    this@post.call.respond(HttpStatusCode.BadRequest, it.redirectUrl)
+                                }
+
+                            } else {
+                                throw it
+                            }
+                        } else {
+                            runBlocking {
+                                logger.error(it) { "/verify error: $errorDescription" }
+                                this@post.call.respond(HttpStatusCode.BadRequest, errorDescription)
+                            }
+                        }
                     }.also {
                         verificationUseCase.notifySubscribers(sessionId)
                     }
@@ -464,7 +497,7 @@ fun Application.verifierApi() {
                 },
                 openId4VPProfile = OpenId4VPProfile.EBSIV3
             )
-            context.respondRedirect(
+            call.respondRedirect(
                 "openid://?${
                     session.authorizationRequest!!.toEbsiRequestObjectByReferenceHttpQueryString(
                         SERVER_URL.let { "$it/openid4vc/request/${session.id}" })
@@ -485,57 +518,4 @@ private fun getErrorDescription(it: Throwable): String? = when (it.message) {
         "<\$presentation_submission.descriptor_map[x].id> is revoked"
 
     else -> null
-}
-
-private fun PipelineContext<Unit, ApplicationCall>.processError(
-    sessionId: String,
-    error: Throwable
-) {
-    val session = verificationUseCase.getSession(sessionId)
-    if (session.walletInitiatedAuthState != null) {
-        val state = session.walletInitiatedAuthState
-        runBlocking {
-            context.respondRedirect(
-                "openid://?state=$state&error=invalid_request&error_description=${getErrorDescription(error)}"
-            )
-        }
-    } else if (error is VerificationUseCase.FailedVerificationException && error.redirectUrl != null) {
-        runBlocking {
-            context.respond(HttpStatusCode.BadRequest, error.redirectUrl)
-        }
-
-    } else {
-        throw error
-    }
-}
-
-private fun PipelineContext<Unit, ApplicationCall>.processVerificationFailureResult(
-    sessionId: String?,
-    error: Throwable,
-) {
-    runBlocking { logger.debug(error) { "Verification failed ($error)" } }
-    val errorDescription = error.message ?: "Verification failed"
-    runBlocking { logger.error { "Error: $errorDescription" } }
-    if (sessionId != null) {
-        processError(sessionId, error)
-    } else {
-        runBlocking {
-            logger.error(error) { "/verify error: $errorDescription" }
-            call.respond(HttpStatusCode.BadRequest, errorDescription)
-        }
-    }
-}
-
-private suspend fun PipelineContext<Unit, ApplicationCall>.processVerificationSuccessResult(
-    sessionId: String?,
-    redirectUrl: String,
-) {
-    val session = verificationUseCase.getSession(sessionId!!)
-    if (session.walletInitiatedAuthState != null) {
-        val state = session.walletInitiatedAuthState
-        val code = Uuid.random().toString()
-        context.respondRedirect("openid://?code=$code&state=$state")
-    } else {
-        call.respond(HttpStatusCode.OK, redirectUrl)
-    }
 }
