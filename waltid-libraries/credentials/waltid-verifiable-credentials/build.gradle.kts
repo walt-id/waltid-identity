@@ -84,12 +84,12 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "2.3.12"
+    val ktor_version = "3.1.0"
     sourceSets {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
                 implementation("io.github.optimumcode:json-schema-validator:0.2.3")
 
                 // Ktor client
@@ -101,14 +101,14 @@ kotlin {
                 implementation("io.ktor:ktor-client-logging:$ktor_version")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
                 // Kotlinx
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
                 implementation("app.softwork:kotlinx-uuid-core:0.1.2")
 
                 // Loggin
-                implementation("io.github.oshai:kotlin-logging:7.0.0")
+                implementation("io.github.oshai:kotlin-logging:7.0.4")
 
                 // walt.id
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -122,7 +122,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
             }
         }
         val jvmMain by getting {
@@ -136,9 +136,9 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
                 implementation("org.slf4j:slf4j-simple:2.0.16")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
             }
         }
         val jsMain by getting {

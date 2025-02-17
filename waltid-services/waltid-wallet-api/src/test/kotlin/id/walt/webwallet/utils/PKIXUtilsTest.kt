@@ -1,8 +1,8 @@
 package id.walt.webwallet.utils
 
 import kotlinx.coroutines.test.runTest
-import org.junit.Test
 import java.security.KeyPairGenerator
+import kotlin.test.Test
 import kotlin.test.assertTrue
 
 class PKIXUtilsTest {
@@ -18,6 +18,6 @@ class PKIXUtilsTest {
         val keyPair = keyPairGenerator.generateKeyPair()
         val pemEncodedPrivateKey = PKIXUtils.pemEncodeJavaPrivateKey(keyPair.private)
         val decodedPrivateKey = PKIXUtils.pemDecodeJavaPrivateKey(pemEncodedPrivateKey)
-        assertTrue { keyPair.private.encoded.contentEquals(decodedPrivateKey.encoded)}
+        assertTrue { keyPair.private.encoded.contentEquals(decodedPrivateKey.encoded) }
     }
 }

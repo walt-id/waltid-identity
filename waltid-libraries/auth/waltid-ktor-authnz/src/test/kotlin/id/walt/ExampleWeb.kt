@@ -33,10 +33,10 @@ fun Route.globalMultistepExample() {
     """.trimIndent()
         val authFlow = AuthFlow.fromConfig(flowConfig)
 
-        val contextFunction: PipelineContext<Unit, ApplicationCall>.() -> AuthContext = {
+        val contextFunction: ApplicationCall.() -> AuthContext = {
             AuthContext(
-                tenant = call.request.host(),
-                sessionId = call.parameters["sessionId"],
+                tenant = request.host(),
+                sessionId = parameters["sessionId"],
                 implicitSessionGeneration = true,
                 initialFlow = authFlow
             )
@@ -59,10 +59,10 @@ fun Route.globalImplicitSingleStep() {
         val authFlow = AuthFlow.fromConfig(flowConfig)
 
 
-        val contextFunction: PipelineContext<Unit, ApplicationCall>.() -> AuthContext = {
+        val contextFunction: ApplicationCall.() -> AuthContext = {
             AuthContext(
-                tenant = call.request.host(),
-                sessionId = call.parameters["sessionId"],
+                tenant = request.host(),
+                sessionId = parameters["sessionId"],
                 implicitSessionGeneration = true,
                 initialFlow = authFlow
             )
@@ -87,10 +87,10 @@ fun Route.globalImplicitMultiStep() {
         val authFlow = AuthFlow.fromConfig(flowConfig)
 
 
-        val contextFunction: PipelineContext<Unit, ApplicationCall>.() -> AuthContext = {
+        val contextFunction: ApplicationCall.() -> AuthContext = {
             AuthContext(
-                tenant = call.request.host(),
-                sessionId = call.parameters["sessionId"],
+                tenant = request.host(),
+                sessionId = parameters["sessionId"],
                 implicitSessionGeneration = true,
                 initialFlow = authFlow
             )
@@ -107,10 +107,10 @@ fun Route.globalExplicitMultiStep() {
     route("global-explicit2") {
         val methods = listOf(UserPass, TOTP)
 
-        val contextFunction: PipelineContext<Unit, ApplicationCall>.() -> AuthContext = {
+        val contextFunction: ApplicationCall.() -> AuthContext = {
             AuthContext(
-                tenant = call.request.host(),
-                sessionId = call.parameters["sessionId"] ?: error("Missing sessionId")
+                tenant = request.host(),
+                sessionId = parameters["sessionId"] ?: error("Missing sessionId")
             )
         }
 
@@ -132,7 +132,7 @@ fun Route.globalExplicitMultiStep() {
 
         post("start") {
             val session = SessionManager.openExplicitGlobalSession(authFlow)
-            context.respond(session.toInformation())
+            call.respond(session.toInformation())
         }
     }
 }
@@ -156,10 +156,10 @@ fun Route.globalImplicitVc() {
         val authFlow = AuthFlow.fromConfig(flowConfig)
 
 
-        val contextFunction: PipelineContext<Unit, ApplicationCall>.() -> AuthContext = {
+        val contextFunction: ApplicationCall.() -> AuthContext = {
             AuthContext(
-                tenant = call.request.host(),
-                sessionId = call.parameters["sessionId"],
+                tenant = request.host(),
+                sessionId = parameters["sessionId"],
                 implicitSessionGeneration = true,
                 initialFlow = authFlow
             )
@@ -184,7 +184,7 @@ fun Route.globalImplicitVc() {
         val authFlow = AuthFlow.fromConfig(flowConfig)
 
 
-        val contextFunction: PipelineContext<Unit, ApplicationCall>.() -> AuthContext = {
+        val contextFunction: ApplicationCall.() -> AuthContext = {
             AuthContext(
                 tenant = call.request.host(),
                 sessionId = call.parameters["sessionId"],
@@ -202,7 +202,7 @@ fun Route.globalImplicitVc() {
 
         post("start") {
             val session = SessionManager.openExplicitGlobalSession(authFlow)
-            context.respond(session.toInformation())
+            call.respond(session.toInformation())
         }
     }
 }*/
@@ -245,8 +245,8 @@ fun Application.testApp(jwt: Boolean) {
 
         authenticate("ktor-authnz") {
             get("/protected") {
-                val token = getAuthToken()
-                val accountId = getAuthenticatedAccount()
+                val token = call.getAuthToken()
+                val accountId = call.getAuthenticatedAccount()
                 call.respondText("Hello token ${token}, you are $accountId")
             }
         }

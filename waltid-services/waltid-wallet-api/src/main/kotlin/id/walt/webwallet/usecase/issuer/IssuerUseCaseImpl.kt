@@ -55,9 +55,9 @@ class IssuerUseCaseImpl(
     suspend fun fetchCredentials(url: String): List<CredentialDataTransferObject> {
         val issuerConfiguration = fetchConfiguration(url).jsonObject
         val credentialConfigurations = (
-            issuerConfiguration["credential_configurations_supported"]?.jsonObject?.entries
-            ?: issuerConfiguration["credentials_supported"]?.jsonArray?.associateBy { it.jsonObject["id"]!!.jsonPrimitive.content }?.entries
-            )
+                issuerConfiguration["credential_configurations_supported"]?.jsonObject?.entries
+                    ?: issuerConfiguration["credentials_supported"]?.jsonArray?.associateBy { it.jsonObject["id"]!!.jsonPrimitive.content }?.entries
+                )
         return credentialConfigurations?.mapNotNull { (key, value) ->
             value.jsonObject.let { jsonObject ->
                 val format = jsonObject["format"]?.jsonPrimitive?.content

@@ -52,16 +52,16 @@ kotlin {
             dependencies {
                 // JSON
                 implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
                 implementation("io.github.optimumcode:json-schema-validator:0.2.3")
 
                 implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:7.0.0")
+                implementation("io.github.oshai:kotlin-logging:7.0.4")
             }
         }
         val commonTest by getting {
@@ -71,7 +71,7 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
                 implementation("org.slf4j:slf4j-simple:2.0.16")
             }
         }

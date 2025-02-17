@@ -20,7 +20,6 @@ import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import org.jetbrains.exposed.sql.insert
@@ -68,10 +67,10 @@ fun Application.ktorAuthnzRoutes() {
                 summary = "Account authentication"
                 description = "Configured authentication flow:<br/><br/>${flowConfig.toString().replace("\n", "<br/>")}"
             }) {
-                val contextFunction: PipelineContext<Unit, ApplicationCall>.() -> AuthContext = {
+                val contextFunction: ApplicationCall.() -> AuthContext = {
                     AuthContext(
-                        tenant = call.request.host(),
-                        sessionId = call.parameters["sessionId"],
+                        tenant = request.host(),
+                        sessionId = parameters["sessionId"],
                         implicitSessionGeneration = true,
                         initialFlow = authConfig.authFlow
                     )

@@ -1,6 +1,5 @@
-package id.walt.did.dids.registrar.local.cheqd.models.job.didstates.action
+package id.walt.did.dids.registrar.local.cheqd.models.job.didstates
 
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.DidState
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.js.ExperimentalJsExport
@@ -17,4 +16,19 @@ data class ActionDidState(
     val did: String,
     val secret: Secret,
     val signingRequest: List<SigningRequest>,
-) : DidState()
+) : DidState() {
+    @OptIn(ExperimentalJsExport::class)
+    @Serializable
+    data class Secret(
+        val signingResponse: List<String>,
+    )
+
+    @OptIn(ExperimentalJsExport::class)
+    @Serializable
+    data class SigningRequest(
+        val alg: String,
+        val kid: String,
+        val serializedPayload: String,
+        val type: String,
+    )
+}

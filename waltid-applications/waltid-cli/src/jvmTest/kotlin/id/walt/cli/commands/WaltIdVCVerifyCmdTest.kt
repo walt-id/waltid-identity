@@ -56,7 +56,7 @@ class WaltIdVCVerifyCmdTest {
 
     val schemaFilePath = "${resourcesPath}/schema/OpenBadgeV3_schema.json"
 
-    private val webhookTestServer: NettyApplicationEngine
+    private val webhookTestServer: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>
     private val webhookTestServerURL: String
     private val webhookTestServerSuccessURL: String
     private val webhookTestServerFailURL: String
@@ -78,8 +78,8 @@ class WaltIdVCVerifyCmdTest {
             }
         }.start(false)
         runBlocking {
-            url = "http://" + webhookTestServer.resolvedConnectors()
-                .first().host + ":${webhookTestServer.resolvedConnectors().first().port}"
+            url = "http://" + webhookTestServer.engine.resolvedConnectors()
+                .first().host + ":${webhookTestServer.engine.resolvedConnectors().first().port}"
         }
         webhookTestServerURL = url
         webhookTestServerSuccessURL = "$webhookTestServerURL/success"

@@ -4,7 +4,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.power-assert")
     kotlin("plugin.serialization")
-    id("io.ktor.plugin") version "2.3.12"
+    id("io.ktor.plugin") version "3.1.0"
     id("maven-publish")
 
     application
@@ -85,24 +85,24 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
 
     // Ktor server external
-    implementation("io.github.smiley4:ktor-swagger-ui:3.5.1")
+    implementation("io.github.smiley4:ktor-swagger-ui:4.1.6")
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
     implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
     // Logging
-    implementation("io.klogging:klogging-jvm:0.7.2")
-    implementation("io.klogging:slf4j-klogging:0.7.2")
+    implementation("io.klogging:klogging-jvm:0.9.1")
+    implementation("io.klogging:slf4j-klogging:0.9.1")
 
     /* --- Testing --- */
     testImplementation("io.ktor:ktor-client-logging")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
 
     // Ktor
     testImplementation("io.ktor:ktor-server-cio-jvm")
-    testImplementation("io.ktor:ktor-server-tests-jvm")
+    testImplementation("io.ktor:ktor-server-test-host")
 
     // Kotlin
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")

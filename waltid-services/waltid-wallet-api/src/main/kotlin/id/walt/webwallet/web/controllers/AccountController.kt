@@ -23,8 +23,8 @@ fun Application.accounts() {
                     summary = "Get wallets associated with account"
                     response { HttpStatusCode.OK to { body<AccountWalletListing>() } }
                 }) {
-                    val user = getUserUUID()
-                    context.respond(AccountsService.getAccountWalletMappings("", user)) // FIXME -> TENANT HERE
+                    val user = call.getUserUUID()
+                    call.respond(AccountsService.getAccountWalletMappings("", user)) // FIXME -> TENANT HERE
                 }
             }
         }
