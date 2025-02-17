@@ -7,7 +7,6 @@ import id.walt.did.dids.document.models.verification.method.VerificationMethodTy
 import id.walt.did.dids.document.models.verification.relationship.VerificationRelationship
 import id.walt.did.utils.JsonCanonicalization
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals

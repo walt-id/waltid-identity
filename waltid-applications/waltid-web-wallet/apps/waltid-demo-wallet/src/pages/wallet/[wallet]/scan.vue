@@ -36,12 +36,7 @@
 
 <script setup>
 import ManualRequestEntry from "~/components/scan/ManualRequestEntry.vue";
-import {
-  encodeRequest,
-  fixRequest,
-  getSiopRequestType,
-  SiopRequestType,
-} from "@waltid-web-wallet/composables/siop-requests.ts";
+import { encodeRequest, fixRequest, getSiopRequestType, SiopRequestType } from "@waltid-web-wallet/composables/siop-requests.ts";
 import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
 import QrCodeScanner from "~/components/scan/QrCodeScanner.vue";
 import toggle from "@waltid-web-wallet/components/toggle.vue";

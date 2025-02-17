@@ -8,13 +8,7 @@ import id.walt.did.dids.document.DidCheqdDocument
 import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.LocalRegistrarMethod
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.Secret
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.SigningResponse
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.ActionDidState
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.didStateSerializationModule
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.FailedDidState
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.DidDocument
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.FinishedDidState
+import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.*
 import id.walt.did.dids.registrar.local.cheqd.models.job.request.JobCreateRequest
 import id.walt.did.dids.registrar.local.cheqd.models.job.request.JobDeactivateRequest
 import id.walt.did.dids.registrar.local.cheqd.models.job.request.JobSignRequest
@@ -24,8 +18,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.LogLevel
-import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*

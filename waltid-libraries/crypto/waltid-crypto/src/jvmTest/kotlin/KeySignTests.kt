@@ -1,12 +1,9 @@
 import TestUtils.loadSerializedLocal
 import com.nimbusds.jose.JWSObject
-import id.walt.crypto.keys.KeySerialization
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
-import org.junit.jupiter.api.Disabled
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.assertContains

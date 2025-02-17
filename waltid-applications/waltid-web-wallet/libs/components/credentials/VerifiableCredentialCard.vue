@@ -24,8 +24,8 @@
 </template>
 
 <script lang="ts" setup>
-import { useCredential } from '../../composables/credential.ts';
-import { ref, defineProps, watchEffect, computed } from 'vue';
+import { useCredential } from "../../composables/credential.ts";
+import { computed, defineProps, ref, watchEffect } from "vue";
 
 const props = defineProps({
     credential: {

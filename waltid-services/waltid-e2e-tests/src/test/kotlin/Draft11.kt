@@ -21,8 +21,8 @@ import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlin.test.*
-import kotlin.uuid.Uuid
 import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class Draft11(private val client: HttpClient)  {
 

@@ -19,12 +19,11 @@ import io.klogging.rendering.RENDER_ANSI
 import io.klogging.sending.STDERR
 import io.klogging.sending.STDOUT
 import io.ktor.http.*
-import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
-import io.ktor.server.plugins.calllogging.CallLogging
+import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.doublereceive.*
 import io.ktor.server.plugins.statuspages.*
@@ -33,8 +32,6 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.*
-import io.ktor.util.pipeline.*
-import io.ktor.utils.io.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant

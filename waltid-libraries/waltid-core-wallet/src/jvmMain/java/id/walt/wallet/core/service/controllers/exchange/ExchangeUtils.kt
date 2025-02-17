@@ -1,16 +1,5 @@
 package id.walt.webwallet.web.controllers.exchange
 
-import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.oid4vc.data.CredentialFormat
-import id.walt.sdjwt.KeyBindingJwt
-import id.walt.sdjwt.KeyBindingJwt.Companion.getSdHash
-import id.walt.wallet.core.service.oidc4vc.CredentialFilterUtils
-import id.walt.webwallet.web.controllers.exchange.models.oid4vp.IETFSdJwtVpProofParameters
-import id.walt.webwallet.web.controllers.exchange.models.oid4vp.W3cJwtVpProofParameters
-import kotlinx.datetime.Clock
-import kotlinx.serialization.json.*
-import kotlin.time.Duration.Companion.minutes
-
 object ExchangeUtils {
 
     /*fun getFirstAuthKeyIdFromDidDocument(

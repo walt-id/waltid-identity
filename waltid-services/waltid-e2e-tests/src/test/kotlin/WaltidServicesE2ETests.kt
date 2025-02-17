@@ -9,15 +9,12 @@ import id.walt.commons.web.plugins.httpJson
 import id.walt.credentials.schemes.JwsSignatureScheme
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
-import id.walt.issuer.config.CredentialTypeConfig
-import id.walt.issuer.config.OIDCIssuerServiceConfig
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuerModule
 import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.oid4vc.providers.CredentialIssuerConfig
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
@@ -43,7 +40,6 @@ import io.ktor.server.application.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import kotlin.system.exitProcess
 import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi

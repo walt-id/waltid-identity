@@ -1,17 +1,11 @@
 package id.walt.oid4vc.data
 
-import id.walt.oid4vc.*
-import id.walt.oid4vc.definitions.*
-import io.ktor.http.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonDecoder
-import kotlinx.serialization.json.JsonElement
 
 /**
  * OpenID Provider metadata object, according to

@@ -1,6 +1,7 @@
 package id.walt.did.dids.document.models.verification.relationship
 
-import kotlinx.serialization.*
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 

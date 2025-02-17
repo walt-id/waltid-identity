@@ -7,7 +7,6 @@ import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.issuer.issuance.NewIssuanceRequest
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.GrantType
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi

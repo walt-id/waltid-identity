@@ -1,6 +1,6 @@
 'use client';
 
-import WaltIcon from '@/components/walt/logo/WaltIcon';
+import WaltIcon from "@/components/walt/logo/WaltIcon";
 
 type Props = {
   id: string;

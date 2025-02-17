@@ -4,7 +4,6 @@ import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 
 object GlobalIdentify : IdentifyVirtualAuth("identify-global") {
 
