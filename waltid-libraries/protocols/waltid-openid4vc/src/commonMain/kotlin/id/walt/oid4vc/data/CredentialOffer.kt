@@ -67,46 +67,33 @@ sealed class CredentialOffer() : JsonDataObject() {
     data class Draft13 (
         @SerialName("credential_issuer") override val credentialIssuer: String,
         @SerialName("grants") override val grants: Map<String, GrantDetails> = mapOf(),
-
         @SerialName("credential_configuration_ids") val credentialConfigurationIds: Set<String>,
-
         override val customParameters: Map<String, JsonElement> = mapOf()
     ) : CredentialOffer() {
-
         class Builder(credentialIssuer: String) : CredentialOffer.Builder<Draft13>(credentialIssuer) {
-
             override fun buildInternal() = Draft13(
                 credentialIssuer = credentialIssuer,
                 grants = grants,
                 credentialConfigurationIds = supportedCredentialIds
             )
-
         }
-
     }
 
     @Serializable
     data class Draft11 (
         @SerialName("credential_issuer") override val credentialIssuer: String,
         @SerialName("grants") override val grants: Map<String, GrantDetails> = mapOf(),
-
         @SerialName("credentials") val credentials: Set<String>,
-
         override val customParameters: Map<String, JsonElement> = mapOf()
     ) : CredentialOffer() {
-
         class Builder(credentialIssuer: String) : CredentialOffer.Builder<Draft11>(credentialIssuer) {
-
             override fun buildInternal() = Draft11(
                 credentialIssuer = credentialIssuer,
                 grants = grants,
                 credentials = supportedCredentialIds
             )
-
         }
-
     }
-
 }
 
 
