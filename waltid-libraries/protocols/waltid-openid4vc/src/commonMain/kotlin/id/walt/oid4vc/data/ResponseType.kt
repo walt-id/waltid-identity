@@ -4,7 +4,8 @@ enum class ResponseType(val value: String) {
     IdToken("id_token"),
     Token("token"),
     Code("code"),
-    VpToken("vp_token");
+    VpToken("vp_token"),
+    VpTokenIdToken("vp_token id_token");
 
     companion object {
         fun getResponseTypeString(vararg types: ResponseType) = types.joinToString(" ") { it.value }
