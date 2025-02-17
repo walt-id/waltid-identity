@@ -16,7 +16,7 @@ import kotlin.test.Ignore
 
 class DidCheqdRegistrarTest : DidRegistrarTestBase(DidCheqdRegistrar()) {
 
-    @Ignore
+    @Ignore // FIXME: CHEQD registrar returns "e.g. ..." instaed of actual secret
     @ParameterizedTest
     @MethodSource
     override fun `given did options with no key when register then returns a valid did result`(
@@ -26,7 +26,7 @@ class DidCheqdRegistrarTest : DidRegistrarTestBase(DidCheqdRegistrar()) {
         super.`given did options with no key when register then returns a valid did result`(options, assert)
     }
 
-    @Ignore
+    @Ignore // FIXME: CHEQD registrar returns "e.g. ..." instaed of actual secret
     @ParameterizedTest
     @MethodSource
     override fun `given did options and key when register with key then returns a valid did result`(
