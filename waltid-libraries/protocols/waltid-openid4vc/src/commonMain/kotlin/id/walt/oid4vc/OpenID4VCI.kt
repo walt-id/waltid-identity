@@ -325,7 +325,16 @@ object OpenID4VCI {
         return payload
     }
 
-    fun createDefaultProviderMetadata(baseUrl: String, credentialSupported: Map<String, CredentialSupported>? = null, version: OpenID4VCIVersion, customParameters: Map<String, JsonElement>? = emptyMap()) : OpenIDProviderMetadata {
+    fun createDefaultProviderMetadata(
+        baseUrl: String,
+        credentialSupported: Map<String, CredentialSupported>? = null,
+        version: OpenID4VCIVersion,
+        customParameters: Map<String, JsonElement>? = emptyMap()
+    ): OpenIDProviderMetadata {
+
+        validateCredentialIssuerUrl(baseUrl)
+
+        credentialSupported?.let { validateCryptographicBindingMethods(it) }
 
         return when (version) {
             OpenID4VCIVersion.DRAFT13 -> OpenIDProviderMetadata.Draft13(
@@ -384,6 +393,34 @@ object OpenID4VCI {
                     },
                 customParameters = customParameters!!
             )
+        }
+    }
+
+
+    fun validateCredentialIssuerUrl(url: String) {
+        try {
+            val parsedUrl = Url(url)
+
+            require(parsedUrl.protocol.name == "https" || parsedUrl.protocol.name == "https") { "URL must use HTTPS or HTTP scheme" }
+            require(parsedUrl.host.isNotEmpty()) { "URL must have a valid host" }
+            require(parsedUrl.parameters.isEmpty() && !url.contains("#")) { "URL must not contain query or fragment" }
+
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException("Invalid Credential Issuer URL: ${e.message}")
+        }
+    }
+
+    fun validateCryptographicBindingMethods(credentialSupported: Map<String, CredentialSupported>) {
+        credentialSupported.forEach {
+
+            val validFormats = setOf("jwk", "cose_key")
+            val didPattern = Regex("^did:[a-z0-9]+$")
+
+            it.value.cryptographicBindingMethodsSupported?.forEach { method ->
+                require(method in validFormats || didPattern.matches(method)) {
+                    "Invalid cryptographic binding method: $method. Expected 'jwk', 'cose_key', or 'did:<method-name>'"
+                }
+            }
         }
     }
 
