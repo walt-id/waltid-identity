@@ -13,7 +13,6 @@ import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -37,7 +36,7 @@ abstract class AuthenticationMethod(open val id: String) {
 
     /** Login routes */
     abstract fun Route.registerAuthenticationRoutes(
-        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        authContext: ApplicationCall.() -> AuthContext,
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>? = null
     )
 
@@ -81,7 +80,7 @@ abstract class AuthenticationMethod(open val id: String) {
      * - [supportsRegistration] does this method support automatic registration (set to true)
      * - [authenticationHandlesRegistration] Login & registration is not a combined step (set to false)
      */
-    open fun Route.registerRegistrationRoutes(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext): Unit =
+    open fun Route.registerRegistrationRoutes(authContext: ApplicationCall.() -> AuthContext): Unit =
         throw NotImplementedError("Authentication method ${this::class.simpleName} does not offer registration routes. Authentication routes handle registration: $authenticationHandlesRegistration")
 
 
@@ -98,9 +97,7 @@ abstract class AuthenticationMethod(open val id: String) {
         return (storedData as? V) ?: error("${storedData::class.simpleName} is not requested ${V::class.simpleName}")
     }
 
-    suspend fun PipelineContext<Unit, ApplicationCall>.getSession(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext): AuthSession {
-        val currentContext = authContext.invoke(this)
-
+    private suspend fun sessionForAuthContext(currentContext: AuthContext): AuthSession {
         val session = if (currentContext.implicitSessionGeneration && currentContext.sessionId == null) {
             // Implicit session start
             SessionManager.openImplicitGlobalSession(currentContext.initialFlow!!)
@@ -112,6 +109,9 @@ abstract class AuthenticationMethod(open val id: String) {
         return session
     }
 
+    suspend fun ApplicationCall.getAuthSession(authContext: ApplicationCall.() -> AuthContext): AuthSession =
+        sessionForAuthContext(currentContext = authContext.invoke(this))
+
     // Relations
     open val relatedAuthMethodStoredData: KClass<out AuthMethodStoredData>? = null
     open val relatedAuthMethodConfiguration: KClass<out AuthMethodConfiguration>? = null
@@ -120,7 +120,7 @@ abstract class AuthenticationMethod(open val id: String) {
 
 fun Route.registerAuthenticationMethod(
     method: AuthenticationMethod,
-    authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+    authContext: ApplicationCall.() -> AuthContext,
     functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>? = null
 ) {
     method.apply {
@@ -130,7 +130,7 @@ fun Route.registerAuthenticationMethod(
 
 fun Route.registerAuthenticationMethods(
     methods: List<AuthenticationMethod>,
-    authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+    authContext: ApplicationCall.() -> AuthContext,
     functionAmendments: Map<AuthenticationMethod, Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>>? = null
 ) {
     methods.forEach { method ->

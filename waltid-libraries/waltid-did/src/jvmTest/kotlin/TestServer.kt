@@ -35,12 +35,10 @@ object TestServer {
             subject = X500Principal("CN=localhost, OU=walt.id, O=walt.id, C=AT")
         }
     }.also { it.saveToFile(keyStoreFile, "test123") }
-    private val environment = applicationEngineEnvironment {
-        envConfig()
-    }
-    val server: ApplicationEngine by lazy {
+
+    val server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration> by lazy {
         println("Initializing embedded webserver...")
-        embeddedServer(Netty, environment)
+        embeddedServer(Netty, applicationEnvironment(), { envConfig() }, module = { module() })
     }
 
     private fun Application.module() {
@@ -63,10 +61,7 @@ object TestServer {
         }
     }
 
-    private fun ApplicationEngineEnvironmentBuilder.envConfig() {
-        module {
-            module()
-        }
+    private fun ApplicationEngine.Configuration.envConfig() {
         connector {
             port = 8000
         }

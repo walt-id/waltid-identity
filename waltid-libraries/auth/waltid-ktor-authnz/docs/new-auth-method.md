@@ -126,10 +126,10 @@ object MultiStepExample : AuthenticationMethod("multistep-example") {
         val publicKey: String
     )
 
-    override fun Route.register(authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext) {
+    override fun Route.register(authContext: ApplicationCall.() -> AuthContext) {
         route("multistep-example") {
             get("nonce") { // Step 1
-                context.respond(makeNonce())
+                call.respond(makeNonce())
             }
 
             post<MultiStepExampleSigned>("signed", { // Step 2
@@ -191,7 +191,7 @@ fun Route.globalMultistepExample() {
     """.trimIndent()
         val authFlow = AuthFlow.fromConfig(flowConfig)
 
-        val contextFunction: PipelineContext<Unit, ApplicationCall>.() -> AuthContext = {
+        val contextFunction: ApplicationCall.() -> AuthContext = {
             AuthContext(
                 tenant = call.request.host(),
                 sessionId = call.parameters["sessionId"],
@@ -225,7 +225,7 @@ fun Application.testApp() {
             post<AccountIdentifier>("register-by-identifier") { identifier ->
                 val newAccountId = Uuid.random().toString()
                 KtorAuthnzManager.accountStore.addAccountIdentifierToAccount(newAccountId, identifier)
-                context.respond(newAccountId)
+                call.respond(newAccountId)
             }
         }
 

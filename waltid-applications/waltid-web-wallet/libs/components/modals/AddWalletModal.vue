@@ -59,7 +59,7 @@ import ActionResultModal from "../../components/modals/ActionResultModal.vue";
 import { useCurrentWallet } from "../../composables/accountWallet.ts";
 import CloseButton from "../../components/modals/CloseButton.vue";
 import useModalStore from "../../stores/useModalStore.ts";
-import { toRefs, ref } from "vue";
+import { ref, toRefs } from "vue";
 
 const props = defineProps<{
     callback: any;

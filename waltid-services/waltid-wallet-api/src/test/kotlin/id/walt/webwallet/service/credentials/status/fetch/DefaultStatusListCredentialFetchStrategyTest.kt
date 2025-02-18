@@ -76,12 +76,9 @@ class DefaultStatusListCredentialFetchStrategyTest {
         const val credentialResourcePath = "credential-status/status-list-credential"
         const val statusCredentialPath = "credentials/%s"
 
-        private val environment = applicationEngineEnvironment {
-            envConfig()
-        }
-        val server: ApplicationEngine by lazy {
+        val server: EmbeddedServer<*, *> by lazy {
             println("Initializing embedded webserver...")
-            embeddedServer(CIO, environment)
+            embeddedServer(CIO, applicationEnvironment(), { envConfig() }, module = { module() })
         }
 
         private fun Application.module() {
@@ -90,17 +87,14 @@ class DefaultStatusListCredentialFetchStrategyTest {
             }
             routing {
                 get("credentials/{id}") {
-                    val id = context.parameters.getOrFail("id")
+                    val id = call.parameters.getOrFail("id")
                     val credential = TestUtils.loadResource("$credentialResourcePath/$id.json")
                     call.respond<String>(credential)
                 }
             }
         }
 
-        private fun ApplicationEngineEnvironmentBuilder.envConfig() {
-            module {
-                module()
-            }
+        private fun ApplicationEngine.Configuration.envConfig() {
             connector {
                 port = serverPort
             }

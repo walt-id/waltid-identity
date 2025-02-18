@@ -1,8 +1,9 @@
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
-    id("dev.petuska.npm.publish") version "3.4.3"
+    id("dev.petuska.npm.publish") version "3.5.2"
     `maven-publish`
+    id("com.github.ben-manes.versions")
 }
 
 group = "id.walt.mdoc-credentials"
@@ -55,10 +56,10 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
                 //implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.5.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
                 implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
             }
         }
@@ -74,9 +75,9 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.bouncycastle:bcprov-lts8on:2.73.6")
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.6")
-                implementation("io.mockk:mockk:1.13.11")
+                implementation("org.bouncycastle:bcprov-lts8on:2.73.7")
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.7")
+                implementation("io.mockk:mockk:1.13.16")
 
                 implementation(kotlin("reflect"))
             }

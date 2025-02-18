@@ -22,5 +22,5 @@ class EntityNameResolutionUseCase(
 
     private fun validateAge(age: Instant?) = age?.let {
         now().minus(it).inWholeDays <= cacheAge
-    } ?: false
+    } == true
 }

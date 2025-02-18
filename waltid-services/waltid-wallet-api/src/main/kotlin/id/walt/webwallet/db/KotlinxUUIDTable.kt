@@ -3,8 +3,9 @@
 package id.walt.webwallet.db
 
 import app.softwork.uuid.isValidUuidString
-import org.jetbrains.exposed.dao.id.*
-import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.Column
+import org.jetbrains.exposed.sql.ColumnType
+import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.vendors.currentDialect
 import java.nio.ByteBuffer
 import kotlin.uuid.ExperimentalUuidApi
@@ -36,7 +37,7 @@ import kotlin.uuid.toKotlinUuid
  * Creates a binary column, with the specified [name], for storing Uuids.
  * Unlike the [Table.uuid] function, this one registers [kotlinx.uuid.Uuid] type instead of [java.util.Uuid].
  **/
-public fun Table.kotlinxUuid(name: String): Column<Uuid> {
+fun Table.kotlinxUuid(name: String): Column<Uuid> {
     return registerColumn(name, UuidColumnType())
 }
 
@@ -55,7 +56,7 @@ fun <T : Uuid> Table.typedUUID(name: String, factory: UUIDTypeFactory<T>): Colum
  * Remember that using a [SecureRandom] may require to seed the system random source
  * otherwise a system may get stuck.
  **/
-public fun Column<Uuid>.autoGenerate(): Column<Uuid> = apply {
+fun Column<Uuid>.autoGenerate(): Column<Uuid> = apply {
     defaultValueFun = { Uuid.random() }
 }
 
@@ -63,7 +64,7 @@ public fun Column<Uuid>.autoGenerate(): Column<Uuid> = apply {
  * A [Uuid] column type for registering in exposed tables.
  * @see kotlinxUuid to see how it is used
  */
-public class UuidColumnType : ColumnType<Uuid>() {
+class UuidColumnType : ColumnType<Uuid>() {
     override fun sqlType(): String = currentDialect.dataTypeProvider.uuidType()
 
     override fun valueFromDB(value: Any): Uuid = when {

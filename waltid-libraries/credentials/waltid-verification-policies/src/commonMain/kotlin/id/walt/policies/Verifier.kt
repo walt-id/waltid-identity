@@ -1,12 +1,12 @@
 package id.walt.policies
 
 import id.walt.credentials.utils.VCFormat
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.policies.models.PolicyRequest
 import id.walt.policies.models.PolicyResult
 import id.walt.policies.models.PresentationResultEntry
 import id.walt.policies.models.PresentationVerificationResponse
 import id.walt.policies.policies.JwtSignaturePolicy
-import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDJwtVC
 import io.github.oshai.kotlinlogging.KotlinLogging

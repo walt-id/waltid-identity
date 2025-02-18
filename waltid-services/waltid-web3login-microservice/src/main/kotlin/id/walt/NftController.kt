@@ -37,7 +37,7 @@ fun Application.nfts() = walletRoute {
         }) {
             val nft = getNftService()
             val ecosystem = call.parameters["ecosystem"] ?: throw IllegalArgumentException("No ecosystem provided")
-            context.respond(nft.getChains(ecosystem = ecosystem))
+            call.respond(nft.getChains(ecosystem = ecosystem))
         }
         get("filter", {
             summary = "Fetch the list of tokens with details"
@@ -61,9 +61,9 @@ fun Application.nfts() = walletRoute {
             }
         }) {
             val nft = getNftService()
-            val accountIds = context.request.queryParameters.getAll("accountId")
-            val networks = context.request.queryParameters.getAll("network")
-            context.respond(
+            val accountIds = call.request.queryParameters.getAll("accountId")
+            val networks = call.request.queryParameters.getAll("network")
+            call.respond(
                 nft.filterTokens("", FilterParameter(accountIds ?: emptyList(), networks ?: emptyList()))
                 // FIXME -> TENANT HERE
             )
@@ -91,7 +91,7 @@ fun Application.nfts() = walletRoute {
             val nft = getNftService()
             val chain = call.parameters["chain"] ?: throw IllegalArgumentException("No chain provided")
             val account = call.parameters["account"] ?: throw IllegalArgumentException("No account provided")
-            context.respond(
+            call.respond(
                 nft.getTokens(
                     "", // FIXME -> TENANT HERE
                     ListFetchParameter(
@@ -137,7 +137,7 @@ fun Application.nfts() = walletRoute {
             val account = call.parameters["account"] ?: throw IllegalArgumentException("No account provided")
             val contract = call.parameters["contract"] ?: throw IllegalArgumentException("No contract provided")
             val tokenId = call.parameters["tokenId"] ?: throw IllegalArgumentException("No tokenId provided")
-            val collection = context.request.queryParameters["collectionId"]
+            val collection = call.request.queryParameters["collectionId"]
             val nft = getNftService()
             runCatching {
                 nft.getTokenDetails(
@@ -151,7 +151,7 @@ fun Application.nfts() = walletRoute {
                     )
                 )
             }.onSuccess {
-                context.respond(it)
+                call.respond(it)
             }.onFailure { context.response.status(HttpStatusCode.NotFound) }
         }
         get("marketplace/{chain}/{contract}/{tokenId}", {
@@ -185,7 +185,7 @@ fun Application.nfts() = walletRoute {
                     tokenId = call.parameters["tokenId"] ?: throw IllegalArgumentException("No tokenId provided")
                 )
             )?.run {
-                context.respond(this)
+                call.respond(this)
             } ?: run {
                 context.response.status(HttpStatusCode.NotFound)
             }
@@ -217,7 +217,7 @@ fun Application.nfts() = walletRoute {
                         ?: throw IllegalArgumentException("No contract provided"),
                 )
             )?.run {
-                context.respond(this)
+                call.respond(this)
             } ?: run {
                 context.response.status(HttpStatusCode.NotFound)
             }

@@ -435,7 +435,7 @@ object OidcApi : CIProvider() {
                     )
                 }
 
-                context.respond(credentialOffer.toJSON())
+                call.respond(credentialOffer.toJSON())
             }
 
             post("{standardVersion}/credential") {

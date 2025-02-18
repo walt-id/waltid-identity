@@ -46,12 +46,12 @@ kotlin {
         }
     }
 
-    val ktor_version = "2.3.12"
+    val ktor_version = "3.1.0"
     sourceSets {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -67,20 +67,20 @@ kotlin {
                 implementation("it.justwrote:kjob-kron:0.2.0")*/
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
                 // datetime
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:7.0.0")
+                implementation("io.github.oshai:kotlin-logging:7.0.4")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
-                implementation("org.junit.jupiter:junit-jupiter-api:5.11.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
             }
         }
         val jvmMain by getting {
@@ -92,12 +92,12 @@ kotlin {
                 implementation("org.slf4j:slf4j-simple:2.0.16")
 
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
             }
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
             }
         }
         publishing {

@@ -86,7 +86,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "2.3.12"
+    val ktor_version = "3.1.0"
 
     sourceSets {
 
@@ -97,7 +97,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -107,25 +107,25 @@ kotlin {
                 implementation("io.ktor:ktor-client-json:$ktor_version")
                 implementation("io.ktor:ktor-client-logging:$ktor_version")
 
-                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.5.3"))
+                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
                 implementation("org.kotlincrypto.hash:sha2")
 
                 // Date
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
 
                 // Cache
-                implementation("io.github.reactivecircus.cache4k:cache4k:0.13.0")
+                implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:7.0.0")
+                implementation("io.github.oshai:kotlin-logging:7.0.4")
 
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
 
 
-                implementation(platform("org.kotlincrypto.macs:bom:0.5.3"))
+                implementation(project.dependencies.platform("org.kotlincrypto.macs:bom:0.6.1"))
                 implementation("org.kotlincrypto.macs:hmac-sha2")
 
             }
@@ -134,24 +134,24 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
             }
         }
         val jvmMain by getting {
             dependencies {
-                implementation("com.google.crypto.tink:tink:1.15.0") // for JOSE using Ed25519
+                implementation("com.google.crypto.tink:tink:1.16.0") // for JOSE using Ed25519
 
-                implementation("org.bouncycastle:bcprov-lts8on:2.73.6") // for secp256k1 (which was removed with Java 17)
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.6") // PEM import
+                implementation("org.bouncycastle:bcprov-lts8on:2.73.7") // for secp256k1 (which was removed with Java 17)
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.7") // PEM import
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.10.1")
 
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
 
             }
         }
@@ -163,9 +163,9 @@ kotlin {
                 // Test
                 implementation(kotlin("test"))
 
-                implementation("org.junit.jupiter:junit-jupiter-api:5.11.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
             }
         }
         val jsMain by getting {

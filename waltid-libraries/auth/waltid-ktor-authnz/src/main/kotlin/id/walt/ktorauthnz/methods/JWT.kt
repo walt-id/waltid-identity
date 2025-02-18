@@ -13,7 +13,6 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 
 object JWT : AuthenticationMethod("jwt") {
 
@@ -30,20 +29,20 @@ object JWT : AuthenticationMethod("jwt") {
     }
 
     override fun Route.registerAuthenticationRoutes(
-        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        authContext: ApplicationCall.() -> AuthContext,
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
     ) {
         post("jwt", {
             request { body<String>() }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
         }) {
-            val session = getSession(authContext)
+            val session = call.getAuthSession(authContext)
             val config = session.lookupConfiguration<JwtAuthConfiguration>(this@JWT)
 
-            val jwt = context.receiveText()
+            val jwt = call.receiveText()
             val id = auth(jwt, config)
 
-            context.handleAuthSuccess(session, id.resolveToAccountId())
+            call.handleAuthSuccess(session, id.resolveToAccountId())
         }
     }
 

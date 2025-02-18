@@ -13,7 +13,6 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 import org.apache.directory.api.ldap.model.exception.LdapException
 import org.apache.directory.ldap.client.api.LdapConnection
 import org.apache.directory.ldap.client.api.LdapNetworkConnection
@@ -45,20 +44,20 @@ object LDAP : UserPassBasedAuthMethod("ldap") {
     }
 
     override fun Route.registerAuthenticationRoutes(
-        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        authContext: ApplicationCall.() -> AuthContext,
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
     ) {
         post("ldap", {
             request { body<UserPassCredentials>() }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
         }) {
-            val session = getSession(authContext)
+            val session = call.getAuthSession(authContext)
 
             val credential = call.getUsernamePasswordFromRequest()
 
-            val identifier = auth(session, credential, context)
+            val identifier = auth(session, credential, call)
 
-            context.handleAuthSuccess(session, identifier.resolveToAccountId())
+            call.handleAuthSuccess(session, identifier.resolveToAccountId())
         }
     }
 

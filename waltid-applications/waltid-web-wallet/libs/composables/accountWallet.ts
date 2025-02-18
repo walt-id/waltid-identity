@@ -1,4 +1,4 @@
-import { useState, useRoute, navigateTo, useFetch } from "nuxt/app";
+import { navigateTo, useFetch, useRoute, useState } from "nuxt/app";
 
 export type WalletListing = {
     id: string,
