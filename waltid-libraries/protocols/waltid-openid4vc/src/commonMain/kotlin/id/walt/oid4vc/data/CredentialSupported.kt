@@ -1,7 +1,9 @@
 package id.walt.oid4vc.data
 
 import id.walt.sdjwt.SDJWTVCTypeMetadata
-import kotlinx.serialization.*
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer

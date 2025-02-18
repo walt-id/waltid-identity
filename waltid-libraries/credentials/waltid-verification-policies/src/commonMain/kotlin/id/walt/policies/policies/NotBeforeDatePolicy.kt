@@ -4,11 +4,11 @@ import id.walt.credentials.Claims
 import id.walt.credentials.JwtClaims
 import id.walt.credentials.VcClaims
 import id.walt.credentials.utils.VCFormat
+import id.walt.policies.CredentialWrapperValidatorPolicy
 import id.walt.policies.DatePolicyUtils.checkJwt
 import id.walt.policies.DatePolicyUtils.checkVc
 import id.walt.policies.DatePolicyUtils.policyUnavailable
 import id.walt.policies.NotBeforePolicyException
-import id.walt.policies.CredentialWrapperValidatorPolicy
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable

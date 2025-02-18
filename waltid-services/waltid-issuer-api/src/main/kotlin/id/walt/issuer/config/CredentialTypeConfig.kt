@@ -4,11 +4,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.WaltConfig
 import id.walt.mdoc.doc.MDocTypes
 import id.walt.oid4vc.OpenID4VCIVersion
-import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.data.CredentialSupported
-import id.walt.oid4vc.data.ProofType
-import id.walt.oid4vc.data.ProofTypeMetadata
-import id.walt.oid4vc.data.CredentialDefinition
+import id.walt.oid4vc.data.*
 import id.walt.sdjwt.SDJWTVCTypeMetadata
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*

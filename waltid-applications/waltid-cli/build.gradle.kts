@@ -1,7 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 object Versions {
-    const val KTOR_VERSION = "2.3.12"
+    const val KTOR_VERSION = "3.1.0"
 }
 
 plugins {
@@ -9,7 +9,7 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
-    id("io.ktor.plugin") version "2.3.12" // Versions.KTOR_VERSION
+    id("io.ktor.plugin") version "3.1.0" // Versions.KTOR_VERSION
     // Apply the application plugin to add support for building a CLI application in Java.
     application
 }
@@ -65,25 +65,27 @@ kotlin {
                 api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
                 api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
-                implementation("com.google.code.gson:gson:2.11.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+                implementation("com.google.code.gson:gson:2.12.1")
 
                 // CLI
-                implementation("com.github.ajalt.mordant:mordant:2.7.1")
-                implementation("com.github.ajalt.clikt:clikt:4.4.0")
+                implementation("com.github.ajalt.clikt:clikt:5.0.3")
+                implementation("com.github.ajalt.clikt:clikt-markdown:5.0.3")
+                implementation("com.github.ajalt.mordant:mordant:3.0.2")
+                implementation("com.github.ajalt.mordant:mordant-markdown:3.0.2")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:7.0.0")
+                implementation("io.github.oshai:kotlin-logging:7.0.4")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
             }
         }
         val jvmMain by getting {
@@ -92,18 +94,18 @@ kotlin {
                 implementation("org.slf4j:slf4j-simple:2.0.16")
 
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:9.41.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
 
                 // BouncyCastle for PEM import
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.6")
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.7")
             }
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-                implementation("com.wolpl.clikt-testkit:clikt-testkit:2.0.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("com.wolpl.clikt-testkit:clikt-testkit:3.0.0")
 
-                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
 
                 // Ktor server
                 implementation("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")

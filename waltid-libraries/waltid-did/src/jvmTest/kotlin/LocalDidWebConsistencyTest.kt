@@ -43,7 +43,7 @@ class LocalDidWebConsistencyTest {
 
     private val didWebTestEntryList: List<TestEntry>
     private val didWebPathToDocMap = mutableMapOf<String, DidDocument>()
-    private val didWebTestServer: NettyApplicationEngine
+    private val didWebTestServer: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>
 
     private val keyStoreFile = File(this.javaClass.classLoader.getResource("")!!.path.plus("keystore.jks"))
     private val keyStore = buildKeyStore {
@@ -53,16 +53,14 @@ class LocalDidWebConsistencyTest {
             subject = X500Principal("CN=localhost, OU=walt.id, O=walt.id, C=AT")
         }
     }.also { it.saveToFile(keyStoreFile, "test123") }
-    private val environment = applicationEngineEnvironment {
-        envConfig()
-    }
 
     init {
         didWebTestEntryList = populateTestData()
+
         didWebTestServer = embeddedServer(
-            Netty,
-            environment,
-        ).start(false)
+            Netty, applicationEnvironment(), { envConfig() },
+            module = { module() }
+        ).start(wait = false)
     }
 
     @AfterTest
@@ -102,10 +100,7 @@ class LocalDidWebConsistencyTest {
         }
     }
 
-    private fun ApplicationEngineEnvironmentBuilder.envConfig() {
-        module {
-            module()
-        }
+    private fun ApplicationEngine.Configuration.envConfig() {
         connector {
             port = 8000
         }

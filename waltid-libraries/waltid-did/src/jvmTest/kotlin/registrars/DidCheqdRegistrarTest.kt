@@ -12,9 +12,11 @@ import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
+import kotlin.test.Ignore
 
 class DidCheqdRegistrarTest : DidRegistrarTestBase(DidCheqdRegistrar()) {
 
+    @Ignore // FIXME: CHEQD registrar returns "e.g. ..." instaed of actual secret
     @ParameterizedTest
     @MethodSource
     override fun `given did options with no key when register then returns a valid did result`(
@@ -24,6 +26,7 @@ class DidCheqdRegistrarTest : DidRegistrarTestBase(DidCheqdRegistrar()) {
         super.`given did options with no key when register then returns a valid did result`(options, assert)
     }
 
+    @Ignore // FIXME: CHEQD registrar returns "e.g. ..." instaed of actual secret
     @ParameterizedTest
     @MethodSource
     override fun `given did options and key when register with key then returns a valid did result`(

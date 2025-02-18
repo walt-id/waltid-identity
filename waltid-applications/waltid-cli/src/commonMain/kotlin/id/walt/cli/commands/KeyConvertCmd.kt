@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.mordant.terminal.YesNoPrompt
+import com.github.ajalt.mordant.terminal.prompt
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
 import id.walt.cli.util.getNormalizedPath
@@ -39,17 +40,23 @@ enum class KeyFileFormat {
 }
 
 class KeyConvertCmd : CliktCommand(
-    name = "convert",
-    printHelpOnEmptyArgs = true,
-    help = """Convert key files between PEM and JWK formats.
+    name = "convert"
+) {
+
+    override fun help(context: Context) = """Convert key files between PEM and JWK formats.
         
         Example usage:
         ---------------
         waltid key convert -i myRsaKey.pem
         waltid key convert -i myEncryptedRsaKey.pem -p 123123 -o myRsaKey.jwk
-    """,
+    """.replace("\n", "  \n")
 
-) {
+    init {
+        installMordantMarkdown()
+    }
+
+    override val printHelpOnEmptyArgs = true
+
 
     init {
         context {

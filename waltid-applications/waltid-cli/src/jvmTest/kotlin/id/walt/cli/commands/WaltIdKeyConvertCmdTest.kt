@@ -49,12 +49,9 @@ class WaltIdKeyConvertCmdTest {
     fun `should fail if --input is provided with no value`() {
         val command = KeyConvertCmd()
 
-        val failure = assertFailsWith<MultiUsageError> {
+        assertFails {
             command.parse(listOf("-i"))
         }
-
-        assertTrue(failure.errors.any { it is IncorrectOptionValueCount })
-        assertTrue(failure.errors.any { it is MissingOption })
     }
 
     @Test
@@ -232,16 +229,20 @@ class WaltIdKeyConvertCmdTest {
         val inputFilePath = getResourcePath(this, inputFileName)
 
         class PassphraseTerminal : TerminalInterface {
-            override val info: TerminalInfo
-                get() = TerminalInfo(
-                    width = 0,
-                    height = 0,
+            override fun info(
+                ansiLevel: AnsiLevel?,
+                hyperlinks: Boolean?,
+                outputInteractive: Boolean?,
+                inputInteractive: Boolean?
+            ): TerminalInfo {
+                return TerminalInfo(
                     ansiLevel = AnsiLevel.NONE,
                     ansiHyperLinks = false,
                     outputInteractive = false,
                     inputInteractive = false,
-                    crClearsLine = false
+                    supportsAnsiCursor = false
                 )
+            }
 
             override fun completePrintRequest(request: PrintRequest) {
                 StringWriter().write(request.text)

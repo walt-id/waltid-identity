@@ -1,7 +1,5 @@
-package id.walt.did.dids.registrar.local.cheqd.models.job.didstates.finished
+package id.walt.did.dids.registrar.local.cheqd.models.job.didstates
 
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.DidState
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.Secret
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.js.ExperimentalJsExport

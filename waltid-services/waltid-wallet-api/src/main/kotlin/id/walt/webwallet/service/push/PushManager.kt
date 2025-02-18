@@ -5,7 +5,6 @@ import com.interaso.webpush.WebPushService
 import id.walt.commons.config.ConfigManager
 import id.walt.webwallet.config.PushConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 object PushManager {

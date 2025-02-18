@@ -39,7 +39,7 @@ fun Application.configureOpenApi() {
         get("/", {
             summary = "Redirect to swagger interface for API documentation"
         }) {
-            context.respondRedirect("swagger")
+            call.respondRedirect("swagger")
         }
     }
 }

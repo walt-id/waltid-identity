@@ -10,6 +10,7 @@ import io.ktor.server.response.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.encodeToJsonElement
+import redis.clients.jedis.exceptions.JedisException
 import kotlin.reflect.jvm.jvmName
 
 
@@ -35,6 +36,7 @@ private fun statusCodeForException(cause: Throwable) = when (cause) {
     is IllegalArgumentException -> HttpStatusCode.BadRequest
     is BadRequestException -> HttpStatusCode.BadRequest
     is IllegalStateException -> HttpStatusCode.InternalServerError
+    is JedisException -> HttpStatusCode.InternalServerError
     is WebException -> cause.status
     else -> HttpStatusCode.InternalServerError
 }

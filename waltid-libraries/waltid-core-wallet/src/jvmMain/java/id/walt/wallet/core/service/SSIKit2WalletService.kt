@@ -18,11 +18,11 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.wallet.core.utils.SessionAttributes
 import id.walt.wallet.core.service.exchange.IssuanceService
 import id.walt.wallet.core.service.exchange.PresentationRequestParameter
 import id.walt.wallet.core.service.oidc4vc.TestCredentialWallet
 import id.walt.wallet.core.service.oidc4vc.VPresentationSession
+import id.walt.wallet.core.utils.SessionAttributes
 import id.walt.webwallet.utils.StringUtils.couldBeJsonObject
 import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -37,7 +37,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.collections.set
 import kotlin.time.Duration.Companion.seconds
 
 class SSIKit2WalletService(

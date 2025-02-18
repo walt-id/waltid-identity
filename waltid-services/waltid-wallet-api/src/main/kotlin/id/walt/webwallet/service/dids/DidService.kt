@@ -50,7 +50,11 @@ object DidsService {
     }.insertedCount
 
     fun delete(wallet: Uuid, did: String): Boolean =
-        transaction { WalletDids.deleteWhere { (WalletDids.wallet eq wallet.toJavaUuid()) and (WalletDids.did eq did.replace("%3A", ":").replace("%3D", "=")) } } > 0
+        transaction {
+            WalletDids.deleteWhere {
+                (WalletDids.wallet eq wallet.toJavaUuid()) and (WalletDids.did eq did.replace("%3A", ":").replace("%3D", "="))
+            }
+        } > 0
 
 
     fun makeDidDefault(wallet: Uuid, newDefaultDid: String) {

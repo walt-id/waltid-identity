@@ -2,7 +2,7 @@ package id.walt.issuer.issuance
 
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
-import io.ktor.server.plugins.BadRequestException
+import io.ktor.server.plugins.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 

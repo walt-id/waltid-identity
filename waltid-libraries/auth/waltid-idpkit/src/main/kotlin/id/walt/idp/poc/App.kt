@@ -19,12 +19,11 @@ import io.klogging.rendering.RENDER_ANSI
 import io.klogging.sending.STDERR
 import io.klogging.sending.STDOUT
 import io.ktor.http.*
-import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
-import io.ktor.server.plugins.callloging.*
+import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.doublereceive.*
 import io.ktor.server.plugins.statuspages.*
@@ -33,8 +32,6 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.*
-import io.ktor.util.pipeline.*
-import io.ktor.utils.io.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -107,31 +104,6 @@ fun main() {
             }
         }
 
-        fun toLogString(subject: Any): String = when (subject) {
-            is TextContent -> subject.text
-            is OutputStreamContent -> {
-                val channel = ByteChannel(true)
-                runBlocking {
-                    subject.writeTo(channel)
-                    StringBuilder().apply {
-                        while (!channel.isClosedForRead) channel.readUTF8LineTo(this)
-                    }.toString()
-                }
-            }
-
-            else -> "???"
-        }
-
-        suspend fun PipelineContext<Unit, ApplicationCall>.logResponseBody(call: ApplicationCall) {
-            call.response.pipeline.intercept(ApplicationSendPipeline.Engine) { message ->
-                this@embeddedServer.log.debug("Response Body (${call.request.uri}): ${toLogString(message)}")
-            }
-        }
-
-        intercept(ApplicationCallPipeline.Call) {
-            logResponseBody(call)
-        }
-
         install(StatusPages) {
             exception<Throwable> { call, cause ->
                 cause.printStackTrace()
@@ -175,7 +147,7 @@ fun Application.test() {
     routing {
 
         get("/jwks") {
-            context.respond(mapOf(
+            call.respond(mapOf(
                 "keys" to listOf(key).map { it.toPublicJWK().toJSONObject() }
             ))
         }

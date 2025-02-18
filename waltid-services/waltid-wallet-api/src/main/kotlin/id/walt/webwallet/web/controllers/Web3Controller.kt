@@ -31,8 +31,8 @@ fun Application.web3accounts() = walletRoute {
                 }
             }
         }) {
-            val wallet = getWalletService()
-            context.respond<List<LinkedWalletDataTransferObject>>(wallet.getLinkedWallets())
+            val wallet = call.getWalletService()
+            call.respond<List<LinkedWalletDataTransferObject>>(wallet.getLinkedWallets())
         }
 
         post("link", {
@@ -49,9 +49,9 @@ fun Application.web3accounts() = walletRoute {
                 }
             }
         }) {
-            val wallet = getWalletService()
+            val wallet = call.getWalletService()
             val data = Json.decodeFromString<WalletDataTransferObject>(call.receive())
-            context.respond(wallet.linkWallet(data))
+            call.respond(wallet.linkWallet(data))
         }
 
         post("unlink", {
@@ -63,9 +63,9 @@ fun Application.web3accounts() = walletRoute {
                 HttpStatusCode.OK to { description = "Wallet unlinked" }
             }
         }) {
-            val wallet = getWalletService()
+            val wallet = call.getWalletService()
             val walletId = Uuid.parse(call.receiveText())
-            context.respond(wallet.unlinkWallet(walletId))
+            call.respond(wallet.unlinkWallet(walletId))
         }
 
         post("connect", {
@@ -82,9 +82,9 @@ fun Application.web3accounts() = walletRoute {
                 }
             }
         }) {
-            val wallet = getWalletService()
+            val wallet = call.getWalletService()
             val walletId = Uuid.parse(call.receiveText())
-            context.respond(wallet.connectWallet(walletId))
+            call.respond(wallet.connectWallet(walletId))
         }
 
         post("disconnect", {
@@ -96,9 +96,9 @@ fun Application.web3accounts() = walletRoute {
                 HttpStatusCode.OK to { description = "Wallet disconnected" }
             }
         }) {
-            val wallet = getWalletService()
+            val wallet = call.getWalletService()
             val walletId = Uuid.parse(call.receiveText())
-            context.respond(wallet.disconnectWallet(walletId))
+            call.respond(wallet.disconnectWallet(walletId))
         }
     }
 }

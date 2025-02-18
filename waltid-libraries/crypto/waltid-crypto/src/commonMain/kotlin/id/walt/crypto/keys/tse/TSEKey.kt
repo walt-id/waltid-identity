@@ -1,10 +1,6 @@
 package id.walt.crypto.keys.tse
 
-import id.walt.crypto.exceptions.KeyNotFoundException
-import id.walt.crypto.exceptions.KeyTypeNotSupportedException
-import id.walt.crypto.exceptions.MissingSignatureException
-import id.walt.crypto.exceptions.TSEError
-import id.walt.crypto.exceptions.VerificationException
+import id.walt.crypto.exceptions.*
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.TseKeyMeta
@@ -29,7 +25,6 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -326,7 +321,6 @@ class TSEKey(
             else -> throw KeyTypeNotSupportedException(type)
         }
 
-        @OptIn(InternalAPI::class)
         @JvmBlocking
         @JvmAsync
         @JsPromise

@@ -41,7 +41,7 @@ COPY waltid-libraries/waltid-core-wallet/. /work/waltid-libraries/waltid-core-wa
 
 COPY waltid-services/waltid-service-commons/. /work/waltid-services/waltid-service-commons
 COPY waltid-services/waltid-wallet-api/src/ /work/waltid-services/waltid-wallet-api/src
-COPY waltid-services/waltid-wallet-api/build.gradle.kts waltid-services/waltid-wallet-api/gradle.properties waltid-services/waltid-wallet-api/gradlew /work/waltid-services/waltid-wallet-api/
+COPY waltid-services/waltid-wallet-api/build.gradle.kts waltid-services/waltid-wallet-api/gradlew /work/waltid-services/waltid-wallet-api/
 
 RUN gradle clean installDist
 

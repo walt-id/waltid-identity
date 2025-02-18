@@ -1,8 +1,8 @@
 import AWSKeyTest.Config.payloadJWS
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.aws.AWSAuth
-import id.walt.crypto.keys.aws.AWSKeyRestAPI
 import id.walt.crypto.keys.aws.AWSKeyMetadata
+import id.walt.crypto.keys.aws.AWSKeyRestAPI
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject

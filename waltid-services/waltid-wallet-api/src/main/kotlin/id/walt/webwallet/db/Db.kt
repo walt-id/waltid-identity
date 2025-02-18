@@ -94,7 +94,7 @@ object Db {
                 val accountResult = AccountsService.register(request = EmailAccountRequest("Max Mustermann", "user@email.com", "password"))
                 val accountId = accountResult.getOrNull()?.id!!
                 val walletResult = AccountsService.getAccountWalletMappings("", accountId)
-                val walletId = walletResult.wallets[0].id
+                walletResult.wallets[0].id
 
                 /*CredentialsService().add(
                     wallet = walletId,

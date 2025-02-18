@@ -16,7 +16,6 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -44,20 +43,20 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
     }
 
     override fun Route.registerAuthenticationRoutes(
-        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        authContext: ApplicationCall.() -> AuthContext,
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
     ) {
         post("userpass", {
             request { body<UserPassCredentials>() }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
         }) {
-            val session = getSession(authContext)
+            val session = call.getAuthSession(authContext)
 
             val credential = call.getUsernamePasswordFromRequest()
 
-            val identifier = auth(session, credential, context)
+            val identifier = auth(session, credential, call)
 
-            context.handleAuthSuccess(session, identifier.resolveToAccountId())
+            call.handleAuthSuccess(session, identifier.resolveToAccountId())
         }
     }
 

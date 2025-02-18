@@ -1,10 +1,5 @@
 <script lang="ts" setup>
-import {
-  Listbox,
-  ListboxButton,
-  ListboxLabel,
-  ListboxOptions,
-} from "@headlessui/vue";
+import { Listbox, ListboxButton, ListboxLabel, ListboxOptions } from "@headlessui/vue";
 import { useI18n } from "vue-i18n";
 import { availableLocales } from "@waltid-web-wallet/locales/availableLocales";
 
