@@ -1,4 +1,4 @@
-FROM docker.io/gradle:jdk17 as buildstage
+FROM docker.io/gradle:jdk21 as buildstage
 
 COPY gradle/ /work/gradle
 COPY settings.gradle.kts build.gradle.kts gradle.properties gradlew /work/
