@@ -5,7 +5,6 @@ import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject

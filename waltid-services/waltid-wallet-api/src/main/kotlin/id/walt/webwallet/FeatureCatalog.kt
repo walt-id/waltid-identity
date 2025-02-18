@@ -12,7 +12,8 @@ object FeatureCatalog : ServiceFeatureCatalog {
     val devModeFeature = OptionalFeature("dev-mode", "Development mode", default = false)
 
     val legacyAuthenticationFeature = OptionalFeature("auth", "Legacy authentication system", AuthConfig::class, true)
-    val ktorAuthnzAuthenticationFeature = OptionalFeature("ktor-authnz", "waltid-ktor-authnz authentication system", KtorAuthnzConfig::class, false)
+    val ktorAuthnzAuthenticationFeature =
+        OptionalFeature("ktor-authnz", "waltid-ktor-authnz authentication system", KtorAuthnzConfig::class, false)
     // val loginsMethodFeature = BaseFeature("logins", "Logins method management", LoginMethodsConfig::class)
 
 

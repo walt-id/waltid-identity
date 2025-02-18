@@ -3,6 +3,7 @@ package id.walt.cli.commands
 import com.github.ajalt.clikt.core.MissingArgument
 import com.github.ajalt.clikt.core.MissingOption
 import com.github.ajalt.clikt.core.PrintHelpMessage
+import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.testing.test
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.*
@@ -56,7 +57,7 @@ class WaltIdVCSignCmdTest {
     fun `should accept one positional argument after --options`() {
         val result = command.test(listOf("--help"), width = 800, height = 800)
 
-        assertContains(result.stdout, "The file path to the Verifiable Credential that will be signed (required).")
+        assertContains(result.output, "The file path to the Verifiable Credential that will")
     }
 
     @Test

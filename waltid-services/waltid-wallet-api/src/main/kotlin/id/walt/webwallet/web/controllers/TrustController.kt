@@ -25,7 +25,7 @@ fun Application.trustRegistry() = authenticatedWebWalletRoute {
             val result = request.isVerifier.takeIf { it }
                 ?.let { WalletServiceManager.verifierTrustValidationService.validate(request.did, request.credentialType, request.egfUri) }
                 ?: WalletServiceManager.issuerTrustValidationService.validate(request.did, request.credentialType, request.egfUri)
-            context.respond(TrustResponse(result))
+            call.respond(TrustResponse(result))
         }
     }
 }

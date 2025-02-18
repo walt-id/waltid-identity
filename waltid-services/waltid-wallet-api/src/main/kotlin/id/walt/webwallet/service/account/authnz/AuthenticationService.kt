@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.util.*
+import java.util.UUID
 import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalUuidApi::class)
@@ -26,8 +26,8 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
         ): Unit = withContext(dispatcher) {
             transaction {
                 AuthnzAccountIdentifiers.insert {
-                    it[AuthnzAccountIdentifiers.userId] = UUID.fromString(accountId)
-                    it[AuthnzAccountIdentifiers.identifier] = newAccountIdentifier.accountIdentifierName
+                    it[userId] = UUID.fromString(accountId)
+                    it[identifier] = newAccountIdentifier.accountIdentifierName
                     //it[AuthnzAccountIdentifiers.method] =
                 }
                 Unit // Explicitly return Unit
@@ -46,9 +46,9 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
             val savableStoredData = data.transformSavable()
             transaction {
                 val userId = AuthnzAccountIdentifiers
-                    .select(AuthnzAccountIdentifiers.userId)
+                    .select(userId)
                     .where { AuthnzAccountIdentifiers.identifier eq accountIdentifier.accountIdentifierName }
-                    .singleOrNull()?.get(AuthnzAccountIdentifiers.userId)
+                    .singleOrNull()?.get(userId)
                     ?: throw IllegalStateException("Account not found")
 
                 AuthnzStoredData.insert {

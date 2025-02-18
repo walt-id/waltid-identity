@@ -2,6 +2,7 @@ plugins {
     kotlin("jvm")
     id("maven-publish")
     //`maven-publish`
+    id("com.github.ben-manes.versions")
 }
 
 group = "id.walt"

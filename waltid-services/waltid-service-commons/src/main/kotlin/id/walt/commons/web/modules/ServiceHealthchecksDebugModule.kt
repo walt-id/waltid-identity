@@ -109,7 +109,7 @@ object ServiceHealthChecksDebugModule {
                     if (debugConfig.ram) get("ram") {
                         val rt = Runtime.getRuntime()
                         val memory = ManagementFactory.getMemoryMXBean()
-                        context.respond(buildJsonObject {
+                        call.respond(buildJsonObject {
                             put("free", rt.freeMemory())
                             put("max", rt.maxMemory())
                             put("total", rt.totalMemory())
@@ -122,7 +122,7 @@ object ServiceHealthChecksDebugModule {
 
                     if (debugConfig.cpu) get("cpu") {
                         val thread = ManagementFactory.getThreadMXBean()
-                        context.respond(buildJsonObject {
+                        call.respond(buildJsonObject {
                             put("loadAverage", ManagementFactory.getOperatingSystemMXBean().systemLoadAverage)
                             put("processors", ManagementFactory.getOperatingSystemMXBean().availableProcessors)
                             put("threadCount", JsonPrimitive(thread.threadCount))
@@ -132,7 +132,7 @@ object ServiceHealthChecksDebugModule {
                     }
 
                     if (debugConfig.memoryPool) get("memoryPool") {
-                        context.respond(buildJsonObject {
+                        call.respond(buildJsonObject {
                             ManagementFactory.getMemoryPoolMXBeans().forEach {
                                 putJsonObject(it.name) {
                                     put("type", JsonPrimitive(it.type.name))

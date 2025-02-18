@@ -5,12 +5,13 @@ package id.walt.webwallet.web.controllers.exchange
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64URL
-import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.CredentialFormat
+import id.walt.oid4vc.data.ResponseMode
+import id.walt.oid4vc.data.VpTokenParameter
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.errors.AuthorizationError
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -48,7 +49,10 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -101,7 +105,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 }
             }
         }) {
-            val walletService = getWalletService()
+            val walletService = call.getWalletService()
             runCatching {
                 val req = call.receive<PrepareOID4VPRequest>()
                 logger.debug { "Request: $req" }
@@ -169,7 +173,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     req.disclosures,
                 )
 
-                val (rootPathVP, rootPathMDoc) = if (ietfVpTokenParams != null && w3cJwtVpTokenParams == null) {
+                val (rootPathVP, _) = if (ietfVpTokenParams != null && w3cJwtVpTokenParams == null) {
                     Pair("$", "$[0]")
                 } else if (ietfVpTokenParams != null) {
                     Pair("$[0]", "$[1]")
@@ -215,14 +219,14 @@ fun Application.exchangeExternalSignatures() = walletRoute {
 
             }.onSuccess { responsePayload ->
                 logger.debug { "Response payload: $responsePayload" }
-                context.respond(
+                call.respond(
                     HttpStatusCode.OK,
                     responsePayload,
                 )
 
             }.onFailure { error ->
                 logger.debug { "error: $error" }
-                context.respond(
+                call.respond(
                     HttpStatusCode.BadRequest,
                     error.message ?: "Unknown error",
                 )
@@ -253,7 +257,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
 
             response(ExchangeOpenApiCommons.usePresentationRequestResponse())
         }) {
-            val walletService = getWalletService()
+            val walletService = call.getWalletService()
 
             runCatching {
                 val req = call.receive<SubmitOID4VPRequest>()
@@ -312,7 +316,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     if (authReq.responseMode == ResponseMode.direct_post_jwt) {
                         val encKey =
                             authReq.clientMetadata?.jwks?.get("keys")?.jsonArray?.first { jwk ->
-                                JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false
+                                JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) == true
                             }?.jsonObject ?: throw Exception("No ephemeral reader key found")
                         val ephemeralWalletKey =
                             runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
@@ -379,14 +383,14 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     } else {
                         throw PresentationError(
                             message =
-                            if (responseBody.isNotBlank()) "Presentation failed:\n $responseBody"
-                            else "Presentation failed",
+                                if (responseBody.isNotBlank()) "Presentation failed:\n $responseBody"
+                                else "Presentation failed",
                             redirectUri = ""
                         )
                     }
                 }
             }.onSuccess {
-                context.respond(
+                call.respond(
                     HttpStatusCode.OK,
                     it,
                 )
@@ -394,7 +398,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 logger.debug { "error: $error" }
                 when (error) {
                     is PresentationError -> {
-                        context.respond(
+                        call.respond(
                             HttpStatusCode.BadRequest,
                             mapOf(
                                 "redirectUri" to error.redirectUri,
@@ -404,7 +408,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     }
 
                     else -> {
-                        context.respond(
+                        call.respond(
                             HttpStatusCode.BadRequest,
                             mapOf(
                                 "errorMessage" to error.message
@@ -451,7 +455,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 }
             }
         }) {
-            val walletService = getWalletService()
+            val walletService = call.getWalletService()
 
             runCatching {
                 val req = call.receive<PrepareOID4VCIRequest>()
@@ -497,12 +501,12 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     )
                 }
             }.onSuccess { responsePayload ->
-                context.respond(
+                call.respond(
                     HttpStatusCode.OK,
                     responsePayload,
                 )
             }.onFailure { error ->
-                context.respond(
+                call.respond(
                     HttpStatusCode.BadRequest,
                     error.message ?: "Unknown error",
                 )
@@ -532,7 +536,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
 
             response(ExchangeOpenApiCommons.useOfferRequestEndpointResponseParams())
         }) {
-            val walletService = getWalletService()
+            val walletService = call.getWalletService()
 
             runCatching {
                 val req = call.receive<SubmitOID4VCIRequest>()
@@ -546,7 +550,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         tenantId = walletService.tenant,
                         accountId = walletService.accountId,
                         walletId = walletService.walletId,
-                        pending = req.requireUserInput ?: true,
+                        pending = req.requireUserInput != false,
                         did = did,
                         offerURL = req.offerURL,
                         credentialIssuerURL = req.credentialIssuer,
@@ -554,12 +558,12 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         offeredCredentialProofsOfPossession = req.offeredCredentialProofsOfPossession,
                     )
             }.onSuccess { walletCredentialList ->
-                context.respond(
+                call.respond(
                     HttpStatusCode.OK,
                     walletCredentialList,
                 )
             }.onFailure { error ->
-                context.respond(
+                call.respond(
                     HttpStatusCode.BadRequest,
                     error.message ?: "Unknown error",
                 )

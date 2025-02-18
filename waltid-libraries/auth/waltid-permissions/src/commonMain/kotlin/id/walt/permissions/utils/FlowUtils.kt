@@ -1,6 +1,7 @@
 package id.walt.permissions.utils
 
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 object FlowUtils {
 

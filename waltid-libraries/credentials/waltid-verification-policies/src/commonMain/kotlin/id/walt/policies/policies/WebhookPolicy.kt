@@ -2,7 +2,6 @@ package id.walt.policies.policies
 
 import id.walt.credentials.utils.VCFormat
 import id.walt.policies.CredentialWrapperValidatorPolicy
-import id.walt.policies.WebhookPolicyException
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*

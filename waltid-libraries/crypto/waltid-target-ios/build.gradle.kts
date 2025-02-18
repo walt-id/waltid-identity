@@ -2,6 +2,7 @@ plugins {
     kotlin("multiplatform")
     kotlin("native.cocoapods")
     kotlin("plugin.serialization")
+    id("com.github.ben-manes.versions")
 }
 
 kotlin {
@@ -55,8 +56,8 @@ kotlin {
 
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
             }
         }
 

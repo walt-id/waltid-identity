@@ -5,13 +5,15 @@ import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.document.models.service.Service
-import id.walt.did.dids.document.models.service.ServiceMap
 import id.walt.did.dids.document.models.service.ServiceEndpoint
+import id.walt.did.dids.document.models.service.ServiceMap
 import id.walt.did.dids.document.models.verification.method.VerificationMaterialType
 import id.walt.did.dids.document.models.verification.method.VerificationMethod
 import id.walt.did.dids.document.models.verification.method.VerificationMethodType
 import id.walt.did.dids.document.models.verification.relationship.VerificationRelationship
 import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
+import id.walt.did.dids.registrar.dids.DidDocConfig.Companion.buildFromPublicKeySet
+import id.walt.did.dids.registrar.dids.DidDocConfig.Companion.buildFromPublicKeySetVerificationConfiguration
 import id.walt.did.utils.randomUUID
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json

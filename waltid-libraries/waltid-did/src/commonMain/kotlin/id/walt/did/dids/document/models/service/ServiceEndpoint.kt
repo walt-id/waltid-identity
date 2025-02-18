@@ -1,10 +1,16 @@
 package id.walt.did.dids.document.models.service
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import kotlinx.serialization.*
+import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonContentPolymorphicSerializer
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 

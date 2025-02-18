@@ -1,9 +1,6 @@
 package id.walt.cli.commands
 
-import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.FileNotFound
-import com.github.ajalt.clikt.core.MissingOption
-import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.*
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.associate
 import com.github.ajalt.clikt.parameters.options.help
@@ -14,19 +11,19 @@ import com.github.ajalt.clikt.parameters.types.file
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.VCUtil
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.policies.ExpirationDatePolicyException
-import id.walt.policies.JsonSchemaVerificationException
 import id.walt.policies.NotBeforePolicyException
 import id.walt.policies.models.PolicyResult
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import java.io.File
 
 class VCVerifyCmd : CliktCommand(
-    name = "verify",
-    help = """Apply a wide range of verification policies on a W3C Verifiable Credential (VC).
+    name = "verify"
+) {
+    override fun help(context: Context) = """Apply a wide range of verification policies on a W3C Verifiable Credential (VC).
         
         Example usage:
         ----------------
@@ -34,9 +31,13 @@ class VCVerifyCmd : CliktCommand(
         waltid vc verify -p signature ./myVC.signed.json
         waltid vc verify -p schema --arg=schema=mySchema.json ./myVC.signed.json
         waltid vc verify -p signature -p schema --arg=schema=mySchema.json ./myVC.signed.json
-    """,
-    printHelpOnEmptyArgs = true,
-) {
+    """.replace("\n", "  \n")
+
+    init {
+        installMordantMarkdown()
+    }
+
+    override val printHelpOnEmptyArgs = true
 
     init {
         context {

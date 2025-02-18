@@ -1,6 +1,7 @@
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.PrintHelpMessage
+import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.testing.test
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -18,11 +19,11 @@ class WaltIdVCCmdTest {
             command.parse(emptyList())
         }
 
-        val helpMsg = """Sign and apply a wide range verification policies on W3C Verifiable Credentials (VCs)."""
+        val helpMsg = """Sign and apply a wide range verification policies on W3C Verifiable"""
         result1.message?.let { assertTrue(it.contains(helpMsg)) }
 
         val result2 = command.test(width = 800, height = 800)
-        assertTrue(result2.output.contains(helpMsg, ignoreCase = true))
+        assertContains(result2.output, helpMsg)
     }
 
     @Test

@@ -88,14 +88,14 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-                implementation("io.github.oshai:kotlin-logging:7.0.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("io.github.oshai:kotlin-logging:7.0.4")
             }
         }
         val androidInstrumentedTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
                 implementation("androidx.test.ext:junit:1.2.1")
                 implementation("androidx.test:runner:1.6.1")
                 implementation("androidx.test:rules:1.6.1")
@@ -104,8 +104,8 @@ kotlin {
         val androidUnitTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.junit.jupiter:junit-jupiter-api:5.11.0")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
             }
         }
         publishing {

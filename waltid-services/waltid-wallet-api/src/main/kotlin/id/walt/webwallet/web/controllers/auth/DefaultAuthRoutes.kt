@@ -34,7 +34,7 @@ fun Application.defaultAuthRoutes() = webWalletRoute {
                     }
                 }
             }) {
-                getUsersSessionToken()?.run {
+                call.getUsersSessionToken()?.run {
                     val jwsObject = JWSObject.parse(this)
                     val uuid =
                         Json.parseToJsonElement(jwsObject.payload.toString()).jsonObject["sub"]?.jsonPrimitive?.content.toString()
@@ -42,7 +42,7 @@ fun Application.defaultAuthRoutes() = webWalletRoute {
                 } ?: call.respond(HttpStatusCode.BadRequest)
             }
             get("session", { summary = "Return session ID if logged in" }) {
-                val token = getUsersSessionToken() ?: throw UnauthorizedException("Invalid session")
+                val token = call.getUsersSessionToken() ?: throw UnauthorizedException("Invalid session")
                 call.respond(mapOf("token" to mapOf("accessToken" to token)))
             }
         }

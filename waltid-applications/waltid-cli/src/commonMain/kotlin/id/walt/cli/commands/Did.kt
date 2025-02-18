@@ -2,13 +2,16 @@ package id.walt.cli.commands
 
 import com.github.ajalt.clikt.completion.CompletionCandidates
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.enum
 import id.walt.did.dids.DidService
 import kotlinx.coroutines.runBlocking
 
-class Did : CliktCommand(help = "Run commands on DIDs") {
+class Did : CliktCommand() {
+
+    override fun help(context: Context) = "Run commands on DIDs"
 
     //private val config by findOrSetObject { mutableMapOf<String, String>() }
 

@@ -1,7 +1,8 @@
 plugins {
     kotlin("jvm") version "2.0.0"
-    id("io.ktor.plugin") version "2.3.12"
+    id("io.ktor.plugin") version "3.1.0"
     id("org.jetbrains.kotlin.plugin.serialization") version "2.0.0"
+    id("com.github.ben-manes.versions")
 }
 
 group = "id.walt"
@@ -27,7 +28,6 @@ dependencies {
     implementation("io.ktor:ktor-server-content-negotiation-jvm")
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
     implementation("io.ktor:ktor-server-cio-jvm")
-    testImplementation("io.ktor:ktor-server-tests-jvm")
     testImplementation(kotlin("test-junit"))
 
     // nftkit

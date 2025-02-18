@@ -9,7 +9,6 @@ import id.walt.did.dids.DidUtils
 import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.SDJwt
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject

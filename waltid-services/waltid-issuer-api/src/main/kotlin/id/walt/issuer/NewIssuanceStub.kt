@@ -5,7 +5,6 @@ import id.walt.commons.logging.setups.TraceLoggingSetup
 import id.walt.credentials.CredentialBuilder
 import id.walt.credentials.CredentialBuilderType
 import id.walt.credentials.issuance.Issuer.baseIssue
-import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -25,6 +24,7 @@ import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.JwtUtils
+import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.sdjwt.SDJwt
 import io.ktor.http.*
 import io.ktor.util.reflect.*

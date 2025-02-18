@@ -32,14 +32,13 @@ import io.ktor.server.auth.*
 import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
-import io.ktor.util.pipeline.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
@@ -58,9 +57,11 @@ data class ByteLoginRequest(val username: String, val password: ByteArray) {
     override fun toString() = "[LOGIN REQUEST FOR: $username]"
 }
 
-data class LoginTokenSession(val token: String) : Principal
+@Serializable
+data class LoginTokenSession(val token: String)
 
-data class OidcTokenSession(val token: String) : Principal
+@Serializable
+data class OidcTokenSession(val token: String)
 
 object AuthKeys {
     private val config = ConfigManager.getConfig<AuthConfig>()
@@ -132,7 +133,7 @@ suspend fun ApplicationCall.getLoginRequest() = runCatching {
 }.getOrElse { throw LoginRequestError(it) }
 
 
-suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
+suspend fun RoutingContext.doLogin() {
     val reqBody = call.getLoginRequest()
     val authenticatedUser = AccountsService.authenticate("", reqBody).getOrThrow()
     val now = Clock.System.now().toJavaInstant()
@@ -159,14 +160,14 @@ suspend fun PipelineContext<Unit, ApplicationCall>.doLogin() {
     )
 }
 
-fun PipelineContext<Unit, ApplicationCall>.getUserId() =
-    call.principal<UserIdPrincipal>("auth-session")
-        ?: call.principal<UserIdPrincipal>("auth-bearer")
-        ?: call.principal<UserIdPrincipal>("auth-bearer-alternative")
-        ?: call.principal<UserIdPrincipal>() // bearer is registered with no name for some reason
+fun ApplicationCall.getUserId() =
+    principal<UserIdPrincipal>("auth-session")
+        ?: principal<UserIdPrincipal>("auth-bearer")
+        ?: principal<UserIdPrincipal>("auth-bearer-alternative")
+        ?: principal<UserIdPrincipal>() // bearer is registered with no name for some reason
         ?: throw UnauthorizedException("Could not find user authorization within request.")
 
-suspend fun PipelineContext<Unit, ApplicationCall>.getUserUUID() =
+suspend fun ApplicationCall.getUserUUID() =
     runCatching {
         when {
             FeatureManager.isFeatureEnabled(FeatureCatalog.legacyAuthenticationFeature) -> Uuid.parse(getUserId().name)
@@ -175,25 +176,23 @@ suspend fun PipelineContext<Unit, ApplicationCall>.getUserUUID() =
         }
     }.getOrElse { throw IllegalArgumentException("Invalid user id: $it") }
 
-fun PipelineContext<Unit, ApplicationCall>.getWalletId() =
+fun ApplicationCall.getWalletId() =
     runCatching {
-        Uuid.parse(call.parameters["wallet"] ?: throw IllegalArgumentException("No wallet ID provided"))
+        Uuid.parse(parameters["wallet"] ?: throw IllegalArgumentException("No wallet ID provided"))
     }.getOrElse { throw IllegalArgumentException("Invalid wallet ID provided: ${it.message}") }
         .also {
             ensurePermissionsForWallet(AccountWalletPermissions.READ_ONLY, walletId = it)
         }
 
-suspend fun PipelineContext<Unit, ApplicationCall>.getWalletService(walletId: Uuid) =
-    WalletServiceManager.getWalletService("", getUserUUID(), walletId) // FIXME -> TENANT HERE
+@OptIn(ExperimentalUuidApi::class)
+suspend fun ApplicationCall.getWalletService(walletId: Uuid? = null) =
+    WalletServiceManager.getWalletService("", getUserUUID(), walletId ?: getWalletId()) // FIXME -> TENANT HERE
 
-suspend fun PipelineContext<Unit, ApplicationCall>.getWalletService() =
-    WalletServiceManager.getWalletService("", getUserUUID(), getWalletId()) // FIXME -> TENANT HERE
+fun ApplicationCall.getUsersSessionToken(): String? =
+    sessions.get(LoginTokenSession::class)?.token
+        ?: request.authorization()?.removePrefix("Bearer ")
 
-fun PipelineContext<Unit, ApplicationCall>.getUsersSessionToken(): String? =
-    call.sessions.get(LoginTokenSession::class)?.token
-        ?: call.request.authorization()?.removePrefix("Bearer ")
-
-fun PipelineContext<Unit, ApplicationCall>.ensurePermissionsForWallet(
+fun ApplicationCall.ensurePermissionsForWallet(
     required: AccountWalletPermissions,
 
     userId: Uuid = runBlocking { getUserUUID() },
