@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers
 
 import id.walt.crypto.keys.KeyGenerationRequest
@@ -15,6 +17,7 @@ import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import org.jetbrains.exposed.sql.transactions.transaction
+import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.keys() = walletRoute {
     route("keys", {
@@ -29,7 +32,7 @@ fun Application.keys() = walletRoute {
                 }
             }
         }) {
-            context.respond(getWalletService().run { transaction { runBlocking { listKeys() } } })
+            call.respond(call.getWalletService().run { transaction { runBlocking { listKeys() } } })
         }
 
         post("generate", {
@@ -144,14 +147,14 @@ fun Application.keys() = walletRoute {
                 }
             }
         }) {
-            val keyGenerationRequest = context.receive<KeyGenerationRequest>()
+            val keyGenerationRequest = call.receive<KeyGenerationRequest>()
 
             runCatching {
-                getWalletService().generateKey(keyGenerationRequest)
+                call.getWalletService().generateKey(keyGenerationRequest)
             }.onSuccess {
-                context.respond(HttpStatusCode.Created, it)
+                call.respond(HttpStatusCode.Created, it)
             }.onFailure {
-                context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
             }
         }
 
@@ -165,11 +168,11 @@ fun Application.keys() = walletRoute {
             val body = call.receiveText()
 
             runCatching {
-                getWalletService().importKey(body)
+                call.getWalletService().importKey(body)
             }
 
                 .onSuccess { key ->
-                    context.respond(
+                    call.respond(
                         HttpStatusCode.Created,
                         key
                     )
@@ -205,9 +208,9 @@ fun Application.keys() = walletRoute {
                 }
             }
         }) {
-            val jwk = context.request.queryParameters.getOrFail("JWK")
-            val signature = context.receive<String>()
-            context.respond(getWalletService().verify(jwk, signature))
+            val jwk = call.request.queryParameters.getOrFail("JWK")
+            val signature = call.receive<String>()
+            call.respond(call.getWalletService().verify(jwk, signature))
 
         }
 
@@ -229,9 +232,9 @@ fun Application.keys() = walletRoute {
                     }
                 }
             }) {
-                context.respond(
-                    getWalletService().loadKey(
-                        context.parameters["keyId"] ?: throw IllegalArgumentException("No key supplied")
+                call.respond(
+                    call.getWalletService().loadKey(
+                        call.parameters["keyId"] ?: throw IllegalArgumentException("No key supplied")
                     )
                 )
             }
@@ -245,8 +248,8 @@ fun Application.keys() = walletRoute {
                     }
                 }
             }) {
-                val keyId = context.parameters["keyId"] ?: error("No key supplied")
-                context.respond(getWalletService().getKeyMeta(keyId))
+                val keyId = call.parameters["keyId"] ?: error("No key supplied")
+                call.respond(call.getWalletService().getKeyMeta(keyId))
             }
 
             get("export", {
@@ -266,12 +269,12 @@ fun Application.keys() = walletRoute {
                     }
                 }
             }) {
-                val keyId = context.parameters["keyId"] ?: throw IllegalArgumentException("No key id provided.")
+                val keyId = call.parameters["keyId"] ?: throw IllegalArgumentException("No key id provided.")
 
-                val format = context.request.queryParameters["format"] ?: "JWK"
-                val loadPrivateKey = context.request.queryParameters["loadPrivateKey"].toBoolean()
+                val format = call.request.queryParameters["format"] ?: "JWK"
+                val loadPrivateKey = call.request.queryParameters["loadPrivateKey"].toBoolean()
 
-                context.respond(getWalletService().exportKey(keyId, format, loadPrivateKey))
+                call.respond(call.getWalletService().exportKey(keyId, format, loadPrivateKey))
             }
 
             delete({
@@ -282,10 +285,10 @@ fun Application.keys() = walletRoute {
                     HttpStatusCode.BadRequest to { description = "Key could not be deleted" }
                 }
             }) {
-                val keyId = context.parameters.getOrFail("keyId")
+                val keyId = call.parameters.getOrFail("keyId")
 
-                val success = getWalletService().deleteKey(keyId)
-                context.respond(if (success) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+                val success = call.getWalletService().deleteKey(keyId)
+                call.respond(if (success) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
             }
 
             delete("remove", {
@@ -295,10 +298,10 @@ fun Application.keys() = walletRoute {
                     HttpStatusCode.BadRequest to { description = "Failed to remove the key" }
                 }
             }) {
-                val keyId = context.parameters.getOrFail("keyId")
+                val keyId = call.parameters.getOrFail("keyId")
 
-                val success = getWalletService().removeKey(keyId)
-                context.respond(if (success) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+                val success = call.getWalletService().removeKey(keyId)
+                call.respond(if (success) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
             }
 
             post("sign", {
@@ -313,9 +316,9 @@ fun Application.keys() = walletRoute {
                     }
                 }
             }) {
-                val keyId = context.parameters.getOrFail("keyId")
-                val message = context.receive<JsonElement>()
-                context.respond(getWalletService().sign(keyId, message))
+                val keyId = call.parameters.getOrFail("keyId")
+                val message = call.receive<JsonElement>()
+                call.respond(call.getWalletService().sign(keyId, message))
             }
 
         }

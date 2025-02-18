@@ -1,6 +1,5 @@
-package id.walt.did.dids.registrar.local.cheqd.models.job.didstates.finished
+package id.walt.did.dids.registrar.local.cheqd.models.job.didstates
 
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.VerificationMethod
 import kotlinx.serialization.Serializable
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport

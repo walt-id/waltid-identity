@@ -6,7 +6,9 @@ import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.uuid.ExperimentalUuidApi
 
+@OptIn(ExperimentalUuidApi::class)
 object DidCreation {
 
     private const val DidKeyMethodName = "key"
@@ -26,17 +28,17 @@ object DidCreation {
                 }
             }
         }) {
-            getWalletService().createDid(
-                DidKeyMethodName, extractDidCreateParameters(DidKeyMethodName, context.request.queryParameters)
-            ).let { context.respond(it) }
+            call.getWalletService().createDid(
+                DidKeyMethodName, extractDidCreateParameters(DidKeyMethodName, call.request.queryParameters)
+            ).let { call.respond(it) }
         }
 
         post(DidJwkMethodName, {
             summary = "Create a did:jwk"
         }) {
-            getWalletService().createDid(
-                DidJwkMethodName, extractDidCreateParameters(DidJwkMethodName, context.request.queryParameters)
-            ).let { context.respond(it) }
+            call.getWalletService().createDid(
+                DidJwkMethodName, extractDidCreateParameters(DidJwkMethodName, call.request.queryParameters)
+            ).let { call.respond(it) }
         }
 
         post(DidWebMethodName, {
@@ -50,8 +52,8 @@ object DidCreation {
                 }
             }
         }) {
-            val parameters = extractDidCreateParameters(DidWebMethodName, context.request.queryParameters)
-            getWalletService().createDid(DidWebMethodName, parameters).let { context.respond(it) }
+            val parameters = extractDidCreateParameters(DidWebMethodName, call.request.queryParameters)
+            call.getWalletService().createDid(DidWebMethodName, parameters).let { call.respond(it) }
         }
 
         post(DidEbsiMethodName, {
@@ -61,9 +63,9 @@ object DidCreation {
                 queryParameter<String>("bearerToken") { description = "Required for v1 (LegalEntity)" }
             }
         }) {
-            getWalletService().createDid(
-                DidEbsiMethodName, extractDidCreateParameters(DidEbsiMethodName, context.request.queryParameters)
-            ).let { context.respond(it) }
+            call.getWalletService().createDid(
+                DidEbsiMethodName, extractDidCreateParameters(DidEbsiMethodName, call.request.queryParameters)
+            ).let { call.respond(it) }
         }
 
         post(DidCheqdMethodName, {
@@ -72,17 +74,17 @@ object DidCreation {
                 queryParameter<String>("network") { description = "testnet or mainnet" }
             }
         }) {
-            getWalletService().createDid(
-                DidCheqdMethodName, extractDidCreateParameters(DidCheqdMethodName, context.request.queryParameters)
-            ).let { context.respond(it) }
+            call.getWalletService().createDid(
+                DidCheqdMethodName, extractDidCreateParameters(DidCheqdMethodName, call.request.queryParameters)
+            ).let { call.respond(it) }
         }
 
         post(DidIotaMethodName, {
             summary = "Create a did:iota"
         }) {
-            getWalletService().createDid(
-                DidIotaMethodName, extractDidCreateParameters(DidIotaMethodName, context.request.queryParameters)
-            ).let { context.respond(it) }
+            call.getWalletService().createDid(
+                DidIotaMethodName, extractDidCreateParameters(DidIotaMethodName, call.request.queryParameters)
+            ).let { call.respond(it) }
         }
     }
 
@@ -95,7 +97,7 @@ object DidCreation {
         when (method) {
             DidKeyMethodName -> mapOf(
                 "useJwkJcsPub" to JsonPrimitive(
-                    parameters["useJwkJcsPub"]?.toBoolean() ?: false
+                    parameters["useJwkJcsPub"]?.toBoolean() == true
                 )
             )
 

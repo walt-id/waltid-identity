@@ -2,7 +2,7 @@ package id.walt.sdjwt
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonArray
 
 @Serializable
 data class JWTVCIssuerMetadata(

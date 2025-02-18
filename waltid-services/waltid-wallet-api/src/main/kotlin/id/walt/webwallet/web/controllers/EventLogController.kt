@@ -63,10 +63,10 @@ fun Application.eventLogs() = walletRoute {
             val startingAfter = call.request.queryParameters["startingAfter"]
             val sortBy = call.request.queryParameters["sortBy"]
             val sortOrder = call.request.queryParameters["sortOrder"]
-            context.respond(
+            call.respond(
                 eventFilterUseCase.filter(
-                    accountId = getUserUUID(),
-                    walletId = getWalletId(),
+                    accountId = call.getUserUUID(),
+                    walletId = call.getWalletId(),
                     filter = EventLogFilter(
                         limit = limit,
                         startingAfter = startingAfter,
@@ -91,8 +91,8 @@ fun Application.eventLogs() = walletRoute {
                 HttpStatusCode.BadRequest to { description = "Event log could not be deleted" }
             }
         }) {
-            val id = context.parameters.getOrFail("id").toInt()
-            context.respond(HttpStatusCode.Accepted, eventUseCase.delete(id))
+            val id = call.parameters.getOrFail("id").toInt()
+            call.respond(HttpStatusCode.Accepted, eventUseCase.delete(id))
         }
     }
 }

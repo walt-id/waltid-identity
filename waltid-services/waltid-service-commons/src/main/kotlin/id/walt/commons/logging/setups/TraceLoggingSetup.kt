@@ -16,7 +16,7 @@ data object TraceLoggingSetup : LoggingSetup("trace", {
         }
     }
     logging {
-        fromLoggerBase("io.ktor.routing.Routing", stopOnMatch = true)
+        fromLoggerBase("io.ktor", stopOnMatch = true)
         fromMinLevel(Level.DEBUG) {
             toSink("stdout")
         }

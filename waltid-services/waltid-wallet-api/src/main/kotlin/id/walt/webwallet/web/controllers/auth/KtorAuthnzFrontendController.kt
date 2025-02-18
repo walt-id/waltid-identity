@@ -31,7 +31,7 @@ fun Application.ktorAuthnzFrontendRoutes() {
                         }
                     }
                 }) {
-                    call.respond(getAuthenticatedAccount())
+                    call.respond(call.getAuthenticatedAccount())
                 }
                 get("session", { summary = "Return session ID if logged in" }) {
                     val token = getAuthenticatedSession().token ?: throw UnauthorizedException("Invalid session")
@@ -52,12 +52,12 @@ fun Application.ktorAuthnzFrontendRoutes() {
                     account to sessionToken
 
                 } else {
-                    val authenticatedAccount = getAuthenticatedAccount()
+                    val authenticatedAccount = call.getAuthenticatedAccount()
                     val authenticatedSessionToken = getAuthenticatedSession().token
                     authenticatedAccount to authenticatedSessionToken
                 }
 
-                context.respond(
+                call.respond(
                     buildJsonObject {
                         put("id", account)
                         put("token", token)
@@ -69,7 +69,7 @@ fun Application.ktorAuthnzFrontendRoutes() {
                 call.response.cookies.append("ktor-authnz-auth", "", CookieEncoding.URI_ENCODING, 0L, GMTDate())
                 call.response.cookies.append("auth.token", "", CookieEncoding.URI_ENCODING, 0L, GMTDate())
 
-                context.respond(HttpStatusCode.OK)
+                call.respond(HttpStatusCode.OK)
             }
         }
     }

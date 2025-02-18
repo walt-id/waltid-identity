@@ -42,7 +42,7 @@
 </template>
 
 <script lang="ts" setup>
-import { type WalletListing, setWallet } from "../../composables/accountWallet.ts";
+import { setWallet, type WalletListing } from "../../composables/accountWallet.ts";
 import LoadingIndicator from "../../components/loading/LoadingIndicator.vue";
 import { navigateTo } from "nuxt/app";
 

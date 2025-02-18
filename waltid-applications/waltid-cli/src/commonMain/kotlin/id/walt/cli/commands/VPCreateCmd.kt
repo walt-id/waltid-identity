@@ -1,8 +1,6 @@
 package id.walt.cli.commands
 
-import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.context
-import com.github.ajalt.clikt.core.terminal
+import com.github.ajalt.clikt.core.*
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.clikt.parameters.types.path
@@ -32,8 +30,9 @@ import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
 class VPCreateCmd : CliktCommand(
-    name = "create",
-    help = """Create a W3C Verifiable Presentation (VP).
+    name = "create"
+) {
+    override fun help(context: Context) = """Create a W3C Verifiable Presentation (VP).
         
         Example usage:
         ----------------
@@ -61,9 +60,13 @@ class VPCreateCmd : CliktCommand(
         -pd ./presDef.json \
         -vp ./outputVp.jwt \
         -ps ./outputPresSub.json
-    """,
-    printHelpOnEmptyArgs = true,
-) {
+    """.replace("\n", "  \n")
+
+    init {
+        installMordantMarkdown()
+    }
+
+    override val printHelpOnEmptyArgs = true
 
     init {
         context {

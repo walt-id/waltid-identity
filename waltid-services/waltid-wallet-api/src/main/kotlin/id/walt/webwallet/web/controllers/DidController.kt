@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.db.models.WalletDid
@@ -12,6 +14,7 @@ import io.ktor.server.application.*
 import io.ktor.server.response.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
+import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.dids() = walletRoute {
     route("dids", {
@@ -26,7 +29,7 @@ fun Application.dids() = walletRoute {
                 }
             }
         }) {
-            context.respond(getWalletService().run { runBlocking { listDids() } })
+            call.respond(call.getWalletService().run { runBlocking { listDids() } })
         }
 
         route("{did}", {
@@ -49,9 +52,9 @@ fun Application.dids() = walletRoute {
                     }
                 }
             }) {
-                context.respond(
-                    getWalletService().loadDid(
-                        context.parameters["did"] ?: throw IllegalArgumentException("No DID supplied")
+                call.respond(
+                    call.getWalletService().loadDid(
+                        call.parameters["did"] ?: throw IllegalArgumentException("No DID supplied")
                     )
                 )
             }
@@ -63,11 +66,11 @@ fun Application.dids() = walletRoute {
                     HttpStatusCode.BadRequest to { description = "DID could not be deleted" }
                 }
             }) {
-                val success = getWalletService().deleteDid(
-                    context.parameters["did"] ?: throw IllegalArgumentException("No DID supplied")
+                val success = call.getWalletService().deleteDid(
+                    call.parameters["did"] ?: throw IllegalArgumentException("No DID supplied")
                 )
 
-                context.respond(
+                call.respond(
                     if (success) HttpStatusCode.Accepted
                     else HttpStatusCode.BadRequest
                 )
@@ -89,10 +92,10 @@ fun Application.dids() = walletRoute {
             }
             response { HttpStatusCode.Accepted to { description = "Default DID updated" } }
         }) {
-            getWalletService().setDefault(
-                context.parameters["did"] ?: throw IllegalArgumentException("No DID supplied")
+            call.getWalletService().setDefault(
+                call.parameters["did"] ?: throw IllegalArgumentException("No DID supplied")
             )
-            context.respond(HttpStatusCode.Accepted)
+            call.respond(HttpStatusCode.Accepted)
         }
 
         route("create", {

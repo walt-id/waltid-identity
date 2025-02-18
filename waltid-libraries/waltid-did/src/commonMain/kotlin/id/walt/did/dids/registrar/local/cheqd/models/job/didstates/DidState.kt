@@ -1,10 +1,6 @@
 package id.walt.did.dids.registrar.local.cheqd.models.job.didstates
 
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.action.ActionDidState
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.failed.FailedDidState
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.finished.FinishedDidState
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.modules.SerializersModule
@@ -15,10 +11,10 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class, ExperimentalSerializationApi::class)
 @JsExport
-@Polymorphic
+//@Polymorphic
 @Serializable
 @JsonClassDiscriminator("state")
-abstract class DidState {
+sealed class DidState {
     abstract val state: String
 }
 

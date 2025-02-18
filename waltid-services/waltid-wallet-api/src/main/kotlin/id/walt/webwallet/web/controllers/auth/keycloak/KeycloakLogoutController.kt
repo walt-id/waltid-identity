@@ -5,10 +5,9 @@ import id.walt.webwallet.web.controllers.auth.LogoutControllerBase
 import id.walt.webwallet.web.model.KeycloakLogoutRequest
 import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRoute
 import io.ktor.http.*
-import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
-import io.ktor.util.pipeline.*
+import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 
 class KeycloakLogoutController : LogoutControllerBase(keycloakAuthPath, keycloakAuthTags) {
@@ -29,7 +28,7 @@ class KeycloakLogoutController : LogoutControllerBase(keycloakAuthPath, keycloak
         response { HttpStatusCode.OK to { description = "Keycloak HTTP status code." } }
     }
 
-    override suspend fun PipelineContext<Unit, ApplicationCall>.execute() {
+    override suspend fun RoutingContext.execute() {
         clearUserSession()
         logger.debug { "Clearing Keycloak user session" }
         val req = Json.decodeFromString<KeycloakLogoutRequest>(call.receive())

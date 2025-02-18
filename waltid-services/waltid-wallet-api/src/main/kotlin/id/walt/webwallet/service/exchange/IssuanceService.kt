@@ -2,10 +2,15 @@ package id.walt.webwallet.service.exchange
 
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.CredentialFormat
+import id.walt.oid4vc.data.CredentialOffer
+import id.walt.oid4vc.data.GrantType
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
-import id.walt.oid4vc.responses.*
+import id.walt.oid4vc.responses.CredentialResponse
+import id.walt.oid4vc.responses.EntraIssuanceCompletionCode
+import id.walt.oid4vc.responses.EntraIssuanceCompletionErrorDetails
+import id.walt.oid4vc.responses.EntraIssuanceCompletionResponse
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
 import io.klogging.logger
@@ -16,7 +21,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-object IssuanceService: IssuanceServiceBase() {
+object IssuanceService : IssuanceServiceBase() {
 
     override val logger = logger<IssuanceService>()
 

@@ -301,25 +301,16 @@
 
 <script lang="ts" setup>
 import { ref } from "vue";
+import { Dialog, DialogPanel, Menu, MenuButton, MenuItem, MenuItems, TransitionChild, TransitionRoot } from "@headlessui/vue";
 import {
-  Dialog,
-  DialogPanel,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuItems,
-  TransitionChild,
-  TransitionRoot,
-} from "@headlessui/vue";
-import {
-  ArrowPathIcon,
-  Bars3CenterLeftIcon,
-  BellIcon,
-  CogIcon,
-  ListBulletIcon,
-  QuestionMarkCircleIcon,
-  ShieldCheckIcon,
-  XMarkIcon,
+    ArrowPathIcon,
+    Bars3CenterLeftIcon,
+    BellIcon,
+    CogIcon,
+    ListBulletIcon,
+    QuestionMarkCircleIcon,
+    ShieldCheckIcon,
+    XMarkIcon
 } from "@heroicons/vue/24/outline";
 import { ChevronDownIcon, MagnifyingGlassIcon } from "@heroicons/vue/20/solid";
 import { useUserStore } from "@waltid-web-wallet/stores/user.ts";

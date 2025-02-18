@@ -27,7 +27,7 @@ class KtorAuthnzDevMockedTest {
         routing {
             authenticate {
                 get("/protected") {
-                    context.respond("protected")
+                    call.respond("protected")
                 }
             }
         }
@@ -56,8 +56,8 @@ class KtorAuthnzDevMockedTest {
         routing {
             authenticate("dev-auth") {
                 get("/protected") {
-                    val acc = getAuthenticatedAccount()
-                    context.respond("protected! you are: $acc")
+                    val acc = call.getAuthenticatedAccount()
+                    call.respond("protected! you are: $acc")
                 }
             }
         }

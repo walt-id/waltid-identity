@@ -1,12 +1,8 @@
-import {
-  AvailableCredential,
-  CredentialFormats,
-  DIDMethods,
-} from '@/types/credentials';
-import EditCredentialModal from '../modal/EditCredentialModal';
-import { PencilSquareIcon } from '@heroicons/react/24/outline';
-import Dropdown from '@/components/walt/forms/Dropdown';
-import React from 'react';
+import { AvailableCredential, CredentialFormats, DIDMethods } from "@/types/credentials";
+import EditCredentialModal from "../modal/EditCredentialModal";
+import { PencilSquareIcon } from "@heroicons/react/24/outline";
+import Dropdown from "@/components/walt/forms/Dropdown";
+import React from "react";
 
 type Props = {
   credentialToEdit: AvailableCredential;

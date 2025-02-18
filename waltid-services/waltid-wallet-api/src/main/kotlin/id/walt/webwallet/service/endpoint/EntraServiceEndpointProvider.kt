@@ -19,7 +19,7 @@ class EntraServiceEndpointProvider(
         contentType(ContentType.Application.Json)
         setBody(
             IdentityHubRequest(
-                requestId =  Uuid.random().toString(),
+                requestId = Uuid.random().toString(),
                 target = did,
                 messages = listOf(
                     IdentityHubRequest.Message(

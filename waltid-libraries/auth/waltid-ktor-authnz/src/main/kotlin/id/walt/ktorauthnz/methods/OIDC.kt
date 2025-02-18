@@ -17,7 +17,6 @@ import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
-import io.ktor.util.pipeline.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -151,24 +150,24 @@ object OIDC : AuthenticationMethod("oidc") {
     }
 
     override fun Route.registerAuthenticationRoutes(
-        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        authContext: ApplicationCall.() -> AuthContext,
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
     ) {
 
 
         route("oidc") {
             get("auth") {
-                val session = getSession(authContext)
+                val session = call.getAuthSession(authContext)
                 val config = session.lookupConfiguration<OidcAuthConfiguration>(this@OIDC)
 
                 val oidcAuthSession = createOidcSession(context = Unit, config)
-                context.respondRedirect(oidcAuthSession.authUrl)
+                call.respondRedirect(oidcAuthSession.authUrl)
             }
             get("callback") {
-                val session = getSession(authContext)
+                val session = call.getAuthSession(authContext)
                 val config = session.lookupConfiguration<OidcAuthConfiguration>(this@OIDC)
 
-                val params = context.parameters
+                val params = call.parameters
                 val code = params.getOrFail("code")
                 val state = params.getOrFail("state")
 
@@ -182,7 +181,7 @@ object OIDC : AuthenticationMethod("oidc") {
                 // TODO: better OIDC Identifier (make sure malicious cannot generate a clash per URL)
                 val identifier = OIDCIdentifier(config.openIdConfiguration.authorizationEndpoint, sub)
 
-                context.handleAuthSuccess(session, identifier.resolveToAccountId())
+                call.handleAuthSuccess(session, identifier.resolveToAccountId())
             }
         }
 

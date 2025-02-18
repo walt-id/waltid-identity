@@ -82,9 +82,9 @@ object NotificationController {
                         }
                     }
                 }) {
-                    context.respond(
+                    call.respond(
                         WalletServiceManager.notificationFilterUseCase.filter(
-                            getWalletId(), NotificationFilterParameter(
+                            call.getWalletId(), NotificationFilterParameter(
                                 type = call.request.queryParameters["type"],
                                 isRead = call.request.queryParameters["isRead"]?.toBooleanStrictOrNull(),
                                 addedOn = call.request.queryParameters["addedOn"],
@@ -101,7 +101,7 @@ object NotificationController {
                         HttpStatusCode.BadRequest to { description = "Notifications could not be deleted" }
                     }
                 }) {
-                    context.respond(if (WalletServiceManager.notificationUseCase.deleteAll(getWalletId()) > 0) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+                    call.respond(if (WalletServiceManager.notificationUseCase.deleteAll(call.getWalletId()) > 0) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
                 }
                 put("status/{status}", {
                     summary = "Set notification read status"
@@ -123,7 +123,7 @@ object NotificationController {
                 }) {
                     val ids = call.receive<List<String>>()
                     val status = call.parameters.getOrFail("status").toBoolean()
-                    context.respond(
+                    call.respond(
                         if (WalletServiceManager.notificationUseCase.setStatus(
                                 *ids.map { Uuid.parse(it) }.toTypedArray(), isRead = status
                             ) > 0
@@ -149,7 +149,7 @@ object NotificationController {
                         }
                     }) {
                         val id = call.parameters.getOrFail("id")
-                        context.respond(WalletServiceManager.notificationUseCase.findById(Uuid.parse(id)).fold(onSuccess = {
+                        call.respond(WalletServiceManager.notificationUseCase.findById(Uuid.parse(id)).fold(onSuccess = {
                             it
                         }, onFailure = {
                             it.localizedMessage
@@ -163,7 +163,7 @@ object NotificationController {
                         }
                     }) {
                         val id = call.parameters.getOrFail("id")
-                        context.respond(if (WalletServiceManager.notificationUseCase.deleteById(Uuid.parse(id)) > 0) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
+                        call.respond(if (WalletServiceManager.notificationUseCase.deleteById(Uuid.parse(id)) > 0) HttpStatusCode.Accepted else HttpStatusCode.BadRequest)
                     }
                 }
 

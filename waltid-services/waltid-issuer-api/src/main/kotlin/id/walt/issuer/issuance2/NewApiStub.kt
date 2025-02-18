@@ -38,7 +38,7 @@ object NewApiStub {
                             }
                         }
                     }) {
-                        val issuanceRequest = context.receive<NewIssuanceRequest>()
+                        val issuanceRequest = call.receive<NewIssuanceRequest>()
                         IssuanceOfferManager.makeOfferFor(issuanceRequest)
                     }
                 }

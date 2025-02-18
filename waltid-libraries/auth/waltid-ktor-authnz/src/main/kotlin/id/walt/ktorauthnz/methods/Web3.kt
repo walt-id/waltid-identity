@@ -14,7 +14,6 @@ import io.klogging.logger
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
@@ -119,19 +118,19 @@ object Web3 : AuthenticationMethod("web3") {
     }
 
     override fun Route.registerAuthenticationRoutes(
-        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        authContext: ApplicationCall.() -> AuthContext,
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
     ) {
         route("web3") {
             get("nonce") {
                 val newNonce = makeNonce()
-                context.respond(newNonce)
+                call.respond(newNonce)
             }
 
             post<SiweRequest>("signed", {
                 request { body<SiweRequest>() }
             }) { req ->
-                val session = getSession(authContext)
+                val session = call.getAuthSession(authContext)
                 val address = verifySiweLogin(req)
 
                 val identifier = Web3Identifier(address)
@@ -142,7 +141,7 @@ object Web3 : AuthenticationMethod("web3") {
                     registrationFunction.invoke(identifier)
                 }
 
-                context.handleAuthSuccess(session, identifierResolved ?: identifier.resolveToAccountId())
+                call.handleAuthSuccess(session, identifierResolved ?: identifier.resolveToAccountId())
             }
         }
     }

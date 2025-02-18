@@ -31,7 +31,7 @@ fun Application.issuers() = walletRoute {
                 }
             }
         }) {
-            context.respond(WalletServiceManager.issuerUseCase.list(getWalletService().walletId))
+            call.respond(WalletServiceManager.issuerUseCase.list(call.getWalletService().walletId))
         }
         post("add", {
             summary = "Add issuer to wallet"
@@ -49,16 +49,16 @@ fun Application.issuers() = walletRoute {
             val issuer = call.receive<IssuerParameter>()
             WalletServiceManager.issuerUseCase.add(
                 IssuerDataTransferObject(
-                    wallet = getWalletService().walletId,
+                    wallet = call.getWalletService().walletId,
                     did = issuer.name,
                     description = issuer.description,
                     uiEndpoint = issuer.uiEndpoint,
                     configurationEndpoint = issuer.configurationEndpoint,
                 )
             ).onSuccess {
-                context.respond(HttpStatusCode.Created)
+                call.respond(HttpStatusCode.Created)
             }.onFailure {
-                context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
             }
         }
         route("{issuer}", {
@@ -83,10 +83,10 @@ fun Application.issuers() = walletRoute {
                     }
                 }
             }) {
-                WalletServiceManager.issuerUseCase.get(getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
-                    context.respond(it)
+                WalletServiceManager.issuerUseCase.get(call.getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
+                    call.respond(it)
                 }.onFailure {
-                    context.respondText(it.localizedMessage, ContentType.Text.Plain, HttpStatusCode.NotFound)
+                    call.respondText(it.localizedMessage, ContentType.Text.Plain, HttpStatusCode.NotFound)
                 }
             }
             put("authorize", {
@@ -96,10 +96,10 @@ fun Application.issuers() = walletRoute {
                     HttpStatusCode.BadRequest to { description = "Authorization failed" }
                 }
             }) {
-                WalletServiceManager.issuerUseCase.authorize(getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
-                    context.respond(HttpStatusCode.Accepted)
+                WalletServiceManager.issuerUseCase.authorize(call.getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
+                    call.respond(HttpStatusCode.Accepted)
                 }.onFailure {
-                    context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
         }
@@ -125,10 +125,10 @@ fun Application.issuers() = walletRoute {
                     }
                 }
             }) {
-                WalletServiceManager.issuerUseCase.credentials(getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
-                    context.respond(it)
+                WalletServiceManager.issuerUseCase.credentials(call.getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
+                    call.respond(it)
                 }.onFailure {
-                    context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                    call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
         }

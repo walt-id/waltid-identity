@@ -4,10 +4,8 @@ package id.walt.webwallet.service.settings
 
 import id.walt.webwallet.db.models.WalletSettings
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.upsert
@@ -36,7 +34,8 @@ object SettingsService {
     }
 
     private fun tryParseSettings(settings: String?) =
-        runCatching { json.decodeFromString<JsonObject>(settings ?: "") }.fold(onSuccess = { WalletSetting(it) },
+        runCatching { json.decodeFromString<JsonObject>(settings ?: "") }.fold(
+            onSuccess = { WalletSetting(it) },
             onFailure = { WalletSetting.default })
 }
 

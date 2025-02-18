@@ -6,7 +6,6 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.wallet.core.utils.WalletCredential
 import id.walt.webwallet.usecase.exchange.strategies.PresentationDefinitionMatchStrategy
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.json.JsonObject
 import kotlin.uuid.ExperimentalUuidApi
 
 

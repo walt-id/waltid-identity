@@ -56,7 +56,7 @@ fun Application.lspPotentialIssuanceTestApi() {
                 val offerUri = LspPotentialIssuanceInterop.createInteropSampleCredentialOfferUrimDL(
                     IssuanceExamples.mDLCredentialIssuanceData
                 )
-                context.respond(
+                call.respond(
                     HttpStatusCode.OK, offerUri
                 )
             }
@@ -64,7 +64,7 @@ fun Application.lspPotentialIssuanceTestApi() {
                 val offerUri = LspPotentialIssuanceInterop.createInteropSampleCredentialOfferUriSdJwt(
                     IssuanceExamples.sdJwtVCData
                 )
-                context.respond(
+                call.respond(
                     HttpStatusCode.OK, offerUri
                 )
             }

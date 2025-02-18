@@ -1,6 +1,7 @@
 plugins {
     kotlin("multiplatform")
     kotlin("native.cocoapods")
+    id("com.github.ben-manes.versions")
 }
 
 kotlin {

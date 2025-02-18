@@ -1,7 +1,8 @@
 package id.walt.did.dids.document.models.verification.relationship
 
 import id.walt.did.dids.document.models.verification.method.VerificationMethod
-import kotlinx.serialization.*
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder

@@ -3,7 +3,7 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
 
-    id("com.github.ben-manes.versions") version "0.52.0"
+    id("com.github.ben-manes.versions")
 }
 
 group = "id.walt"
@@ -14,7 +14,7 @@ repositories {
 }
 
 object Versions {
-    const val KTOR_VERSION = "2.3.12" // also change 1 plugin
+    const val KTOR_VERSION = "3.1.0" // also change 1 plugin
 }
 
 dependencies {
@@ -30,40 +30,40 @@ dependencies {
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
     // Logging
-    api("io.klogging:klogging-jvm:0.7.2") // JVM + ~JS
-    implementation("io.klogging:slf4j-klogging:0.7.2")
+    api("io.klogging:klogging-jvm:0.9.1") // JVM + ~JS
+    implementation("io.klogging:slf4j-klogging:0.9.1")
     implementation("org.slf4j:jul-to-slf4j:2.0.16")
 
     // CLI
-    api("com.github.ajalt.clikt:clikt:5.0.1")  // JVM
+    api("com.github.ajalt.clikt:clikt:5.0.3")  // JVM
 
     // Config
-    api("com.sksamuel.hoplite:hoplite-core:2.8.2")
-    api("com.sksamuel.hoplite:hoplite-hocon:2.8.2")
-    api("com.sksamuel.hoplite:hoplite-hikaricp:2.8.2")
+    api("com.sksamuel.hoplite:hoplite-core:2.9.0")
+    api("com.sksamuel.hoplite:hoplite-hocon:2.9.0")
+    api("com.sksamuel.hoplite:hoplite-hikaricp:2.9.0")
 
     // Kotlinx.serialization
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 
     // Health checks
-    api("com.sksamuel.cohort:cohort-ktor:2.5.1")
+    api("com.sksamuel.cohort:cohort-ktor:2.6.1")
 
     // OpenAPI
-    api("io.github.smiley4:ktor-swagger-ui:3.5.1")
-    implementation("io.github.smiley4:schema-kenerator-core:1.4.1")
+    api("io.github.smiley4:ktor-swagger-ui:4.1.6")
+    /*implementation("io.github.smiley4:schema-kenerator-core:1.4.1")
     implementation("io.github.smiley4:schema-kenerator-serialization:1.4.1")
     implementation("io.github.smiley4:schema-kenerator-reflection:1.4.1")
-    implementation("io.github.smiley4:schema-kenerator-swagger:1.4.1")
+    implementation("io.github.smiley4:schema-kenerator-swagger:1.4.1")*/
 
     // Persistence
-    api("io.github.reactivecircus.cache4k:cache4k:0.13.0")
-    api("app.softwork:kotlinx-uuid-core:0.1.2")
+    api("io.github.reactivecircus.cache4k:cache4k:0.14.0")
+    api("app.softwork:kotlinx-uuid-core:0.1.4")
     api("redis.clients:jedis:5.2.0")
 
     // Testing
     testApi(kotlin("test"))
-    testApi("io.ktor:ktor-server-test-host:2.3.12")
-    testApi("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testApi("io.ktor:ktor-server-test-host:3.1.0")
+    testApi("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
 }
 
 tasks.test {

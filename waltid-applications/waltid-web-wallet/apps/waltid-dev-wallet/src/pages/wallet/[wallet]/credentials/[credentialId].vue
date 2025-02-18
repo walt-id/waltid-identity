@@ -454,10 +454,7 @@
 
 <script lang="ts" setup>
 import VerifiableCredentialCard from "@waltid-web-wallet/components/credentials/VerifiableCredentialCard.vue";
-import {
-  useCredential,
-  type WalletCredential,
-} from "@waltid-web-wallet/composables/credential.ts";
+import { useCredential, type WalletCredential } from "@waltid-web-wallet/composables/credential.ts";
 import LoadingIndicator from "@waltid-web-wallet/components/loading/LoadingIndicator.vue";
 import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
 import BackButton from "@waltid-web-wallet/components/buttons/BackButton.vue";

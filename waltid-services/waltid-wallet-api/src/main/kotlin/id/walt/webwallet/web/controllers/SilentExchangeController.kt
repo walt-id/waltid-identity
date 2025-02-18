@@ -29,9 +29,9 @@ fun Application.silentExchange() = webWalletRoute {
             runCatching {
                 WalletServiceManager.silentClaimStrategy.claim(did, offer)
             }.onSuccess {
-                context.respond(HttpStatusCode.Accepted, it.size)
+                call.respond(HttpStatusCode.Accepted, it.size)
             }.onFailure {
-                context.respond(HttpStatusCode.BadRequest, it.localizedMessage)
+                call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
             }
         }
     }
