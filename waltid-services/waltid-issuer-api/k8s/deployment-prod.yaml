@@ -11,7 +11,7 @@ data:
     webHost = "0.0.0.0"
     webPort = 3000
   issuer-service.conf: |
-    baseUrl = "https://issuer.portal.walt.id"
+    baseUrl = "https://issuer.demo.walt.id"
   authentication-service.conf: |
     name = "keycloak"
     authorizeUrl = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/auth"
@@ -72,10 +72,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - issuer.portal.walt.id
+        - issuer.demo.walt.id
       secretName: issuer-tls-secret
   rules:
-    - host: issuer.portal.walt.id
+    - host: issuer.demo.walt.id
       http:
         paths:
           - path: /
