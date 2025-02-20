@@ -2,6 +2,7 @@ package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.InvalidFileFormat
 import com.github.ajalt.clikt.core.PrintHelpMessage
+import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.util.getResourcePath
 import id.walt.did.utils.randomUUID

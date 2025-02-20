@@ -24,12 +24,7 @@ import BackButton from "@waltid-web-wallet/components/buttons/BackButton.vue";
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import ManualRequestEntry from "~/components/scan/ManualRequestEntry.vue";
 import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
-import {
-  encodeRequest,
-  fixRequest,
-  getSiopRequestType,
-  SiopRequestType,
-} from "@waltid-web-wallet/composables/siop-requests.ts";
+import { encodeRequest, fixRequest, getSiopRequestType, SiopRequestType } from "@waltid-web-wallet/composables/siop-requests.ts";
 
 const currentWallet = useCurrentWallet();
 

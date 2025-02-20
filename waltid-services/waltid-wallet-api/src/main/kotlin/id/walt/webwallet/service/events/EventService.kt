@@ -4,9 +4,7 @@ package id.walt.webwallet.service.events
 
 import id.walt.webwallet.db.models.Events
 import kotlinx.datetime.toJavaInstant
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.javatime.date
@@ -107,7 +105,7 @@ class EventService {
         sortOrder = sortOrder,
         sortBy = sortBy,
         dataFilter = dataFilter
-    ).limit(n = limit, offset = offset)
+    ).limit(count = limit).offset(start = offset)
 
     private fun getFilterQueryUnlimited(
         accountId: Uuid,
@@ -116,7 +114,8 @@ class EventService {
         sortBy: String,
         dataFilter: Map<String, List<String>>,
     ) = Events.selectAll().where { Events.account eq accountId or (Events.wallet eq walletId) }
-        .orderBy(getColumn(sortBy) ?: Events.timestamp,
+        .orderBy(
+            getColumn(sortBy) ?: Events.timestamp,
             sortOrder.takeIf { it.uppercase() == "ASC" }?.let { SortOrder.ASC } ?: SortOrder.DESC)
         .addWhereClause(dataFilter)
 

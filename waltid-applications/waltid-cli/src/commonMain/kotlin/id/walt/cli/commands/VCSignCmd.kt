@@ -1,9 +1,6 @@
 package id.walt.cli.commands
 
-import com.github.ajalt.clikt.core.BadParameterValue
-import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.context
-import com.github.ajalt.clikt.core.terminal
+import com.github.ajalt.clikt.core.*
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.help
@@ -19,8 +16,10 @@ import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 
 class VCSignCmd : CliktCommand(
-    name = "sign",
-    help = """Sign a W3C Verifiable Credential (VC).
+    name = "sign"
+) {
+
+    override fun help(context: Context) = """Sign a W3C Verifiable Credential (VC).
         
         Example usage:
         --------------
@@ -29,9 +28,13 @@ class VCSignCmd : CliktCommand(
                        -s did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9 \
                        -i did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \
                        ./myVC.json
-    """,
-    printHelpOnEmptyArgs = true,
-) {
+    """.replace("\n", "  \n")
+
+    init {
+        installMordantMarkdown()
+    }
+
+    override val printHelpOnEmptyArgs = true
 
     init {
         context {

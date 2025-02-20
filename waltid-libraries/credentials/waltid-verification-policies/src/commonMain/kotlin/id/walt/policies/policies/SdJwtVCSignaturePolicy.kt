@@ -1,12 +1,10 @@
 package id.walt.policies.policies
 
-import id.walt.credentials.schemes.JwsSignatureScheme
 import id.walt.credentials.utils.VCFormat
 import id.walt.credentials.utils.randomUUID
 import id.walt.crypto.exceptions.VerificationException
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.policies.JwtVerificationPolicy

@@ -1,11 +1,10 @@
 package id.walt.did.serialize.service
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.did.dids.document.models.service.ServiceMap
+import id.walt.did.dids.document.models.service.RegisteredServiceType
 import id.walt.did.dids.document.models.service.ServiceEndpointObject
 import id.walt.did.dids.document.models.service.ServiceEndpointURL
-import id.walt.did.dids.document.models.service.RegisteredServiceType
-import kotlinx.serialization.encodeToString
+import id.walt.did.dids.document.models.service.ServiceMap
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test

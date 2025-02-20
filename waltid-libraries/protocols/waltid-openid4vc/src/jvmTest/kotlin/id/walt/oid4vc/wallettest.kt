@@ -1,6 +1,5 @@
 package id.walt.oid4vc
 
-import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.providers.OpenIDClientConfig
@@ -10,6 +9,7 @@ import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
+import id.walt.policies.policies.JwtSignaturePolicy
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*

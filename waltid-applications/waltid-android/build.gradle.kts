@@ -3,6 +3,7 @@ plugins {
     kotlin("android")
     kotlin("plugin.serialization")
     kotlin("plugin.compose")
+    id("com.github.ben-manes.versions")
 }
 
 android {
@@ -57,7 +58,7 @@ dependencies {
     api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 
     // -- Android --
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
@@ -65,7 +66,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.3")
-    implementation("androidx.activity:activity-compose:1.9.0")
+    implementation("androidx.activity:activity-compose:1.10.1")
 
     // Compose
     implementation(platform("androidx.compose:compose-bom:2024.02.01"))
@@ -77,7 +78,7 @@ dependencies {
 
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.test.ext:junit:1.2.1")
     testImplementation("androidx.test.espresso:espresso-core:3.6.1")

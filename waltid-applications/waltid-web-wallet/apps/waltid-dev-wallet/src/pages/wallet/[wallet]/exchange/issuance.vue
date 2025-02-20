@@ -225,13 +225,7 @@ import PageHeader from "@waltid-web-wallet/components/PageHeader.vue";
 import CredentialIcon from "@waltid-web-wallet/components/CredentialIcon.vue";
 import ActionButton from "@waltid-web-wallet/components/buttons/ActionButton.vue";
 import LoadingIndicator from "@waltid-web-wallet/components/loading/LoadingIndicator.vue";
-import {
-  Listbox,
-  ListboxButton,
-  ListboxLabel,
-  ListboxOption,
-  ListboxOptions,
-} from "@headlessui/vue";
+import { Listbox, ListboxButton, ListboxLabel, ListboxOption, ListboxOptions } from "@headlessui/vue";
 import { useIssuance } from "@waltid-web-wallet/composables/issuance.ts";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/vue/20/solid";
 import { useTitle } from "@vueuse/core";

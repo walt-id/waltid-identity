@@ -1,11 +1,7 @@
 package id.walt.crypto.keys
 
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
-import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.jwk.OctetKeyPair
-import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jose.jwk.*
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator
 import com.nimbusds.jose.jwk.gen.JWKGenerator
 import com.nimbusds.jose.jwk.gen.OctetKeyPairGenerator

@@ -8,7 +8,10 @@ import id.walt.wallet.core.service.SSIKit2WalletService
 import id.walt.wallet.core.service.WalletServiceManager
 import id.walt.wallet.core.service.WalletServiceManager.getWalletService
 import id.walt.wallet.core.service.WalletServiceManager.httpClient
-import id.walt.wallet.core.service.exchange.*
+import id.walt.wallet.core.service.exchange.CredentialDataResult
+import id.walt.wallet.core.service.exchange.IssuanceService
+import id.walt.wallet.core.service.exchange.PresentationRequestParameter
+import id.walt.wallet.core.service.exchange.UsePresentationResponse
 import id.walt.wallet.core.utils.WalletCredential
 import id.walt.webwallet.usecase.exchange.FilterData
 import io.ktor.http.*

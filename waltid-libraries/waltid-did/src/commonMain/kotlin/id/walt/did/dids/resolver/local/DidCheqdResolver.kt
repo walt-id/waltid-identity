@@ -58,7 +58,7 @@ class DidCheqdResolver : LocalResolverMethod("cheqd") {
             resolution.jsonObject["didDocument"]?.jsonObject
                 ?: throw IllegalArgumentException("Response for did:cheqd did not contain a DID document!")
         }.let {
-            json.decodeFromString<id.walt.did.dids.registrar.local.cheqd.models.job.didstates.finished.DidDocument>(
+            json.decodeFromString<id.walt.did.dids.registrar.local.cheqd.models.job.didstates.DidDocument>(
                 it.toString()
             )
         }

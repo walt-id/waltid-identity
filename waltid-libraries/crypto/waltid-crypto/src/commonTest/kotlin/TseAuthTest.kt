@@ -4,8 +4,6 @@ import id.walt.crypto.keys.tse.TSEKey
 import id.walt.crypto.keys.tse.TSEKeyMetadata
 import io.ktor.util.*
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Ignore
-import kotlin.test.Test
 
 class TseAuthTest {
 

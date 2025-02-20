@@ -5,11 +5,9 @@ import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRoute
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
-import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
-import io.ktor.util.pipeline.*
 
 abstract class LogoutControllerBase(
     private val path: String = defaultAuthPath,
@@ -28,12 +26,12 @@ abstract class LogoutControllerBase(
         response { HttpStatusCode.OK to { description = "Logged out." } }
     }
 
-    override suspend fun PipelineContext<Unit, ApplicationCall>.execute() {
+    override suspend fun RoutingContext.execute() {
         clearUserSession()
         call.respond(HttpStatusCode.OK)
     }
 
-    protected fun PipelineContext<Unit, ApplicationCall>.clearUserSession() {
+    protected fun RoutingContext.clearUserSession() {
         call.sessions.get<LoginTokenSession>()?.let {
             logger.debug { "Clearing login token session" }
             call.sessions.clear<LoginTokenSession>()

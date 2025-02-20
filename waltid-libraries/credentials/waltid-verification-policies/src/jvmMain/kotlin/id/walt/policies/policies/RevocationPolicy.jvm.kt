@@ -10,7 +10,8 @@ import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import java.io.InputStream
-import java.util.*
+import java.util.Base64
+import java.util.BitSet
 import java.util.zip.GZIPInputStream
 
 

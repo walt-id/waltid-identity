@@ -61,11 +61,12 @@ data class WalletCredential @OptIn(ExperimentalUuidApi::class) constructor(
     companion object {
         fun parseDocument(document: String, id: String, format: CredentialFormat) =
             runCatching {
-                when(format) {
+                when (format) {
                     CredentialFormat.ldp_vc -> Json.parseToJsonElement(document).jsonObject
                     CredentialFormat.jwt_vc, CredentialFormat.sd_jwt_vc, CredentialFormat.jwt_vc_json,
                     CredentialFormat.jwt_vc_json_ld -> document.decodeJws().payload
                         .run { jsonObject["vc"]?.jsonObject ?: jsonObject }
+
                     CredentialFormat.mso_mdoc -> MDoc.fromCBORHex(document).toMapElement().toJsonElement().jsonObject
                     else -> throw IllegalArgumentException("Unknown credential format")
                 }?.toMutableMap().also {
@@ -97,9 +98,10 @@ data class WalletCredential @OptIn(ExperimentalUuidApi::class) constructor(
             manifest?.let { JsonUtils.tryGetData(it, "display.card.issuedBy")?.jsonPrimitive?.content }
 
         fun parseFullDocument(document: String, disclosures: String?, id: String, format: CredentialFormat) = kotlin.runCatching {
-            when(format) {
+            when (format) {
                 CredentialFormat.jwt_vc, CredentialFormat.sd_jwt_vc, CredentialFormat.jwt_vc_json,
                 CredentialFormat.jwt_vc_json_ld -> SDJwt.parse(document + (disclosures?.let { "~$it" } ?: "")).fullPayload
+
                 else -> parseDocument(document, id, format)
             }
         }.onFailure { it.printStackTrace() }
@@ -116,6 +118,7 @@ data class WalletCredential @OptIn(ExperimentalUuidApi::class) constructor(
         manifest = result[WalletCredentials.manifest],
         deletedOn = result[WalletCredentials.deletedOn]?.toKotlinInstant(),
         pending = result[WalletCredentials.pending],
-        format = CredentialFormat.fromValue(result[WalletCredentials.format]) ?: throw IllegalArgumentException("Credential format couldn't be decoded")
+        format = CredentialFormat.fromValue(result[WalletCredentials.format])
+            ?: throw IllegalArgumentException("Credential format couldn't be decoded")
     )
 }

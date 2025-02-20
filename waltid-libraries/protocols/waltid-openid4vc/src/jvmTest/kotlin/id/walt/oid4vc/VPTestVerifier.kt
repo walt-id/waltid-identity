@@ -1,6 +1,5 @@
 package id.walt.oid4vc
 
-import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.providers.CredentialVerifierConfig
@@ -8,6 +7,7 @@ import id.walt.oid4vc.providers.OpenIDCredentialVerifier
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
+import id.walt.policies.policies.JwtSignaturePolicy
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*

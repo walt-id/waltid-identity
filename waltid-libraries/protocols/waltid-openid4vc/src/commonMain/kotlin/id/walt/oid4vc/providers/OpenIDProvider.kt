@@ -4,7 +4,10 @@ import id.walt.crypto.keys.Key
 import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.OpenID4VCIVersion
-import id.walt.oid4vc.data.*
+import id.walt.oid4vc.data.GrantType
+import id.walt.oid4vc.data.OpenIDProviderMetadata
+import id.walt.oid4vc.data.ResponseMode
+import id.walt.oid4vc.data.ResponseType
 import id.walt.oid4vc.data.ResponseType.Companion.getResponseTypeString
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.definitions.JWTClaims

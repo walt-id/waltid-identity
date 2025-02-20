@@ -23,7 +23,7 @@ fun Application.reasons() = authenticatedWebWalletRoute {
             }
         }) {
             val service = RejectionReasonService()
-            context.respond(service.list())
+            call.respond(service.list())
         }
     }
 }

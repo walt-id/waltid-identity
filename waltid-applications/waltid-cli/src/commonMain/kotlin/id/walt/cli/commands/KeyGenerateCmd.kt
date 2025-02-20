@@ -1,8 +1,6 @@
 package id.walt.cli.commands
 
-import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.context
-import com.github.ajalt.clikt.core.terminal
+import com.github.ajalt.clikt.core.*
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.help
@@ -22,8 +20,10 @@ import kotlin.io.path.exists
 import kotlin.io.path.writeText
 
 class KeyGenerateCmd : CliktCommand(
-    name = "generate",
-    help = """Generates a new cryptographic key.
+    name = "generate"
+) {
+
+    override fun help(context: Context) = """Generates a new cryptographic key.
         
         Example usage:
         ---------------
@@ -31,8 +31,11 @@ class KeyGenerateCmd : CliktCommand(
         waltid key generate -t secp256k1
         waltid key generate -t RSA
         waltid key generate -t RSA -o myRsaKey.json
-    """
-) {
+    """.replace("\n", "  \n")
+
+    init {
+        installMordantMarkdown()
+    }
 
     init {
         context {

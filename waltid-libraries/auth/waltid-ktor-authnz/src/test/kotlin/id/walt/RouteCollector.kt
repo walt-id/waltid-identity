@@ -28,41 +28,41 @@ fun Application.collectRoutes(): List<String> {
  */
 private fun Route.allRoutes(prefix: String = ""): List<String> {
     val routes = mutableListOf<String>()
-
-    /**
-     * Checks if the route is a prefix (non-terminal) route.
-     * A prefix route is identified by having children with specific HTTP method selectors.
-     *
-     * @return True if the route is a prefix route, false otherwise.
-     */
-    fun Route.isPrefixRoute(): Boolean {
-        return this.children.any { it.selector is HttpMethodRouteSelector }
-    }
-
-    /**
-     * Recursive function to traverse the route tree and collect terminal routes.
-     *
-     * @param currentPath The current path accumulated from the parent routes.
-     */
-    fun Route.collectRoutes(currentPath: String) {
-        val pathSegment = when (val selector = this.selector) {
-            is PathSegmentConstantRouteSelector -> "${currentPath}/${selector.value}"
-            is PathSegmentParameterRouteSelector -> "${currentPath}/{${selector.name}}"
-            is PathSegmentWildcardRouteSelector -> "${currentPath}/*"
-            else -> currentPath
-        }
-
-        // Add the route if it's a terminal route (has an HttpMethodRouteSelector and is not a prefix route).
-        if (this.selector is HttpMethodRouteSelector && !this.isPrefixRoute()) {
-            val method = (this.selector as HttpMethodRouteSelector).method.value
-            routes.add("$method $pathSegment")
-        }
-
-        // Recursively collect routes from children.
-        this.children.forEach { it.collectRoutes(pathSegment) }
-    }
-
-    this.collectRoutes(prefix)
+//
+//    /**
+//     * Checks if the route is a prefix (non-terminal) route.
+//     * A prefix route is identified by having children with specific HTTP method selectors.
+//     *
+//     * @return True if the route is a prefix route, false otherwise.
+//     */
+//    fun Route.isPrefixRoute(): Boolean {
+//        return this.children.any { it.selector is HttpMethodRouteSelector }
+//    }
+//
+//    /**
+//     * Recursive function to traverse the route tree and collect terminal routes.
+//     *
+//     * @param currentPath The current path accumulated from the parent routes.
+//     */
+//    fun Route.collectRoutes(currentPath: String) {
+//        val pathSegment = when (val selector = this.selector) {
+//            is PathSegmentConstantRouteSelector -> "${currentPath}/${selector.value}"
+//            is PathSegmentParameterRouteSelector -> "${currentPath}/{${selector.name}}"
+//            is PathSegmentWildcardRouteSelector -> "${currentPath}/*"
+//            else -> currentPath
+//        }
+//
+//        // Add the route if it's a terminal route (has an HttpMethodRouteSelector and is not a prefix route).
+//        if (this.selector is HttpMethodRouteSelector && !this.isPrefixRoute()) {
+//            val method = (this.selector as HttpMethodRouteSelector).method.value
+//            routes.add("$method $pathSegment")
+//        }
+//
+//        // Recursively collect routes from children.
+//        this.children.forEach { it.collectRoutes(pathSegment) }
+//    }
+//
+//    this.collectRoutes(prefix)
 
     return routes.distinct()
 }

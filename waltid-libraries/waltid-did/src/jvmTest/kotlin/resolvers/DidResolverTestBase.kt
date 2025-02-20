@@ -10,6 +10,10 @@ import id.walt.did.dids.resolver.local.LocalResolverMethod
 import io.ktor.client.network.sockets.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
+import resolvers.DidResolverTestBase.Companion.didDocAssertions
+import resolvers.DidResolverTestBase.Companion.ed25519DidAssertions
+import resolvers.DidResolverTestBase.Companion.ed25519KeyAssertions
+import resolvers.DidResolverTestBase.Companion.keyAssertions
 import kotlin.test.assertNotNull
 
 abstract class DidResolverTestBase {
