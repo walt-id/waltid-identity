@@ -413,7 +413,7 @@ object OpenID4VCI {
         try {
             val parsedUrl = Url(url)
 
-            require(parsedUrl.protocol.name == "https" || parsedUrl.protocol.name == "https") { "URL must use HTTPS or HTTP scheme" }
+            require(parsedUrl.protocol.name == "http" || parsedUrl.protocol.name == "https") { "URL must use HTTPS or HTTP scheme" }
             require(parsedUrl.host.isNotEmpty()) { "URL must have a valid host" }
             require(parsedUrl.parameters.isEmpty() && !url.contains("#")) { "URL must not contain query or fragment" }
 
