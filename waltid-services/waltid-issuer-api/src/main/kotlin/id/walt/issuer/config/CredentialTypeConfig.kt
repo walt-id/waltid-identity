@@ -78,7 +78,7 @@ data class CredentialTypeConfig(
         "my_custom_vct_vc+sd-jwt" to vc(
             CredentialSupported(
                 format = CredentialFormat.sd_jwt_vc,
-                cryptographicBindingMethodsSupported = setOf("did", "jwk"),
+                cryptographicBindingMethodsSupported = setOf("did:key", "jwk"),
                 credentialSigningAlgValuesSupported = setOf("ES256"),
                 vct = "https://example.com/my_custom_vct",
                 sdJwtVcTypeMetadata = SDJWTVCTypeMetadata(
@@ -107,7 +107,7 @@ data class CredentialTypeConfig(
                     CredentialFormat.entries.associate { format ->
                         "${entry.key}_${format.value}" to CredentialSupported(
                             format = format,
-                            cryptographicBindingMethodsSupported = if (format == CredentialFormat.sd_jwt_vc) setOf("jwk") else setOf("did"),
+                            cryptographicBindingMethodsSupported = if (format == CredentialFormat.sd_jwt_vc) setOf("jwk") else setOf("did:key", "did:jwk", "did:cheqd", "did:web", "did:ebsi"),
                             credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
                             credentialDefinition = if (format != CredentialFormat.sd_jwt_vc && format != CredentialFormat.mso_mdoc ) CredentialDefinition(type = type)  else null,
                             vct = if (format == CredentialFormat.sd_jwt_vc) baseUrl.plus("/${entry.key}") else null,
