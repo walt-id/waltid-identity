@@ -196,7 +196,7 @@ class TestOID4VCI {
 
         validateEndpoint(credentialIssuerUrl, metadata.credentialEndpoint, "credential")
         validateEndpoint(credentialIssuerUrl, metadata.batchCredentialEndpoint, "batch_credential")
-        validateEndpoint(credentialIssuerUrl, metadata.deferredCredentialEndpoint, "deferred_credential")
+        validateEndpoint(credentialIssuerUrl, metadata.deferredCredentialEndpoint, "credential_deferred")
 
         assertNotNull(metadata.credentialConfigurationsSupported)
 

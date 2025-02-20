@@ -356,7 +356,7 @@ object OpenID4VCI {
                 tokenEndpoint = "$baseUrl/token",
                 credentialEndpoint = "$baseUrl/credential",
                 batchCredentialEndpoint = "$baseUrl/batch_credential",
-                deferredCredentialEndpoint = "$baseUrl/credential_deferred", // (EBSI)
+                deferredCredentialEndpoint = "$baseUrl/credential_deferred",
                 jwksUri = "$baseUrl/jwks",
                 grantTypesSupported = setOf(
                     GrantType.authorization_code,
@@ -383,7 +383,7 @@ object OpenID4VCI {
                 tokenEndpoint = "$baseUrl/token",
                 credentialEndpoint = "$baseUrl/credential",
                 batchCredentialEndpoint = "$baseUrl/batch_credential",
-                deferredCredentialEndpoint = "$baseUrl/credential_deferred",
+                deferredCredentialEndpoint = "$baseUrl/credential_deferred", // (EBSI)
                 jwksUri = "$baseUrl/jwks",
                 grantTypesSupported = setOf(GrantType.authorization_code, GrantType.pre_authorized_code),
                 requestUriParameterSupported = true,
@@ -394,11 +394,11 @@ object OpenID4VCI {
                     ResponseType.VpToken.value,
                     ResponseType.IdToken.value
                 ),
-                idTokenSigningAlgValuesSupported = setOf("ES256"),
+                idTokenSigningAlgValuesSupported = setOf("ES256"), // (EBSI)
                 codeChallengeMethodsSupported = listOf("S256"),
                 credentialSupported = credentialSupported?.
                     filterValues { credential ->
-                        credential.format == CredentialFormat.jwt_vc || credential.format == CredentialFormat.jwt_vc_json
+                        credential.format == CredentialFormat.jwt_vc || credential.format == CredentialFormat.jwt_vc_json // (EBSI)
                     }?.
                     mapValues {
                         (_, credential) -> credential.copy(types = credential.credentialDefinition?.type, credentialDefinition = null)
