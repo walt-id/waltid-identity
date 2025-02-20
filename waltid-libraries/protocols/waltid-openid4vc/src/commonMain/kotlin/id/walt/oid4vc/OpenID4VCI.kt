@@ -63,9 +63,21 @@ object OpenID4VCI {
         credentialOfferEndpoint: String = CROSS_DEVICE_CREDENTIAL_OFFER_URL,
         customReqParams: Map<String, List<String>> = mapOf()
     ): String {
-        return URLBuilder(credentialOfferEndpoint).apply {
-            parameters.appendAll(parametersOf(CredentialOfferRequest(credOffer, customParameters = customReqParams).toHttpParameters()))
-        }.buildString()
+        val queryParams = CredentialOfferRequest(
+            credentialOffer = credOffer,
+            customParameters = customReqParams
+        ).toHttpParameters()
+
+        val queryString = queryParams.entries
+            .flatMap { (key, values)
+                -> values.map {
+                    value -> "$key=${value.encodeURLParameter()}"
+                }
+            }
+            .joinToString(separator = "&")
+
+        return "$credentialOfferEndpoint?$queryString"
+
     }
 
     fun getCredentialOfferRequestUrl(
