@@ -84,12 +84,12 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "2.3.12"
+    val ktor_version = "3.1.0"
     sourceSets {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -100,22 +100,23 @@ kotlin {
                 implementation("io.ktor:ktor-client-logging:$ktor_version")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
                 // Date
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
 
                 // Uuid
-                implementation("app.softwork:kotlinx-uuid-core:0.1.2")
+                implementation("app.softwork:kotlinx-uuid-core:0.1.4")
 
                 // Crypto
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
 
                 // Encodings
-                implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.5.0")
+                implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.6.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:7.0.0")
+                implementation("io.github.oshai:kotlin-logging:7.0.4")
+
 
                 // suspend-transform plugin annotations (required in the current version to avoid "compileOnly" warning)
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
@@ -124,7 +125,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
             }
         }
         val jvmMain by getting {
@@ -141,12 +142,16 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation("org.slf4j:slf4j-simple:2.0.16")
+
+
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
                 implementation(kotlin("test"))
-                implementation("org.junit.jupiter:junit-jupiter-params:5.11.0")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
                 implementation("io.ktor:ktor-server-test-host:$ktor_version")
                 implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
-                implementation("io.ktor:ktor-server-netty:2.3.12")
+                implementation("io.ktor:ktor-server-netty:$ktor_version")
+                implementation("io.ktor:ktor-network-tls-certificates:$ktor_version")
             }
         }
         val jsMain by getting {

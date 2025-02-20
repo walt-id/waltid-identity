@@ -2,7 +2,6 @@ package id.walt.sdjwt
 
 import dev.whyoleg.cryptography.random.CryptographyRandom
 import id.walt.sdjwt.SdjwtStringUtils.decodeFromBase64Url
-import id.walt.sdjwt.utils.Base64Utils.base64UrlDecode
 import korlibs.crypto.SecureRandom
 import korlibs.crypto.sha256
 import kotlinx.serialization.json.*

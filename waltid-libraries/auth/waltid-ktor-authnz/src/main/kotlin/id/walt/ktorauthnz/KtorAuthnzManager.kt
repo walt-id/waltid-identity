@@ -1,7 +1,6 @@
 package id.walt.ktorauthnz
 
 import id.walt.ktorauthnz.accounts.EditableAccountStore
-import id.walt.ktorauthnz.accounts.ExampleAccountStore
 import id.walt.ktorauthnz.security.PasswordHashingConfiguration
 import id.walt.ktorauthnz.sessions.InMemorySessionStore
 import id.walt.ktorauthnz.tokens.TokenHandler

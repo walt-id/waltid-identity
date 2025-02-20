@@ -85,11 +85,11 @@ fun Application.entraIssuance() {
                     body<EntraIssuanceRequest>()
                 }
             }) {
-                val req = context.receive<EntraIssuanceRequest>()
+                val req = call.receive<EntraIssuanceRequest>()
 
                 val url = EntraIssuanceApi.entraIssuance(req.authorization, req.data)
 
-                context.respond(url)
+                call.respond(url)
             }
         }
     }

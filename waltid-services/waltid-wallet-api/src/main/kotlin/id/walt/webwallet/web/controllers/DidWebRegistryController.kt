@@ -23,7 +23,7 @@ fun Application.didRegistry() = webWalletRoute {
                 }
             }
         }) {
-            context.respond(runBlocking {
+            call.respond(runBlocking {
                 DidWebRegistryService.listRegisteredDids()
             })
         }
@@ -47,9 +47,9 @@ fun Application.didRegistry() = webWalletRoute {
                 }
             }) {
 
-                val id = context.parameters["id"] ?: throw IllegalArgumentException("No ID supplied")
+                val id = call.parameters["id"] ?: throw IllegalArgumentException("No ID supplied")
 
-                context.respond(
+                call.respond(
                     DidWebRegistryService.loadRegisteredDid(id)
                 )
             }

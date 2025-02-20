@@ -17,7 +17,6 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 import kotlinx.serialization.Serializable
 
 object TOTP : AuthenticationMethod("totp") {
@@ -40,14 +39,14 @@ object TOTP : AuthenticationMethod("totp") {
     data class TOTPCode(val code: String)
 
     override fun Route.registerAuthenticationRoutes(
-        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        authContext: ApplicationCall.() -> AuthContext,
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
     ) {
         post("totp", {
             request { body<TOTPCode>() }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
         }) {
-            val session = getSession(authContext)
+            val session = call.getAuthSession(authContext)
 
             val otp = when (call.request.contentType()) {
                 ContentType.Application.Json -> call.receive<TOTPCode>().code
@@ -59,7 +58,7 @@ object TOTP : AuthenticationMethod("totp") {
 
             auth(session, otp)
 
-            context.handleAuthSuccess(session, null)
+            call.handleAuthSuccess(session, null)
         }
     }
 

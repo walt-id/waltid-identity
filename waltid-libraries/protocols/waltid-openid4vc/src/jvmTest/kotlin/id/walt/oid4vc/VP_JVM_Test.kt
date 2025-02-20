@@ -1,7 +1,6 @@
 package id.walt.oid4vc
 
 import id.walt.credentials.utils.VCFormat
-import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.*
@@ -10,6 +9,7 @@ import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
+import id.walt.policies.policies.JwtSignaturePolicy
 import io.kotest.matchers.collections.shouldContain
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -23,7 +23,6 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
 import io.ktor.util.reflect.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.BeforeAll
 import kotlin.test.*

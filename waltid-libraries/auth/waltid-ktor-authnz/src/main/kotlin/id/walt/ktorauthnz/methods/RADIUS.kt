@@ -13,7 +13,6 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 import org.aaa4j.radius.client.RadiusClient
 import org.aaa4j.radius.client.clients.UdpRadiusClient
 import org.aaa4j.radius.core.attribute.StringData
@@ -54,21 +53,20 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
         return identifier
     }
 
-
     override fun Route.registerAuthenticationRoutes(
-        authContext: PipelineContext<Unit, ApplicationCall>.() -> AuthContext,
+        authContext: ApplicationCall.() -> AuthContext,
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
     ) {
         post("radius", {
             request { body<UserPassCredentials>() }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
         }) {
-            val session = getSession(authContext)
+            val session = call.getAuthSession(authContext)
 
             val credential = call.getUsernamePasswordFromRequest()
 
-            val identifier = auth(session, credential, context)
-            context.handleAuthSuccess(session, identifier.resolveToAccountId())
+            val identifier = auth(session, credential, call)
+            call.handleAuthSuccess(session, identifier.resolveToAccountId())
         }
     }
 

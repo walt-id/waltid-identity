@@ -2,7 +2,6 @@ package id.walt.did.serialize.service
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.document.models.service.*
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test

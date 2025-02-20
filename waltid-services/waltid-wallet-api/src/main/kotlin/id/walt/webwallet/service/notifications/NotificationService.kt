@@ -43,7 +43,7 @@ object NotificationService {
     }
 
     fun delete(vararg ids: Uuid): Int = transaction {
-        WalletNotifications.deleteWhere { WalletNotifications.id inList ids.map { it.toJavaUuid() } }
+        WalletNotifications.deleteWhere { id inList ids.map { it.toJavaUuid() } }
     }
 
     fun update(vararg notification: Notification): Int = transaction {
@@ -63,7 +63,8 @@ object NotificationService {
     }.andWhere {
         runCatching { LocalDate.parse(addedOn!!) }.getOrNull()
             ?.let { WalletNotifications.addedOn.date() eq dateParam(it.toJavaLocalDate()) } ?: Op.TRUE
-    }.orderBy(column = WalletNotifications.addedOn,
+    }.orderBy(
+        column = WalletNotifications.addedOn,
         order = ascending?.takeIf { it }?.let { SortOrder.ASC } ?: SortOrder.DESC)
 
     private fun insert(vararg notifications: Notification): List<Uuid> = WalletNotifications.batchInsert(

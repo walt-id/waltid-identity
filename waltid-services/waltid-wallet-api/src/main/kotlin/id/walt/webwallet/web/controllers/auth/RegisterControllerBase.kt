@@ -7,11 +7,9 @@ import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRoute
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.http.*
-import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 
 abstract class RegisterControllerBase(
     private val path: String = defaultAuthPath,
@@ -53,7 +51,7 @@ abstract class RegisterControllerBase(
         }
     }
 
-    override suspend fun PipelineContext<Unit, ApplicationCall>.execute() {
+    override suspend fun RoutingContext.execute() {
 //        val jsonObject = call.receive<JsonObject>()
 //        val type = jsonObject["type"]?.jsonPrimitive?.contentOrNull
 //        if (type.isNullOrEmpty()) {

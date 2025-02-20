@@ -138,16 +138,18 @@ class CredentialsService {
         transaction { WalletCredentials.deleteWhere { (WalletCredentials.wallet eq wallet.toJavaUuid()) and (id eq credentialId) } }
 
     private fun categorizedQuery(wallet: Uuid, deleted: Boolean?, pending: Boolean?, categories: List<String>) =
-        WalletCredentials.innerJoin(otherTable = WalletCredentialCategoryMap,
+        WalletCredentials.innerJoin(
+            otherTable = WalletCredentialCategoryMap,
             onColumn = { id },
             otherColumn = { credential },
             additionalConstraint = {
                 WalletCredentials.wallet eq wallet.toJavaUuid() and (WalletCredentialCategoryMap.wallet eq wallet) and deletedCondition(
                     deleted
                 ) and pendingCondition(pending)
-            }).innerJoin(otherTable = WalletCategory,
+            }).innerJoin(
+            otherTable = WalletCategory,
             onColumn = { WalletCredentialCategoryMap.category },
-            otherColumn = { WalletCategory.id },
+            otherColumn = { id },
             additionalConstraint = {
                 WalletCategory.wallet eq wallet.toJavaUuid() and (WalletCredentialCategoryMap.wallet eq wallet) and (WalletCategory.name inList (categories))
             }).selectAll()

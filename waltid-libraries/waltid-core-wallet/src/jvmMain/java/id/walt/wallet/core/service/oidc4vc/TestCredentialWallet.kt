@@ -2,6 +2,7 @@
 
 package id.walt.wallet.core.service.oidc4vc
 
+
 import COSE.AlgorithmID
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.utils.VCFormat
@@ -53,10 +54,7 @@ import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-
-
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi

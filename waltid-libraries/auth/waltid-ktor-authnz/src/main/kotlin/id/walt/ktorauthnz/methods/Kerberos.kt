@@ -31,9 +31,9 @@ fun auth(kerberosRealm: String, kerberosKdc: String, servicePrincipal: String, u
     )
 
     return try {
-        context.requestMutualAuth(true)
-        context.requestConf(true)
-        context.requestInteg(true)
+        call.requestMutualAuth(true)
+        call.requestConf(true)
+        call.requestInteg(true)
 
         val token = ByteArray(0)
         val outToken = context.initSecContext(token, 0, token.size)

@@ -204,26 +204,26 @@ fun Application.entraVerifierApi() {
                 request { body<EntraVerifyRequest>() }
                 response { HttpStatusCode.OK to { body<EntraVerifyResponse>() } }
             }) {
-                val verifyRequest = context.receive<EntraVerifyRequest>()
+                val verifyRequest = call.receive<EntraVerifyRequest>()
                 val res = EntraVerifierApi.createPresentationRequest(verifyRequest.entraVerification, verifyRequest.data)
 
-                context.respond(res.getOrThrow())
+                call.respond(res.getOrThrow())
             }
 
             post("verification-callback/{nonce}", {
                 tags = listOf("Entra")
             }) {
-                val nonce = context.parameters["nonce"]?.let { Uuid.parse(it) }
+                val nonce = call.parameters["nonce"]?.let { Uuid.parse(it) }
 
                 println("--- ENTRA CALLBACK ---")
-                println("Nonce: " + context.parameters["nonce"])
-                println("Headers: " + context.request.headers)
-                //println("Body: " + context.receiveText())
-                println("URL: " + context.url())
+                println("Nonce: " + call.parameters["nonce"])
+                println("Headers: " + call.request.headers)
+                //println("Body: " + call.receiveText())
+                println("URL: " + call.url())
 
                 require(EntraVerifierApi.callbackMapping.containsKey(nonce)) { "Invalid nonce: $nonce" }
 
-                val body = context.receiveText()
+                val body = call.receiveText()
                 println("Response: $body")
                 val response = Json.decodeFromString<EntraVerificationApiResponse>(body)
 
@@ -241,7 +241,7 @@ fun Application.entraVerifierApi() {
                     EntraVerifierApi.policyStatusMapping[nonce!!] = result
                 }
 
-                context.respond(HttpStatusCode.OK)
+                call.respond(HttpStatusCode.OK)
             }
 
             get("status/{nonce}", {
@@ -249,7 +249,7 @@ fun Application.entraVerifierApi() {
                 request { pathParameter<String>("nonce") }
                 response { HttpStatusCode.OK to { body<JsonArray>() } }
             }) {
-                val nonce = context.parameters["nonce"]?.let { Uuid.parse(it) }
+                val nonce = call.parameters["nonce"]?.let { Uuid.parse(it) }
 
                 val result =
                     EntraVerifierApi.policyStatusMapping[nonce]
@@ -270,8 +270,8 @@ fun Application.entraVerifierApi() {
                         }
                     }
 
-                    context.respond(output)
-                } else context.respond(HttpStatusCode.NotFound)
+                    call.respond(output)
+                } else call.respond(HttpStatusCode.NotFound)
             }
         }
     }

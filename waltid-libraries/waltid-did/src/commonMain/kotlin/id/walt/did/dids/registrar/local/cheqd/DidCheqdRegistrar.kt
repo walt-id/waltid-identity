@@ -8,13 +8,7 @@ import id.walt.did.dids.document.DidCheqdDocument
 import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.LocalRegistrarMethod
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.Secret
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.SigningResponse
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.action.ActionDidState
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.didStateSerializationModule
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.failed.FailedDidState
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.finished.DidDocument
-import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.finished.FinishedDidState
+import id.walt.did.dids.registrar.local.cheqd.models.job.didstates.*
 import id.walt.did.dids.registrar.local.cheqd.models.job.request.JobCreateRequest
 import id.walt.did.dids.registrar.local.cheqd.models.job.request.JobDeactivateRequest
 import id.walt.did.dids.registrar.local.cheqd.models.job.request.JobSignRequest
@@ -24,6 +18,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -67,6 +62,9 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
     private val client = HttpClient {
         install(ContentNegotiation) {
             json(json)
+        }
+        install(Logging) {
+            level = LogLevel.BODY
         }
     }
 
@@ -133,11 +131,14 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
         TODO()
     }
 
-    private suspend fun initiateDidJob(url: String, body: JsonElement) =
+    private suspend fun initiateDidJob(url: String, body: JsonElement): JobActionResponse =
         client.post(url) {
             contentType(ContentType.Application.Json)
             setBody(body)
-        }.body<JobActionResponse>()
+        }.bodyAsText().let {
+            log.debug { "Try parse Job action response: $it" }
+            json.decodeFromString<JobActionResponse>(it)
+        }
 
     private suspend fun finalizeDidJob(url: String, jobId: String, verificationMethodId: String, signatures: List<String>) = let {
         client.post(url) {

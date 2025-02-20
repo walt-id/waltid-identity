@@ -3,10 +3,12 @@
 package id.walt.webwallet.service.issuers
 
 import id.walt.webwallet.db.models.WalletIssuers
-
-import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.statements.UpdateStatement
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.sql.upsert
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid
@@ -30,7 +32,14 @@ object IssuersService {
         configurationEndpoint: String,
         authorized: Boolean = false,
     ) = transaction {
-        addToWalletQuery(wallet, did, description, uiEndpoint, configurationEndpoint, authorized)
+        WalletIssuers.upsert {
+            it[this.wallet] = wallet.toJavaUuid()
+            it[this.did] = did
+            it[this.description] = description
+            it[this.uiEndpoint] = uiEndpoint
+            it[this.configurationEndpoint] = configurationEndpoint
+            it[this.authorized] = authorized
+        }
     }.insertedCount
 
     fun authorize(wallet: Uuid, issuer: String) = transaction {
@@ -44,32 +53,6 @@ object IssuersService {
             .singleOrNull()?.let {
                 IssuerDataTransferObject(it)
             }
-
-    private fun addToWalletQuery(
-        wallet: Uuid,
-        did: String,
-        description: String?,
-        uiEndpoint: String,
-        configurationEndpoint: String,
-        authorized: Boolean,
-    ) = WalletIssuers.upsert(
-        keys = arrayOf(WalletIssuers.wallet, WalletIssuers.did),
-        onUpdate = listOf(
-            description?.let { WalletIssuers.description to stringLiteral(it) },
-            WalletIssuers.uiEndpoint to stringLiteral(uiEndpoint),
-            WalletIssuers.configurationEndpoint to stringLiteral(configurationEndpoint),
-            WalletIssuers.authorized to booleanLiteral(authorized)
-        ).mapNotNull {
-            it
-        }
-    ) {
-        it[this.wallet] = wallet.toJavaUuid()
-        it[this.did] = did
-        it[this.description] = description
-        it[this.uiEndpoint] = uiEndpoint
-        it[this.configurationEndpoint] = configurationEndpoint
-        it[this.authorized] = authorized
-    }
 
     //TODO: copied from CredentialsService
     private fun updateColumn(wallet: Uuid, issuer: String, update: (statement: UpdateStatement) -> Unit): Int =

@@ -1,6 +1,6 @@
-import React from 'react';
-import Button from '@/components/walt/button/Button';
-import BaseModal from '@/components/walt/modal/BaseModal';
+import React from "react";
+import Button from "@/components/walt/button/Button";
+import BaseModal from "@/components/walt/modal/BaseModal";
 
 type Props = {
   show: boolean;

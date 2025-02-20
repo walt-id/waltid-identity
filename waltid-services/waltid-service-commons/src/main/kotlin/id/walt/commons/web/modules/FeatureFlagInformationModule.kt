@@ -39,7 +39,7 @@ object FeatureFlagInformationModule {
                         }
                     }
                 }) {
-                    context.respond(FeatureManager.registeredFeatures.mapValues { it.value.description })
+                    call.respond(FeatureManager.registeredFeatures.mapValues { it.value.description })
                 }
                 get("state", {
                     summary = "Show state of features"
@@ -57,7 +57,7 @@ object FeatureFlagInformationModule {
                     val defaulted = registered.keys.subtract(enabled.keys).subtract(disabled.keys)
                         .associateWith { registered[it]!!.description }
 
-                    context.respond(
+                    call.respond(
                         FeatureFlagInformations(
                             enabled = FeatureFlagInformation(enabled),
                             disabled = FeatureFlagInformation(disabled),

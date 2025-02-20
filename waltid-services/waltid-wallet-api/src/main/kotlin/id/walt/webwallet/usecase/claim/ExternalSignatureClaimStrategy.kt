@@ -3,8 +3,8 @@ package id.walt.webwallet.usecase.claim
 import id.walt.crypto.keys.Key
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.credentials.CredentialsService
-import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession
 import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures
+import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession
 import id.walt.webwallet.usecase.event.EventLogUseCase
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid

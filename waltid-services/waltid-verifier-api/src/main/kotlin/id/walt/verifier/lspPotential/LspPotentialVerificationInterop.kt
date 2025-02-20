@@ -45,7 +45,7 @@ import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
-import java.util.*
+import java.util.Base64
 
 private val logger = KotlinLogging.logger {}
 object LspPotentialVerificationInterop {
@@ -108,7 +108,7 @@ fun Application.lspPotentialVerificationTestApi() {
           }
         }
       }) {
-        val deviceJwk = context.request.call.receiveParameters().toMap()["jwk"]
+        val deviceJwk = call.request.call.receiveParameters().toMap()["jwk"]
         val devicePubKey = JWK.parse(deviceJwk!!.first()).toECKey().toPublicKey()
 
         val mdoc = MDocBuilder(MDocTypes.ISO_MDL)
@@ -145,7 +145,7 @@ fun Application.lspPotentialVerificationTestApi() {
           }
         }
       }) {
-        val holderJwk = context.request.call.receiveParameters().toMap().get("jwk")!!.first()
+        val holderJwk = call.request.call.receiveParameters().toMap().get("jwk")!!.first()
 
         val sdJwtVc = SDJwtVC.sign(
           SDPayload.Companion.createSDPayload(buildJsonObject {
