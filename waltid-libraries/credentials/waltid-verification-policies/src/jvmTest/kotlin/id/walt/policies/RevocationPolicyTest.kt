@@ -150,12 +150,13 @@ class RevocationPolicyTest {
                 eyJraWQiOiJWeng3bDVmaDU2RjNQZjlhUjNERUNVNUJ3ZnJZNlpKZTA1YWlXWVd6YW44IiwiYWxnIjoiRWREU0EifQ.eyJpc3MiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCIsInN1YiI6ImRpZDprZXk6ejZNa2pvUmhxMWpTTkpkTGlydVNYckZGeGFncXJ6dFphWEhxSEdVVEtKYmNOeXdwIiwidmMiOnsiQGNvbnRleHQiOlsiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy9leGFtcGxlcy92MSJdLCJpZCI6Imh0dHA6Ly9sb2NhbGhvc3Q6NzAwNC9jcmVkZW50aWFscy81MGNiZmE5ZjU4N2FhYzFkYTY5ZGU4ZGQ4MjIxMzE5MyIsInR5cGUiOlsiVmVyaWZpYWJsZUNyZWRlbnRpYWwiLCJTdGF0dXNMaXN0MjAyMUNyZWRlbnRpYWwiXSwiaXNzdWVyIjoiZGlkOmp3azpleUpyZEhraU9pSlBTMUFpTENKamNuWWlPaUpGWkRJMU5URTVJaXdpYTJsa0lqb2lUVm80VUdaVU4wbHFSMk5RTWkxSk9YWlVlV0Z3ZGpaa2FIWmxkR1pvVVVsa2MyZFhURUl5WlRkS1JTSXNJbmdpT2lJdGFGWTNkbEpzTlhaME5WTnVhRlYxTkd4cGIzcHNkblJyWkRobWRHazROREJsVVdVM05EWnBNVVpOSW4wIiwiaXNzdWFuY2VEYXRlIjoiMjAyNS0wMS0wOVQyMTozODoxNS4wMTczODQ0MDAiLCJleHBpcmF0aW9uRGF0ZSI6IjIwMzUtMDEtMDlUMjE6Mzg6MTUuMDE3Mzg0NDAwIiwiY3JlZGVudGlhbFN1YmplY3QiOnsiaWQiOiI1MGNiZmE5ZjU4N2FhYzFkYTY5ZGU4ZGQ4MjIxMzE5MyIsInR5cGUiOiJTdGF0dXNMaXN0MjAyMSIsInN0YXR1c1B1cnBvc2UiOiJyZXZvY2F0aW9uIiwiZW5jb2RlZExpc3QiOiJINHNJQUFBQUFBQUFBKzNCTVFFQUFBakFvRVd4ZjBwdDRRUFVtUUFBQUFBQUFBQUFBQUFBQUFBQUFJQkhDek9hN1RBQVFBQUEifX19.HWmYRdlce_C3GjFCKxPUSDJDgGqrPy1h7UJEcfGOcxisfWhYIBAbdis9-sws4sFjzpoA14Himp9lUzFdZTqDAw
             """.trimIndent(),
         )
-        private val environment = applicationEngineEnvironment {
-            envConfig()
-        }
-        val server: ApplicationEngine by lazy {
+        val server by lazy {
             println("Initializing embedded webserver...")
-            embeddedServer(Netty, environment)
+            embeddedServer(Netty, configure = {
+                connector {
+                    port = 8080
+                }
+            }, module = { module() })
         }
 
         private fun Application.module() {
@@ -169,15 +170,5 @@ class RevocationPolicyTest {
                 }
             }
         }
-
-        private fun ApplicationEngineEnvironmentBuilder.envConfig() {
-            module {
-                module()
-            }
-            connector {
-                port = serverPort
-            }
-        }
-
     }
 }
