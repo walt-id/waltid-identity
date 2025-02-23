@@ -159,13 +159,15 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
                 "credentialData" to data.toMap()
             ).toJsonObject()
 
-            val response = http.post("${config.opaServer}/v1/data/${config.policyQuery}/${config.policyName}") {
+            val response = http.post("${config.opaServer}/v1/data/${config.policyQuery}") {
                 contentType(ContentType.Application.Json)
                 setBody(mapOf("input" to input))
             }
 
-            val result = response.body<JsonObject>()["result"]?.jsonObject
-                ?: throw DynamicPolicyException("Invalid response from OPA server")
+            val result = response.body<JsonObject>().let { it -> 
+                    it["result"] ?: throw DynamicPolicyException("Invalid response from OPA server") 
+                    it
+                }
 
             Result.success(result)
         } catch (e: Exception) {
