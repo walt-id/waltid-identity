@@ -1,5 +1,6 @@
 package id.walt.oid4vc.openID4VC
 
+import org.junit.jupiter.api.Assertions.*
 import id.walt.credentials.CredentialBuilder
 import id.walt.credentials.CredentialBuilderType
 import id.walt.credentials.issuance.Issuer.baseIssue
@@ -10,6 +11,7 @@ import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -31,13 +33,16 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
-import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.*
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.net.URLEncoder
 import kotlin.test.*
+import kotlin.test.Test
+
+val ISSUER_BASE_URL = "https://example.com"
 
 class TestOID4VCI {
-    val ISSUER_BASE_URL = "https://example.com"
     val CREDENTIAL_OFFER_BASE_URL = "openid-credential-offer://test"
 
     companion object {
@@ -103,39 +108,100 @@ class TestOID4VCI {
             .addPreAuthorizedCodeGrant("test-pre-auth-code")
             .build()
 
-        assertDoesNotThrow { validateCredentialOffer(credOffer, issuerMetadata)}
+        assertDoesNotThrow {
+            validateCredentialOffer(
+                offer = credOffer,
+                metadata = issuerMetadata
+            )
+        }
 
-        val credOfferURIByValue = OpenID4VCI.getCredentialOfferRequestUrl(
+        // Validate Offer URI By Value
+        val credentialOfferURIByValue = OpenID4VCI.getCredentialOfferRequestUrl(
             credOffer = credOffer
         )
-
-        assertDoesNotThrow { validateCredentialOfferURI(credOfferURIByValue, credOffer) }
+        assertDoesNotThrow {
+            validateCredentialOfferURI (
+                actualCredentialOfferURI = credentialOfferURIByValue,
+                credentialOffer = credOffer,
+                isByReference = false
+            )
+        }
 
         // Validate Offer URI By Reference
+        val offerRequest = CredentialOfferRequest(
+            credentialOffer = null,
+            credentialOfferUri = "$ISSUER_BASE_URL/credentialOffer?id=RandomSessionId"
+        )
+
+
+        val credentialOfferURIByReference = OpenID4VCI.getCredentialOfferRequestUrl(
+            credOfferReq = offerRequest,
+            credentialOfferEndpoint = CROSS_DEVICE_CREDENTIAL_OFFER_URL
+        )
+
+        assertDoesNotThrow {
+            validateCredentialOfferURI(
+                actualCredentialOfferURI = credentialOfferURIByReference,
+                credentialOffer = credOffer,
+                isByReference = true
+            )
+        }
 
 
         //
         // Wallet Gets Offer
         //
 
+        // Wallet Gets the Credential Offer By Value
+        val resolvedCredentialOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(credentialOfferURIByValue) as CredentialOffer.Draft13
 
+        assertEquals(resolvedCredentialOffer.credentialIssuer, issuerMetadata.credentialIssuer)
+
+        assertDoesNotThrow {
+            validateCredentialOffer(
+                offer = resolvedCredentialOffer,
+                metadata = issuerMetadata
+            )
+        }
+
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(resolvedCredentialOffer, issuerMetadata)
+        assertEquals(1, offeredCredentials.size)
+
+        val offeredCredential = offeredCredentials[0]
+
+        assertEquals(CredentialFormat.jwt_vc_json, offeredCredential.format)
+        assertEquals("VerifiableId", offeredCredential.credentialDefinition?.type?.last())
+
+        assertTrue(offeredCredential.cryptographicBindingMethodsSupported!!.contains("did:key"))
+
+        assertTrue(offeredCredential.customParameters.containsKey("foo"))
+
+        assertNotNull(credOffer.grants[GrantType.pre_authorized_code.value]?.preAuthorizedCode)
+        assertEquals("test-pre-auth-code", credOffer.grants[GrantType.pre_authorized_code.value]?.preAuthorizedCode)
+
+
+    //
+//        println("// token req")
+//        tokenReq = TokenRequest(
+//            grantType = GrantType.pre_authorized_code,
+//            //clientId = testCIClientConfig.clientID,
+//            redirectUri = WALLET_REDIRECT_URI,
+//            preAuthorizedCode = credOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
+//            txCode = null
+//        )
     }
 
 
-    private fun validateCredentialOfferURI(credOfferURI: String, credentialOffer: CredentialOffer.Draft13? = null, credentialOfferUri: String? = null) {
-        val expectedURL = when {
-            credentialOffer != null -> {
+    private fun validateCredentialOfferURI(actualCredentialOfferURI: String, credentialOffer: CredentialOffer.Draft13, isByReference: Boolean = false) {
+        val expectedURL = when (isByReference) {
+            false -> {
                 val expectedEncodedOffer = URLEncoder.encode(credentialOffer.toJSONString(), "UTF-8")
                 "openid-credential-offer://?credential_offer=$expectedEncodedOffer"
             }
-            credentialOfferUri != null -> {
-                val expectedEncodedUri = URLEncoder.encode(credentialOfferUri, "UTF-8")
-                "openid-credential-offer://?credential_offer_uri=$expectedEncodedUri"
-            }
-            else -> throw IllegalArgumentException("❌ Either credentialOffer or credentialOfferUri must be provided!")
+            true -> "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fexample.com%2FcredentialOffer%3Fid%3DRandomSessionId"
         }
 
-        assertEquals(expectedURL, credOfferURI, "❌ Credential Offer URI does not match expected output")
+        assertEquals(expectedURL, actualCredentialOfferURI, "Credential Offer URI does not match expected output")
     }
 
     private fun validateCredentialOffer(
@@ -171,6 +237,7 @@ class TestOID4VCI {
         assertNull(offer.grants[GrantType.pre_authorized_code.value]?.issuerState)
 
     }
+
 
     private fun validateIssuerMetadata(metadata: OpenIDProviderMetadata.Draft13) {
         val credentialIssuerUrl = metadata.credentialIssuer ?: throw IllegalArgumentException("credentialIssuerUrl cannot be null")
