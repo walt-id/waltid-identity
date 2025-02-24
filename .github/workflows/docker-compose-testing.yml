@@ -2,11 +2,22 @@ name: Docker compose testing (reusable workflow)
 
 on:
   workflow_call:
+    inputs:
+      artifact:
+        description: "Use images from artifact (defaults to false)"
+        required: false
+        type: boolean
+      tag:
+        description: "Use this docker tag (defaults to empty)"
+        required: false
+        type: string
   workflow_dispatch:  # Allows manual triggering of the workflow
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      use-artifact: ${{ inputs.artifact && inputs.tag != '' }}
     strategy:
       matrix:
         environment:
@@ -70,10 +81,46 @@ jobs:
           sudo chmod +x /usr/local/bin/docker-compose
           docker-compose --version
         continue-on-error: false
+      - name: Download issuer-api artifact
+        if: ${{ env.use-artifact }}
+        uses: actions/download-artifact@v4
+        with:
+          name: issuer-api
+          path: ${{ runner.temp }}
+      - name: Download verifier-api artifact
+        if: ${{ env.use-artifact }}
+        uses: actions/download-artifact@v4
+        with:
+          name: verifier-api
+          path: ${{ runner.temp }}
+      - name: Download wallet-api artifact
+        if: ${{ env.use-artifact }}
+        uses: actions/download-artifact@v4
+        with:
+          name: wallet-api
+          path: ${{ runner.temp }}
+      - name: Unzip
+        if: ${{ env.use-artifact }}
+        run: |
+          gunzip ${{ runner.temp }}/issuer-api.tar.gz
+          gunzip ${{ runner.temp }}/verifier-api.tar.gz
+          gunzip ${{ runner.temp }}/wallet-api.tar.gz
+      - name: Load Docker images from tarballs
+        if: ${{ env.use-artifact }}
+        run: |
+          docker load --input ${{ runner.temp }}/issuer-api.tar
+          docker load --input ${{ runner.temp }}/verifier-api.tar
+          docker load --input ${{ runner.temp }}/wallet-api.tar
       - name: Run stack
         run: |
           cd ./docker-compose
-          docker compose --profile services --profile tse up --build -d
+          if [[ "${{ env.use-artifact }}" == "true" ]]; then
+            export VERSION_TAG=${{ inputs.tag }}
+            build_arg=""
+          else
+            build_arg="--build"
+          fi
+          docker compose --profile services --profile tse up -d $build_arg
       - name: Ping services
         timeout-minutes: 5
         run: |
@@ -98,13 +145,13 @@ jobs:
           --iteration-data "${{ matrix.config.dataset }}" \
           --reporters htmlextra,cli,emojitrain \
           --reporter-cli-show-timestamps \
-          --reporter-htmlextra-export ./reports/${{ env.dataset_filename }}.html \
+          --reporter-htmlextra-export ./${{ env.dataset_filename }}.html \
           --insecure \
           --verbose
       - name: Upload report
         uses: actions/upload-artifact@v4
         with:
-          name: reports
-          path: ./reports
+          name: test-report-${{ env.dataset_filename }}
+          path: ./${{ env.dataset_filename }}.html
           overwrite: true
-          retention-days: 5
+          retention-days: 1
