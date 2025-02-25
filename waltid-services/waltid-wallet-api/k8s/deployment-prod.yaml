@@ -66,8 +66,9 @@ kind: PersistentVolumeClaim
 metadata:
   name: wallet-data-volume-claim
 spec:
+  storageClassName: azure-managed-standardssd-retain
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 10Gi
@@ -88,6 +89,13 @@ spec:
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
+      initContainers:
+        - name: init-myservice
+          image: busybox
+          command: [ 'sh', '-c', 'chmod 777 /waltid-wallet-api/data/' ]
+          volumeMounts:
+            - mountPath: "/waltid-wallet-api/data/"
+              name: wallet-data
       containers:
         - name: wallet-api
           image: waltid/wallet-api:__DEFAULT_IMAGE_TAG__
