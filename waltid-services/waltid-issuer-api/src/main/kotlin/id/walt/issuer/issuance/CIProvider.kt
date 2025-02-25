@@ -581,7 +581,7 @@ open class CIProvider(
             errorCode = TokenErrorCode.invalid_request,
             message = "No authorization session found for given authorization code, or session expired."
         )
-        if (tokenRequest.grantType == GrantType.pre_authorized_code && session.txCode != null &&
+        if (tokenRequest is TokenRequest.PreAuthorizedCode && session.txCode != null &&
             session.txCodeValue != tokenRequest.txCode
         ) {
             throw TokenError(
