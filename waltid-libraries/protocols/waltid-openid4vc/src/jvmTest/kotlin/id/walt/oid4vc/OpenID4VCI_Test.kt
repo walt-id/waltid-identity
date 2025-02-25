@@ -763,7 +763,7 @@ class OpenID4VCI_Test {
       // W: resolveIssuerMetadataByCredentialOffer (CredOfferObject) -> OpenIDProvideMetadataObject
       val resolveCIProviderMetadata = OpenID4VCI.resolveCIProviderMetadata(credentialOffer)
 
-      // The Wallet API checks for it's preauthorized or authorizedcode
+      // The Wallet API checks if the offer has a it's preauthorized or authorization code (check GrantTypes.isAvailableIn() or so)
       // Its Pre-Authorized
       // The Wallet API constructs the Token the Request as follows (considering make this with type safety with sealed classed (e.g. TokenRequest() -> AuthorizationCode(), PreAuthorizedCode()) :
       val tokenRequest = TokenRequest.PreAuthorizedCode(
@@ -771,7 +771,7 @@ class OpenID4VCI_Test {
         clientId = null,  // The Wallet API should check for token_endpoint_auth_method in Issuer Metadata to see what client authentication types are supported.
       )
 
-//      val tokenResponse = OpenID4VCI.sendTokenRequest(resolveCIProviderMetadata, tokenRequest)
+      val tokenResponse = OpenID4VCI.sendTokenRequest(resolveCIProviderMetadata, tokenRequest)
       // W: sendTokenRequest (code or preauthCode ) -> TokenRepsonseObject
 
 
