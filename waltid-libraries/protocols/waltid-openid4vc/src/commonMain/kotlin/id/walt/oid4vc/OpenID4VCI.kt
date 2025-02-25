@@ -185,21 +185,11 @@ object OpenID4VCI {
     }
 
     private fun validateAuthorizationCode(tokenRequest: TokenRequest, authorizationCode: String): Boolean {
-        val code = when (tokenRequest.grantType) {
-            GrantType.authorization_code -> tokenRequest.code ?: throw TokenError(
-                tokenRequest = tokenRequest,
-                errorCode = TokenErrorCode.invalid_grant,
-                message = "No code parameter found on token request"
-            )
-
-            GrantType.pre_authorized_code -> tokenRequest.preAuthorizedCode ?: throw TokenError(
-                tokenRequest = tokenRequest,
-                errorCode = TokenErrorCode.invalid_grant,
-                message = "No pre-authorized_code parameter found on token request"
-            )
-
-            else -> throw TokenError(tokenRequest, TokenErrorCode.unsupported_grant_type, "Grant type not supported")
+        val code = when (tokenRequest) {
+            is TokenRequest.AuthorizationCode -> tokenRequest.code
+            is TokenRequest.PreAuthorizedCode -> tokenRequest.preAuthorizedCode
         }
+
         return code == authorizationCode
     }
 
