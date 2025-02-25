@@ -32,32 +32,51 @@ import kotlinx.serialization.json.*
 object OpenID4VC {
   private val log = KotlinLogging.logger { }
 
-  suspend fun generateToken(sub: String, issuer: String, audience: TokenTarget, tokenId: String? = null, tokenKey: Key): String {
-    return signToken(audience, buildJsonObject {
-      put(JWTClaims.Payload.subject, sub)
-      put(JWTClaims.Payload.issuer, issuer)
-      put(JWTClaims.Payload.audience, audience.name)
-      tokenId?.let { put(JWTClaims.Payload.jwtID, it) }
-    }, tokenKey)
+  suspend fun generateToken(
+    sub: String,
+    issuer: String,
+    audience: TokenTarget,
+    tokenId: String? = null,
+    tokenKey: Key
+  ): String {
+    return signToken(
+      target = audience,
+      payload = buildJsonObject {
+          put(JWTClaims.Payload.subject, sub)
+          put(JWTClaims.Payload.issuer, issuer)
+          put(JWTClaims.Payload.audience, audience.name)
+          tokenId?.let { put(JWTClaims.Payload.jwtID, it) }
+      },
+      privKey = tokenKey
+    )
   }
 
-  suspend fun verifyAndParseToken(token: String, issuer: String, target: TokenTarget, tokenKey: Key? = null): JsonObject? {
-    if (verifyTokenSignature(target, token, tokenKey)) {
-      val payload = parseTokenPayload(token)
-      if (payload.keys.containsAll(
-          setOf(
-            JWTClaims.Payload.subject,
-            JWTClaims.Payload.audience,
-            JWTClaims.Payload.issuer
-          )
-        ) &&
-        payload[JWTClaims.Payload.audience]!!.jsonPrimitive.content == target.name &&
-        payload[JWTClaims.Payload.issuer]!!.jsonPrimitive.content == issuer
-      ) {
-        return payload
-      }
-    }
-    return null
+  suspend fun verifyAndParseToken(
+    token: String,
+    issuer: String,
+    target: TokenTarget,
+    tokenKey: Key? = null
+  ): JsonObject? {
+
+    if (!verifyTokenSignature(
+        target = target,
+        token = token,
+        tokenKey = tokenKey
+      )) return null
+
+    val payload = parseTokenPayload(token)
+
+    val requiredClaims = setOf(
+      JWTClaims.Payload.subject,
+      JWTClaims.Payload.audience,
+      JWTClaims.Payload.issuer
+    )
+
+    val isValid = requiredClaims.all { it in payload } &&
+            payload[JWTClaims.Payload.audience]?.jsonPrimitive?.content == target.name &&
+            payload[JWTClaims.Payload.issuer]?.jsonPrimitive?.content == issuer
+
+    return if (isValid) payload else null
   }
 
   suspend fun verifyAndParseIdToken(token: String, tokenKey: Key? = null): JsonObject {
