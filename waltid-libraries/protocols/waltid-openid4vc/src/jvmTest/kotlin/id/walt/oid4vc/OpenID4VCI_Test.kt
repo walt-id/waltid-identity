@@ -127,12 +127,12 @@ class OpenID4VCI_Test {
 
     println("// -------- WALLET ----------")
     println("// token req")
-    val tokenReq =
-      TokenRequest(
-        GrantType.authorization_code,
-        WALLET_CLIENT_ID,
-        code = authCodeResponse.code!!
-      )
+    val tokenReq = TokenRequest.AuthorizationCode(
+      clientId =  WALLET_CLIENT_ID,
+      code =  authCodeResponse.code!!,
+    )
+
+
     println("tokenReq: $tokenReq")
 
     println("// -------- CREDENTIAL ISSUER ----------")
