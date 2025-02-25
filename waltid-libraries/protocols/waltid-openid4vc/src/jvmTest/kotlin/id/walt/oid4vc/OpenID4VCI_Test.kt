@@ -21,7 +21,16 @@ import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.randomUUID
 import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.sdjwt.SDJwt
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.reflect.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -31,6 +40,7 @@ import org.junit.jupiter.api.BeforeAll
 import kotlin.test.*
 
 class OpenID4VCI_Test {
+  val DEPLOYED_ISSUER_BASE_URL = "https://issuer.portal.test.waltid.cloud"
   val ISSUER_BASE_URL = "https://test"
   val CREDENTIAL_OFFER_BASE_URL = "openid-credential-offer://test"
   val ISSUER_METADATA = (OpenID4VCI.createDefaultProviderMetadata(ISSUER_BASE_URL, emptyMap(), OpenID4VCIVersion.DRAFT13) as OpenIDProviderMetadata.Draft13).copy(
@@ -264,12 +274,12 @@ class OpenID4VCI_Test {
 
     println("// -------- WALLET ----------")
     println("// token req")
-    var tokenReq =
-      TokenRequest(
-        GrantType.authorization_code,
-        WALLET_CLIENT_ID,
-        code = authCodeResponse.code!!
-      )
+
+    var tokenReq = TokenRequest.AuthorizationCode(
+      clientId =  WALLET_CLIENT_ID,
+      code =  authCodeResponse.code!!,
+    )
+
     println("tokenReq: $tokenReq")
 
 
@@ -412,12 +422,13 @@ class OpenID4VCI_Test {
 
     println("// -------- WALLET ----------")
     println("// token req")
-    tokenReq =
-      TokenRequest(
-        GrantType.authorization_code,
-        WALLET_CLIENT_ID,
-        code = authCodeResponse.code!!
-      )
+
+    tokenReq = TokenRequest.AuthorizationCode(
+      clientId = WALLET_CLIENT_ID,
+      code = authCodeResponse.code!!
+    )
+
+
     println("tokenReq: $tokenReq")
 
 
@@ -566,12 +577,11 @@ class OpenID4VCI_Test {
 
     println("// -------- WALLET ----------")
     println("// token req")
-    tokenReq =
-      TokenRequest(
-        GrantType.authorization_code,
-        WALLET_CLIENT_ID,
-        code = authCodeResponse.code!!
-      )
+    tokenReq = TokenRequest.AuthorizationCode(
+      clientId = WALLET_CLIENT_ID,
+      code = authCodeResponse.code!!
+    )
+
     println("tokenReq: $tokenReq")
 
 
@@ -649,18 +659,13 @@ class OpenID4VCI_Test {
 
 
     println("// token req")
-    tokenReq = TokenRequest(
-      grantType = GrantType.pre_authorized_code,
-      //clientId = testCIClientConfig.clientID,
-      redirectUri = WALLET_REDIRECT_URI,
-      preAuthorizedCode = credOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-      txCode = null
+    val tokenReqPre = TokenRequest.PreAuthorizedCode(
+      preAuthorizedCode = credOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!
     )
-
 
     println("// -------- CREDENTIAL ISSUER ----------")
     // Validate token request against authorization code
-    OpenID4VCI.validateTokenRequestRaw(tokenReq.toHttpParameters(), preAuthCode)
+    OpenID4VCI.validateTokenRequestRaw(tokenReqPre.toHttpParameters(), preAuthCode)
 
     // Generate Access Token
     expirationTime = (Clock.System.now().epochSeconds + 864000L) // ten days in milliseconds
