@@ -44,6 +44,7 @@ data class CredentialTypeConfig(
         "eID" to vc("VerifiableCredential", "VerifiableAttestation", "eID"),
         "NaturalPersonVerifiableID" to vc("VerifiableCredential", "VerifiableAttestation", "NaturalPersonVerifiableID"),
         "BoardingPass" to vc("VerifiableCredential", "VerifiableAttestation", "BoardingPass"),
+        "LegalPerson" to vc("VerifiableCredential", "LegalPerson"),
         MDocTypes.ISO_MDL to vc(
             CredentialSupported(
                 format = CredentialFormat.mso_mdoc,
