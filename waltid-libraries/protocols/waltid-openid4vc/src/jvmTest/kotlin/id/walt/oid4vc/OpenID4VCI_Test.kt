@@ -716,4 +716,138 @@ class OpenID4VCI_Test {
       actual = credential["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull?.substringBefore("#")
     )
   }
+
+    @Test
+    fun testWalletRelatedIsolatedFunctions() = runTest {
+        //
+        // Issuer
+        //
+
+        // Setup Issuer - Currently, the deployed one is used
+        val httpClient = testHttpClient()
+
+        val credentialRequest = buildJsonObject {
+            put("issuerKey",  ISSUER_DID_KEY.exportJWKObject())
+            put("issuerDid", ISSUER_DID)
+            put("credentialConfigurationId", "OpenBadgeCredential_jwt_vc_json")
+            put("credentialData", Json.parseToJsonElement(openBadgeCredentialData).jsonObject)
+            put("mapping", Json.parseToJsonElement("""
+                {
+                     "id":"<uuid>",
+                     "issuer":{
+                        "id":"<issuerDid>"
+                     },
+                     "credentialSubject":{
+                        "id":"<subjectDid>"
+                     },
+                     "issuanceDate":"<timestamp>",
+                     "expirationDate":"<timestamp-in:365d>"
+                  }
+                """.trimIndent()
+            ).jsonObject)
+        }
+
+      // Create Offer In Issuer API and get it as a String
+      val credentialOfferUrlString = httpClient.post("${DEPLOYED_ISSUER_BASE_URL}/openid4vc/jwt/issue") {
+          setBody(Json.encodeToJsonElement(credentialRequest))
+        }.expectSuccess().body<String>()
+
+      //
+      // Wallet
+      //
+
+      // Wallet API gets CredentialOfferString somehow.
+      // Wallet parses it.
+      val credentialOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(credentialOfferUrlString)
+
+      // W: resolveIssuerMetadataByCredentialOffer (CredOfferObject) -> OpenIDProvideMetadataObject
+      val resolveCIProviderMetadata = OpenID4VCI.resolveCIProviderMetadata(credentialOffer)
+
+      // The Wallet API checks for it's preauthorized or authorizedcode
+      // Its Pre-Authorized
+      // The Wallet API constructs the Token the Request as follows (considering make this with type safety with sealed classed (e.g. TokenRequest() -> AuthorizationCode(), PreAuthorizedCode()) :
+      val tokenRequest = TokenRequest.PreAuthorizedCode(
+        preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!,
+        clientId = null,  // The Wallet API should check for token_endpoint_auth_method in Issuer Metadata to see what client authentication types are supported.
+      )
+
+//      val tokenResponse = OpenID4VCI.sendTokenRequest(resolveCIProviderMetadata, tokenRequest)
+      // W: sendTokenRequest (code or preauthCode ) -> TokenRepsonseObject
+
+
+      // The Wallet API sings the proper material
+        // W: sendCredentialRequest (token, PoP) -> CredentialResponseObject
+        // The Wallet API receives the credential
+
+    }
 }
+
+fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
+    install(ContentNegotiation) {
+      json(
+        Json {
+          explicitNulls = false
+          encodeDefaults = true
+        }
+      )
+    }
+    install(DefaultRequest) {
+      contentType(ContentType.Application.Json)
+      host = "127.0.0.1"
+      port = 22222
+
+      if (token != null) bearerAuth(token)
+    }
+    install(Logging) {
+      level = LogLevel.ALL
+    }
+    followRedirects = doFollowRedirects
+}
+
+fun HttpResponse.expectSuccess() = also {
+  check(it.status.isSuccess()) { "Expected success for request ${it.request.url}, but was: $it" }
+}
+
+private val openBadgeCredentialData = """
+      {
+          "@context": [
+            "https://www.w3.org/2018/credentials/v1",
+            "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
+          ],
+          "id": "urn:uuid:THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION (see below)",
+          "type": [
+            "VerifiableCredential",
+            "OpenBadgeCredential"
+          ],
+          "name": "JFF x vc-edu PlugFest 3 Interoperability",
+          "issuer": {
+            "type": [
+              "Profile"
+            ],
+            "name": "Jobs for the Future (JFF)",
+            "url": "https://www.jff.org/",
+            "image": "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png"
+          },
+          "credentialSubject": {
+            "type": [
+              "AchievementSubject"
+            ],
+            "achievement": {
+              "id": "urn:uuid:ac254bd5-8fad-4bb1-9d29-efd938536926",
+              "type": [
+                "Achievement"
+              ],
+              "name": "JFF x vc-edu PlugFest 3 Interoperability",
+              "description": "This wallet supports the use of W3C Verifiable Credentials and has demonstrated interoperability during the presentation request workflow during JFF x VC-EDU PlugFest 3.",
+              "criteria": {
+                "type": "Criteria",
+                "narrative": "Wallet solutions providers earned this badge by demonstrating interoperability during the presentation request workflow. This includes successfully receiving a presentation request, allowing the holder to select at least two types of verifiable credentials to create a verifiable presentation, returning the presentation to the requestor, and passing verification of the presentation and the included credentials."
+              },
+              "image": {
+                "id": "https://w3c-ccg.github.io/vc-ed/plugfest-3-2023/images/JFF-VC-EDU-PLUGFEST3-badge-image.png",
+                "type": "Image"
+              }
+            }
+          }
+        }
+      """.trimIndent()
