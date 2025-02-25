@@ -34,6 +34,7 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationCodeWithAuthorizationRequestResponse
 import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.responses.TokenErrorCode
+import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.http
 import id.walt.policies.Verifier
@@ -45,7 +46,9 @@ import id.walt.sdjwt.SDJwtVC.Companion.defaultPayloadProperties
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
@@ -170,6 +173,25 @@ object OpenID4VCI {
 
     private fun parseAuthorizationRequestQueryString(authorizationRequestQueryString: String): AuthorizationRequest {
         return AuthorizationRequest.fromHttpQueryString(authorizationRequestQueryString)
+    }
+
+    suspend fun sendTokenRequest(
+        metadata: OpenIDProviderMetadata,
+        tokenRequest: TokenRequest,
+    ): TokenResponse {
+        val tokenEndpoint = metadata.tokenEndpoint
+            ?: throw IllegalArgumentException("Missing token endpoint in issuer metadata.")
+
+        val response = http.submitForm(
+            url = tokenEndpoint,
+            formParameters = parametersOf(tokenRequest.toHttpParameters())
+        )
+
+        if (!response.status.isSuccess()) {
+            throw IllegalArgumentException("Failed to get token: ${response.status.value} - ${response.bodyAsText()}")
+        }
+
+        return response.body<TokenResponse>()
     }
 
     fun validateTokenRequestRaw(tokenRequestRaw: Map<String, List<String>>, authorizationCode: String): TokenRequest {
