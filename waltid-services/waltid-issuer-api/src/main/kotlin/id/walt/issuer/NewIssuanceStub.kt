@@ -152,9 +152,8 @@ suspend fun main() {
     println("// -------- WALLET ----------")
     println("// token req")
     val tokenReq =
-        TokenRequest(
-            GrantType.authorization_code,
-            clientId,
+        TokenRequest.AuthorizationCode(
+            clientId = clientId,
             code = authCodeResponse.code!!
         )
     println("tokenReq: $tokenReq")

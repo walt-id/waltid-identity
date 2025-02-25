@@ -8,7 +8,6 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.mdoc.dataelement.MapElement
-import id.walt.oid4vc.data.GrantType
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
@@ -115,20 +114,9 @@ object OpenID4VC {
   }
 
   suspend fun validateAndParseTokenRequest(tokenRequest: TokenRequest, issuer: String, tokenKey: Key? = null): JsonObject {
-    val code = when (tokenRequest.grantType) {
-      GrantType.authorization_code -> tokenRequest.code ?: throw TokenError(
-        tokenRequest = tokenRequest,
-        errorCode = TokenErrorCode.invalid_grant,
-        message = "No code parameter found on token request"
-      )
-
-      GrantType.pre_authorized_code -> tokenRequest.preAuthorizedCode ?: throw TokenError(
-        tokenRequest = tokenRequest,
-        errorCode = TokenErrorCode.invalid_grant,
-        message = "No pre-authorized_code parameter found on token request"
-      )
-
-      else -> throw TokenError(tokenRequest, TokenErrorCode.unsupported_grant_type, "Grant type not supported")
+    val code = when (tokenRequest) {
+      is TokenRequest.AuthorizationCode -> tokenRequest.code
+      is TokenRequest.PreAuthorizedCode -> tokenRequest.preAuthorizedCode
     }
 
     return verifyAndParseToken(
