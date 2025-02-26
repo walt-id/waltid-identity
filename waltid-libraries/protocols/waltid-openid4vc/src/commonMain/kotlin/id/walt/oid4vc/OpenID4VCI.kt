@@ -187,10 +187,10 @@ object OpenID4VCI {
     }
 
     suspend fun sendTokenRequest(
-        metadata: OpenIDProviderMetadata,
+        providerMetadata: OpenIDProviderMetadata,
         tokenRequest: TokenRequest,
     ): TokenResponse {
-        val tokenEndpoint = metadata.tokenEndpoint
+        val tokenEndpoint = providerMetadata.tokenEndpoint
             ?: throw IllegalArgumentException("Missing token endpoint in issuer metadata.")
 
         val response = http.submitForm(
@@ -206,11 +206,11 @@ object OpenID4VCI {
     }
 
     suspend fun sendCredentialRequest(
-        metadata: OpenIDProviderMetadata,
+        providerMetadata: OpenIDProviderMetadata,
         accessToken: String,
         credentialRequest: CredentialRequest
     ): CredentialResponse {
-        val credentialEndpoint = metadata.credentialEndpoint
+        val credentialEndpoint = providerMetadata.credentialEndpoint
             ?: throw IllegalArgumentException("Missing credential endpoint in issuer metadata.")
 
         val response = http.post(credentialEndpoint) {
@@ -265,8 +265,8 @@ object OpenID4VCI {
         }
     }
 
-    fun isCryptographicBindingProofRequired(metadata: OpenIDProviderMetadata): Boolean {
-        return metadata.getSupportedProofTypes().isNullOrEmpty()
+    fun isCryptographicBindingProofRequired(providerMetadata: OpenIDProviderMetadata): Boolean {
+        return providerMetadata.getSupportedProofTypes().isNullOrEmpty()
     }
 
     suspend fun verifyToken(token: String, key: Key): Result<JsonElement> {
