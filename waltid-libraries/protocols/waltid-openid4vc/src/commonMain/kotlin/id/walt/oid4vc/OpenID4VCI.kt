@@ -228,6 +228,29 @@ object OpenID4VCI {
         return response.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
     }
 
+    suspend fun sendBatchCredentialRequest(
+        providerMetadata: OpenIDProviderMetadata,
+        accessToken: String,
+        batchCredentialRequest: BatchCredentialRequest,
+    ): BatchCredentialResponse {
+        val batchCredentialEndpoint = providerMetadata.batchCredentialEndpoint
+            ?: throw IllegalArgumentException("Missing batch credential endpoint in issuer metadata.")
+
+        val response = http.post(batchCredentialEndpoint) {
+            headers {
+                appendAll(Headers.build { set(HttpHeaders.Authorization, "Bearer $accessToken") })
+            }
+            contentType(ContentType.Application.Json)
+            setBody(batchCredentialRequest.toJSON())
+        }
+
+        if (!response.status.isSuccess()) {
+            throw IllegalArgumentException("Failed to get token: ${response.status.value} - ${response.bodyAsText()}")
+        }
+
+        return response.body<JsonObject>().let { BatchCredentialResponse.fromJSON(it) }
+    }
+
     fun validateTokenRequestRaw(tokenRequestRaw: Map<String, List<String>>, authorizationCode: String): TokenRequest {
         val tokenRequest = parseTokenRequest(tokenRequestRaw)
         validateAuthorizationCode(tokenRequest, authorizationCode).let {
