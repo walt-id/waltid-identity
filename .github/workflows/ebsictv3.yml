@@ -49,6 +49,7 @@ jobs:
           path: ${{ runner.temp }}
 
       - name: Unzip ${{ inputs.artifact }}.tar.gz
+        if: ${{ env.use-artifact }}
         run: gunzip ${{ runner.temp }}/${{ inputs.artifact }}.tar.gz
       - name: Load Docker image from tarball
         if: ${{ env.use-artifact }}
