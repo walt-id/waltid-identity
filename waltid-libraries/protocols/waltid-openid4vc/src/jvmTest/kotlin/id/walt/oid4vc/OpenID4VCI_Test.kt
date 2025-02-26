@@ -725,9 +725,13 @@ class OpenID4VCI_Test {
 
         // Setup Issuer - Currently, the deployed one is used
         val httpClient = testHttpClient()
-
-        val credentialRequest = buildJsonObject {
-            put("issuerKey",  ISSUER_DID_KEY.exportJWKObject())
+      ISSUER_DID_KEY.exportJWKObject()
+        val createCredentialOfferRequestBody = buildJsonObject {
+            put("issuerKey", buildJsonObject {
+                put("type", "jwk")
+                put("jwk", ISSUER_DID_KEY.exportJWKObject())
+              }
+            )
             put("issuerDid", ISSUER_DID)
             put("credentialConfigurationId", "OpenBadgeCredential_jwt_vc_json")
             put("credentialData", Json.parseToJsonElement(openBadgeCredentialData).jsonObject)
@@ -749,7 +753,7 @@ class OpenID4VCI_Test {
 
       // Create Offer In Issuer API and get it as a String
       val credentialOfferUrlString = httpClient.post("${DEPLOYED_ISSUER_BASE_URL}/openid4vc/jwt/issue") {
-          setBody(Json.encodeToJsonElement(credentialRequest))
+          setBody(Json.encodeToJsonElement(createCredentialOfferRequestBody))
         }.expectSuccess().body<String>()
 
       //
@@ -763,7 +767,7 @@ class OpenID4VCI_Test {
       // W: resolveIssuerMetadataByCredentialOffer (CredOfferObject) -> OpenIDProvideMetadataObject
       val resolvedCIProviderMetadata = OpenID4VCI.resolveCIProviderMetadata(credentialOffer)
 
-      // The Wallet API checks if the offer has a it's preauthorized or authorization code (check GrantTypes.isAvailableIn() or so)
+      // The Wallet API checks if the offer has a preauthorized or authorization code (check GrantTypes.isAvailableIn() or so)
       // Its Pre-Authorized
       // The Wallet API constructs the Token the Request as follows (considering make this with type safety with sealed classed (e.g. TokenRequest() -> AuthorizationCode(), PreAuthorizedCode()) :
       val tokenRequest = TokenRequest.PreAuthorizedCode(
@@ -774,11 +778,68 @@ class OpenID4VCI_Test {
       val tokenResponse = OpenID4VCI.sendTokenRequest(resolvedCIProviderMetadata, tokenRequest)
       // W: sendTokenRequest (code or preauthCode ) -> TokenRepsonseObject
 
+      // Wallet Validates the response
+      OpenID4VCI.validateTokenResponse(tokenResponse)
 
-      // The Wallet API sings the proper material
-        // W: sendCredentialRequest (token, PoP) -> CredentialResponseObject
-        // The Wallet API receives the credential
+      /*
+       // 1. The wallet should check if there is the proof_types_supported in credential_configurations_supported, if its there it checks for the proof_type (i.e. jwt, ctw or ldp_vp) - currently the issuer implementation is does not contain this
 
+       Possible cases:
+       A. If it's not required and there is no c_nonce - we skip it
+       B. If it's either required either there c_nonce, either both are there - we do it
+
+       1. check if the isCryptographicBindingProofRequired is true and c_nonce != null
+            1a. take the proofTypesSupported
+            1a.b if its `jwt`, continue with jwt-proof and add the c_nonce, else throw a TODO
+       2. check if the isCryptographicBindingProofRequired is true and c_nonce == null
+            2a. take the proofTypesSupported
+            2a.b if its `jwt`, continue with jwt-proof and add a random nonce or don't add at all since its optional, else throw a TODO
+       3. check if the isCryptographicBindingProofRequired is false and c_nonce != null
+            3a continue with your choice of proof type, e.g. `jwt`, continue with jwt-proof and add a random nonce or don't add at all since its optional, else throw a TODO
+       4. check if the isCryptographicBindingProofRequired is false and c_nonce == null
+            4a dont sent proof
+
+      // 2. When the proofType is defined we need to check the `proof_signing_alg_values_supported` (i.e. ES256)
+
+      sealed class ProofHandlingResult {
+          object SkipProof : ProofHandlingResult()  // No proof required, skip this step
+          object ProceedWithJWT : ProofHandlingResult() // Continue with JWT-based proof flow
+          data class TodoHandleOtherProofs(val proofTypes: List<ProofType>) : ProofHandlingResult() // Handle non-JWT proofs
+          object ProceedWithChosenProof : ProofHandlingResult() // Proof is not required, but c_nonce exists → choose proof or Continue with JWT-based proof flow
+      }
+
+      // 3. Then, the wallet should check the cryptographic_binding_methods_supported to understand with which key material will sign the proof (i.e. keys in JWK format `jwk`, keys expressed as a COSE Key `cose_key` or a specific did method, (e.g did:key), currently the issuer implementation is wrong
+      */
+
+      // 4. the wallet constructs the credential request
+      val nonce = tokenResponse.cNonce
+
+      val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, resolvedCIProviderMetadata)
+      assertEquals(1, offeredCredentials.size)
+      val offeredCredential = offeredCredentials[0]
+
+      val holderDid = WALLET_DID
+      val holderKey = JWKKey.importJWK(WALLET_KEY).getOrThrow()
+      val holderKeyId = holderKey.getKeyId()
+      val proofKeyId = "$holderDid#$holderKeyId"
+      val proofOfPossession = ProofOfPossession.JWTProofBuilder(
+        issuerUrl = resolvedCIProviderMetadata.credentialIssuer!!,
+        clientId = WALLET_CLIENT_ID,
+        nonce = nonce,
+        keyId = proofKeyId
+      ).build(
+        key = holderKey
+      )
+
+      val credentialRequest = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
+      println("credReq: $credentialRequest")
+
+      val accessToken = tokenResponse.accessToken!!
+      val credential = OpenID4VCI.sendCredentialRequest(resolvedCIProviderMetadata, accessToken, credentialRequest)
+      // W: sendCredentialRequest (token, PoP) -> CredentialResponseObject
+
+      assertNotNull(credential.credential)
+      println(credential)
     }
 }
 
