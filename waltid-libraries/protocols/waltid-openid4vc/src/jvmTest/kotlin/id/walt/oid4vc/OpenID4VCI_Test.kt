@@ -837,7 +837,11 @@ class OpenID4VCI_Test {
             clientId = null,  // The Wallet API should check for token_endpoint_auth_method in Issuer Metadata to see what client authentication types are supported.
         )
 
-        val tokenResponse = OpenID4VCI.sendTokenRequest(resolvedCIProviderMetadata, tokenRequest)
+        val tokenResponse = OpenID4VCI.sendTokenRequest(
+            providerMetadata = resolvedCIProviderMetadata,
+            tokenRequest = tokenRequest
+        )
+
         // W: sendTokenRequest (code or preauthCode ) -> TokenRepsonseObject
 
         // Wallet Validates the response ( check if there is successful and contains the required access_token)
@@ -873,11 +877,16 @@ class OpenID4VCI_Test {
         // 3. Then, the wallet should check the cryptographic_binding_methods_supported to understand with which key material will sign the proof (i.e. keys in JWK format `jwk`, keys expressed as a COSE Key `cose_key` or a specific did method, (e.g did:key), currently the issuer implementation is wrong
         */
 
-        // 4. the wallet constructs the credential request
+        // 4. The Wallet API constructs the credential request
         val nonce = tokenResponse.cNonce
 
-        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, resolvedCIProviderMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(
+            credentialOffer = credentialOffer,
+            providerMetadata = resolvedCIProviderMetadata
+        )
+
         assertEquals(1, offeredCredentials.size)
+
         val offeredCredential = offeredCredentials[0]
 
         val holderDid = WALLET_DID
@@ -894,10 +903,17 @@ class OpenID4VCI_Test {
         )
 
         val accessToken = tokenResponse.accessToken!!
-        val credentialRequest = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
+        val credentialRequest = CredentialRequest.forOfferedCredential(
+            offeredCredential = offeredCredential,
+            proof = proofOfPossession
+        )
 
-        val credentialResponse =
-            OpenID4VCI.sendCredentialRequest(resolvedCIProviderMetadata, accessToken, credentialRequest)
+        // 5. The Wallet API sends the credential request
+        val credentialResponse = OpenID4VCI.sendCredentialRequest(
+            providerMetadata = resolvedCIProviderMetadata,
+            accessToken = accessToken,
+            credentialRequest = credentialRequest
+        )
 
         assertNotNull(credentialResponse.credential)
         println(credentialResponse)
