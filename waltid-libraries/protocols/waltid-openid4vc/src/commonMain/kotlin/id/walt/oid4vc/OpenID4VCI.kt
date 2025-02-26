@@ -205,6 +205,29 @@ object OpenID4VCI {
         return response.body<TokenResponse>()
     }
 
+    suspend fun sendCredentialRequest(
+        metadata: OpenIDProviderMetadata,
+        accessToken: String,
+        credentialRequest: CredentialRequest
+    ): CredentialResponse {
+        val credentialEndpoint = metadata.credentialEndpoint
+            ?: throw IllegalArgumentException("Missing credential endpoint in issuer metadata.")
+
+        val response = http.post(credentialEndpoint) {
+            headers {
+                appendAll(Headers.build { set(HttpHeaders.Authorization, "Bearer $accessToken") })
+            }
+            contentType(ContentType.Application.Json)
+            setBody(credentialRequest.toJSON())
+        }
+
+        if (!response.status.isSuccess()) {
+            throw IllegalArgumentException("Failed to get token: ${response.status.value} - ${response.bodyAsText()}")
+        }
+
+        return response.body<CredentialResponse>()
+    }
+
     fun validateTokenRequestRaw(tokenRequestRaw: Map<String, List<String>>, authorizationCode: String): TokenRequest {
         val tokenRequest = parseTokenRequest(tokenRequestRaw)
         validateAuthorizationCode(tokenRequest, authorizationCode).let {
