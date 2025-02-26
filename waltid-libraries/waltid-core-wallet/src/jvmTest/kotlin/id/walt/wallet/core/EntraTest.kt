@@ -49,7 +49,7 @@ class EntraTest : BaseTest() {
         println("Verification: $verification")
     }
 
-    @Test
+    // @Test // FIXME: Entra Issuer deployment at https://entra-demo.walt.id/entra/issue is unavailable
     fun testEntraFlow() = runTest(timeout = 3.minutes) {
         val receivedCredentials = entraFlowIssuance()
         entraFlowVerification(receivedCredentials)

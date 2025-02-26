@@ -36,7 +36,7 @@ import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
-import java.util.Base64
+import java.util.*
 
 class VerificationUseCase(
     val http: HttpClient, cryptoProvider: JWTCryptoProvider,
@@ -174,10 +174,7 @@ class VerificationUseCase(
             val redirectUri = sessionVerificationInfo.errorRedirectUri?.replace("\$id", session.id)
 
             logger.debug { "Presentation failed, redirecting to: $redirectUri" }
-
-            if (redirectUri != null) {
-                return Result.failure(Exception(redirectUri))
-            }
+            
 
             return if (policyResults == null) {
                 Result.failure(FailedVerificationException(redirectUri, IllegalArgumentException("Verification policies did not succeed")))
