@@ -321,17 +321,30 @@ object OpenID4VC {
     log.debug { "JWS Verification: target: $target" }
 
     val tokenHeader = Json.parseToJsonElement(token.split(".")[0].base64UrlDecode().decodeToString()).jsonObject
-    val key = (if (tokenHeader["jwk"] != null) {
-      JWKKey.importJWK(tokenHeader["jwk"].toString()).getOrThrow()
-    } else if (tokenHeader["kid"] != null) {
-      val kid = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
-      if(DidUtils.isDidUrl(kid)) {
-        log.debug { "Resolving DID: $kid" }
-        DidService.resolveToKey(kid).getOrThrow()
-      } else if(tokenKey != null && kid.equals(tokenKey.getKeyId())) {
-        tokenKey
-      } else null
-    } else tokenKey) ?: throw TokenVerificationError(token, target, "Could not resolve key for given token")
+
+    val key = when {
+      tokenHeader["jwk"] != null -> JWKKey.importJWK(tokenHeader["jwk"].toString()).getOrThrow()
+
+      tokenHeader["kid"] != null -> {
+        val kid = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
+        when {
+          DidUtils.isDidUrl(kid) -> {
+            log.debug { "Resolving DID: $kid" }
+            DidService.resolveToKey(kid).getOrThrow()
+          }
+          tokenKey != null && kid == tokenKey.getKeyId() -> tokenKey
+          else -> null
+        }
+      }
+
+      else -> tokenKey
+    }
+      ?: throw TokenVerificationError(
+        token = token,
+        target = target,
+        message = "Could not resolve key for given token"
+      )
+
     return key.verifyJws(token).also { log.debug { "VERIFICATION IS: $it" } }.isSuccess
   }
 
