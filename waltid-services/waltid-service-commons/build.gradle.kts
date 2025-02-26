@@ -19,6 +19,8 @@ object Versions {
 
 dependencies {
     api(project(":waltid-libraries:waltid-library-commons"))
+    // OIDC
+    api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
     // Ktor
     api("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
