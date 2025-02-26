@@ -1,7 +1,7 @@
-package id.walt.commons.audit.filter
+package id.walt.commons.events.filter
 
-import id.walt.commons.audit.EventStatus
-import id.walt.commons.audit.EventType
+import id.walt.commons.events.EventStatus
+import id.walt.commons.events.EventType
 import kotlinx.serialization.Serializable
 
 @Serializable
