@@ -37,17 +37,18 @@ object IssuanceService : IssuanceServiceBase() {
         val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)
         val processedCredentialOffers = if (isEntra) {
             processMSEntraIssuanceRequest(
-                EntraIssuanceRequest.fromAuthorizationRequest(
+                entraIssuanceRequest = EntraIssuanceRequest.fromAuthorizationRequest(
                     AuthorizationRequest.fromHttpParametersAuto(
                         reqParams
                     )
-                ), credentialWallet
+                ),
+                credentialWallet = credentialWallet
             )
         } else {
             processCredentialOffer(
-                credentialWallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams)),
-                credentialWallet,
-                clientId
+                credentialOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(offer),
+                credentialWallet = credentialWallet,
+                clientId = clientId
             )
         }
         // === original ===
@@ -67,16 +68,15 @@ object IssuanceService : IssuanceServiceBase() {
         credentialWallet: TestCredentialWallet,
         clientId: String,
     ): List<ProcessedCredentialOffer> {
-        val providerMetadata = getCredentialIssuerOpenIDMetadata(
-            credentialOffer.credentialIssuer,
-            credentialWallet,
-        )
+
+        val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(credentialOffer)
 
         logger.debug { "providerMetadata: $providerMetadata" }
 
         logger.debug { "// resolve offered credentials" }
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
         logger.debug { "offeredCredentials: $offeredCredentials" }
+
         require(offeredCredentials.isNotEmpty()) { "Resolved an empty list of offered credentials" }
 
         logger.debug { "// fetch access token using pre-authorized code (skipping authorization step)" }
@@ -86,12 +86,14 @@ object IssuanceService : IssuanceServiceBase() {
             clientId = clientId
         )
 
-        val tokenResp = issueTokenRequest(
-            providerMetadata.tokenEndpoint!!,
-            tokenReq,
+        val tokenResp =  OpenID4VCI.sendTokenRequest(
+            providerMetadata = providerMetadata,
+            tokenRequest = tokenReq
         )
         logger.debug { ">>> Token response is: $tokenResp" }
-        validateTokenResponse(tokenResp)
+
+        OpenID4VCI.validateTokenResponse(tokenResp)
+
         //we know for a fact that there is an access token in the response
         //due to the validation call above
         val accessToken = tokenResp.accessToken!!
