@@ -7,14 +7,17 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class)
 @Serializable
 class VerificationEvent(
+  override val originator: String?,
   override val target: String,
   override val timestamp: Long,
-  override val status: EventStatus,
+  override val action: Action,
+  override val status: Status,
+  override val callId: String?,
+  override val error: String?,
+
   val sessionId: String,
   val format: String,
   val signatureAlgorithm: String,
   val credentialType: String? = null,
   val holderId: String? = null,
-  override val callId: String? = null,
-  override val error: String? = null
-) : Event(Uuid.random().toHexString(), EventType.VerificationEvent)
+) : Event()

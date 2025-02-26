@@ -9,7 +9,7 @@ import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
 @Serializable
-class IssuanceEvent(
+class PresentationEvent(
     override val originator: String?,
     override val target: String,
     override val timestamp: Long,
@@ -21,9 +21,9 @@ class IssuanceEvent(
     // custom event data
     val tenant: String,
     val account: String,
-    val credentialOfferUrl: String,
+    val presentationRequestUrl: String,
     val credentialId: String,
-    val issuerId: String,
+    val verifierId: String,
     val type: String
 ) : Event() {
 
