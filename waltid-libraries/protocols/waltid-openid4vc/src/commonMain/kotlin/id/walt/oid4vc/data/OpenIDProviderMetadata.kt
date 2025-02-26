@@ -359,6 +359,13 @@ object OpenIDProviderMetadataSerializer : KSerializer<OpenIDProviderMetadata> {
     }
 }
 
+fun OpenIDProviderMetadata.getSupportedProofTypes(): List<ProofType>? {
+    return when (this) {
+        is OpenIDProviderMetadata.Draft11 -> credentialSupported?.values?.flatMap { it.proofTypesSupported?.keys ?: emptyList() }
+        is OpenIDProviderMetadata.Draft13 -> credentialConfigurationsSupported?.values?.flatMap { it.proofTypesSupported?.keys ?: emptyList() }
+    }
+}
+
 object OpenIDProviderMetadataDraft13Serializer : KSerializer<OpenIDProviderMetadata.Draft13> {
     override val descriptor: SerialDescriptor = OpenIDProviderMetadata.Draft13.serializer().descriptor
 
