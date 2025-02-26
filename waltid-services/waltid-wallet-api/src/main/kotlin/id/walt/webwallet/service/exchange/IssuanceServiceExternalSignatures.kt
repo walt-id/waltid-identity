@@ -3,7 +3,6 @@ package id.walt.webwallet.service.exchange
 import id.walt.crypto.keys.Key
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
-import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.EntraIssuanceRequest
 import id.walt.oid4vc.requests.TokenRequest
@@ -18,14 +17,12 @@ object IssuanceServiceExternalSignatures : IssuanceServiceBase() {
 
     suspend fun prepareExternallySignedOfferRequest(
         offerURL: String,
-        credentialWallet: TestCredentialWallet,
         publicKey: Key,
         did: String,
         didAuthKeyId: String,
     ): PrepareExternalClaimResult {
         logger.debug { "// -------- WALLET: PREPARE STEP FOR OID4VCI WITH EXTERNAL SIGNATURES ----------" }
         logger.debug { "// parse credential URI" }
-        val reqParams = parseOfferParams(offerURL)
 
         // entra or openid4vc credential offer
         val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offerURL)
@@ -34,8 +31,7 @@ object IssuanceServiceExternalSignatures : IssuanceServiceBase() {
             throw UnsupportedOperationException("MS Entra credential issuance requests with externally provided signatures are not supported yet")
         } else {
             processPrepareCredentialOffer(
-                credentialWallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams)),
-                credentialWallet,
+                OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(offerURL),
                 did,
                 didAuthKeyId,
                 publicKey,
@@ -45,15 +41,11 @@ object IssuanceServiceExternalSignatures : IssuanceServiceBase() {
 
     private suspend fun processPrepareCredentialOffer(
         credentialOffer: CredentialOffer,
-        credentialWallet: TestCredentialWallet,
         did: String,
         didAuthKeyId: String,
         publicKey: Key,
     ): PrepareExternalClaimResult {
-        val providerMetadata = getCredentialIssuerOpenIDMetadata(
-            credentialOffer.credentialIssuer,
-            credentialWallet,
-        ) as OpenIDProviderMetadata.Draft13
+        val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(credentialOffer)
 
         logger.debug { "providerMetadata: $providerMetadata" }
 
@@ -69,12 +61,13 @@ object IssuanceServiceExternalSignatures : IssuanceServiceBase() {
             clientId = did
         )
 
-        val tokenResp = issueTokenRequest(
-            providerMetadata.tokenEndpoint!!,
-            tokenReq,
+        val tokenResp =  OpenID4VCI.sendTokenRequest(
+            providerMetadata = providerMetadata,
+            tokenRequest = tokenReq
         )
+
         logger.debug { ">>> Token response is: $tokenResp" }
-        validateTokenResponse(tokenResp)
+        OpenID4VCI.validateTokenResponse(tokenResp)
 
         val offeredCredentialsProofRequests = offeredCredentials.map { offeredCredential ->
             OfferedCredentialProofOfPossessionParameters(
@@ -147,10 +140,8 @@ object IssuanceServiceExternalSignatures : IssuanceServiceBase() {
         accessToken: String?,
     ): List<ProcessedCredentialOffer> {
         logger.debug { "// get issuer metadata" }
-        val providerMetadata = getCredentialIssuerOpenIDMetadata(
-            credentialIssuerURL,
-            credentialWallet,
-        )
+        val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(credentialIssuerURL)
+
         logger.debug { "providerMetadata: $providerMetadata" }
         logger.debug { "Using issuer URL: $credentialIssuerURL" }
         val credReqs = offeredCredentialProofsOfPossession.map { offeredCredentialProofOfPossession ->
