@@ -15,7 +15,6 @@ import id.walt.oid4vc.data.ResponseType.Companion.getResponseTypeString
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.AuthorizationError
-import id.walt.oid4vc.errors.TokenError
 import id.walt.oid4vc.errors.TokenVerificationError
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -56,13 +55,13 @@ object OpenID4VC {
     issuer: String,
     target: TokenTarget,
     tokenKey: Key? = null
-  ): JsonObject? {
+  ): JsonObject {
 
     if (!verifyTokenSignature(
         target = target,
         token = token,
         tokenKey = tokenKey
-      )) return null
+      )) throw IllegalStateException("Invalid token")
 
     val payload = parseTokenPayload(token)
 
@@ -76,7 +75,7 @@ object OpenID4VC {
             payload[JWTClaims.Payload.audience]?.jsonPrimitive?.content == target.name &&
             payload[JWTClaims.Payload.issuer]?.jsonPrimitive?.content == issuer
 
-    return if (isValid) payload else null
+    return if (isValid) payload else throw IllegalStateException("Invalid token")
   }
 
   suspend fun verifyAndParseIdToken(token: String, tokenKey: Key? = null): JsonObject {
@@ -143,10 +142,6 @@ object OpenID4VC {
       issuer = issuer,
       target = TokenTarget.TOKEN,
       tokenKey = tokenKey
-    ) ?: throw TokenError(
-      tokenRequest = tokenRequest,
-      errorCode = TokenErrorCode.invalid_grant,
-      message = "Authorization code could not be verified"
     )
   }
 
