@@ -27,14 +27,8 @@ import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.CredentialError
 import id.walt.oid4vc.errors.TokenError
 import id.walt.oid4vc.providers.TokenTarget
-import id.walt.oid4vc.requests.AuthorizationRequest
-import id.walt.oid4vc.requests.CredentialOfferRequest
-import id.walt.oid4vc.requests.CredentialRequest
-import id.walt.oid4vc.requests.TokenRequest
-import id.walt.oid4vc.responses.AuthorizationCodeWithAuthorizationRequestResponse
-import id.walt.oid4vc.responses.CredentialErrorCode
-import id.walt.oid4vc.responses.TokenErrorCode
-import id.walt.oid4vc.responses.TokenResponse
+import id.walt.oid4vc.requests.*
+import id.walt.oid4vc.responses.*
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.http
 import id.walt.policies.Verifier
@@ -234,6 +228,22 @@ object OpenID4VCI {
 
     suspend fun signToken(privateKey: Key, payload: JsonObject, headers: Map<String, JsonElement>? = null): String {
         return privateKey.signJws(payload.toString().toByteArray(), headers ?: emptyMap())
+    }
+
+    fun validateTokenResponse(
+        tokenResponse: TokenResponse,
+    ) {
+        require(tokenResponse.isSuccess) {
+            "token request failed: ${tokenResponse.error} ${tokenResponse.errorDescription}"
+        }
+
+        requireNotNull(tokenResponse.accessToken) {
+            "invalid Authorization Server token response: no access token included in the response: $tokenResponse "
+        }
+    }
+
+    fun isCryptographicBindingProofRequired(metadata: OpenIDProviderMetadata): Boolean {
+        return metadata.getSupportedProofTypes().isNullOrEmpty()
     }
 
     suspend fun verifyToken(token: String, key: Key): Result<JsonElement> {
