@@ -202,7 +202,7 @@ object OpenID4VCI {
             throw IllegalArgumentException("Failed to get token: ${response.status.value} - ${response.bodyAsText()}")
         }
 
-        return response.body<TokenResponse>()
+        return response.body<JsonObject>().let { TokenResponse.fromJSON(it) }
     }
 
     suspend fun sendCredentialRequest(
@@ -225,7 +225,7 @@ object OpenID4VCI {
             throw IllegalArgumentException("Failed to get token: ${response.status.value} - ${response.bodyAsText()}")
         }
 
-        return response.body<CredentialResponse>()
+        return response.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
     }
 
     fun validateTokenRequestRaw(tokenRequestRaw: Map<String, List<String>>, authorizationCode: String): TokenRequest {
