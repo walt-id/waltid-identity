@@ -1,12 +1,12 @@
 package id.walt.commons.web.modules
 
-/*import io.github.smiley4.schemakenerator.core.connectSubTypes
+import io.github.smiley4.schemakenerator.core.connectSubTypes
 import io.github.smiley4.schemakenerator.core.handleNameAnnotation
 import io.github.smiley4.schemakenerator.reflection.collectSubTypes
 import io.github.smiley4.schemakenerator.reflection.processReflection
 import io.github.smiley4.schemakenerator.serialization.processKotlinxSerialization
 import io.github.smiley4.schemakenerator.swagger.*
-import io.github.smiley4.schemakenerator.swagger.data.TitleType*/
+import io.github.smiley4.schemakenerator.swagger.data.TitleType
 import id.walt.commons.config.statics.BuildConfig
 import id.walt.commons.config.statics.ServiceConfig
 import io.github.smiley4.ktorswaggerui.SwaggerUI
@@ -24,6 +24,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
+import kotlin.reflect.KType
 import kotlin.reflect.full.isSubtypeOf
 import kotlin.reflect.typeOf
 import kotlin.time.Duration.Companion.nanoseconds
@@ -38,7 +39,7 @@ object OpenApiModule {
         var custom: (PluginConfigDsl.() -> Unit)? = null
     }
 
-   /* private fun KType.processWithKotlinxSerializationGenerator() = processKotlinxSerialization()
+    private fun KType.processWithKotlinxSerializationGenerator() = processKotlinxSerialization()
         .connectSubTypes()
         .handleNameAnnotation()
         .generateSwaggerSchema()
@@ -54,7 +55,7 @@ object OpenApiModule {
             .generateSwaggerSchema()
             .handleCoreAnnotations()
             .withTitle(TitleType.SIMPLE)
-            .compileReferencingRoot()*/
+            .compileReferencingRoot()
 
     // Module
     fun Application.enable() {
@@ -82,20 +83,20 @@ object OpenApiModule {
             schemas {
                 val kotlinxPrefixes = listOf("id.walt")
 
-                /*generator = { type ->
+                generator = { type ->
 
                     if (kotlinxPrefixes.any { type.toString().startsWith(it) }) {
                         runCatching {
-//                             println("Trying kotlinx schema with: $type")
+                            // println("Trying kotlinx schema with: $type")
                             type.processWithKotlinxSerializationGenerator()
                         }.recover { ex ->
-//                             println("Falling back to reflection schema with: $type, due to $ex")
+                            logger.trace { "Falling back to reflection schema with: $type, due to $ex" }
                             type.processWithReflectionGenerator()
                         }.getOrElse { ex ->
                             error("Could neither parse with kotlinx nor reflection: $type, due to $ex")
                         }
                     } else type.processWithReflectionGenerator()
-                }*/
+                }
             }
 
             info {
