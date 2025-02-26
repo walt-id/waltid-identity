@@ -1,8 +1,7 @@
-package id.walt.commons.audit.filter
+package id.walt.commons.events.filter
 
-import id.walt.commons.audit.DeviceFlow
+import id.walt.commons.events.DeviceFlow
 import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.data.ProofType
 import kotlinx.serialization.Serializable
 
 @Serializable

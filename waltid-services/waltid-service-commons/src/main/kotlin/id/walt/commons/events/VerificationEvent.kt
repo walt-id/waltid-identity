@@ -1,6 +1,5 @@
-package id.walt.commons.audit
+package id.walt.commons.events
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -18,4 +17,4 @@ class VerificationEvent(
   val holderId: String? = null,
   override val callId: String? = null,
   override val error: String? = null
-) : AuditEvent(Uuid.random().toHexString(), EventType.VerificationEvent)
+) : Event(Uuid.random().toHexString(), EventType.VerificationEvent)
