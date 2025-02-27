@@ -847,37 +847,66 @@ class OpenID4VCI_Test {
         // Wallet Validates the response ( check if there is successful and contains the required access_token)
         OpenID4VCI.validateTokenResponse(tokenResponse)
 
+
         /*
-         // 1. The wallet should check if there is the proof_types_supported in credential_configurations_supported, if its there it checks for the proof_type (i.e. jwt, ctw or ldp_vp) - currently the issuer implementation is does not contain this
+        The Wallet should check if it should create a proof.
+
+        The scenario where proof_types_supported is empty or missing but the issuer still sends a c_nonce needs to be handled explicitly. Since proof is optional in OID4VCI, we need to carefully distinguish between:
+           - Issuer explicitly supporting certain proof types (proof_types_supported is present).
+           - Issuer not specifying any proof type (proof_types_supported is empty).
+           - Issuer sending a c_nonce despite not specifying proof support (likely for replay attack protection).
 
          Possible cases:
-         A. If it's not required and there is no c_nonce - the wallet skip the `proof` in the credential request
-         B. If it's either required either there c_nonce, either both are there - the wallet will generate a proof and provide it in the credential request
+           A. If proof_types_supported = "true", wallet must send proof.
+           B. If proof_types_supported = "false" AND c_nonce is not provided, wallet skips proof.
+           C. If proof_types_supported = "false" BUT c_nonce is provided, wallet should still generate proof to include the c_nonce (for replay protection).
 
-         1. check if the isCryptographicBindingProofRequired is true and c_nonce != null
-              1a. take the proofTypesSupported
-              1a.b if its `jwt`, continue with jwt-proof and add the c_nonce, else throw a TODO
-         2. check if the isCryptographicBindingProofRequired is true and c_nonce == null
-              2a. take the proofTypesSupported
-              2a.b if its `jwt`, continue with jwt-proof and add a random nonce or don't add at all since its optional, else throw a TODO
-         3. check if the isCryptographicBindingProofRequired is false and c_nonce != null
-              3a continue with your choice of proof type, e.g. `jwt`, continue with jwt-proof and add a random nonce or don't add at all since its optional, else throw a TODO
-         4. check if the isCryptographicBindingProofRequired is false and c_nonce == null
-              4a dont sent proof
+         Steps:
+         1. The wallet should check if there is the proof_types_supported in credential_configurations_supported(in Issuer Metadata), if its there it checks for the proof_type (i.e. jwt, ctw or ldp_vp) - currently the issuer implementation is does not contain this
+             {
+                  "cryptographic_binding_methods_supported": ["did:example", "jwk", "cose_key],
+                  "proof_types_supported": [
+                    {
+                      "proof_type": "jwt",
+                      "proof_signing_alg_values_supported": ["ES256", "EdDSA", "ES256K"]
+                    },
+                    {
+                      "proof_type": "cwt",
+                      "proof_signing_alg_values_supported": ["ES256"]
+                    }
+                  ]
+                }
 
-        // 2. When the proofType is defined we need to check the `proof_signing_alg_values_supported` (i.e. ES256) and choose a supported algorithm
 
-        sealed class ProofHandlingResult {
-            object SkipProof : ProofHandlingResult()  // No proof required, skip this step
-            object ProceedWithJWT : ProofHandlingResult() // Continue with JWT-based proof flow
-            data class TodoHandleOtherProofs(val proofTypes: List<ProofType>) : ProofHandlingResult() // Handle non-JWT proofs
-            object ProceedWithChosenProof : ProofHandlingResult() // Proof is not required, but c_nonce exists → choose proof or Continue with JWT-based proof flow
-        }
+            It selects a proof type that both the issuer and wallet support (e.g., jwt or cwt).
+            If proof_types_supported is defined and not empty → Select a supported proof type (jwt, cwt, etc.).
+            If proof_types_supported is empty or missing:
+                If c_nonce is provided, the wallet must still generate proof, but it must guess the proof type based on its own capabilities and common standards (e.g., jwt).
+                If c_nonce is not provided, wallet skips proof since it's not required.
 
-        // 3. Then, the wallet should check the cryptographic_binding_methods_supported to understand with which key material will sign the proof (i.e. keys in JWK format `jwk`, keys expressed as a COSE Key `cose_key` or a specific did method, (e.g did:key), currently the issuer implementation is wrong
+         2. When the proofType is defined we need to check the `proof_signing_alg_values_supported` (i.e. ES256) and choose a supported algorithm
+            If a proof type was selected, choose a compatible algorithm from proof_signing_alg_values_supported.
+            If no supported algorithm is found, we should stop with an error (but maybe for compatibility??).
+
+
+         3. Then, the wallet should check the cryptographic_binding_methods_supported to understand with which key material will sign the proof (i.e. keys in JWK format `jwk`, keys expressed as a COSE Key `cose_key` or a specific did method, (e.g did:key), currently the issuer implementation is wrong
+            If cryptographic_binding_methods_supported is specified, select a compatible method (did, jwk, etc.).
+            If missing, default to a commonly supported method (e.g., did, jwk).
+            If no compatible method is found, stop with an error (but maybe for compatibility??).
+
+                sealed class ProofHandlingResult {
+                    object SkipProof : ProofHandlingResult()  // No proof required, skip this step
+                    object ProceedWithJWT : ProofHandlingResult() // Continue with JWT-based proof flow
+                    data class TodoHandleOtherProofs(val proofTypes: List<ProofType>) : ProofHandlingResult() // Handle non-JWT proofs
+                    object ProceedWithChosenProof : ProofHandlingResult() // Proof is not required, but c_nonce exists → choose proof or Continue with JWT-based proof flow
+                }
         */
 
         // 4. The Wallet API constructs the credential request
+        // The wallet constructs the proof based on the selected proof type, signing algorithm, and binding method.
+        // If c_nonce is provided, it is included in the proof in a specific parameter based on `proof_type`.
+        // The proof is included in the credential request and sent to the issuer.
+
         val nonce = tokenResponse.cNonce
 
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(
