@@ -8,18 +8,12 @@ import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.OfferedCredential
-import id.walt.oid4vc.data.OpenIDProviderMetadata
-import id.walt.oid4vc.requests.TokenRequest
-import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.SDJWTVCTypeMetadata
-import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
 import id.walt.webwallet.utils.WalletHttpClients
 import io.klogging.Klogger
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -34,48 +28,6 @@ abstract class IssuanceServiceBase {
     protected abstract val logger: Klogger
 
     protected fun parseOfferParams(offerURL: String) = Url(offerURL).parameters.toMap()
-
-    protected suspend fun getCredentialIssuerOpenIDMetadata(
-        issuerURL: String,
-        credentialWallet: TestCredentialWallet,
-    ): OpenIDProviderMetadata {
-        logger.debug { "// get issuer metadata" }
-        val providerMetadataUri =
-            credentialWallet.getCIProviderMetadataUrl(issuerURL)
-        logger.debug { "Getting provider metadata from: $providerMetadataUri" }
-        val providerMetadataResult = http.get(providerMetadataUri)
-        logger.debug { "Provider metadata returned: ${providerMetadataResult.bodyAsText()}" }
-        return providerMetadataResult
-            .body<JsonObject>()
-            .let {
-                OpenIDProviderMetadata.fromJSON(it)
-            }
-    }
-
-    protected suspend fun issueTokenRequest(
-        tokenURL: String,
-        req: TokenRequest,
-    ) = http.submitForm(
-        tokenURL, formParameters = parametersOf(req.toHttpParameters())
-    ).let { rawResponse ->
-        logger.debug { "Raw TokenResponse: $rawResponse" }
-        rawResponse.body<JsonObject>().let {
-            TokenResponse.fromJSON(it)
-        }
-    }
-
-    protected fun validateTokenResponse(
-        tokenResponse: TokenResponse,
-    ) {
-        require(tokenResponse.isSuccess) {
-            "token request failed: ${tokenResponse.error} ${tokenResponse.errorDescription}"
-        }
-        //there has to be an access token in the response, otherwise we are unable
-        //to invoke the credential endpoint
-        requireNotNull(tokenResponse.accessToken) {
-            "invalid Authorization Server token response: no access token included in the response: $tokenResponse "
-        }
-    }
 
     protected suspend fun getCredentialData(
         processedOffer: ProcessedCredentialOffer,

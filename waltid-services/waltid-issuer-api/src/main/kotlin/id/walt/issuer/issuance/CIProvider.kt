@@ -548,12 +548,28 @@ open class CIProvider(
     fun generateCredentialResponse(credentialRequest: CredentialRequest, session: IssuanceSession): CredentialResponse = runBlocking {
         // access_token should be validated on API level and issuance session extracted
         // Validate credential request (proof of possession, etc)
-        val nonce = session.cNonce ?: throw CredentialError(credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "No cNonce found on current issuance session")
-        val validationResult = OpenID4VCI.validateCredentialRequest(credentialRequest, nonce, metadata)
-        if(!validationResult.success)
-            throw CredentialError(credentialRequest, CredentialErrorCode.invalid_request, message = validationResult.message)
+        val nonce = session.cNonce
+            ?: throw CredentialError(
+                credentialRequest = credentialRequest,
+                errorCode = CredentialErrorCode.invalid_or_missing_proof,
+                message = "No cNonce found on current issuance session"
+            )
+
+        val validationResult = OpenID4VCI.validateCredentialRequest(
+            credentialRequest = credentialRequest,
+            nonce = nonce,
+            openIDProviderMetadata = metadata
+        )
+
+        if(!validationResult.success) throw CredentialError(
+            credentialRequest = credentialRequest,
+            errorCode = CredentialErrorCode.invalid_request,
+            message = validationResult.message
+        )
+
         // create credential result
         val credentialResult = generateCredential(credentialRequest, session)
+
         return@runBlocking createCredentialResponseFor(credentialResult, session)
     }
 
@@ -574,27 +590,43 @@ open class CIProvider(
     }
 
     fun processTokenRequest(tokenRequest: TokenRequest): TokenResponse = runBlocking {
-        val payload = OpenID4VC.validateAndParseTokenRequest(tokenRequest, metadata.issuer!!, CI_TOKEN_KEY) ?: throw TokenError(tokenRequest, TokenErrorCode.invalid_request, "Token request could not be validated")
+        val payload = OpenID4VC.validateAndParseTokenRequest(
+            tokenRequest = tokenRequest,
+            issuer = metadata.issuer!!,
+            tokenKey = CI_TOKEN_KEY
+        )
+
         val sessionId = payload[JWTClaims.Payload.subject]?.jsonPrimitive?.content ?: throw TokenError(tokenRequest, TokenErrorCode.invalid_request, "Token contains no session ID in subject")
+
         val session = getVerifiedSession(sessionId) ?: throw TokenError(
             tokenRequest = tokenRequest,
             errorCode = TokenErrorCode.invalid_request,
             message = "No authorization session found for given authorization code, or session expired."
         )
-        if (tokenRequest.grantType == GrantType.pre_authorized_code && session.txCode != null &&
+
+        if (tokenRequest is TokenRequest.PreAuthorizedCode &&
+            session.txCode != null &&
             session.txCodeValue != tokenRequest.txCode
         ) {
             throw TokenError(
-                tokenRequest,
-                TokenErrorCode.invalid_grant,
+                tokenRequest = tokenRequest,
+                errorCode = TokenErrorCode.invalid_grant,
                 message = "User PIN required for this issuance session has not been provided or PIN is wrong."
             )
         }
+
         // Expiration time required by EBSI
         val currentTime = Clock.System.now().epochSeconds
         val expirationTime = (currentTime + 864000L) // ten days in milliseconds
+
         return@runBlocking TokenResponse.success(
-            OpenID4VC.generateToken(sessionId, metadata.issuer!!, TokenTarget.ACCESS, null, CI_TOKEN_KEY),
+            accessToken = OpenID4VC.generateToken(
+                    sub = sessionId,
+                    issuer = metadata.issuer!!,
+                    audience = TokenTarget.ACCESS,
+                    tokenId = null,
+                    tokenKey = CI_TOKEN_KEY
+            ),
             tokenType = "bearer",
             expiresIn = expirationTime,
             cNonce = generateProofOfPossessionNonceFor(session).cNonce,
@@ -602,9 +634,14 @@ open class CIProvider(
             state = session.authorizationRequest?.state
         ).also {
             if(!session.callbackUrl.isNullOrEmpty())
-                sendCallback(sessionId, "requested_token", buildJsonObject {
-                    put("request", Json.encodeToJsonElement(session.issuanceRequests.first()))
-                }, session.callbackUrl)
+                sendCallback(
+                    sessionId = sessionId,
+                    type = "requested_token",
+                    data = buildJsonObject {
+                        put("request", Json.encodeToJsonElement(session.issuanceRequests.first()))
+                    },
+                    callbackUrl = session.callbackUrl
+                )
         }
     }
 

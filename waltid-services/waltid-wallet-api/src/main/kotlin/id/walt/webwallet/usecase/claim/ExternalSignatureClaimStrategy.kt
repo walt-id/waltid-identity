@@ -26,7 +26,6 @@ class ExternalSignatureClaimStrategy(
         did = did,
         didAuthKeyId = didAuthKeyId,
         publicKey = publicKey,
-        credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
     )
 
     suspend fun submitCredentialClaim(
