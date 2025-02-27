@@ -201,11 +201,10 @@ class EBSIIssueToHolderConformanceTest {
         //
         // Get Access Token
         //
-        val tokenReq = TokenRequest(
-            grantType =  GrantType.authorization_code,
+        val tokenReq = TokenRequest.AuthorizationCode(
             clientId =  ISSUER_MOCK_DID,
             redirectUri = ISSUER_MOCK_URL,
-            code =  codeResp.code,
+            code =  codeResp.code!!,
             codeVerifier = codeVerifier
         )
 

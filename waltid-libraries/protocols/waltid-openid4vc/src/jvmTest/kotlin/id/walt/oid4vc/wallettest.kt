@@ -120,13 +120,11 @@ class wallettest {
         println("offeredCredentials[0]: $offeredCredential")
 
         println("// fetch access token using pre-authorized code (skipping authorization step)")
-        val tokenReq = TokenRequest(
-            grantType = GrantType.pre_authorized_code,
+        val tokenReq = TokenRequest.PreAuthorizedCode(
             clientId = testCIClientConfig.clientID,
-            redirectUri = credentialWallet.config.redirectUri,
-            preAuthorizedCode = parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            txCode = null
+            preAuthorizedCode = parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!,
         )
+
         println("tokenReq: $tokenReq")
 
         val tokenResp = ktorClient.submitForm(
