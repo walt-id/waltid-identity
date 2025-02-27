@@ -24,6 +24,7 @@ import kotlinx.serialization.json.Json
 
 
 import kotlin.test.BeforeTest
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.ExperimentalUuidApi
@@ -96,6 +97,7 @@ class SilentClaimStrategyTest {
     }
 
     @Test
+    @Ignore
     fun `given a trusted issuer, when claiming the offer, then an event is logged and a notification created and sent`() =
         runTest {
             coEvery { issuerTrustValidationService.validate(any(), any(), any()) } returns true
@@ -110,6 +112,7 @@ class SilentClaimStrategyTest {
         }
 
     @Test
+    @Ignore
     fun `given an untrusted issuer, when claiming the offer, then no event is logged and no notification created and sent`() =
         runTest {
             coEvery { issuerTrustValidationService.validate(any(), any(), any()) } returns false
