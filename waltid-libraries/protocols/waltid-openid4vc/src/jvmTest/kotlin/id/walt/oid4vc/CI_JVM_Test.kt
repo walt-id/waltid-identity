@@ -259,13 +259,10 @@ class CI_JVM_Test {
         assertContains(map = credOfferReq.credentialOffer!!.grants, key = GrantType.pre_authorized_code.value)
 
         // make token request
-        val tokenReq = TokenRequest(
-            grantType = GrantType.pre_authorized_code,
-            //clientId = testCIClientConfig.clientID,
-            redirectUri = credentialWallet.config.redirectUri,
-            preAuthorizedCode = credOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            txCode = null
+        val tokenReq = TokenRequest.PreAuthorizedCode(
+            preAuthorizedCode =  credOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!
         )
+
         println("tokenReq: $tokenReq")
         val tokenResp = ktorClient.submitForm(
             providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
@@ -314,13 +311,10 @@ class CI_JVM_Test {
         assertContains(credOfferReq.credentialOffer!!.grants, GrantType.pre_authorized_code.value)
 
         // make token request
-        val tokenReq = TokenRequest(
-            grantType = GrantType.pre_authorized_code,
-            clientId = testCIClientConfig.clientID,
-            redirectUri = credentialWallet.config.redirectUri,
-            preAuthorizedCode = credOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            txCode = null
+        val tokenReq = TokenRequest.PreAuthorizedCode(
+            preAuthorizedCode =  credOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!
         )
+
         println("tokenReq: ${tokenReq.toHttpQueryString()}")
         val tokenResp = ktorClient.submitForm(
             providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
@@ -368,13 +362,10 @@ class CI_JVM_Test {
         println("offeredCredentials: $offeredCredentials")
 
         // make token request
-        val tokenReq = TokenRequest(
-            grantType = GrantType.pre_authorized_code,
-            clientId = testCIClientConfig.clientID,
-            redirectUri = credentialWallet.config.redirectUri,
-            preAuthorizedCode = credOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            txCode = null
+        val tokenReq = TokenRequest.PreAuthorizedCode(
+            preAuthorizedCode =  credOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!
         )
+
         println("tokenReq: ${tokenReq.toHttpQueryString()}")
         val tokenResp = ktorClient.submitForm(
             providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())

@@ -8,7 +8,6 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.mdoc.dataelement.MapElement
-import id.walt.oid4vc.data.GrantType
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
@@ -16,7 +15,6 @@ import id.walt.oid4vc.data.ResponseType.Companion.getResponseTypeString
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.AuthorizationError
-import id.walt.oid4vc.errors.TokenError
 import id.walt.oid4vc.errors.TokenVerificationError
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -33,32 +31,51 @@ import kotlinx.serialization.json.*
 object OpenID4VC {
   private val log = KotlinLogging.logger { }
 
-  suspend fun generateToken(sub: String, issuer: String, audience: TokenTarget, tokenId: String? = null, tokenKey: Key): String {
-    return signToken(audience, buildJsonObject {
-      put(JWTClaims.Payload.subject, sub)
-      put(JWTClaims.Payload.issuer, issuer)
-      put(JWTClaims.Payload.audience, audience.name)
-      tokenId?.let { put(JWTClaims.Payload.jwtID, it) }
-    }, tokenKey)
+  suspend fun generateToken(
+    sub: String,
+    issuer: String,
+    audience: TokenTarget,
+    tokenId: String? = null,
+    tokenKey: Key
+  ): String {
+    return signToken(
+      target = audience,
+      payload = buildJsonObject {
+          put(JWTClaims.Payload.subject, sub)
+          put(JWTClaims.Payload.issuer, issuer)
+          put(JWTClaims.Payload.audience, audience.name)
+          tokenId?.let { put(JWTClaims.Payload.jwtID, it) }
+      },
+      privKey = tokenKey
+    )
   }
 
-  suspend fun verifyAndParseToken(token: String, issuer: String, target: TokenTarget, tokenKey: Key? = null): JsonObject? {
-    if (verifyTokenSignature(target, token, tokenKey)) {
-      val payload = parseTokenPayload(token)
-      if (payload.keys.containsAll(
-          setOf(
-            JWTClaims.Payload.subject,
-            JWTClaims.Payload.audience,
-            JWTClaims.Payload.issuer
-          )
-        ) &&
-        payload[JWTClaims.Payload.audience]!!.jsonPrimitive.content == target.name &&
-        payload[JWTClaims.Payload.issuer]!!.jsonPrimitive.content == issuer
-      ) {
-        return payload
-      }
-    }
-    return null
+  suspend fun verifyAndParseToken(
+    token: String,
+    issuer: String,
+    target: TokenTarget,
+    tokenKey: Key? = null
+  ): JsonObject {
+
+    if (!verifyTokenSignature(
+        target = target,
+        token = token,
+        tokenKey = tokenKey
+      )) throw IllegalStateException("Invalid token")
+
+    val payload = parseTokenPayload(token)
+
+    val requiredClaims = setOf(
+      JWTClaims.Payload.subject,
+      JWTClaims.Payload.audience,
+      JWTClaims.Payload.issuer
+    )
+
+    val isValid = requiredClaims.all { it in payload } &&
+            payload[JWTClaims.Payload.audience]?.jsonPrimitive?.content == target.name &&
+            payload[JWTClaims.Payload.issuer]?.jsonPrimitive?.content == issuer
+
+    return if (isValid) payload else throw IllegalStateException("Invalid token")
   }
 
   suspend fun verifyAndParseIdToken(token: String, tokenKey: Key? = null): JsonObject {
@@ -115,20 +132,9 @@ object OpenID4VC {
   }
 
   suspend fun validateAndParseTokenRequest(tokenRequest: TokenRequest, issuer: String, tokenKey: Key? = null): JsonObject {
-    val code = when (tokenRequest.grantType) {
-      GrantType.authorization_code -> tokenRequest.code ?: throw TokenError(
-        tokenRequest = tokenRequest,
-        errorCode = TokenErrorCode.invalid_grant,
-        message = "No code parameter found on token request"
-      )
-
-      GrantType.pre_authorized_code -> tokenRequest.preAuthorizedCode ?: throw TokenError(
-        tokenRequest = tokenRequest,
-        errorCode = TokenErrorCode.invalid_grant,
-        message = "No pre-authorized_code parameter found on token request"
-      )
-
-      else -> throw TokenError(tokenRequest, TokenErrorCode.unsupported_grant_type, "Grant type not supported")
+    val code = when (tokenRequest) {
+      is TokenRequest.AuthorizationCode -> tokenRequest.code
+      is TokenRequest.PreAuthorizedCode -> tokenRequest.preAuthorizedCode
     }
 
     return verifyAndParseToken(
@@ -136,10 +142,6 @@ object OpenID4VC {
       issuer = issuer,
       target = TokenTarget.TOKEN,
       tokenKey = tokenKey
-    ) ?: throw TokenError(
-      tokenRequest = tokenRequest,
-      errorCode = TokenErrorCode.invalid_grant,
-      message = "Authorization code could not be verified"
     )
   }
 
@@ -314,17 +316,30 @@ object OpenID4VC {
     log.debug { "JWS Verification: target: $target" }
 
     val tokenHeader = Json.parseToJsonElement(token.split(".")[0].base64UrlDecode().decodeToString()).jsonObject
-    val key = (if (tokenHeader["jwk"] != null) {
-      JWKKey.importJWK(tokenHeader["jwk"].toString()).getOrThrow()
-    } else if (tokenHeader["kid"] != null) {
-      val kid = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
-      if(DidUtils.isDidUrl(kid)) {
-        log.debug { "Resolving DID: $kid" }
-        DidService.resolveToKey(kid).getOrThrow()
-      } else if(tokenKey != null && kid.equals(tokenKey.getKeyId())) {
-        tokenKey
-      } else null
-    } else tokenKey) ?: throw TokenVerificationError(token, target, "Could not resolve key for given token")
+
+    val key = when {
+      tokenHeader["jwk"] != null -> JWKKey.importJWK(tokenHeader["jwk"].toString()).getOrThrow()
+
+      tokenHeader["kid"] != null -> {
+        val kid = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
+        when {
+          DidUtils.isDidUrl(kid) -> {
+            log.debug { "Resolving DID: $kid" }
+            DidService.resolveToKey(kid).getOrThrow()
+          }
+          tokenKey != null && kid == tokenKey.getKeyId() -> tokenKey
+          else -> null
+        }
+      }
+
+      else -> tokenKey
+    }
+      ?: throw TokenVerificationError(
+        token = token,
+        target = target,
+        message = "Could not resolve key for given token"
+      )
+
     return key.verifyJws(token).also { log.debug { "VERIFICATION IS: $it" } }.isSuccess
   }
 
