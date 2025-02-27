@@ -1,0 +1,157 @@
+name: Docker compose testing (reusable workflow)
+
+on:
+  workflow_call:
+    inputs:
+      artifact:
+        description: "Use images from artifact (defaults to false)"
+        required: false
+        type: boolean
+      tag:
+        description: "Use this docker tag (defaults to empty)"
+        required: false
+        type: string
+  workflow_dispatch:  # Allows manual triggering of the workflow
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      use-artifact: ${{ inputs.artifact && inputs.tag != '' }}
+    strategy:
+      matrix:
+        environment:
+          - ./postman/docker.postman_environment.json
+        config:
+          - {
+            collection: ./postman/Postman Collections/Issuance-Presentation Tests.postman_collection.json,
+            dataset: ./postman/Datasets/Issuance-Presentation/jwk/jwt_vc_json.csv
+          }
+          - {
+            collection: ./postman/Postman Collections/Issuance-Presentation Tests.postman_collection.json,
+            dataset: ./postman/Datasets/Issuance-Presentation/jwk/sd-jwt-w3c.csv
+          }
+          - {
+            collection: ./postman/Postman Collections/Issuance-Presentation Tests.postman_collection.json,
+            dataset: ./postman/Datasets/Issuance-Presentation/jwk/vc+sd-jwt.csv
+          }
+          - {
+            collection: ./postman/Postman Collections/Issuance-Presentation Tests.postman_collection.json,
+            dataset: ./postman/Datasets/Issuance-Presentation/jwk/mso_mdoc.csv
+          }
+          - {
+            collection: ./postman/Postman Collections/Issuance-Presentation Tests.postman_collection.json,
+            dataset: ./postman/Datasets/Issuance-Presentation/tse.csv
+          }
+    steps:
+      - name: Get dataset filename
+        run: |
+          path="${{ matrix.config.dataset }}"
+          filenameWithExtension="${path##*/}"
+          filenameNoExtension=${filenameWithExtension%.*}
+          echo "Will use filename $filenameNoExtension for reports"
+          echo "dataset_filename=$filenameNoExtension" >> $GITHUB_ENV
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Checkout waltid-identity-postman
+        uses: actions/checkout@v4
+        with:
+          repository: walt-id/waltid-identity-postman
+          ref: main
+          token: ${{ secrets.PAT }}
+          path: "./postman"
+      - name: Install Docker using Docker's official script
+        run: |
+          # Add Docker's official GPG key:
+          sudo apt-get update
+          sudo apt-get install ca-certificates curl
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+          # Add the repository to Apt sources:
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+            $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+            sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          sudo apt-get update
+        continue-on-error: false
+      - name: Install Docker Compose
+        run: |
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.32.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose --version
+        continue-on-error: false
+      - name: Download issuer-api artifact
+        if: ${{ env.use-artifact }}
+        uses: actions/download-artifact@v4
+        with:
+          name: issuer-api
+          path: ${{ runner.temp }}
+      - name: Download verifier-api artifact
+        if: ${{ env.use-artifact }}
+        uses: actions/download-artifact@v4
+        with:
+          name: verifier-api
+          path: ${{ runner.temp }}
+      - name: Download wallet-api artifact
+        if: ${{ env.use-artifact }}
+        uses: actions/download-artifact@v4
+        with:
+          name: wallet-api
+          path: ${{ runner.temp }}
+      - name: Unzip
+        if: ${{ env.use-artifact }}
+        run: |
+          gunzip ${{ runner.temp }}/issuer-api.tar.gz
+          gunzip ${{ runner.temp }}/verifier-api.tar.gz
+          gunzip ${{ runner.temp }}/wallet-api.tar.gz
+      - name: Load Docker images from tarballs
+        if: ${{ env.use-artifact }}
+        run: |
+          docker load --input ${{ runner.temp }}/issuer-api.tar
+          docker load --input ${{ runner.temp }}/verifier-api.tar
+          docker load --input ${{ runner.temp }}/wallet-api.tar
+      - name: Run stack
+        run: |
+          cd ./docker-compose
+          if [[ "${{ env.use-artifact }}" == "true" ]]; then
+            export VERSION_TAG=${{ inputs.tag }}
+            build_arg=""
+          else
+            build_arg="--build"
+          fi
+          docker compose --profile services --profile tse up -d $build_arg
+      - name: Ping services
+        timeout-minutes: 5
+        run: |
+          cd ./docker-compose
+          chmod +x ./ping.sh
+          ./ping.sh
+      - name: Install node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install newman
+        run: "npm install -g newman newman-reporter-htmlextra"
+      - name: Add docker to /etc/hosts
+        run: |
+          sudo echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
+      - name: Run API tests
+        env:
+          NODE_OPTIONS: "--max-old-space-size=6144 --max-semi-space-size=1024"
+        run: |
+          newman run "${{ matrix.config.collection }}" \
+          --environment "${{ matrix.environment }}" \
+          --iteration-data "${{ matrix.config.dataset }}" \
+          --reporters htmlextra,cli,emojitrain \
+          --reporter-cli-show-timestamps \
+          --reporter-htmlextra-export ./${{ env.dataset_filename }}.html \
+          --insecure \
+          --verbose
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-${{ env.dataset_filename }}
+          path: ./${{ env.dataset_filename }}.html
+          overwrite: true
+          retention-days: 1

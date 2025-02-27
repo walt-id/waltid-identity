@@ -399,15 +399,12 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         grantType: GrantType, offeredCredentials: List<OfferedCredential>, holderDid: String,
         client: OpenIDClientConfig, authorizationCode: String? = null, codeVerifier: String? = null, userPIN: String? = null
     ): List<CredentialResponse> {
-        val tokenReq = TokenRequest(
-            grantType,
-            client.clientID,
-            config.redirectUri,
-            authorizationCode,
-            credentialOffer.grants[grantType.value]?.preAuthorizedCode,
-            userPIN,
-            codeVerifier
+        val tokenReq = TokenRequest.PreAuthorizedCode(
+            clientId = client.clientID,
+            preAuthorizedCode = credentialOffer.grants[grantType.value]!!.preAuthorizedCode!!,
+            userPIN = userPIN
         )
+
         authorizationServerMetadata as OpenIDProviderMetadata.Draft13
         issuerMetadata as OpenIDProviderMetadata.Draft13
 
