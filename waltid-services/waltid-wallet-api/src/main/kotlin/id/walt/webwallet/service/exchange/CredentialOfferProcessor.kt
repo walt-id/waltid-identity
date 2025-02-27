@@ -1,16 +1,11 @@
 package id.walt.webwallet.service.exchange
 
+import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.requests.BatchCredentialRequest
 import id.walt.oid4vc.requests.CredentialRequest
-import id.walt.oid4vc.responses.BatchCredentialResponse
-import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.webwallet.utils.WalletHttpClients
 import io.klogging.logger
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import kotlinx.serialization.json.JsonObject
 
 object CredentialOfferProcessor {
     private val http = WalletHttpClients.getHttpClient()
@@ -30,21 +25,18 @@ object CredentialOfferProcessor {
         accessToken: String,
     ): List<ProcessedCredentialOffer> {
 
-        providerMetadata as OpenIDProviderMetadata.Draft13
-
         val batchCredentialRequest = BatchCredentialRequest(credReqs)
 
-        val batchResponse = http.post(providerMetadata.batchCredentialEndpoint!!) {
-            contentType(ContentType.Application.Json)
-            bearerAuth(accessToken)
-            setBody(batchCredentialRequest.toJSON())
-        }.body<JsonObject>().let { BatchCredentialResponse.fromJSON(it) }
-        logger.debug { "credential batch response: $batchResponse" }
+        val batchCredentialResponse = OpenID4VCI.sendBatchCredentialRequest(
+            providerMetadata = providerMetadata,
+            accessToken = accessToken,
+            batchCredentialRequest = batchCredentialRequest,
+        )
 
-        return (batchResponse.credentialResponses
+        return (batchCredentialResponse.credentialResponses
             ?: throw IllegalArgumentException("No credential responses returned")).indices.map {
             ProcessedCredentialOffer(
-                batchResponse.credentialResponses!![it],
+                batchCredentialResponse.credentialResponses!![it],
                 batchCredentialRequest.credentialRequests[it]
             )
         }
@@ -56,14 +48,16 @@ object CredentialOfferProcessor {
         accessToken: String,
     ): List<ProcessedCredentialOffer> {
 
-        val credReq = credReqs.first()
-
-        val credentialResponse = http.post(providerMetadata.credentialEndpoint!!) {
-            contentType(ContentType.Application.Json)
-            bearerAuth(accessToken)
-            setBody(credReq.toJSON())
-        }.body<JsonObject>().let { ProcessedCredentialOffer(CredentialResponse.fromJSON(it), credReq) }
-        logger.debug { "credentialResponse: $credentialResponse" }
+        val credentialResponse = OpenID4VCI.sendCredentialRequest(
+            providerMetadata = providerMetadata,
+            accessToken = accessToken,
+            credentialRequest = credReqs.first()
+        ).let {
+            ProcessedCredentialOffer(
+                credentialResponse = it,
+                credentialRequest = credReqs.first()
+            )
+        }
 
         return listOf(credentialResponse)
     }

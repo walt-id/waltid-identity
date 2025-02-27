@@ -439,21 +439,37 @@ object OidcApi : CIProvider() {
             }
 
             post("{standardVersion}/credential") {
-                val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
-                val parsedToken = accessToken?.let { OpenID4VC.verifyAndParseToken(it, metadata.issuer!!, TokenTarget.ACCESS, CI_TOKEN_KEY) }
-                if (parsedToken == null) {
-                    call.respond(HttpStatusCode.Unauthorized)
-                } else {
-                    val credReq = CredentialRequest.fromJSON(call.receive<JsonObject>())
-                    try {
-                        val session = parsedToken[JWTClaims.Payload.subject]?.jsonPrimitive?.content?.let { getSession(it) }
-                            ?: throw CredentialError(credReq, CredentialErrorCode.invalid_request, "Session not found for access token")
-                        call.respond(generateCredentialResponse(credReq, session).toJSON())
-                    } catch (exc: CredentialError) {
-                        logger.error(exc) { "Credential error: " }
-                        call.respond(HttpStatusCode.BadRequest, exc.toCredentialErrorResponse().toJSON())
-                    }
+                val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ") ?: call.respond(HttpStatusCode.Unauthorized)
+
+                try {
+
+                    val parsedToken = OpenID4VC.verifyAndParseToken(
+                        token = accessToken.toString(),
+                        issuer = metadata.issuer!!,
+                        target = TokenTarget.ACCESS,
+                        tokenKey = CI_TOKEN_KEY
+                    )
+
+                    val credentialRequest = CredentialRequest.fromJSON(call.receive<JsonObject>())
+
+                    val session = parsedToken[JWTClaims.Payload.subject]?.jsonPrimitive?.content?.let { getSession(it) }
+                        ?: throw CredentialError(
+                            credentialRequest = credentialRequest,
+                            errorCode = CredentialErrorCode.invalid_request,
+                            message = "Session not found for access token"
+                        )
+
+                    call.respond(
+                        generateCredentialResponse(
+                            credentialRequest = credentialRequest,
+                            session = session
+                        ).toJSON()
+                    )
+                } catch (exc: CredentialError) {
+                    logger.error(exc) { "Credential error: " }
+                    call.respond(HttpStatusCode.BadRequest, exc.toCredentialErrorResponse().toJSON())
                 }
+
             }
 
             post("{standardVersion}/credential_deferred") {
