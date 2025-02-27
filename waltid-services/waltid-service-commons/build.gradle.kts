@@ -50,10 +50,10 @@ dependencies {
 
     // OpenAPI
     api("io.github.smiley4:ktor-swagger-ui:4.1.6")
-    /*implementation("io.github.smiley4:schema-kenerator-core:1.4.1")
-    implementation("io.github.smiley4:schema-kenerator-serialization:1.4.1")
-    implementation("io.github.smiley4:schema-kenerator-reflection:1.4.1")
-    implementation("io.github.smiley4:schema-kenerator-swagger:1.4.1")*/
+    implementation("io.github.smiley4:schema-kenerator-core:1.6.5")
+    implementation("io.github.smiley4:schema-kenerator-serialization:1.6.5")
+    implementation("io.github.smiley4:schema-kenerator-reflection:1.6.5")
+    implementation("io.github.smiley4:schema-kenerator-swagger:1.6.5")
 
     // Persistence
     api("io.github.reactivecircus.cache4k:cache4k:0.14.0")

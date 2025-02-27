@@ -94,6 +94,14 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
     abstract val requireRequestUriRegistration: Boolean
     abstract val opPolicyUri: String?
     abstract val opTosUri: String?
+    abstract val revocationEndpoint: String?
+    abstract val revocationEndpointAuthMethodsSupported: Set<String>?
+    abstract val revocationEndpointAuthSigningAlgValuesSupported: Set<String>?
+    abstract val introspectionEndpoint: String?
+    abstract val introspectionEndpointAuthMethodsSupported: Set<String>?
+    abstract val introspectionEndpointAuthSigningAlgValuesSupported: Set<String>?
+    abstract val codeChallengeMethodsSupported: List<String>?
+
 
     // OID4VCI Draft 11 and Draft 13 properties
     abstract val credentialIssuer: String?
@@ -103,7 +111,6 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
     abstract val display: List<DisplayProperties>?
     abstract val presentationDefinitionUriSupported: Boolean?
     abstract val clientIdSchemesSupported: List<String>?
-    abstract val codeChallengeMethodsSupported: List<String>?
     abstract val requirePushedAuthorizationRequests: Boolean?
     abstract val dpopSigningAlgValuesSupported: Set<String>?
 
@@ -155,6 +162,14 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
         @SerialName("require_request_uri_registration") override val requireRequestUriRegistration: Boolean = false,
         @SerialName("op_policy_uri") override val opPolicyUri: String? = null,
         @SerialName("op_tos_uri") override val opTosUri: String? = null,
+        @SerialName("code_challenge_methods_supported") override val codeChallengeMethodsSupported: List<String>? = null,
+        @SerialName("revocation_endpoint") override val revocationEndpoint: String? = null,
+        @SerialName("revocation_endpoint_auth_methods_supported") override val revocationEndpointAuthMethodsSupported: Set<String>? = null,
+        @SerialName("revocation_endpoint_auth_signing_alg_values_supported") override val revocationEndpointAuthSigningAlgValuesSupported: Set<String>? = null,
+        @SerialName("introspection_endpoint") override val introspectionEndpoint: String? = null,
+        @SerialName("introspection_endpoint_auth_methods_supported") override val introspectionEndpointAuthMethodsSupported: Set<String>? = null,
+        @SerialName("introspection_endpoint_auth_signing_alg_values_supported") override val introspectionEndpointAuthSigningAlgValuesSupported: Set<String>? = null,
+
 
         // OID4VCI properties
         @SerialName("credential_issuer") override val credentialIssuer: String? = null,
@@ -164,7 +179,6 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
         @SerialName("display") @Serializable(DisplayPropertiesListSerializer::class) override val display: List<DisplayProperties>? = null,
         @SerialName("presentation_definition_uri_supported") override val presentationDefinitionUriSupported: Boolean? = null,
         @SerialName("client_id_schemes_supported") override val clientIdSchemesSupported: List<String>? = null,
-        @SerialName("code_challenge_methods_supported") override val codeChallengeMethodsSupported: List<String>? = null,
         @SerialName("require_pushed_authorization_requests") override val requirePushedAuthorizationRequests: Boolean? = null,
         @SerialName("dpop_signing_alg_values_supported") override val dpopSigningAlgValuesSupported: Set<String>? = null,
 
@@ -236,6 +250,15 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
         @SerialName("require_request_uri_registration") override val requireRequestUriRegistration: Boolean = false,
         @SerialName("op_policy_uri") override val opPolicyUri: String? = null,
         @SerialName("op_tos_uri") override val opTosUri: String? = null,
+        @SerialName("require_pushed_authorization_requests") override val requirePushedAuthorizationRequests: Boolean? = null,
+        @SerialName("code_challenge_methods_supported") override val codeChallengeMethodsSupported: List<String>? = null,
+        @SerialName("revocation_endpoint") override val revocationEndpoint: String? = null,
+        @SerialName("revocation_endpoint_auth_methods_supported") override val revocationEndpointAuthMethodsSupported: Set<String>? = null,
+        @SerialName("revocation_endpoint_auth_signing_alg_values_supported") override val revocationEndpointAuthSigningAlgValuesSupported: Set<String>? = null,
+        @SerialName("introspection_endpoint") override val introspectionEndpoint: String? = null,
+        @SerialName("introspection_endpoint_auth_methods_supported") override val introspectionEndpointAuthMethodsSupported: Set<String>? = null,
+        @SerialName("introspection_endpoint_auth_signing_alg_values_supported") override val introspectionEndpointAuthSigningAlgValuesSupported: Set<String>? = null,
+
 
         // OID4VCI properties
         @SerialName("credential_issuer") override val credentialIssuer: String? = null,
@@ -245,13 +268,12 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
         @SerialName("display") @Serializable(DisplayPropertiesListSerializer::class) override val display: List<DisplayProperties>? = null,
         @SerialName("presentation_definition_uri_supported") override val presentationDefinitionUriSupported: Boolean? = null,
         @SerialName("client_id_schemes_supported") override val clientIdSchemesSupported: List<String>? = null,
-        @SerialName("code_challenge_methods_supported") override val codeChallengeMethodsSupported: List<String>? = null,
-        @SerialName("require_pushed_authorization_requests") override val requirePushedAuthorizationRequests: Boolean? = null,
         @SerialName("dpop_signing_alg_values_supported") override val dpopSigningAlgValuesSupported: Set<String>? = null,
 
         // OID4VCI 13
         @SerialName("credential_configurations_supported") @Serializable(CredentialSupportedMapSerializer::class) val credentialConfigurationsSupported: Map<String, CredentialSupported>? = null,
         @SerialName("authorization_servers") val authorizationServers: Set<String>? = null,
+        @SerialName("pre-authorized_grant_anonymous_access_supported") val preAuthorizedGrantAnonymousAccessSupport: Boolean? = null,
 
         override val customParameters: Map<String, JsonElement> = mapOf()
 
@@ -334,6 +356,13 @@ object OpenIDProviderMetadataSerializer : KSerializer<OpenIDProviderMetadata> {
             "credential_configurations_supported" in transformedElement.jsonObject -> Json.decodeFromJsonElement(OpenIDProviderMetadata.Draft13.serializer(), transformedElement)
             else -> throw IllegalArgumentException("Unknown OpenIDProviderMetadata version: missing expected fields")
         }
+    }
+}
+
+fun OpenIDProviderMetadata.getSupportedProofTypes(): List<ProofType>? {
+    return when (this) {
+        is OpenIDProviderMetadata.Draft11 -> credentialSupported?.values?.flatMap { it.proofTypesSupported?.keys ?: emptyList() }
+        is OpenIDProviderMetadata.Draft13 -> credentialConfigurationsSupported?.values?.flatMap { it.proofTypesSupported?.keys ?: emptyList() }
     }
 }
 
