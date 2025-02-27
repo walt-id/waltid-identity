@@ -84,13 +84,12 @@ object IssuanceService : IssuanceServiceBase() {
         require(offeredCredentials.isNotEmpty()) { "Resolved an empty list of offered credentials" }
 
         logger.debug { "// fetch access token using pre-authorized code (skipping authorization step)" }
-        val tokenReq = TokenRequest(
-            grantType = GrantType.pre_authorized_code,
+
+        val tokenReq = TokenRequest.PreAuthorizedCode(
             clientId = clientId,
-            redirectUri = credentialWallet.config.redirectUri,
-            preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode,
-            txCode = null
+            preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!,
         )
+
         val tokenResp = issueTokenRequest(
             providerMetadata.tokenEndpoint!!,
             tokenReq,
