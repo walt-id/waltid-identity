@@ -17,4 +17,5 @@ class DidEvent(
 
   val didEventType: DidEventType,
   val didMethod: String,
-) : Event()
+) : Event(EventType.DIDEvent) {
+}
