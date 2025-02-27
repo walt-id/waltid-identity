@@ -20,6 +20,10 @@ enum class GrantType(val value: String) {
             return entries.find { it.value == value }
         }
     }
+
+    fun isAvailableIn(grantTypes: Map<String, GrantDetails>): Boolean {
+        return grantTypes.containsKey(value)
+    }
 }
 
 @OptIn(ExperimentalSerializationApi::class)
