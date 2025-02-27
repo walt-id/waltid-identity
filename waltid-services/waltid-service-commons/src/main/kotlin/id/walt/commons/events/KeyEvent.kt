@@ -17,4 +17,5 @@ class KeyEvent(
 
   val keyEventType: KeyEventType,
   val keyAlgorithm: String
-) : Event()
+) : Event(EventType.KeyEvent) {
+}

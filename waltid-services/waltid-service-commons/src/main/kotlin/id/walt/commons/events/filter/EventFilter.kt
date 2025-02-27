@@ -7,7 +7,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class EventFilter(
   val eventType: Set<EventType>? = null,
-  val status: Set<EventStatus>? = null,
+  val status: Set<String>? = null,
+  val action: Set<String>? = null,
   val fromTimestamp: Long? = null,
   val toTimestamp: Long? = null,
   val callId: String? = null,

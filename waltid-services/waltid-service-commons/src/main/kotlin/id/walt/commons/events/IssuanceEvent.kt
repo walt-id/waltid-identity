@@ -3,7 +3,6 @@ package id.walt.commons.events
 import id.walt.oid4vc.data.ProofType
 import kotlinx.serialization.Serializable
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
 @Serializable
@@ -20,5 +19,6 @@ class IssuanceEvent(
   val credentialConfigurationId: String,
   val format: String?,
   val proofType: ProofType? = null,
-  val holderId: String? = null,
-) : Event()
+  val holderId: String? = null
+) : Event(EventType.IssuanceEvent) {
+}
