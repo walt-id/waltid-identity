@@ -3,6 +3,7 @@ package id.walt.did.dids.registrar.dids
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -12,6 +13,7 @@ import kotlin.js.JsName
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 open class DidCreateOptions(
     val method: String,
     val config: JsonElement,
