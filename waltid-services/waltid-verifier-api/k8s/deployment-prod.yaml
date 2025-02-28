@@ -11,9 +11,9 @@ data:
     webHost = "0.0.0.0"
     webPort = 3000
   verifier-service.conf: |
-    baseUrl = "https://verifier.portal.walt.id"
+    baseUrl = "https://verifier.demo.walt.id"
   entra.conf: |
-    callbackUrl = "https://verifier.portal.walt.id/entra/verification-callback/"
+    callbackUrl = "https://verifier.demo.walt.id/entra/verification-callback/"
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -69,10 +69,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - verifier.portal.walt.id
+        - verifier.demo.walt.id
       secretName: verifier-tls-secret
   rules:
-    - host: verifier.portal.walt.id
+    - host: verifier.demo.walt.id
       http:
         paths:
           - path: /

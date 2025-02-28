@@ -5,9 +5,9 @@ metadata:
 data:
   .env: |
     NEXT_PUBLIC_VC_REPO: https://credentials.walt.id
-    NEXT_PUBLIC_ISSUER: https://issuer.portal.walt.id
-    NEXT_PUBLIC_VERIFIER: https://verifier.portal.walt.id
-    NEXT_PUBLIC_WALLET: https://wallet.walt.id
+    NEXT_PUBLIC_ISSUER: https://issuer.demo.walt.id
+    NEXT_PUBLIC_VERIFIER: https://verifier.demo.walt.id
+    NEXT_PUBLIC_WALLET: https://wallet.demo.walt.id
 ---
 
 ---
@@ -34,11 +34,11 @@ spec:
             - name: NEXT_PUBLIC_VC_REPO
               value: "https://credentials.walt.id"
             - name: NEXT_PUBLIC_ISSUER
-              value: "https://issuer.portal.walt.id"
+              value: "https://issuer.demo.walt.id"
             - name: NEXT_PUBLIC_VERIFIER
-              value: "https://verifier.portal.walt.id"
+              value: "https://verifier.demo.walt.id"
             - name: NEXT_PUBLIC_WALLET
-              value: "https://wallet.walt.id"
+              value: "https://wallet.demo.walt.id"
           ports:
             - containerPort: 3000
               name: http-portal
@@ -75,10 +75,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - portal.walt.id
+        - portal.demo.walt.id
       secretName: web-portal-tls-secret
   rules:
-    - host: portal.walt.id
+    - host: portal.demo.walt.id
       http:
         paths:
           - path: /offer
