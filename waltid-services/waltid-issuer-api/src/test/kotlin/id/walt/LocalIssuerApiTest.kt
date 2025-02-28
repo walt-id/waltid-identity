@@ -1,6 +1,10 @@
 package id.walt
 
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.events.Action
+import id.walt.commons.events.EventType
+import id.walt.commons.events.Status
+import id.walt.commons.events.IssuanceEvent
 import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.issuer.issuance.IssuanceRequest
@@ -217,5 +221,25 @@ companion object {
 
     }
 
+    @Test
+    fun testEventSerialization() {
 
+        val json = Json.encodeToString(
+            IssuanceEvent(
+            "originator",
+            target = "target",
+            timestamp = 0,
+            status = Status("status"),
+            action = Action("action"),
+            sessionId = "sessionId",
+            credentialConfigurationId = "credentialConfigurationId",
+            format = "format",
+            proofType = null,
+            holderId = null,
+            callId = null,
+            error = null
+        )
+        )
+        println(json)
+    }
 }
