@@ -4,7 +4,7 @@ import id.walt.webwallet.utils.StringUtils.hexToByteArray
 import kotlin.test.*
 
 class BitstringUtilsTest {
-    private val bitString = hexToByteArray("5AA5")//0b01011010_10100101
+    private val bitString = hexToByteArray("A265")//0b10100010_01100101
 
     @Test
     fun `test unit bitsize, no overflow`() {
