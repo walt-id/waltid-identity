@@ -51,7 +51,8 @@ export const DIDMethodsConfig = {
   },
   'did:ebsi': {
     'issuerDid': 'did:ebsi:zf39qHTXaLrr6iy3tQhT3UZ',
-    'issuerKey': {"type": "jwk",
+    'issuerKey': {
+      "type": "jwk",
       "jwk": {
         "kty": "EC",
         "x": "SgfOvOk1TL5yiXhK5Nq7OwKfn_RUkDizlIhAf8qd2wE",
@@ -63,7 +64,8 @@ export const DIDMethodsConfig = {
   },
   'did:jwk': {
     'issuerDid': 'did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2Iiwia2lkIjoiM1lOZDlGbng5Smx5UFZZd2dXRkUzN0UzR3dJMGVHbENLOHdGbFd4R2ZwTSIsIngiOiJGb3ZZMjFMQUFPVGxnLW0tTmVLV2haRUw1YUZyblIwdWNKakQ1VEtwR3VnIiwieSI6IkNyRkpmR1RkUDI5SkpjY3BRWHV5TU8zb2h0enJUcVB6QlBCSVRZajBvZ0EifQ',
-    'issuerKey': {"type": "jwk",
+    'issuerKey': {
+      "type": "jwk",
       "jwk": {
         "kty": "EC",
         "d": "8jH4vwtvCw6tcBzdxQ6V7FY2L215lBGm-x3flgENx4Y",
@@ -75,8 +77,9 @@ export const DIDMethodsConfig = {
     }
   },
   'did:web': {
-    'issuerDid': 'did:web:wallet.walt.id:wallet-api:registry:portal',
-    'issuerKey': {"type": "jwk",
+    'issuerDid': 'did:web:wallet.demo.walt.id:wallet-api:registry:portal',
+    'issuerKey': {
+      "type": "jwk",
       "jwk": {
         "kty": "EC",
         "d": "6rVNEWMQzVdPgin7ER_ptWlSnkozGwOWYlSDcQHMRZw",
@@ -89,7 +92,8 @@ export const DIDMethodsConfig = {
   },
   'did:cheqd': {
     'issuerDid': 'did:cheqd:testnet:16047c9a-8f6f-4258-b35e-73098c6981e0',
-    'issuerKey': {"type": "jwk",
+    'issuerKey': {
+      "type": "jwk",
       "jwk": {
         "kty": "OKP",
         "d": "YqOrL8iTCxeoVAFAxXC-CVxX7-RfOtVggl55wwP3wg0",
