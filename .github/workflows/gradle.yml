@@ -25,7 +25,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@f7b46c8ae1c27f1a0873a5ca8dfb0440c77381ec
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@b503772bdf234f16ce83f1da078cbe0d430351c5
       - name: Set version
         run: |
           sed -i "s/1.0.0-SNAPSHOT/${{ inputs.version }}/g" build.gradle.kts
