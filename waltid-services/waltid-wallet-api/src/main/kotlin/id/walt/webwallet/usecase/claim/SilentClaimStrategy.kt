@@ -2,9 +2,6 @@
 
 package id.walt.webwallet.usecase.claim
 
-import id.walt.commons.config.ConfigManager
-import id.walt.webwallet.config.NotificationConfig
-import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.db.models.Notification
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.seeker.Seeker
@@ -50,12 +47,7 @@ class SilentClaimStrategy(
         val issuerDid = WalletCredential.parseIssuerDid(credential, manifest) ?: "n/a"
         val type = credentialTypeSeeker.get(credential)
         val egfUri = "test"
-        if (ConfigManager.getConfig<TrustConfig>().issuersRecord.baseUrl.startsWith("http")) {
-            Pair(it, issuerDid).takeIf { validateIssuer(issuerDid, type, egfUri) }
-        } else {
             Pair(it, issuerDid)
-        }
-
     }.map {
         prepareCredentialData(did = did, data = it.first, issuerDid = it.second)
     }.flatten().groupBy {
@@ -65,9 +57,7 @@ class SilentClaimStrategy(
         storeCredentials(entry.key, credentials).getOrNull()?.let {
             accountService.getAccountForWallet(entry.key)?.run {
                 createEvents("", this, entry.value, EventType.Credential.Receive)
-                if (ConfigManager.getConfig<NotificationConfig>().url.startsWith("http")) {
-                    createNotifications(this, credentials, EventType.Credential.Receive)
-                }
+                createNotifications(this, credentials, EventType.Credential.Receive)
             }
             entry.value.map { it.first.id }
         }
