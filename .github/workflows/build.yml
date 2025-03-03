@@ -11,32 +11,32 @@ concurrency:
 
 jobs:
   version:
-    uses: walt-id/waltid-identity/.github/workflows/version.yml@266f5c09359450c39019a6da38f2b331e7122918
+    uses: walt-id/waltid-identity/.github/workflows/version.yml@81cb955f8cb89a15edb54204d23c79df8189cf56
   gradle-build:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@d3e3284f901bef1e6d80b35720fbae5e4b49a95a
+    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@81cb955f8cb89a15edb54204d23c79df8189cf56
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
   docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@927c4233610e90dd8a57418662fad7293b7b29a4
+    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@81cb955f8cb89a15edb54204d23c79df8189cf56
     with:
       jsonpath: ".github/workflows/data/docker-matrix.json"
   docker:
-    uses: walt-id/waltid-identity/.github/workflows/docker.yml@a99af313ae1f930dbf03c1bd41f006ac74f77e43
+    uses: walt-id/waltid-identity/.github/workflows/docker.yml@81cb955f8cb89a15edb54204d23c79df8189cf56
     needs: [ version, docker-matrix ]
     with:
       images: ${{ needs.docker-matrix.outputs.json }}
       version: ${{ needs.version.outputs.release_version }}
       artifact: true
   ebsi-ct-v3:
-    uses: walt-id/waltid-identity/.github/workflows/ebsictv3.yml@3f56b05ff315770abd06e7a931b5a73942296cc4
+    uses: walt-id/waltid-identity/.github/workflows/ebsictv3.yml@81cb955f8cb89a15edb54204d23c79df8189cf56
     needs: [ version, docker ]
     secrets: inherit
     with:
       artifact: issuer-api
       tag: "waltid/issuer-api:${{ needs.version.outputs.release_version }}"
   compose-test:
-    uses: walt-id/waltid-identity/.github/workflows/docker-compose-testing.yml@a99af313ae1f930dbf03c1bd41f006ac74f77e43
+    uses: walt-id/waltid-identity/.github/workflows/docker-compose-testing.yml@81cb955f8cb89a15edb54204d23c79df8189cf56
     needs: [ version, docker ]
     secrets: inherit
     with:
