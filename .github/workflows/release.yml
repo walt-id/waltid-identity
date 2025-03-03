@@ -39,9 +39,8 @@ jobs:
     with:
       version: ${{ needs.version.outputs.release_version }}
       deployment: prod
-      namespace: default
-      portals: portals
-      kubeconfig_secret: NL_KUBE_CONFIG
+      namespace: identity-main
+      portals: identity-main
   tag:
     uses: walt-id/waltid-identity/.github/workflows/tag.yml@266f5c09359450c39019a6da38f2b331e7122918
     needs: [ version, deploy ]
