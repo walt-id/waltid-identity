@@ -51,7 +51,7 @@ metadata:
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   rules:
-    - host: opa.walt.id
+    - host: opa.demo.walt.id
       http:
         paths:
           - path: /
