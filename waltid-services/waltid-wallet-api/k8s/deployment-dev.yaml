@@ -42,6 +42,14 @@ data:
             refillRateMinutes: 1
         }
     }
+  registration-defaults.conf: |
+    defaultIssuerConfig: {
+      did = "did:web:walt.id",
+      description = "walt.id issuer portal",
+      uiEndpoint = "https://portal.demo.walt.id/credentials?ids=",
+      configurationEndpoint = "https://issuer.demo.walt.id/.well-known/openid-credential-issuer",
+      authorized = false,
+    }
 #  rejectionreason.conf: |
 #    reasons = [
 #        "Unknown sender",
@@ -113,6 +121,10 @@ spec:
               mountPath: /waltid-wallet-api/config/oidc.conf
               readOnly: true
               subPath: oidc.conf
+            - name: wallet-config
+              mountPath: /waltid-wallet-api/config/registration-defaults.conf
+              readOnly: true
+              subPath: registration-defaults.conf
             - name: wallet-auth-secret
               mountPath: /waltid-wallet-api/config/auth.conf
               readOnly: true
