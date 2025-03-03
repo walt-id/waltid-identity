@@ -8,6 +8,7 @@ import kotlin.uuid.Uuid
 @Serializable
 class KeyEvent(
   override val originator: String?,
+  override val organization: String,
   override val target: String,
   override val timestamp: Long,
   override val action: Action,

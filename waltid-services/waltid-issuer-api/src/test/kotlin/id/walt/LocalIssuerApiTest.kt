@@ -227,6 +227,7 @@ companion object {
         val json = Json.encodeToString(
             IssuanceEvent(
             "originator",
+            organization = "organization",
             target = "target",
             timestamp = 0,
             status = Status("status"),
