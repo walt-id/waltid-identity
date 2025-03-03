@@ -15,6 +15,7 @@ sealed class Event @OptIn(ExperimentalUuidApi::class) constructor(
   @SerialName("_id") val id: String = Uuid.random().toString()
 ) {
   abstract val originator: String? // user or system that initiated the event
+  abstract val organization: String // organization.tenant
   abstract val target: String // organization.tenant
   abstract val timestamp: Long
   abstract val action: Action // e.g. received/accepted/rejected

@@ -12,6 +12,7 @@ data class EventFilter(
   val fromTimestamp: Long? = null,
   val toTimestamp: Long? = null,
   val callId: String? = null,
+  val target: Set<String>? = null,
   val issuanceEventFilter: IssuanceEventFilter? = null,
   val verificationEventFilter: VerificationEventFilter? = null,
   val keyEventFilter: KeyEventFilter? = null,
