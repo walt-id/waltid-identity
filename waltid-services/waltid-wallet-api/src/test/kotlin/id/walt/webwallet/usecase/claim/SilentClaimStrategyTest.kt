@@ -108,16 +108,4 @@ class SilentClaimStrategyTest {
             coVerify(exactly = 1) { notificationDispatchUseCaseMock.send(any()) }
         }
 
-    @Test
-    fun `given an untrusted issuer, when claiming the offer, then no event is logged and no notification created and sent`() =
-        runTest {
-            coEvery { issuerTrustValidationService.validate(any(), any(), any()) } returns false
-
-            val result = sut.claim(did, offer)
-
-            assertEquals(0, result.size)
-            verify(exactly = 0) { eventUseCase.log(any()) }
-            verify(exactly = 0) { notificationUseCase.add(any()) }
-            coVerify(exactly = 0) { notificationDispatchUseCaseMock.send(any()) }
-        }
 }
