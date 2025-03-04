@@ -47,10 +47,7 @@ class SilentClaimStrategy(
         val issuerDid = WalletCredential.parseIssuerDid(credential, manifest) ?: "n/a"
         val type = credentialTypeSeeker.get(credential)
         val egfUri = "test"
-        //TODO: improve for same issuer - type values
-        if (validateIssuer(issuerDid, type, egfUri)) {
             Pair(it, issuerDid)
-        } else null
     }.map {
         prepareCredentialData(did = did, data = it.first, issuerDid = it.second)
     }.flatten().groupBy {
@@ -104,7 +101,6 @@ class SilentClaimStrategy(
                 addedOn = Clock.System.now(),
                 manifest = data.manifest,
                 deletedOn = null,
-                pending = issuerUseCase.get(wallet = it, did = issuerDid).getOrNull()?.authorized != false,
                 format = data.format
             ), data.type
         )
