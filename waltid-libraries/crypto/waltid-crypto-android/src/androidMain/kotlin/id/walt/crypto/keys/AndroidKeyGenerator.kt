@@ -8,6 +8,7 @@ import java.security.spec.ECGenParameterSpec
 import javax.security.auth.x500.X500Principal
 import kotlin.uuid.Uuid
 
+@OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 object AndroidKeyGenerator : AndroidKeyCreator {
 
     private const val KEY_PAIR_ALIAS_PREFIX = "local_key_pair_"
