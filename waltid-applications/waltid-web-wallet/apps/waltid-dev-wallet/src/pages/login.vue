@@ -349,21 +349,21 @@
 
 <script lang="ts" setup>
 import {
-    ArrowRightOnRectangleIcon,
-    BookmarkSquareIcon,
-    EnvelopeIcon,
-    IdentificationIcon,
-    QuestionMarkCircleIcon
+  ArrowRightOnRectangleIcon,
+  BookmarkSquareIcon,
+  EnvelopeIcon,
+  IdentificationIcon,
+  QuestionMarkCircleIcon
 } from "@heroicons/vue/20/solid";
-import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from "@headlessui/vue";
-import { ExclamationCircleIcon, XMarkIcon } from "@heroicons/vue/24/outline";
-import { usePageLeave, useParallax } from "@vueuse/core";
+import {Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot} from "@headlessui/vue";
+import {ExclamationCircleIcon, XMarkIcon} from "@heroicons/vue/24/outline";
+import {usePageLeave, useParallax} from "@vueuse/core";
 import useModalStore from "@waltid-web-wallet/stores/useModalStore.ts";
-import { useUserStore } from "@waltid-web-wallet/stores/user.ts";
-import { storeToRefs } from "pinia";
-import { useTenant } from "@waltid-web-wallet/composables/tenants.ts";
-import { decodeJwt } from "jose";
-import { MetaMaskSDK } from "@metamask/sdk";
+import {useUserStore} from "@waltid-web-wallet/stores/user.ts";
+import {storeToRefs} from "pinia";
+import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
+import {decodeJwt} from "jose";
+import {MetaMaskSDK} from "@metamask/sdk";
 
 const store = useModalStore();
 
