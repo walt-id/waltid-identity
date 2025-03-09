@@ -1,7 +1,3 @@
-import love.forte.plugin.suspendtrans.ClassInfo
-import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
-import love.forte.plugin.suspendtrans.TargetPlatform
-import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -10,7 +6,6 @@ plugins {
     id("com.android.library")
     id("maven-publish")
     id("com.github.ben-manes.versions")
-    id("love.forte.plugin.suspend-transform")
 }
 
 group = "id.walt.crypto"
@@ -20,20 +15,12 @@ repositories {
     maven("https://jitpack.io")
 }
 
-suspendTransform {
-    enabled = true
-    includeRuntime = true
-    useDefault()
-}
-
 java {
     sourceCompatibility = JavaVersion.VERSION_15
     targetCompatibility = JavaVersion.VERSION_15
 }
 
 kotlin {
-//    jvmToolchain(15)
-
     androidTarget {
         compilations.all {
             compileTaskProvider.configure {
@@ -47,7 +34,7 @@ kotlin {
 
 android {
     namespace = "id.walt.crypto"
-    compileSdk = 34
+    compileSdk = 35
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
 
     defaultConfig {
@@ -67,24 +54,11 @@ android {
 }
 
 kotlin {
-    targets.configureEach {
-        compilations.configureEach {
-            compileTaskProvider.configure {
-                compilerOptions {
-                    freeCompilerArgs.add("-Xexpect-actual-classes")
-                }
-            }
-        }
+    androidTarget {
+        publishLibraryVariants("release")
     }
 
     sourceSets {
-
-        all {
-            languageSettings.optIn("kotlin.ExperimentalStdlibApi")
-            languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
-            languageSettings.optIn("kotlin.io.encoding.ExperimentalEncodingApi")
-        }
-
         val androidMain by getting {
             dependencies {
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -137,18 +111,6 @@ kotlin {
                 }
             }
         }
-        all {
-            languageSettings.enableLanguageFeature("InlineClasses")
-        }
-    }
-}
 
-extensions.getByType<SuspendTransformGradleExtension>().apply {
-    transformers[TargetPlatform.JS] = mutableListOf(
-        SuspendTransformConfiguration.jsPromiseTransformer.copy(
-            copyAnnotationExcludes = listOf(
-                ClassInfo("kotlin.js", "JsExport.Ignore")
-            )
-        )
-    )
+    }
 }
