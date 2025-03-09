@@ -121,10 +121,16 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
         override suspend fun lookupAccountUuid(identifier: AccountIdentifier): String? =
             withContext(dispatcher) {
                 transaction {
-                    AuthnzAccountIdentifiers
-                        .selectAll().where { AuthnzAccountIdentifiers.identifier eq identifier.accountIdentifierName }
-                        .map { it[userId].toString() }
+                    val existingAccount = Accounts
+                        .select(Accounts.id)
+                        .where { Accounts.name eq identifier.toDataString() }
+                        .map { it[Accounts.id] }
                         .firstOrNull()
+
+                    if (existingAccount != null) {
+                        return@transaction existingAccount.toString()
+                    }
+                    return@transaction null
                 }
             }
 
