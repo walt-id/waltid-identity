@@ -426,6 +426,14 @@ function closeModal() {
     error.value = {};
 }
 
+const MMSDK = new MetaMaskSDK({
+  dappMetadata: {name: "Walt.id Web Wallet", url: window.location.href},
+  injectProvider: true
+});
+
+await MMSDK.connect();
+const ethereum = MMSDK.getProvider();
+
 
 async function openWeb3() {
     const response = await fetch("/wallet-api/auth/account/web3/nonce", { method: "GET" });
@@ -433,13 +441,7 @@ async function openWeb3() {
     console.log("====Frontend DEBUG LOGS====");
     console.log("Received JWT:", challenge);
 
-    const MMSDK = new MetaMaskSDK({
-        dappMetadata: { name: "Walt.id Web Wallet", url: window.location.href },
-        injectProvider: true
-    });
 
-    await MMSDK.connect();
-    const ethereum = MMSDK.getProvider();
     const accounts = await ethereum.request({ method: "eth_requestAccounts" });
     const address = accounts[0];
 
