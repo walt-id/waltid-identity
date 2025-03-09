@@ -22,6 +22,7 @@ import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger { }
 
+@OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 class AndroidKey() : Key() {
 
     override val keyType: KeyType
