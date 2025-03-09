@@ -426,11 +426,6 @@ function closeModal() {
     error.value = {};
 }
 
-function decodeJWT(token) {
-    const payloadBase64 = token.split(".")[1]; // Extract the payload part
-    const decodedPayload = atob(payloadBase64); // Decode Base64
-    return JSON.parse(decodedPayload); // Parse JSON
-}
 
 async function openWeb3() {
     const response = await fetch("/wallet-api/auth/account/web3/nonce", { method: "GET" });
