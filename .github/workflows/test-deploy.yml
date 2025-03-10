@@ -8,21 +8,21 @@ on:
         required: false
 jobs:
   version:
-    uses: walt-id/waltid-identity/.github/workflows/version.yml@266f5c09359450c39019a6da38f2b331e7122918
+    uses: walt-id/waltid-identity/.github/workflows/version.yml@60994ea4135c36e84f099db8adb77de5f399e334
     with:
       preferred: ${{ inputs.release_version }}
   gradle:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@d3e3284f901bef1e6d80b35720fbae5e4b49a95a
+    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@60994ea4135c36e84f099db8adb77de5f399e334
     secrets: inherit
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
   docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@927c4233610e90dd8a57418662fad7293b7b29a4
+    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@60994ea4135c36e84f099db8adb77de5f399e334
     with:
       jsonpath: ".github/workflows/data/docker-matrix.json"
   docker:
-    uses: walt-id/waltid-identity/.github/workflows/docker.yml@a82cb3363b9ffc14fde08d787383318f83cb99be
+    uses: walt-id/waltid-identity/.github/workflows/docker.yml@60994ea4135c36e84f099db8adb77de5f399e334
     secrets: inherit
     needs: [ version, docker-matrix ]
     with:
@@ -30,13 +30,13 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       publish: true
   deploy:
-    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@7e03d0f22863cac15deafac7292b4c38fd9ba920
+    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@60994ea4135c36e84f099db8adb77de5f399e334
     secrets: inherit
     needs: [ version, gradle, docker ]
     with:
       version: ${{ needs.version.outputs.release_version }}
   tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@266f5c09359450c39019a6da38f2b331e7122918
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@60994ea4135c36e84f099db8adb77de5f399e334
     needs: [ version, deploy ]
     with:
       version: ${{ needs.version.outputs.release_version }}
