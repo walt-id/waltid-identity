@@ -6,6 +6,7 @@ plugins {
     id("com.android.library")
     id("maven-publish")
     id("com.github.ben-manes.versions")
+    id("love.forte.plugin.suspend-transform")
 }
 
 group = "id.walt.crypto"
@@ -13,6 +14,12 @@ group = "id.walt.crypto"
 repositories {
     mavenCentral()
     maven("https://jitpack.io")
+}
+
+suspendTransform {
+    enabled = true
+    includeRuntime = true
+    useJvmDefault()
 }
 
 java {
@@ -62,6 +69,7 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
                 implementation("io.github.oshai:kotlin-logging:7.0.4")
             }
@@ -85,7 +93,10 @@ kotlin {
         publishing {
             repositories {
                 maven {
-                    url = uri("https://maven.waltid.dev/releases")
+                    val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+                    val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+                    url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
+
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
 
@@ -95,15 +106,9 @@ kotlin {
                     val secretMavenUsername = envUsername ?: usernameFile.let {
                         if (it.isFile) it.readLines().first() else ""
                     }
-                    //println("Deploy username length: ${secretMavenUsername.length}")
                     val secretMavenPassword = envPassword ?: passwordFile.let {
                         if (it.isFile) it.readLines().first() else ""
                     }
-
-                    //if (secretMavenPassword.isBlank()) {
-                    //   println("WARNING: Password is blank!")
-                    //}
-
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword
