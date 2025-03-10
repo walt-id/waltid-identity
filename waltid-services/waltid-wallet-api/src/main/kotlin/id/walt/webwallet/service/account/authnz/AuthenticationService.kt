@@ -4,6 +4,7 @@ import id.walt.ktorauthnz.accounts.EditableAccountStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
+import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers.userId
 import id.walt.webwallet.db.models.authnz.AuthnzStoredData
@@ -13,7 +14,7 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.util.UUID
+import java.util.*
 import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalUuidApi::class)
@@ -120,10 +121,16 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
         override suspend fun lookupAccountUuid(identifier: AccountIdentifier): String? =
             withContext(dispatcher) {
                 transaction {
-                    AuthnzAccountIdentifiers
-                        .selectAll().where { AuthnzAccountIdentifiers.identifier eq identifier.accountIdentifierName }
-                        .map { it[userId].toString() }
+                    val existingAccount = Accounts
+                        .select(Accounts.id)
+                        .where { Accounts.name eq identifier.toDataString() }
+                        .map { it[Accounts.id] }
                         .firstOrNull()
+
+                    if (existingAccount != null) {
+                        return@transaction existingAccount.toString()
+                    }
+                    return@transaction null
                 }
             }
 
