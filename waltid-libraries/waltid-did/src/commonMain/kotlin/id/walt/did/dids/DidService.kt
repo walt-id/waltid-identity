@@ -153,6 +153,13 @@ object DidService {
     @JsExport.Ignore
     suspend fun resolveToKey(did: String): Result<Key> =
         getResolverForDid(did).resolveToKey(did)
+        
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    suspend fun resolveToKeys(did: String): Result<Set<Key>> =
+        getResolverForDid(did).resolveToKeys(did)
 
     private fun getRegistrarForMethod(method: String): DidRegistrar =
         registrarMethods[method] ?: throw IllegalArgumentException("No registrar for did method: $method")

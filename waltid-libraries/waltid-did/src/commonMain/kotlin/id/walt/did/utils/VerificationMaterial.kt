@@ -25,6 +25,20 @@ object VerificationMaterial {
         val verificationMethod = extractVerificationMethod(element)
         extractVerificationMaterial(verificationMethod)
     }
+    
+    fun getAll(document: JsonObject): List<JsonElement>? {
+        // First try to get all verification methods
+        document.jsonObject["verificationMethod"]?.let { verificationMethods ->
+            if (verificationMethods is JsonArray) {
+                return verificationMethods.jsonArray.map { 
+                    extractVerificationMaterial(it)
+                }
+            }
+        }
+        
+        // Fallback to the first verification method found
+        return get(document)?.let { listOf(it) }
+    }
 
     private fun extractVerificationMethod(element: JsonElement?): JsonElement = when (element) {
         is JsonArray -> element.jsonArray.first()
