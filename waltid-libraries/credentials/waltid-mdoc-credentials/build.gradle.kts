@@ -71,7 +71,7 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                implementation("org.cose:cose-java:1.1.1-SNAPSHOT")
+                implementation("org.cose:cose-java:1.1.1-WALTID-SNAPSHOT")
             }
         }
         val jvmTest by getting {

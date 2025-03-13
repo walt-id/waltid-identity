@@ -103,7 +103,7 @@ dependencies {
     api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
     // crypto
-    implementation("org.cose:cose-java:1.1.1-SNAPSHOT")
+    implementation("org.cose:cose-java:1.1.1-WALTID-SNAPSHOT")
     implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
 
     // Multiplatform / Hashes

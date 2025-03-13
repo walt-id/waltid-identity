@@ -131,7 +131,7 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
-                implementation("org.cose:cose-java:1.1.1-SNAPSHOT")
+                implementation("org.cose:cose-java:1.1.1-WALTID-SNAPSHOT")
                 implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
             }
         }
@@ -160,7 +160,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.10.1")
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 
-                implementation("org.cose:cose-java:1.1.1-SNAPSHOT")
+                implementation("org.cose:cose-java:1.1.1-WALTID-SNAPSHOT")
                 implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
 
                 implementation("org.slf4j:slf4j-simple:2.0.16")
