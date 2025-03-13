@@ -3,7 +3,7 @@
 package id.walt.wallet.core.service.oidc4vc
 
 
-import COSE.AlgorithmID
+import org.cose.java.AlgorithmID
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.Key
