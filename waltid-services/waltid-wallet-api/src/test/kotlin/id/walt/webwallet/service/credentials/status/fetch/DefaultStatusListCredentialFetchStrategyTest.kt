@@ -72,7 +72,7 @@ class DefaultStatusListCredentialFetchStrategyTest {
 
     object StatusCredentialTestServer {
         var serverStarted = false
-        const val serverPort = 8080
+        const val serverPort = 8085
         const val credentialResourcePath = "credential-status/status-list-credential"
         const val statusCredentialPath = "credentials/%s"
 

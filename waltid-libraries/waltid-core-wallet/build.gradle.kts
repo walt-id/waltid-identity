@@ -51,7 +51,7 @@ kotlin {
 
                 // Problematic libraries:
                 implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
-                implementation("org.cose:cose-java:1.1.1-SNAPSHOT")
+                implementation("org.cose:cose-java:1.1.1-WALTID-SNAPSHOT")
             }
         }
         val jvmMain by getting {
