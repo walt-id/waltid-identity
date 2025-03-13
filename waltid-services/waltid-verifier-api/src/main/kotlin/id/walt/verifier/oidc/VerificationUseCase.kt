@@ -1,6 +1,6 @@
 package id.walt.verifier.oidc
 
-import COSE.AlgorithmID
+import org.cose.java.AlgorithmID
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
@@ -174,7 +174,7 @@ class VerificationUseCase(
             val redirectUri = sessionVerificationInfo.errorRedirectUri?.replace("\$id", session.id)
 
             logger.debug { "Presentation failed, redirecting to: $redirectUri" }
-            
+
 
             return if (policyResults == null) {
                 Result.failure(FailedVerificationException(redirectUri, IllegalArgumentException("Verification policies did not succeed")))

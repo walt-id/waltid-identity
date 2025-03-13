@@ -2,8 +2,8 @@
 
 package id.walt.verifier.oidc
 
-import COSE.AlgorithmID
-import COSE.OneKey
+import org.cose.java.AlgorithmID
+import org.cose.java.OneKey
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
