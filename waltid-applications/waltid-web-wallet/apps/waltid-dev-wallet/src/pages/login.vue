@@ -431,11 +431,12 @@ const MMSDK = new MetaMaskSDK({
   injectProvider: true
 });
 
-await MMSDK.connect();
-const ethereum = MMSDK.getProvider();
+
 
 
 async function openWeb3() {
+  await MMSDK.connect();
+  const ethereum = MMSDK.getProvider();
     const response = await fetch("/wallet-api/auth/account/web3/nonce", { method: "GET" });
     const challenge = await response.text();
     console.log("====Frontend DEBUG LOGS====");
