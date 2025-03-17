@@ -35,7 +35,7 @@ dependencies {
 
     testImplementation("app.softwork:kotlinx-uuid-core:0.1.4")
     testImplementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
-    implementation("org.cose:cose-java:1.1.1-WALTID-SNAPSHOT")
+    implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
     testImplementation("org.bouncycastle:bcpkix-lts8on:2.73.7")
 
     // Multiplatform / Hashes
