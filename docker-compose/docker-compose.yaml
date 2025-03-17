@@ -1,5 +1,6 @@
 services:
   wallet-api:
+    platform: linux/x86_64
     image: docker.io/waltid/wallet-api:${VERSION_TAG:-latest}
     profiles:
       - services
@@ -63,6 +64,7 @@ services:
       OPA_SERVER_URL: "http://opa-server:8181"
 
   waltid-demo-wallet:
+    platform: linux/x86_64
     image: docker.io/waltid/waltid-demo-wallet:${VERSION_TAG:-latest}
     profiles:
       - apps
@@ -81,6 +83,7 @@ services:
       PORT: $DEMO_WALLET_FRONTEND_PORT
 
   waltid-dev-wallet:
+    platform: linux/x86_64
     image: docker.io/waltid/waltid-dev-wallet:${VERSION_TAG:-latest}
     profiles:
       - apps
