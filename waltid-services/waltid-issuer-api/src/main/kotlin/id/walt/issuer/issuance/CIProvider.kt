@@ -2,8 +2,8 @@
 
 package id.walt.issuer.issuance
 
-import COSE.AlgorithmID
-import COSE.OneKey
+import org.cose.java.AlgorithmID
+import org.cose.java.OneKey
 import cbor.Cbor
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
