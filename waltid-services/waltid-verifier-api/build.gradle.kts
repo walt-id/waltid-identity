@@ -89,7 +89,7 @@ dependencies {
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
     // Crypto
-    implementation("org.cose:cose-java:1.1.1-WALTID-SNAPSHOT")
+    implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
     implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
 
     // Test
