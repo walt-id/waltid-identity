@@ -1,6 +1,6 @@
 package id.walt.webwallet.service.exchange
 
-import COSE.OneKey
+import org.cose.java.OneKey
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.encodeToBase64

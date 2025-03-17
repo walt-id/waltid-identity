@@ -1,7 +1,7 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
 
-import COSE.AlgorithmID
+import org.cose.java.AlgorithmID
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier

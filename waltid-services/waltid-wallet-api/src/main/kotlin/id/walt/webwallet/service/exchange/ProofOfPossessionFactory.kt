@@ -1,6 +1,6 @@
 package id.walt.webwallet.service.exchange
 
-import COSE.OneKey
+import org.cose.java.OneKey
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.CredentialOffer

@@ -61,6 +61,7 @@ class AuthApi(private val client: HttpClient) {
         client.get("/wallet-api/auth/session").expectSuccess()
     }
 
+    @OptIn(ExperimentalUuidApi::class)
     suspend fun userWallets(expectedAccountId: Uuid, output: ((AccountWalletListing) -> Unit)? = null) =
         test("/wallet-api/wallet/accounts/wallets - get wallets") {
             client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().apply {

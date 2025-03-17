@@ -11,6 +11,7 @@ group = "id.walt"
 repositories {
     mavenLocal()
     mavenCentral()
+    maven("https://maven.waltid.dev/snapshots")
 }
 
 dependencies {
@@ -34,7 +35,7 @@ dependencies {
 
     testImplementation("app.softwork:kotlinx-uuid-core:0.1.4")
     testImplementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
-    testImplementation("com.augustcellars.cose:cose-java:1.1.0")
+    implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
     testImplementation("org.bouncycastle:bcpkix-lts8on:2.73.7")
 
     // Multiplatform / Hashes
