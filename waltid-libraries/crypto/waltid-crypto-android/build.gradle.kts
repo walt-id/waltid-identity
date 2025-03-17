@@ -1,7 +1,3 @@
-import love.forte.plugin.suspendtrans.ClassInfo
-import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
-import love.forte.plugin.suspendtrans.TargetPlatform
-import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -23,7 +19,7 @@ repositories {
 suspendTransform {
     enabled = true
     includeRuntime = true
-    useDefault()
+    useJvmDefault()
 }
 
 java {
@@ -32,8 +28,6 @@ java {
 }
 
 kotlin {
-//    jvmToolchain(15)
-
     androidTarget {
         compilations.all {
             compileTaskProvider.configure {
@@ -47,7 +41,7 @@ kotlin {
 
 android {
     namespace = "id.walt.crypto"
-    compileSdk = 34
+    compileSdk = 35
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
 
     defaultConfig {
@@ -67,27 +61,15 @@ android {
 }
 
 kotlin {
-    targets.configureEach {
-        compilations.configureEach {
-            compileTaskProvider.configure {
-                compilerOptions {
-                    freeCompilerArgs.add("-Xexpect-actual-classes")
-                }
-            }
-        }
+    androidTarget {
+        publishLibraryVariants("release")
     }
 
     sourceSets {
-
-        all {
-            languageSettings.optIn("kotlin.ExperimentalStdlibApi")
-            languageSettings.optIn("kotlin.uuid.ExperimentalUuidApi")
-            languageSettings.optIn("kotlin.io.encoding.ExperimentalEncodingApi")
-        }
-
         val androidMain by getting {
             dependencies {
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
                 implementation("io.github.oshai:kotlin-logging:7.0.4")
             }
@@ -111,7 +93,10 @@ kotlin {
         publishing {
             repositories {
                 maven {
-                    url = uri("https://maven.waltid.dev/releases")
+                    val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
+                    val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
+                    url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
+
                     val envUsername = System.getenv("MAVEN_USERNAME")
                     val envPassword = System.getenv("MAVEN_PASSWORD")
 
@@ -121,15 +106,9 @@ kotlin {
                     val secretMavenUsername = envUsername ?: usernameFile.let {
                         if (it.isFile) it.readLines().first() else ""
                     }
-                    //println("Deploy username length: ${secretMavenUsername.length}")
                     val secretMavenPassword = envPassword ?: passwordFile.let {
                         if (it.isFile) it.readLines().first() else ""
                     }
-
-                    //if (secretMavenPassword.isBlank()) {
-                    //   println("WARNING: Password is blank!")
-                    //}
-
                     credentials {
                         username = secretMavenUsername
                         password = secretMavenPassword
@@ -137,18 +116,6 @@ kotlin {
                 }
             }
         }
-        all {
-            languageSettings.enableLanguageFeature("InlineClasses")
-        }
-    }
-}
 
-extensions.getByType<SuspendTransformGradleExtension>().apply {
-    transformers[TargetPlatform.JS] = mutableListOf(
-        SuspendTransformConfiguration.jsPromiseTransformer.copy(
-            copyAnnotationExcludes = listOf(
-                ClassInfo("kotlin.js", "JsExport.Ignore")
-            )
-        )
-    )
+    }
 }

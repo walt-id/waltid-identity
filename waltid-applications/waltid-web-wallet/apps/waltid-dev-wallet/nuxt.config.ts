@@ -1,5 +1,6 @@
 import { defineNuxtConfig } from "nuxt/config";
 import presetIcons from "@unocss/preset-icons";
+import path from "path";
 
 export default defineNuxtConfig({
   devtools: { enabled: true },
@@ -163,7 +164,7 @@ export default defineNuxtConfig({
     logLevel: "info",
     resolve: {
       alias: {
-        "@waltid-web-wallet": "../../libs",
+        "@waltid-web-wallet": path.resolve(__dirname, "../../libs"),
       },
     },
     /*server: {
