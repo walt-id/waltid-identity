@@ -349,21 +349,21 @@
 
 <script lang="ts" setup>
 import {
-    ArrowRightOnRectangleIcon,
-    BookmarkSquareIcon,
-    EnvelopeIcon,
-    IdentificationIcon,
-    QuestionMarkCircleIcon
+  ArrowRightOnRectangleIcon,
+  BookmarkSquareIcon,
+  EnvelopeIcon,
+  IdentificationIcon,
+  QuestionMarkCircleIcon
 } from "@heroicons/vue/20/solid";
-import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from "@headlessui/vue";
-import { ExclamationCircleIcon, XMarkIcon } from "@heroicons/vue/24/outline";
-import { usePageLeave, useParallax } from "@vueuse/core";
+import {Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot} from "@headlessui/vue";
+import {ExclamationCircleIcon, XMarkIcon} from "@heroicons/vue/24/outline";
+import {usePageLeave, useParallax} from "@vueuse/core";
 import useModalStore from "@waltid-web-wallet/stores/useModalStore.ts";
-import { useUserStore } from "@waltid-web-wallet/stores/user.ts";
-import { storeToRefs } from "pinia";
-import { useTenant } from "@waltid-web-wallet/composables/tenants.ts";
-import { decodeJwt } from "jose";
-import { MetaMaskSDK } from "@metamask/sdk";
+import {useUserStore} from "@waltid-web-wallet/stores/user.ts";
+import {storeToRefs} from "pinia";
+import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
+import {decodeJwt} from "jose";
+import {MetaMaskSDK} from "@metamask/sdk";
 
 const store = useModalStore();
 
@@ -426,11 +426,14 @@ function closeModal() {
     error.value = {};
 }
 
-function decodeJWT(token) {
-    const payloadBase64 = token.split(".")[1]; // Extract the payload part
-    const decodedPayload = atob(payloadBase64); // Decode Base64
-    return JSON.parse(decodedPayload); // Parse JSON
-}
+const MMSDK = new MetaMaskSDK({
+  dappMetadata: {name: "Walt.id Web Wallet", url: window.location.href},
+  injectProvider: true
+});
+
+await MMSDK.connect();
+const ethereum = MMSDK.getProvider();
+
 
 async function openWeb3() {
     const response = await fetch("/wallet-api/auth/account/web3/nonce", { method: "GET" });
@@ -438,13 +441,7 @@ async function openWeb3() {
     console.log("====Frontend DEBUG LOGS====");
     console.log("Received JWT:", challenge);
 
-    const MMSDK = new MetaMaskSDK({
-        dappMetadata: { name: "Walt.id Web Wallet", url: window.location.href },
-        injectProvider: true
-    });
 
-    await MMSDK.connect();
-    const ethereum = MMSDK.getProvider();
     const accounts = await ethereum.request({ method: "eth_requestAccounts" });
     const address = accounts[0];
 
