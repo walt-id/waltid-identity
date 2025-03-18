@@ -7,6 +7,7 @@ allprojects {
         google()
         mavenCentral()
         maven("https://maven.waltid.dev/releases")
+        maven("https://maven.waltid.dev/snapshots")
         maven("https://jitpack.io")
     }
 }

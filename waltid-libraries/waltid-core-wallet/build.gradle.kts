@@ -9,6 +9,7 @@ group = "id.walt.wallet"
 
 repositories {
     mavenCentral()
+    maven("https://maven.waltid.dev/snapshots")
 }
 
 kotlin {
@@ -50,7 +51,7 @@ kotlin {
 
                 // Problematic libraries:
                 implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
-                implementation("com.augustcellars.cose:cose-java:1.1.0")
+                implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
             }
         }
         val jvmMain by getting {
