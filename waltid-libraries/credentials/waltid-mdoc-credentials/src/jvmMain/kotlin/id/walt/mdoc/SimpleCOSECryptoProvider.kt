@@ -1,6 +1,6 @@
 package id.walt.mdoc
 
-import COSE.*
+import org.cose.java.*
 import cbor.Cbor
 import com.upokecenter.cbor.CBORObject
 import id.walt.mdoc.cose.COSECryptoProvider

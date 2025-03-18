@@ -22,6 +22,7 @@ repositories {
     mavenCentral()
     maven("https://jitpack.io")
     maven("https://maven.waltid.dev/releases")
+    maven("https://maven.waltid.dev/snapshots")
 }
 
 tasks.withType<KotlinCompile> {
@@ -140,7 +141,7 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-verifier-api"))
 
     implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
-    implementation("com.augustcellars.cose:cose-java:1.1.0")
+    implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
 
     implementation("io.ktor:ktor-client-java:$ktor_version")
 
