@@ -487,7 +487,8 @@ fun Application.issuerApi() {
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("mDL/MDOC example", IssuanceExamples.mDLCredentialIssuanceExample)
+                                example("mDL/MDOC example with CWT proof", IssuanceExamples.mDLCredentialIssuanceExample)
+                                example("mDL/MDOC example with JWT proof", IssuanceExamples.mDLCredentialIssuanceJwtProofExample)
                                 required = true
                             }
                         }

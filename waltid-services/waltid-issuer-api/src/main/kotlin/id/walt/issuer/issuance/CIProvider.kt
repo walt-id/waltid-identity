@@ -5,6 +5,7 @@ package id.walt.issuer.issuance
 import org.cose.java.AlgorithmID
 import org.cose.java.OneKey
 import cbor.Cbor
+import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
 import id.walt.commons.config.ConfigManager
@@ -266,18 +267,36 @@ open class CIProvider(
         }))
     }
 
+    private suspend fun extractHolderKey(proof: ProofOfPossession): COSECryptoProviderKeyInfo? {
+        when(proof.proofType) {
+            ProofType.cwt -> {
+                return proof.cwt?.base64UrlDecode()?.let {
+                    COSESign1Utils.extractHolderKey(Cbor.decodeFromByteArray<COSESign1>(it))
+                }
+            }
+            else -> {
+                return proof.jwt?.let { JwtUtils.parseJWTHeader(it) }?.get(JWTClaims.Header.jwk)?.jsonObject?.let {
+                    JWKKey.importJWK(it.toString()).getOrNull()?.let { key ->
+                        COSECryptoProviderKeyInfo(
+                            key.getKeyId(),
+                            AlgorithmID.ECDSA_256,
+                            ECKey.parse(key.exportJWK()).toECPublicKey(),
+                            null
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun doGenerateMDoc(
         credentialRequest: CredentialRequest,
         issuanceSession: IssuanceSession
     ): CredentialResult {
-        val coseSign1 = Cbor.decodeFromByteArray<COSESign1>(
-            credentialRequest.proof?.cwt?.base64UrlDecode() ?: throw CredentialError(
-                credentialRequest,
-                CredentialErrorCode.invalid_or_missing_proof, message = "No CWT proof found on credential request"
-            )
-        )
-        val holderKey = COSESign1Utils.extractHolderKey(coseSign1)
+        val proof = credentialRequest.proof ?: throw CredentialError(credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "No proof found on credential request")
+        val holderKey = extractHolderKey(proof) ?: throw CredentialError(credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "No holder key could be extracted from proof")
+
         val nonce = OpenID4VCI.getNonceFromProof(credentialRequest.proof!!) ?: throw CredentialError(
             credentialRequest,
             CredentialErrorCode.invalid_or_missing_proof,
