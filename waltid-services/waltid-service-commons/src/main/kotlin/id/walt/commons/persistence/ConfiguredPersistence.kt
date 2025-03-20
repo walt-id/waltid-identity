@@ -48,8 +48,27 @@ class ConfiguredPersistence<V : Any>(
     override fun getAll(): Sequence<V> = underlyingPersistence.getAll()
     override fun listSize(id: String): Int = underlyingPersistence.listSize(id)
 
-    override fun listAdd(id: String, value: V) = underlyingPersistence.listAdd(id, value)
+    /**
+     * Add a value to a list with a specified or default expiration.
+     * @param id The key of the list
+     * @param value The value to add
+     * @param ttl Optional expiration duration. If null, defaultExpiration will be used
+     */
+    override fun listAdd(id: String, value: V, ttl: Duration?) = underlyingPersistence.listAdd(id, value, ttl)
 
-    override fun set(id: String, value: V) = underlyingPersistence.set(id, value)
+    /**
+     * Store a value with the default expiration.
+     * @param id The key to store the value under
+     * @param value The value to store
+     */
+    override operator fun set(id: String, value: V) { underlyingPersistence[id] = value }
+    
+    /**
+     * Store a value with a specified expiration.
+     * @param id The key to store the value under
+     * @param value The value to store
+     * @param ttl Expiration duration. If null, defaultExpiration will be used
+     */
+    override fun set(id: String, value: V, ttl: Duration?) = underlyingPersistence.set(id, value, ttl)
 
 }
