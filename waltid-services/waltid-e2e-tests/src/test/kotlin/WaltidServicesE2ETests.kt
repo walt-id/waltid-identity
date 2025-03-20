@@ -9,6 +9,7 @@ import id.walt.commons.web.plugins.httpJson
 import id.walt.credentials.schemes.JwsSignatureScheme
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
+import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuerModule
 import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
@@ -323,7 +324,8 @@ class WaltidServicesE2ETests {
         lspPotentialVerification.testPotentialInteropTrack3()
         lspPotentialVerification.testPotentialInteropTrack4()
         val lspPotentialWallet = setupTestWallet()
-        lspPotentialWallet.testMDocIssuance()
+        lspPotentialWallet.testMDocIssuance(IssuanceExamples.mDLCredentialIssuanceData, true)
+        lspPotentialWallet.testMDocIssuance(IssuanceExamples.mDLCredentialIssuanceDataJwtProof, false)
         lspPotentialWallet.testMdocPresentation()
         lspPotentialWallet.testSDJwtVCIssuance()
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
