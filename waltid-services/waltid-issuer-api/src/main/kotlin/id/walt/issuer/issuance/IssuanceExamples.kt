@@ -458,6 +458,29 @@ object IssuanceExamples {
 
     val mDLCredentialIssuanceExample = typedValueExampleDescriptorDsl<IssuanceRequest>(mDLCredentialIssuanceData)
 
+    val mDLCredentialIssuanceDataJwtProof = """
+        {
+          "issuerKey": { 
+            "type": "jwk",
+            "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
+          },
+          "issuerDid":"",
+          "credentialConfigurationId":"org.iso.18013.5.1.mDL-JWT-Proof",
+          "credentialData":null,
+          "mdocData": { 
+              "org.iso.18013.5.1": {
+                  "family_name": "Doe",
+                  "given_name": "John",
+                  "birth_date": "1980-01-02"
+              }
+          },
+          "x5Chain": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ISSUER_CERT) }},
+          "trustedRootCAs": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT) }}
+       }
+    """.trimIndent()
+
+    val mDLCredentialIssuanceJwtProofExample = typedValueExampleDescriptorDsl<IssuanceRequest>(mDLCredentialIssuanceDataJwtProof)
+
     // language=JSON
     val batchExampleJwt = typedValueExampleDescriptorDsl<List<IssuanceRequest>>(
         """
