@@ -53,9 +53,9 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         }
     }
 
-    suspend fun testMDocIssuance() = test("test mdoc issuance") {
+    suspend fun testMDocIssuance(issuanceRequestData: String, useForPresentation: Boolean) = test("test mdoc issuance") {
         // === get credential offer from test issuer API ===
-        val issuanceReq = Json.decodeFromString<IssuanceRequest>(IssuanceExamples.mDLCredentialIssuanceData).copy(
+        val issuanceReq = Json.decodeFromString<IssuanceRequest>(issuanceRequestData).copy(
             authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED
         )
         val offerResp = client.post("/openid4vc/mdoc/issue") {
@@ -77,7 +77,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         }.expectSuccess().body<CredentialOffer.Draft13>()
 
         assertEquals(1, resolvedOffer.credentialConfigurationIds.size)
-        assertEquals("org.iso.18013.5.1.mDL", resolvedOffer.credentialConfigurationIds.first())
+        assertEquals(issuanceReq.credentialConfigurationId, resolvedOffer.credentialConfigurationIds.first())
 
         // === resolve issuer metadata ===
         val issuerMetadata =
@@ -100,7 +100,8 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         val fetchedCredential = client.get("/wallet-api/wallet/$walletId/credentials/${issuedCred.id}")
             .expectSuccess().body<WalletCredential>()
         assertEquals(issuedCred.format, fetchedCredential.format)
-        runBlocking { issuedMdocId = fetchedCredential.id }
+        if(useForPresentation)
+            runBlocking { issuedMdocId = fetchedCredential.id }
     }
 
     suspend fun testMdocPresentation() = test("test mdoc presentation") {
