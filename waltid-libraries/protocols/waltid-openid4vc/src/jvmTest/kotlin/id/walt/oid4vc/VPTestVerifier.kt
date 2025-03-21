@@ -22,6 +22,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Duration
 
 const val VP_VERIFIER_PORT = 8002
 const val VP_VERIFIER_BASE_URL = "http://localhost:$VP_VERIFIER_PORT"
@@ -34,7 +35,7 @@ class VPTestVerifier : OpenIDCredentialVerifier(
     private val presentationDefinitionCache = mutableMapOf<String, PresentationDefinition>()
     override fun getSession(id: String): PresentationSession? = sessionCache[id]
 
-    override fun putSession(id: String, session: PresentationSession) {
+    override fun putSession(id: String, session: PresentationSession, ttl: Duration?) {
         sessionCache[id] = session
     }
 

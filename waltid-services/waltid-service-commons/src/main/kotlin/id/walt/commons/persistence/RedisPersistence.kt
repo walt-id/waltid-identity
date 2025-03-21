@@ -21,6 +21,15 @@ class RedisPersistence<V>(
         else
             pool["$discriminator:$id"] = encoding.invoke(value)
     }
+    
+    override fun set(id: String, value: V, ttl: Duration?) {
+        val effectiveTtl = ttl ?: defaultExpiration
+        
+        if (effectiveTtl != null)
+            pool.setex("$discriminator:$id", effectiveTtl.inWholeSeconds, encoding.invoke(value))
+        else
+            pool["$discriminator:$id"] = encoding.invoke(value)
+    }
 
     override fun remove(id: String) {
         pool.del("$discriminator:$id")
@@ -40,14 +49,13 @@ class RedisPersistence<V>(
         }
     }
 
-    override fun listAdd(id: String, value: V) {
+    override fun listAdd(id: String, value: V, ttl: Duration?) {
         pool.sadd("$discriminator:$id", value.toString())
 
-        if (defaultExpiration != null)
-            pool.expire("$discriminator:$id", defaultExpiration.inWholeSeconds)
+        val effectiveTtl = ttl ?: defaultExpiration
+        if (effectiveTtl != null)
+            pool.expire("$discriminator:$id", effectiveTtl.inWholeSeconds)
     }
 
     override fun listSize(id: String): Int = pool.scard(id).toInt()
-
-
 }
