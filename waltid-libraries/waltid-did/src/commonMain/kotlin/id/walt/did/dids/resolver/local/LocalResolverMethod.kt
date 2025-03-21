@@ -22,5 +22,12 @@ abstract class LocalResolverMethod(val method: String) {
     @JsPromise
     @JsExport.Ignore
     abstract suspend fun resolveToKey(did: String): Result<id.walt.crypto.keys.Key>
+    
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    open suspend fun resolveToKeys(did: String): Result<Set<id.walt.crypto.keys.Key>> = 
+        resolveToKey(did).map { setOf(it) }
 
 }

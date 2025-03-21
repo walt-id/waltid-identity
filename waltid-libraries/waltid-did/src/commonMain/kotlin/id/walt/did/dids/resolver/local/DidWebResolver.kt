@@ -43,6 +43,15 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
     @JsPromise
     @JsExport.Ignore
     override suspend fun resolveToKey(did: String): Result<Key> {
+        // For backward compatibility, return the first key
+        return resolveToKeys(did).map { it.firstOrNull() ?: throw NoSuchElementException("No key could be imported") }
+    }
+    
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun resolveToKeys(did: String): Result<Set<Key>> {
         val didDocumentResult = resolve(did)
         if (didDocumentResult.isFailure) return Result.failure(didDocumentResult.exceptionOrNull()!!)
 
@@ -56,7 +65,7 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
                 }
             }.filter { it.isSuccess }.map { it.getOrThrow() }
 
-        return tryConvertAnyPublicKeyJwkToKey(publicKeyJwks)
+        return tryConvertPublicKeyJwksToKeys(publicKeyJwks)
     }
 
     private fun resolveDidToUrl(did: String): String = DidUtils.identifierFromDid(did)?.let {
@@ -83,6 +92,27 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
             if (result.isSuccess) return result
         }
         return Result.failure(NoSuchElementException("No key could be imported"))
+    }
+    
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    suspend fun tryConvertPublicKeyJwksToKeys(publicKeyJwks: List<String>): Result<Set<JWKKey>> {
+        val keys = mutableSetOf<JWKKey>()
+        
+        for (publicKeyJwk in publicKeyJwks) {
+            val result = JWKKey.importJWK(publicKeyJwk)
+            if (result.isSuccess) {
+                keys.add(result.getOrThrow())
+            }
+        }
+        
+        return if (keys.isNotEmpty()) {
+            Result.success(keys)
+        } else {
+            Result.failure(NoSuchElementException("No keys could be imported from the DID document"))
+        }
     }
 
     companion object {
