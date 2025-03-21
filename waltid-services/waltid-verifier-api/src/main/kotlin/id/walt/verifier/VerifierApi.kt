@@ -38,6 +38,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -176,6 +178,12 @@ fun Application.verifierApi() {
                         // example = ""
                         required = false
                     }
+                    headerParameter<String?>("sessionTtl") {
+                        description =
+                            "Optional header to set the sessionTtl of the VP request, in seconds"
+                        // example = ""
+                        required = false
+                    }
                     body<JsonObject> {
                         description =
                             "Presentation definition, describing the presentation requirement for this verification session. ID of the presentation definition is automatically assigned randomly."
@@ -224,6 +232,8 @@ fun Application.verifierApi() {
                 val statusCallbackApiKey = call.request.header("statusCallbackApiKey")
                 val stateId = call.request.header("stateId")
                 val openId4VPProfile = call.request.header("openId4VPProfile")
+                // Parse session TTL from header if provided
+                val sessionTtl = call.request.header("sessionTtl")?.toLongOrNull()?.let { it.seconds }
 
                 val body = call.receive<JsonObject>()
 
@@ -241,7 +251,8 @@ fun Application.verifierApi() {
                     openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull
                         ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
                         ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
-                    trustedRootCAs = body["trusted_root_cas"]?.jsonArray
+                    trustedRootCAs = body["trusted_root_cas"]?.jsonArray,
+                    sessionTtl = sessionTtl
                 )
 
                 call.respond(
@@ -470,6 +481,9 @@ fun Application.verifierApi() {
             val scope = params["scope"]?.jsonArray.toString().replace("\"", "").replace("[", "").replace("]", "")
 
             val stateId = Uuid.random().toString()
+            // Parse session TTL from query parameter if provided
+            val sessionTtl = params["sessionTtl"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull?.toLongOrNull()?.let { it.seconds }
+            
             val session = verificationUseCase.createSession(
                 vpPoliciesJson = null,
                 vcPoliciesJson = buildJsonArray {
@@ -493,7 +507,8 @@ fun Application.verifierApi() {
                     true -> ResponseType.IdToken
                     else -> ResponseType.VpToken
                 },
-                openId4VPProfile = OpenId4VPProfile.EBSIV3
+                openId4VPProfile = OpenId4VPProfile.EBSIV3,
+                sessionTtl = sessionTtl
             )
             call.respondRedirect(
                 "openid://?${
