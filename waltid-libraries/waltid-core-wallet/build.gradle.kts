@@ -1,3 +1,7 @@
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableAndroidBuild = getSetting("enableAndroidBuild")
+val enableIosBuild = getSetting("enableIosBuild")
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
@@ -13,11 +17,14 @@ repositories {
 }
 
 kotlin {
-    jvm {
-        withJava()
-    }
-
     jvmToolchain(21)
+
+    jvm()
+    js(IR)
+    if (enableIosBuild) {
+        iosArm64()
+        iosSimulatorArm64()
+    }
 
     sourceSets {
         val ktor_version = "3.1.0"

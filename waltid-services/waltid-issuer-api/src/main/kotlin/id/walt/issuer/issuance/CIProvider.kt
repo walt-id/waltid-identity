@@ -154,9 +154,9 @@ open class CIProvider(
     }
 
 
-    fun putSession(id: String, session: IssuanceSession) {
+    fun putSession(id: String, session: IssuanceSession, ttl: Duration? = null) {
         log.debug { "SETTING CI AUTH SESSION: $id = $session" }
-        authSessions[id] = session
+        authSessions.set(id, session, ttl)
     }
 
     fun removeSession(id: String) {
@@ -444,10 +444,20 @@ open class CIProvider(
     }
 
     private fun generateProofOfPossessionNonceFor(session: IssuanceSession): IssuanceSession {
+        // Calculate remaining TTL based on session expiration
+        val remainingTtl = session.expirationTimestamp?.let {
+            val now = Clock.System.now()
+            if (it > now) {
+                it - now  // Calculate duration between now and expiration
+            } else {
+                null  // Already expired
+            }
+        }
+        
         return session.copy(
             cNonce = randomUUID()
         ).also {
-            putSession(it.id, it)
+            putSession(it.id, it, remainingTtl)
         }
     }
 
@@ -496,7 +506,7 @@ open class CIProvider(
             val updatedSession = IssuanceSession(
                 id = it.id,
                 authorizationRequest = authorizationRequest,
-                expirationTimestamp = Clock.System.now().plus(5.minutes),
+                expirationTimestamp = Clock.System.now().plus(expiresIn),
                 issuanceRequests = it.issuanceRequests,
                 authServerState = authServerState,
                 txCode = it.txCode,
@@ -506,7 +516,7 @@ open class CIProvider(
                 callbackUrl = it.callbackUrl,
                 customParameters = it.customParameters
             )
-            putSession(it.id, updatedSession)
+            putSession(it.id, updatedSession, expiresIn)
         }
     }
 
@@ -544,7 +554,7 @@ open class CIProvider(
             credentialOffer = credentialOfferBuilder.build(),
             callbackUrl = callbackUrl
         ).also {
-            putSession(it.id, it)
+            putSession(it.id, it, expiresIn)
         }
     }
 

@@ -53,7 +53,6 @@ kotlin {
 
     jvmToolchain(toolingRuntime.majorVersion.toInt())
     jvm {
-        withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
         }

@@ -383,7 +383,7 @@ class TestCredentialWallet(
         TODO("Not yet implemented")
     }
 
-    override fun putSession(id: String, session: VPresentationSession) {
+    override fun putSession(id: String, session: VPresentationSession, ttl: Duration?) {
         sessionCache[id] = session
     }
 
