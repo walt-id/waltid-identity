@@ -1,7 +1,7 @@
 package id.walt.mdoc
 
-import COSE.AlgorithmID
-import COSE.OneKey
+import org.cose.java.AlgorithmID
+import org.cose.java.OneKey
 import cbor.Cbor
 import com.upokecenter.cbor.CBORObject
 import id.walt.mdoc.cose.COSESign1Serializer

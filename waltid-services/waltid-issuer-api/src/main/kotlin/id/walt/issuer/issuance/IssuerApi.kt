@@ -26,6 +26,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.reflect.KClass
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger {}
 suspend fun createCredentialOfferUri(
@@ -33,6 +34,7 @@ suspend fun createCredentialOfferUri(
     credentialFormat: CredentialFormat,
     callbackUrl: String? = null,
     expiresIn: Duration = 5.minutes,
+    sessionTtl: Duration? = null,
 ): String {
     val overwrittenIssuanceRequests = issuanceRequests.map {
         it.copy(
@@ -44,7 +46,7 @@ suspend fun createCredentialOfferUri(
 
     val issuanceSession = OidcApi.initializeCredentialOffer(
         issuanceRequests = overwrittenIssuanceRequests,
-        expiresIn = expiresIn,
+        expiresIn = sessionTtl ?: expiresIn,
         callbackUrl = callbackUrl,
         standardVersion = overwrittenIssuanceRequests.first().standardVersion!!
     )
@@ -211,8 +213,15 @@ fun Application.issuerApi() {
                 description = "Callback to push state changes of the issuance process to"
                 required = false
             }
+            
+            fun OpenApiRequest.sessionTtlHeader() = headerParameter<Long>("sessionTtl") {
+                description = "Custom session time-to-live in seconds"
+                required = false
+            }
 
             fun RoutingContext.getCallbackUriHeader() = call.request.header("statusCallbackUri")
+            
+            fun RoutingContext.getSessionTtl() = call.request.header("sessionTtl")?.toLongOrNull()?.let { it.seconds }
 
             route("raw") {
                 route("jwt") {
@@ -281,6 +290,7 @@ fun Application.issuerApi() {
 
                         request {
                             statusCallbackUriHeader()
+                            sessionTtlHeader()
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
@@ -343,7 +353,8 @@ fun Application.issuerApi() {
                             listOf(jwtIssuanceRequest),
                             getFormatByCredentialConfigurationId(jwtIssuanceRequest.credentialConfigurationId)
                                 ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
-                            getCallbackUriHeader()
+                            getCallbackUriHeader(),
+                            sessionTtl = getSessionTtl()
                         )
                         call.respond(HttpStatusCode.OK, offerUri)
                     }
@@ -354,6 +365,7 @@ fun Application.issuerApi() {
 
                         request {
                             statusCallbackUriHeader()
+                            sessionTtlHeader()
                             body<List<IssuanceRequest>> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
@@ -379,7 +391,8 @@ fun Application.issuerApi() {
                             issuanceRequests,
                             getFormatByCredentialConfigurationId(issuanceRequests.first().credentialConfigurationId)
                                 ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
-                            getCallbackUriHeader()
+                            getCallbackUriHeader(),
+                            sessionTtl = getSessionTtl()
                         )
                         logger.debug { "Offer URI: $offerUri" }
                         call.respond(HttpStatusCode.OK, offerUri)
@@ -394,6 +407,7 @@ fun Application.issuerApi() {
 
                         request {
                             statusCallbackUriHeader()
+                            sessionTtlHeader()
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue in the body of the request."
@@ -426,7 +440,8 @@ fun Application.issuerApi() {
                             listOf(sdJwtIssuanceRequest),
                             getFormatByCredentialConfigurationId(sdJwtIssuanceRequest.credentialConfigurationId)
                                 ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
-                            getCallbackUriHeader()
+                            getCallbackUriHeader(),
+                            sessionTtl = getSessionTtl()
                         )
 
                         call.respond(
@@ -441,6 +456,7 @@ fun Application.issuerApi() {
 
                         request {
                             statusCallbackUriHeader()
+                            sessionTtlHeader()
                             body<List<IssuanceRequest>> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
@@ -467,7 +483,8 @@ fun Application.issuerApi() {
                                 sdJwtIssuanceRequests,
                                 getFormatByCredentialConfigurationId(sdJwtIssuanceRequests.first().credentialConfigurationId)
                                     ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
-                                getCallbackUriHeader()
+                                getCallbackUriHeader(),
+                                sessionTtl = getSessionTtl()
                             )
 
                         logger.debug { "Offer URI: $offerUri" }
@@ -484,10 +501,12 @@ fun Application.issuerApi() {
                         description = "This endpoint issues a mdoc and returns an issuance URL "
                         request {
                             statusCallbackUriHeader()
+                            sessionTtlHeader()
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("mDL/MDOC example", IssuanceExamples.mDLCredentialIssuanceExample)
+                                example("mDL/MDOC example with CWT proof", IssuanceExamples.mDLCredentialIssuanceExample)
+                                example("mDL/MDOC example with JWT proof", IssuanceExamples.mDLCredentialIssuanceJwtProofExample)
                                 required = true
                             }
                         }
@@ -497,7 +516,8 @@ fun Application.issuerApi() {
                             listOf(mdocIssuanceRequest),
                             getFormatByCredentialConfigurationId(mdocIssuanceRequest.credentialConfigurationId)
                                 ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
-                            getCallbackUriHeader()
+                            getCallbackUriHeader(),
+                            sessionTtl = getSessionTtl()
                         )
 
                         call.respond(

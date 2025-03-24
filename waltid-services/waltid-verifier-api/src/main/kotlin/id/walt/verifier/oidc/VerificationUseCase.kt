@@ -1,6 +1,6 @@
 package id.walt.verifier.oidc
 
-import COSE.AlgorithmID
+import org.cose.java.AlgorithmID
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
@@ -37,6 +37,7 @@ import java.security.cert.X509Certificate
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import java.util.*
+import kotlin.time.Duration
 
 class VerificationUseCase(
     val http: HttpClient, cryptoProvider: JWTCryptoProvider,
@@ -56,6 +57,7 @@ class VerificationUseCase(
         openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT,
         walletInitiatedAuthState: String? = null,
         trustedRootCAs: JsonArray? = null,
+        sessionTtl: Duration? = null,
     ) = let {
         val requestedCredentials = requestCredentialsJson.jsonArray.map {
             when (it) {
@@ -89,19 +91,23 @@ class VerificationUseCase(
             it.id to it.policies!!.parsePolicyRequests()
         }
 
-        OIDCVerifierService.sessionVerificationInfos[session.id] = OIDCVerifierService.SessionVerificationInformation(
-            vpPolicies = vpPolicies,
-            vcPolicies = vcPolicies,
-            specificPolicies = specificPolicies,
-            successRedirectUri = successRedirectUri,
-            errorRedirectUri = errorRedirectUri,
-            walletInitiatedAuthState = walletInitiatedAuthState,
-            statusCallback = statusCallbackUri?.let {
-                OIDCVerifierService.StatusCallback(
-                    statusCallbackUri = it,
-                    statusCallbackApiKey = statusCallbackApiKey,
-                )
-            }
+        OIDCVerifierService.sessionVerificationInfos.set(
+            session.id,
+            OIDCVerifierService.SessionVerificationInformation(
+                vpPolicies = vpPolicies,
+                vcPolicies = vcPolicies,
+                specificPolicies = specificPolicies,
+                successRedirectUri = successRedirectUri,
+                errorRedirectUri = errorRedirectUri,
+                walletInitiatedAuthState = walletInitiatedAuthState,
+                statusCallback = statusCallbackUri?.let {
+                    OIDCVerifierService.StatusCallback(
+                        statusCallbackUri = it,
+                        statusCallbackApiKey = statusCallbackApiKey,
+                    )
+                }
+            ),
+            sessionTtl
         )
         session
     }
@@ -120,13 +126,14 @@ class VerificationUseCase(
         openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT,
         walletInitiatedAuthState: String? = null,
         trustedRootCAs: JsonArray? = null,
+        sessionTtl: Duration? = null,
     ): PresentationSession {
         return createSession(
             vpPoliciesJson, vcPoliciesJson,
             requestCredentialsJson = JsonArray(Json.decodeFromJsonElement<PresentationDefinition>(presentationDefinitionJson).inputDescriptors.map {
                 RequestedCredential(inputDescriptor = it, policies = null).toJsonElement()
             }), responseMode, responseType, successRedirectUri, errorRedirectUri, statusCallbackUri, statusCallbackApiKey, stateId,
-            openId4VPProfile, walletInitiatedAuthState, trustedRootCAs
+            openId4VPProfile, walletInitiatedAuthState, trustedRootCAs, sessionTtl
         )
     }
 
@@ -174,7 +181,7 @@ class VerificationUseCase(
             val redirectUri = sessionVerificationInfo.errorRedirectUri?.replace("\$id", session.id)
 
             logger.debug { "Presentation failed, redirecting to: $redirectUri" }
-            
+
 
             return if (policyResults == null) {
                 Result.failure(FailedVerificationException(redirectUri, IllegalArgumentException("Verification policies did not succeed")))

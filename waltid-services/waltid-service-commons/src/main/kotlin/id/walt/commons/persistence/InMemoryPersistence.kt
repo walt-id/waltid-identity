@@ -13,7 +13,12 @@ class InMemoryPersistence<V : Any>(discriminator: String, defaultExpiration: Dur
         .expireAfterWrite(defaultExpiration)
         .build() }
 
-    override fun listAdd(id: String, value: V) {
+    // Note: For in-memory persistence, we can't easily change TTL for individual entries
+    // without creating a new cache for each TTL, which would be inefficient.
+    // The Cache4k library doesn't support per-entry TTL configuration.
+    // This implementation will still use the default expiration for all entries.
+    
+    override fun listAdd(id: String, value: V, ttl: Duration?) {
         if (!listStore.asMap().containsKey(id)) {
             listStore.put(id, arrayListOf(value))
         } else {
@@ -27,6 +32,12 @@ class InMemoryPersistence<V : Any>(discriminator: String, defaultExpiration: Dur
     }
 
     override operator fun set(id: String, value: V) {
+        store.put(id, value)
+    }
+    
+    override fun set(id: String, value: V, ttl: Duration?) {
+        // For in-memory persistence, we always use the defaultExpiration
+        // as Cache4k doesn't support per-entry TTL
         store.put(id, value)
     }
 

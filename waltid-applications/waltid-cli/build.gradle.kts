@@ -1,3 +1,6 @@
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
+
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 object Versions {
@@ -9,9 +12,6 @@ plugins {
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
-    id("io.ktor.plugin") version "3.1.0" // Versions.KTOR_VERSION
-    // Apply the application plugin to add support for building a CLI application in Java.
-    application
 }
 
 group = "id.walt.cli"
@@ -21,16 +21,9 @@ repositories {
     maven("https://jitpack.io")
 }
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_15
-    targetCompatibility = JavaVersion.VERSION_15
-}
-
 kotlin {
     jvmToolchain(17)
-}
 
-kotlin {
     targets.configureEach {
         compilations.configureEach {
             compileTaskProvider.configure {
@@ -49,9 +42,19 @@ kotlin {
                 }
             }
         }
-        withJava()
+
         tasks.withType<Test>().configureEach {
             useJUnitPlatform()
+        }
+
+        binaries {
+            executable {
+                // Define the main class for the application.
+                // Works with:
+                //     ../../gradlew run --args="--help"
+                mainClass = "id.walt.cli.MainKt"
+                applicationName = "waltid"
+            }
         }
     }
 
@@ -166,14 +169,6 @@ kotlin {
     }
 }
 
-application {
-    // Define the main class for the application.
-    // Works with:
-    //     ../gradlew run --args="--help"
-    mainClass = "id.walt.cli.MainKt"
-    applicationName = "waltid"
-}
-
-tasks.test {
+/*tasks.test {
     useJUnitPlatform()
-}
+}*/

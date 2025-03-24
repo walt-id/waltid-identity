@@ -1,3 +1,7 @@
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableAndroidBuild = getSetting("enableAndroidBuild")
+val enableIosBuild = getSetting("enableIosBuild")
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
@@ -9,14 +13,18 @@ group = "id.walt.wallet"
 
 repositories {
     mavenCentral()
+    maven("https://maven.waltid.dev/snapshots")
 }
 
 kotlin {
-    jvm {
-        withJava()
-    }
-
     jvmToolchain(21)
+
+    jvm()
+    js(IR)
+    if (enableIosBuild) {
+        iosArm64()
+        iosSimulatorArm64()
+    }
 
     sourceSets {
         val ktor_version = "3.1.0"
@@ -50,7 +58,7 @@ kotlin {
 
                 // Problematic libraries:
                 implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
-                implementation("com.augustcellars.cose:cose-java:1.1.0")
+                implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
             }
         }
         val jvmMain by getting {
