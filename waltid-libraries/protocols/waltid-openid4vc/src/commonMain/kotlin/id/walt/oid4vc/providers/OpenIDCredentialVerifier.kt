@@ -46,7 +46,8 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         clientIdScheme: ClientIdScheme = config.defaultClientIdScheme,
         openId4VPProfile: OpenId4VPProfile = OpenId4VPProfile.DEFAULT,
         walletInitiatedAuthState: String? = null,
-        trustedRootCAs: List<String>? = null
+        trustedRootCAs: List<String>? = null,
+        sessionTtl: Duration? = null // Custom TTL duration for the session
     ): PresentationSession {
         val session = PresentationSession(
             id = sessionId ?: ShortIdUtils.randomSessionId(),
@@ -58,7 +59,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
             openId4VPProfile = openId4VPProfile,
             trustedRootCAs = trustedRootCAs
         ).also {
-            putSession(it.id, it)
+            putSession(it.id, it, sessionTtl ?: expiresIn)
         }
         val presentationDefinitionUri = when(openId4VPProfile) {
             OpenId4VPProfile.ISO_18013_7_MDOC, OpenId4VPProfile.HAIP -> null
@@ -108,18 +109,28 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
             nonce = Uuid.random().toString()
         )
         return session.copy(authorizationRequest = authReq).also {
-            putSession(session.id, it)
+            putSession(session.id, it, sessionTtl ?: expiresIn)
         }
     }
 
     open fun verify(tokenResponse: TokenResponse, session: PresentationSession): PresentationSession {
         // https://json-schema.org/specification
         // https://github.com/OptimumCode/json-schema-validator
+        // Calculate the remaining time to live based on the session's expiration timestamp
+        val remainingTtl = session.expirationTimestamp?.let {
+            val now = Clock.System.now()
+            if (it > now) {
+                it - now  // Calculate duration between now and expiration
+            } else {
+                null  // Already expired
+            }
+        }
+        
         return session.copy(
             tokenResponse = tokenResponse,
             verificationResult = doVerify(tokenResponse, session)
         ).also {
-            putSession(it.id, it)
+            putSession(it.id, it, remainingTtl)
         }
     }
 

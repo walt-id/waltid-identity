@@ -42,6 +42,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
+import kotlin.time.Duration
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -225,7 +226,7 @@ class EBSITestWallet(
         )
     }
 
-    override fun putSession(id: String, session: SIOPSession) {
+    override fun putSession(id: String, session: SIOPSession, ttl: Duration?) {
         sessionCache[id] = session
     }
 

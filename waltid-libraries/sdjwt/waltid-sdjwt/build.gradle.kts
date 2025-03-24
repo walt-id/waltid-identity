@@ -29,7 +29,7 @@ kotlin {
 
     jvmToolchain(17)
     jvm {
-        withJava()
+
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
         }
@@ -86,7 +86,7 @@ kotlin {
 
         when {
             isMacOS -> {
-               // macosX64("native")
+                // macosX64("native")
             }
 
             hostOs == "Linux" -> linuxX64("native")
