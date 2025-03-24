@@ -3,7 +3,7 @@
 package id.walt.webwallet.service.oidc4vc
 
 
-import COSE.AlgorithmID
+import org.cose.java.AlgorithmID
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.keys.Key
@@ -350,7 +350,7 @@ class TestCredentialWallet(
         TODO("Not yet implemented")
     }
 
-    override fun putSession(id: String, session: VPresentationSession) {
+    override fun putSession(id: String, session: VPresentationSession, ttl: Duration?) {
         sessionCache[id] = session
     }
 

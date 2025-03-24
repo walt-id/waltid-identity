@@ -10,6 +10,7 @@ group = "id.walt.mdoc-credentials"
 
 repositories {
     mavenCentral()
+    maven("https://maven.waltid.dev/snapshots")
 }
 
 
@@ -30,7 +31,6 @@ kotlin {
 
     jvmToolchain(17)
     jvm {
-        withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
         }
@@ -70,7 +70,7 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                implementation("com.augustcellars.cose:cose-java:1.1.0")
+                implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
             }
         }
         val jvmTest by getting {

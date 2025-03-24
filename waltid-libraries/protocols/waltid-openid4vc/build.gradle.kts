@@ -18,6 +18,7 @@ repositories {
             includeGroup("id.walt")
         }
     }
+    maven("https://maven.waltid.dev/snapshots")
     mavenLocal()
 }
 
@@ -52,7 +53,6 @@ kotlin {
 
     jvmToolchain(toolingRuntime.majorVersion.toInt())
     jvm {
-        withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
         }
@@ -130,7 +130,7 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
-                implementation("com.augustcellars.cose:cose-java:1.1.0")
+                implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
                 implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
             }
         }
@@ -159,7 +159,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.10.1")
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 
-                implementation("com.augustcellars.cose:cose-java:1.1.0")
+                implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
                 implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
 
                 implementation("org.slf4j:slf4j-simple:2.0.16")

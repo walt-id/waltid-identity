@@ -2,8 +2,8 @@
 
 package id.walt.verifier.oidc
 
-import COSE.AlgorithmID
-import COSE.OneKey
+import org.cose.java.AlgorithmID
+import org.cose.java.OneKey
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
@@ -126,7 +126,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
     override fun getSession(id: String) = presentationSessions[id]
         ?: throw NotFoundException("Id parameter $id doesn't refer to an existing session, or session expired")
-    override fun putSession(id: String, session: PresentationSession) = presentationSessions.put(id, session)
+    override fun putSession(id: String, session: PresentationSession, ttl: Duration?) = presentationSessions.put(id, session, ttl)
     override fun getSessionByAuthServerState(authServerState: String): PresentationSession? {
         TODO("Not yet implemented")
     }
@@ -298,7 +298,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         clientIdScheme: ClientIdScheme,
         openId4VPProfile: OpenId4VPProfile,
         walletInitiatedAuthState: String?,
-        trustedRootCAs: List<String>?
+        trustedRootCAs: List<String>?,
+        sessionTtl: Duration?
     ): PresentationSession {
         val presentationSession = super.initializeAuthorization(
             presentationDefinition = presentationDefinition,
@@ -311,7 +312,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
             clientIdScheme = clientIdScheme,
             openId4VPProfile = openId4VPProfile,
             walletInitiatedAuthState = walletInitiatedAuthState,
-            trustedRootCAs = trustedRootCAs
+            trustedRootCAs = trustedRootCAs,
+            sessionTtl = sessionTtl
         )
         return presentationSession.copy(
             authorizationRequest = presentationSession.authorizationRequest!!.copy(

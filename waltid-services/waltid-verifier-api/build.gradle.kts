@@ -25,6 +25,7 @@ repositories {
     mavenCentral()
     maven("https://jitpack.io")
     maven("https://maven.waltid.dev/releases")
+    maven("https://maven.waltid.dev/snapshots")
 }
 
 
@@ -88,7 +89,7 @@ dependencies {
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
     // Crypto
-    implementation("com.augustcellars.cose:cose-java:1.1.0")
+    implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
     implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
 
     // Test

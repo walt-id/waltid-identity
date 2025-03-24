@@ -144,8 +144,10 @@ object E2ETest {
         val result = runCatching { function.invoke() }
         if (failEarly && result.isFailure) {
             t.println("\n${TextColors.brightRed("Fail early called for $id. test: $name")}")
-            result.getOrThrow()
+            val err = result.exceptionOrNull()!!
+            t.println("Error causing fail early: ${err.stackTraceToString()}")
             t.println()
+            result.getOrThrow()
         }
 
         testResults.add(result)

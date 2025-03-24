@@ -52,6 +52,7 @@ import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
+import kotlin.time.Duration
 
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:${WALLET_PORT}"
@@ -241,7 +242,7 @@ class TestCredentialWallet(
         TODO("Not yet implemented")
     }
 
-    override fun putSession(id: String, session: SIOPSession) {
+    override fun putSession(id: String, session: SIOPSession, ttl: Duration?) {
         sessionCache[id] = session
     }
 
