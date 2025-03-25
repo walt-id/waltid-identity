@@ -24,7 +24,8 @@ kotlin {
                 cinterops.create("implementation") {
                     val interopTask = tasks[interopProcessingTaskName]
                     interopTask.dependsOn(":waltid-libraries:crypto:${project.name}:$iosUtilsProjectName:$iosUtilsProjectName-$target")
-                    headers("$projectDir/$iosUtilsProjectName/build/$target/Release-$sdk/include/waltid_crypto_ios_utils/waltid_crypto_ios_utils-Swift.h")
+                    //headers("$projectDir/$iosUtilsProjectName/build/$target/Release-$sdk/include/waltid_crypto_ios_utils/waltid_crypto_ios_utils-Swift.h")
+                    headers(file("$projectDir/$iosUtilsProjectName/build/$target/Release-$sdk/include/waltid_crypto_ios_utils/waltid_crypto_ios_utils-Swift.h").absolutePath)
                 }
             }
         }
