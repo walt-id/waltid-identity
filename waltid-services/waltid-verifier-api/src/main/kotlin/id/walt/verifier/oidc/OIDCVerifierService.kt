@@ -245,17 +245,41 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
             } ?: throw UnsupportedOperationException("Resolving issuer key from SD-JWT is only supported for issuer did in kid header and PEM cert in x5c header parameter")
         }
     }
+    
+    private suspend fun resolveIssuerKeysFromSdJwt(sdJwt: SDJwtVC): Set<Key> {
+        val kid = sdJwt.keyID ?: randomUUID()
+        return if(!sdJwt.issuer.isNullOrEmpty() && DidUtils.isDidUrl(sdJwt.issuer!!)) {
+            DidService.resolveToKeys(sdJwt.issuer!!).getOrThrow()
+        } else {
+            sdJwt.header.get("x5c")?.jsonArray?.last()?.let {
+                val key = JWKKey.importPEM(it.jsonPrimitive.content).getOrThrow().let { JWKKey(it.jwk, kid) }
+                setOf(key)
+            } ?: throw UnsupportedOperationException("Resolving issuer key from SD-JWT is only supported for issuer did in kid header and PEM cert in x5c header parameter")
+        }
+    }
 
     private suspend fun verifySdJwtVC(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
         val sdJwtVC = SDJwtVC.parse(tokenResponse.vpToken!!.jsonPrimitive.content)
         require(sdJwtVC.isPresentation && sdJwtVC.keyBindingJwt != null) { "SD-JWT is not a presentation and/or doesn't contain a holder key binding JWT" }
         val holderKey = JWKKey.importJWK(sdJwtVC.holderKeyJWK.toString()).getOrThrow()
-        val issuerKey = resolveIssuerKeyFromSdJwt(sdJwtVC)
+        
+        // Get all possible issuer keys
+        val issuerKeys = resolveIssuerKeysFromSdJwt(sdJwtVC)
+        val issuerKey = issuerKeys.firstOrNull() ?: 
+            throw IllegalStateException("No issuer keys found in the DID document")
+        
+        // Create a map of all possible issuer keys by their key IDs
+        val keyMap = mutableMapOf<String, Key>()
+        issuerKeys.forEach { key ->
+            keyMap[key.getKeyId()] = key
+        }
+        // Add the default key ID mapping
+        keyMap[sdJwtVC.keyID ?: issuerKey.getKeyId()] = issuerKey
+        // Add the holder key
+        keyMap[holderKey.getKeyId()] = holderKey
+        
         val verificationResult = sdJwtVC.verifyVC(
-            WaltIdJWTCryptoProvider(mapOf(
-                (sdJwtVC.keyID ?: issuerKey.getKeyId()) to issuerKey,
-                holderKey.getKeyId() to holderKey)
-            ),
+            WaltIdJWTCryptoProvider(keyMap),
             requiresHolderKeyBinding = true,
             session.authorizationRequest!!.clientId,
             session.authorizationRequest!!.nonce!!

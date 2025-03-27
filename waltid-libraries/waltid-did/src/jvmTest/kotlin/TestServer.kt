@@ -28,6 +28,8 @@ object TestServer {
         ).path.let { File(it).readText() }
     private val rsaDocumentResponse =
         URI(this.javaClass.classLoader.getResource("did-web/rsa.json")!!.toString()).path.let { File(it).readText() }
+    private val multiKeyDocumentResponse =
+        URI(this.javaClass.classLoader.getResource("did-web/multi-key.json")!!.toString()).path.let { File(it).readText() }
     private val keyStore = buildKeyStore {
         certificate("test") {
             password = "test123"
@@ -57,6 +59,9 @@ object TestServer {
             }
             get("/rsa/did.json") {
                 call.respond<JsonObject>(Json.decodeFromString<JsonObject>(rsaDocumentResponse))
+            }
+            get("/multi-key/did.json") {
+                call.respond<JsonObject>(Json.decodeFromString<JsonObject>(multiKeyDocumentResponse))
             }
         }
     }
