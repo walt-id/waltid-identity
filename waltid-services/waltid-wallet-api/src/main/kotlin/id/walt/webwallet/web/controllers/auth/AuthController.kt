@@ -177,9 +177,9 @@ suspend fun ApplicationCall.getUserUUID() =
         }
     }.getOrElse { throw IllegalArgumentException("Invalid user id: $it") }
 
-fun ApplicationCall.getWalletId() =
 
 @OptIn(ExperimentalUuidApi::class)
+fun ApplicationCall.getWalletId(userId: Uuid? = null) =
     runCatching {
         Uuid.parse(parameters["wallet"] ?: throw IllegalArgumentException("No wallet ID provided"))
     }.getOrElse { throw IllegalArgumentException("Invalid wallet ID provided: ${it.message}") }
