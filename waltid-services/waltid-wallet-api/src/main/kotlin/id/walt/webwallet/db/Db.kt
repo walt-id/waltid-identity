@@ -63,6 +63,7 @@ object Db {
         WalletDids,
         WalletKeys,
         WalletCredentials,
+        WalletOid4vciAuthReqSessions,
         AccountWalletMappings,
 
         Web3Wallets,
