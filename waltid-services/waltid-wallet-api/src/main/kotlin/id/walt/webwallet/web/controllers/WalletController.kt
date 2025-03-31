@@ -1,6 +1,7 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.web.WebBaseRoutes.authenticatedWebWalletRoute
+import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
 import io.github.smiley4.ktorswaggerui.dsl.routing.route
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
@@ -22,3 +23,20 @@ fun Application.walletRoute(build: Route.() -> Unit) {
     }
 }
 
+
+fun Application.unprotectedWalletRoute(build: Route.() -> Unit) {
+    webWalletRoute {
+        route("wallet/{wallet}", {
+            request {
+                pathParameter<String>("wallet") {
+                    required = true
+                    allowEmptyValue = false
+                    description = "Wallet ID"
+                }
+            }
+            // tags = listOf("wallet")
+        }) {
+            build.invoke(this)
+        }
+    }
+}
