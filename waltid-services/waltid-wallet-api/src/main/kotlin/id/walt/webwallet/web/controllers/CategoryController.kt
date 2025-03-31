@@ -11,6 +11,7 @@ import io.ktor.server.util.*
 import kotlinx.serialization.json.JsonObject
 import kotlin.uuid.ExperimentalUuidApi
 
+@OptIn(ExperimentalUuidApi::class)
 fun Application.categories() = walletRoute {
     route("categories", {
         tags = listOf("WalletCategories")
