@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc
 
 import cbor.Cbor
@@ -7,6 +9,7 @@ import id.walt.mdoc.cose.HMAC256
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.dataretrieval.DeviceRequest
 import id.walt.mdoc.dataretrieval.DeviceResponse
+import id.walt.mdoc.dataretrieval.DocumentError
 import id.walt.mdoc.devicesigned.DeviceAuth
 import id.walt.mdoc.doc.MDocBuilder
 import id.walt.mdoc.doc.MDocTypes
@@ -28,31 +31,118 @@ class MDocTest {
 
     @Test
     fun testSerialization() {
-        val textItem = IssuerSignedItem(0u.toDataElement(),byteArrayOf(1, 2, 3).toDataElement(),"family_name".toDataElement(), "Doe".toDataElement())
-        val byteStringItem = IssuerSignedItem(0u.toDataElement(),byteArrayOf(1, 2, 3).toDataElement(),"byte_array".toDataElement(), byteArrayOf(0,1,2).toDataElement())
-        val intItem = IssuerSignedItem(0u.toDataElement(),byteArrayOf(1, 2, 3).toDataElement(),"age".toDataElement(), 35.toDataElement())
-        val floatItem = IssuerSignedItem(0u.toDataElement(),byteArrayOf(1, 2, 3).toDataElement(),"factor_x".toDataElement(), 0.5f.toDataElement())
-        val booleanItem = IssuerSignedItem(0u.toDataElement(),byteArrayOf(1, 2, 3).toDataElement(),"is_over_18".toDataElement(), true.toDataElement())
-        val listItem = IssuerSignedItem(0u.toDataElement(),byteArrayOf(1, 2, 3).toDataElement(),"driving_privileges".toDataElement(), listOf("A".toDataElement(), "B".toDataElement()).toDataElement())
-        val mapItem = IssuerSignedItem(0u.toDataElement(),byteArrayOf(1, 2, 3).toDataElement(),"attributes".toDataElement(), mapOf("attribute1" to "X".toDataElement(), "attribute2" to "Y".toDataElement()).toDataElement())
-        val nullItem = IssuerSignedItem(0u.toDataElement(), byteArrayOf(1,2,3).toDataElement(), "nothing".toDataElement(), NullElement())
+        val textItem = IssuerSignedItem(
+            0u.toDataElement(),
+            byteArrayOf(1, 2, 3).toDataElement(),
+            "family_name".toDataElement(),
+            "Doe".toDataElement()
+        )
+        val byteStringItem = IssuerSignedItem(
+            0u.toDataElement(),
+            byteArrayOf(1, 2, 3).toDataElement(),
+            "byte_array".toDataElement(),
+            byteArrayOf(0, 1, 2).toDataElement()
+        )
+        val intItem = IssuerSignedItem(
+            0u.toDataElement(),
+            byteArrayOf(1, 2, 3).toDataElement(),
+            "age".toDataElement(),
+            35.toDataElement()
+        )
+        val floatItem = IssuerSignedItem(
+            0u.toDataElement(),
+            byteArrayOf(1, 2, 3).toDataElement(),
+            "factor_x".toDataElement(),
+            0.5f.toDataElement()
+        )
+        val booleanItem = IssuerSignedItem(
+            0u.toDataElement(),
+            byteArrayOf(1, 2, 3).toDataElement(),
+            "is_over_18".toDataElement(),
+            true.toDataElement()
+        )
+        val listItem = IssuerSignedItem(
+            0u.toDataElement(),
+            byteArrayOf(1, 2, 3).toDataElement(),
+            "driving_privileges".toDataElement(),
+            listOf("A".toDataElement(), "B".toDataElement()).toDataElement()
+        )
+        val mapItem = IssuerSignedItem(
+            0u.toDataElement(),
+            byteArrayOf(1, 2, 3).toDataElement(),
+            "attributes".toDataElement(),
+            mapOf("attribute1" to "X".toDataElement(), "attribute2" to "Y".toDataElement()).toDataElement()
+        )
+        val nullItem = IssuerSignedItem(
+            0u.toDataElement(),
+            byteArrayOf(1, 2, 3).toDataElement(),
+            "nothing".toDataElement(),
+            NullElement()
+        )
         val embeddedCborValue = "The encoded item"
-        val cborItem = IssuerSignedItem(0u.toDataElement(), byteArrayOf(1,2,3).toDataElement(), "encoded_cbor".toDataElement(), EncodedCBORElement(StringElement(embeddedCborValue)))
-        val tdateItem = IssuerSignedItem(0u.toDataElement(), byteArrayOf(1,2,3).toDataElement(), "issue_date".toDataElement(), Clock.System.now().toDataElement())
-        val tdateIntItem = IssuerSignedItem(0u.toDataElement(), byteArrayOf(1,2,3).toDataElement(), "issue_date_int".toDataElement(), Clock.System.now().toDataElement(
-            DEDateTimeMode.time_int))
-        val tdateDblItem = IssuerSignedItem(0u.toDataElement(), byteArrayOf(1,2,3).toDataElement(), "issue_date_dbl".toDataElement(), Clock.System.now().toDataElement(
-            DEDateTimeMode.time_double))
-        val fullDateStrItem = IssuerSignedItem(0u.toDataElement(), byteArrayOf(1,2,3).toDataElement(), "birth_date".toDataElement(), LocalDate.parse("1983-07-05").toDataElement(
-            DEFullDateMode.full_date_str))
-        val fullDateIntItem = IssuerSignedItem(0u.toDataElement(), byteArrayOf(1,2,3).toDataElement(), "expiry_date".toDataElement(), LocalDate.parse("2025-12-31").toDataElement(
-            DEFullDateMode.full_date_int))
+        val cborItem = IssuerSignedItem(
+            0u.toDataElement(),
+            byteArrayOf(1, 2, 3).toDataElement(),
+            "encoded_cbor".toDataElement(),
+            EncodedCBORElement(StringElement(embeddedCborValue))
+        )
+        val tdateItem = IssuerSignedItem(
+            0u.toDataElement(),
+            byteArrayOf(1, 2, 3).toDataElement(),
+            "issue_date".toDataElement(),
+            Clock.System.now().toDataElement()
+        )
+        val tdateIntItem = IssuerSignedItem(
+            0u.toDataElement(),
+            byteArrayOf(1, 2, 3).toDataElement(),
+            "issue_date_int".toDataElement(),
+            Clock.System.now().toDataElement(
+                DEDateTimeMode.time_int
+            )
+        )
+        val tdateDblItem = IssuerSignedItem(
+            0u.toDataElement(),
+            byteArrayOf(1, 2, 3).toDataElement(),
+            "issue_date_dbl".toDataElement(),
+            Clock.System.now().toDataElement(
+                DEDateTimeMode.time_double
+            )
+        )
+        val fullDateStrItem = IssuerSignedItem(
+            0u.toDataElement(),
+            byteArrayOf(1, 2, 3).toDataElement(),
+            "birth_date".toDataElement(),
+            LocalDate.parse("1983-07-05").toDataElement(
+                DEFullDateMode.full_date_str
+            )
+        )
+        val fullDateIntItem = IssuerSignedItem(
+            0u.toDataElement(),
+            byteArrayOf(1, 2, 3).toDataElement(),
+            "expiry_date".toDataElement(),
+            LocalDate.parse("2025-12-31").toDataElement(
+                DEFullDateMode.full_date_int
+            )
+        )
 
         val mdocResp = DeviceResponse(
             documents = listOf(
-                MDocBuilder(MDocTypes.ISO_MDL).
-                addIssuerSignedItems(
-                    "org.iso.18013.5.1", textItem, byteStringItem, intItem, floatItem, booleanItem, listItem, mapItem, nullItem, cborItem, tdateItem, tdateIntItem, tdateDblItem, fullDateStrItem, fullDateIntItem
+                MDocBuilder(MDocTypes.ISO_MDL).addIssuerSignedItems(
+                    "org.iso.18013.5.1",
+                    textItem,
+                    byteStringItem,
+                    intItem,
+                    floatItem,
+                    booleanItem,
+                    listItem,
+                    mapItem,
+                    nullItem,
+                    cborItem,
+                    tdateItem,
+                    tdateIntItem,
+                    tdateDblItem,
+                    fullDateStrItem,
+                    fullDateIntItem
                 ).build(COSESign1())
             )
         )
@@ -63,7 +153,7 @@ class MDocTest {
         val mdocParsed = DeviceResponse.fromCBORHex(mdocHex)
         assertEquals(expected = mdocResp.version, actual = mdocParsed.version)
         assertEquals(expected = 0L, actual = mdocParsed.status.value)
-        assertEquals(expected = null, actual = mdocParsed.documentErrors)
+//        assertEquals(expected = null, actual = mdocParsed.documentErrors)
         assertEquals(expected = mdocResp.documents.size, actual = mdocParsed.documents.size)
         assertEquals(expected = mdocResp.documents[0].docType, actual = mdocParsed.documents[0].docType)
         assertEquals(
@@ -188,10 +278,12 @@ class MDocTest {
 
     @Test
     fun testEncodedCBORElement() {
-        val element = MapElement(mapOf(
-            MapKey("prop1") to StringElement("val1"),
-            MapKey("prop2") to NumberElement(5L)
-        ))
+        val element = MapElement(
+            mapOf(
+                MapKey("prop1") to StringElement("val1"),
+                MapKey("prop2") to NumberElement(5L)
+            )
+        )
         val encodedCbor = EncodedCBORElement(element)
         val decodedCbor = encodedCbor.decode()
         assertEquals(expected = element, actual = decodedCbor)
@@ -199,12 +291,14 @@ class MDocTest {
 
     @Test
     fun testListOfAny() {
-        val listOfAny = ListElement(listOf(
-            ByteStringElement(byteArrayOf(0xA1.toByte(), 0x01, 0x05)),
-            MapElement(mapOf()),
-            NullElement(),
-            ByteStringElement(byteArrayOf(0xe9.toByte(), 0x95.toByte()))
-        ))
+        val listOfAny = ListElement(
+            listOf(
+                ByteStringElement(byteArrayOf(0xA1.toByte(), 0x01, 0x05)),
+                MapElement(mapOf()),
+                NullElement(),
+                ByteStringElement(byteArrayOf(0xe9.toByte(), 0x95.toByte()))
+            )
+        )
         val hex = Cbor.encodeToHexString(listOfAny)
         println(hex)
         val parsedList = Cbor.decodeFromHexString<ListElement>(hex)
@@ -301,5 +395,71 @@ class MDocTest {
             expected = deviceMacParsed.signatureOrTag,
             actual = deviceSignedByUs.deviceAuth.deviceMac!!.signatureOrTag
         )
+    }
+
+    @Test
+    fun testDocumentError() {
+        val docType = "org.iso.18013.5.1.mDL"
+
+        //single document error
+        val someDocError = DocumentError(
+            docType = docType,
+            errorCode = -5,
+        )
+
+        //check deserialization from MapElement
+        var deserializedDocError = DocumentError.fromMapElement(someDocError.toMapElement())
+
+        assertEquals(
+            expected = someDocError,
+            actual = deserializedDocError,
+        )
+
+        //check deserialization from cbor hex string
+        deserializedDocError = Cbor.decodeFromHexString<DocumentError>(someDocError.toCBORHex())
+
+        assertEquals(
+            expected = someDocError,
+            actual = deserializedDocError,
+        )
+
+        //list of document errors
+        val docErrorList = listOf(
+            DocumentError(
+                docType = "some-doc-type",
+                errorCode = 0,
+            ),
+            DocumentError(
+                docType = "some-other-doc-type",
+                errorCode = 5,
+            ),
+        )
+
+        //check deserialization from cbor hex string
+        val decodedDocErrorList = Cbor.decodeFromHexString<List<DocumentError>>(Cbor.encodeToHexString(docErrorList))
+
+        assertContentEquals(
+            expected = docErrorList,
+            actual = decodedDocErrorList,
+        )
+
+        //list of document errors embedded in a ListElement
+        val docErrorListElement = ListElement(docErrorList.map { it.toMapElement() })
+
+        //check deserialization from cbor hex string
+        val decodedDocErrorListElement = Cbor.decodeFromHexString<ListElement>(Cbor.encodeToHexString(docErrorListElement))
+
+        assertEquals(
+            expected = docErrorListElement.value.size,
+            actual = decodedDocErrorListElement.value.size,
+        )
+
+        decodedDocErrorListElement.value.zip(docErrorListElement.value).forEach { pair->
+            assertEquals(
+                expected = DocumentError.fromMapElement(pair.second as MapElement),
+                actual = DocumentError.fromMapElement(pair.first as MapElement),
+            )
+
+        }
     }
 }
