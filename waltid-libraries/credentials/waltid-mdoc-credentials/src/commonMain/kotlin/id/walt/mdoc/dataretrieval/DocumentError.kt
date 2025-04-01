@@ -1,11 +1,12 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.dataretrieval
 
 import cbor.Cbor
 import id.walt.mdoc.dataelement.*
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.decodeFromHexString
+import kotlinx.serialization.*
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 /**
  * Error code for unreturned document according to Section 8.3.2.1.2.3 of ISO/IEC 18013-5
@@ -16,7 +17,7 @@ import kotlinx.serialization.decodeFromHexString
  *
  * ErrorCode = int; Error code
  */
-@Serializable
+@Serializable(with = DocumentErrorSerializer::class)
 class DocumentError(
     val docType: String,
     val errorCode: Int,
@@ -61,4 +62,15 @@ class DocumentError(
         )
     }
 
+}
+
+@Serializer(forClass = DocumentError::class)
+internal object DocumentErrorSerializer : KSerializer<DocumentError> {
+    override fun serialize(encoder: Encoder, value: DocumentError) {
+        encoder.encodeSerializableValue(DataElementSerializer, value.toMapElement())
+    }
+
+    override fun deserialize(decoder: Decoder): DocumentError {
+        return DocumentError.fromMapElement(decoder.decodeSerializableValue(DataElementSerializer) as MapElement)
+    }
 }
