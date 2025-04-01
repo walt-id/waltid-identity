@@ -16,6 +16,11 @@ object FeatureCatalog : ServiceFeatureCatalog {
         OptionalFeature("ktor-authnz", "waltid-ktor-authnz authentication system", KtorAuthnzConfig::class, false)
     // val loginsMethodFeature = BaseFeature("logins", "Logins method management", LoginMethodsConfig::class)
 
+    val walletService = BaseFeature(
+        "wallet-service",
+        "Wallet Service Implementation",
+        WalletServiceConfig::class
+    )
 
     val tenantFeature = OptionalFeature("tenant", "Cloud-based tenant management", TenantConfig::class, false)
     val pushFeature = OptionalFeature("push", "Push notifications", PushConfig::class, false)
@@ -60,6 +65,7 @@ object FeatureCatalog : ServiceFeatureCatalog {
     )
 
     override val baseFeatures = listOf(
+        walletService,
         databaseFeature
     )
     override val optionalFeatures = listOf(

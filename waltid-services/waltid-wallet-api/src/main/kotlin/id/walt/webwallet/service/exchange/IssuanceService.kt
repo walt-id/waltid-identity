@@ -1,5 +1,6 @@
 package id.walt.webwallet.service.exchange
 
+import id.walt.commons.config.ConfigManager
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.OpenID4VCI
@@ -9,6 +10,7 @@ import id.walt.oid4vc.definitions.OPENID_CREDENTIAL_SCOPE
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
+import id.walt.webwallet.config.WalletServiceConfig
 import id.walt.webwallet.db.models.WalletOid4vciAuthReqSession
 import id.walt.webwallet.db.models.getAuthReqSessions
 import id.walt.webwallet.manifest.extractor.EntraManifestExtractor
