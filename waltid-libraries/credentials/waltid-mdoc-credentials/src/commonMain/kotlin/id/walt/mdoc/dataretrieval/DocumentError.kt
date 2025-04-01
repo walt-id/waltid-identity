@@ -52,5 +52,13 @@ class DocumentError(
         @OptIn(ExperimentalSerializationApi::class)
         fun fromCBORHex(cbor: String) = Cbor.decodeFromHexString<DocumentError>(cbor)
 
+        /**
+         * Convert from CBOR map element
+         */
+        fun fromMapElement(element: MapElement) = DocumentError(
+            element.value.keys.first().toString(),
+            (element.value.values.first() as NumberElement).value.toInt(),
+        )
     }
+
 }
