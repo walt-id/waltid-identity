@@ -44,13 +44,13 @@ class DocumentError(
          * Deserialize from CBOR data
          */
         @OptIn(ExperimentalSerializationApi::class)
-        fun fromCBOR(cbor: ByteArray) = Cbor.decodeFromByteArray<DeviceResponse>(cbor)
+        fun fromCBOR(cbor: ByteArray) = Cbor.decodeFromByteArray<DocumentError>(cbor)
 
         /**
          * Deserialize from CBOR hex string
          */
         @OptIn(ExperimentalSerializationApi::class)
-        fun fromCBORHex(cbor: String) = Cbor.decodeFromHexString<DeviceResponse>(cbor)
+        fun fromCBORHex(cbor: String) = Cbor.decodeFromHexString<DocumentError>(cbor)
 
     }
 }
