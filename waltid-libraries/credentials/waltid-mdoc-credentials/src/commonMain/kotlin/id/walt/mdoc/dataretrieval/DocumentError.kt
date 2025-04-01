@@ -18,7 +18,7 @@ import kotlinx.serialization.encoding.Encoder
  * ErrorCode = int; Error code
  */
 @Serializable(with = DocumentErrorSerializer::class)
-class DocumentError(
+data class DocumentError(
     val docType: String,
     val errorCode: Int,
 ) {
