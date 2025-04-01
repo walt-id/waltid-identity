@@ -248,8 +248,11 @@ object IssuanceService : IssuanceServiceBase() {
         // 2. assemble authorize request
         val authReqSessionId = RandomUtils.randomBase64UrlString(256)
         val state = RandomUtils.randomBase64UrlString(256)
-        val redirectUri = "http://localhost:7001/wallet-api/wallet/${walletId}/exchange/callback/$authReqSessionId"
-        val authorizationEndpoint = "http://localhost:7001/wallet-api/wallet/${walletId}/exchange/authorization/$authReqSessionId"
+
+        val walletServiceBaseUrl = let { ConfigManager.getConfig<WalletServiceConfig>().baseUrl}
+
+        val redirectUri = "$walletServiceBaseUrl/wallet-api/wallet/${walletId}/exchange/callback/$authReqSessionId"
+        val authorizationEndpoint = "$walletServiceBaseUrl/wallet-api/wallet/${walletId}/exchange/authorization/$authReqSessionId"
 
         val authReq = AuthorizationRequest(
             responseType = setOf(ResponseType.Code),
