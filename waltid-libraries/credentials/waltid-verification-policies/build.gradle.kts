@@ -61,7 +61,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.1.0"
+    val ktor_version = "3.1.1"
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -70,7 +70,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
                 implementation("io.github.optimumcode:json-schema-validator:0.4.0")
 
-                implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+                implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
                 implementation(project(":waltid-libraries:credentials:waltid-dif-definitions-parser"))
                 implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
@@ -86,7 +86,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-logging:$ktor_version")
 
                 // Loggin
-                implementation("io.github.oshai:kotlin-logging:7.0.4")
+                implementation("io.github.oshai:kotlin-logging:7.0.5")
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")

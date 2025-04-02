@@ -4,7 +4,7 @@ import java.util.Properties
 
 plugins {
     kotlin("jvm")
-    id("io.ktor.plugin") version "3.1.0"
+    id("io.ktor.plugin") version "3.1.1"
     kotlin("plugin.serialization")
     id("com.github.ben-manes.versions")
 }
@@ -65,7 +65,7 @@ dependencies {
 
     /* -- KTOR -- */
 
-    val ktor_version = "3.1.0"
+    val ktor_version = "3.1.1"
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-auth-jvm:$ktor_version")
@@ -122,7 +122,7 @@ dependencies {
     implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
     implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
     implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
-    implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+    implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
 
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-oci"))
@@ -179,7 +179,7 @@ dependencies {
     implementation("com.zaxxer:HikariCP:6.2.1")
 
     // Logging
-    implementation("io.github.oshai:kotlin-logging-jvm:7.0.4")
+    implementation("io.github.oshai:kotlin-logging-jvm:7.0.5")
     implementation("org.slf4j:jul-to-slf4j:2.0.16")
     implementation("io.klogging:klogging-jvm:0.9.1")
     implementation("io.klogging:slf4j-klogging:0.9.1")

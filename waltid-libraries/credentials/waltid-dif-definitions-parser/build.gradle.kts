@@ -55,13 +55,13 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
                 implementation("io.github.optimumcode:json-schema-validator:0.4.0")
 
-                implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+                implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:7.0.4")
+                implementation("io.github.oshai:kotlin-logging:7.0.5")
             }
         }
         val commonTest by getting {

@@ -20,7 +20,7 @@ Available for Kotlin/Java and JavaScript environments.
   create and use keys based on different algorithms and KMS backends (in-memory, AWS, Hashicorp TSE, OCI)
 - **DID** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-dids/overview) | [GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-did/README.md)) -
   create, register, and resolve DIDs on different ecosystems.
-- **Verifiable Credentials** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-credentials/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-verifiable-credentials)) -
+- **W3C Credentials** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-credentials/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-w3c-credentials)) -
   issue and verify W3C credentials as JWTs and SD-JWTs.
 - **mdoc Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-mdoc-credentials)) -
   issue and verify mdoc credentials (mDL ISO/IEC 18013-5).
