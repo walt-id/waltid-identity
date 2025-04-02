@@ -73,7 +73,7 @@ The examples are based on **JVM** and make use of the following libraries:
 handling
 - [**waltid-crypto**](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto) for cryptographic operations
 - [**waltid-did**](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-did) for DID-related operations 
-- [**waltid-verifiable-credentials**](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-verifiable-credentials) for credential and presentation handling
+- [**waltid-w3c-credentials**](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-w3c-credentials) for credential and presentation handling
 
 ### Issuer
 

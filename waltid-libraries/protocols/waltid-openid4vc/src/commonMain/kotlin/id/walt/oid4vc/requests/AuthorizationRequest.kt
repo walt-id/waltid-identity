@@ -225,9 +225,7 @@ data class AuthorizationRequest(
         )
 
         suspend fun fromRequestObjectByReference(requestUri: String): AuthorizationRequest {
-            println("Request object by reference: $requestUri")
             val body = id.walt.oid4vc.util.http.get(requestUri).bodyAsText()
-            println("Reference resolves to: $body")
 
             return fromRequestObject(body)
         }

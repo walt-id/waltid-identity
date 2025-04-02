@@ -1,6 +1,6 @@
 import com.nimbusds.jose.JWSAlgorithm
-import id.walt.credentials.schemes.JwsSignatureScheme
-import id.walt.credentials.utils.VCFormat
+import id.walt.w3c.schemes.JwsSignatureScheme
+import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws

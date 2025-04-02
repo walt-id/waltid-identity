@@ -1,6 +1,6 @@
 package id.walt.issuer.issuance2
 
-import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.issuer.issuance.IssuanceConfiguration
 import id.walt.issuer.issuance.IssuerConfiguration
 import id.walt.issuer.issuance.NewIssuanceRequest

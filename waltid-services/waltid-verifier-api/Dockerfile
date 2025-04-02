@@ -3,7 +3,7 @@ FROM docker.io/gradle:jdk21 AS buildstage
 COPY gradle/ /work/gradle
 COPY settings.gradle.kts build.gradle.kts gradle.properties gradlew /work/
 
-COPY waltid-libraries/credentials/waltid-verifiable-credentials/build.gradle.kts /work/waltid-libraries/credentials/waltid-verifiable-credentials/
+COPY waltid-libraries/credentials/waltid-w3c-credentials/build.gradle.kts /work/waltid-libraries/credentials/waltid-w3c-credentials/
 COPY waltid-libraries/credentials/waltid-verification-policies/build.gradle.kts /work/waltid-libraries/credentials/waltid-verification-policies/
 COPY waltid-libraries/credentials/waltid-dif-definitions-parser/build.gradle.kts /work/waltid-libraries/credentials/waltid-dif-definitions-parser/
 COPY waltid-libraries/crypto/waltid-crypto/build.gradle.kts /work/waltid-libraries/crypto/waltid-crypto/
@@ -19,7 +19,7 @@ COPY waltid-services/waltid-verifier-api/build.gradle.kts /work/waltid-services/
 WORKDIR /work/waltid-services/waltid-verifier-api/
 RUN gradle build || return 0
 
-COPY waltid-libraries/credentials/waltid-verifiable-credentials/. /work/waltid-libraries/credentials/waltid-verifiable-credentials
+COPY waltid-libraries/credentials/waltid-w3c-credentials/. /work/waltid-libraries/credentials/waltid-w3c-credentials
 COPY waltid-libraries/credentials/waltid-verification-policies/. /work/waltid-libraries/credentials/waltid-verification-policies
 COPY waltid-libraries/credentials/waltid-dif-definitions-parser/. /work/waltid-libraries/credentials/waltid-dif-definitions-parser
 COPY waltid-libraries/crypto/waltid-crypto/. /work/waltid-libraries/crypto/waltid-crypto
