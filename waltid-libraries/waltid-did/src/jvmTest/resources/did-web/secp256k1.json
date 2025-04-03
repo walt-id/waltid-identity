@@ -1,16 +1,16 @@
 {
   "assertionMethod": [
-    "did:web:localhost%3A8080:secp256k1#d5c5048d0e7440a4830ea0b407174f83"
+    "did:web:localhost%3A<DID_WEB_PORT>:secp256k1#d5c5048d0e7440a4830ea0b407174f83"
   ],
   "authentication": [
-    "did:web:localhost%3A8080:secp256k1#d5c5048d0e7440a4830ea0b407174f83"
+    "did:web:localhost%3A<DID_WEB_PORT>:secp256k1#d5c5048d0e7440a4830ea0b407174f83"
   ],
   "@context": "https://www.w3.org/ns/did/v1",
-  "id": "did:web:localhost%3A8080:secp256k1",
+  "id": "did:web:localhost%3A<DID_WEB_PORT>:secp256k1",
   "verificationMethod": [
     {
-      "controller": "did:web:localhost%3A8080:secp256k1",
-      "id": "did:web:localhost%3A8080:secp256k1#d5c5048d0e7440a4830ea0b407174f83",
+      "controller": "did:web:localhost%3A<DID_WEB_PORT>:secp256k1",
+      "id": "did:web:localhost%3A<DID_WEB_PORT>:secp256k1#d5c5048d0e7440a4830ea0b407174f83",
       "publicKeyJwk": {
         "alg": "ES256K",
         "crv": "secp256k1",
