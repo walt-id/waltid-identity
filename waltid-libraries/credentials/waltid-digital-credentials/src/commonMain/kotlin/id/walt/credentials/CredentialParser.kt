@@ -6,7 +6,6 @@ import id.walt.credentials.CredentialDetectorTypes.MdocsSubType
 import id.walt.credentials.CredentialDetectorTypes.SDJWTVCSubType
 import id.walt.credentials.CredentialDetectorTypes.SignaturePrimaryType
 import id.walt.credentials.CredentialDetectorTypes.W3CSubType
-import id.walt.credentials.JwtUtils.isJwt
 import id.walt.credentials.formats.VerifiableCredential
 import id.walt.credentials.formats.mdocs.MdocsCredential
 import id.walt.credentials.formats.sdjwtvc.SdJwtCredential
@@ -15,10 +14,17 @@ import id.walt.credentials.formats.w3c.W3C2
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.DataIntegrityProofCredentialSignature
 import id.walt.credentials.signatures.SdJwtCredentialSignature
+import id.walt.credentials.utils.Base64Utils.base64Url
+import id.walt.credentials.utils.Base64Utils.matchesBase64Url
+import id.walt.credentials.utils.HexUtils.matchesHex
+import id.walt.credentials.utils.JwtUtils
+import id.walt.credentials.utils.JwtUtils.isJwt
+import id.walt.mdoc.doc.MDoc
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 
+@OptIn(ExperimentalEncodingApi::class)
 object CredentialParser {
 
     val DM_1_1_CONTEXT_INDICATORS = listOf(
@@ -42,6 +48,13 @@ object CredentialParser {
         }
     }
 
+    private fun handleMdocs(credential: String, base64: Boolean = false): Pair<CredentialDetectionResult, MdocsCredential> {
+        val mdoc = if (base64) MDoc.fromCBOR(base64Url.decode(credential)) else MDoc.fromCBORHex(credential)
+
+        return CredentialDetectionResult(CredentialPrimaryDataType.MDOCS, MdocsSubType.mdocs, SignaturePrimaryType.COSE) to
+                MdocsCredential(signature = CoseCredentialSignature(), signed = credential, credentialData = JsonObject(emptyMap()))
+        // TODO: ^^^ mdocs credentials
+    }
 
     @OptIn(ExperimentalEncodingApi::class)
     fun detectAndParse(rawCredential: String): Pair<CredentialDetectionResult, VerifiableCredential> {
@@ -225,11 +238,8 @@ object CredentialParser {
             }
 
             // TODO: W3C could also has COSE signature
-            credential.lowercase()
-                .all { it in "0123456789abcdef" } || runCatching { JwtUtils.base64Url.decode(credential) }.isSuccess
-                -> CredentialDetectionResult(CredentialPrimaryDataType.MDOCS, MdocsSubType.mdocs, SignaturePrimaryType.COSE) to
-                    MdocsCredential(signature = CoseCredentialSignature(), signed = credential, credentialData = JsonObject(emptyMap()))
-            // TODO: ^^^ mdocs credentials
+            credential.matchesHex() -> handleMdocs(credential, false)
+            credential.matchesBase64Url() -> handleMdocs(credential, true)
 
             else -> throw NotImplementedError("unknown: $credential")
         }
