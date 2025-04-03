@@ -4,7 +4,7 @@ import id.walt.credentials.CredentialDetectorTypes.CredentialDetectionResult
 import kotlin.test.Test
 
 
-class HeuristicTest {
+class CredentialParsingTest {
 
     @Test
     fun x() {
