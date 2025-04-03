@@ -132,6 +132,7 @@ object CoreWalletOpenId4VP {
     }
 }
 
+/*
 suspend fun main() {
     WaltidServices.minimalInit()
 
@@ -179,3 +180,4 @@ suspend fun main() {
 
     CoreWalletOpenId4VP.presentCredential(x, callback)
 }
+*/

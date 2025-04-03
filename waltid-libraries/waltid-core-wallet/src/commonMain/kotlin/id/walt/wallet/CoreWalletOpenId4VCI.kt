@@ -213,6 +213,7 @@ object CoreWalletOpenId4VCI {
     }
 }
 
+/*
 suspend fun main() {
     WaltidServices.minimalInit()
     val key =
@@ -257,3 +258,4 @@ suspend fun main() {
 
     println("All done.")
 }
+*/
