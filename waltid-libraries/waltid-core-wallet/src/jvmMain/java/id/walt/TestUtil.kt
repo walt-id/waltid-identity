@@ -1,4 +1,4 @@
-package id.walt.wallet
+package id.walt
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
