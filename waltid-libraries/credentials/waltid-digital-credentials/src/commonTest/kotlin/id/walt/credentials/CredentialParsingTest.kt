@@ -7,7 +7,7 @@ import kotlin.test.Test
 class CredentialParsingTest {
 
     @Test
-    fun x() {
+    fun credentialParsingTest() {
         val results = ArrayList<Triple<CredentialDetectionResult, CredentialDetectionResult, String>>()
 
         fun doCheck(index: Int, example: Pair<String, CredentialDetectionResult>, name: String) {

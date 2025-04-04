@@ -89,27 +89,5 @@ object CredentialDetectorTypes {
                 throw IllegalArgumentException("Credential does not contain any selective disclosures; but disclosures were provided? -> for $this")
             }
         }
-
-        fun x() {
-            when (credentialPrimaryType) {
-                CredentialPrimaryDataType.W3C -> {
-                    when (credentialSubType) {
-                        W3CSubType.W3C_1_1 -> {}
-                        W3CSubType.W3C_2 -> {}
-                        else -> error("")
-                    }
-                }
-
-                CredentialPrimaryDataType.SDJWTVC -> {
-
-                }
-
-                CredentialPrimaryDataType.MDOCS -> {
-
-                }
-
-            }
-        }
     }
-
 }
