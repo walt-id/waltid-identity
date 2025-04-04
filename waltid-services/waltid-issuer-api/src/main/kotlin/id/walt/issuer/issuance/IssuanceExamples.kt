@@ -1,7 +1,7 @@
 package id.walt.issuer.issuance
 
 import id.walt.commons.interop.LspPotentialInterop
-import id.walt.credentials.utils.VCFormat
+import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
 import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl

@@ -86,7 +86,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.1.0"
+    val ktor_version = "3.1.1"
 
     sourceSets {
 
@@ -120,7 +120,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:7.0.4")
+                implementation("io.github.oshai:kotlin-logging:7.0.5")
 
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
 
