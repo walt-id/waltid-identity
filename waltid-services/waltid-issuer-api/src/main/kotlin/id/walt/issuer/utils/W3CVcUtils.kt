@@ -1,6 +1,6 @@
 package id.walt.issuer.utils
 
-import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.w3c.vc.vcs.W3CVC
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject

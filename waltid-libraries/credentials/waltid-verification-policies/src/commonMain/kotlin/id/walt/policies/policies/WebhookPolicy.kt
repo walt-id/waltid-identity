@@ -1,6 +1,6 @@
 package id.walt.policies.policies
 
-import id.walt.credentials.utils.VCFormat
+import id.walt.w3c.utils.VCFormat
 import id.walt.policies.CredentialWrapperValidatorPolicy
 import io.ktor.client.*
 import io.ktor.client.call.*

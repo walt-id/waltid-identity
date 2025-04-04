@@ -14,7 +14,7 @@ repositories {
 }
 
 object Versions {
-    const val KTOR_VERSION = "3.1.0" // also change 1 plugin
+    const val KTOR_VERSION = "3.1.1" // also change 1 plugin
 }
 
 dependencies {
@@ -64,7 +64,7 @@ dependencies {
 
     // Testing
     testApi(kotlin("test"))
-    testApi("io.ktor:ktor-server-test-host:3.1.0")
+    testApi("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
     testApi("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
 }
 

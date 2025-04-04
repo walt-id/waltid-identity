@@ -1,10 +1,11 @@
 package id.walt.oid4vc
 
-import id.walt.credentials.CredentialBuilder
-import id.walt.credentials.CredentialBuilderType
-import id.walt.credentials.issuance.Issuer.baseIssue
+import id.walt.w3c.CredentialBuilder
+import id.walt.w3c.CredentialBuilderType
+import id.walt.w3c.issuance.Issuer.baseIssue
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -821,13 +822,18 @@ class OpenID4VCI_Test {
         //
         // Wallet
         //
+        println("--- Wallet ---")
+        println("Start: Credential offer = $credentialOfferUrlString")
 
         // Wallet API gets CredentialOfferString somehow.
         // Wallet parses it.
         val credentialOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(credentialOfferUrlString)
+        println("Decoded credential offer: $credentialOffer")
 
         // W: resolveIssuerMetadataByCredentialOffer (CredOfferObject) -> OpenIDProvideMetadataObject
         val resolvedCIProviderMetadata = OpenID4VCI.resolveCIProviderMetadata(credentialOffer)
+        println("Resolved CI Provider Metadata: $resolvedCIProviderMetadata")
+
 
         // The Wallet API checks if the offer has a preauthorized or authorization code (check GrantTypes.isAvailableIn() or so)
         // Its Pre-Authorized
@@ -836,17 +842,20 @@ class OpenID4VCI_Test {
             preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!,
             clientId = null,  // The Wallet API should check for token_endpoint_auth_method in Issuer Metadata to see what client authentication types are supported.
         )
+            println("Sending token request... $tokenRequest")
 
         val tokenResponse = OpenID4VCI.sendTokenRequest(
             providerMetadata = resolvedCIProviderMetadata,
             tokenRequest = tokenRequest
         )
+        println("Response to token request is: $tokenResponse")
 
         // W: sendTokenRequest (code or preauthCode ) -> TokenRepsonseObject
 
+        println("Validating token response...")
         // Wallet Validates the response ( check if there is successful and contains the required access_token)
         OpenID4VCI.validateTokenResponse(tokenResponse)
-
+        println("Token response is valid!")
 
         /*
         The Wallet should check if it should create a proof.
@@ -907,21 +916,31 @@ class OpenID4VCI_Test {
         // If c_nonce is provided, it is included in the proof in a specific parameter based on `proof_type`.
         // The proof is included in the credential request and sent to the issuer.
 
+        println("> Constructing credential request: vvv")
+
         val nonce = tokenResponse.cNonce
+        println("cNonce: $nonce")
 
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(
             credentialOffer = credentialOffer,
             providerMetadata = resolvedCIProviderMetadata
         )
+        println("Offered credentials (${offeredCredentials.size}x) are: $offeredCredentials")
 
         assertEquals(1, offeredCredentials.size)
 
+        println("Using #0 credential offer")
+
         val offeredCredential = offeredCredentials[0]
+        println("Offered credential: $offeredCredential")
 
         val holderDid = WALLET_DID
         val holderKey = JWKKey.importJWK(WALLET_KEY).getOrThrow()
         val holderKeyId = holderKey.getKeyId()
         val proofKeyId = "$holderDid#$holderKeyId"
+
+        println("Data for PoP: holderDid = $holderDid, holderKey = $holderKey, holderKeyId = $holderKeyId, proofKeyId = $proofKeyId")
+
         val proofOfPossession = ProofOfPossession.JWTProofBuilder(
             issuerUrl = resolvedCIProviderMetadata.credentialIssuer!!,
             clientId = WALLET_CLIENT_ID,
@@ -930,22 +949,31 @@ class OpenID4VCI_Test {
         ).build(
             key = holderKey
         )
+        println("Built proof of possession: $proofOfPossession")
 
         val accessToken = tokenResponse.accessToken!!
+        println("Access token of token response was: $accessToken")
+
         val credentialRequest = CredentialRequest.forOfferedCredential(
             offeredCredential = offeredCredential,
             proof = proofOfPossession
         )
+        println("Credential request for offered credential is: $credentialRequest")
 
         // 5. The Wallet API sends the credential request
+        println("Sending credential request...")
         val credentialResponse = OpenID4VCI.sendCredentialRequest(
             providerMetadata = resolvedCIProviderMetadata,
             accessToken = accessToken,
             credentialRequest = credentialRequest
         )
+        println("Response to credential request: $credentialResponse")
+        println("-> Credential response success: ${credentialResponse.isSuccess}")
 
         assertNotNull(credentialResponse.credential)
-        println(credentialResponse)
+
+        println("Signed credential is: ${credentialResponse.credential}")
+        println("Credential data is: ${credentialResponse.credential.jsonPrimitive.content.decodeJws().payload["vc"]?.jsonObject}")
     }
 }
 

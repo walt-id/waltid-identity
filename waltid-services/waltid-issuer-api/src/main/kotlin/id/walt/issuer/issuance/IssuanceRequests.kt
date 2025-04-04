@@ -1,6 +1,6 @@
 package id.walt.issuer.issuance
 
-import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.*
 import id.walt.sdjwt.SDMap
