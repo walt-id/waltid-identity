@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
 
 object Versions {
-    const val KTOR_VERSION = "3.1.0" // also change 1 plugin
+    const val KTOR_VERSION = "3.1.1" // also change 1 plugin
     const val COROUTINES_VERSION = "1.10.1"
     const val HOPLITE_VERSION = "2.9.0"
 }
@@ -12,7 +12,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
 
-    id("io.ktor.plugin") version "3.1.0" // Versions.KTOR_VERSION
+    id("io.ktor.plugin") version "3.1.1" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.2.0"
     id("com.github.jk1.dependency-license-report") version "2.9"
     id("com.github.ben-manes.versions")
@@ -79,7 +79,7 @@ dependencies {
     implementation("com.sksamuel.hoplite:hoplite-hocon:${Versions.HOPLITE_VERSION}")
 
     // Logging
-    implementation("io.github.oshai:kotlin-logging-jvm:7.0.4")
+    implementation("io.github.oshai:kotlin-logging-jvm:7.0.5")
     implementation("org.slf4j:jul-to-slf4j:2.0.16")
     implementation("io.klogging:klogging-jvm:0.9.1")
     implementation("io.klogging:slf4j-klogging:0.9.1")
@@ -97,7 +97,7 @@ dependencies {
 
     api(project(":waltid-libraries:waltid-did"))
 
-    api(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+    api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
     api(project(":waltid-libraries:credentials:waltid-verification-policies"))
     api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
     api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))

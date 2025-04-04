@@ -76,7 +76,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.1.0"
+    val ktor_version = "3.1.1"
 
     sourceSets {
 
@@ -93,7 +93,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
 
-                implementation("io.github.oshai:kotlin-logging:7.0.4")
+                implementation("io.github.oshai:kotlin-logging:7.0.5")
 
                 // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
@@ -101,7 +101,7 @@ kotlin {
                 // walt.id
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
-                implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+                implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
                 implementation(project(":waltid-libraries:credentials:waltid-verification-policies"))
                 implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
                 implementation(project(":waltid-libraries:waltid-did"))
@@ -123,7 +123,7 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(project(":waltid-libraries:waltid-did"))
-                implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+                implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
             }
         }

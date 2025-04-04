@@ -1,6 +1,6 @@
 package id.walt.oid4vc.data.dif
 
-import id.walt.credentials.utils.VCFormat
+import id.walt.w3c.utils.VCFormat
 import id.walt.oid4vc.data.JsonDataObject
 import id.walt.oid4vc.data.JsonDataObjectFactory
 import id.walt.oid4vc.data.JsonDataObjectSerializer

@@ -5,7 +5,7 @@ package id.walt.webwallet.service.oidc4vc
 
 import org.cose.java.AlgorithmID
 import com.nimbusds.jose.jwk.ECKey
-import id.walt.credentials.utils.VCFormat
+import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
