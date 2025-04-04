@@ -106,7 +106,7 @@ internal object DataElementSerializer : KSerializer<DataElement> {
     override fun serialize(encoder: Encoder, value: DataElement) {
         when (value.type) {
             DEType.number -> when (value.internalValue) {
-                is Int, is Long, is Short -> encoder.encodeLong((value.internalValue as Number).toLong())
+                is Int, is Long, is Short, is UInt -> encoder.encodeLong((value.internalValue as Number).toLong())
                 is Float -> encoder.encodeFloat(value.internalValue.toFloat())
                 is Double -> encoder.encodeDouble(value.internalValue.toDouble())
             }
