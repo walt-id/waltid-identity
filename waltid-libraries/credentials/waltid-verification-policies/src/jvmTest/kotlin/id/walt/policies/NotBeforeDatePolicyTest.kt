@@ -1,8 +1,8 @@
 package id.walt.policies
 
-import id.walt.credentials.Claims
-import id.walt.credentials.JwtClaims
-import id.walt.credentials.VcClaims
+import id.walt.w3c.Claims
+import id.walt.w3c.JwtClaims
+import id.walt.w3c.VcClaims
 import id.walt.policies.policies.NotBeforeDatePolicy
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant

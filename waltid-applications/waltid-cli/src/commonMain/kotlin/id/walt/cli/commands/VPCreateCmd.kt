@@ -14,7 +14,7 @@ import id.walt.cli.presexch.strategies.FilterPresentationDefinitionMatchStrategy
 import id.walt.cli.util.KeyUtil
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
-import id.walt.credentials.PresentationBuilder
+import id.walt.w3c.PresentationBuilder
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService

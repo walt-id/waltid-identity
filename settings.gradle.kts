@@ -14,7 +14,7 @@ val libraries = ":waltid-libraries"
 val applications = ":waltid-applications"
 val services = ":waltid-services"
 
-val modules = listOf(
+val modules = listOfNotNull(
     * "$libraries:crypto".group(
         "waltid-crypto",
         "waltid-crypto-oci",
@@ -26,7 +26,8 @@ val modules = listOf(
     ),
 
     * "$libraries:credentials".group(
-        "waltid-verifiable-credentials",
+        "waltid-w3c-credentials",
+        "waltid-digital-credentials",
         "waltid-mdoc-credentials",
         "waltid-dif-definitions-parser",
         "waltid-verification-policies"
@@ -78,7 +79,7 @@ val modules = listOf(
 
     "$applications:waltid-openid4vc-ios-testApp" whenEnabled enableIosBuild,
     "$applications:waltid-openid4vc-ios-testApp:shared" whenEnabled enableIosBuild
-).filterNotNull()
+)
 
 include(*modules.toTypedArray())
 

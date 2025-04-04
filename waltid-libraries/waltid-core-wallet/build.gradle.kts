@@ -27,14 +27,16 @@ kotlin {
     }
 
     sourceSets {
-        val ktor_version = "3.1.0"
+        val ktor_version = "3.1.1"
 
         val commonMain by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
 
-                implementation("io.github.oshai:kotlin-logging-jvm:7.0.4")
+                implementation("io.github.oshai:kotlin-logging:7.0.5")
+
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(project(":waltid-libraries:waltid-did"))
@@ -42,7 +44,7 @@ kotlin {
                 implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
                 implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
                 implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
-                implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+                implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")

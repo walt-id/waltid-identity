@@ -1,7 +1,7 @@
 package id.walt.policies.policies
 
-import id.walt.credentials.utils.VCFormat
-import id.walt.credentials.utils.randomUUID
+import id.walt.w3c.utils.VCFormat
+import id.walt.w3c.utils.randomUUID
 import id.walt.crypto.exceptions.VerificationException
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
