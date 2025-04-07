@@ -1,6 +1,6 @@
 import WaltidServicesE2ETests.Companion.nameFieldSchemaPresentationRequestPayload
 import WaltidServicesE2ETests.Companion.sdjwtCredential
-import id.walt.credentials.schemes.JwsSignatureScheme
+import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils

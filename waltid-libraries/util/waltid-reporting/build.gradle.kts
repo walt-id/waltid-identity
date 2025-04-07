@@ -46,7 +46,7 @@ kotlin {
         }
     }
 
-    val ktor_version = "3.1.0"
+    val ktor_version = "3.1.1"
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -73,7 +73,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:7.0.4")
+                implementation("io.github.oshai:kotlin-logging:7.0.5")
             }
         }
         val commonTest by getting {

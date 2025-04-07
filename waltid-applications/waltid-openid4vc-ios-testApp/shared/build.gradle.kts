@@ -24,13 +24,13 @@ kotlin {
     }
 
     sourceSets {
-        val ktor_version = "3.1.0"
+        val ktor_version = "3.1.1"
 
         commonMain.dependencies {
             implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             implementation(project(":waltid-libraries:waltid-did"))
             implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
-            implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+            implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
             implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -53,7 +53,7 @@ kotlin {
             iosSimulatorArm64Main.dependsOn(this)
             dependencies {
                 implementation(project(":waltid-libraries:crypto:waltid-crypto-ios"))
-                implementation("io.ktor:ktor-client-darwin:3.1.0")
+                implementation("io.ktor:ktor-client-darwin:3.1.1")
             }
         }
     }

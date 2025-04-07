@@ -4,7 +4,7 @@ package id.walt.verifier
 
 import com.nimbusds.jose.JWSAlgorithm
 import id.walt.commons.config.ConfigManager
-import id.walt.credentials.utils.VCFormat
+import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.oid4vc.data.OpenId4VPProfile
@@ -38,7 +38,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -287,11 +286,13 @@ fun Application.verifierApi() {
                         mediaTypes = listOf(ContentType.Application.FormUrlEncoded)
                         example("simple vp_token response") {
                             value = TokenResponseFormParam(
-                                JsonPrimitive("abc.def.ghi"), PresentationSubmissionFormParam(
-                                    "1", "1", listOf(
-                                        DescriptorMappingFormParam("1", VCFormat.jwt_vc_json, "$.vc.type")
-                                    )
-                                ), null
+                                vp_token = JsonPrimitive("abc.def.ghi"),
+                                presentation_submission = PresentationSubmissionFormParam(
+                                    id = "1",
+                                    definition_id = "1",
+                                    descriptor_map = listOf(DescriptorMappingFormParam("1", VCFormat.jwt_vc_json, "$.vc.type"))
+                                ),
+                                response = null
                             )
                         }
                         example("direct_post.jwt response") {
@@ -483,7 +484,7 @@ fun Application.verifierApi() {
             val stateId = Uuid.random().toString()
             // Parse session TTL from query parameter if provided
             val sessionTtl = params["sessionTtl"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull?.toLongOrNull()?.let { it.seconds }
-            
+
             val session = verificationUseCase.createSession(
                 vpPoliciesJson = null,
                 vcPoliciesJson = buildJsonArray {

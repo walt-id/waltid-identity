@@ -1,6 +1,6 @@
 package id.walt.issuer.issuance
 
-import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.did.dids.DidService
@@ -213,14 +213,14 @@ fun Application.issuerApi() {
                 description = "Callback to push state changes of the issuance process to"
                 required = false
             }
-            
+
             fun OpenApiRequest.sessionTtlHeader() = headerParameter<Long>("sessionTtl") {
                 description = "Custom session time-to-live in seconds"
                 required = false
             }
 
             fun RoutingContext.getCallbackUriHeader() = call.request.header("statusCallbackUri")
-            
+
             fun RoutingContext.getSessionTtl() = call.request.header("sessionTtl")?.toLongOrNull()?.let { it.seconds }
 
             route("raw") {

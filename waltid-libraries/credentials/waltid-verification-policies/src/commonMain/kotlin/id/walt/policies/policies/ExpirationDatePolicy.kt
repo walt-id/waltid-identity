@@ -1,14 +1,14 @@
 package id.walt.policies.policies
 
-import id.walt.credentials.Claims
-import id.walt.credentials.JwtClaims
-import id.walt.credentials.VcClaims
-import id.walt.credentials.utils.VCFormat
+import id.walt.w3c.Claims
+import id.walt.w3c.JwtClaims
+import id.walt.w3c.utils.VCFormat
 import id.walt.policies.CredentialWrapperValidatorPolicy
 import id.walt.policies.DatePolicyUtils.checkJwt
 import id.walt.policies.DatePolicyUtils.checkVc
 import id.walt.policies.DatePolicyUtils.policyUnavailable
 import id.walt.policies.ExpirationDatePolicyException
+import id.walt.w3c.VcClaims
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable

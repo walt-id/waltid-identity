@@ -1,13 +1,13 @@
 package id.walt.oid4vc
 
 import cbor.Cbor
-import id.walt.credentials.issuance.Issuer.getKidHeader
-import id.walt.credentials.issuance.Issuer.mergingJwtIssue
-import id.walt.credentials.issuance.Issuer.mergingSdJwtIssue
-import id.walt.credentials.issuance.dataFunctions
-import id.walt.credentials.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
-import id.walt.credentials.utils.VCFormat
-import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.w3c.issuance.Issuer.getKidHeader
+import id.walt.w3c.issuance.Issuer.mergingJwtIssue
+import id.walt.w3c.issuance.Issuer.mergingSdJwtIssue
+import id.walt.w3c.issuance.dataFunctions
+import id.walt.w3c.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
+import id.walt.w3c.utils.VCFormat
+import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
