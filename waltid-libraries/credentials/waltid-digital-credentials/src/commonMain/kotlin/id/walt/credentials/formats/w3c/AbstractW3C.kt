@@ -1,9 +1,10 @@
-package id.walt.credentials.formats.w3c
+package id.walt.credentials.formats
 
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
-import id.walt.credentials.formats.VerifiableCredential
+import kotlinx.serialization.Serializable
 
-abstract class AbstractW3C(
-) : VerifiableCredential(), SelectivelyDisclosableVerifiableCredential {
+@Serializable
+sealed class AbstractW3C(
+) : DigitalCredential(), SelectivelyDisclosableVerifiableCredential {
 }
 

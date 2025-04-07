@@ -1,6 +1,6 @@
 package id.walt.credentials.signatures.sdjwt
 
-import id.walt.credentials.formats.VerifiableCredential
+import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -25,7 +25,7 @@ interface SelectivelyDisclosableVerifiableCredential {
             } else null
         }
 
-    fun disclose(credential: VerifiableCredential, attributes: List<SdJwtSelectiveDisclosure>): String {
+    fun disclose(credential: DigitalCredential, attributes: List<SdJwtSelectiveDisclosure>): String {
         checkNotNull(credential.signed) { "Credential has to be signed to be able to disclose" }
         return "${credential.signed}~${attributes.joinToString("~") { it.encoded() }}"
     }

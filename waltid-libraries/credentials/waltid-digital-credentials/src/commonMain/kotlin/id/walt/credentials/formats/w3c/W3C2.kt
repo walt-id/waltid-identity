@@ -1,9 +1,11 @@
-package id.walt.credentials.formats.w3c
+package id.walt.credentials.formats
 
 import id.walt.credentials.signatures.CredentialSignature
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
+@Serializable
 data class W3C2(
     override val disclosableAttributes: JsonArray?,
     override val disclosuresString: String?,
