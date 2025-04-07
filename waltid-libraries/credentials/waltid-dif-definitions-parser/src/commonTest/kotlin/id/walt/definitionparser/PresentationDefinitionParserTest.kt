@@ -1,6 +1,6 @@
 package id.walt.definitionparser
 
-import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.w3c.vc.vcs.W3CVC
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.map

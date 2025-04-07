@@ -1,6 +1,6 @@
 package id.walt.policies
 
-import id.walt.credentials.utils.VCFormat
+import id.walt.w3c.utils.VCFormat
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator

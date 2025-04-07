@@ -84,7 +84,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.1.0"
+    val ktor_version = "3.1.1"
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -115,7 +115,7 @@ kotlin {
                 implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.6.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:7.0.4")
+                implementation("io.github.oshai:kotlin-logging:7.0.5")
 
 
                 // suspend-transform plugin annotations (required in the current version to avoid "compileOnly" warning)

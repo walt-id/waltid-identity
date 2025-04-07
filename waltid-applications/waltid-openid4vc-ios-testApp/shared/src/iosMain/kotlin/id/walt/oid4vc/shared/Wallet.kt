@@ -1,6 +1,6 @@
 package id.walt.oid4vc.shared
 
-import id.walt.credentials.PresentationBuilder
+import id.walt.w3c.PresentationBuilder
 import id.walt.crypto.IosKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
@@ -13,7 +13,7 @@ import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
-import id.walt.credentials.utils.VCFormat
+import id.walt.w3c.utils.VCFormat
 import id.walt.oid4vc.errors.PresentationError
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.interfaces.SimpleHttpResponse

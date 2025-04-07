@@ -1,6 +1,6 @@
 package id.walt.policies
 
-import id.walt.credentials.utils.VCFormat
+import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.policies.models.PolicyRequest
 import id.walt.policies.models.PolicyResult

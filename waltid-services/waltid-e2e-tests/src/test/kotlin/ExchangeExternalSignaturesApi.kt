@@ -6,7 +6,7 @@ import com.nimbusds.jose.jwk.ECKey
 import id.walt.commons.interop.LspPotentialInterop
 import id.walt.commons.testing.E2ETest.getBaseURL
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
-import id.walt.credentials.utils.VCFormat
+import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
