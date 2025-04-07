@@ -6,11 +6,7 @@ import id.walt.credentials.CredentialDetectorTypes.MdocsSubType
 import id.walt.credentials.CredentialDetectorTypes.SDJWTVCSubType
 import id.walt.credentials.CredentialDetectorTypes.SignaturePrimaryType
 import id.walt.credentials.CredentialDetectorTypes.W3CSubType
-import id.walt.credentials.formats.VerifiableCredential
-import id.walt.credentials.formats.mdocs.MdocsCredential
-import id.walt.credentials.formats.sdjwtvc.SdJwtCredential
-import id.walt.credentials.formats.w3c.W3C11
-import id.walt.credentials.formats.w3c.W3C2
+import id.walt.credentials.formats.*
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.DataIntegrityProofCredentialSignature
 import id.walt.credentials.signatures.SdJwtCredentialSignature
@@ -57,7 +53,7 @@ object CredentialParser {
     }
 
     @OptIn(ExperimentalEncodingApi::class)
-    fun detectAndParse(rawCredential: String): Pair<CredentialDetectionResult, VerifiableCredential> {
+    fun detectAndParse(rawCredential: String): Pair<CredentialDetectionResult, DigitalCredential> {
         val credential = rawCredential.trim()
 
         return when {
