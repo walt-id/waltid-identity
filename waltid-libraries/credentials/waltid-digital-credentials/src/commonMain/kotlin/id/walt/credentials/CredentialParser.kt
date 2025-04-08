@@ -17,6 +17,7 @@ import id.walt.credentials.utils.JwtUtils
 import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.mdoc.doc.MDoc
 import kotlinx.serialization.json.*
+import kotlin.collections.contains
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 
@@ -50,6 +51,80 @@ object CredentialParser {
         return CredentialDetectionResult(CredentialPrimaryDataType.MDOCS, MdocsSubType.mdocs, SignaturePrimaryType.COSE) to
                 MdocsCredential(signature = CoseCredentialSignature(), signed = credential, credentialData = JsonObject(emptyMap()))
         // TODO: ^^^ mdocs credentials
+    }
+
+    private fun parseSdJwt(
+        credential: String,
+        payload: JsonObject,
+        signature: String,
+    ): Pair<CredentialDetectionResult, DigitalCredential> {
+        val containsDisclosures = payload.contains("_sd")
+        val disclosures = payload["_sd"]?.jsonArray
+
+        fun detectedSdjwtSigned(
+            primary: CredentialPrimaryDataType, sub: CredentialDetectorTypes.CredentialSubDataType
+        ) = CredentialDetectionResult(
+            credentialPrimaryType = primary,
+            credentialSubType = sub,
+            signaturePrimary = SignaturePrimaryType.SDJWT,
+            containsDisclosures = containsDisclosures,
+            providesDisclosures = true
+        )
+
+        val signedCredentialWithoutDisclosures = credential.substringBefore("~")
+        val availableDisclosures = signature.substringAfter("~")
+
+        return when {
+            payload.contains("@context") && payload.contains("vct")
+                -> detectedSdjwtSigned(CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvcdm) to
+                    SdJwtCredential(
+                        type = SDJWTVCSubType.sdjwtvcdm,
+                        disclosableAttributes = disclosures,
+                        disclosuresString = availableDisclosures,
+                        signature = SdJwtCredentialSignature(),
+                        signed = signedCredentialWithoutDisclosures,
+                        credentialData = payload
+                    )
+
+            payload.contains("@context") && ((payload["@context"]?.jsonArray?.map { it.jsonPrimitive.content }
+                ?.contains("https://www.w3.org/ns/credentials/v2") == true) || payload.contains("type"))
+                -> {
+                val w3cModelVersion = detectW3CDataModelVersion(payload)
+                val credential = when (w3cModelVersion) {
+                    W3CSubType.W3C_1_1 -> W3C11(
+                        disclosableAttributes = disclosures,
+                        disclosuresString = availableDisclosures,
+                        signature = SdJwtCredentialSignature(),
+                        signed = signedCredentialWithoutDisclosures,
+                        credentialData = payload
+                    )
+
+                    W3CSubType.W3C_2 -> W3C2(
+                        disclosableAttributes = disclosures,
+                        disclosuresString = availableDisclosures,
+                        signature = SdJwtCredentialSignature(),
+                        signed = signedCredentialWithoutDisclosures,
+                        credentialData = payload
+                    )
+                }
+                detectedSdjwtSigned(CredentialPrimaryDataType.W3C, w3cModelVersion) to credential
+            }
+
+            payload.contains("vct") && !payload.contains("@context")
+                -> detectedSdjwtSigned(CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvc) to
+                    SdJwtCredential(
+                        type = SDJWTVCSubType.sdjwtvcdm,
+                        disclosableAttributes = disclosures,
+                        disclosuresString = availableDisclosures,
+                        signature = SdJwtCredentialSignature(),
+                        signed = signedCredentialWithoutDisclosures,
+                        credentialData = payload
+                    )
+
+            payload.contains("vc") -> parseSdJwt(credential, payload["vc"]!!.jsonObject, signature)
+
+            else -> throw NotImplementedError("Unknown SD-JWT-signed credential: $credential")
+        }
     }
 
     @OptIn(ExperimentalEncodingApi::class)
@@ -153,76 +228,9 @@ object CredentialParser {
                 // TODO: also check if `typ` matches, and pass through `alg`
                 val (header, payload, signature) = JwtUtils.parseJwt(credential)
 
-                val containsDisclosures = payload.contains("_sd")
-                val disclosures = payload["_sd"]?.jsonArray
-
-                fun detectedSdjwtSigned(
-                    primary: CredentialPrimaryDataType, sub: CredentialDetectorTypes.CredentialSubDataType
-                ) = CredentialDetectionResult(
-                    credentialPrimaryType = primary,
-                    credentialSubType = sub,
-                    signaturePrimary = SignaturePrimaryType.SDJWT,
-                    containsDisclosures = containsDisclosures,
-                    providesDisclosures = true
-                )
-
                 when {
                     // SD-JWT disclosures
-                    credential.contains("~") -> {
-
-                        val signedCredentialWithoutDisclosures = credential.substringBefore("~")
-                        val availableDisclosures = signature.substringAfter("~")
-
-                        when {
-                            payload.contains("@context") && payload.contains("vct")
-                                -> detectedSdjwtSigned(CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvcdm) to
-                                    SdJwtCredential(
-                                        type = SDJWTVCSubType.sdjwtvcdm,
-                                        disclosableAttributes = disclosures,
-                                        disclosuresString = availableDisclosures,
-                                        signature = SdJwtCredentialSignature(),
-                                        signed = signedCredentialWithoutDisclosures,
-                                        credentialData = payload
-                                    )
-
-                            payload.contains("@context") && ((payload["@context"]?.jsonArray?.map { it.jsonPrimitive.content }
-                                ?.contains("https://www.w3.org/ns/credentials/v2") == true) || payload.contains("type"))
-                                -> {
-                                val w3cModelVersion = detectW3CDataModelVersion(payload)
-                                val credential = when (w3cModelVersion) {
-                                    W3CSubType.W3C_1_1 -> W3C11(
-                                        disclosableAttributes = disclosures,
-                                        disclosuresString = availableDisclosures,
-                                        signature = SdJwtCredentialSignature(),
-                                        signed = signedCredentialWithoutDisclosures,
-                                        credentialData = payload
-                                    )
-
-                                    W3CSubType.W3C_2 -> W3C2(
-                                        disclosableAttributes = disclosures,
-                                        disclosuresString = availableDisclosures,
-                                        signature = SdJwtCredentialSignature(),
-                                        signed = signedCredentialWithoutDisclosures,
-                                        credentialData = payload
-                                    )
-                                }
-                                detectedSdjwtSigned(CredentialPrimaryDataType.W3C, w3cModelVersion) to credential
-                            }
-
-                            payload.contains("vct") && !payload.contains("@context")
-                                -> detectedSdjwtSigned(CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvc) to
-                                    SdJwtCredential(
-                                        type = SDJWTVCSubType.sdjwtvcdm,
-                                        disclosableAttributes = disclosures,
-                                        disclosuresString = availableDisclosures,
-                                        signature = SdJwtCredentialSignature(),
-                                        signed = signedCredentialWithoutDisclosures,
-                                        credentialData = payload
-                                    )
-
-                            else -> throw NotImplementedError("Unknown SD-JWT-signed credential: $credential")
-                        }
-                    }
+                    credential.contains("~") -> parseSdJwt(credential, payload, signature)
 
                     // JOSE signature
                     else -> {
