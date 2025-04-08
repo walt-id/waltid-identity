@@ -18,8 +18,8 @@ import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.credentials.utils.SdJwtUtils.getSdArrays
 import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
 import id.walt.mdoc.doc.MDoc
+import id.walt.sdjwt.SDJwt
 import kotlinx.serialization.json.*
-import kotlin.collections.contains
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 
@@ -74,7 +74,11 @@ object CredentialParser {
         )
 
         val signedCredentialWithoutDisclosures = credential.substringBefore("~")
+
         val availableDisclosures = parseDisclosureString(signature.substringAfter("~", ""))
+        val fullCredentialData = if (availableDisclosures?.isNotEmpty() == true) {
+            SDJwt.parse(credential).fullPayload
+        } else payload
 
         return when {
             payload.contains("@context") && payload.contains("vct")
@@ -85,12 +89,11 @@ object CredentialParser {
                         disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(),
                         signed = signedCredentialWithoutDisclosures,
-                        credentialData = payload
+                        credentialData = fullCredentialData,
+                        originalCredentialData = payload
                     )
 
-            payload.contains("@context") && ((payload["@context"]?.jsonArray?.map { it.jsonPrimitive.content }
-                ?.contains("https://www.w3.org/ns/credentials/v2") == true) || payload.contains("type"))
-                -> {
+            payload.contains("@context") || payload.contains("type") -> {
                 val w3cModelVersion = detectW3CDataModelVersion(payload)
                 val credential = when (w3cModelVersion) {
                     W3CSubType.W3C_1_1 -> W3C11(
@@ -98,7 +101,8 @@ object CredentialParser {
                         disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(),
                         signed = signedCredentialWithoutDisclosures,
-                        credentialData = payload
+                        credentialData = fullCredentialData,
+                        originalCredentialData = payload
                     )
 
                     W3CSubType.W3C_2 -> W3C2(
@@ -106,7 +110,8 @@ object CredentialParser {
                         disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(),
                         signed = signedCredentialWithoutDisclosures,
-                        credentialData = payload
+                        credentialData = fullCredentialData,
+                        originalCredentialData = payload
                     )
                 }
                 detectedSdjwtSigned(CredentialPrimaryDataType.W3C, w3cModelVersion) to credential
@@ -120,7 +125,8 @@ object CredentialParser {
                         disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(),
                         signed = signedCredentialWithoutDisclosures,
-                        credentialData = payload
+                        credentialData = fullCredentialData,
+                        originalCredentialData = payload
                     )
 
             payload.contains("vc") -> parseSdJwt(credential, payload["vc"]!!.jsonObject, signature)
