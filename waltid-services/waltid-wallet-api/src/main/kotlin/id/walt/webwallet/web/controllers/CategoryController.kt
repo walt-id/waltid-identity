@@ -2,6 +2,7 @@
 
 package id.walt.webwallet.web.controllers
 
+import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.web.controllers.auth.getWalletService
 import io.github.smiley4.ktoropenapi.delete
 import io.github.smiley4.ktoropenapi.get
@@ -24,7 +25,7 @@ fun Application.categories() = walletRoute {
             response {
                 HttpStatusCode.OK to {
                     description = "Array of categories"
-                    body<List<JsonObject>>()
+                    body<List<WalletCategoryData>>()
                 }
             }
         }) {
