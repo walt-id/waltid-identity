@@ -13,7 +13,8 @@ data class W3C2(
     override val disclosures: List<SdJwtSelectiveDisclosure>?,
     override val signature: CredentialSignature?,
     override val signed: String?,
-    override val credentialData: JsonObject
+    override val credentialData: JsonObject,
+    override val originalCredentialData: JsonObject? = null
 ) : AbstractW3C() {
 
 }
