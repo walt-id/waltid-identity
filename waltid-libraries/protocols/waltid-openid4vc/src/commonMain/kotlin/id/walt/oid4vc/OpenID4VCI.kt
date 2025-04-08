@@ -252,7 +252,7 @@ object OpenID4VCI {
         }
 
         if (!response.status.isSuccess()) {
-            throw IllegalArgumentException("Failed to get token: ${response.status.value} - ${response.bodyAsText()}")
+            throw IllegalArgumentException("Failed to send credential request: ${response.status.value} - ${response.bodyAsText()}")
         }
 
         return response.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
@@ -275,7 +275,7 @@ object OpenID4VCI {
         }
 
         if (!response.status.isSuccess()) {
-            throw IllegalArgumentException("Failed to get token: ${response.status.value} - ${response.bodyAsText()}")
+            throw IllegalArgumentException("Failed to send batch credential request: ${response.status.value} - ${response.bodyAsText()}")
         }
 
         return response.body<JsonObject>().let { BatchCredentialResponse.fromJSON(it) }
