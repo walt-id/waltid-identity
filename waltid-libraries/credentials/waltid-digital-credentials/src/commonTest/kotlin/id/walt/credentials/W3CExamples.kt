@@ -220,14 +220,14 @@ object W3CExamples {
             CredentialPrimaryDataType.W3C,
             W3CSubType.W3C_2,
             CredentialDetectorTypes.SignaturePrimaryType.SDJWT,
-            containsDisclosures = true,
+            containsDisclosables = true,
             providesDisclosures = true
         ), // SD-JWT
         ossIssedW3CSdJwt to CredentialDetectionResult(
             CredentialPrimaryDataType.W3C,
             W3CSubType.W3C_1_1,
             CredentialDetectorTypes.SignaturePrimaryType.SDJWT,
-            containsDisclosures = true,
+            containsDisclosables = true,
             providesDisclosures = true
         )
     )

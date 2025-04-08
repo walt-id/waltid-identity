@@ -338,7 +338,7 @@ object SdJwtExamples {
             CredentialPrimaryDataType.SDJWTVC,
             SDJWTVCSubType.sdjwtvc,
             CredentialDetectorTypes.SignaturePrimaryType.UNSIGNED,
-            containsDisclosures = true
+            containsDisclosables = true
         ),
         sdJwtVcDmExample to CredentialDetectionResult(
             CredentialPrimaryDataType.SDJWTVC,
@@ -349,21 +349,21 @@ object SdJwtExamples {
             CredentialPrimaryDataType.SDJWTVC,
             SDJWTVCSubType.sdjwtvc,
             CredentialDetectorTypes.SignaturePrimaryType.SDJWT,
-            containsDisclosures = true,
+            containsDisclosables = true,
             providesDisclosures = true
         ),
         sdJwtVcSignedExample2 to CredentialDetectionResult(
             CredentialPrimaryDataType.SDJWTVC,
             SDJWTVCSubType.sdjwtvc,
             CredentialDetectorTypes.SignaturePrimaryType.SDJWT,
-            containsDisclosures = true,
+            containsDisclosables = true,
             providesDisclosures = true
         ),
         sdJwtVcSignedExample2WithoutProvidedDisclosures to CredentialDetectionResult(
             CredentialPrimaryDataType.SDJWTVC,
             SDJWTVCSubType.sdjwtvc,
             CredentialDetectorTypes.SignaturePrimaryType.JWT,
-            containsDisclosures = true
+            containsDisclosables = true
         )
     )
 

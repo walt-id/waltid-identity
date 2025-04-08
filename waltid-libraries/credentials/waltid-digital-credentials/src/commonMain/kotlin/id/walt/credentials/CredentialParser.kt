@@ -15,6 +15,8 @@ import id.walt.credentials.utils.Base64Utils.matchesBase64Url
 import id.walt.credentials.utils.HexUtils.matchesHex
 import id.walt.credentials.utils.JwtUtils
 import id.walt.credentials.utils.JwtUtils.isJwt
+import id.walt.credentials.utils.SdJwtUtils.getSdArrays
+import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
 import id.walt.mdoc.doc.MDoc
 import kotlinx.serialization.json.*
 import kotlin.collections.contains
@@ -58,8 +60,8 @@ object CredentialParser {
         payload: JsonObject,
         signature: String,
     ): Pair<CredentialDetectionResult, DigitalCredential> {
-        val containsDisclosures = payload.contains("_sd")
-        val disclosures = payload["_sd"]?.jsonArray
+        val containedDisclosables = payload.getSdArrays()
+        val containsDisclosures = containedDisclosables.count() >= 1
 
         fun detectedSdjwtSigned(
             primary: CredentialPrimaryDataType, sub: CredentialDetectorTypes.CredentialSubDataType
@@ -67,20 +69,20 @@ object CredentialParser {
             credentialPrimaryType = primary,
             credentialSubType = sub,
             signaturePrimary = SignaturePrimaryType.SDJWT,
-            containsDisclosures = containsDisclosures,
+            containsDisclosables = containsDisclosures,
             providesDisclosures = true
         )
 
         val signedCredentialWithoutDisclosures = credential.substringBefore("~")
-        val availableDisclosures = signature.substringAfter("~")
+        val availableDisclosures = parseDisclosureString(signature.substringAfter("~", ""))
 
         return when {
             payload.contains("@context") && payload.contains("vct")
                 -> detectedSdjwtSigned(CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvcdm) to
                     SdJwtCredential(
                         type = SDJWTVCSubType.sdjwtvcdm,
-                        disclosableAttributes = disclosures,
-                        disclosuresString = availableDisclosures,
+                        disclosables = containedDisclosables,
+                        disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(),
                         signed = signedCredentialWithoutDisclosures,
                         credentialData = payload
@@ -92,16 +94,16 @@ object CredentialParser {
                 val w3cModelVersion = detectW3CDataModelVersion(payload)
                 val credential = when (w3cModelVersion) {
                     W3CSubType.W3C_1_1 -> W3C11(
-                        disclosableAttributes = disclosures,
-                        disclosuresString = availableDisclosures,
+                        disclosables = containedDisclosables,
+                        disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(),
                         signed = signedCredentialWithoutDisclosures,
                         credentialData = payload
                     )
 
                     W3CSubType.W3C_2 -> W3C2(
-                        disclosableAttributes = disclosures,
-                        disclosuresString = availableDisclosures,
+                        disclosables = containedDisclosables,
+                        disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(),
                         signed = signedCredentialWithoutDisclosures,
                         credentialData = payload
@@ -114,8 +116,8 @@ object CredentialParser {
                 -> detectedSdjwtSigned(CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvc) to
                     SdJwtCredential(
                         type = SDJWTVCSubType.sdjwtvcdm,
-                        disclosableAttributes = disclosures,
-                        disclosuresString = availableDisclosures,
+                        disclosables = containedDisclosables,
+                        disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(),
                         signed = signedCredentialWithoutDisclosures,
                         credentialData = payload
@@ -135,8 +137,8 @@ object CredentialParser {
             credential.startsWith("{") -> {
                 val parsedJson = Json.decodeFromString<JsonObject>(credential)
 
+                val containedDisclosables = parsedJson.getSdArrays()
                 val containsDisclosures = parsedJson.contains("_sd")
-                val disclosures = parsedJson["_sd"]?.jsonArray
 
 
                 fun detectedUnsigned(
@@ -145,7 +147,7 @@ object CredentialParser {
                     credentialPrimaryType = primary,
                     credentialSubType = sub,
                     signaturePrimary = SignaturePrimaryType.UNSIGNED,
-                    containsDisclosures = containsDisclosures
+                    containsDisclosables = containsDisclosures
                 )
 
                 when {
@@ -159,8 +161,8 @@ object CredentialParser {
                                 CredentialPrimaryDataType.W3C, W3CSubType.W3C_2, // DataIntegrityProof was introduced with DM 2
                                 SignaturePrimaryType.DATA_INTEGRITY_PROOF
                             ) to W3C2(
-                                disclosableAttributes = disclosures,
-                                disclosuresString = null,
+                                disclosables = containedDisclosables,
+                                disclosures = null,
                                 signature = DataIntegrityProofCredentialSignature(proofElement),
                                 signed = credential,
                                 credentialData = parsedJson
@@ -177,8 +179,8 @@ object CredentialParser {
                         SDJWTVCSubType.sdjwtvcdm
                     ) to SdJwtCredential(
                         type = SDJWTVCSubType.sdjwtvcdm,
-                        disclosableAttributes = disclosures,
-                        disclosuresString = null,
+                        disclosables = containedDisclosables,
+                        disclosures = null,
                         signature = null,
                         signed = null,
                         credentialData = parsedJson
@@ -188,8 +190,8 @@ object CredentialParser {
                         CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvc
                     ) to SdJwtCredential(
                         type = SDJWTVCSubType.sdjwtvc,
-                        disclosableAttributes = disclosures,
-                        disclosuresString = null,
+                        disclosables = containedDisclosables,
+                        disclosures = null,
                         signature = null,
                         signed = null,
                         credentialData = parsedJson
@@ -199,16 +201,16 @@ object CredentialParser {
                         val w3cModelVersion = detectW3CDataModelVersion(parsedJson)
                         val credential = when (w3cModelVersion) {
                             W3CSubType.W3C_1_1 -> W3C11(
-                                disclosableAttributes = disclosures,
-                                disclosuresString = null,
+                                disclosables = containedDisclosables,
+                                disclosures = null,
                                 signature = null,
                                 signed = null,
                                 credentialData = parsedJson
                             )
 
                             W3CSubType.W3C_2 -> W3C2(
-                                disclosableAttributes = disclosures,
-                                disclosuresString = null,
+                                disclosables = containedDisclosables,
+                                disclosures = null,
                                 signature = null,
                                 signed = null,
                                 credentialData = parsedJson

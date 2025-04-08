@@ -1,7 +1,7 @@
 import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 
 allprojects {
-    version = "credentiallayer-2025-04-08_10"
+    version = "credentiallayer-2025-04-08_11"
 
     repositories {
         google()
