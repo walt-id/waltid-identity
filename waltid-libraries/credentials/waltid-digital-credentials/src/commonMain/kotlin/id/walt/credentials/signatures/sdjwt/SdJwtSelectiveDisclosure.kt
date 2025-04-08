@@ -28,7 +28,7 @@ data class SdJwtSelectiveDisclosure(
     }
 
     fun asJsonArray() = makeJsonArray(salt, name, value)
-    fun encoded() = makeEncoded(salt, name, value)
+    fun asEncoded() = makeEncoded(salt, name, value)
     fun asHashed() = SHA256().digest(asJsonArray().toString().encodeToByteArray()).encodeToBase64Url()
 
     constructor(jsonArray: JsonArray) : this(

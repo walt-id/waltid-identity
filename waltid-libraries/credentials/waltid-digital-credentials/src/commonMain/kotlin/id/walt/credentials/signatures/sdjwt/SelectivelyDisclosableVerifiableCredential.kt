@@ -20,7 +20,7 @@ interface SelectivelyDisclosableVerifiableCredential {
 
     fun disclose(credential: DigitalCredential, attributes: List<SdJwtSelectiveDisclosure>): String {
         checkNotNull(credential.signed) { "Credential has to be signed to be able to disclose" }
-        return "${credential.signed}~${attributes.joinToString("~") { it.encoded() }}"
+        return "${credential.signed}~${attributes.joinToString("~") { it.asEncoded() }}"
     }
 
     fun selfCheck() {
