@@ -1,11 +1,21 @@
 package id.walt.commons.web.modules
 
+import com.sksamuel.hoplite.simpleName
 import id.walt.commons.config.statics.BuildConfig
 import id.walt.commons.config.statics.ServiceConfig
 import io.github.smiley4.ktoropenapi.OpenApi
+import io.github.smiley4.ktoropenapi.config.ExampleEncoder
 import io.github.smiley4.ktoropenapi.config.InfoConfig
 import io.github.smiley4.ktoropenapi.config.OpenApiPluginConfig
 import io.github.smiley4.ktoropenapi.config.SchemaGenerator
+import io.github.smiley4.ktoropenapi.config.descriptors.AnyOfTypeDescriptor
+import io.github.smiley4.ktoropenapi.config.descriptors.ArrayTypeDescriptor
+import io.github.smiley4.ktoropenapi.config.descriptors.EmptyTypeDescriptor
+import io.github.smiley4.ktoropenapi.config.descriptors.KTypeDescriptor
+import io.github.smiley4.ktoropenapi.config.descriptors.RefTypeDescriptor
+import io.github.smiley4.ktoropenapi.config.descriptors.SerialTypeDescriptor
+import io.github.smiley4.ktoropenapi.config.descriptors.SwaggerTypeDescriptor
+import io.github.smiley4.ktoropenapi.config.descriptors.TypeDescriptor
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.openApi
 import io.github.smiley4.ktoropenapi.route
@@ -55,6 +65,30 @@ object OpenApiModule {
                     }.recoverCatching {
                         logger.debug { "Failed kotlinx schema generation, trying reflection schema generation for: \"${type.schemaName()}\", due to: \"${it.message}\"." }
                         reflectionGenerator.invoke(type)
+                    }.getOrThrow()
+                }
+            }
+
+            examples {
+                val kotlinxEncoder = ExampleEncoder.kotlinx()
+                val reflectionEncoder = ExampleEncoder.internal()
+
+                fun TypeDescriptor.typeName(): String = when(this) {
+                    is SwaggerTypeDescriptor -> "${schema.name} ${schema.type} (SwaggerType)"
+                    is KTypeDescriptor -> type.simpleName + "<" + type.arguments.joinToString { it.type?.simpleName.toString() } + "> (KType)"
+                    is SerialTypeDescriptor -> "${descriptor.serialName} (SerialType)"
+                    is AnyOfTypeDescriptor -> "Any of ${this.types.map { it.typeName() } } (AnyOfType)"
+                    is ArrayTypeDescriptor -> "Array of ${this.type.typeName()} (ArrayType)"
+                    is EmptyTypeDescriptor -> "Empty Type (EmptyType)"
+                    is RefTypeDescriptor -> "$schemaId (RefType)"
+                }
+
+                exampleEncoder = { type, example ->
+                    runCatching {
+                        kotlinxEncoder.invoke(type, example)
+                    }.recoverCatching {
+                        logger.debug { "Failed kotlinx example encoding, trying internal example encoder for: \"${type?.typeName()}\", due to: \"${it.message}\"." }
+                        reflectionEncoder.invoke(type, example)
                     }.getOrThrow()
                 }
             }
