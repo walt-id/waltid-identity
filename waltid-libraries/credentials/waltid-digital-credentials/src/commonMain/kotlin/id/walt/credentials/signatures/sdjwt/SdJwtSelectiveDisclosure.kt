@@ -1,6 +1,10 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.credentials.signatures.sdjwt
 
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -12,11 +16,19 @@ import org.kotlincrypto.hash.sha2.SHA256
 data class SdJwtSelectiveDisclosure(
     val salt: String,
     val name: String,
-    val value: JsonElement
-) {
-    fun asJsonArray() = JsonArray(listOf(JsonPrimitive(salt), JsonPrimitive(name), value))
+    val value: JsonElement,
 
-    fun encoded() = asJsonArray().toString().encodeToByteArray().encodeToBase64Url()
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
+    var encoded: String = makeEncoded(salt, name, value)
+) {
+    companion object {
+        fun makeJsonArray(salt: String, name: String, value: JsonElement) = JsonArray(listOf(JsonPrimitive(salt), JsonPrimitive(name), value))
+        fun encodeJsonArray(jsonArray: JsonArray) = jsonArray.toString().encodeToByteArray().encodeToBase64Url()
+        fun makeEncoded(salt: String, name: String, value: JsonElement) = encodeJsonArray(makeJsonArray(salt, name, value))
+    }
+
+    fun asJsonArray() = makeJsonArray(salt, name, value)
+    fun encoded() = makeEncoded(salt, name, value)
     fun asHashed() = SHA256().digest(asJsonArray().toString().encodeToByteArray()).encodeToBase64Url()
 
     constructor(jsonArray: JsonArray) : this(
