@@ -4,7 +4,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 object Versions {
-    const val KTOR_VERSION = "3.1.1"
+    const val KTOR_VERSION = "3.1.2"
 }
 
 plugins {
