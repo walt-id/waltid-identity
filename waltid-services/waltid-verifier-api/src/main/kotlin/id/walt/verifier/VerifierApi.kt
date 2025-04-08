@@ -18,9 +18,9 @@ import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.SwaggerPresentationSessionInfo
 import id.walt.verifier.oidc.VerificationUseCase
 import id.walt.verifier.oidc.VerificationUseCase.FailedVerificationException
-import io.github.smiley4.ktorswaggerui.dsl.routing.get
-import io.github.smiley4.ktorswaggerui.dsl.routing.post
-import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.post
+import io.github.smiley4.ktoropenapi.route
 import io.klogging.logger
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*

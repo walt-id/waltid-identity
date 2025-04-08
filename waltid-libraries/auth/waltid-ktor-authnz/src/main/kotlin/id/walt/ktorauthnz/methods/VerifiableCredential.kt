@@ -5,7 +5,7 @@ import com.nfeld.jsonpathkt.kotlinx.resolveAsStringOrNull
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.methods.config.VerifiableCredentialAuthConfiguration
-import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.github.smiley4.ktoropenapi.route
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*

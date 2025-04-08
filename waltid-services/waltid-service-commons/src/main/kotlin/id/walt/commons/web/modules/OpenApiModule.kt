@@ -1,21 +1,19 @@
 package id.walt.commons.web.modules
 
-import io.github.smiley4.schemakenerator.core.connectSubTypes
-import io.github.smiley4.schemakenerator.core.handleNameAnnotation
-import io.github.smiley4.schemakenerator.reflection.collectSubTypes
-import io.github.smiley4.schemakenerator.reflection.processReflection
-import io.github.smiley4.schemakenerator.serialization.processKotlinxSerialization
-import io.github.smiley4.schemakenerator.swagger.*
-import io.github.smiley4.schemakenerator.swagger.data.TitleType
 import id.walt.commons.config.statics.BuildConfig
 import id.walt.commons.config.statics.ServiceConfig
-import io.github.smiley4.ktorswaggerui.SwaggerUI
-import io.github.smiley4.ktorswaggerui.data.KTypeDescriptor
-import io.github.smiley4.ktorswaggerui.dsl.config.OpenApiInfo
-import io.github.smiley4.ktorswaggerui.dsl.config.PluginConfigDsl
-import io.github.smiley4.ktorswaggerui.dsl.routing.get
-import io.github.smiley4.ktorswaggerui.routing.openApiSpec
-import io.github.smiley4.ktorswaggerui.routing.swaggerUI
+import io.github.smiley4.ktoropenapi.OpenApi
+import io.github.smiley4.ktoropenapi.config.InfoConfig
+import io.github.smiley4.ktoropenapi.config.OpenApiPluginConfig
+import io.github.smiley4.ktoropenapi.config.SchemaGenerator
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.openApi
+import io.github.smiley4.ktoropenapi.route
+import io.github.smiley4.ktorredoc.redoc
+import io.github.smiley4.ktorswaggerui.swaggerUI
+import io.github.smiley4.schemakenerator.core.data.InitialKTypeData
+import io.github.smiley4.schemakenerator.core.data.InitialTypeData
+import io.github.smiley4.schemakenerator.serialization.data.InitialSerialDescriptorTypeData
 import io.klogging.noCoLogger
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -23,9 +21,6 @@ import io.ktor.server.routing.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.serializer
-import kotlin.reflect.KType
-import kotlin.reflect.full.isSubtypeOf
 import kotlin.reflect.typeOf
 import kotlin.time.Duration.Companion.nanoseconds
 
@@ -34,68 +29,33 @@ object OpenApiModule {
     private val logger = noCoLogger("OpenAPI")
 
     object OpenApiConfig {
-        var customInfo: (OpenApiInfo.() -> Unit)? = null
+        var customInfo: (InfoConfig.() -> Unit)? = null
 
-        var custom: (PluginConfigDsl.() -> Unit)? = null
+        var custom: (OpenApiPluginConfig.() -> Unit)? = null
     }
-
-    private fun KType.processWithKotlinxSerializationGenerator() = processKotlinxSerialization()
-        .connectSubTypes()
-        .handleNameAnnotation()
-        .generateSwaggerSchema()
-        .handleCoreAnnotations()
-        .withTitle(TitleType.SIMPLE)
-        .compileReferencingRoot()
-
-    private fun KType.processWithReflectionGenerator() =
-        collectSubTypes()
-            .processReflection()
-            .connectSubTypes()
-            .handleNameAnnotation()
-            .generateSwaggerSchema()
-            .handleCoreAnnotations()
-            .withTitle(TitleType.SIMPLE)
-            .compileReferencingRoot()
 
     // Module
     fun Application.enable() {
-        install(SwaggerUI) {
-
-            examples {
-                example("Uuid") {
-                    value = "12345678-abcd-9876-efgh-543210123456"
-                }
-
-                example("Instant") {
-                    value = Clock.System.now().toString()
-                }
-
-                encoder { type, example ->
-                    if (type is KTypeDescriptor) {
-                        encodeSwaggerExample(type, example)
-                    } else {
-                        logger.trace { "No type descriptor for example, type is: $type" }
-                        example
-                    }
-                }
-            }
+        install(OpenApi) {
 
             schemas {
-                val kotlinxPrefixes = listOf("id.walt")
+                val kotlinxGenerator = SchemaGenerator.kotlinx()
+                val reflectionGenerator = SchemaGenerator.reflection()
+
+                fun InitialTypeData.schemaName() =
+                    when (this) {
+                        is InitialKTypeData -> "${this.type} (KType)"
+                        is InitialSerialDescriptorTypeData -> "${this.type.serialName} (Serialname)"
+                        else -> error("Unknown data type $this")
+                    }
 
                 generator = { type ->
-
-                    if (kotlinxPrefixes.any { type.toString().startsWith(it) }) {
-                        runCatching {
-                            // println("Trying kotlinx schema with: $type")
-                            type.processWithKotlinxSerializationGenerator()
-                        }.recover { ex ->
-                            logger.trace { "Falling back to reflection schema with: $type, due to $ex" }
-                            type.processWithReflectionGenerator()
-                        }.getOrElse { ex ->
-                            error("Could neither parse with kotlinx nor reflection: $type, due to $ex")
-                        }
-                    } else type.processWithReflectionGenerator()
+                    runCatching {
+                        kotlinxGenerator.invoke(type)
+                    }.recoverCatching {
+                        logger.debug { "Failed kotlinx schema generation, trying reflection schema generation for: \"${type.schemaName()}\", due to: \"${it.message}\"." }
+                        reflectionGenerator.invoke(type)
+                    }.getOrThrow()
                 }
             }
 
@@ -107,7 +67,7 @@ object OpenApiModule {
                     Clock.System.now().roundToSecond()
                 }.
                     Questions about anything here? Visit <a href='https://github.com/walt-id/#join-the-community'>support</a>.
-                    
+
                 """.trimIndent().replace("\n", "<br/>")
 
                 contact {
@@ -123,6 +83,7 @@ object OpenApiModule {
 
                 OpenApiConfig.customInfo?.invoke(this)
             }
+
             server {
                 url = "/"
                 description = "Development Server"
@@ -134,18 +95,22 @@ object OpenApiModule {
                 url = "https://docs.walt.id"
                 description = "docs.walt.id"
             }
-            swagger {
-                showTagFilterInput = true
-            }
         }
 
         routing {
-            route("swagger") {
-                swaggerUI("/api.json")
+            route("api.json") {
+                openApi()
             }
 
-            route("api.json") {
-                openApiSpec()
+            route("swagger") {
+                swaggerUI("/api.json") {
+                    filter = true
+                    // onlineSpecValidator()
+                }
+            }
+
+            route("redoc") {
+                redoc("/api.json")
             }
 
             get("/", {
@@ -154,22 +119,55 @@ object OpenApiModule {
                 call.respondRedirect("swagger")
             }
         }
+
+//        install(SwaggerUI) {
+
+        /*examples {
+            example("Uuid") {
+                value = "12345678-abcd-9876-efgh-543210123456"
+            }
+
+            example("Instant") {
+                value = Clock.System.now().toString()
+            }
+
+            encoder { type, example ->
+                if (type is KTypeDescriptor) {
+                    encodeSwaggerExample(type, example)
+                } else {
+                    logger.trace { "No type descriptor for example, type is: $type" }
+                    example
+                }
+            }
+        }
+
+        schemas {
+            val kotlinxPrefixes = listOf("id.walt")
+
+            generator = { type ->
+
+                if (kotlinxPrefixes.any { type.toString().startsWith(it) }) {
+                    runCatching {
+                        // println("Trying kotlinx schema with: $type")
+                        type.processWithKotlinxSerializationGenerator()
+                    }.recover { ex ->
+                        logger.trace { "Falling back to reflection schema with: $type, due to $ex" }
+                        type.processWithReflectionGenerator()
+                    }.getOrElse { ex ->
+                        error("Could neither parse with kotlinx nor reflection: $type, due to $ex")
+                    }
+                } else type.processWithReflectionGenerator()
+            }
+        }*/
+
+
     }
+
     private val skippedTypes = listOf(typeOf<String>(), typeOf<Enum<*>>())
 
     private val exampleJson = Json {
         encodeDefaults = true
         explicitNulls = false
-    }
-    private fun encodeSwaggerExample(descriptor: KTypeDescriptor, example: Any?) = when {
-        skippedTypes.any { descriptor.type.isSubtypeOf(it) } -> {
-            logger.trace { "Skipped encoding for type: ${descriptor.type}; example is: $example (${example!!::class.simpleName})" }
-            example
-        }
-        else -> {
-            logger.trace("Example for: ${descriptor.type}; example is: $example (${example!!::class.simpleName})")
-            exampleJson.encodeToString(Json.serializersModule.serializer(descriptor.type), example)
-        }
     }
 }
 

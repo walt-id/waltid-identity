@@ -1,9 +1,9 @@
 package id.walt.webwallet.web.plugins
 
 import id.walt.commons.web.modules.OpenApiModule
-import io.github.smiley4.ktorswaggerui.data.AuthKeyLocation
-import io.github.smiley4.ktorswaggerui.data.AuthScheme
-import io.github.smiley4.ktorswaggerui.data.AuthType
+import io.github.smiley4.ktoropenapi.config.AuthKeyLocation
+import io.github.smiley4.ktoropenapi.config.AuthScheme
+import io.github.smiley4.ktoropenapi.config.AuthType
 import io.ktor.server.plugins.ratelimit.*
 
 internal val walletOpenApiPluginAmendment: suspend () -> Unit = suspend {

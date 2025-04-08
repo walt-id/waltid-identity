@@ -97,7 +97,7 @@ package id.walt.ktorauthnz.methods
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.MultiStepExampleIdentifier
 import id.walt.ktorauthnz.exceptions.authCheck
-import io.github.smiley4.ktorswaggerui.dsl.routing.post
+import io.github.smiley4.ktoropenapi.post
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*

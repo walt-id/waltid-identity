@@ -3,8 +3,8 @@ package id.walt.webwallet.web.controllers
 import id.walt.mdoc.dataelement.DataElement
 import id.walt.mdoc.dataelement.toJsonElement
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
-import io.github.smiley4.ktorswaggerui.dsl.routing.post
-import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.github.smiley4.ktoropenapi.post
+import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
