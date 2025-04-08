@@ -1,12 +1,14 @@
 package id.walt.credentials.signatures.sdjwt
 
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import org.kotlincrypto.hash.sha2.SHA256
 
+@Serializable
 data class SdJwtSelectiveDisclosure(
     val salt: String,
     val name: String,
