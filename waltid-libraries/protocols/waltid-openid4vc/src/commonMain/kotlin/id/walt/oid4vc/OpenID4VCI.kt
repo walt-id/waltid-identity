@@ -117,8 +117,8 @@ object OpenID4VCI {
         @Transient
         override val cause: Throwable? = null
     ) : IllegalArgumentException(
-        message = "Could not resolve credential offer from URL${cause.causeName().let { " ($it)" }}: $url",
-        cause = cause
+        "Could not resolve credential offer from URL${cause.causeName().let { " ($it)" }}: $url",
+        cause
     )
 
     @Serializable
@@ -128,8 +128,8 @@ object OpenID4VCI {
         @Transient
         override val cause: Throwable? = null
     ) : IllegalArgumentException(
-        message = "Could not parse credential offer from URL (\"$url\") result: \"$text\"",
-        cause = cause
+        "Could not parse credential offer from URL (\"$url\") result: \"$text\"",
+        cause
     )
 
     suspend fun parseAndResolveCredentialOfferRequestUrl(credOfferReqUrl: String): CredentialOffer {
