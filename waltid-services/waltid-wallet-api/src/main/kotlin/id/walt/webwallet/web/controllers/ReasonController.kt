@@ -2,8 +2,8 @@ package id.walt.webwallet.web.controllers
 
 import id.walt.webwallet.service.credentials.RejectionReasonService
 import id.walt.webwallet.web.WebBaseRoutes.authenticatedWebWalletRoute
-import io.github.smiley4.ktorswaggerui.dsl.routing.get
-import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*

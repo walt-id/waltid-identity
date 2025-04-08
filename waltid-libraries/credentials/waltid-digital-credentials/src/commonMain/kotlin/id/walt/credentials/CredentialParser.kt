@@ -234,8 +234,8 @@ object CredentialParser {
             }
 
             // TODO: W3C could also has COSE signature
-            credential.matchesHex() -> handleMdocs(credential, false)
-            credential.matchesBase64Url() -> handleMdocs(credential, true)
+            credential.matchesHex() -> handleMdocs(credential, base64 = false)
+            credential.matchesBase64Url() -> handleMdocs(credential, base64 = true)
 
             else -> throw NotImplementedError("unknown: $credential")
         }
