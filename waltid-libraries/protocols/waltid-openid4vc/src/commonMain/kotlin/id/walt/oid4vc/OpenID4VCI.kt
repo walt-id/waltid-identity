@@ -1,13 +1,6 @@
 package id.walt.oid4vc
 
 import cbor.Cbor
-import id.walt.w3c.issuance.Issuer.getKidHeader
-import id.walt.w3c.issuance.Issuer.mergingJwtIssue
-import id.walt.w3c.issuance.Issuer.mergingSdJwtIssue
-import id.walt.w3c.issuance.dataFunctions
-import id.walt.w3c.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
-import id.walt.w3c.utils.VCFormat
-import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
@@ -18,6 +11,7 @@ import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.MapKey
 import id.walt.mdoc.dataelement.StringElement
+import id.walt.oid4vc.OpenID4VCIVersion.entries
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.ResponseType.Companion.getResponseTypeString
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -39,6 +33,13 @@ import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDJwtVC.Companion.defaultPayloadProperties
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
+import id.walt.w3c.issuance.Issuer.getKidHeader
+import id.walt.w3c.issuance.Issuer.mergingJwtIssue
+import id.walt.w3c.issuance.Issuer.mergingSdJwtIssue
+import id.walt.w3c.issuance.dataFunctions
+import id.walt.w3c.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
+import id.walt.w3c.utils.VCFormat
+import id.walt.w3c.vc.vcs.W3CVC
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -618,7 +619,7 @@ object OpenID4VCI {
         credentialRequest: CredentialRequest,
         credentialData: JsonObject, issuerKey: Key, issuerId: String,
         selectiveDisclosure: SDMap? = null,
-        dataMapping: JsonObject? = null, x5Chain: List<String>? = null
+        dataMapping: JsonObject? = null, x5Chain: List<String>? = null, display: List<DisplayProperties>? = null
     ): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
             credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
@@ -637,6 +638,7 @@ object OpenID4VCI {
                     subjectDid = holderDid ?: "",
                     mappings = dataMapping ?: JsonObject(emptyMap()),
                     additionalJwtHeader = additionalJwtHeaders,
+                    display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                     additionalJwtOptions = emptyMap()
                 )
 

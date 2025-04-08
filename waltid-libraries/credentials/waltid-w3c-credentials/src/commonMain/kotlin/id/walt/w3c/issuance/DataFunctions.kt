@@ -20,9 +20,8 @@ import kotlin.uuid.Uuid
 val dataFunctions = mapOf<String, suspend (call: CredentialDataMergeUtils.FunctionCall) -> JsonElement>(
     "subjectDid" to { it.fromContext() },
     "issuerDid" to { it.fromContext() },
-
     "context" to { it.context[it.args!!]!! },
-
+    "display" to { it.fromContext() },
     "timestamp-ebsi" to { JsonPrimitive(Clock.System.now().toIso8681WithoutSubSecondPrecision())},
     "timestamp-ebsi-in" to { JsonPrimitive((Clock.System.now() + Duration.parse(it.args!!)).toIso8681WithoutSubSecondPrecision()) },
 
