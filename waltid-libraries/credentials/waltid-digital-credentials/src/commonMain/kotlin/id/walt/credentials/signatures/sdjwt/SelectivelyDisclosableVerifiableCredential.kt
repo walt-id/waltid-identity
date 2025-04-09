@@ -16,6 +16,7 @@ interface SelectivelyDisclosableVerifiableCredential {
     /** Disclosures available to share */
     val disclosures: List<SdJwtSelectiveDisclosure>?
 
+    val signedWithDisclosures: String?
     val originalCredentialData: JsonObject?
 
     fun disclose(credential: DigitalCredential, attributes: List<SdJwtSelectiveDisclosure>): String {

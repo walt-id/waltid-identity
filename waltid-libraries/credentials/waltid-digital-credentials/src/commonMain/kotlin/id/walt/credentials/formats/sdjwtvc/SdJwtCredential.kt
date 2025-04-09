@@ -16,8 +16,9 @@ data class SdJwtCredential(
     override val disclosures: List<SdJwtSelectiveDisclosure>?,
     override val signature: CredentialSignature?,
     override val signed: String?,
+    override val signedWithDisclosures: String?,
     override val credentialData: JsonObject,
-    override val originalCredentialData: JsonObject? = null
+    override val originalCredentialData: JsonObject? = null,
 ) : DigitalCredential(), SelectivelyDisclosableVerifiableCredential {
     init {
         selfCheck()

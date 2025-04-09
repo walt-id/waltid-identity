@@ -9,7 +9,9 @@ import id.walt.credentials.CredentialDetectorTypes.W3CSubType
 import id.walt.credentials.formats.*
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.DataIntegrityProofCredentialSignature
+import id.walt.credentials.signatures.JwtCredentialSignature
 import id.walt.credentials.signatures.SdJwtCredentialSignature
+import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.utils.Base64Utils.base64Url
 import id.walt.credentials.utils.Base64Utils.matchesBase64Url
 import id.walt.credentials.utils.HexUtils.matchesHex
@@ -21,6 +23,7 @@ import id.walt.mdoc.doc.MDoc
 import id.walt.sdjwt.SDJwt
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.math.sign
 
 
 @OptIn(ExperimentalEncodingApi::class)
@@ -75,7 +78,39 @@ object CredentialParser {
 
         val signedCredentialWithoutDisclosures = credential.substringBefore("~")
 
-        val availableDisclosures = parseDisclosureString(signature.substringAfter("~", ""))
+        var availableDisclosures = parseDisclosureString(signature.substringAfter("~", ""))
+
+        if (availableDisclosures?.isNotEmpty() == true) {
+//            println("=== MAPPING ===")
+            // Map disclosures to disclosable locations
+            val mappedDisclosures = ArrayList<SdJwtSelectiveDisclosure>()
+
+            fun findForHash(hash: String) = availableDisclosures!!.firstOrNull { it.asHashed() == hash || it.asHashed2() == hash }
+
+            containedDisclosables.entries.forEach { (sdLocation, disclosureHashes) ->
+//                println("Trying sd location: $sdLocation\n")
+                val unsuffixedLocation = sdLocation.removeSuffix("_sd")
+                disclosureHashes.forEach { hash ->
+//                    println("Trying hash: $hash")
+//                    availableDisclosures.forEach {
+//                        println("Available h: ${it.asHashed()}  –  ${it.asHashed2()}")
+//                    }
+                    findForHash(hash)?.let { matchingDisclosure ->
+                        mappedDisclosures.add(matchingDisclosure.copy(location = "$unsuffixedLocation${matchingDisclosure.name}"))
+//                        println("Found hash for ${matchingDisclosure.name}: ${matchingDisclosure.asHashed()}")
+                    }
+//                    println()
+                }
+            }
+
+//            mappedDisclosures.forEachIndexed { idx, it ->
+//                println("$idx: ${it.location} -> $it")
+//            }
+
+            check(availableDisclosures.size == mappedDisclosures.size) { "Invalid disclosures: Different size after mapping disclosures (${availableDisclosures.size}) to mappable disclosable (${mappedDisclosures.size}), for credential: $credential" }
+            availableDisclosures = mappedDisclosures
+        }
+
         val fullCredentialData = if (availableDisclosures?.isNotEmpty() == true) {
             SDJwt.parse(credential).fullPayload
         } else payload
@@ -89,6 +124,7 @@ object CredentialParser {
                         disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(),
                         signed = signedCredentialWithoutDisclosures,
+                        signedWithDisclosures = credential,
                         credentialData = fullCredentialData,
                         originalCredentialData = payload
                     )
@@ -101,6 +137,7 @@ object CredentialParser {
                         disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(),
                         signed = signedCredentialWithoutDisclosures,
+                        signedWithDisclosures = credential,
                         credentialData = fullCredentialData,
                         originalCredentialData = payload
                     )
@@ -110,6 +147,7 @@ object CredentialParser {
                         disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(),
                         signed = signedCredentialWithoutDisclosures,
+                        signedWithDisclosures = credential,
                         credentialData = fullCredentialData,
                         originalCredentialData = payload
                     )
@@ -125,6 +163,7 @@ object CredentialParser {
                         disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(),
                         signed = signedCredentialWithoutDisclosures,
+                        signedWithDisclosures = credential,
                         credentialData = fullCredentialData,
                         originalCredentialData = payload
                     )
@@ -171,6 +210,7 @@ object CredentialParser {
                                 disclosures = null,
                                 signature = DataIntegrityProofCredentialSignature(proofElement),
                                 signed = credential,
+                                signedWithDisclosures = null,
                                 credentialData = parsedJson
                             )
 
@@ -189,6 +229,7 @@ object CredentialParser {
                         disclosures = null,
                         signature = null,
                         signed = null,
+                        signedWithDisclosures = null,
                         credentialData = parsedJson
                     )
                     // TODO: signed version?
@@ -200,6 +241,7 @@ object CredentialParser {
                         disclosures = null,
                         signature = null,
                         signed = null,
+                        signedWithDisclosures = null,
                         credentialData = parsedJson
                     )
 
@@ -211,6 +253,7 @@ object CredentialParser {
                                 disclosures = null,
                                 signature = null,
                                 signed = null,
+                                signedWithDisclosures = null,
                                 credentialData = parsedJson
                             )
 
@@ -219,6 +262,7 @@ object CredentialParser {
                                 disclosures = null,
                                 signature = null,
                                 signed = null,
+                                signedWithDisclosures = null,
                                 credentialData = parsedJson
                             )
                         }
@@ -244,7 +288,20 @@ object CredentialParser {
                     else -> {
                         val unsignedCredential = payload["vc"]?.toString() ?: payload.toString()
                         val unsignedCredentialDetection = detectAndParse(unsignedCredential)
-                        unsignedCredentialDetection.copy(first = unsignedCredentialDetection.first.copy(signaturePrimary = SignaturePrimaryType.JWT))
+
+                        val parsedCred = unsignedCredentialDetection.second
+
+                        val signedCredential = when (parsedCred) {
+                            is W3C2 -> parsedCred.copy(signed = credential, signature = JwtCredentialSignature())
+                            is W3C11 -> parsedCred.copy(signed = credential, signature = JwtCredentialSignature())
+                            is SdJwtCredential -> parsedCred.copy(signed = credential, signature = JwtCredentialSignature())
+                            else -> throw NotImplementedError("unknown credential with JOSE signature: $parsedCred")
+                        }
+
+                        unsignedCredentialDetection.copy(
+                            first = unsignedCredentialDetection.first.copy(signaturePrimary = SignaturePrimaryType.JWT),
+                            second = signedCredential
+                        )
                     }
                 }
             }

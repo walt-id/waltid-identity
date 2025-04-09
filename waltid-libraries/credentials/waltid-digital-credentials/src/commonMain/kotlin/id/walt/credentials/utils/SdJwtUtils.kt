@@ -88,7 +88,6 @@ object SdJwtUtils {
             disclosures.split("~").mapNotNull {
                 if (it.isNotBlank()) {
                     val jsonArrayString = it.base64UrlDecode().decodeToString()
-                    println(jsonArrayString)
                     val jsonArray = Json.decodeFromString<JsonArray>(jsonArrayString)
 
                     SdJwtSelectiveDisclosure(
