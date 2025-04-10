@@ -164,8 +164,8 @@ object Issuer {
         }
             .mapValues { (_, value) ->
                 when (value) {
-                    is JsonElement -> value // Keep JsonElement as-is
-                    else -> JsonPrimitive(value.toString()) // Convert other types to JsonPrimitive
+                    is JsonElement -> value
+                    else -> JsonPrimitive(value.toString())
                 }
             }
 
@@ -200,7 +200,7 @@ object Issuer {
                 vc["issuanceDate"]?.let { Instant.parse(it.jsonPrimitive.content) }
                     ?.epochSeconds?.let { JsonPrimitive(it) }
             }
-            completeJwtAttributes("display") { // ← adding display to JWT attributes
+            completeJwtAttributes("display") {
                 display?.let { JsonArray(it) }
             }
         }
