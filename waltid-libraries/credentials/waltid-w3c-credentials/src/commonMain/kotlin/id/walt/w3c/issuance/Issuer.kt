@@ -97,6 +97,7 @@ object Issuer {
         issuerKey: Key,
         issuerId: String,
         subjectDid: String,
+        display: JsonArray = JsonArray(emptyList()),
 
         mappings: JsonObject,
         type: String = "JWT",
@@ -109,7 +110,7 @@ object Issuer {
         issuerId = issuerId,
         subjectDid = subjectDid,
         mappings = mappings,
-        display = null,
+        display = display,
         completeJwtWithDefaultCredentialData
     ).run {
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
@@ -122,6 +123,7 @@ object Issuer {
             additionalJwtHeaders = additionalJwtHeaders.toMutableMap().apply {
                 put("typ", type.toJsonElement())
             },
+
             additionalJwtOptions = additionalJwtOptions.toMutableMap().apply {
                 putAll(jwtOptions)
             }

@@ -649,6 +649,7 @@ object OpenID4VCI {
                     mappings = dataMapping ?: JsonObject(emptyMap()),
                     additionalJwtHeaders = additionalJwtHeaders,
                     additionalJwtOptions = emptyMap(),
+                    display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                     disclosureMap = selectiveDisclosure
                 )
             }
