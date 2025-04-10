@@ -1,11 +1,10 @@
-@file:OptIn(ExperimentalSerializationApi::class)
-
 package id.walt.mdoc.dataretrieval
 
 import cbor.Cbor
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.doc.MDoc
 import kotlinx.serialization.*
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.io.encoding.Base64
@@ -13,6 +12,8 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Device response data structure containing MDocs presented by device
+ *
+ * TODO: Strictly from a standard's perspective, the "documents" field is optional.
  */
 @Serializable(with = DeviceResponseSerializer::class)
 data class DeviceResponse(
@@ -21,6 +22,20 @@ data class DeviceResponse(
     val status: NumberElement = DeviceResponseStatus.OK.status.toDataElement(),
     val documentErrors: List<DocumentError>? = null,
 ) {
+
+    init {
+
+        require(documents.isNotEmpty()) {
+            "When a List<MDoc> is defined in a DeviceResponse structure, it must not be empty"
+        }
+
+        documentErrors?.let {
+            require(documentErrors.isNotEmpty()) {
+                "When a List<DocumentError> is defined in a DeviceResponse structure, it must not be empty"
+            }
+        }
+    }
+
     /**
      * Convert to CBOR map element
      */
@@ -76,17 +91,18 @@ data class DeviceResponse(
             },
             version = element.value[MapKey("version")] as StringElement,
             status = element.value[MapKey("status")] as NumberElement,
-            documentErrors = (element.value[MapKey("documentErrors")] as? ListElement)?.value?.map {
-                DocumentError.fromMapElement(
-                    it as MapElement
-                )
+            documentErrors = element.value[MapKey("documentErrors")]?.let { docErrorsDataElement ->
+                (docErrorsDataElement as ListElement).value.map {
+                    DocumentError.fromMapElement(it as MapElement)
+                }
             },
         )
     }
 }
 
-@Serializer(forClass = DeviceResponse::class)
 internal object DeviceResponseSerializer : KSerializer<DeviceResponse> {
+
+    override val descriptor = buildClassSerialDescriptor("DeviceResponse")
 
     override fun serialize(encoder: Encoder, value: DeviceResponse) {
         encoder.encodeSerializableValue(DataElementSerializer, value.toMapElement())
