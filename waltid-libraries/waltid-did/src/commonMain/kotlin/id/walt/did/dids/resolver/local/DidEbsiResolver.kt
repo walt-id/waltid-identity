@@ -56,13 +56,26 @@ class DidEbsiResolver(
         val didDocumentResult = resolve(did)
         if (didDocumentResult.isFailure) return Result.failure(didDocumentResult.exceptionOrNull()!!)
 
-        val publicKeyJwks = didDocumentResult.getOrNull()!!["verificationMethod"]!!.jsonArray.map {
+        val didDocument = didDocumentResult.getOrNull() 
+            ?: return Result.failure(IllegalStateException("DID document is null for $did"))
+        
+        val verificationMethod = didDocument["verificationMethod"]
+            ?: return Result.failure(IllegalStateException("No verification method found in DID document for $did"))
+        
+        val verificationArray = verificationMethod.jsonArray
+        
+        val publicKeyJwks = verificationArray.mapNotNull { element ->
             runCatching {
-                val verificationMethod = it.jsonObject
-                val publicKeyJwk = verificationMethod["publicKeyJwk"]!!.jsonObject
+                val verificationMethod = element.jsonObject
+                val publicKeyJwk = verificationMethod["publicKeyJwk"]?.jsonObject 
+                    ?: return@runCatching null
                 DidWebResolver.json.encodeToString(publicKeyJwk)
-            }
-        }.filter { it.isSuccess }.map { it.getOrThrow() }
+            }.getOrNull()
+        }
+        
+        if (publicKeyJwks.isEmpty()) {
+            return Result.failure(IllegalStateException("No valid public key JWKs found in DID document for $did"))
+        }
 
         return tryConvertAnyPublicKeyJwkToKey(publicKeyJwks)
     }
@@ -75,13 +88,26 @@ class DidEbsiResolver(
         val didDocumentResult = resolve(did)
         if (didDocumentResult.isFailure) return Result.failure(didDocumentResult.exceptionOrNull()!!)
 
-        val publicKeyJwks = didDocumentResult.getOrNull()!!["verificationMethod"]!!.jsonArray.map {
+        val didDocument = didDocumentResult.getOrNull()
+            ?: return Result.failure(IllegalStateException("DID document is null for $did"))
+        
+        val verificationMethod = didDocument["verificationMethod"]
+            ?: return Result.failure(IllegalStateException("No verification method found in DID document for $did"))
+        
+        val verificationArray = verificationMethod.jsonArray
+        
+        val publicKeyJwks = verificationArray.mapNotNull { element ->
             runCatching {
-                val verificationMethod = it.jsonObject
-                val publicKeyJwk = verificationMethod["publicKeyJwk"]!!.jsonObject
+                val verificationMethod = element.jsonObject
+                val publicKeyJwk = verificationMethod["publicKeyJwk"]?.jsonObject
+                    ?: return@runCatching null
                 DidWebResolver.json.encodeToString(publicKeyJwk)
-            }
-        }.filter { it.isSuccess }.map { it.getOrThrow() }
+            }.getOrNull()
+        }
+        
+        if (publicKeyJwks.isEmpty()) {
+            return Result.failure(IllegalStateException("No valid public key JWKs found in DID document for $did"))
+        }
 
         return tryConvertPublicKeyJwksToKeys(publicKeyJwks)
     }
