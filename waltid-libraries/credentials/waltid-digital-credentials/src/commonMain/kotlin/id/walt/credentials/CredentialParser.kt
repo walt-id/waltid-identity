@@ -1,5 +1,6 @@
 package id.walt.credentials
 
+import cbor.Cbor
 import id.walt.credentials.CredentialDetectorTypes.CredentialDetectionResult
 import id.walt.credentials.CredentialDetectorTypes.CredentialPrimaryDataType
 import id.walt.credentials.CredentialDetectorTypes.MdocsSubType
@@ -19,8 +20,13 @@ import id.walt.credentials.utils.JwtUtils
 import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.credentials.utils.SdJwtUtils.getSdArrays
 import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
+import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.MapKey
+import id.walt.mdoc.dataelement.toJsonElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.sdjwt.SDJwt
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.decodeFromHexString
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.math.sign
@@ -51,11 +57,16 @@ object CredentialParser {
     }
 
     private fun handleMdocs(credential: String, base64: Boolean = false): Pair<CredentialDetectionResult, MdocsCredential> {
-        val mdoc = if (base64) MDoc.fromCBOR(base64Url.decode(credential)) else MDoc.fromCBORHex(credential)
+        val mapElement = if(base64) Cbor.decodeFromByteArray<MapElement>(base64Url.decode(credential)) else Cbor.decodeFromHexString<MapElement>(credential)
+        // detect if this is the issuer-signed structure or the full mdoc
+        if(!mapElement.value.keys.containsAll(listOf(MapKey("docType"), MapKey("issuerSigned"))))
+            throw NotImplementedError("Invalid mdoc structure: $credential, only full mdocs are currently supported. If this is an issuer signed structure, like returned by an OpenID4VCI issuer, the doc type is additionally required to restore the full mdoc.")
+        val mdoc = MDoc.fromMapElement(mapElement)
+        val hasSd = !(mdoc.issuerSigned.nameSpaces?.values?.flatten().isNullOrEmpty())
 
-        return CredentialDetectionResult(CredentialPrimaryDataType.MDOCS, MdocsSubType.mdocs, SignaturePrimaryType.COSE) to
-                MdocsCredential(signature = CoseCredentialSignature(), signed = credential, credentialData = JsonObject(emptyMap()))
-        // TODO: ^^^ mdocs credentials
+        return CredentialDetectionResult(CredentialPrimaryDataType.MDOCS, MdocsSubType.mdocs, SignaturePrimaryType.COSE, hasSd, hasSd) to
+                MdocsCredential(signature = CoseCredentialSignature(), signed = credential,
+                    credentialData = mdoc.toMapElement().toJsonElement().jsonObject)
     }
 
     private fun parseSdJwt(
@@ -107,7 +118,7 @@ object CredentialParser {
 //                println("$idx: ${it.location} -> $it")
 //            }
 
-            check(availableDisclosures.size == mappedDisclosures.size) { "Invalid disclosures: Different size after mapping disclosures (${availableDisclosures.size}) to mappable disclosable (${mappedDisclosures.size}), for credential: $credential" }
+            check(availableDisclosures.size == mappedDisclosures.size) { "Invalid disclosures: Different size after mapping disclosures (${availableDisclosures!!.size}) to mappable disclosable (${mappedDisclosures.size}), for credential: $credential" }
             availableDisclosures = mappedDisclosures
         }
 
