@@ -1,17 +1,12 @@
 package id.walt.w3c.issuance
 
 import id.walt.w3c.utils.CredentialDataMergeUtils
-import id.walt.w3c.utils.CredentialSupported
-import id.walt.w3c.utils.CredentialTypeConfig
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Duration
@@ -26,40 +21,36 @@ val dataFunctions = mapOf<String, suspend (call: CredentialDataMergeUtils.Functi
     "issuerDid" to { it.fromContext() },
     "context" to { it.context[it.args!!]!! },
     "display" to {
-        val credentialType = "testCredential+jwt-vc-json"
-        val credentialConfig = CredentialTypeConfig().supportedCredentialTypes[credentialType]
-        println("credentialConfig: $credentialConfig")
-        if (credentialConfig is CredentialSupported && credentialConfig.display.isNotEmpty()) {
-            val display = credentialConfig.display[0]
-            JsonObject(
-                mapOf(
-                    "name" to JsonPrimitive(display.name),
-                    "description" to JsonPrimitive(display.description),
-                    "logo" to JsonObject(
-                        mapOf(
-                            "url" to JsonPrimitive(display.logo.url),
-                            "altText" to JsonPrimitive(display.logo.altText)
-                        )
-                    ),
-                    "backgroundColor" to JsonPrimitive(display.backgroundColor),
-                    "textColor" to JsonPrimitive(display.textColor)
+        val context = it.context
+        println("context: $context")
+        val displayList =
+            context["display"]?.jsonArray ?: throw IllegalArgumentException("No display available for this credential")
+
+        val displayJsonArray = JsonArray(
+            displayList.mapNotNull { entry ->
+                val display = entry.jsonObject
+                val logo = display["logo"]!!.jsonObject
+                println("display data function: $display")
+                JsonObject(
+                    mapOf(
+                        "name" to display["name"]!!,
+                        "description" to display["description"]!!,
+                        "locale" to display["locale"]!!,
+                        "logo" to JsonObject(
+                            mapOf(
+                                "url" to logo["url"]!!,
+                                "altText" to logo["alt_text"]!!,
+                            )
+                        ),
+                        "backgroundColor" to display["background_color"]!!,
+                        "textColor" to display["text_color"]!!,
+                    )
                 )
-            )
-        } else {
-            JsonObject(
-                mapOf(
-                    "name" to JsonPrimitive("Default Display Name"),
-                    "description" to JsonPrimitive("No description available"),
-                    "logo" to JsonObject(
-                        mapOf(
-                            "url" to JsonPrimitive("default_logo_url"),
-                            "altText" to JsonPrimitive("Default Logo AltText")
-                        )
-                    ),
-                    "backgroundColor" to JsonPrimitive("#FFFFFF"),
-                    "textColor" to JsonPrimitive("#000000")
-                )
-            )
+            }
+        )
+
+        displayJsonArray.also {
+            println("displayJsonArray: $it")
         }
     },
     "timestamp-ebsi" to { JsonPrimitive(Clock.System.now().toIso8681WithoutSubSecondPrecision())},
