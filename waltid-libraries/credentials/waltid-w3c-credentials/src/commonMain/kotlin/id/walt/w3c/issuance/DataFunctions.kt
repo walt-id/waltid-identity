@@ -22,15 +22,12 @@ val dataFunctions = mapOf<String, suspend (call: CredentialDataMergeUtils.Functi
     "context" to { it.context[it.args!!]!! },
     "display" to {
         val context = it.context
-        println("context: $context")
         val displayList =
             context["display"]?.jsonArray ?: throw IllegalArgumentException("No display available for this credential")
-
         val displayJsonArray = JsonArray(
             displayList.mapNotNull { entry ->
                 val display = entry.jsonObject
                 val logo = display["logo"]!!.jsonObject
-                println("display data function: $display")
                 JsonObject(
                     mapOf(
                         "name" to display["name"]!!,
@@ -48,10 +45,7 @@ val dataFunctions = mapOf<String, suspend (call: CredentialDataMergeUtils.Functi
                 )
             }
         )
-
-        displayJsonArray.also {
-            println("displayJsonArray: $it")
-        }
+        displayJsonArray
     },
     "timestamp-ebsi" to { JsonPrimitive(Clock.System.now().toIso8681WithoutSubSecondPrecision())},
     "timestamp-ebsi-in" to { JsonPrimitive((Clock.System.now() + Duration.parse(it.args!!)).toIso8681WithoutSubSecondPrecision()) },
