@@ -45,6 +45,8 @@ data class CredentialTypeConfig(
         "NaturalPersonVerifiableID" to vc("VerifiableCredential", "VerifiableAttestation", "NaturalPersonVerifiableID"),
         "BoardingPass" to vc("VerifiableCredential", "VerifiableAttestation", "BoardingPass"),
         "LegalPerson" to vc("VerifiableCredential", "LegalPerson"),
+        "LegalRegistrationNumber" to vc("VerifiableCredential", "LegalRegistrationNumber"),
+        "GaiaXTermsAndConditions" to vc("VerifiableCredential", "GaiaXTermsAndConditions"),
         MDocTypes.ISO_MDL to vc(
             CredentialSupported(
                 format = CredentialFormat.mso_mdoc,
