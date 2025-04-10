@@ -63,11 +63,11 @@ data class CredentialTypeConfig(
                 format = CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"),
                 credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
-                types = listOf("VerifiableCredential", "TestCredential"),
                 credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "TestCredential")),
                 display = listOf(
                     DisplayProperties(
                         name = "Test Credential",
+                        locale = "en-US",
                         description = "This is a test credential",
                         logo = LogoProperties(
                             url = "https://example.com/logo.png",
