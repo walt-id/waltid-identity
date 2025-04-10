@@ -55,15 +55,26 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
         val didDocumentResult = resolve(did)
         if (didDocumentResult.isFailure) return Result.failure(didDocumentResult.exceptionOrNull()!!)
 
-        val publicKeyJwks =
-            didDocumentResult.getOrNull()!!["verificationMethod"]!!.jsonArray.map {
-                runCatching { // TODO: one layer up
-                    val verificationMethod = it.jsonObject
-                    val publicKeyJwk = verificationMethod["publicKeyJwk"]!!.jsonObject
-                    // Todo base58
-                    json.encodeToString(publicKeyJwk)
-                }
-            }.filter { it.isSuccess }.map { it.getOrThrow() }
+        val didDocument = didDocumentResult.getOrNull()
+            ?: return Result.failure(IllegalStateException("DID document is null for $did"))
+
+        val verificationMethod = didDocument["verificationMethod"]
+            ?: return Result.failure(IllegalStateException("No verification method found in DID document for $did"))
+
+        val verificationArray = verificationMethod.jsonArray
+
+        val publicKeyJwks = verificationArray.mapNotNull { element ->
+            runCatching {
+                val method = element.jsonObject
+                val publicKeyJwk = method["publicKeyJwk"]?.jsonObject
+                    ?: return@runCatching null
+                json.encodeToString(publicKeyJwk)
+            }.getOrNull()
+        }
+
+        if (publicKeyJwks.isEmpty()) {
+            return Result.failure(IllegalStateException("No valid public key JWKs found in DID document for $did"))
+        }
 
         return tryConvertPublicKeyJwksToKeys(publicKeyJwks)
     }

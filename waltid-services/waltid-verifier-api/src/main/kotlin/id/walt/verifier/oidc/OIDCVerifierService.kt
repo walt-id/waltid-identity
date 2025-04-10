@@ -269,10 +269,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
             throw IllegalStateException("No issuer keys found in the DID document")
         
         // Create a map of all possible issuer keys by their key IDs
-        val keyMap = mutableMapOf<String, Key>()
-        issuerKeys.forEach { key ->
-            keyMap[key.getKeyId()] = key
-        }
+        val keyMap = issuerKeys.associateBy { it.getKeyId() }.toMutableMap()
+
         // Add the default key ID mapping
         keyMap[sdJwtVC.keyID ?: issuerKey.getKeyId()] = issuerKey
         // Add the holder key

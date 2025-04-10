@@ -32,9 +32,9 @@ class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
     return if(DidUtils.isDidUrl(kid)) {
       DidService.resolveToKey(kid).getOrThrow()
     } else {
-      sdJwt.header.get("x5c")?.jsonArray?.last()?.let { x5c ->
-        return JWKKey.importPEM(x5c.jsonPrimitive.content).getOrThrow().let { JWKKey(it.exportJWK(), kid) }
-      } ?: throw UnsupportedOperationException("Resolving issuer key from SD-JWT is only supported for issuer did in kid header and PEM cert in x5c header parameter")
+        val x5c = sdJwt.header.get("x5c")?.jsonArray?.lastOrNull()
+            ?: throw IllegalArgumentException("x5c header parameter is missing or empty.")
+        JWKKey.importPEM(x5c.jsonPrimitive.content).getOrThrow().let { JWKKey(it.exportJWK(), kid) }
     }
   }
   
@@ -43,10 +43,10 @@ class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
     return if(DidUtils.isDidUrl(kid)) {
       DidService.resolveToKeys(kid).getOrThrow()
     } else {
-      sdJwt.header.get("x5c")?.jsonArray?.last()?.let { x5c ->
+        val x5c = sdJwt.header.get("x5c")?.jsonArray?.lastOrNull()
+            ?: throw IllegalArgumentException("x5c header parameter is missing or empty.")
         val key = JWKKey.importPEM(x5c.jsonPrimitive.content).getOrThrow().let { JWKKey(it.exportJWK(), kid) }
-        return setOf(key)
-      } ?: throw UnsupportedOperationException("Resolving issuer key from SD-JWT is only supported for issuer did in kid header and PEM cert in x5c header parameter")
+        setOf(key)
     }
   }
 
@@ -55,57 +55,56 @@ class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
   @JsPromise
   @JsExport.Ignore
   override suspend fun verify(credential: String, args: Any?, context: Map<String, Any>): Result<Any> {
-    val sdJwtVC = SDJwtVC.parse(credential)
-    
-    if(!sdJwtVC.isPresentation) {
-      // Get all possible issuer keys from the DID document
-      val issuerKeys = resolveIssuerKeysFromSdJwt(sdJwtVC)
+    return runCatching {
+      val sdJwtVC = SDJwtVC.parse(credential)
       
-      // Try to verify with each key
-      var lastError: Throwable? = null
-      for (issuerKey in issuerKeys) {
-        val result = try {
-          issuerKey.verifyJws(credential)
-        } catch (e: Exception) {
-          lastError = e
-          Result.failure(e)
+      if(!sdJwtVC.isPresentation) {
+        // Get all possible issuer keys from the DID document
+        val issuerKeys = resolveIssuerKeysFromSdJwt(sdJwtVC)
+        
+        if (issuerKeys.isEmpty()) {
+          throw VerificationException("No issuer keys found in the DID document")
         }
         
-        if (result.isSuccess) {
-          return result
+        // Try to verify with each key
+        val results = issuerKeys.map { issuerKey ->
+          runCatching { issuerKey.verifyJws(credential) }
         }
-      }
-      
-      // If we get here, all keys failed
-      return Result.failure(lastError ?: VerificationException("Verification failed with all keys from the DID document"))
-    } else {
-      // For presentations, we'll still use the first key for now but create a map of all possible issuer keys
-      val issuerKeys = resolveIssuerKeysFromSdJwt(sdJwtVC)
-      val issuerKey = issuerKeys.firstOrNull() ?: 
-        return Result.failure(VerificationException("No issuer keys found in the DID document"))
-      
-      val holderKey = JWKKey.importJWK(sdJwtVC.holderKeyJWK.toString()).getOrThrow()
-      
-      // Create a map of all possible issuer keys by their key IDs
-      val keyMap = mutableMapOf<String, Key>()
-      issuerKeys.forEach { key ->
-        keyMap[key.getKeyId()] = key
-      }
-      // Add the default key ID mapping
-      keyMap[sdJwtVC.keyID ?: issuerKey.getKeyId()] = issuerKey
-      // Add the holder key
-      keyMap[holderKey.getKeyId()] = holderKey
-      
-      return sdJwtVC.verifyVC(
-        JWTCryptoProviderManager.getDefaultJWTCryptoProvider(keyMap),
-        requiresHolderKeyBinding = true,
-        context["clientId"]?.toString(),
-        context["challenge"]?.toString()
-      ).let {
-        if(it.verified)
-          Result.success(sdJwtVC.undisclosedPayload)
-        else
-          Result.failure(VerificationException("SD-JWT verification failed"))
+        
+        // Return the first successful result or the last error
+        val successResult = results.firstOrNull { it.isSuccess }
+        successResult?.getOrNull()
+          ?: throw results.last().exceptionOrNull() 
+            ?: VerificationException("Verification failed with all keys from the DID document")
+        
+      } else {
+        // For presentations, get all possible issuer keys
+        val issuerKeys = resolveIssuerKeysFromSdJwt(sdJwtVC)
+        val issuerKey = issuerKeys.firstOrNull() 
+          ?: throw VerificationException("No issuer keys found in the DID document")
+        
+        val holderKey = JWKKey.importJWK(sdJwtVC.holderKeyJWK.toString()).getOrThrow()
+        
+        // Create a map of all possible issuer keys by their key IDs
+        val keyMap = issuerKeys.associateBy { it.getKeyId() }.toMutableMap()
+
+        // Add the default key ID mapping
+        keyMap[sdJwtVC.keyID ?: issuerKey.getKeyId()] = issuerKey
+        // Add the holder key
+        keyMap[holderKey.getKeyId()] = holderKey
+        
+        val verificationResult = sdJwtVC.verifyVC(
+          JWTCryptoProviderManager.getDefaultJWTCryptoProvider(keyMap),
+          requiresHolderKeyBinding = true,
+          context["clientId"]?.toString(),
+          context["challenge"]?.toString()
+        )
+        
+        if (!verificationResult.verified) {
+          throw VerificationException("SD-JWT verification failed")
+        }
+        
+        sdJwtVC.undisclosedPayload
       }
     }
   }

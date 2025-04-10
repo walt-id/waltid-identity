@@ -79,14 +79,12 @@ class UniresolverResolver(var resolverUrl: String = DEFAULT_RESOLVER_URL) : DidR
     @JsPromise
     @JsExport.Ignore
     override suspend fun resolveToKeys(did: String): Result<Set<Key>> = resolve(did).fold(
-        onSuccess = {
-            VerificationMaterial.getAll(it)?.let { materials ->
-                val keys = mutableSetOf<Key>()
-                materials.forEach { material ->
-                    KeyMaterial.get(material).onSuccess { key ->
-                        keys.add(key)
-                    }
-                }
+        onSuccess = { jsonObject ->
+            VerificationMaterial.getAll(jsonObject)?.let { materials ->
+                val keys = materials.mapNotNull { material ->
+                    KeyMaterial.get(material).getOrNull()
+                }.toSet()
+                
                 if (keys.isNotEmpty()) {
                     Result.success(keys)
                 } else {

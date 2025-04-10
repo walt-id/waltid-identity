@@ -55,7 +55,7 @@ class JwsSignatureScheme : SignatureScheme {
   @JsExport.Ignore
   suspend fun getIssuerKeyInfo(jws: String): KeyInfo {
     val jwsParsed = jws.decodeJws()
-    val keyId = jwsParsed.header[JwsHeader.KEY_ID]!!.jsonPrimitive.content
+    val keyId = jwsParsed.header[JwsHeader.KEY_ID]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing key ID in JWS header")
     val issuerId = (jwsParsed.payload[JwsOption.ISSUER]?.jsonPrimitive?.content ?: keyId)
     val key = if (DidUtils.isDidUrl(issuerId)) {
       log.trace { "Resolving key from issuer did: $issuerId" }
@@ -68,7 +68,7 @@ class JwsSignatureScheme : SignatureScheme {
         }
         .getOrThrow()
     } else
-      TODO("Issuer IDs other than DIDs are currently not supported for W3C credentials.")
+      throw UnsupportedOperationException("Only DIDs are supported as issuer IDs for W3C credentials.")
     return KeyInfo(keyId, key)
   }
   
@@ -78,7 +78,7 @@ class JwsSignatureScheme : SignatureScheme {
   @JsExport.Ignore
   suspend fun getIssuerKeysInfo(jws: String): KeysInfo {
     val jwsParsed = jws.decodeJws()
-    val keyId = jwsParsed.header[JwsHeader.KEY_ID]!!.jsonPrimitive.content
+    val keyId = jwsParsed.header[JwsHeader.KEY_ID]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing key ID in JWS header")
     val issuerId = (jwsParsed.payload[JwsOption.ISSUER]?.jsonPrimitive?.content ?: keyId)
     val keys = if (DidUtils.isDidUrl(issuerId)) {
       log.trace { "Resolving keys from issuer did: $issuerId" }
