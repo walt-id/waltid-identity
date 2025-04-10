@@ -76,7 +76,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.1.0"
+    val ktor_version = "3.1.1"
 
     sourceSets {
 
@@ -93,7 +93,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
 
-                implementation("io.github.oshai:kotlin-logging:7.0.4")
+                implementation("io.github.oshai:kotlin-logging:7.0.5")
 
                 // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
@@ -101,7 +101,7 @@ kotlin {
                 // walt.id
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
-                implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+                implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
                 implementation(project(":waltid-libraries:credentials:waltid-verification-policies"))
                 implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
                 implementation(project(":waltid-libraries:waltid-did"))
@@ -123,7 +123,7 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(project(":waltid-libraries:waltid-did"))
-                implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+                implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
             }
         }
@@ -202,35 +202,6 @@ kotlin {
             }
         }
     }
-
-    publishing {
-        repositories {
-            val envUsername = System.getenv("MAVEN_USERNAME")
-            val envPassword = System.getenv("MAVEN_PASSWORD")
-            val usernameFile = File("secret_maven_username.txt")
-            val passwordFile = File("secret_maven_password.txt")
-            val secretMavenUsername =
-                envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-            val secretMavenPassword =
-                envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
-            val hasMavenAuth = secretMavenUsername.isNotEmpty() && secretMavenPassword.isNotEmpty()
-            if (hasMavenAuth) {
-                maven {
-                    val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
-                    val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-                    url = uri(
-                        if (version.toString()
-                                .endsWith("SNAPSHOT")
-                        ) snapshotsRepoUrl else releasesRepoUrl
-                    )
-                    credentials {
-                        username = secretMavenUsername
-                        password = secretMavenPassword
-                    }
-                }
-            }
-        }
-    }
 }
 
 npmPublish {
@@ -247,6 +218,43 @@ npmPublish {
             register("npmjs") {
                 uri.set(uri("https://registry.npmjs.org"))
                 authToken.set(secretNpmToken)
+            }
+        }
+    }
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            pom {
+                name.set("walt.id OpenId4VC library")
+                description.set("walt.id Kotlin/Java OpenId4VC library")
+                url.set("https://walt.id")
+
+                licenses {
+                    license {
+                        name.set("Apache License 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                    }
+                }
+
+                developers {
+                    developer {
+                        id.set("walt.id")
+                        name.set("walt.id")
+                        email.set("office@walt.id")
+                    }
+                }
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            url = uri(if (version.toString().endsWith("SNAPSHOT")) uri("https://maven.waltid.dev/snapshots") else uri("https://maven.waltid.dev/releases"))
+            credentials {
+                username = System.getenv("MAVEN_USERNAME") ?: File("$rootDir/secret_maven_username.txt").let { if (it.isFile) it.readLines().first() else "" }
+                password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let { if (it.isFile) it.readLines().first() else "" }
             }
         }
     }

@@ -1,16 +1,16 @@
 {
   "assertionMethod": [
-    "did:web:localhost%3A8080:rsa#ab269ce10ce94b7c9565e30c034b5692"
+    "did:web:localhost%3A<DID_WEB_PORT>:rsa#ab269ce10ce94b7c9565e30c034b5692"
   ],
   "authentication": [
-    "did:web:localhost%3A8080:rsa#ab269ce10ce94b7c9565e30c034b5692"
+    "did:web:localhost%3A<DID_WEB_PORT>:rsa#ab269ce10ce94b7c9565e30c034b5692"
   ],
   "@context": "https://www.w3.org/ns/did/v1",
-  "id": "did:web:localhost%3A8080:rsa",
+  "id": "did:web:localhost%3A<DID_WEB_PORT>:rsa",
   "verificationMethod": [
     {
-      "controller": "did:web:localhost%3A8080:rsa",
-      "id": "did:web:localhost%3A8080:rsa#ab269ce10ce94b7c9565e30c034b5692",
+      "controller": "did:web:localhost%3A<DID_WEB_PORT>:rsa",
+      "id": "did:web:localhost%3A<DID_WEB_PORT>:rsa#ab269ce10ce94b7c9565e30c034b5692",
       "publicKeyJwk": {
         "alg": "RS256",
         "e": "AQAB",

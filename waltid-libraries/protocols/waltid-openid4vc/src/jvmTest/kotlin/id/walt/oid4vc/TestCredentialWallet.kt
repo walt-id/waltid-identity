@@ -5,8 +5,8 @@ import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.ECKey
-import id.walt.credentials.PresentationBuilder
-import id.walt.credentials.utils.VCFormat
+import id.walt.w3c.PresentationBuilder
+import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws

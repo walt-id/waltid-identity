@@ -2,10 +2,9 @@ package id.walt
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.events.Action
-import id.walt.commons.events.EventType
 import id.walt.commons.events.Status
 import id.walt.commons.events.IssuanceEvent
-import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.createCredentialOfferUri
