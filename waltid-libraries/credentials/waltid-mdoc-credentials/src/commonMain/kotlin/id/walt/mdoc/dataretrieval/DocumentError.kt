@@ -5,6 +5,7 @@ package id.walt.mdoc.dataretrieval
 import cbor.Cbor
 import id.walt.mdoc.dataelement.*
 import kotlinx.serialization.*
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
@@ -19,16 +20,15 @@ import kotlinx.serialization.encoding.Encoder
  */
 @Serializable(with = DocumentErrorSerializer::class)
 data class DocumentError(
-    val docType: String,
-    val errorCode: Int,
+    val docTypeToErrorCodeMap: Map<String, Int>,
 ) {
 
     /**
      * Convert to CBOR map element
      */
-    fun toMapElement() = mapOf(
-        MapKey(docType) to errorCode.toDataElement(),
-    ).toDataElement()
+    fun toMapElement() = docTypeToErrorCodeMap.map {
+        MapKey(it.key) to it.value.toDataElement()
+    }.toMap().toDataElement()
 
     /**
      * Serialize to CBOR data
@@ -56,16 +56,27 @@ data class DocumentError(
         /**
          * Convert from CBOR map element
          */
-        fun fromMapElement(element: MapElement) = DocumentError(
-            element.value.keys.first().toString(),
-            (element.value.values.first() as NumberElement).value.toInt(),
-        )
+        fun fromMapElement(element: MapElement): DocumentError {
+            require(element.value.keys.all { it.type == MapKeyType.string }) {
+                "DocumentError CBOR map keys must all be of type ${MapKeyType.string}"
+            }
+            require(element.value.values.all { it.type == DEType.number }) {
+                "DocumentError CBOR map values must all be of type ${DEType.number}"
+            }
+            return DocumentError(
+                docTypeToErrorCodeMap = element.value.map {
+                    it.key.str to (it.value as NumberElement).value.toInt()
+                }.toMap(),
+            )
+        }
     }
 
 }
 
-@Serializer(forClass = DocumentError::class)
 internal object DocumentErrorSerializer : KSerializer<DocumentError> {
+
+    override val descriptor = buildClassSerialDescriptor("DocumentError")
+
     override fun serialize(encoder: Encoder, value: DocumentError) {
         encoder.encodeSerializableValue(DataElementSerializer, value.toMapElement())
     }
