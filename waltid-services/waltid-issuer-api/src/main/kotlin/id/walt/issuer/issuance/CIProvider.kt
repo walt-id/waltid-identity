@@ -434,26 +434,14 @@ open class CIProvider(
                 when (credentialRequest.format) {
                     CredentialFormat.jwt_vc_json, CredentialFormat.jwt_vc -> {
                         val types = getTypesByCredentialConfigurationId(credentialConfigurationId)
-                        log.debug {
-                            "Checking types - Request types: ${credentialRequest.credentialDefinition?.type}, " +
-                                    "Session types: $types"
-                        }
                         types?.containsAll(credentialRequest.credentialDefinition?.type ?: emptyList()) ?: false
                     }
                     CredentialFormat.sd_jwt_vc -> {
                         val vct = metadata.getVctByCredentialConfigurationId(credentialConfigurationId)
-                        log.debug {
-                            "Checking VCT - Request VCT: ${credentialRequest.vct}, " +
-                                    "Session VCT: $vct"
-                        }
                         vct == credentialRequest.vct
                     }
                     else -> {
                         val docType = getDocTypeByCredentialConfigurationId(credentialConfigurationId)
-                        log.debug {
-                            "Checking docType - Request docType: ${credentialRequest.docType}, " +
-                                    "Session docType: $docType"
-                        }
                         docType == credentialRequest.docType
                     }
                 }
