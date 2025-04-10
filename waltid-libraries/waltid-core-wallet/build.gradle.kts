@@ -27,14 +27,16 @@ kotlin {
     }
 
     sourceSets {
-        val ktor_version = "3.1.0"
+        val ktor_version = "3.1.1"
 
         val commonMain by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
 
-                implementation("io.github.oshai:kotlin-logging-jvm:7.0.4")
+                implementation("io.github.oshai:kotlin-logging:7.0.5")
+
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(project(":waltid-libraries:waltid-did"))
@@ -42,7 +44,7 @@ kotlin {
                 implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
                 implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
                 implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
-                implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+                implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -83,29 +85,39 @@ kotlin {
     }
 }
 
+
 publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            pom {
+                name.set("walt.id wallet core")
+                description.set("walt.id Kotlin/Java wallet core library")
+                url.set("https://walt.id")
+
+                licenses {
+                    license {
+                        name.set("Apache License 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                    }
+                }
+
+                developers {
+                    developer {
+                        id.set("walt.id")
+                        name.set("walt.id")
+                        email.set("office@walt.id")
+                    }
+                }
+            }
+        }
+    }
+
     repositories {
         maven {
-            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
-            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
-            val envUsername = System.getenv("MAVEN_USERNAME")
-            val envPassword = System.getenv("MAVEN_PASSWORD")
-
-            val usernameFile = File("$rootDir/secret_maven_username.txt")
-            val passwordFile = File("$rootDir/secret_maven_password.txt")
-
-            val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-            //println("Deploy username length: ${secretMavenUsername.length}")
-            val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
-
-            //if (secretMavenPassword.isBlank()) {
-            //   println("WARNING: Password is blank!")
-            //}
-
+            url = uri(if (version.toString().endsWith("SNAPSHOT")) uri("https://maven.waltid.dev/snapshots") else uri("https://maven.waltid.dev/releases"))
             credentials {
-                username = secretMavenUsername
-                password = secretMavenPassword
+                username = System.getenv("MAVEN_USERNAME") ?: File("$rootDir/secret_maven_username.txt").let { if (it.isFile) it.readLines().first() else "" }
+                password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let { if (it.isFile) it.readLines().first() else "" }
             }
         }
     }

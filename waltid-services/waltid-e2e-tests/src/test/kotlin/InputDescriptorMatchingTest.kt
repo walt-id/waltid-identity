@@ -1,4 +1,4 @@
-import id.walt.credentials.schemes.JwsSignatureScheme
+import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.util.JwtUtils

@@ -20,7 +20,7 @@ kotlin {
     jvmToolchain(17)
 
     fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-    val enableAndroidBuild = getSetting("enableAndroidBuild")
+    //val enableAndroidBuild = getSetting("enableAndroidBuild")
     val enableIosBuild = getSetting("enableIosBuild")
 
     jvm {
@@ -35,7 +35,7 @@ kotlin {
     }
 
     js(IR) {
-        moduleName = "definitions-parser"
+        outputModuleName = "definitions-parser"
         nodejs {
             generateTypeScriptDefinitions()
         }
@@ -55,13 +55,13 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
                 implementation("io.github.optimumcode:json-schema-validator:0.4.0")
 
-                implementation(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+                implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
 
                 // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:7.0.4")
+                implementation("io.github.oshai:kotlin-logging:7.0.5")
             }
         }
         val commonTest by getting {
@@ -109,28 +109,31 @@ publishing {
                     """.trimIndent()
                 )
                 url.set("https://walt.id")
+
+                licenses {
+                    license {
+                        name.set("Apache License 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                    }
+                }
+
+                developers {
+                    developer {
+                        id.set("walt.id")
+                        name.set("walt.id")
+                        email.set("office@walt.id")
+                    }
+                }
             }
-            from(components["kotlin"])
         }
     }
 
     repositories {
         maven {
-            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
-            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
-            val envUsername = System.getenv("MAVEN_USERNAME")
-            val envPassword = System.getenv("MAVEN_PASSWORD")
-
-            val usernameFile = File("secret_maven_username.txt")
-            val passwordFile = File("secret_maven_password.txt")
-
-            val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-            val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
-
+            url = uri(if (version.toString().endsWith("SNAPSHOT")) uri("https://maven.waltid.dev/snapshots") else uri("https://maven.waltid.dev/releases"))
             credentials {
-                username = secretMavenUsername
-                password = secretMavenPassword
+                username = System.getenv("MAVEN_USERNAME") ?: File("$rootDir/secret_maven_username.txt").let { if (it.isFile) it.readLines().first() else "" }
+                password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let { if (it.isFile) it.readLines().first() else "" }
             }
         }
     }

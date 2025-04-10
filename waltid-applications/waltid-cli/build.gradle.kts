@@ -4,7 +4,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 object Versions {
-    const val KTOR_VERSION = "3.1.0"
+    const val KTOR_VERSION = "3.1.1"
 }
 
 plugins {
@@ -63,7 +63,7 @@ kotlin {
             dependencies {
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
                 api(project(":waltid-libraries:waltid-did"))
-                api(project(":waltid-libraries:credentials:waltid-verifiable-credentials"))
+                api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
                 api(project(":waltid-libraries:credentials:waltid-verification-policies"))
                 api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
                 api(project(":waltid-libraries:protocols:waltid-openid4vc"))
@@ -82,7 +82,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:7.0.4")
+                implementation("io.github.oshai:kotlin-logging:7.0.5")
             }
         }
         val commonTest by getting {
@@ -138,31 +138,6 @@ kotlin {
 
             }
         }
-        /*publishing {
-            repositories {
-                maven {
-                    url = uri("https://maven.waltid.dev/releases")
-                    val envUsername = System.getenv("MAVEN_USERNAME")
-                    val envPassword = System.getenv("MAVEN_PASSWORD")
-
-                    val usernameFile = File("$rootDir/secret_maven_username.txt")
-                    val passwordFile = File("$rootDir/secret_maven_password.txt")
-
-                    val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-                    //println("Deploy username length: ${secretMavenUsername.length}")
-                    val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
-
-                    //if (secretMavenPassword.isBlank()) {
-                    //   println("WARNING: Password is blank!")
-                    //}
-
-                    credentials {
-                        username = secretMavenUsername
-                        password = secretMavenPassword
-                    }
-                }
-            }
-        }*/
         all {
             languageSettings.enableLanguageFeature("InlineClasses")
         }
