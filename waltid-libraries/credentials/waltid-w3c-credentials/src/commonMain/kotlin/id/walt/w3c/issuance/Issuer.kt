@@ -37,7 +37,7 @@ object Issuer {
         dataOverwrites: Map<String, JsonElement>,
         dataUpdates: Map<String, Map<String, JsonElement>>,
         additionalJwtHeaders: Map<String, JsonElement>,
-        additionalJwtOptions: Map<String, JsonElement>
+        additionalJwtOptions: Map<String, JsonElement>,
     ): String {
         val overwritten = overwrite(dataOverwrites)
         var updated = overwritten
@@ -74,7 +74,7 @@ object Issuer {
         display = display,
         completeJwtWithDefaultCredentialData
     ).run {
-        val issuerDid = if(DidUtils.isDidUrl(issuerId)) issuerId else null
+        val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
         w3cVc.signJws(
             issuerKey = issuerKey,
             issuerId = issuerId,
@@ -104,7 +104,7 @@ object Issuer {
         additionalJwtOptions: Map<String, JsonElement>,
 
         completeJwtWithDefaultCredentialData: Boolean = true,
-        disclosureMap: SDMap
+        disclosureMap: SDMap,
     ) = mergingToVc(
         issuerId = issuerId,
         subjectDid = subjectDid,
@@ -112,7 +112,7 @@ object Issuer {
         display = null,
         completeJwtWithDefaultCredentialData
     ).run {
-        val issuerDid = if(DidUtils.isDidUrl(issuerId)) issuerId else null
+        val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
         w3cVc.signSdJwt(
             issuerKey = issuerKey,
             issuerId = issuerId,
@@ -130,7 +130,7 @@ object Issuer {
 
     data class IssuanceInformation(
         val w3cVc: W3CVC,
-        val jwtOptions: Map<String, JsonElement>
+        val jwtOptions: Map<String, JsonElement>,
     )
 
     /**
@@ -150,9 +150,9 @@ object Issuer {
     ): IssuanceInformation {
         val context = mapOf(
             "issuerId" to issuerId,
-            "issuerDid" to (if(DidUtils.isDidUrl(issuerId)) issuerId else null),
+            "issuerDid" to (if (DidUtils.isDidUrl(issuerId)) issuerId else null),
             "subjectDid" to subjectDid,
-            "display" to display?.let { JsonArray(it) }
+            "display" to display
         ).filterValues { value ->
             when (value) {
                 is JsonElement -> value !is JsonNull &&
@@ -201,7 +201,7 @@ object Issuer {
                     ?.epochSeconds?.let { JsonPrimitive(it) }
             }
             completeJwtAttributes("display") {
-                display?.let { JsonArray(it) }
+                vc["display"]?.let { display }
             }
         }
 
@@ -213,7 +213,7 @@ object Issuer {
     @JsPromise
     @JsExport.Ignore
     suspend fun getKidHeader(issuerKey: Key, issuerDid: String? = null): String {
-        return if(!issuerDid.isNullOrEmpty()) {
+        return if (!issuerDid.isNullOrEmpty()) {
             if (issuerDid.startsWith("did:key"))
                 issuerDid + "#" + issuerDid.removePrefix("did:key:")
             else
