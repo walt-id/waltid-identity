@@ -12,6 +12,7 @@ data class OfferedCredential(
     val format: CredentialFormat,
     val types: List<String>? = null, // for draft 11
     val vct: String? = null,
+    @SerialName("display") val display: List<DisplayProperties>? = null,
     @SerialName("doctype") val docType: String? = null,
     @SerialName("credential_definition") val credentialDefinition: CredentialDefinition? = null,
     @SerialName("proof_types_supported") val proofTypesSupported: Map<ProofType, ProofTypeMetadata>? = null,
@@ -28,6 +29,7 @@ data class OfferedCredential(
             credential.format,
             credential.types,
             credential.vct,
+            credential.display,
             credential.docType,
             CredentialDefinition(type = credential.credentialDefinition?.type),
             credential.proofTypesSupported,

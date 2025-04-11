@@ -6,23 +6,47 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Duration
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+
 @OptIn(ExperimentalJsExport::class, ExperimentalUuidApi::class)
 @JsExport
 val dataFunctions = mapOf<String, suspend (call: CredentialDataMergeUtils.FunctionCall) -> JsonElement>(
     "subjectDid" to { it.fromContext() },
     "issuerDid" to { it.fromContext() },
-
     "context" to { it.context[it.args!!]!! },
-
+    "display" to {
+        val context = it.context
+        val displayList =
+            context["display"]?.jsonArray ?: throw IllegalArgumentException("No display available for this credential")
+        val displayJsonArray = JsonArray(
+            displayList.mapNotNull { entry ->
+                val display = entry.jsonObject
+                val logo = display["logo"]!!.jsonObject
+                JsonObject(
+                    mapOf(
+                        "name" to display["name"]!!,
+                        "description" to display["description"]!!,
+                        "locale" to display["locale"]!!,
+                        "logo" to JsonObject(
+                            mapOf(
+                                "url" to logo["url"]!!,
+                                "altText" to logo["alt_text"]!!,
+                            )
+                        ),
+                        "backgroundColor" to display["background_color"]!!,
+                        "textColor" to display["text_color"]!!,
+                    )
+                )
+            }
+        )
+        displayJsonArray
+    },
     "timestamp-ebsi" to { JsonPrimitive(Clock.System.now().toIso8681WithoutSubSecondPrecision())},
     "timestamp-ebsi-in" to { JsonPrimitive((Clock.System.now() + Duration.parse(it.args!!)).toIso8681WithoutSubSecondPrecision()) },
 
