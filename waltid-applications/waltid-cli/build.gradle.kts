@@ -138,31 +138,6 @@ kotlin {
 
             }
         }
-        /*publishing {
-            repositories {
-                maven {
-                    url = uri("https://maven.waltid.dev/releases")
-                    val envUsername = System.getenv("MAVEN_USERNAME")
-                    val envPassword = System.getenv("MAVEN_PASSWORD")
-
-                    val usernameFile = File("$rootDir/secret_maven_username.txt")
-                    val passwordFile = File("$rootDir/secret_maven_password.txt")
-
-                    val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-                    //println("Deploy username length: ${secretMavenUsername.length}")
-                    val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
-
-                    //if (secretMavenPassword.isBlank()) {
-                    //   println("WARNING: Password is blank!")
-                    //}
-
-                    credentials {
-                        username = secretMavenUsername
-                        password = secretMavenPassword
-                    }
-                }
-            }
-        }*/
         all {
             languageSettings.enableLanguageFeature("InlineClasses")
         }
