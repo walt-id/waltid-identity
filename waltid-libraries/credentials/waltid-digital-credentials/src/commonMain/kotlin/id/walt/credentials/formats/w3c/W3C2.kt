@@ -9,8 +9,8 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 @SerialName("vc-w3c_2")
 data class W3C2(
-    override val disclosables: Map<String, Set<String>>?,
-    override val disclosures: List<SdJwtSelectiveDisclosure>?,
+    override val disclosables: Map<String, Set<String>>? = null,
+    override val disclosures: List<SdJwtSelectiveDisclosure>? = null,
     override val signature: CredentialSignature?,
     override val signed: String?,
     override val signedWithDisclosures: String?,
