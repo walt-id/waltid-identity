@@ -49,7 +49,7 @@ tasks.withType<Test> {
 
 
 kotlin {
-    jvmToolchain(15)
+    jvmToolchain(17)
     sourceSets {
         all {
             languageSettings.enableLanguageFeature("InlineClasses")
