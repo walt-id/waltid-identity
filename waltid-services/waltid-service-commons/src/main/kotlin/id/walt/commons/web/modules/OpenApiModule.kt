@@ -1,12 +1,5 @@
 package id.walt.commons.web.modules
 
-import io.github.smiley4.schemakenerator.core.connectSubTypes
-import io.github.smiley4.schemakenerator.core.handleNameAnnotation
-import io.github.smiley4.schemakenerator.reflection.collectSubTypes
-import io.github.smiley4.schemakenerator.reflection.processReflection
-import io.github.smiley4.schemakenerator.serialization.processKotlinxSerialization
-import io.github.smiley4.schemakenerator.swagger.*
-import io.github.smiley4.schemakenerator.swagger.data.TitleType
 import id.walt.commons.config.statics.BuildConfig
 import id.walt.commons.config.statics.ServiceConfig
 import io.github.smiley4.ktorswaggerui.SwaggerUI
@@ -16,6 +9,16 @@ import io.github.smiley4.ktorswaggerui.dsl.config.PluginConfigDsl
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.routing.openApiSpec
 import io.github.smiley4.ktorswaggerui.routing.swaggerUI
+import io.github.smiley4.schemakenerator.core.connectSubTypes
+import io.github.smiley4.schemakenerator.core.handleNameAnnotation
+import io.github.smiley4.schemakenerator.reflection.collectSubTypes
+import io.github.smiley4.schemakenerator.reflection.processReflection
+import io.github.smiley4.schemakenerator.serialization.processKotlinxSerialization
+import io.github.smiley4.schemakenerator.swagger.compileReferencingRoot
+import io.github.smiley4.schemakenerator.swagger.data.TitleType
+import io.github.smiley4.schemakenerator.swagger.generateSwaggerSchema
+import io.github.smiley4.schemakenerator.swagger.handleCoreAnnotations
+import io.github.smiley4.schemakenerator.swagger.withTitle
 import io.klogging.noCoLogger
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -58,7 +61,7 @@ object OpenApiModule {
             .compileReferencingRoot()
 
     // Module
-    fun Application.enable() {
+    fun Application.enable(rootPath: String) {
         install(SwaggerUI) {
 
             examples {
@@ -141,7 +144,7 @@ object OpenApiModule {
 
         routing {
             route("swagger") {
-                swaggerUI("/api.json")
+                swaggerUI(rootPath + "/api.json")
             }
 
             route("api.json") {
