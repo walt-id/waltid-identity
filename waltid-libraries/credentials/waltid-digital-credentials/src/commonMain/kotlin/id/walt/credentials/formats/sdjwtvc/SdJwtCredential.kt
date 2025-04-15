@@ -12,13 +12,19 @@ import kotlinx.serialization.json.JsonObject
 @SerialName("vc-sd_jwt")
 data class SdJwtCredential(
     val dmtype: CredentialDetectorTypes.SDJWTVCSubType,
+
+    // Selective disclosure
     override val disclosables: Map<String, Set<String>>? = null,
     override val disclosures: List<SdJwtSelectiveDisclosure>? = null,
-    override val signature: CredentialSignature?,
-    override val signed: String?,
-    override val signedWithDisclosures: String?,
+    override val signedWithDisclosures: String? = null,
+
+    // Data
     override val credentialData: JsonObject,
     override val originalCredentialData: JsonObject? = null,
+
+    // Signature
+    override val signature: CredentialSignature?,
+    override val signed: String?,
 ) : DigitalCredential(), SelectivelyDisclosableVerifiableCredential {
     init {
         selfCheck()
