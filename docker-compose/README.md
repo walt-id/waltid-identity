@@ -22,7 +22,7 @@ If you prefer to run the services using latest release pre-built Docker images, 
 Start by pulling the latest release Docker images for the services:
 
 ```bash
-docker-compose pull
+docker compose pull
 ```
 
 This ensures that you're using the most recent release images from the Docker registry.
@@ -32,7 +32,7 @@ This ensures that you're using the most recent release images from the Docker re
 Once the images are pulled, start the services by running:
 
 ```bash
-docker-compose up
+docker compose up
 ```
 
 *Note:* If you are facing issues with the containers, try running the following command to remove the existing
@@ -42,13 +42,13 @@ above command again.
 ### Stop the Services
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ### Tear down the Services
 
 ```bash
-docker-compose down -v
+docker compose down -v
 ```
 
 *Note:*
@@ -69,13 +69,13 @@ Update the `VERSION_TAG` variable to the desired version value for the local bui
 Once the `VERSION_TAG` is set, build the Docker images based on your local changes by running:
 
 ```bash
-docker-compose build
+docker compose build
 ```
 
 ### Start the Services
 
 ```bash
-docker-compose up
+docker compose up
 ```
 
 ### Starting services selectively
@@ -122,13 +122,13 @@ vault-init            | Secret ID: 3abf1e00-2dc1-9e77-0705-9a81a95c7c59
 ### Stop the Services
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ### Tear down the Services
 
 ```bash
-docker-compose down -v
+docker compose down -v
 ```
 
 ## Port mapping

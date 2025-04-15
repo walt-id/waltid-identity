@@ -27,7 +27,7 @@ services:
 
   issuer-api:
     platform: linux/x86_64
-    image: waltid/issuer-api:rootPath
+    image: docker.io/waltid/issuer-api:${VERSION_TAG:-latest}
     profiles:
       - services
       - identity
@@ -45,7 +45,7 @@ services:
 
   verifier-api:
     platform: linux/x86_64
-    image: waltid/verifier-api:rootPath
+    image: docker.io/waltid/verifier-api:${VERSION_TAG:-latest}
     profiles:
       - services
       - identity
