@@ -71,8 +71,8 @@ object CredentialDetectorTypes {
         val credentialSubType: CredentialSubDataType,
         val signaturePrimary: SignaturePrimaryType,
 
-        /** Does this credential contain a list of disclosures? */
-        val containsDisclosures: Boolean = false,
+        /** Does this credential contain a list of disclosables? */
+        val containsDisclosables: Boolean = false,
         /** Have disclosures been shared with this credential? */
         val providesDisclosures: Boolean = false
     ) {
@@ -85,7 +85,7 @@ object CredentialDetectorTypes {
                 else -> {}
             }
 
-            if (!containsDisclosures && providesDisclosures) {
+            if (!containsDisclosables && providesDisclosures) {
                 throw IllegalArgumentException("Credential does not contain any selective disclosures; but disclosures were provided? -> for $this")
             }
         }

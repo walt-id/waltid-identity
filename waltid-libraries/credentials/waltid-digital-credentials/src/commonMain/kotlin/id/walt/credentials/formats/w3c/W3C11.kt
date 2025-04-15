@@ -1,15 +1,21 @@
-package id.walt.credentials.formats.w3c
+package id.walt.credentials.formats
 
 import id.walt.credentials.signatures.CredentialSignature
-import kotlinx.serialization.json.JsonArray
+import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
+@Serializable
+@SerialName("vc-w3c_1_1")
 data class W3C11(
-    override val disclosableAttributes: JsonArray?,
-    override val disclosuresString: String?,
+    override val disclosables: Map<String, Set<String>>?,
+    override val disclosures: List<SdJwtSelectiveDisclosure>?,
     override val signature: CredentialSignature?,
     override val signed: String?,
-    override val credentialData: JsonObject
+    override val signedWithDisclosures: String?,
+    override val credentialData: JsonObject,
+    override val originalCredentialData: JsonObject? = null
 ) : AbstractW3C() {
 
 }

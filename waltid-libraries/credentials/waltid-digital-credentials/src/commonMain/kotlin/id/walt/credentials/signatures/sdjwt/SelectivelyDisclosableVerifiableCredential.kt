@@ -1,32 +1,33 @@
 package id.walt.credentials.signatures.sdjwt
 
-import id.walt.credentials.formats.VerifiableCredential
-import id.walt.crypto.utils.Base64Utils.base64UrlDecode
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.jsonPrimitive
+import id.walt.credentials.formats.DigitalCredential
+import kotlinx.serialization.json.JsonObject
 
 interface SelectivelyDisclosableVerifiableCredential {
-    val disclosableAttributes: JsonArray?
-    val disclosuresString: String?
+    /**
+     * Disclosables contained within a credential (`_sd` arrays).
+     *
+     * Map: Path -> Set of DisclosableString
+     *
+     * e.g.: `mapOf("$._sd" to setOf("abc"))`
+     */
+    val disclosables: Map<String, Set<String>>?
 
-    fun listDisclosures() =
-        disclosuresString?.split("~")?.mapNotNull {
-            if (it.isNotBlank()) {
-                val jsonArrayString = it.base64UrlDecode().decodeToString()
-                println(jsonArrayString)
-                val jsonArray = Json.decodeFromString<JsonArray>(jsonArrayString)
+    /** Disclosures available to share */
+    val disclosures: List<SdJwtSelectiveDisclosure>?
 
-                SdJwtSelectiveDisclosure(
-                    salt = jsonArray[0].jsonPrimitive.content,
-                    name = jsonArray[1].jsonPrimitive.content,
-                    value = jsonArray[2]
-                )
-            } else null
-        }
+    val signedWithDisclosures: String?
+    val originalCredentialData: JsonObject?
 
-    fun disclose(credential: VerifiableCredential, attributes: List<SdJwtSelectiveDisclosure>): String {
+    fun disclose(credential: DigitalCredential, attributes: List<SdJwtSelectiveDisclosure>): String {
         checkNotNull(credential.signed) { "Credential has to be signed to be able to disclose" }
-        return "${credential.signed}~${attributes.joinToString("~") { it.encoded() }}"
+        return "${credential.signed}~${attributes.joinToString("~") { it.asEncoded() }}"
+    }
+
+    fun selfCheck() {
+        if (disclosures != null) {
+            require(disclosables != null) { "Disclosures available, without any disclosables in SD credential?" }
+            require(originalCredentialData != null) { "Disclosures available, but no original credential data set?" }
+        }
     }
 }
