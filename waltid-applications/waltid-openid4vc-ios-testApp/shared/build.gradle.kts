@@ -24,7 +24,7 @@ kotlin {
     }
 
     sourceSets {
-        val ktor_version = "3.1.1"
+        val ktor_version = "3.1.2"
 
         commonMain.dependencies {
             implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
@@ -53,7 +53,7 @@ kotlin {
             iosSimulatorArm64Main.dependsOn(this)
             dependencies {
                 implementation(project(":waltid-libraries:crypto:waltid-crypto-ios"))
-                implementation("io.ktor:ktor-client-darwin:3.1.1")
+                implementation("io.ktor:ktor-client-darwin:3.1.2")
             }
         }
     }

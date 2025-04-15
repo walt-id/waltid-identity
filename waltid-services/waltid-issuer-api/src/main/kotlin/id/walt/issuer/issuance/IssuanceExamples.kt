@@ -4,7 +4,7 @@ import id.walt.commons.interop.LspPotentialInterop
 import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
-import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
+import io.github.smiley4.ktoropenapi.config.ValueExampleDescriptorConfig
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
@@ -12,7 +12,7 @@ import kotlinx.serialization.json.buildJsonArray
 
 object IssuanceExamples {
 
-    private inline fun <reified T> typedValueExampleDescriptorDsl(content: String): ValueExampleDescriptorDsl.() -> Unit =
+    private inline fun <reified T> typedValueExampleDescriptorDsl(content: String): ValueExampleDescriptorConfig.() -> Unit =
         {
             value = Json.decodeFromString<T>(content)
         }

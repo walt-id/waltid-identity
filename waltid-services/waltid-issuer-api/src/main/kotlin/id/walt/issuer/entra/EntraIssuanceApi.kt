@@ -1,7 +1,7 @@
 package id.walt.issuer.entra
 
-import io.github.smiley4.ktorswaggerui.dsl.routing.post
-import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.github.smiley4.ktoropenapi.post
+import io.github.smiley4.ktoropenapi.route
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*

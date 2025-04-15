@@ -1,9 +1,9 @@
 package id.walt.webwallet.web.controllers.auth
 
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRoute
-import io.github.smiley4.ktorswaggerui.dsl.routing.post
-import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.github.smiley4.ktoropenapi.config.RouteConfig
+import io.github.smiley4.ktoropenapi.post
+import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -21,7 +21,7 @@ abstract class LogoutControllerBase(
         }
     }
 
-    override fun apiBuilder(): OpenApiRoute.() -> Unit = {
+    override fun apiBuilder(): RouteConfig.() -> Unit = {
         summary = "Logout (delete session)"
         response { HttpStatusCode.OK to { description = "Logged out." } }
     }
