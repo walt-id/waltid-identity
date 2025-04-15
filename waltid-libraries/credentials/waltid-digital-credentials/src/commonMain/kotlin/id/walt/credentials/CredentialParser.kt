@@ -23,8 +23,6 @@ import id.walt.mdoc.doc.MDoc
 import id.walt.sdjwt.SDJwt
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.ExperimentalEncodingApi
-import kotlin.math.sign
-
 
 @OptIn(ExperimentalEncodingApi::class)
 object CredentialParser {
@@ -119,7 +117,7 @@ object CredentialParser {
             payload.contains("@context") && payload.contains("vct")
                 -> detectedSdjwtSigned(CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvcdm) to
                     SdJwtCredential(
-                        type = SDJWTVCSubType.sdjwtvcdm,
+                        dmtype = SDJWTVCSubType.sdjwtvcdm,
                         disclosables = containedDisclosables,
                         disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(),
@@ -158,7 +156,7 @@ object CredentialParser {
             payload.contains("vct") && !payload.contains("@context")
                 -> detectedSdjwtSigned(CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvc) to
                     SdJwtCredential(
-                        type = SDJWTVCSubType.sdjwtvcdm,
+                        dmtype = SDJWTVCSubType.sdjwtvcdm,
                         disclosables = containedDisclosables,
                         disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(),
@@ -224,7 +222,7 @@ object CredentialParser {
                         CredentialPrimaryDataType.SDJWTVC,
                         SDJWTVCSubType.sdjwtvcdm
                     ) to SdJwtCredential(
-                        type = SDJWTVCSubType.sdjwtvcdm,
+                        dmtype = SDJWTVCSubType.sdjwtvcdm,
                         disclosables = containedDisclosables,
                         disclosures = null,
                         signature = null,
@@ -236,7 +234,7 @@ object CredentialParser {
                     parsedJson.contains("vct") -> detectedUnsigned(
                         CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvc
                     ) to SdJwtCredential(
-                        type = SDJWTVCSubType.sdjwtvc,
+                        dmtype = SDJWTVCSubType.sdjwtvc,
                         disclosables = containedDisclosables,
                         disclosures = null,
                         signature = null,
