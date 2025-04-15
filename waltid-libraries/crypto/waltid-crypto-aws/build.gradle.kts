@@ -60,6 +60,7 @@ kotlin {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("Walt.id Crypto AWS")
                 description.set("Walt.id Crypto AWS Integration")
