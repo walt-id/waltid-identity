@@ -186,6 +186,7 @@ npmPublish {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id SD-JWT library")
                 description.set("walt.id Kotlin/Java library for SD-JWTs")

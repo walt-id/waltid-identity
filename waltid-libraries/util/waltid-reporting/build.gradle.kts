@@ -110,6 +110,7 @@ kotlin {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id reporting")
                 description.set("walt.id reporting client")
