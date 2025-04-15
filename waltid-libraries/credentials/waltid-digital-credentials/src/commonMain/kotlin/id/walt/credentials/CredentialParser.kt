@@ -75,6 +75,7 @@ object CredentialParser {
         )
 
         val signedCredentialWithoutDisclosures = credential.substringBefore("~")
+        val plainSignature = signedCredentialWithoutDisclosures.substringAfterLast(".")
 
         var availableDisclosures = parseDisclosureString(signature.substringAfter("~", ""))
 
@@ -120,7 +121,7 @@ object CredentialParser {
                         dmtype = SDJWTVCSubType.sdjwtvcdm,
                         disclosables = containedDisclosables,
                         disclosures = availableDisclosures,
-                        signature = SdJwtCredentialSignature(),
+                        signature = SdJwtCredentialSignature(plainSignature, availableDisclosures),
                         signed = signedCredentialWithoutDisclosures,
                         signedWithDisclosures = credential,
                         credentialData = fullCredentialData,
@@ -133,7 +134,7 @@ object CredentialParser {
                     W3CSubType.W3C_1_1 -> W3C11(
                         disclosables = containedDisclosables,
                         disclosures = availableDisclosures,
-                        signature = SdJwtCredentialSignature(),
+                        signature = SdJwtCredentialSignature(plainSignature, availableDisclosures),
                         signed = signedCredentialWithoutDisclosures,
                         signedWithDisclosures = credential,
                         credentialData = fullCredentialData,
@@ -143,7 +144,7 @@ object CredentialParser {
                     W3CSubType.W3C_2 -> W3C2(
                         disclosables = containedDisclosables,
                         disclosures = availableDisclosures,
-                        signature = SdJwtCredentialSignature(),
+                        signature = SdJwtCredentialSignature(plainSignature, availableDisclosures),
                         signed = signedCredentialWithoutDisclosures,
                         signedWithDisclosures = credential,
                         credentialData = fullCredentialData,
@@ -159,7 +160,7 @@ object CredentialParser {
                         dmtype = SDJWTVCSubType.sdjwtvcdm,
                         disclosables = containedDisclosables,
                         disclosures = availableDisclosures,
-                        signature = SdJwtCredentialSignature(),
+                        signature = SdJwtCredentialSignature(plainSignature, availableDisclosures),
                         signed = signedCredentialWithoutDisclosures,
                         signedWithDisclosures = credential,
                         credentialData = fullCredentialData,
@@ -290,9 +291,9 @@ object CredentialParser {
                         val parsedCred = unsignedCredentialDetection.second
 
                         val signedCredential = when (parsedCred) {
-                            is W3C2 -> parsedCred.copy(signed = credential, signature = JwtCredentialSignature())
-                            is W3C11 -> parsedCred.copy(signed = credential, signature = JwtCredentialSignature())
-                            is SdJwtCredential -> parsedCred.copy(signed = credential, signature = JwtCredentialSignature())
+                            is W3C2 -> parsedCred.copy(signed = credential, signature = JwtCredentialSignature(signature))
+                            is W3C11 -> parsedCred.copy(signed = credential, signature = JwtCredentialSignature(signature))
+                            is SdJwtCredential -> parsedCred.copy(signed = credential, signature = JwtCredentialSignature(signature))
                             else -> throw NotImplementedError("unknown credential with JOSE signature: $parsedCred")
                         }
 

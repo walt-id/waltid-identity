@@ -5,5 +5,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 @SerialName("signature-jwt")
-class JwtCredentialSignature : CredentialSignature() {
+data class JwtCredentialSignature(
+    val signature: String
+) : CredentialSignature() {
 }
