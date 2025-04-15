@@ -90,32 +90,43 @@ kotlin {
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
             }
         }
-        publishing {
-            repositories {
-                maven {
-                    val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
-                    val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-                    url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
+    }
+}
 
-                    val envUsername = System.getenv("MAVEN_USERNAME")
-                    val envPassword = System.getenv("MAVEN_PASSWORD")
 
-                    val usernameFile = File("$rootDir/secret_maven_username.txt")
-                    val passwordFile = File("$rootDir/secret_maven_password.txt")
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            pom {
+                name.set("walt.id Crypto Android")
+                description.set("walt.id Kotlin/Java Crypto Android library")
+                url.set("https://walt.id")
 
-                    val secretMavenUsername = envUsername ?: usernameFile.let {
-                        if (it.isFile) it.readLines().first() else ""
+                licenses {
+                    license {
+                        name.set("Apache License 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
                     }
-                    val secretMavenPassword = envPassword ?: passwordFile.let {
-                        if (it.isFile) it.readLines().first() else ""
-                    }
-                    credentials {
-                        username = secretMavenUsername
-                        password = secretMavenPassword
+                }
+
+                developers {
+                    developer {
+                        id.set("walt.id")
+                        name.set("walt.id")
+                        email.set("office@walt.id")
                     }
                 }
             }
         }
+    }
 
+    repositories {
+        maven {
+            url = uri(if (version.toString().endsWith("SNAPSHOT")) uri("https://maven.waltid.dev/snapshots") else uri("https://maven.waltid.dev/releases"))
+            credentials {
+                username = System.getenv("MAVEN_USERNAME") ?: File("$rootDir/secret_maven_username.txt").let { if (it.isFile) it.readLines().first() else "" }
+                password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let { if (it.isFile) it.readLines().first() else "" }
+            }
+        }
     }
 }

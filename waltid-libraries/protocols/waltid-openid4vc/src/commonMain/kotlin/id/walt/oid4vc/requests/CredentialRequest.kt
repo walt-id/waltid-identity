@@ -27,6 +27,7 @@ data class CredentialRequest(
     @Serializable(ClaimDescriptorNamespacedMapSerializer::class) val claims: Map<String, Map<String, ClaimDescriptor>>? = null,
     @SerialName("credential_definition") val credentialDefinition: CredentialDefinition? = null,
     @SerialName("types") val types: List<String>? = null,
+    @SerialName("display") val display: List<DisplayProperties>? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = json.encodeToJsonElement(CredentialRequestSerializer, this).jsonObject
@@ -45,6 +46,7 @@ data class CredentialRequest(
                 authorizationDetails.claims,
                 authorizationDetails.credentialDefinition,
                 authorizationDetails.types,
+                null,
                 authorizationDetails.customParameters
             )
 
@@ -57,6 +59,7 @@ data class CredentialRequest(
            claims = null,
            credentialDefinition = offeredCredential.credentialDefinition,
            types = offeredCredential.types,
+           display = offeredCredential.display,
            customParameters = offeredCredential.customParameters
        )
     }

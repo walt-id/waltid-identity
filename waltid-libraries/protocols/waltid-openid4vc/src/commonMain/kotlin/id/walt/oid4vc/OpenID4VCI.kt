@@ -11,6 +11,7 @@ import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.MapKey
 import id.walt.mdoc.dataelement.StringElement
+import id.walt.oid4vc.OpenID4VCIVersion.entries
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.ResponseType.Companion.getResponseTypeString
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -652,7 +653,7 @@ object OpenID4VCI {
         credentialRequest: CredentialRequest,
         credentialData: JsonObject, issuerKey: Key, issuerId: String,
         selectiveDisclosure: SDMap? = null,
-        dataMapping: JsonObject? = null, x5Chain: List<String>? = null
+        dataMapping: JsonObject? = null, x5Chain: List<String>? = null, display: List<DisplayProperties>? = null
     ): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
             credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
@@ -671,6 +672,7 @@ object OpenID4VCI {
                     subjectDid = holderDid ?: "",
                     mappings = dataMapping ?: JsonObject(emptyMap()),
                     additionalJwtHeader = additionalJwtHeaders,
+                    display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                     additionalJwtOptions = emptyMap()
                 )
 
@@ -681,6 +683,7 @@ object OpenID4VCI {
                     mappings = dataMapping ?: JsonObject(emptyMap()),
                     additionalJwtHeaders = additionalJwtHeaders,
                     additionalJwtOptions = emptyMap(),
+                    display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                     disclosureMap = selectiveDisclosure
                 )
             }
