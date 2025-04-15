@@ -11,7 +11,7 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 @SerialName("vc-sd_jwt")
 data class SdJwtCredential(
-    val type: CredentialDetectorTypes.SDJWTVCSubType,
+    val dmtype: CredentialDetectorTypes.SDJWTVCSubType,
     override val disclosables: Map<String, Set<String>>?,
     override val disclosures: List<SdJwtSelectiveDisclosure>?,
     override val signature: CredentialSignature?,
