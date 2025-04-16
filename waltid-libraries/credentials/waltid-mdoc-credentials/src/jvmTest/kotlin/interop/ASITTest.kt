@@ -6,7 +6,6 @@ import at.asitplus.wallet.lib.iso.MobileSecurityObject
 import at.asitplus.wallet.lib.iso.vckCborSerializer
 import id.walt.mdoc.dataretrieval.DeviceResponse
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.decodeFromHexString
 import kotlin.test.Test
 import kotlin.test.assertEquals
