@@ -87,7 +87,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.1.1"
+    val ktor_version = "3.1.2"
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -211,6 +211,7 @@ powerAssert {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id Digital Credentials")
                 description.set("walt.id Kotlin/Java library for Digital Credentials")

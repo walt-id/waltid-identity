@@ -47,6 +47,7 @@ data class CredentialTypeConfig(
         "LegalPerson" to vc("VerifiableCredential", "LegalPerson"),
         "LegalRegistrationNumber" to vc("VerifiableCredential", "LegalRegistrationNumber"),
         "GaiaXTermsAndConditions" to vc("VerifiableCredential", "GaiaXTermsAndConditions"),
+
         MDocTypes.ISO_MDL to vc(
             CredentialSupported(
                 format = CredentialFormat.mso_mdoc,
@@ -55,6 +56,27 @@ data class CredentialTypeConfig(
                 proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
                 credentialDefinition =  CredentialDefinition(type = listOf(MDocTypes.ISO_MDL)),
                 docType = MDocTypes.ISO_MDL
+            )
+        ),
+        "testCredential+jwt-vc-json" to vc(
+            CredentialSupported(
+                format = CredentialFormat.jwt_vc_json,
+                cryptographicBindingMethodsSupported = setOf("did"),
+                credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
+                credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "TestCredential")),
+                display = listOf(
+                    DisplayProperties(
+                        name = "Test Credential",
+                        locale = "en-US",
+                        description = "This is a test credential",
+                        logo = LogoProperties(
+                            url = "https://example.com/logo.png",
+                            altText = "Logo"
+                        ),
+                        backgroundColor = "#FFFFFF",
+                        textColor = "#000000"
+                    )
+                ),
             )
         ),
         "urn:eu.europa.ec.eudi:pid:1" to vc(
@@ -110,7 +132,7 @@ data class CredentialTypeConfig(
                             credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
                             credentialDefinition = if (format != CredentialFormat.sd_jwt_vc && format != CredentialFormat.mso_mdoc ) CredentialDefinition(type = type)  else null,
                             vct = if (format == CredentialFormat.sd_jwt_vc) baseUrl.plus("/${entry.key}") else null,
-                            docType = if (format == CredentialFormat.mso_mdoc) MDocTypes.ISO_MDL else null,
+                            docType = if (format == CredentialFormat.mso_mdoc) MDocTypes.ISO_MDL else null
                         )
                     }.entries
                 }

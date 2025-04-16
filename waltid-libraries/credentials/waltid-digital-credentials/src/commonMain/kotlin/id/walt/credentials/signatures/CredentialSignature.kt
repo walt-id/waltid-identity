@@ -1,4 +1,7 @@
 package id.walt.credentials.signatures
 
-abstract class CredentialSignature {
+import kotlinx.serialization.Serializable
+
+@Serializable
+sealed class CredentialSignature {
 }

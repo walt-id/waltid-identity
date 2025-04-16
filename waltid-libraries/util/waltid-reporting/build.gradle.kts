@@ -46,7 +46,7 @@ kotlin {
         }
     }
 
-    val ktor_version = "3.1.1"
+    val ktor_version = "3.1.2"
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -110,6 +110,7 @@ kotlin {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id reporting")
                 description.set("walt.id reporting client")

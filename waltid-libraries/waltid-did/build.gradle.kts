@@ -84,7 +84,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.1.1"
+    val ktor_version = "3.1.2"
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -202,6 +202,7 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id DID library")
                 description.set("walt.id Kotlin/Java library working with Decentralised Identifiers (DIDs)")

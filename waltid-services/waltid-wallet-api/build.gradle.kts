@@ -4,7 +4,7 @@ import java.util.Properties
 
 plugins {
     kotlin("jvm")
-    id("io.ktor.plugin") version "3.1.1"
+    id("io.ktor.plugin") version "3.1.2"
     kotlin("plugin.serialization")
     id("com.github.ben-manes.versions")
 }
@@ -65,7 +65,7 @@ dependencies {
 
     /* -- KTOR -- */
 
-    val ktor_version = "3.1.1"
+    val ktor_version = "3.1.2"
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-auth-jvm:$ktor_version")

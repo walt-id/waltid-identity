@@ -1,8 +1,8 @@
 package id.walt.issuer.issuance2
 
 import id.walt.issuer.issuance.NewIssuanceRequest
-import io.github.smiley4.ktorswaggerui.dsl.routing.post
-import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.github.smiley4.ktoropenapi.post
+import io.github.smiley4.ktoropenapi.route
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*

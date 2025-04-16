@@ -144,6 +144,7 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id crypto OCI library")
                 description.set("walt.id Kotlin/Java crypto OCI library")
