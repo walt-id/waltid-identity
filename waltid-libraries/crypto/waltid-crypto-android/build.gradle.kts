@@ -97,6 +97,7 @@ kotlin {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id Crypto Android")
                 description.set("walt.id Kotlin/Java Crypto Android library")

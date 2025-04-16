@@ -200,6 +200,7 @@ npmPublish {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id W3C credential")
                 description.set("walt.id Kotlin/Java library for W3C Credentials")

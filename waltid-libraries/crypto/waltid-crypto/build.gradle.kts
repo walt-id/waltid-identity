@@ -221,6 +221,7 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id crypto")
                 description.set("walt.id crypto")

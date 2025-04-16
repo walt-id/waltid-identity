@@ -147,6 +147,7 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            // (Has no source set)
             pom {
                 name.set("walt.id library commons")
                 description.set("walt.id library commons")
