@@ -133,6 +133,7 @@ npmPublish {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id mdoc credentials")
                 description.set("walt.id Kotlin/Java library for ISO mdoc/mDL 18013-5")

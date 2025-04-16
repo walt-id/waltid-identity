@@ -6,5 +6,7 @@ import kotlinx.serialization.Serializable
 // TODO
 @Serializable
 @SerialName("signature-cose")
-class CoseCredentialSignature : CredentialSignature() {
+data class CoseCredentialSignature(
+    val x: String? = null // What does the COSE signature have/need?
+) : CredentialSignature() {
 }

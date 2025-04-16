@@ -202,6 +202,7 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id DID library")
                 description.set("walt.id Kotlin/Java library working with Decentralised Identifiers (DIDs)")

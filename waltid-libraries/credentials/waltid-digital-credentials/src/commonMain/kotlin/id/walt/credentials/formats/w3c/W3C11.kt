@@ -9,13 +9,18 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 @SerialName("vc-w3c_1_1")
 data class W3C11(
-    override val disclosables: Map<String, Set<String>>?,
-    override val disclosures: List<SdJwtSelectiveDisclosure>?,
-    override val signature: CredentialSignature?,
-    override val signed: String?,
-    override val signedWithDisclosures: String?,
+    // Selective disclosure
+    override val disclosables: Map<String, Set<String>>? = null,
+    override val disclosures: List<SdJwtSelectiveDisclosure>? = null,
+    override val signedWithDisclosures: String? = null,
+
+    // Data
     override val credentialData: JsonObject,
-    override val originalCredentialData: JsonObject? = null
+    override val originalCredentialData: JsonObject? = null,
+
+    // Signature
+    override val signature: CredentialSignature?,
+    override val signed: String?
 ) : AbstractW3C() {
 
 }

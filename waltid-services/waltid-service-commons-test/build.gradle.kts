@@ -61,12 +61,13 @@ artifacts {
 publishing {
     publications {
         // Main sources
-        create<MavenPublication>("mavenJava") {
+        create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
-                name.set("walt.id service-commons")
+                name.set("walt.id service-commons-test")
                 description.set(
                     """
-                    Kotlin/Java library for the walt.id services-commons
+                    Kotlin/Java library for walt.id services-commons-test
                     """.trimIndent()
                 )
                 url.set("https://walt.id")

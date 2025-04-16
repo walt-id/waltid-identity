@@ -100,7 +100,8 @@ kotlin {
 
 publishing {
     publications {
-        create<MavenPublication>("mavenJava") {
+        create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id DIF Definitions Parser")
                 description.set(
