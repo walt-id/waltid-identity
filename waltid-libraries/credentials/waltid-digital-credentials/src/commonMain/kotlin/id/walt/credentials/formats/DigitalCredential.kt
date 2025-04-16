@@ -1,9 +1,11 @@
 package id.walt.credentials.formats
 
 import id.walt.credentials.signatures.CredentialSignature
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
-abstract class VerifiableCredential {
+@Serializable
+sealed class DigitalCredential {
     abstract val credentialData: JsonObject
     abstract val signature: CredentialSignature?
     abstract val signed: String?

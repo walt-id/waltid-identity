@@ -33,8 +33,8 @@ dependencies {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_15
-    targetCompatibility = JavaVersion.VERSION_15
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
     withJavadocJar()
     withSourcesJar()
 }
@@ -49,7 +49,7 @@ tasks.withType<Test> {
 
 
 kotlin {
-    jvmToolchain(15)
+    jvmToolchain(17)
     sourceSets {
         all {
             languageSettings.enableLanguageFeature("InlineClasses")
@@ -60,6 +60,7 @@ kotlin {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("Walt.id Crypto AWS")
                 description.set("Walt.id Crypto AWS Integration")

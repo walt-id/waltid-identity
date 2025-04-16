@@ -84,7 +84,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.1.1"
+    val ktor_version = "3.1.2"
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -200,6 +200,7 @@ npmPublish {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id W3C credential")
                 description.set("walt.id Kotlin/Java library for W3C Credentials")

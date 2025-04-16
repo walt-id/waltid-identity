@@ -38,8 +38,8 @@ import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeOpenApiCommons
 import id.walt.webwallet.web.controllers.exchange.openapi.examples.ExchangeExternalSignaturesExamples
 import id.walt.webwallet.web.controllers.walletRoute
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.github.smiley4.ktorswaggerui.dsl.routing.post
-import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.github.smiley4.ktoropenapi.post
+import io.github.smiley4.ktoropenapi.route
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*

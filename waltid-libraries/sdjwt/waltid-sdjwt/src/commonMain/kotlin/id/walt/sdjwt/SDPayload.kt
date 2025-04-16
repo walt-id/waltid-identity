@@ -131,19 +131,21 @@ data class SDPayload internal constructor(
             return messageDigest.base64Url
         }
 
+        private val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
+
         private fun generateSalt(): String {
             val randomness = CryptographyRandom.nextBytes(16)
-            return Base64.UrlSafe.encode(randomness)
+            return base64Url.encode(randomness)
         }
 
         private fun generateDisclosure(key: String, value: JsonElement): SDisclosure {
             val salt = generateSalt()
-            return Base64.UrlSafe.encode(buildJsonArray {
+            return base64Url.encode(buildJsonArray {
                 add(salt)
                 add(key)
                 add(value)
             }.toString().encodeToByteArray()).let { disclosure ->
-                SDisclosure(disclosure.trimEnd('='), salt, key, value)
+                SDisclosure(disclosure, salt, key, value)
             }
         }
 

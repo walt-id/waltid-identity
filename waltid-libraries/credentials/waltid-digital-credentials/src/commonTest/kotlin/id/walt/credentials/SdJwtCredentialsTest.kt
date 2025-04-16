@@ -24,7 +24,7 @@ class SdJwtCredentialsTest {
         ["oyF-Gt9-upkQdSFL_JSzCg","family_name","Silverstone"]
         ["LdohJ49wh0q0nmcIPovIXg","birthdate","1991-11-06"]
         """.trimIndent().lines().map { Json.decodeFromString<JsonArray>(it) }
-        val vcDisclosures = vc.listDisclosures()!!.map { it.asJsonArray() }
+        val vcDisclosures = vc.disclosures!!.map { it.asJsonArray() }
 
         fun List<JsonArray>.sortedByName() = sortedBy { it[1].jsonPrimitive.content }
         check(disclosures.sortedByName() == vcDisclosures.sortedByName()) { "Expected disclosures != parsed disclosures" }

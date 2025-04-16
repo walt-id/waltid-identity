@@ -6,8 +6,8 @@ import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.report.CredentialReportRequestParameter
 import id.walt.webwallet.web.controllers.auth.getWalletId
 import id.walt.webwallet.web.controllers.auth.getWalletService
-import io.github.smiley4.ktorswaggerui.dsl.routing.get
-import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
