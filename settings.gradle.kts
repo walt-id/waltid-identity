@@ -30,6 +30,7 @@ val modules = listOfNotNull(
         "waltid-digital-credentials",
         "waltid-mdoc-credentials",
         "waltid-dif-definitions-parser",
+        "waltid-dcql",
         "waltid-verification-policies"
     ),
 
