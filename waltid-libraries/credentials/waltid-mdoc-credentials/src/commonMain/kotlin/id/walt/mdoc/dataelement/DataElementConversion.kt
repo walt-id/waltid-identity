@@ -80,3 +80,12 @@ fun DataElement.toJsonElement(): JsonElement = when(this) {
   else -> throw Exception("Unsupported data type")
 }
 
+fun DataElement.toUIJson(): JsonElement = when(this) {
+  is MapElement -> buildJsonObject {
+    (this@toUIJson as MapElement).value.forEach { (key, value) ->
+      put(key.str, value.toUIJson())
+    }
+  }
+  is EncodedCBORElement -> this.decode().toUIJson()
+  else -> this.toJsonElement()
+}
