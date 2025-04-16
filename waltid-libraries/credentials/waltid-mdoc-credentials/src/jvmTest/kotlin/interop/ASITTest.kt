@@ -2,9 +2,11 @@
 
 package interop
 
+import at.asitplus.wallet.lib.iso.MobileSecurityObject
 import at.asitplus.wallet.lib.iso.vckCborSerializer
 import id.walt.mdoc.dataretrieval.DeviceResponse
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.decodeFromHexString
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,7 +22,9 @@ class ASITTest {
 
         val deviceResponse = DeviceResponse.fromCBORHex(isoSpecExampleSignedDeviceResponse)
 
-        val asitDeviceResponse = vckCborSerializer.decodeFromHexString<at.asitplus.wallet.lib.iso.DeviceResponse>(isoSpecExampleSignedDeviceResponse)
+        val asitDeviceResponse = vckCborSerializer.decodeFromHexString<at.asitplus.wallet.lib.iso.DeviceResponse>(
+            isoSpecExampleSignedDeviceResponse
+        )
 
         assertEquals(
             expected = deviceResponse.version.value,
@@ -48,6 +52,16 @@ class ASITTest {
 
             assertTrue {
                 waltMDoc.issuerSigned.nameSpaces!!.keys.containsAll(asitMDoc.issuerSigned.namespaces!!.keys)
+            }
+
+            assertTrue {
+                waltMDoc.deviceSigned!!.toMapElement().toCBOR().contentEquals(asitMDoc.deviceSigned.serialize())
+            }
+
+            assertTrue {
+                waltMDoc.issuerSigned.issuerAuth!!.toCBOR().contentEquals(asitMDoc.issuerSigned.issuerAuth.serialize(
+                    MobileSecurityObject.serializer()
+                ))
             }
 
             val mso = waltMDoc.MSO!!
