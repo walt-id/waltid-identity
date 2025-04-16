@@ -23,6 +23,7 @@ import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
 import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.MapKey
 import id.walt.mdoc.dataelement.toJsonElement
+import id.walt.mdoc.dataelement.toUIJson
 import id.walt.mdoc.doc.MDoc
 import id.walt.sdjwt.SDJwt
 import kotlinx.serialization.decodeFromByteArray
@@ -61,10 +62,10 @@ object CredentialParser {
             throw NotImplementedError("Invalid mdoc structure: $credential, only full mdocs are currently supported. If this is an issuer signed structure, like returned by an OpenID4VCI issuer, the doc type is additionally required to restore the full mdoc.")
         val mdoc = MDoc.fromMapElement(mapElement)
         val hasSd = !(mdoc.issuerSigned.nameSpaces?.values?.flatten().isNullOrEmpty())
-
         return CredentialDetectionResult(CredentialPrimaryDataType.MDOCS, MdocsSubType.mdocs, SignaturePrimaryType.COSE, hasSd, hasSd) to
                 MdocsCredential(signature = CoseCredentialSignature(), signed = credential,
-                    credentialData = mdoc.toMapElement().toJsonElement().jsonObject)
+                    credentialData = mdoc.issuerSigned.toUIJson(),
+                    docType = mdoc.docType.value)
     }
 
     private fun parseSdJwt(
