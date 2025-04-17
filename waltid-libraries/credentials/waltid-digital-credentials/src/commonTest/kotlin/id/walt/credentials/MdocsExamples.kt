@@ -21,17 +21,20 @@ object MdocsExamples {
         mdocsExampleBase64Url to CredentialDetectionResult(
             CredentialPrimaryDataType.MDOCS,
             MdocsSubType.mdocs,
-            CredentialDetectorTypes.SignaturePrimaryType.COSE
+            CredentialDetectorTypes.SignaturePrimaryType.COSE,
+            true, true
         ),
         mdocExampleHex to CredentialDetectionResult(
             CredentialPrimaryDataType.MDOCS,
             MdocsSubType.mdocs,
-            CredentialDetectorTypes.SignaturePrimaryType.COSE
+            CredentialDetectorTypes.SignaturePrimaryType.COSE,
+            true, true
         ),
-       /* mdocExampleMdocsLib to CredentialDetectionResult(
+       /*mdocExampleMdocsLib to CredentialDetectionResult(
             CredentialPrimaryDataType.MDOCS,
             MdocsSubType.mdocs,
-            CredentialDetectorTypes.SignaturePrimaryType.COSE
+            CredentialDetectorTypes.SignaturePrimaryType.COSE,
+           true, true
         )*/
     )
 }
