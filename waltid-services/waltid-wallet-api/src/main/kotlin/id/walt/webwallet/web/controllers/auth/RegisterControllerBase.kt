@@ -3,9 +3,9 @@ package id.walt.webwallet.web.controllers.auth
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.web.model.*
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRoute
-import io.github.smiley4.ktorswaggerui.dsl.routing.post
-import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.github.smiley4.ktoropenapi.config.RouteConfig
+import io.github.smiley4.ktoropenapi.post
+import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -23,7 +23,7 @@ abstract class RegisterControllerBase(
         }
     }
 
-    override fun apiBuilder(): OpenApiRoute.() -> Unit = {
+    override fun apiBuilder(): RouteConfig.() -> Unit = {
         summary = "Register with [email + password] or [wallet address + ecosystem]"
         request {
             body<AccountRequest> {

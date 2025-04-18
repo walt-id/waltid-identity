@@ -76,7 +76,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.1.1"
+    val ktor_version = "3.1.2"
 
     sourceSets {
 
@@ -226,6 +226,7 @@ npmPublish {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id OpenId4VC library")
                 description.set("walt.id Kotlin/Java OpenId4VC library")

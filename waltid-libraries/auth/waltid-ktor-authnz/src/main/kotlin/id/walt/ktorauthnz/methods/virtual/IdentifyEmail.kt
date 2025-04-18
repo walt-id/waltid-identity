@@ -6,7 +6,7 @@ import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
 import id.walt.ktorauthnz.methods.data.FlowAmendmentData
 import id.walt.ktorauthnz.sessions.SessionManager
-import io.github.smiley4.ktorswaggerui.dsl.routing.post
+import io.github.smiley4.ktoropenapi.post
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*

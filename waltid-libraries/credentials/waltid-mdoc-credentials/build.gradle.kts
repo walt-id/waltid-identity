@@ -79,6 +79,9 @@ kotlin {
                 implementation("io.mockk:mockk:1.13.16")
 
                 implementation(kotlin("reflect"))
+
+                //Interoperability test support with A-SIT's implementation
+                implementation("at.asitplus.wallet:vck:5.4.4")
             }
         }
         val jsMain by getting {
@@ -133,6 +136,7 @@ npmPublish {
 publishing {
     publications {
         create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id mdoc credentials")
                 description.set("walt.id Kotlin/Java library for ISO mdoc/mDL 18013-5")

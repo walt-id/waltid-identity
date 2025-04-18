@@ -4,7 +4,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.power-assert")
     kotlin("plugin.serialization")
-    id("io.ktor.plugin") version "3.1.1"
+    id("io.ktor.plugin") version "3.1.2"
     id("maven-publish")
 
     application
@@ -85,7 +85,9 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
 
     // Ktor server external
-    implementation("io.github.smiley4:ktor-swagger-ui:4.1.6")
+    implementation("io.github.smiley4:ktor-openapi:5.0.2")
+    implementation("io.github.smiley4:ktor-swagger-ui:5.0.2")
+    implementation("io.github.smiley4:ktor-redoc:5.0.2")
 
     // JSON
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
@@ -114,7 +116,8 @@ kotlin {
 
 publishing {
     publications {
-        create<MavenPublication>("mavenJava") {
+        create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id ktor-authnz")
                 description.set(

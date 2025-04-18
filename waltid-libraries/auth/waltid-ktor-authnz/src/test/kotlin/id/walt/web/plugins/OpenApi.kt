@@ -1,15 +1,42 @@
 package id.walt.web.plugins
 
-import io.github.smiley4.ktorswaggerui.SwaggerUI
-import io.github.smiley4.ktorswaggerui.dsl.routing.get
-import io.github.smiley4.ktorswaggerui.routing.openApiSpec
-import io.github.smiley4.ktorswaggerui.routing.swaggerUI
+import io.github.smiley4.ktoropenapi.OpenApi
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.openApi
+import io.github.smiley4.ktoropenapi.route
+import io.github.smiley4.ktorredoc.redoc
+import io.github.smiley4.ktorswaggerui.swaggerUI
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
 fun Application.configureOpenApi() {
-    install(SwaggerUI) {
+
+    install(OpenApi) {
+
+    }
+
+    routing {
+        route("api.json") {
+            openApi()
+        }
+
+        route("swagger") {
+            swaggerUI("/api.json")
+        }
+
+        route("redoc") {
+            redoc("/api.json")
+        }
+
+        get("/", {
+            summary = "Redirect to swagger interface for API documentation"
+        }) {
+            call.respondRedirect("swagger")
+        }
+    }
+
+    /*install(SwaggerUI) {
         swagger {
 //            swaggerUrl = "swagger-ui"
 //            forwardRoot = true
@@ -27,19 +54,5 @@ fun Application.configureOpenApi() {
             showTagFilterInput = true
         }
     }
-    routing {
-        route("swagger") {
-            swaggerUI("/api.json")
-        }
-
-        route("api.json") {
-            openApiSpec()
-        }
-
-        get("/", {
-            summary = "Redirect to swagger interface for API documentation"
-        }) {
-            call.respondRedirect("swagger")
-        }
-    }
+    */
 }
