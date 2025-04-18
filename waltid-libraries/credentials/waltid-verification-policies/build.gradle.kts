@@ -61,7 +61,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.1.1"
+    val ktor_version = "3.1.2"
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -146,7 +146,8 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
 
 publishing {
     publications {
-        create<MavenPublication>("mavenJava") {
+        create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id verification policies")
                 description.set(

@@ -48,6 +48,8 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
 import io.ktor.utils.io.core.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
 
@@ -107,14 +109,42 @@ object OpenID4VCI {
         return CredentialOfferRequest.fromHttpParameters(Url(credOfferReqUrl).parameters.toMap())
     }
 
+
+    private fun Throwable?.causeName() = this?.let { ex -> ex::class.simpleName }
+
+    @Serializable
+    data class UnresolvableCredentialOfferException(
+        val url: String,
+        @Transient
+        override val cause: Throwable? = null
+    ) : IllegalArgumentException(
+        "Could not resolve credential offer from URL${cause.causeName().let { " ($it)" }}: $url",
+        cause
+    )
+
+    @Serializable
+    data class CouldNotParseCredentialOfferException(
+        val url: String,
+        val text: String,
+        @Transient
+        override val cause: Throwable? = null
+    ) : IllegalArgumentException(
+        "Could not parse credential offer from URL (\"$url\") result: \"$text\"",
+        cause
+    )
+
     suspend fun parseAndResolveCredentialOfferRequestUrl(credOfferReqUrl: String): CredentialOffer {
         val offerReq = parseCredentialOfferRequestUrl(credOfferReqUrl)
 
         return when {
 
             offerReq.credentialOfferUri != null -> {
-                http.get(offerReq.credentialOfferUri).bodyAsText().let {
-                    CredentialOffer.fromJSONString(it)
+                runCatching { http.get(offerReq.credentialOfferUri) }.getOrElse { ex ->
+                    throw UnresolvableCredentialOfferException(offerReq.credentialOfferUri, ex)
+                }.bodyAsText().let { text ->
+                    runCatching { CredentialOffer.fromJSONString(text) }.getOrElse { ex ->
+                        throw CouldNotParseCredentialOfferException(url = offerReq.credentialOfferUri, text = text, ex)
+                    }
                 }
             }
 
@@ -223,7 +253,7 @@ object OpenID4VCI {
         }
 
         if (!response.status.isSuccess()) {
-            throw IllegalArgumentException("Failed to get token: ${response.status.value} - ${response.bodyAsText()}")
+            throw IllegalArgumentException("Failed to send credential request: ${response.status.value} - ${response.bodyAsText()}")
         }
 
         return response.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
@@ -246,7 +276,7 @@ object OpenID4VCI {
         }
 
         if (!response.status.isSuccess()) {
-            throw IllegalArgumentException("Failed to get token: ${response.status.value} - ${response.bodyAsText()}")
+            throw IllegalArgumentException("Failed to send batch credential request: ${response.status.value} - ${response.bodyAsText()}")
         }
 
         return response.body<JsonObject>().let { BatchCredentialResponse.fromJSON(it) }
@@ -340,6 +370,7 @@ object OpenID4VCI {
                         }
                     }
                 )
+
                 false -> null
             },
             presentationDefinition = when (responseType) {
@@ -502,12 +533,14 @@ object OpenID4VCI {
                     token = credentialRequest.proof.jwt!!
                 ) && getNonceFromProof(credentialRequest.proof) == nonce
             }
+
             credentialRequest.proof.isCwtProofType -> {
                 OpenID4VC.verifyCOSESign1Signature(
                     target = TokenTarget.PROOF_OF_POSSESSION,
                     token = credentialRequest.proof.cwt!!
                 ) && getNonceFromProof(credentialRequest.proof) == nonce
             }
+
             else -> false
         }
     }
@@ -610,7 +643,8 @@ object OpenID4VCI {
 
         val finalSdPayload = SDPayload.createSDPayload(fullPayload, undisclosedPayload)
 
-        val jwt = issuerKey.signJws(finalSdPayload.undisclosedPayload.toString().encodeToByteArray(),
+        val jwt = issuerKey.signJws(
+            finalSdPayload.undisclosedPayload.toString().encodeToByteArray(),
             headers.mapValues { it.value.toJsonElement() })
         return SDJwtVC(SDJwt.createFromSignedJwt(jwt, finalSdPayload)).toString()
     }
