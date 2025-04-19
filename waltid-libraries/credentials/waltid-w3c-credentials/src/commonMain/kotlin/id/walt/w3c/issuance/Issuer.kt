@@ -202,9 +202,6 @@ object Issuer {
                 vc["issuanceDate"]?.let { Instant.parse(it.jsonPrimitive.content) }
                     ?.epochSeconds?.let { JsonPrimitive(it) }
             }
-            completeJwtAttributes("display") {
-                vc["display"]?.let { display }
-            }
         }
 
         return IssuanceInformation(vc, jwtRes)

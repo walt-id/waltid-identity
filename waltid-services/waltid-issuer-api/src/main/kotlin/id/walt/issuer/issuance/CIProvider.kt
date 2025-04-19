@@ -245,6 +245,7 @@ open class CIProvider(
                         issuerKey = resolvedIssuerKey,
                         selectiveDisclosure = request.selectiveDisclosure,
                         dataMapping = request.mapping,
+                        display = credentialRequest.display,
                         x5Chain = request.x5Chain).also {
                         if(!issuanceSession.callbackUrl.isNullOrEmpty())
                             sendCallback(issuanceSession.id, "sdjwt_issue", buildJsonObject { put("sdjwt", it) }, issuanceSession.callbackUrl)

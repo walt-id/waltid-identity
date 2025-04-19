@@ -590,7 +590,8 @@ object OpenID4VCI {
         credentialRequest: CredentialRequest,
         credentialData: JsonObject, issuerId: String, issuerKey: Key,
         selectiveDisclosure: SDMap? = null,
-        dataMapping: JsonObject? = null, x5Chain: List<String>? = null
+        dataMapping: JsonObject? = null, x5Chain: List<String>? = null,
+        display: List<DisplayProperties>? = null,
     ): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
             credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
@@ -612,8 +613,19 @@ object OpenID4VCI {
             credentialData.mergeSDJwtVCPayloadWithMapping(
                 mapping = dataMapping ?: JsonObject(emptyMap()),
                 context = mapOf(
-                    "subjectDid" to holderDid
-                ).filterValues { !it.isNullOrEmpty() }.mapValues { JsonPrimitive(it.value) },
+                    "subjectDid" to holderDid,
+                    "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
+                ).filterValues {
+                    when (it) {
+                        is JsonElement -> it !is JsonNull && (it !is JsonObject || it.jsonObject.isNotEmpty()) && (it !is JsonArray || it.jsonArray.isNotEmpty())
+                        else -> it.toString().isNotEmpty()
+                    }
+                }.mapValues { (_, value) ->
+                    when (value) {
+                        is JsonElement -> value
+                        else -> JsonPrimitive(value.toString())
+                    }
+                },
                 dataFunctions
             ),
             selectiveDisclosure ?: SDMap(mapOf())
@@ -629,7 +641,7 @@ object OpenID4VCI {
                     CredentialErrorCode.invalid_request,
                     "VCT must be set on credential request"
                 )
-        )
+        ).plus("display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray)
         val undisclosedPayload = sdPayload.undisclosedPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
         val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
