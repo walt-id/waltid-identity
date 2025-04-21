@@ -74,7 +74,11 @@ data class CredentialTypeConfig(
                             altText = "Logo"
                         ),
                         backgroundColor = "#FFFFFF",
-                        textColor = "#000000"
+                        textColor = "#000000",
+                        backgroundImage = LogoProperties(
+                            url = "https://example.com/background.png",
+                            altText = "Background"
+                        )
                     )
                 ),
             )
