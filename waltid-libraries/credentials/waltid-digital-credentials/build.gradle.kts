@@ -1,10 +1,10 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
-import love.forte.plugin.suspendtrans.ClassInfo
-import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
-import love.forte.plugin.suspendtrans.TargetPlatform
+import love.forte.plugin.suspendtrans.configuration.ClassInfo
+import love.forte.plugin.suspendtrans.configuration.SuspendTransformConfiguration
+import love.forte.plugin.suspendtrans.configuration.TargetPlatform
 import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
-import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+import love.forte.plugin.suspendtrans.gradle.SuspendTransformPluginExtension
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -25,10 +25,10 @@ repositories {
     maven("https://jitpack.io")
 }
 
-suspendTransform {
+suspendTransformPlugin {
     enabled = true
     includeRuntime = true
-    useDefault()
+    transformers { useDefault() }
 
     includeAnnotation = false // Required in the current version to avoid "compileOnly" warning
 }
@@ -87,7 +87,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.1.2"
+    //val ktor_version = "3.1.2"
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -175,7 +175,7 @@ kotlin {
     }
 }
 
-extensions.getByType<SuspendTransformGradleExtension>().apply {
+/*extensions.getByType<SuspendTransformGradleExtension>().apply {
     transformers[TargetPlatform.JS] = mutableListOf(
         SuspendTransformConfiguration.jsPromiseTransformer.copy(
             copyAnnotationExcludes = listOf(
@@ -183,7 +183,7 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
             )
         )
     )
-}
+}*/
 
 npmPublish {
     registries {
