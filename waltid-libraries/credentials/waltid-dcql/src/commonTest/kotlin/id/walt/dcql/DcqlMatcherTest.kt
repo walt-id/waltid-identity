@@ -38,7 +38,7 @@ class DcqlMatcherTest {
         }
     )
     private val cred3_mdoc = SampleCredential(
-        id = "cred-mdoc-1",
+        id = "cred-mdoc-3",
         format = "mso_mdoc",
 //        issuer = "did:example:issuer_mdoc",
         data = buildJsonObject {
