@@ -20,7 +20,10 @@ kotlin {
     jvmToolchain(21)
 
     jvm()
-    js(IR)
+    js(IR) {
+        nodejs()
+        browser()
+    }
     if (enableIosBuild) {
         iosArm64()
         iosSimulatorArm64()

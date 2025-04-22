@@ -1,7 +1,7 @@
-import love.forte.plugin.suspendtrans.ClassInfo
-import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
-import love.forte.plugin.suspendtrans.TargetPlatform
-import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+import love.forte.plugin.suspendtrans.configuration.ClassInfo
+import love.forte.plugin.suspendtrans.configuration.SuspendTransformConfiguration
+import love.forte.plugin.suspendtrans.configuration.TargetPlatform
+import love.forte.plugin.suspendtrans.gradle.SuspendTransformPluginExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -20,10 +20,10 @@ repositories {
     maven("https://jitpack.io")
 }
 
-suspendTransform {
+suspendTransformPlugin {
     enabled = true
     includeRuntime = true
-    useDefault()
+    transformers { useDefault() }
 }
 
 tasks.withType<ProcessResources> {
@@ -131,7 +131,7 @@ kotlin {
     }
 }
 
-extensions.getByType<SuspendTransformGradleExtension>().apply {
+/*extensions.getByType<SuspendTransformGradleExtension>().apply {
     transformers[TargetPlatform.JS] = mutableListOf(
         SuspendTransformConfiguration.jsPromiseTransformer.copy(
             copyAnnotationExcludes = listOf(
@@ -139,7 +139,7 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
             )
         )
     )
-}
+}*/
 
 publishing {
     publications {
