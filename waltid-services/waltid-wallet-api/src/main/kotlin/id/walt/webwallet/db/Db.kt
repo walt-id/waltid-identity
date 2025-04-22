@@ -123,7 +123,11 @@ object Db {
         } else {
             transaction {
                 SchemaUtils.createMissingTablesAndColumns(*tables)
+                if (FeatureManager.isFeatureEnabled(FeatureCatalog.ktorAuthnzAuthenticationFeature)) {
+                    SchemaUtils.create(AuthnzUsers, AuthnzAccountIdentifiers, AuthnzStoredData)
+                }
             }
+
         }
     }
 

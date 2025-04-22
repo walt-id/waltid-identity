@@ -9,5 +9,6 @@ import kotlinx.serialization.json.JsonObject
 @SerialName("vc-mdocs")
 data class MdocsCredential(
     override val signature: CredentialSignature?,
-    override val signed: String?, override val credentialData: JsonObject
+    override val signed: String?, override val credentialData: JsonObject,
+    val docType: String
 ) : DigitalCredential()
