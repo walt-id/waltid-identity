@@ -83,6 +83,32 @@ data class CredentialTypeConfig(
                 ),
             )
         ),
+        "testCredential+sd-jwt" to vc(
+            CredentialSupported(
+                format = CredentialFormat.jwt_vc_json,
+                cryptographicBindingMethodsSupported = setOf("did"),
+                credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
+                vct = baseUrl.plus("/identity_credential"),
+                sdJwtVcTypeMetadata = SDJWTVCTypeMetadata(
+                    vct = baseUrl.plus("/identity_credential"),
+                    name = "Identity Credential",
+                    description = "The Identity Verifiable Credential"
+                ),
+                display = listOf(
+                    DisplayProperties(
+                        name = "Test Credential",
+                        locale = "en-US",
+                        description = "This is a test credential",
+                        logo = LogoProperties(
+                            url = "https://example.com/logo.png",
+                            altText = "Logo"
+                        ),
+                        backgroundColor = "#FFFFFF",
+                        textColor = "#000000"
+                    )
+                ),
+            )
+        ),
         "urn:eu.europa.ec.eudi:pid:1" to vc(
             CredentialSupported(
                 format = CredentialFormat.sd_jwt_vc,
@@ -97,6 +123,19 @@ data class CredentialTypeConfig(
                 cryptographicBindingMethodsSupported = setOf("jwk"),
                 credentialSigningAlgValuesSupported = setOf("ES256"),
                 vct = baseUrl.plus("/identity_credential"),
+                display = listOf(
+                    DisplayProperties(
+                        name = "Test Credential",
+                        locale = "en-US",
+                        description = "This is a test credential",
+                        logo = LogoProperties(
+                            url = "https://example.com/logo.png",
+                            altText = "Logo"
+                        ),
+                        backgroundColor = "#FFFFFF",
+                        textColor = "#000000"
+                    )
+                ),
                 sdJwtVcTypeMetadata =  SDJWTVCTypeMetadata(vct = baseUrl.plus("/identity_credential"), name = "Identity Credential", description = "The Identity Verifiable Credential")
             )
         ),
