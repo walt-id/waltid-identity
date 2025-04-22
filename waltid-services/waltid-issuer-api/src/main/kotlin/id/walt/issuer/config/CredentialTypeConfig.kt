@@ -123,7 +123,7 @@ data class CredentialTypeConfig(
                 cryptographicBindingMethodsSupported = setOf("jwk"),
                 credentialSigningAlgValuesSupported = setOf("ES256"),
                 vct = baseUrl.plus("/identity_credential"),
-                display = listOf(
+                /*display = listOf( // <-- Breaks EBSI draft11 compatibility. Instead, configure in credential-issuer-metadata.conf
                     DisplayProperties(
                         name = "Test Credential",
                         locale = "en-US",
@@ -135,7 +135,7 @@ data class CredentialTypeConfig(
                         backgroundColor = "#FFFFFF",
                         textColor = "#000000"
                     )
-                ),
+                ),*/
                 sdJwtVcTypeMetadata =  SDJWTVCTypeMetadata(vct = baseUrl.plus("/identity_credential"), name = "Identity Credential", description = "The Identity Verifiable Credential")
             )
         ),
