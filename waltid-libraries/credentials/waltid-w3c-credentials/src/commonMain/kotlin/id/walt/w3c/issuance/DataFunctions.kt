@@ -41,13 +41,19 @@ val dataFunctions = mapOf<String, suspend (call: CredentialDataMergeUtils.Functi
                         ),
                         "backgroundColor" to display["background_color"]!!,
                         "textColor" to display["text_color"]!!,
+                        "backgroundImage" to JsonObject(
+                            mapOf(
+                                "url" to logo["url"]!!,
+                                "altText" to logo["alt_text"]!!,
+                            )
+                        )
                     )
                 )
             }
         )
         displayJsonArray
     },
-    "timestamp-ebsi" to { JsonPrimitive(Clock.System.now().toIso8681WithoutSubSecondPrecision())},
+    "timestamp-ebsi" to { JsonPrimitive(Clock.System.now().toIso8681WithoutSubSecondPrecision()) },
     "timestamp-ebsi-in" to { JsonPrimitive((Clock.System.now() + Duration.parse(it.args!!)).toIso8681WithoutSubSecondPrecision()) },
 
     "timestamp" to { JsonPrimitive(Clock.System.now().toString()) },
