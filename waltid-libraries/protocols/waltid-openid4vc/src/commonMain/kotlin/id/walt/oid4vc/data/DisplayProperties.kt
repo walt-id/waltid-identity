@@ -20,6 +20,7 @@ import kotlinx.serialization.json.jsonObject
  * @param description OPTIONAL. String value of a description of the Credential.
  * @param backgroundColor OPTIONAL. String value of a background color of the Credential represented as numerical color values defined in CSS Color Module Level 37 [CSS-Color].
  * @param textColor String value of a text color of the Credential represented as numerical color values defined in CSS Color Module Level 37 [CSS-Color].
+ * @param backgroundImage OPTIONAL. Object with information about the background image of the Credential.
  */
 @Serializable
 data class DisplayProperties(
@@ -28,8 +29,9 @@ data class DisplayProperties(
     @Serializable(LogoPropertiesSerializer::class) val logo: LogoProperties? = null,
     val description: String? = null,
     @SerialName("background_color") val backgroundColor: String? = null,
+    @SerialName("background_image") val backgroundImage: LogoProperties? = null,
     @SerialName("text_color") val textColor: String? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement> = mapOf(),
 ) : JsonDataObject() {
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(DisplayPropertiesSerializer, this).jsonObject
 
