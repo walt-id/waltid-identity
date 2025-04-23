@@ -281,6 +281,7 @@ object IssuanceService : IssuanceServiceBase() {
                 accountId = accountId,
                 authorizationRequest = authReq.toJSON(),
                 issuerMetadata = providerMetadata,
+                credentialOffer = credentialOffer,
                 successRedirectUri = successRedirectUri,
                 createdOn = Clock.System.now()
             )
@@ -319,11 +320,12 @@ object IssuanceService : IssuanceServiceBase() {
         logger.debug { "// receive credential" }
         val nonce = tokenResponse.cNonce
 
-        val authDetailsArray = authReqSession.authorizationRequest["authorizationDetails"]?.jsonArray
+        val authDetailsArray = authReqSession.authorizationRequest["authorizationDetails"]?.jsonArray ?:  authReqSession.authorizationRequest["authorization_details"]?.jsonArray
 
         val firstDetail = authDetailsArray?.firstOrNull()?.jsonObject
 
-        val format = firstDetail?.get("format")?.jsonPrimitive?.contentOrNull?.let { CredentialFormat.fromValue(it) } ?: CredentialFormat.jwt_vc_json
+        val format = firstDetail?.get("format")?.jsonPrimitive?.contentOrNull?.let { CredentialFormat.fromValue(it) }
+            ?: CredentialFormat.jwt_vc_json
 
         val types = firstDetail?.get("types")?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }
 
@@ -332,14 +334,10 @@ object IssuanceService : IssuanceServiceBase() {
             types = types
         )
 
-//        val offeredCredential = OfferedCredential(
-//            format = authReqSession.authorizationRequest.authorizationDetails?.firstOrNull()?.format ?: CredentialFormat.jwt_vc_json,
-//            types = authReqSession.authorizationRequest.authorizationDetails?.firstOrNull()?.types,
-//        )
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(authReqSession.credentialOffer, authReqSession.issuerMetadata)
 
-        val offeredCredentials = listOf(offeredCredential)
-        val credentialOfferBuilder =  CredentialOffer.Draft13.Builder(authReqSession.issuerMetadata.credentialIssuer!!) // we create credential offer since the generatePoP needs a credential offer object to extract the issuer url
-
+        val credentialOfferBuilder =
+            CredentialOffer.Draft13.Builder(authReqSession.issuerMetadata.credentialIssuer!!) // we create credential offer since the generatePoP needs a credential offer object to extract the issuer url
 
         val credReqs = offeredCredentials.map { offeredCredential ->
             logger.info("Offered credential format: ${offeredCredential.format.name}")
@@ -364,12 +362,13 @@ object IssuanceService : IssuanceServiceBase() {
         logger.debug { "credReqs: $credReqs" }
 
         require(credReqs.isNotEmpty()) { "No credentials offered" }
-        val processedCredentialOffers = CredentialOfferProcessor.process(credReqs, authReqSession.issuerMetadata, accessToken)
+        val processedCredentialOffers =
+            CredentialOfferProcessor.process(credReqs, authReqSession.issuerMetadata, accessToken)
 
         logger.debug { "// parse and verify credential(s)" }
         check(processedCredentialOffers.any { it.credentialResponse.credential != null }) { "No credential was returned from credentialEndpoint: $processedCredentialOffers" }
 
-        val credentials =  processedCredentialOffers.map {
+        val credentials = processedCredentialOffers.map {
             getCredentialData(it, null)
         }
 
