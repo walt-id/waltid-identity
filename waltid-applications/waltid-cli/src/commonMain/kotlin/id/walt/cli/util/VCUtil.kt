@@ -1,7 +1,7 @@
 package id.walt.cli.util
 
-import id.walt.credentials.issuance.Issuer.mergingJwtIssue
-import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.w3c.issuance.Issuer.mergingJwtIssue
+import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.policies.PolicyManager

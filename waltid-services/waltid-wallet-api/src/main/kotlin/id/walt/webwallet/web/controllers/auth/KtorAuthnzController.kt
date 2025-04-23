@@ -16,7 +16,7 @@ import id.walt.webwallet.config.KtorAuthnzConfig
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.db.models.authnz.AuthnzUsers
 import id.walt.webwallet.service.account.AccountsService.initializeUserAccount
-import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.github.smiley4.ktoropenapi.route
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*

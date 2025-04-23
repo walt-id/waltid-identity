@@ -3,6 +3,7 @@ package id.walt.mdoc.issuersigned
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.buildJsonObject
 
 /**
  * Issuer signed part of the mdoc
@@ -30,6 +31,20 @@ data class IssuerSigned(
             }
         }
     )
+
+    fun toUIJson() = buildJsonObject {
+        nameSpaces?.keys?.forEach { namespace ->
+            put(namespace, buildJsonObject {
+                nameSpaces.get(namespace)?.forEach { encObj ->
+                    val decodedObj = encObj.decode() as MapElement
+                    put(
+                        decodedObj.value[MapKey("elementIdentifier")]!!.internalValue.toString(),
+                        decodedObj.value[MapKey("elementValue")]!!.toUIJson()
+                    )
+                }
+            } )
+        }
+    }
 
     companion object {
         /**

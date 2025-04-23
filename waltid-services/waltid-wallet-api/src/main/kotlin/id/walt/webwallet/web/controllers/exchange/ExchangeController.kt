@@ -14,6 +14,9 @@ import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeOpenApiCommons
 import id.walt.webwallet.web.controllers.walletRoute
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.post
+import io.github.smiley4.ktoropenapi.route
 import id.walt.webwallet.web.controllers.unprotectedWalletRoute
 import io.github.smiley4.ktorswaggerui.dsl.routing.get
 import io.github.smiley4.ktorswaggerui.dsl.routing.post
@@ -189,10 +192,7 @@ fun Application.exchange() = walletRoute {
         }) {
             val presentationDefinition = PresentationDefinition.fromJSON(call.receive<JsonObject>())
             val matchedCredentials =
-                WalletServiceManager.matchCredentialsForPresentationDefinition(
-                    call.getWalletId(),
-                    presentationDefinition
-                )
+                WalletServiceManager.matchCredentialsForPresentationDefinition(call.getWalletId(), presentationDefinition)
             call.respond(matchedCredentials)
         }
         post("unmatchedCredentialsForPresentationDefinition", {

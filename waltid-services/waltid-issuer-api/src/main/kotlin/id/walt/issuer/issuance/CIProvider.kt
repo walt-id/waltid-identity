@@ -2,8 +2,6 @@
 
 package id.walt.issuer.issuance
 
-import org.cose.java.AlgorithmID
-import org.cose.java.OneKey
 import cbor.Cbor
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
@@ -62,6 +60,8 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
+import org.cose.java.AlgorithmID
+import org.cose.java.OneKey
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
@@ -245,6 +245,7 @@ open class CIProvider(
                         issuerKey = resolvedIssuerKey,
                         selectiveDisclosure = request.selectiveDisclosure,
                         dataMapping = request.mapping,
+                        display = credentialRequest.display,
                         x5Chain = request.x5Chain).also {
                         if(!issuanceSession.callbackUrl.isNullOrEmpty())
                             sendCallback(issuanceSession.id, "sdjwt_issue", buildJsonObject { put("sdjwt", it) }, issuanceSession.callbackUrl)
@@ -257,7 +258,9 @@ open class CIProvider(
                           ?: throw BadRequestException("Issuer API currently supports only issuer DID for issuer ID property in W3C credentials. Issuer DID was not given in issuance request."),
                       selectiveDisclosure = request.selectiveDisclosure,
                       dataMapping = request.mapping,
-                      x5Chain = request.x5Chain
+                      x5Chain = request.x5Chain,
+                      display = credentialRequest.display
+
                   ).also {
                       if(!issuanceSession.callbackUrl.isNullOrEmpty())
                           sendCallback(issuanceSession.id, "jwt_issue", buildJsonObject { put("jwt", it) }, issuanceSession.callbackUrl)
@@ -421,6 +424,11 @@ open class CIProvider(
         return issuanceRequests.find { sessionData ->
             val credentialConfigurationId = sessionData.credentialConfigurationId
             val credentialFormat = getFormatByCredentialConfigurationId(credentialConfigurationId)
+            log.debug {
+                "Checking format - Request format: ${credentialRequest.format}, " +
+                        "Session format: $credentialFormat"
+            }
+
             require(credentialFormat == credentialRequest.format) { "Format does not match" }
             // Depending on the format, perform specific checks
             val additionalMatches =

@@ -3,12 +3,12 @@ package id.walt.webwallet.web.controllers.auth.keycloak
 import id.walt.webwallet.web.controllers.auth.LoginControllerBase
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.KeycloakAccountRequest
-import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRoute
+import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.*
 
 class KeycloakLoginController : LoginControllerBase(keycloakAuthPath, keycloakAuthTags) {
 
-    override fun apiBuilder(): OpenApiRoute.() -> Unit = {
+    override fun apiBuilder(): RouteConfig.() -> Unit = {
         summary = "Keycloak login with [username + password]"
         description = "Login of a user managed by Keycloak."
         request {

@@ -1,8 +1,8 @@
-import love.forte.plugin.suspendtrans.ClassInfo
-import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
-import love.forte.plugin.suspendtrans.TargetPlatform
+import love.forte.plugin.suspendtrans.configuration.ClassInfo
+import love.forte.plugin.suspendtrans.configuration.SuspendTransformConfiguration
+import love.forte.plugin.suspendtrans.configuration.TargetPlatform
 import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
-import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+import love.forte.plugin.suspendtrans.gradle.SuspendTransformPluginExtension
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -26,10 +26,10 @@ java {
     targetCompatibility = JavaVersion.VERSION_15
 }
 
-suspendTransform {
+suspendTransformPlugin {
     enabled = true
     includeRuntime = true
-    useDefault()
+    transformers { useDefault() }
 
     includeAnnotation = false // Required in the current version to avoid "compileOnly" warning
 }
@@ -65,7 +65,7 @@ kotlin {
         }
     }
     js(IR) {
-        moduleName = "dids"
+        outputModuleName = "dids"
         /*browser {
             commonWebpackConfig {
                 cssSupport {
@@ -84,7 +84,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.1.0"
+    val ktor_version = "3.1.2"
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -115,7 +115,7 @@ kotlin {
                 implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.6.0")
 
                 // Logging
-                implementation("io.github.oshai:kotlin-logging:7.0.4")
+                implementation("io.github.oshai:kotlin-logging:7.0.5")
 
 
                 // suspend-transform plugin annotations (required in the current version to avoid "compileOnly" warning)
@@ -182,40 +182,14 @@ kotlin {
                 iosSimulatorArm64Test.dependsOn(this)
             }
         }
-        publishing {
-            repositories {
-                maven {
-                    val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
-                    val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-                    url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
-                    val envUsername = System.getenv("MAVEN_USERNAME")
-                    val envPassword = System.getenv("MAVEN_PASSWORD")
 
-                    val usernameFile = File("$rootDir/secret_maven_username.txt")
-                    val passwordFile = File("$rootDir/secret_maven_password.txt")
-
-                    val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-                    //println("Deploy username length: ${secretMavenUsername.length}")
-                    val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
-
-                    //if (secretMavenPassword.isBlank()) {
-                    //   println("WARNING: Password is blank!")
-                    //}
-
-                    credentials {
-                        username = secretMavenUsername
-                        password = secretMavenPassword
-                    }
-                }
-            }
-        }
         all {
             languageSettings.enableLanguageFeature("InlineClasses")
         }
     }
 }
 
-extensions.getByType<SuspendTransformGradleExtension>().apply {
+/*extensions.getByType<SuspendTransformGradleExtension>().apply {
     transformers[TargetPlatform.JS] = mutableListOf(
         SuspendTransformConfiguration.jsPromiseTransformer.copy(
             copyAnnotationExcludes = listOf(
@@ -223,4 +197,42 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
             )
         )
     )
+}*/
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["kotlin"])
+            pom {
+                name.set("walt.id DID library")
+                description.set("walt.id Kotlin/Java library working with Decentralised Identifiers (DIDs)")
+                url.set("https://walt.id")
+
+                licenses {
+                    license {
+                        name.set("Apache License 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                    }
+                }
+
+                developers {
+                    developer {
+                        id.set("walt.id")
+                        name.set("walt.id")
+                        email.set("office@walt.id")
+                    }
+                }
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            url = uri(if (version.toString().endsWith("SNAPSHOT")) uri("https://maven.waltid.dev/snapshots") else uri("https://maven.waltid.dev/releases"))
+            credentials {
+                username = System.getenv("MAVEN_USERNAME") ?: File("$rootDir/secret_maven_username.txt").let { if (it.isFile) it.readLines().first() else "" }
+                password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let { if (it.isFile) it.readLines().first() else "" }
+            }
+        }
+    }
 }

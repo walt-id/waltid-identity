@@ -1,6 +1,6 @@
 package id.walt.issuer.issuance
 
-import id.walt.credentials.vc.vcs.W3CVC
+import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.did.dids.DidService
@@ -10,9 +10,9 @@ import id.walt.issuer.issuance.OidcApi.getFormatByCredentialConfigurationId
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRequest
-import io.github.smiley4.ktorswaggerui.dsl.routing.post
-import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.github.smiley4.ktoropenapi.config.RequestConfig
+import io.github.smiley4.ktoropenapi.post
+import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
@@ -209,18 +209,18 @@ fun Application.issuerApi() {
         route("", {
             tags = listOf("Credential Issuance")
         }) {
-            fun OpenApiRequest.statusCallbackUriHeader() = headerParameter<String>("statusCallbackUri") {
+            fun RequestConfig.statusCallbackUriHeader() = headerParameter<String>("statusCallbackUri") {
                 description = "Callback to push state changes of the issuance process to"
                 required = false
             }
-            
-            fun OpenApiRequest.sessionTtlHeader() = headerParameter<Long>("sessionTtl") {
+
+            fun RequestConfig.sessionTtlHeader() = headerParameter<Long>("sessionTtl") {
                 description = "Custom session time-to-live in seconds"
                 required = false
             }
 
             fun RoutingContext.getCallbackUriHeader() = call.request.header("statusCallbackUri")
-            
+
             fun RoutingContext.getSessionTtl() = call.request.header("sessionTtl")?.toLongOrNull()?.let { it.seconds }
 
             route("raw") {
@@ -289,6 +289,7 @@ fun Application.issuerApi() {
                         description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
 
                         request {
+
                             statusCallbackUriHeader()
                             sessionTtlHeader()
                             body<IssuanceRequest> {

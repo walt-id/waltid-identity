@@ -45,6 +45,9 @@ data class CredentialTypeConfig(
         "NaturalPersonVerifiableID" to vc("VerifiableCredential", "VerifiableAttestation", "NaturalPersonVerifiableID"),
         "BoardingPass" to vc("VerifiableCredential", "VerifiableAttestation", "BoardingPass"),
         "LegalPerson" to vc("VerifiableCredential", "LegalPerson"),
+        "LegalRegistrationNumber" to vc("VerifiableCredential", "LegalRegistrationNumber"),
+        "GaiaXTermsAndConditions" to vc("VerifiableCredential", "GaiaXTermsAndConditions"),
+
         MDocTypes.ISO_MDL to vc(
             CredentialSupported(
                 format = CredentialFormat.mso_mdoc,
@@ -53,6 +56,57 @@ data class CredentialTypeConfig(
                 proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
                 credentialDefinition =  CredentialDefinition(type = listOf(MDocTypes.ISO_MDL)),
                 docType = MDocTypes.ISO_MDL
+            )
+        ),
+        "testCredential+jwt-vc-json" to vc(
+            CredentialSupported(
+                format = CredentialFormat.jwt_vc_json,
+                cryptographicBindingMethodsSupported = setOf("did"),
+                credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
+                credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "TestCredential")),
+                display = listOf(
+                    DisplayProperties(
+                        name = "Test Credential",
+                        locale = "en-US",
+                        description = "This is a test credential",
+                        logo = LogoProperties(
+                            url = "https://example.com/logo.png",
+                            altText = "Logo"
+                        ),
+                        backgroundColor = "#FFFFFF",
+                        textColor = "#000000",
+                        backgroundImage = LogoProperties(
+                            url = "https://example.com/background.png",
+                            altText = "Background"
+                        )
+                    )
+                ),
+            )
+        ),
+        "testCredential+sd-jwt" to vc(
+            CredentialSupported(
+                format = CredentialFormat.jwt_vc_json,
+                cryptographicBindingMethodsSupported = setOf("did"),
+                credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
+                vct = baseUrl.plus("/identity_credential"),
+                sdJwtVcTypeMetadata = SDJWTVCTypeMetadata(
+                    vct = baseUrl.plus("/identity_credential"),
+                    name = "Identity Credential",
+                    description = "The Identity Verifiable Credential"
+                ),
+                display = listOf(
+                    DisplayProperties(
+                        name = "Test Credential",
+                        locale = "en-US",
+                        description = "This is a test credential",
+                        logo = LogoProperties(
+                            url = "https://example.com/logo.png",
+                            altText = "Logo"
+                        ),
+                        backgroundColor = "#FFFFFF",
+                        textColor = "#000000"
+                    )
+                ),
             )
         ),
         "urn:eu.europa.ec.eudi:pid:1" to vc(
@@ -69,6 +123,19 @@ data class CredentialTypeConfig(
                 cryptographicBindingMethodsSupported = setOf("jwk"),
                 credentialSigningAlgValuesSupported = setOf("ES256"),
                 vct = baseUrl.plus("/identity_credential"),
+                /*display = listOf( // <-- Breaks EBSI draft11 compatibility. Instead, configure in credential-issuer-metadata.conf
+                    DisplayProperties(
+                        name = "Test Credential",
+                        locale = "en-US",
+                        description = "This is a test credential",
+                        logo = LogoProperties(
+                            url = "https://example.com/logo.png",
+                            altText = "Logo"
+                        ),
+                        backgroundColor = "#FFFFFF",
+                        textColor = "#000000"
+                    )
+                ),*/
                 sdJwtVcTypeMetadata =  SDJWTVCTypeMetadata(vct = baseUrl.plus("/identity_credential"), name = "Identity Credential", description = "The Identity Verifiable Credential")
             )
         ),
@@ -108,7 +175,7 @@ data class CredentialTypeConfig(
                             credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
                             credentialDefinition = if (format != CredentialFormat.sd_jwt_vc && format != CredentialFormat.mso_mdoc ) CredentialDefinition(type = type)  else null,
                             vct = if (format == CredentialFormat.sd_jwt_vc) baseUrl.plus("/${entry.key}") else null,
-                            docType = if (format == CredentialFormat.mso_mdoc) MDocTypes.ISO_MDL else null,
+                            docType = if (format == CredentialFormat.mso_mdoc) MDocTypes.ISO_MDL else null
                         )
                     }.entries
                 }
