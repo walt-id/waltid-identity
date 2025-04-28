@@ -13,57 +13,49 @@ import kotlin.time.Duration
 
 @JsExport
 @Serializable
-sealed class SerializableRuntimeException(override val message: String? = null) : RuntimeException(message)
+sealed class SerializableRuntimeException(
+    override val message: String? = null
+) : RuntimeException(message)
 
 @JsExport
 @Serializable
 @SerialName("JsonSchemaVerificationException")
-data class JsonSchemaVerificationException(val validationErrors: List<JsonSchemaPolicy.SerializableValidationError>) :
-    id.walt.policies.SerializableRuntimeException()
+data class JsonSchemaVerificationException(
+    val validationErrors: List<JsonSchemaPolicy.SerializableValidationError>
+) : SerializableRuntimeException()
 
 @JsExport
 @Serializable
 @SerialName("NotBeforePolicyException")
 data class NotBeforePolicyException(
     val date: Instant,
-    @SerialName("date_seconds")
-    val dateSeconds: Long,
+    @SerialName("date_seconds") val dateSeconds: Long,
 
-    @SerialName("available_in")
-    val availableIn: Duration,
-    @SerialName("available_in_seconds")
-    val availableInSeconds: Long,
+    @SerialName("available_in") val availableIn: Duration,
+    @SerialName("available_in_seconds") val availableInSeconds: Long,
     val key: String,
-    @SerialName("policy_available")
-    val policyAvailable: Boolean = true,
-) :
-    id.walt.policies.SerializableRuntimeException()
+    @SerialName("policy_available") val policyAvailable: Boolean = true,
+) : SerializableRuntimeException()
 
 @JsExport
 @Serializable
 @SerialName("ExpirationDatePolicyException")
 data class ExpirationDatePolicyException(
     val date: Instant,
-    @SerialName("date_seconds")
-    val dateSeconds: Long,
+    @SerialName("date_seconds") val dateSeconds: Long,
 
-    @SerialName("expired_in")
-    val expiredSince: Duration,
-    @SerialName("expired_in_seconds")
-    val expiredSinceSeconds: Long,
+    @SerialName("expired_in") val expiredSince: Duration,
+    @SerialName("expired_in_seconds") val expiredSinceSeconds: Long,
     val key: String,
-    @SerialName("policy_available")
-    val policyAvailable: Boolean = true,
-) :
-    id.walt.policies.SerializableRuntimeException()
+    @SerialName("policy_available") val policyAvailable: Boolean = true,
+) : SerializableRuntimeException()
 
 @JsExport
 @Serializable
 @SerialName("WebhookPolicyException")
 data class WebhookPolicyException(
     val response: JsonObject,
-) :
-    id.walt.policies.SerializableRuntimeException()
+) : SerializableRuntimeException()
 
 @JsExport
 @Serializable
@@ -71,7 +63,15 @@ data class WebhookPolicyException(
 class PresentationDefinitionException(
 //    val missingCredentialTypes: List<String>,
     val presentationDefinitionMatch: Boolean
-) : id.walt.policies.SerializableRuntimeException()
+) : SerializableRuntimeException()
+
+@JsExport
+@Serializable
+@SerialName("PresentationDefinitionRelationalConstraintException")
+class PresentationDefinitionRelationalConstraintException(
+    val constraint: String,
+    val constraintFailureDescription: String
+) : SerializableRuntimeException()
 
 @JsExport
 @Serializable
@@ -79,7 +79,7 @@ class PresentationDefinitionException(
 class MinimumCredentialsException(
     val total: Int,
     val missing: Int,
-) : id.walt.policies.SerializableRuntimeException()
+) : SerializableRuntimeException()
 
 @JsExport
 @Serializable
@@ -87,7 +87,7 @@ class MinimumCredentialsException(
 class MaximumCredentialsException(
     val total: Int,
     val exceeded: Int,
-) : id.walt.policies.SerializableRuntimeException()
+) : SerializableRuntimeException()
 
 @JsExport
 @Serializable
@@ -95,7 +95,7 @@ class MaximumCredentialsException(
 class HolderBindingException(
     val presenterDid: String,
     val credentialDids: List<String>,
-) : id.walt.policies.SerializableRuntimeException()
+) : SerializableRuntimeException()
 
 @JsExport
 @Serializable
@@ -103,7 +103,7 @@ class HolderBindingException(
 class NotAllowedIssuerException(
     val issuer: String,
     val allowedIssuers: List<String>,
-) : id.walt.policies.SerializableRuntimeException()
+) : SerializableRuntimeException()
 
 
 class DynamicPolicyException(
