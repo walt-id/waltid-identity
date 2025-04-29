@@ -1251,4 +1251,308 @@ object IssuanceExamples {
 
     val sdJwtVCExampleWithSDSub = typedValueExampleDescriptorDsl<IssuanceRequest>(sdJwtVCDataWithSDSub)
 
+    val ebsiCTExampleAuthInTimeDraft11 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
+        {
+          "credentialConfigurationId": "InTimeIssuance_jwt_vc_json",
+          "standardVersion": "DRAFT11",
+          "issuerKey": {
+                  "type": "jwk",
+                  "jwk": {
+                    "kty": "EC",
+                    "x": "zK8OWXyBYBH0PJxMf5CsbVeGBDoNNHgcUfXN2fjUazs",
+                    "y": "FcMlAJxSKsvmN9RQPkPZYvJnju7xZLuVEGHi7zatwX0",
+                    "crv": "P-256",
+                    "d": "JhoVo4fRJibCSlREtXJdgKKCHShMgarjWRL5MzCd9Qw"
+                }
+          },
+          "issuerDid": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbtANUSeJyVFB45Gh1at2EMcHbEoMmJVSpaGEu4xGk8b8susD83jxL3jZJ4VbNcq3diik4RVCi3ea6VPfjNNCEyESEWK4w5z89uezUUUc13ssTPkncXEUeoKayqCbX4aJLfW",
+          "authenticationMethod": "ID_TOKEN"
+          "credentialData": {
+            "@context": [
+                "https://www.w3.org/2018/credentials/v1"
+            ],
+            "id": "https://www.w3.org/2018/credentials/123",
+            "type": [
+                "VerifiableCredential",
+                "VerifiableAttestation",
+                "InTimeIssuance"
+            ],
+            "issuanceDate": "2020-03-10T04:24:12Z",
+            "credentialSubject": {
+                "id": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrvQgsKodq2xnfBMYGk99qtunHHQuvvi35kRvbH9SDnue2ZNJqcnaU7yAxeKqEqDX4qFzeKYCj6rdbFnTsf4c8QjFXcgGYS21Db9d2FhHxw9ZEnqt9KPgLsLbQHVAmNNZoz"
+            }
+          },
+          "mapping": {
+            "id": "<uuid>",
+            "issuer": "<issuerDid>",
+            "credentialSubject": {
+                "id": "<subjectDid>"
+            },
+            "issuanceDate": "<timestamp-ebsi>",
+            "issued": "<timestamp-ebsi>",
+            "validFrom": "<timestamp-ebsi>",
+            "expirationDate": "<timestamp-ebsi-in:365d>",
+            "credentialSchema": {
+              "id": "https://api-pilot.ebsi.eu/trusted-schemas-registry/v3/schemas/zDpWGUBenmqXzurskry9Nsk6vq2R8thh9VSeoRqguoyMD",
+              "type": "FullJsonSchemaValidator2021"
+            }
+          },
+          "useJar": true
+        }
+    """.trimIndent()
+    )
+
+    val ebsiCTExampleAuthDeferredDraft11 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
+        {
+          "credentialConfigurationId": "DeferredIssuance_jwt_vc_json",
+          "standardVersion": "DRAFT11",
+          "issuerKey": {
+                  "type": "jwk",
+                  "jwk": {
+                    "kty": "EC",
+                    "x": "zK8OWXyBYBH0PJxMf5CsbVeGBDoNNHgcUfXN2fjUazs",
+                    "y": "FcMlAJxSKsvmN9RQPkPZYvJnju7xZLuVEGHi7zatwX0",
+                    "crv": "P-256",
+                    "d": "JhoVo4fRJibCSlREtXJdgKKCHShMgarjWRL5MzCd9Qw"
+                }
+          },
+          "issuerDid": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbtANUSeJyVFB45Gh1at2EMcHbEoMmJVSpaGEu4xGk8b8susD83jxL3jZJ4VbNcq3diik4RVCi3ea6VPfjNNCEyESEWK4w5z89uezUUUc13ssTPkncXEUeoKayqCbX4aJLfW",
+          "authenticationMethod": "ID_TOKEN"
+          "credentialData": {
+            "@context": [
+                "https://www.w3.org/2018/credentials/v1"
+            ],
+            "id": "https://www.w3.org/2018/credentials/123",
+            "type": [
+                "VerifiableCredential",
+                "VerifiableAttestation",
+                "DeferredIssuance"
+            ],
+            "issuanceDate": "2020-03-10T04:24:12Z",
+            "credentialSubject": {
+                "id": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrvQgsKodq2xnfBMYGk99qtunHHQuvvi35kRvbH9SDnue2ZNJqcnaU7yAxeKqEqDX4qFzeKYCj6rdbFnTsf4c8QjFXcgGYS21Db9d2FhHxw9ZEnqt9KPgLsLbQHVAmNNZoz"
+            }
+          },
+          "mapping": {
+            "id": "<uuid>",
+            "issuer": "<issuerDid>",
+            "credentialSubject": {
+                "id": "<subjectDid>"
+            },
+            "issuanceDate": "<timestamp-ebsi>",
+            "issued": "<timestamp-ebsi>",
+            "validFrom": "<timestamp-ebsi>",
+            "expirationDate": "<timestamp-ebsi-in:365d>",
+            "credentialSchema": {
+              "id": "https://api-pilot.ebsi.eu/trusted-schemas-registry/v3/schemas/zDpWGUBenmqXzurskry9Nsk6vq2R8thh9VSeoRqguoyMD",
+              "type": "FullJsonSchemaValidator2021"
+            }
+          },
+          "useJar": true
+        }
+    """.trimIndent()
+    )
+
+    val ebsiCTExamplePreAuthDraft11 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
+        {
+          "credentialConfigurationId": "PreAuthIssuance_jwt_vc_json",
+          "standardVersion": "DRAFT11",
+          "issuerKey": {
+                  "type": "jwk",
+                  "jwk": {
+                    "kty": "EC",
+                    "x": "zK8OWXyBYBH0PJxMf5CsbVeGBDoNNHgcUfXN2fjUazs",
+                    "y": "FcMlAJxSKsvmN9RQPkPZYvJnju7xZLuVEGHi7zatwX0",
+                    "crv": "P-256",
+                    "d": "JhoVo4fRJibCSlREtXJdgKKCHShMgarjWRL5MzCd9Qw"
+                }
+          },
+          "issuerDid": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbtANUSeJyVFB45Gh1at2EMcHbEoMmJVSpaGEu4xGk8b8susD83jxL3jZJ4VbNcq3diik4RVCi3ea6VPfjNNCEyESEWK4w5z89uezUUUc13ssTPkncXEUeoKayqCbX4aJLfW",
+          "authenticationMethod": "PRE_AUTHORIZED"
+          "credentialData": {
+            "@context": [
+                "https://www.w3.org/2018/credentials/v1"
+            ],
+            "id": "https://www.w3.org/2018/credentials/123",
+            "type": [
+                "VerifiableCredential",
+                "VerifiableAttestation",
+                "PreAuthIssuance"
+            ],
+            "issuanceDate": "2020-03-10T04:24:12Z",
+            "credentialSubject": {
+                "id": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrvQgsKodq2xnfBMYGk99qtunHHQuvvi35kRvbH9SDnue2ZNJqcnaU7yAxeKqEqDX4qFzeKYCj6rdbFnTsf4c8QjFXcgGYS21Db9d2FhHxw9ZEnqt9KPgLsLbQHVAmNNZoz"
+            }
+          },
+          "mapping": {
+            "id": "<uuid>",
+            "issuer": "<issuerDid>",
+            "credentialSubject": {
+                "id": "<subjectDid>"
+            },
+            "issuanceDate": "<timestamp-ebsi>",
+            "issued": "<timestamp-ebsi>",
+            "validFrom": "<timestamp-ebsi>",
+            "expirationDate": "<timestamp-ebsi-in:365d>",
+            "credentialSchema": {
+              "id": "https://api-pilot.ebsi.eu/trusted-schemas-registry/v3/schemas/zDpWGUBenmqXzurskry9Nsk6vq2R8thh9VSeoRqguoyMD",
+              "type": "FullJsonSchemaValidator2021"
+            }
+          }
+        }
+    """.trimIndent()
+    )
+
+    val ebsiCTExampleAuthInTimeDraft13 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
+        {
+          "credentialConfigurationId": "InTimeIssuance_jwt_vc_json",
+          "standardVersion": "DRAFT13",
+          "issuerKey": {
+                  "type": "jwk",
+                  "jwk": {
+                    "kty": "EC",
+                    "x": "zK8OWXyBYBH0PJxMf5CsbVeGBDoNNHgcUfXN2fjUazs",
+                    "y": "FcMlAJxSKsvmN9RQPkPZYvJnju7xZLuVEGHi7zatwX0",
+                    "crv": "P-256",
+                    "d": "JhoVo4fRJibCSlREtXJdgKKCHShMgarjWRL5MzCd9Qw"
+                }
+          },
+          "issuerDid": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbtANUSeJyVFB45Gh1at2EMcHbEoMmJVSpaGEu4xGk8b8susD83jxL3jZJ4VbNcq3diik4RVCi3ea6VPfjNNCEyESEWK4w5z89uezUUUc13ssTPkncXEUeoKayqCbX4aJLfW",
+          "authenticationMethod": "ID_TOKEN"
+          "credentialData": {
+            "@context": [
+                "https://www.w3.org/2018/credentials/v1"
+            ],
+            "id": "https://www.w3.org/2018/credentials/123",
+            "type": [
+                "VerifiableCredential",
+                "VerifiableAttestation",
+                "InTimeIssuance"
+            ],
+            "issuanceDate": "2020-03-10T04:24:12Z",
+            "credentialSubject": {
+                "id": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrvQgsKodq2xnfBMYGk99qtunHHQuvvi35kRvbH9SDnue2ZNJqcnaU7yAxeKqEqDX4qFzeKYCj6rdbFnTsf4c8QjFXcgGYS21Db9d2FhHxw9ZEnqt9KPgLsLbQHVAmNNZoz"
+            }
+          },
+          "mapping": {
+            "id": "<uuid>",
+            "issuer": "<issuerDid>",
+            "credentialSubject": {
+                "id": "<subjectDid>"
+            },
+            "issuanceDate": "<timestamp-ebsi>",
+            "issued": "<timestamp-ebsi>",
+            "validFrom": "<timestamp-ebsi>",
+            "expirationDate": "<timestamp-ebsi-in:365d>",
+            "credentialSchema": {
+              "id": "https://api-pilot.ebsi.eu/trusted-schemas-registry/v3/schemas/zDpWGUBenmqXzurskry9Nsk6vq2R8thh9VSeoRqguoyMD",
+              "type": "FullJsonSchemaValidator2021"
+            }
+          },
+          "useJar": true
+        }
+    """.trimIndent()
+    )
+
+    val ebsiCTExampleAuthDeferredDraft13 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
+        {
+          "credentialConfigurationId": "DeferredIssuance_jwt_vc_json",
+          "standardVersion": "DRAFT13",
+          "issuerKey": {
+                  "type": "jwk",
+                  "jwk": {
+                    "kty": "EC",
+                    "x": "zK8OWXyBYBH0PJxMf5CsbVeGBDoNNHgcUfXN2fjUazs",
+                    "y": "FcMlAJxSKsvmN9RQPkPZYvJnju7xZLuVEGHi7zatwX0",
+                    "crv": "P-256",
+                    "d": "JhoVo4fRJibCSlREtXJdgKKCHShMgarjWRL5MzCd9Qw"
+                }
+          },
+          "issuerDid": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbtANUSeJyVFB45Gh1at2EMcHbEoMmJVSpaGEu4xGk8b8susD83jxL3jZJ4VbNcq3diik4RVCi3ea6VPfjNNCEyESEWK4w5z89uezUUUc13ssTPkncXEUeoKayqCbX4aJLfW",
+          "authenticationMethod": "ID_TOKEN"
+          "credentialData": {
+            "@context": [
+                "https://www.w3.org/2018/credentials/v1"
+            ],
+            "id": "https://www.w3.org/2018/credentials/123",
+            "type": [
+                "VerifiableCredential",
+                "VerifiableAttestation",
+                "DeferredIssuance"
+            ],
+            "issuanceDate": "2020-03-10T04:24:12Z",
+            "credentialSubject": {
+                "id": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrvQgsKodq2xnfBMYGk99qtunHHQuvvi35kRvbH9SDnue2ZNJqcnaU7yAxeKqEqDX4qFzeKYCj6rdbFnTsf4c8QjFXcgGYS21Db9d2FhHxw9ZEnqt9KPgLsLbQHVAmNNZoz"
+            }
+          },
+          "mapping": {
+            "id": "<uuid>",
+            "issuer": "<issuerDid>",
+            "credentialSubject": {
+                "id": "<subjectDid>"
+            },
+            "issuanceDate": "<timestamp-ebsi>",
+            "issued": "<timestamp-ebsi>",
+            "validFrom": "<timestamp-ebsi>",
+            "expirationDate": "<timestamp-ebsi-in:365d>",
+            "credentialSchema": {
+              "id": "https://api-pilot.ebsi.eu/trusted-schemas-registry/v3/schemas/zDpWGUBenmqXzurskry9Nsk6vq2R8thh9VSeoRqguoyMD",
+              "type": "FullJsonSchemaValidator2021"
+            }
+          },
+          "useJar": true
+        }
+    """.trimIndent()
+    )
+
+    val ebsiCTExamplePreAuthDraft13 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
+        {
+          "credentialConfigurationId": "PreAuthIssuance_jwt_vc_json",
+          "standardVersion": "DRAFT13",
+          "issuerKey": {
+                  "type": "jwk",
+                  "jwk": {
+                    "kty": "EC",
+                    "x": "zK8OWXyBYBH0PJxMf5CsbVeGBDoNNHgcUfXN2fjUazs",
+                    "y": "FcMlAJxSKsvmN9RQPkPZYvJnju7xZLuVEGHi7zatwX0",
+                    "crv": "P-256",
+                    "d": "JhoVo4fRJibCSlREtXJdgKKCHShMgarjWRL5MzCd9Qw"
+                }
+          },
+          "issuerDid": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbtANUSeJyVFB45Gh1at2EMcHbEoMmJVSpaGEu4xGk8b8susD83jxL3jZJ4VbNcq3diik4RVCi3ea6VPfjNNCEyESEWK4w5z89uezUUUc13ssTPkncXEUeoKayqCbX4aJLfW",
+          "authenticationMethod": "PRE_AUTHORIZED"
+          "credentialData": {
+            "@context": [
+                "https://www.w3.org/2018/credentials/v1"
+            ],
+            "id": "https://www.w3.org/2018/credentials/123",
+            "type": [
+                "VerifiableCredential",
+                "VerifiableAttestation",
+                "PreAuthIssuance"
+            ],
+            "issuanceDate": "2020-03-10T04:24:12Z",
+            "credentialSubject": {
+                "id": "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrvQgsKodq2xnfBMYGk99qtunHHQuvvi35kRvbH9SDnue2ZNJqcnaU7yAxeKqEqDX4qFzeKYCj6rdbFnTsf4c8QjFXcgGYS21Db9d2FhHxw9ZEnqt9KPgLsLbQHVAmNNZoz"
+            }
+          },
+          "mapping": {
+            "id": "<uuid>",
+            "issuer": "<issuerDid>",
+            "credentialSubject": {
+                "id": "<subjectDid>"
+            },
+            "issuanceDate": "<timestamp-ebsi>",
+            "issued": "<timestamp-ebsi>",
+            "validFrom": "<timestamp-ebsi>",
+            "expirationDate": "<timestamp-ebsi-in:365d>",
+            "credentialSchema": {
+              "id": "https://api-pilot.ebsi.eu/trusted-schemas-registry/v3/schemas/zDpWGUBenmqXzurskry9Nsk6vq2R8thh9VSeoRqguoyMD",
+              "type": "FullJsonSchemaValidator2021"
+            }
+          }
+        }
+    """.trimIndent()
+    )
+
 }
