@@ -1,8 +1,8 @@
-import love.forte.plugin.suspendtrans.ClassInfo
-import love.forte.plugin.suspendtrans.SuspendTransformConfiguration
-import love.forte.plugin.suspendtrans.TargetPlatform
+import love.forte.plugin.suspendtrans.configuration.ClassInfo
+import love.forte.plugin.suspendtrans.configuration.SuspendTransformConfiguration
+import love.forte.plugin.suspendtrans.configuration.TargetPlatform
 import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
-import love.forte.plugin.suspendtrans.gradle.SuspendTransformGradleExtension
+import love.forte.plugin.suspendtrans.gradle.SuspendTransformPluginExtension
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -26,10 +26,10 @@ java {
     targetCompatibility = JavaVersion.VERSION_15
 }
 
-suspendTransform {
+suspendTransformPlugin {
     enabled = true
     includeRuntime = true
-    useDefault()
+    transformers { useDefault() }
 
     includeAnnotation = false // Required in the current version to avoid "compileOnly" warning
 }
@@ -189,7 +189,7 @@ kotlin {
     }
 }
 
-extensions.getByType<SuspendTransformGradleExtension>().apply {
+/*extensions.getByType<SuspendTransformGradleExtension>().apply {
     transformers[TargetPlatform.JS] = mutableListOf(
         SuspendTransformConfiguration.jsPromiseTransformer.copy(
             copyAnnotationExcludes = listOf(
@@ -197,7 +197,7 @@ extensions.getByType<SuspendTransformGradleExtension>().apply {
             )
         )
     )
-}
+}*/
 
 publishing {
     publications {

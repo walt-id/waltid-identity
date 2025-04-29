@@ -16,10 +16,10 @@ repositories {
     maven("https://jitpack.io")
 }
 
-suspendTransform {
+suspendTransformPlugin {
     enabled = true
     includeRuntime = true
-    useJvmDefault()
+    transformers { useDefault() }
 }
 
 java {

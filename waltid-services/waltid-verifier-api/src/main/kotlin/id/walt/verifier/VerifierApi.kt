@@ -4,7 +4,6 @@ package id.walt.verifier
 
 import com.nimbusds.jose.JWSAlgorithm
 import id.walt.commons.config.ConfigManager
-import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.oid4vc.data.OpenId4VPProfile
@@ -18,6 +17,7 @@ import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.SwaggerPresentationSessionInfo
 import id.walt.verifier.oidc.VerificationUseCase
 import id.walt.verifier.oidc.VerificationUseCase.FailedVerificationException
+import id.walt.w3c.utils.VCFormat
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -301,13 +301,14 @@ fun Application.verifierApi() {
                     }
                 }
             }) {
-
-                logger.info { "POST verify/state" }
+                logger.trace { "POST verify/state" }
                 val sessionId = call.parameters.getOrFail("state")
-                logger.info { "State: $sessionId" }
+                logger.trace { "State: $sessionId" }
                 verificationUseCase.verify(sessionId, call.request.call.receiveParameters().toMap())
-                    .onSuccess {
-                        val session = verificationUseCase.getSession(sessionId!!)
+                    .also {
+                        verificationUseCase.notifySubscribers(sessionId)
+                    }.onSuccess {
+                        val session = verificationUseCase.getSession(sessionId)
                         if (session.walletInitiatedAuthState != null) {
                             val state = session.walletInitiatedAuthState
                             val code = Uuid.random().toString()
@@ -316,36 +317,27 @@ fun Application.verifierApi() {
                             call.respond(HttpStatusCode.OK, it)
                         }
                     }.onFailure {
-                        runBlocking { logger.debug(it) { "Verification failed ($it)" } }
+                        logger.debug(it) { "Verification failed ($it)" }
                         val errorDescription = it.message ?: "Verification failed"
-                        runBlocking { logger.error { "Error: $errorDescription" } }
-                        if (sessionId != null) {
-                            val session = verificationUseCase.getSession(sessionId)
-                            if (session.walletInitiatedAuthState != null) {
+                        logger.error { "Error: $errorDescription" }
+                        val session = verificationUseCase.getSession(sessionId)
+                        when {
+                            session.walletInitiatedAuthState != null -> {
                                 val state = session.walletInitiatedAuthState
-                                runBlocking {
-                                    this@post.call.respondRedirect(
-                                        "openid://?state=$state&error=invalid_request&error_description=${getErrorDescription(it)}"
-                                    )
-                                }
-                            } else if (it is FailedVerificationException && it.redirectUrl != null) {
-                                runBlocking {
-                                    this@post.call.respond(HttpStatusCode.BadRequest, it.redirectUrl)
-                                }
+                                call.respondRedirect(
+                                    "openid://?state=$state&error=invalid_request&error_description=${getErrorDescription(it)}"
+                                )
+                            }
 
-                            } else {
+                            it is FailedVerificationException && it.redirectUrl != null -> {
+                                call.respond(HttpStatusCode.BadRequest, it.redirectUrl)
+                            }
+
+                            else -> {
                                 throw it
                             }
-                        } else {
-                            runBlocking {
-                                logger.error(it) { "/verify error: $errorDescription" }
-                                this@post.call.respond(HttpStatusCode.BadRequest, errorDescription)
-                            }
                         }
-                    }.also {
-                        verificationUseCase.notifySubscribers(sessionId)
                     }
-
             }
 
             get("/session/{id}", {
@@ -483,7 +475,8 @@ fun Application.verifierApi() {
 
             val stateId = Uuid.random().toString()
             // Parse session TTL from query parameter if provided
-            val sessionTtl = params["sessionTtl"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull?.toLongOrNull()?.let { it.seconds }
+            val sessionTtl =
+                params["sessionTtl"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull?.toLongOrNull()?.let { it.seconds }
 
             val session = verificationUseCase.createSession(
                 vpPoliciesJson = null,
