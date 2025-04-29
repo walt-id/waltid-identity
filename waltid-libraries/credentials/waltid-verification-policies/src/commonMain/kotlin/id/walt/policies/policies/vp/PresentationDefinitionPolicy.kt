@@ -8,6 +8,7 @@ import id.walt.definitionparser.PresentationSubmission
 import id.walt.policies.CredentialWrapperValidatorPolicy
 import id.walt.policies.PresentationDefinitionException
 import id.walt.policies.PresentationDefinitionRelationalConstraintException
+import id.walt.policies.PresentationDefinitionRelationalConstraintException.RelationalConstraintType
 import id.walt.sdjwt.SDJwt
 import id.walt.w3c.utils.VCFormat
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -34,22 +35,23 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy() {
         descriptorId: String
     ): Result<Unit> {
         for (cred in matchedCredentials) {
-            val issuer = getIssuerDid(cred)
-                ?: return Result.failure(IllegalArgumentException("Cannot find issuer for credential matching descriptor $descriptorId: $cred"))
-            val subject = getSubjectDid(cred)
-                ?: return Result.failure(IllegalArgumentException("Cannot find subject for credential matching descriptor $descriptorId: $cred"))
+            fun cannotFindField(field: String): Result<Unit> =
+                Result.failure(IllegalArgumentException("Cannot find $field for credential matching descriptor $descriptorId: $cred"))
+
+            val issuer = getIssuerDid(cred) ?: return cannotFindField("issuer")
+            val subject = getSubjectDid(cred) ?: return cannotFindField("subject")
 
             if (issuer != subject) {
-                log.error { "subject_is_issuer constraint failed for descriptor $descriptorId. Issuer: $issuer, Subject: $subject" }
+                log.debug { "subject_is_issuer constraint failed for descriptor $descriptorId. Issuer: $issuer, Subject: $subject" }
                 return Result.failure(
                     PresentationDefinitionRelationalConstraintException(
-                        constraint = "subject_is_issuer",
+                        constraint = RelationalConstraintType.subject_is_issuer,
                         "Subject ($subject) does not match issuer ($issuer) for descriptor $descriptorId."
                     )
                 )
             }
         }
-        log.debug { "subject_is_issuer constraint passed for descriptor $descriptorId" }
+        log.trace { "subject_is_issuer constraint passed for descriptor $descriptorId" }
         return Result.success(Unit)
     }
 
@@ -66,13 +68,13 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy() {
                 log.error { "is_holder constraint failed for descriptor $descriptorId. Subject: $subject, Holder: $vpHolderDid" }
                 return Result.failure(
                     PresentationDefinitionRelationalConstraintException(
-                        constraint = "is_holder",
+                        constraint = RelationalConstraintType.is_holder,
                         "Credential subject ($subject) does not match VP holder ($vpHolderDid) for descriptor $descriptorId."
                     )
                 )
             }
         }
-        log.debug { "is_holder constraint passed for descriptor $descriptorId" }
+        log.trace { "is_holder constraint passed for descriptor $descriptorId" }
         return Result.success(Unit)
     }
 
@@ -80,11 +82,11 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy() {
         presentationDefinition: PresentationDefinition,
         subjectDidsPerFieldId: Map<String, Set<String>>
     ): Result<Unit> {
-        log.debug { "Performing same_subject checks..." }
+        log.trace { "Performing same_subject checks..." }
         presentationDefinition.inputDescriptors.forEach { inputDescriptor ->
             inputDescriptor.constraints.sameSubject?.forEach { sameSubjectConstraint ->
                 if (sameSubjectConstraint.directive == Directive.required) {
-                    log.debug { "Checking required same_subject for fields: ${sameSubjectConstraint.fieldId} (related to descriptor ${inputDescriptor.id})" }
+                    log.trace { "Checking required same_subject for fields: ${sameSubjectConstraint.fieldId} (related to descriptor ${inputDescriptor.id})" }
 
                     val subjectSets = sameSubjectConstraint.fieldId
                         .mapNotNull { fieldId -> subjectDidsPerFieldId[fieldId]?.takeIf { it.isNotEmpty() } }
@@ -92,10 +94,10 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy() {
                     // Check if all field IDs mentioned in the constraint actually yielded subjects
                     if (subjectSets.size != sameSubjectConstraint.fieldId.size) {
                         val missingFieldIds = sameSubjectConstraint.fieldId.filter { subjectDidsPerFieldId[it].isNullOrEmpty() }
-                        log.error { "same_subject constraint failed: Not all specified field_ids (${sameSubjectConstraint.fieldId}) yielded subject DIDs. Missing: $missingFieldIds" }
+                        log.debug { "same_subject constraint failed: Not all specified field_ids (${sameSubjectConstraint.fieldId}) yielded subject DIDs. Missing: $missingFieldIds" }
                         return Result.failure(
                             PresentationDefinitionRelationalConstraintException(
-                                constraint = "same_subject",
+                                constraint = RelationalConstraintType.same_subject,
                                 "Required field_id(s) did not resolve to subjects: $missingFieldIds"
                             )
                         )
@@ -106,20 +108,20 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy() {
                         val firstSubjectSet = subjectSets.first()
                         if (!subjectSets.all { it == firstSubjectSet }) {
                             val distinctSubjects = subjectSets.flatten().distinct()
-                            log.error { "same_subject constraint failed for fields ${sameSubjectConstraint.fieldId}. Found differing subjects: $distinctSubjects" }
+                            log.debug { "same_subject constraint failed for fields ${sameSubjectConstraint.fieldId}. Found differing subjects: $distinctSubjects" }
                             return Result.failure(
                                 PresentationDefinitionRelationalConstraintException(
-                                    constraint = "same_subject",
+                                    constraint = RelationalConstraintType.same_subject,
                                     "Subjects did not match for fields: ${sameSubjectConstraint.fieldId}. Subjects found: $distinctSubjects"
                                 )
                             )
                         }
-                        log.debug { "same_subject constraint passed for fields ${sameSubjectConstraint.fieldId} with subject(s): $firstSubjectSet" }
+                        log.trace { "same_subject constraint passed for fields ${sameSubjectConstraint.fieldId} with subject(s): $firstSubjectSet" }
                     } else {
-                        log.warn { "same_subject constraint for fields ${sameSubjectConstraint.fieldId} had no subjects to compare (this should have been caught earlier)." }
+                        log.debug { "same_subject constraint for fields ${sameSubjectConstraint.fieldId} had no subjects to compare (this should have been caught earlier)." }
                         return Result.failure(
                             PresentationDefinitionRelationalConstraintException(
-                                constraint = "same_subject",
+                                constraint = RelationalConstraintType.same_subject,
                                 "No subjects found for required field_ids: ${sameSubjectConstraint.fieldId}"
                             )
                         )
@@ -127,7 +129,7 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy() {
                 }
             }
         }
-        log.debug { "All same_subject checks passed." }
+        log.trace { "All same_subject checks passed." }
         return Result.success(Unit)
     }
 
@@ -156,15 +158,18 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy() {
             VCFormat.sd_jwt_vc -> flowOf(data) // Assuming 'data' itself is the credential structure for sd-jwt
             else -> (data["vp"]?.jsonObject?.get("verifiableCredential")?.jsonArray?.mapNotNull { vc ->
                 vc.jsonPrimitive.contentOrNull?.let { SDJwt.parse(it) }?.fullPayload
-                // Consider adding logging or specific error if parsing fails here
             } ?: emptyList()).asFlow()
+        }
+
+        val hasSameSubjectConstraint = presentationDefinition.inputDescriptors.any {
+            it.constraints.sameSubject?.isNotEmpty() == true
         }
 
         val subjectDidsPerFieldId = mutableMapOf<String, MutableSet<String>>()
         var allDescriptorsMatched = true
 
         for (inputDescriptor in presentationDefinition.inputDescriptors) {
-            log.debug { "Processing Input Descriptor: ${inputDescriptor.id}" }
+            log.trace { "Processing Input Descriptor: ${inputDescriptor.id}" }
 
             val matchedCredentials = PresentationDefinitionParser.matchCredentialsForInputDescriptor(
                 credentialsFlow,
@@ -172,12 +177,12 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy() {
             ).toList()
 
             if (matchedCredentials.isEmpty()) {
-                log.warn { "Input descriptor ${inputDescriptor.id} did not match any credentials." }
+                log.debug { "Input descriptor ${inputDescriptor.id} did not match any credentials." }
                 allDescriptorsMatched = false
                 continue
             }
 
-            log.debug { "Input descriptor ${inputDescriptor.id} matched ${matchedCredentials.size} credential(s)." }
+            log.trace { "Input descriptor ${inputDescriptor.id} matched ${matchedCredentials.size} credential(s)." }
 
             // subject_is_issuer
             if (inputDescriptor.constraints.subjectIsIssuer?.equals("required", ignoreCase = true) == true) {
@@ -192,18 +197,21 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy() {
             }
 
             // --- Collect Data for Cross-Descriptor Checks (same_subject) ---
-            inputDescriptor.constraints.fields?.filter { it.id != null }?.forEach { field ->
-                val fieldId = field.id!!
-                matchedCredentials.forEach { cred ->
-                    getSubjectDid(cred)?.let { subjectDid ->
-                        subjectDidsPerFieldId.getOrPut(fieldId) { mutableSetOf() }.add(subjectDid)
-                    } ?: log.warn { "Could not extract subject DID for credential matching field $fieldId in descriptor ${inputDescriptor.id}" }
+            if (hasSameSubjectConstraint) {
+                inputDescriptor.constraints.fields?.filter { it.id != null }?.forEach { field ->
+                    val fieldId = field.id!!
+                    matchedCredentials.forEach { cred ->
+                        getSubjectDid(cred)?.let { subjectDid ->
+                            subjectDidsPerFieldId.getOrPut(fieldId) { mutableSetOf() }.add(subjectDid)
+                        }
+                            ?: log.debug { "Could not extract subject DID for credential matching field $fieldId in descriptor ${inputDescriptor.id}" }
+                    }
                 }
             }
         }
 
         // --- Apply Cross-Descriptor Constraints (same_subject) ---
-        if (allDescriptorsMatched) {
+        if (allDescriptorsMatched && hasSameSubjectConstraint) {
             // Only check same_subject if all descriptors were initially matched
             checkSameSubject(presentationDefinition, subjectDidsPerFieldId).getOrElse { return Result.failure(it) }
         }
@@ -220,7 +228,7 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy() {
             }
             Result.success(presentedTypes)
         } else {
-            log.error { "Presentation Definition Policy verification failed: Not all input descriptors were satisfied." }
+            log.debug { "Presentation Definition Policy verification failed: Not all input descriptors were satisfied." }
             Result.failure(PresentationDefinitionException(false))
         }
     }
@@ -245,6 +253,7 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy() {
         return when (format) {
             VCFormat.ldp_vp, VCFormat.jwt_vp_json ->
                 vpWrapper["vp"]?.jsonObject?.get("holder")?.jsonPrimitive?.contentOrNull
+
             else -> null
         } ?: vpWrapper["holder"]?.jsonPrimitive?.contentOrNull
         ?: vpWrapper["iss"]?.jsonPrimitive?.contentOrNull
