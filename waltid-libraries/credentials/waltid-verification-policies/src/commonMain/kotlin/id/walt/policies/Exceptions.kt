@@ -69,9 +69,18 @@ class PresentationDefinitionException(
 @Serializable
 @SerialName("PresentationDefinitionRelationalConstraintException")
 class PresentationDefinitionRelationalConstraintException(
-    val constraint: String,
+    val constraint: RelationalConstraintType,
     val constraintFailureDescription: String
-) : SerializableRuntimeException()
+) : SerializableRuntimeException() {
+
+    @Suppress("EnumEntryName")
+    enum class RelationalConstraintType {
+        subject_is_issuer,
+        is_holder,
+        same_subject
+    }
+
+}
 
 @JsExport
 @Serializable
