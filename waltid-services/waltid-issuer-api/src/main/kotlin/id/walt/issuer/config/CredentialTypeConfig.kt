@@ -58,13 +58,13 @@ data class CredentialTypeConfig(
                 docType = MDocTypes.ISO_MDL
             )
         ),
-        "testCredential+jwt-vc-json" to vc(
+        /*"testCredential+jwt-vc-json" to vc(
             CredentialSupported(
                 format = CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"),
                 credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
                 credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "TestCredential")),
-                display = listOf(
+                display = listOf( // <-- Breaks EBSI draft11 compatibility. Instead, configure in credential-issuer-metadata.conf
                     DisplayProperties(
                         name = "Test Credential",
                         locale = "en-US",
@@ -83,7 +83,7 @@ data class CredentialTypeConfig(
                 ),
             )
         ),
-        "testCredential+sd-jwt" to vc(
+        "testCredential+sd-jwt" to vc( // <-- Breaks EBSI draft11 compatibility due to missing "type"
             CredentialSupported(
                 format = CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"),
@@ -93,8 +93,8 @@ data class CredentialTypeConfig(
                     vct = baseUrl.plus("/identity_credential"),
                     name = "Identity Credential",
                     description = "The Identity Verifiable Credential"
-                ),
-                display = listOf(
+                )
+                display = listOf( // <-- Breaks EBSI draft11 compatibility. Instead, configure in credential-issuer-metadata.conf
                     DisplayProperties(
                         name = "Test Credential",
                         locale = "en-US",
@@ -108,8 +108,8 @@ data class CredentialTypeConfig(
                     )
                 ),
             )
-        ),
-        "urn:eu.europa.ec.eudi:pid:1" to vc(
+        ),*/
+        "urn:eu.eur1opa.ec.eudi:pid:1" to vc(
             CredentialSupported(
                 format = CredentialFormat.sd_jwt_vc,
                 cryptographicBindingMethodsSupported = setOf("jwk"),
