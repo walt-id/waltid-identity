@@ -64,7 +64,7 @@ data class CredentialTypeConfig(
                 cryptographicBindingMethodsSupported = setOf("did"),
                 credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
                 credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "TestCredential")),
-                display = listOf(
+                /*display = listOf( // <-- Breaks EBSI draft11 compatibility. Instead, configure in credential-issuer-metadata.conf
                     DisplayProperties(
                         name = "Test Credential",
                         locale = "en-US",
@@ -80,7 +80,7 @@ data class CredentialTypeConfig(
                             altText = "Background"
                         )
                     )
-                ),
+                ),*/
             )
         ),
         "testCredential+sd-jwt" to vc(
@@ -93,8 +93,8 @@ data class CredentialTypeConfig(
                     vct = baseUrl.plus("/identity_credential"),
                     name = "Identity Credential",
                     description = "The Identity Verifiable Credential"
-                ),
-                display = listOf(
+                )/*,
+                display = listOf( // <-- Breaks EBSI draft11 compatibility. Instead, configure in credential-issuer-metadata.conf
                     DisplayProperties(
                         name = "Test Credential",
                         locale = "en-US",
@@ -106,7 +106,7 @@ data class CredentialTypeConfig(
                         backgroundColor = "#FFFFFF",
                         textColor = "#000000"
                     )
-                ),
+                ),*/
             )
         ),
         "urn:eu.europa.ec.eudi:pid:1" to vc(
