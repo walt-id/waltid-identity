@@ -309,6 +309,30 @@ fun Application.issuerApi() {
                                     "OpenBadgeCredential example with Authorization Code Flow and Username/Password Token",
                                     IssuanceExamples.openBadgeCredentialIssuanceExampleWithUsernamePassword
                                 )
+                                example(
+                                    "EBSI-VECTOR interoperability test - InTimeIssuance Draft11",
+                                    IssuanceExamples.ebsiCTExampleAuthInTimeDraft11
+                                )
+                                example(
+                                    "EBSI-VECTOR interoperability test - DeferredIssuance Draft11",
+                                    IssuanceExamples.ebsiCTExampleAuthDeferredDraft11
+                                )
+                                example(
+                                    "EBSI-VECTOR interoperability test - PreAuthIssuance Draft11",
+                                    IssuanceExamples.ebsiCTExamplePreAuthDraft11
+                                )
+                                example(
+                                    "EBSI-VECTOR interoperability test - InTimeIssuance Draft13",
+                                    IssuanceExamples.ebsiCTExampleAuthInTimeDraft13
+                                )
+                                example(
+                                    "EBSI-VECTOR interoperability test - DeferredIssuance Draft13",
+                                    IssuanceExamples.ebsiCTExampleAuthDeferredDraft13
+                                )
+                                example(
+                                    "EBSI-VECTOR interoperability test - PreAuthIssuance Draft13",
+                                    IssuanceExamples.ebsiCTExamplePreAuthDraft13
+                                )
                                 required = true
                             }
                         }
