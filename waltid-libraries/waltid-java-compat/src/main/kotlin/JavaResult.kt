@@ -8,7 +8,8 @@
 class JavaResult<T>(val result: Result<T>) {
 
     companion object {
-        fun <T> success(value: T): JavaResult<T> = JavaResult(Result.success(value))
+        fun <T> success(value: T): JavaResult<T> =
+            JavaResult(Result.success(value))
 
         fun <T> failure(throwable: Throwable): JavaResult<T> =
             JavaResult(Result.failure(throwable))
@@ -40,7 +41,8 @@ class JavaResult<T>(val result: Result<T>) {
      */
     fun exceptionOrNull(): Throwable? = result.exceptionOrNull()
 
-    override fun toString(): String =
-        if (isSuccess) "JavaResult(value = ${getOrNull()})"
-        else "JavaResult(exception = ${exceptionOrNull()?.message})"
+    override fun toString(): String = when {
+        isSuccess -> "JavaResult(value = ${getOrNull()})"
+        else -> "JavaResult(exception = ${exceptionOrNull()?.message})"
+    }
 }
