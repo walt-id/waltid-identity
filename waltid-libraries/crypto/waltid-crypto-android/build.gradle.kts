@@ -19,7 +19,7 @@ repositories {
 suspendTransformPlugin {
     enabled = true
     includeRuntime = true
-    useJvmDefault()
+    transformers { useDefault() }
 }
 
 java {
