@@ -18,6 +18,9 @@ data class W3C11(
     override val credentialData: JsonObject,
     override val originalCredentialData: JsonObject? = null,
 
+    override var issuer: String?,
+    override var subject: String?,
+
     // Signature
     override val signature: CredentialSignature?,
     override val signed: String?
