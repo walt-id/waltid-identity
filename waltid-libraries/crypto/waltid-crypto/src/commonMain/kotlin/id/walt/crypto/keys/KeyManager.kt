@@ -2,7 +2,6 @@ package id.walt.crypto.keys
 
 import id.walt.crypto.exceptions.KeyBackendNotSupportedException
 import id.walt.crypto.exceptions.KeyTypeMissingException
-import id.walt.crypto.exceptions.KeyTypeNotSupportedException
 import id.walt.crypto.keys.aws.AWSKeyRestAPI
 import id.walt.crypto.keys.azure.AzureKey
 import id.walt.crypto.keys.jwk.JWKKey
@@ -22,7 +21,7 @@ object KeyManager {
     val types = HashMap<String, KType>()
     val keyTypeGeneration = HashMap<String, suspend (KeyGenerationRequest) -> Key>()
 
-    fun getRegisteredKeyType(type: String): KType = types[type] ?: throw KeyTypeNotSupportedException(type)
+    fun getRegisteredKeyBackend(type: String): KType = types[type] ?: throw KeyBackendNotSupportedException(type)
 
     init {
         register<JWKKey>("jwk") { generateRequest: KeyGenerationRequest -> JWKKey.generate(generateRequest.keyType) }
@@ -82,7 +81,7 @@ object KeyManager {
 
     // TODO: return Result<..>
     suspend fun resolveSerializedKey(json: JsonObject): Key = json["type"]?.jsonPrimitive?.content?.let {
-        val type = getRegisteredKeyType(it)
+        val type = getRegisteredKeyBackend(it)
         val fields = json.filterKeys { it != "type" }.mapValues { it.value }
         Json.decodeFromJsonElement(serializer(type), JsonObject(fields)) as Key
     }?.apply { init() } ?: throw KeyTypeMissingException()
