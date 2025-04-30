@@ -15,6 +15,7 @@ class ExplicitClaimStrategy(
     private val credentialService: CredentialsService,
     private val eventUseCase: EventLogUseCase,
 ) {
+    @OptIn(ExperimentalUuidApi::class)
     suspend fun claim(
         tenant: String, account: Uuid, wallet: Uuid, did: String, offer: String, pending: Boolean = true,
     ): List<WalletCredential> = issuanceService.useOfferRequest(
