@@ -111,7 +111,52 @@ object VerifierApiExamples {
         """.trimIndent()
     )
 
+    val EBSIVectorExampleInTimeIssuance = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "request_credentials":
+                [
+                    { "format": "jwt_vc", "type": "InTimeIssuance" }
+                ]
+            }
+        """.trimIndent()
+    )
 
+    val EBSIVectorExampleDeferredIssuance = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "request_credentials":
+                [
+                    { "format": "jwt_vc", "type": "DeferredIssuance" }
+                ]
+            }
+        """.trimIndent()
+    )
+
+    val EBSIVectorExamplePreAuthIssuance = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "request_credentials":
+                [
+                    { "format": "jwt_vc", "type": "PreAuthIssuance" }
+                ]
+            }
+        """.trimIndent()
+    )
+
+    val EBSIVectorExampleAllIssuance = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "request_credentials":
+                [
+                    { "format": "jwt_vc", "type": "InTimeIssuance" },
+                    { "format": "jwt_vc", "type": "DeferredIssuance" },
+                    { "format": "jwt_vc", "type": "PreAuthIssuance" }
+
+                ]
+            }
+        """.trimIndent()
+    )
     //language=json
     val dynamicPolicy = jsonObjectValueExampleDescriptorDsl(
         """
