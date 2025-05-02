@@ -95,7 +95,8 @@ data class IssuanceRequest(
     var credentialFormat: CredentialFormat? = null,
     val standardVersion: OpenID4VCIVersion? = OpenID4VCIVersion.DRAFT13,
     val display: List<DisplayProperties>? = null,
-    ) {
+    val issuanceType: String? = null, // IN_TIME, DEFERRED
+) {
     constructor(
         issuerKey: JsonObject,
         credentialConfigurationId: String,
@@ -113,6 +114,7 @@ data class IssuanceRequest(
         credentialFormat: CredentialFormat? = null,
         standardVersion: OpenID4VCIVersion? = OpenID4VCIVersion.DRAFT13,
         display: List<DisplayProperties>? = null,
+        issuanceType: String? = null,
     ) :
         this(
             issuerKey,
@@ -131,7 +133,8 @@ data class IssuanceRequest(
             trustedRootCAs,
             credentialFormat,
             standardVersion,
-            display
+            display,
+            issuanceType
         )
     init {
         credentialData?.let {
