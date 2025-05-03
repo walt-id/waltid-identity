@@ -216,6 +216,11 @@ fun Application.verifierApi() {
                             "SD-JWT-VC verification example with mandatory fields",
                             VerifierApiExamples.sdJwtVCExampleWithRequiredFields
                         )
+                        example("EBSI-VECTOR interoperability test - InTimeIssuance", VerifierApiExamples.EBSIVectorExampleInTimeIssuance)
+                        example("EBSI-VECTOR interoperability test - DeferredIssuance", VerifierApiExamples.EBSIVectorExampleDeferredIssuance)
+                        example("EBSI-VECTOR interoperability test - PreAuthIssuance", VerifierApiExamples.EBSIVectorExamplePreAuthIssuance)
+                        example("EBSI-VECTOR interoperability test - All", VerifierApiExamples.EBSIVectorExampleAllIssuance)
+
                     }
                 }
 
