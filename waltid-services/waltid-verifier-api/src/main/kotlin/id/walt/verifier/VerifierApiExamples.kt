@@ -1,7 +1,7 @@
 package id.walt.verifier
 
 import id.walt.commons.interop.LspPotentialInterop
-import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
+import io.github.smiley4.ktoropenapi.config.ValueExampleDescriptorConfig
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -9,7 +9,7 @@ import kotlinx.serialization.json.encodeToJsonElement
 object VerifierApiExamples {
 
     //todo: remove line when ktor-swagger-ui#107 is fixed
-    private fun jsonObjectValueExampleDescriptorDsl(content: String): ValueExampleDescriptorDsl.() -> Unit = {
+    private fun jsonObjectValueExampleDescriptorDsl(content: String): ValueExampleDescriptorConfig.() -> Unit = {
         value = Json.decodeFromString<JsonObject>(content)
     }
 
@@ -111,7 +111,52 @@ object VerifierApiExamples {
         """.trimIndent()
     )
 
+    val EBSIVectorExampleInTimeIssuance = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "request_credentials":
+                [
+                    { "format": "jwt_vc", "type": "InTimeIssuance" }
+                ]
+            }
+        """.trimIndent()
+    )
 
+    val EBSIVectorExampleDeferredIssuance = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "request_credentials":
+                [
+                    { "format": "jwt_vc", "type": "DeferredIssuance" }
+                ]
+            }
+        """.trimIndent()
+    )
+
+    val EBSIVectorExamplePreAuthIssuance = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "request_credentials":
+                [
+                    { "format": "jwt_vc", "type": "PreAuthIssuance" }
+                ]
+            }
+        """.trimIndent()
+    )
+
+    val EBSIVectorExampleAllIssuance = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "request_credentials":
+                [
+                    { "format": "jwt_vc", "type": "InTimeIssuance" },
+                    { "format": "jwt_vc", "type": "DeferredIssuance" },
+                    { "format": "jwt_vc", "type": "PreAuthIssuance" }
+
+                ]
+            }
+        """.trimIndent()
+    )
     //language=json
     val dynamicPolicy = jsonObjectValueExampleDescriptorDsl(
         """

@@ -2,9 +2,9 @@ package id.walt.issuer
 
 import id.walt.commons.logging.LoggingManager
 import id.walt.commons.logging.setups.TraceLoggingSetup
-import id.walt.credentials.CredentialBuilder
-import id.walt.credentials.CredentialBuilderType
-import id.walt.credentials.issuance.Issuer.baseIssue
+import id.walt.w3c.CredentialBuilder
+import id.walt.w3c.CredentialBuilderType
+import id.walt.w3c.issuance.Issuer.baseIssue
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey

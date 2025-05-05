@@ -1,6 +1,6 @@
 package id.walt.webwallet.web.controllers.exchange.openapi.examples
 
-import id.walt.credentials.utils.VCFormat
+import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.DescriptorMapping
@@ -11,7 +11,7 @@ import id.walt.webwallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIR
 import id.walt.webwallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIResponse
 import id.walt.webwallet.web.controllers.exchange.models.oid4vci.SubmitOID4VCIRequest
 import id.walt.webwallet.web.controllers.exchange.models.oid4vp.*
-import io.github.smiley4.ktorswaggerui.dsl.routes.ValueExampleDescriptorDsl
+import io.github.smiley4.ktoropenapi.config.ValueExampleDescriptorConfig
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
@@ -50,15 +50,15 @@ object ExchangeExternalSignaturesExamples {
         ),
     )
 
-    fun prepareOid4vpRequestW3CVCExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun prepareOid4vpRequestW3CVCExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = prepareOid4vpRequestW3CVCExample
     }
 
-    fun prepareOid4vpRequestW3CSDJWTVCExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun prepareOid4vpRequestW3CSDJWTVCExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = prepareOid4vpRequestW3CSDJWTVCExample
     }
 
-    fun prepareOid4vpRequestIETFSDJWTVCExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun prepareOid4vpRequestIETFSDJWTVCExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = prepareOid4vpRequestIETFSDJWTVCExample
     }
 
@@ -202,15 +202,15 @@ object ExchangeExternalSignaturesExamples {
         ),
     )
 
-    fun prepareOid4vpResponseW3CVCExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun prepareOid4vpResponseW3CVCExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = prepareOid4vpResponseW3CVCExample
     }
 
-    fun prepareOid4vpResponseW3CSDJWTVCExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun prepareOid4vpResponseW3CSDJWTVCExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = prepareOid4vpResponseW3CSDJWTVCExample
     }
 
-    fun prepareOid4vpResponseIETFSDJWTVCExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun prepareOid4vpResponseIETFSDJWTVCExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = prepareOid4vpResponseIETFSDJWTVCExample
     }
 
@@ -243,15 +243,15 @@ object ExchangeExternalSignaturesExamples {
         ),
     )
 
-    fun submitOid4vpRequestW3CVCExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun submitOid4vpRequestW3CVCExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = submitOid4vpRequestW3CVCExample
     }
 
-    fun submitOid4vpRequestW3CSDJWTVCExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun submitOid4vpRequestW3CSDJWTVCExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = submitOid4vpRequestW3CSDJWTVCExample
     }
 
-    fun submitOid4vpRequestIETFSDJWTVCExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun submitOid4vpRequestIETFSDJWTVCExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = submitOid4vpRequestIETFSDJWTVCExample
     }
 
@@ -262,7 +262,7 @@ object ExchangeExternalSignaturesExamples {
         offerURL = "openid-credential-offer://localhost:22222/?credential_offer_uri=http%3A%2F%2Flocalhost%3A22222%2Fopenid4vc%2FcredentialOffer%3Fid%3D8030eb87-fa89-4820-ad36-8e89cc9ccdfe",
     )
 
-    fun prepareOid4vciRequestDefaultExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun prepareOid4vciRequestDefaultExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = prepareOid4vciRequestDefaultExample
     }
 
@@ -359,15 +359,15 @@ object ExchangeExternalSignaturesExamples {
         credentialIssuer = "http://localhost:22222",
     )
 
-    fun prepareOid4vciResponseW3CVCExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun prepareOid4vciResponseW3CVCExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = prepareOid4vciResponseW3CVCExample
     }
 
-    fun prepareOid4vciResponseIETFSDJWTVCExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun prepareOid4vciResponseIETFSDJWTVCExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = prepareOid4vciResponseIETFSDJWTVCExample
     }
 
-    fun prepareOid4vciResponseMDocVCExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun prepareOid4vciResponseMDocVCExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = prepareOid4vciResponseMDocVCExample
     }
 
@@ -424,15 +424,15 @@ object ExchangeExternalSignaturesExamples {
         credentialIssuer = "http://localhost:22222",
     )
 
-    fun submitOid4vciRequestW3CVCExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun submitOid4vciRequestW3CVCExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = submitOid4vciRequestW3CVCExample
     }
 
-    fun submitOid4vciRequestIETFSDJWTVCExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun submitOid4vciRequestIETFSDJWTVCExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = submitOid4vciRequestIETFSDJWTVCExample
     }
 
-    fun submitOid4vciRequestMDocVCExample(): ValueExampleDescriptorDsl.() -> Unit = {
+    fun submitOid4vciRequestMDocVCExample(): ValueExampleDescriptorConfig.() -> Unit = {
         value = submitOid4vciRequestMDocVCExample
     }
 }

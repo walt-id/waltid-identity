@@ -8,7 +8,7 @@ import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.config.JwtAuthConfiguration
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
-import io.github.smiley4.ktorswaggerui.dsl.routing.post
+import io.github.smiley4.ktoropenapi.post
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*

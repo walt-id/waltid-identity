@@ -14,7 +14,7 @@ repositories {
 }
 
 object Versions {
-    const val KTOR_VERSION = "3.1.0" // also change 1 plugin
+    const val KTOR_VERSION = "3.1.2" // also change 1 plugin
 }
 
 dependencies {
@@ -32,9 +32,9 @@ dependencies {
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
     // Logging
-    api("io.klogging:klogging-jvm:0.9.1") // JVM + ~JS
-    implementation("io.klogging:slf4j-klogging:0.9.1")
-    implementation("org.slf4j:jul-to-slf4j:2.0.16")
+    api("io.klogging:klogging-jvm:0.9.4") // JVM + ~JS
+    implementation("io.klogging:slf4j-klogging:0.9.4")
+    implementation("org.slf4j:jul-to-slf4j:2.0.17")
 
     // CLI
     api("com.github.ajalt.clikt:clikt:5.0.3")  // JVM
@@ -45,17 +45,20 @@ dependencies {
     api("com.sksamuel.hoplite:hoplite-hikaricp:2.9.0")
 
     // Kotlinx.serialization
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
 
     // Health checks
-    api("com.sksamuel.cohort:cohort-ktor:2.6.1")
+    api("com.sksamuel.cohort:cohort-ktor:2.6.2")
 
     // OpenAPI
-    api("io.github.smiley4:ktor-swagger-ui:4.1.6")
-    implementation("io.github.smiley4:schema-kenerator-core:1.6.5")
-    implementation("io.github.smiley4:schema-kenerator-serialization:1.6.5")
-    implementation("io.github.smiley4:schema-kenerator-reflection:1.6.5")
-    implementation("io.github.smiley4:schema-kenerator-swagger:1.6.5")
+    api("io.github.smiley4:ktor-openapi:5.0.2")
+    implementation("io.github.smiley4:ktor-swagger-ui:5.0.2")
+    implementation("io.github.smiley4:ktor-redoc:5.0.2")
+
+    implementation("io.github.smiley4:schema-kenerator-core:2.1.2")
+    implementation("io.github.smiley4:schema-kenerator-swagger:2.1.2")
+    implementation("io.github.smiley4:schema-kenerator-serialization:2.1.2")
+    implementation("io.github.smiley4:schema-kenerator-reflection:2.1.2")
 
     // Persistence
     api("io.github.reactivecircus.cache4k:cache4k:0.14.0")
@@ -64,7 +67,7 @@ dependencies {
 
     // Testing
     testApi(kotlin("test"))
-    testApi("io.ktor:ktor-server-test-host:3.1.0")
+    testApi("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
     testApi("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
 }
 
@@ -77,8 +80,8 @@ kotlin {
 
 publishing {
     publications {
-        // Main sources
-        create<MavenPublication>("mavenJava") {
+        create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id service-commons")
                 description.set(
@@ -87,28 +90,31 @@ publishing {
                     """.trimIndent()
                 )
                 url.set("https://walt.id")
+
+                licenses {
+                    license {
+                        name.set("Apache License 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                    }
+                }
+
+                developers {
+                    developer {
+                        id.set("walt.id")
+                        name.set("walt.id")
+                        email.set("office@walt.id")
+                    }
+                }
             }
-            from(components["java"])
         }
     }
 
     repositories {
         maven {
-            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
-            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
-            val envUsername = System.getenv("MAVEN_USERNAME")
-            val envPassword = System.getenv("MAVEN_PASSWORD")
-
-            val usernameFile = File("secret_maven_username.txt")
-            val passwordFile = File("secret_maven_password.txt")
-
-            val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-            val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
-
+            url = uri(if (version.toString().endsWith("SNAPSHOT")) uri("https://maven.waltid.dev/snapshots") else uri("https://maven.waltid.dev/releases"))
             credentials {
-                username = secretMavenUsername
-                password = secretMavenPassword
+                username = System.getenv("MAVEN_USERNAME") ?: File("$rootDir/secret_maven_username.txt").let { if (it.isFile) it.readLines().first() else "" }
+                password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let { if (it.isFile) it.readLines().first() else "" }
             }
         }
     }

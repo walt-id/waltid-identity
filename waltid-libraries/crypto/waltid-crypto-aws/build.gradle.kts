@@ -33,8 +33,8 @@ dependencies {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_15
-    targetCompatibility = JavaVersion.VERSION_15
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
     withJavadocJar()
     withSourcesJar()
 }
@@ -49,7 +49,7 @@ tasks.withType<Test> {
 
 
 kotlin {
-    jvmToolchain(15)
+    jvmToolchain(17)
     sourceSets {
         all {
             languageSettings.enableLanguageFeature("InlineClasses")
@@ -60,8 +60,7 @@ kotlin {
 publishing {
     publications {
         create<MavenPublication>("maven") {
-            from(components["java"])
-
+            from(components["kotlin"])
             pom {
                 name.set("Walt.id Crypto AWS")
                 description.set("Walt.id Crypto AWS Integration")
@@ -87,28 +86,10 @@ publishing {
 
     repositories {
         maven {
-            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
-            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-            url = uri(
-                if (version.toString().endsWith("SNAPSHOT")
-                ) snapshotsRepoUrl else releasesRepoUrl
-            )
-
-            val envUsername = System.getenv("MAVEN_USERNAME")
-            val envPassword = System.getenv("MAVEN_PASSWORD")
-
-            val usernameFile = File("$rootDir/secret_maven_username.txt")
-            val passwordFile = File("$rootDir/secret_maven_password.txt")
-
-            val secretMavenUsername = envUsername ?: usernameFile.let {
-                if (it.isFile) it.readLines().first() else ""
-            }
-            val secretMavenPassword = envPassword ?: passwordFile.let {
-                if (it.isFile) it.readLines().first() else ""
-            }
+            url = uri(if (version.toString().endsWith("SNAPSHOT")) uri("https://maven.waltid.dev/snapshots") else uri("https://maven.waltid.dev/releases"))
             credentials {
-                username = secretMavenUsername
-                password = secretMavenPassword
+                username = System.getenv("MAVEN_USERNAME") ?: File("$rootDir/secret_maven_username.txt").let { if (it.isFile) it.readLines().first() else "" }
+                password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let { if (it.isFile) it.readLines().first() else "" }
             }
         }
     }

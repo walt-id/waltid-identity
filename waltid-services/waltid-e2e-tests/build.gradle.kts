@@ -15,13 +15,15 @@ repositories {
 }
 
 dependencies {
+    val ktorVersion = "3.1.2"
+
     // Testing
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.10.1")
-    testImplementation("io.ktor:ktor-server-test-host:3.1.0")
-    testImplementation("io.ktor:ktor-client-cio:3.1.0")
-    testImplementation("io.ktor:ktor-client-content-negotiation:3.1.0")
-    testImplementation("io.ktor:ktor-client-logging:3.1.0")
+    testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
+    testImplementation("io.ktor:ktor-client-cio:$ktorVersion")
+    testImplementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    testImplementation("io.ktor:ktor-client-logging:$ktorVersion")
 
 
     // Command line formatting
