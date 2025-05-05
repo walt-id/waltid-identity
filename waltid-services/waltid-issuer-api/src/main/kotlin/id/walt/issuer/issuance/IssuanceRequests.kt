@@ -95,6 +95,7 @@ data class IssuanceRequest(
     val standardVersion: OpenID4VCIVersion? = OpenID4VCIVersion.DRAFT13,
     val display: List<DisplayProperties>? = null,
     val draft11EncodeOfferedCredentialsByReference: Boolean? = true, //if set to false and only for standard version DRAFT11, offered credentials will be encoded by value, not by reference - required by EBSI Vector
+    val issuanceType: String? = null, // IN_TIME, DEFERRED
 ) {
     constructor(
         issuerKey: JsonObject,
@@ -113,27 +114,30 @@ data class IssuanceRequest(
         credentialFormat: CredentialFormat? = null,
         standardVersion: OpenID4VCIVersion? = OpenID4VCIVersion.DRAFT13,
         display: List<DisplayProperties>? = null,
+        draft11EncodeOfferedCredentialsByReference: Boolean? = true,
+        issuanceType: String? = null,
     ) :
-            this(
-                issuerKey,
-                credentialConfigurationId,
-                credentialData,
-                vct,
-                null,
-                mapping,
-                selectiveDisclosure,
-                authenticationMethod,
-                vpRequestValue,
-                vpProfile,
-                useJar,
-                issuerDid,
-                x5Chain,
-                trustedRootCAs,
-                credentialFormat,
-                standardVersion,
-                display,
-            )
-
+        this(
+            issuerKey,
+            credentialConfigurationId,
+            credentialData,
+            vct,
+            null,
+            mapping,
+            selectiveDisclosure,
+            authenticationMethod,
+            vpRequestValue,
+            vpProfile,
+            useJar,
+            issuerDid,
+            x5Chain,
+            trustedRootCAs,
+            credentialFormat,
+            standardVersion,
+            display,
+            draft11EncodeOfferedCredentialsByReference,
+            issuanceType,
+        )
     init {
         credentialData?.let {
             require(it.isNotEmpty()) {

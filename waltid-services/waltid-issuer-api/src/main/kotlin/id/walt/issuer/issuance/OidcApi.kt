@@ -490,7 +490,7 @@ object OidcApi : CIProvider() {
                     call.respond(
                         generateCredentialResponse(
                             credentialRequest = credentialRequest,
-                            session = session
+                            session = session,
                         ).toJSON()
                     )
                 } catch (exc: CredentialError) {
@@ -503,8 +503,9 @@ object OidcApi : CIProvider() {
             post("{standardVersion}/credential_deferred") {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
                 if (accessToken.isNullOrEmpty() || !OpenID4VC.verifyTokenSignature(
-                        TokenTarget.DEFERRED_CREDENTIAL,
-                        accessToken
+                        target= TokenTarget.DEFERRED_CREDENTIAL,
+                        token = accessToken,
+                        tokenKey = CI_TOKEN_KEY
                     )
                 ) {
                     call.respond(HttpStatusCode.Unauthorized)
