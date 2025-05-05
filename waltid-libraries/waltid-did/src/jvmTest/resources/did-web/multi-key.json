@@ -1,20 +1,20 @@
 {
   "assertionMethod": [
-    "did:web:localhost%3A8080:multi-key#key1",
-    "did:web:localhost%3A8080:multi-key#key2",
-    "did:web:localhost%3A8080:multi-key#key3"
+    "did:web:localhost%3A<DID_WEB_PORT>:multi-key#key1",
+    "did:web:localhost%3A<DID_WEB_PORT>:multi-key#key2",
+    "did:web:localhost%3A<DID_WEB_PORT>:multi-key#key3"
   ],
   "authentication": [
-    "did:web:localhost%3A8080:multi-key#key1",
-    "did:web:localhost%3A8080:multi-key#key2",
-    "did:web:localhost%3A8080:multi-key#key3"
+    "did:web:localhost%3A<DID_WEB_PORT>:multi-key#key1",
+    "did:web:localhost%3A<DID_WEB_PORT>:multi-key#key2",
+    "did:web:localhost%3A<DID_WEB_PORT>:multi-key#key3"
   ],
   "@context": "https://www.w3.org/ns/did/v1",
-  "id": "did:web:localhost%3A8080:multi-key",
+  "id": "did:web:localhost%3A<DID_WEB_PORT>:multi-key",
   "verificationMethod": [
     {
-      "controller": "did:web:localhost%3A8080:multi-key",
-      "id": "did:web:localhost%3A8080:multi-key#key1",
+      "controller": "did:web:localhost%3A<DID_WEB_PORT>:multi-key",
+      "id": "did:web:localhost%3A<DID_WEB_PORT>:multi-key#key1",
       "publicKeyJwk": {
         "alg": "EdDSA",
         "crv": "Ed25519",
@@ -26,8 +26,8 @@
       "type": "Ed25519VerificationKey2019"
     },
     {
-      "controller": "did:web:localhost%3A8080:multi-key",
-      "id": "did:web:localhost%3A8080:multi-key#key2",
+      "controller": "did:web:localhost%3A<DID_WEB_PORT>:multi-key",
+      "id": "did:web:localhost%3A<DID_WEB_PORT>:multi-key#key2",
       "publicKeyJwk": {
         "alg": "ES256K",
         "crv": "secp256k1",
@@ -40,8 +40,8 @@
       "type": "EcdsaSecp256k1VerificationKey2019"
     },
     {
-      "controller": "did:web:localhost%3A8080:multi-key",
-      "id": "did:web:localhost%3A8080:multi-key#key3",
+      "controller": "did:web:localhost%3A<DID_WEB_PORT>:multi-key",
+      "id": "did:web:localhost%3A<DID_WEB_PORT>:multi-key#key3",
       "publicKeyJwk": {
         "alg": "RS256",
         "e": "AQAB",
