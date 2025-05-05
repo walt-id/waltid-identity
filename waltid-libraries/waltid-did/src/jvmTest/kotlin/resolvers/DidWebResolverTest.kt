@@ -76,7 +76,7 @@ class DidWebResolverTest : DidResolverTestBase() {
                 Stream.of(
                     // Test multi-key DID document
                     arguments(
-                        "did:web:localhost%3A8080:multi-key",
+                        "did:web:localhost%3A${TestServer.DID_WEB_SSL_PORT}:multi-key",
                         // Doesn't matter which key we specify here, we're just testing that the document is resolved
                         Json.decodeFromString<JsonObject>("{\"alg\":\"EdDSA\",\"crv\":\"Ed25519\",\"kid\":\"key1\",\"kty\":\"OKP\",\"use\":\"sig\",\"x\":\"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM\"}"),
                         { did: String, key: JsonObject, result: Result<DidDocument> ->
@@ -104,7 +104,7 @@ class DidWebResolverTest : DidResolverTestBase() {
                 Stream.of(
                     // Test that resolveToKey returns just one key from a multi-key DID
                     arguments(
-                        "did:web:localhost%3A8080:multi-key",
+                        "did:web:localhost%3A${TestServer.DID_WEB_SSL_PORT}:multi-key",
                         // We use Ed25519 key details, but the actual returned key might be any of the three - we'll accept any
                         Json.decodeFromString<JsonObject>("{\"alg\":\"EdDSA\",\"crv\":\"Ed25519\",\"kid\":\"key1\",\"kty\":\"OKP\",\"use\":\"sig\",\"x\":\"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM\"}"),
                         { did: String, key: JsonObject, result: Result<Key> ->
@@ -127,7 +127,7 @@ class DidWebResolverTest : DidResolverTestBase() {
                 Stream.of(
                     // Multi-key test with all three key types
                     arguments(
-                        "did:web:localhost%3A8080:multi-key",
+                        "did:web:localhost%3A${TestServer.DID_WEB_SSL_PORT}:multi-key",
                         // We'll use the Ed25519 key for the test verification
                         Json.decodeFromString<JsonObject>("{\"alg\":\"EdDSA\",\"crv\":\"Ed25519\",\"kid\":\"key1\",\"kty\":\"OKP\",\"use\":\"sig\",\"x\":\"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM\"}"),
                         { did: String, key: JsonObject, result: Result<Set<Key>> ->
