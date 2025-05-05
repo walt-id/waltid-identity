@@ -4,7 +4,6 @@ package id.walt.verifier
 
 import com.nimbusds.jose.JWSAlgorithm
 import id.walt.commons.config.ConfigManager
-import id.walt.credentials.utils.VCFormat
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.oid4vc.data.OpenId4VPProfile
@@ -18,9 +17,10 @@ import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.SwaggerPresentationSessionInfo
 import id.walt.verifier.oidc.VerificationUseCase
 import id.walt.verifier.oidc.VerificationUseCase.FailedVerificationException
-import io.github.smiley4.ktorswaggerui.dsl.routing.get
-import io.github.smiley4.ktorswaggerui.dsl.routing.post
-import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import id.walt.w3c.utils.VCFormat
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.post
+import io.github.smiley4.ktoropenapi.route
 import io.klogging.logger
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -38,7 +38,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -217,6 +216,11 @@ fun Application.verifierApi() {
                             "SD-JWT-VC verification example with mandatory fields",
                             VerifierApiExamples.sdJwtVCExampleWithRequiredFields
                         )
+                        example("EBSI-VECTOR interoperability test - InTimeIssuance", VerifierApiExamples.EBSIVectorExampleInTimeIssuance)
+                        example("EBSI-VECTOR interoperability test - DeferredIssuance", VerifierApiExamples.EBSIVectorExampleDeferredIssuance)
+                        example("EBSI-VECTOR interoperability test - PreAuthIssuance", VerifierApiExamples.EBSIVectorExamplePreAuthIssuance)
+                        example("EBSI-VECTOR interoperability test - All", VerifierApiExamples.EBSIVectorExampleAllIssuance)
+
                     }
                 }
 
@@ -287,11 +291,13 @@ fun Application.verifierApi() {
                         mediaTypes = listOf(ContentType.Application.FormUrlEncoded)
                         example("simple vp_token response") {
                             value = TokenResponseFormParam(
-                                JsonPrimitive("abc.def.ghi"), PresentationSubmissionFormParam(
-                                    "1", "1", listOf(
-                                        DescriptorMappingFormParam("1", VCFormat.jwt_vc_json, "$.vc.type")
-                                    )
-                                ), null
+                                vp_token = JsonPrimitive("abc.def.ghi"),
+                                presentation_submission = PresentationSubmissionFormParam(
+                                    id = "1",
+                                    definition_id = "1",
+                                    descriptor_map = listOf(DescriptorMappingFormParam("1", VCFormat.jwt_vc_json, "$.vc.type"))
+                                ),
+                                response = null
                             )
                         }
                         example("direct_post.jwt response") {
@@ -300,13 +306,14 @@ fun Application.verifierApi() {
                     }
                 }
             }) {
-
-                logger.info { "POST verify/state" }
+                logger.trace { "POST verify/state" }
                 val sessionId = call.parameters.getOrFail("state")
-                logger.info { "State: $sessionId" }
+                logger.trace { "State: $sessionId" }
                 verificationUseCase.verify(sessionId, call.request.call.receiveParameters().toMap())
-                    .onSuccess {
-                        val session = verificationUseCase.getSession(sessionId!!)
+                    .also {
+                        verificationUseCase.notifySubscribers(sessionId)
+                    }.onSuccess {
+                        val session = verificationUseCase.getSession(sessionId)
                         if (session.walletInitiatedAuthState != null) {
                             val state = session.walletInitiatedAuthState
                             val code = Uuid.random().toString()
@@ -315,36 +322,27 @@ fun Application.verifierApi() {
                             call.respond(HttpStatusCode.OK, it)
                         }
                     }.onFailure {
-                        runBlocking { logger.debug(it) { "Verification failed ($it)" } }
+                        logger.debug(it) { "Verification failed ($it)" }
                         val errorDescription = it.message ?: "Verification failed"
-                        runBlocking { logger.error { "Error: $errorDescription" } }
-                        if (sessionId != null) {
-                            val session = verificationUseCase.getSession(sessionId)
-                            if (session.walletInitiatedAuthState != null) {
+                        logger.error { "Error: $errorDescription" }
+                        val session = verificationUseCase.getSession(sessionId)
+                        when {
+                            session.walletInitiatedAuthState != null -> {
                                 val state = session.walletInitiatedAuthState
-                                runBlocking {
-                                    this@post.call.respondRedirect(
-                                        "openid://?state=$state&error=invalid_request&error_description=${getErrorDescription(it)}"
-                                    )
-                                }
-                            } else if (it is FailedVerificationException && it.redirectUrl != null) {
-                                runBlocking {
-                                    this@post.call.respond(HttpStatusCode.BadRequest, it.redirectUrl)
-                                }
+                                call.respondRedirect(
+                                    "openid://?state=$state&error=invalid_request&error_description=${getErrorDescription(it)}"
+                                )
+                            }
 
-                            } else {
+                            it is FailedVerificationException && it.redirectUrl != null -> {
+                                call.respond(HttpStatusCode.BadRequest, it.redirectUrl)
+                            }
+
+                            else -> {
                                 throw it
                             }
-                        } else {
-                            runBlocking {
-                                logger.error(it) { "/verify error: $errorDescription" }
-                                this@post.call.respond(HttpStatusCode.BadRequest, errorDescription)
-                            }
                         }
-                    }.also {
-                        verificationUseCase.notifySubscribers(sessionId)
                     }
-
             }
 
             get("/session/{id}", {
@@ -482,8 +480,9 @@ fun Application.verifierApi() {
 
             val stateId = Uuid.random().toString()
             // Parse session TTL from query parameter if provided
-            val sessionTtl = params["sessionTtl"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull?.toLongOrNull()?.let { it.seconds }
-            
+            val sessionTtl =
+                params["sessionTtl"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull?.toLongOrNull()?.let { it.seconds }
+
             val session = verificationUseCase.createSession(
                 vpPoliciesJson = null,
                 vcPoliciesJson = buildJsonArray {

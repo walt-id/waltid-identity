@@ -1,9 +1,9 @@
 package id.walt.issuer.issuance
 
-import id.walt.credentials.vc.vcs.W3CVC
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.*
 import id.walt.sdjwt.SDMap
+import id.walt.w3c.vc.vcs.W3CVC
 import io.ktor.server.plugins.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -94,7 +94,9 @@ data class IssuanceRequest(
     val trustedRootCAs: List<String>? = null,
     var credentialFormat: CredentialFormat? = null,
     val standardVersion: OpenID4VCIVersion? = OpenID4VCIVersion.DRAFT13,
-    ) {
+    val display: List<DisplayProperties>? = null,
+    val issuanceType: String? = null, // IN_TIME, DEFERRED
+) {
     constructor(
         issuerKey: JsonObject,
         credentialConfigurationId: String,
@@ -111,6 +113,8 @@ data class IssuanceRequest(
         trustedRootCAs: List<String>? = null,
         credentialFormat: CredentialFormat? = null,
         standardVersion: OpenID4VCIVersion? = OpenID4VCIVersion.DRAFT13,
+        display: List<DisplayProperties>? = null,
+        issuanceType: String? = null,
     ) :
         this(
             issuerKey,
@@ -128,7 +132,9 @@ data class IssuanceRequest(
             x5Chain,
             trustedRootCAs,
             credentialFormat,
-            standardVersion
+            standardVersion,
+            display,
+            issuanceType
         )
     init {
         credentialData?.let {

@@ -49,6 +49,4 @@ fun exceptionMap(cause: Throwable, status: HttpStatusCode) = mutableMapOf(
     "message" to JsonPrimitive(cause.message)
 ).apply {
     if (cause.cause != null && logger.isTraceEnabled()) put("cause", JsonPrimitive(cause.cause!!.message))
-}.let {
-    Json.encodeToJsonElement(it).toString()
 }

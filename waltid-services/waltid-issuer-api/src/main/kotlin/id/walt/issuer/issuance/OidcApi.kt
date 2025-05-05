@@ -22,9 +22,9 @@ import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.sdjwt.JWTVCIssuerMetadata
 import id.walt.sdjwt.SDJWTVCTypeMetadata
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.github.smiley4.ktorswaggerui.dsl.routes.OpenApiRequest
-import io.github.smiley4.ktorswaggerui.dsl.routing.get
-import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.github.smiley4.ktoropenapi.config.RequestConfig
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -462,7 +462,7 @@ object OidcApi : CIProvider() {
                     call.respond(
                         generateCredentialResponse(
                             credentialRequest = credentialRequest,
-                            session = session
+                            session = session,
                         ).toJSON()
                     )
                 } catch (exc: CredentialError) {
@@ -475,8 +475,9 @@ object OidcApi : CIProvider() {
             post("{standardVersion}/credential_deferred") {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
                 if (accessToken.isNullOrEmpty() || !OpenID4VC.verifyTokenSignature(
-                        TokenTarget.DEFERRED_CREDENTIAL,
-                        accessToken
+                        target= TokenTarget.DEFERRED_CREDENTIAL,
+                        token = accessToken,
+                        tokenKey = CI_TOKEN_KEY
                     )
                 ) {
                     call.respond(HttpStatusCode.Unauthorized)
@@ -571,13 +572,13 @@ object OidcApi : CIProvider() {
         }
     }
 
-    private fun OpenApiRequest.standardVersionPathParameter() = pathParameter<String>("standardVersion") {
+    private fun RequestConfig.standardVersionPathParameter() = pathParameter<String>("standardVersion") {
         description = "The value of the standard version. Supported values are: draft13 and draft11"
         example("Example") { value = "draft13" }
         required = true
     }
 
-    private fun OpenApiRequest.typePathParameter() = pathParameter<String>("type") {
+    private fun RequestConfig.typePathParameter() = pathParameter<String>("type") {
         description = "The value of the credential type."
         example("Example") { value = "identity_credential" }
         required = true

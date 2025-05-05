@@ -1,7 +1,7 @@
 package id.walt.webwallet.web
 
 import id.walt.webwallet.web.plugins.authConfigNames
-import io.github.smiley4.ktorswaggerui.dsl.routing.route
+import io.github.smiley4.ktoropenapi.route
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*

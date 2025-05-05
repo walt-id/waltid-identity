@@ -8,6 +8,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -19,6 +20,7 @@ import java.util.zip.GZIPInputStream
 
 @Serializable
 actual class RevocationPolicy : RevocationPolicyMp() {
+    @Transient
     private val logger = KotlinLogging.logger {}
 
     @JvmBlocking

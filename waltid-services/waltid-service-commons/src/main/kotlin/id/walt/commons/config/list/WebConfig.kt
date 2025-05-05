@@ -7,5 +7,10 @@ data class WebConfig(
      * - 0.0.0.0: accessible from all network interfaces
      */
     val webHost: String = "0.0.0.0",
-    val webPort: Int = 3000
+    val webPort: Int = 3000,
+
+    /**
+     * Slower, but human-readable: Pretty-print encoded JSON results
+     */
+    val humanReadableResultEncoding: Boolean = false
 )

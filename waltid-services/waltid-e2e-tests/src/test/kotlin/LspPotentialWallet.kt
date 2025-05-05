@@ -3,11 +3,10 @@
 import id.walt.commons.interop.LspPotentialInterop
 import id.walt.commons.testing.E2ETest.getBaseURL
 import id.walt.commons.testing.E2ETest.test
-import id.walt.credentials.utils.VCFormat
+import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
-import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
 import id.walt.oid4vc.data.*

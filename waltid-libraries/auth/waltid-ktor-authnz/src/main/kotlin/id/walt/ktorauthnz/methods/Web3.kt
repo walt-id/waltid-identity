@@ -9,7 +9,7 @@ import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.exceptions.authFailure
 import id.walt.ktorauthnz.tokens.jwttoken.JwtTokenHandler
-import io.github.smiley4.ktorswaggerui.dsl.routing.post
+import io.github.smiley4.ktoropenapi.post
 import io.klogging.logger
 import io.ktor.server.application.*
 import io.ktor.server.response.*

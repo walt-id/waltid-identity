@@ -4,7 +4,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.power-assert")
     kotlin("plugin.serialization")
-    id("io.ktor.plugin") version "3.1.0"
+    id("io.ktor.plugin") version "3.1.2"
     id("maven-publish")
 
     application
@@ -41,7 +41,7 @@ dependencies {
 
     // LDAP
     //implementation("org.apache.directory.server:apacheds-server-integ:2.0.0.AM27")
-    implementation("org.apache.directory.api:api-all:2.1.7")
+    implementation("org.apache.directory.api:api-all:2.1.7") //TODO: resole CVE-2024-52046 -> https://mvnrepository.com/artifact/org.apache.directory.api/api-all/2.1.7
 
     // TOTP/HOTP
     implementation("com.atlassian:onetime:2.1.2")
@@ -85,7 +85,9 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
 
     // Ktor server external
-    implementation("io.github.smiley4:ktor-swagger-ui:4.1.6")
+    implementation("io.github.smiley4:ktor-openapi:5.0.2")
+    implementation("io.github.smiley4:ktor-swagger-ui:5.0.2")
+    implementation("io.github.smiley4:ktor-redoc:5.0.2")
 
     // JSON
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
@@ -114,7 +116,8 @@ kotlin {
 
 publishing {
     publications {
-        create<MavenPublication>("mavenJava") {
+        create<MavenPublication>("maven") {
+            from(components["kotlin"])
             pom {
                 name.set("walt.id ktor-authnz")
                 description.set(
@@ -123,28 +126,31 @@ publishing {
                     """.trimIndent()
                 )
                 url.set("https://walt.id")
+
+                licenses {
+                    license {
+                        name.set("Apache License 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                    }
+                }
+
+                developers {
+                    developer {
+                        id.set("walt.id")
+                        name.set("walt.id")
+                        email.set("office@walt.id")
+                    }
+                }
             }
-            from(components["java"])
         }
     }
 
     repositories {
         maven {
-            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
-            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-            url = uri(if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl)
-            val envUsername = System.getenv("MAVEN_USERNAME")
-            val envPassword = System.getenv("MAVEN_PASSWORD")
-
-            val usernameFile = File("secret_maven_username.txt")
-            val passwordFile = File("secret_maven_password.txt")
-
-            val secretMavenUsername = envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" }
-            val secretMavenPassword = envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
-
+            url = uri(if (version.toString().endsWith("SNAPSHOT")) uri("https://maven.waltid.dev/snapshots") else uri("https://maven.waltid.dev/releases"))
             credentials {
-                username = secretMavenUsername
-                password = secretMavenPassword
+                username = System.getenv("MAVEN_USERNAME") ?: File("$rootDir/secret_maven_username.txt").let { if (it.isFile) it.readLines().first() else "" }
+                password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let { if (it.isFile) it.readLines().first() else "" }
             }
         }
     }

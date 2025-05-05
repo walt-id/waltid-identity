@@ -1,6 +1,6 @@
 package id.walt.policies
 
-import id.walt.credentials.Claims
+import id.walt.w3c.Claims
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
