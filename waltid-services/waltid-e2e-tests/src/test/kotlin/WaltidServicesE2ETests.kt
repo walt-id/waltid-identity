@@ -379,6 +379,13 @@ class WaltidServicesE2ETests {
 
         draft11.testIssuanceDraft11PreAuthFlow(preAuthFlowIssuanceReq, wallet)
 
+        val preAuthFlowIssuanceReqOfferedCredByValue = preAuthFlowIssuanceReq.copy(
+            standardVersion = OpenID4VCIVersion.DRAFT11,
+            draft11EncodeOfferedCredentialsByReference = false,
+        )
+
+        draft11.testIssuanceDraft11PreAuthFlow(preAuthFlowIssuanceReqOfferedCredByValue, wallet)
+
 
         // Test External Signature API Endpoints
         //In the context of these test cases, a new wallet is created and initialized
@@ -399,9 +406,6 @@ class WaltidServicesE2ETests {
         PresentationDefinitionPolicyTests().runTests()
         //endregion -Presentation Definition Policy (Verifier)-
 
-        //region -EBSI Vector shenanigans-
-        EBSIVector(client, wallet).runTest()
-        //endregion -EBSI Vector shenanigans-
     }
 
     /* @Test // enable to execute test selectively
