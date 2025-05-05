@@ -64,12 +64,10 @@ import org.cose.java.AlgorithmID
 import org.cose.java.OneKey
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-import kotlin.uuid.ExperimentalUuidApi
 
 /**
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
  */
-@OptIn(ExperimentalUuidApi::class)
 open class CIProvider(
     val baseUrl: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.DRAFT13.versionString}"},
     val baseUrlDraft11: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.DRAFT11.versionString}"},
@@ -538,7 +536,7 @@ open class CIProvider(
     ): IssuanceSession = runBlocking {
         val sessionId = randomUUID()
 
-        val credentialOfferBuilder = OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests, standardVersion )
+        val credentialOfferBuilder = OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests, standardVersion)
 
         when (issuanceRequests[0].authenticationMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> {

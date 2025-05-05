@@ -1,6 +1,5 @@
 package id.walt.issuer.issuance
 
-
 import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -65,7 +64,8 @@ object OidcApi : CIProvider() {
                 }
             }) {
                 val metadata = getMetadataForVersion(
-                    standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required"),
+                    standardVersion = call.parameters["standardVersion"]
+                        ?: throw IllegalArgumentException("standardVersion parameter is required"),
                 )
 
                 call.respond(metadata.toJSON())
@@ -77,7 +77,8 @@ object OidcApi : CIProvider() {
                 }
             }) {
                 val metadata = getMetadataForVersion(
-                    standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required"),
+                    standardVersion = call.parameters["standardVersion"]
+                        ?: throw IllegalArgumentException("standardVersion parameter is required"),
                 )
 
                 call.respond(metadata.toJSON())
@@ -89,7 +90,8 @@ object OidcApi : CIProvider() {
                 }
             }) {
                 val metadata = getMetadataForVersion(
-                    standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required"),
+                    standardVersion = call.parameters["standardVersion"]
+                        ?: throw IllegalArgumentException("standardVersion parameter is required"),
                 )
 
                 call.respond(metadata.toJSON())
@@ -100,11 +102,14 @@ object OidcApi : CIProvider() {
                     standardVersionPathParameter()
                 }
             }) {
-                call.respond(HttpStatusCode.OK, JWTVCIssuerMetadata(issuer = metadata.issuer, jwksUri = metadata.jwksUri))
+                call.respond(
+                    HttpStatusCode.OK,
+                    JWTVCIssuerMetadata(issuer = metadata.issuer, jwksUri = metadata.jwksUri)
+                )
             }
 
             get("/.well-known/vct/{standardVersion}/{type}", {
-                request{
+                request {
                     standardVersionPathParameter()
                     typePathParameter()
                 }
@@ -117,7 +122,11 @@ object OidcApi : CIProvider() {
                     HttpStatusCode.OK,
                     when (vctMetadata.sdJwtVcTypeMetadata != null) {
                         true -> SDJWTVCTypeMetadata.fromJSON(vctMetadata.sdJwtVcTypeMetadata!!.toJSON())
-                        else -> SDJWTVCTypeMetadata(vct = vctMetadata.vct!!, name = credType, description = "$credType Verifiable Credential")
+                        else -> SDJWTVCTypeMetadata(
+                            vct = vctMetadata.vct!!,
+                            name = credType,
+                            description = "$credType Verifiable Credential"
+                        )
                     }
                 )
             }
@@ -133,9 +142,10 @@ object OidcApi : CIProvider() {
                     val session = initializeIssuanceSession(authReq, 5.minutes, null)
                     call.respond(
                         PushedAuthorizationResponse.success(
-                        requestUri = "${OpenID4VC.PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX}${session.id}",
-                        expiresIn = session.expirationTimestamp - Clock.System.now()
-                    ).toJSON())
+                            requestUri = "${OpenID4VC.PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX}${session.id}",
+                            expiresIn = session.expirationTimestamp - Clock.System.now()
+                        ).toJSON()
+                    )
                 } catch (exc: AuthorizationError) {
                     logger.error(exc) { "Authorization error: " }
                     call.respond(HttpStatusCode.BadRequest, exc.toPushedAuthorizationErrorResponse().toJSON())
@@ -151,12 +161,15 @@ object OidcApi : CIProvider() {
             }
 
             get("{standardVersion}/authorize") {
-                val standardVersion = call.parameters["standardVersion"] ?: throw IllegalArgumentException("standardVersion parameter is required")
+                val standardVersion = call.parameters["standardVersion"]
+                    ?: throw IllegalArgumentException("standardVersion parameter is required")
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
 
                 try {
-                    val issuanceSession = authReq.issuerState?.let { getSession(it) } ?: error("No issuance session found for given issuer state, or issuer state was empty: ${authReq.issuerState}")
-                    val authMethod = issuanceSession.issuanceRequests.firstOrNull()?.authenticationMethod ?: AuthenticationMethod.NONE
+                    val issuanceSession = authReq.issuerState?.let { getSession(it) }
+                        ?: error("No issuance session found for given issuer state, or issuer state was empty: ${authReq.issuerState}")
+                    val authMethod = issuanceSession.issuanceRequests.firstOrNull()?.authenticationMethod
+                        ?: AuthenticationMethod.NONE
                     val authResp: Any = when {
                         ResponseType.Code in authReq.responseType -> {
                             when (authMethod) {
@@ -199,10 +212,11 @@ object OidcApi : CIProvider() {
                                         authServerState = authServerState
                                     )
 
-                                    val vpProfile = issuanceSession.issuanceRequests.first().vpProfile ?: OpenId4VPProfile.DEFAULT
+                                    val vpProfile =
+                                        issuanceSession.issuanceRequests.first().vpProfile ?: OpenId4VPProfile.DEFAULT
 
                                     val credFormat = issuanceSession.issuanceRequests.first().credentialFormat
-                                        ?: when(vpProfile) {
+                                        ?: when (vpProfile) {
                                             OpenId4VPProfile.HAIP -> CredentialFormat.sd_jwt_vc
                                             OpenId4VPProfile.ISO_18013_7_MDOC -> CredentialFormat.mso_mdoc
                                             OpenId4VPProfile.EBSIV3 -> CredentialFormat.jwt_vc
@@ -219,16 +233,18 @@ object OidcApi : CIProvider() {
                                             is JsonPrimitive -> it.contentOrNull
                                             is JsonObject -> it["credential"]?.jsonPrimitive?.contentOrNull
                                             else -> throw IllegalArgumentException("Invalid JSON type for requested credential: $it")
-                                        } ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
+                                        }
+                                            ?: throw IllegalArgumentException("Invalid VC type for requested credential: $it")
                                     }
 
-                                    val presentationDefinition = when(vpProfile) {
+                                    val presentationDefinition = when (vpProfile) {
                                         OpenId4VPProfile.EBSIV3 -> PresentationDefinition(
                                             inputDescriptors = requestedTypes.map { type ->
                                                 generateDefaultEBSIV3InputDescriptor(type)
                                             }
                                         )
-                                        else ->  PresentationDefinition.defaultGenerationFromVcTypesForCredentialFormat(
+
+                                        else -> PresentationDefinition.defaultGenerationFromVcTypesForCredentialFormat(
                                             types = requestedTypes,
                                             format = credFormat
                                         )
@@ -244,7 +260,7 @@ object OidcApi : CIProvider() {
                                         authServerState = authServerState,
                                         responseType = ResponseType.VpToken,
                                         providerMetadata = getMetadataForVersion(standardVersion),
-                                        tokenKey =  CI_TOKEN_KEY,
+                                        tokenKey = CI_TOKEN_KEY,
                                         isJar = issuanceSession.issuanceRequests.first().useJar,
                                         presentationDefinition = presentationDefinition
                                     )
@@ -254,7 +270,8 @@ object OidcApi : CIProvider() {
                                     authorizationRequest = authReq,
                                     sessionId = issuanceSession.id,
                                     providerMetadata = metadata,
-                                    tokenKey = CI_TOKEN_KEY)
+                                    tokenKey = CI_TOKEN_KEY
+                                )
 
                                 else -> {
                                     throw AuthorizationError(
@@ -283,17 +300,19 @@ object OidcApi : CIProvider() {
                     }
 
                     val redirectUri = when (authMethod) {
-                        AuthenticationMethod.VP_TOKEN, AuthenticationMethod.ID_TOKEN -> authReq.clientMetadata!!.customParameters["authorization_endpoint"]?.jsonPrimitive?.content ?: "openid://"
+                        AuthenticationMethod.VP_TOKEN, AuthenticationMethod.ID_TOKEN -> authReq.clientMetadata!!.customParameters["authorization_endpoint"]?.jsonPrimitive?.content
+                            ?: "openid://"
+
                         else -> if (authReq.isReferenceToPAR) {
-                                    val pushedSession = getPushedAuthorizationSession(authReq)
-                                    pushedSession.authorizationRequest?.redirectUri
-                                } else {
-                                    authReq.redirectUri
-                                } ?: throw AuthorizationError(
-                                        authorizationRequest = authReq,
-                                        errorCode = AuthorizationErrorCode.invalid_request,
-                                        message = "No redirect_uri found for this authorization request"
-                                )
+                            val pushedSession = getPushedAuthorizationSession(authReq)
+                            pushedSession.authorizationRequest?.redirectUri
+                        } else {
+                            authReq.redirectUri
+                        } ?: throw AuthorizationError(
+                            authorizationRequest = authReq,
+                            errorCode = AuthorizationErrorCode.invalid_request,
+                            message = "No redirect_uri found for this authorization request"
+                        )
                     }
 
                     logger.info { "Redirect Uri is: $redirectUri" }
@@ -302,7 +321,8 @@ object OidcApi : CIProvider() {
 
                         status(HttpStatusCode.Found)
 
-                        val defaultResponseMode = if (authReq.responseType.contains(ResponseType.Code)) ResponseMode.query else ResponseMode.fragment
+                        val defaultResponseMode =
+                            if (authReq.responseType.contains(ResponseType.Code)) ResponseMode.query else ResponseMode.fragment
 
                         authResp as IHTTPDataObject
 
@@ -330,7 +350,8 @@ object OidcApi : CIProvider() {
                                         authExc.toAuthorizationErrorResponse().toHttpParameters()
                                     )
                                 )
-                            }.buildString())
+                            }.buildString()
+                        )
                     }
                 }
             }
@@ -355,10 +376,13 @@ object OidcApi : CIProvider() {
                     } else {
                         val vpToken = params["vp_token"]?.get(0)!!
                         val presSub = params["presentation_submission"]?.get(0)!!
-                        val presentationFormat = PresentationSubmission.fromJSONString(presSub).descriptorMap.firstOrNull()?.format ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
+                        val presentationFormat =
+                            PresentationSubmission.fromJSONString(presSub).descriptorMap.firstOrNull()?.format
+                                ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
 
                         // Verify and Parse VP Token
-                        val policies = Json.parseToJsonElement("""["signature", "expired", "not-before"]""").jsonArray.parsePolicyRequests()
+                        val policies =
+                            Json.parseToJsonElement("""["signature", "expired", "not-before"]""").jsonArray.parsePolicyRequests()
 
                         Verifier.verifyPresentation(
                             format = presentationFormat,
@@ -371,9 +395,11 @@ object OidcApi : CIProvider() {
                     }
 
                     // Process response
-                    val session = getSessionByAuthServerState(state) ?: throw IllegalStateException("No session found for given state parameter")
+                    val session = getSessionByAuthServerState(state)
+                        ?: throw IllegalStateException("No session found for given state parameter")
                     val resp = OpenID4VC.processDirectPost(
-                        authorizationRequest = session.authorizationRequest ?: throw IllegalStateException("Session for given state has no authorization request"),
+                        authorizationRequest = session.authorizationRequest
+                            ?: throw IllegalStateException("Session for given state has no authorization request"),
                         sessionId = session.id,
                         providerMetadata = metadata,
                         tokenKey = CI_TOKEN_KEY
@@ -439,7 +465,9 @@ object OidcApi : CIProvider() {
             }
 
             post("{standardVersion}/credential") {
-                val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ") ?: call.respond(HttpStatusCode.Unauthorized)
+                val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ") ?: call.respond(
+                    HttpStatusCode.Unauthorized
+                )
 
                 try {
 
@@ -492,14 +520,26 @@ object OidcApi : CIProvider() {
 
             post("{standardVersion}/batch_credential") {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
-                val parsedToken = accessToken?.let { OpenID4VC.verifyAndParseToken(it, metadata.issuer!!, TokenTarget.ACCESS, CI_TOKEN_KEY) }
+                val parsedToken = accessToken?.let {
+                    OpenID4VC.verifyAndParseToken(
+                        it,
+                        metadata.issuer!!,
+                        TokenTarget.ACCESS,
+                        CI_TOKEN_KEY
+                    )
+                }
                 if (parsedToken == null) {
                     call.respond(HttpStatusCode.Unauthorized)
                 } else {
                     val req = BatchCredentialRequest.fromJSON(call.receive())
                     try {
-                        val session = parsedToken[JWTClaims.Payload.subject]?.jsonPrimitive?.content?.let { getSession(it) }
-                            ?: throw BatchCredentialError(req, CredentialErrorCode.invalid_request, "Session not found for access token")
+                        val session =
+                            parsedToken[JWTClaims.Payload.subject]?.jsonPrimitive?.content?.let { getSession(it) }
+                                ?: throw BatchCredentialError(
+                                    req,
+                                    CredentialErrorCode.invalid_request,
+                                    "Session not found for access token"
+                                )
                         call.respond(generateBatchCredentialResponse(req, session).toJSON())
                     } catch (exc: BatchCredentialError) {
                         logger.error(exc) { "BatchCredentialError: " }
@@ -541,7 +581,12 @@ object OidcApi : CIProvider() {
 
                     // should redirect to authorization request redirect uri with the code
                     val session = getSessionByAuthServerState(call.request.rawQueryParameters.toMap()["state"]!![0])
-                    val authResp = OpenID4VC.processCodeFlowAuthorization(session?.authorizationRequest!!, session.id, metadata, CI_TOKEN_KEY)
+                    val authResp = OpenID4VC.processCodeFlowAuthorization(
+                        session?.authorizationRequest!!,
+                        session.id,
+                        metadata,
+                        CI_TOKEN_KEY
+                    )
 
                     val redirectUri = when (session.authorizationRequest.isReferenceToPAR) {
                         true -> getPushedAuthorizationSession(session.authorizationRequest).authorizationRequest?.redirectUri
