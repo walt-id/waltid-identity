@@ -11,7 +11,6 @@ import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.MapKey
 import id.walt.mdoc.dataelement.StringElement
-import id.walt.oid4vc.OpenID4VCIVersion.entries
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.ResponseType.Companion.getResponseTypeString
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -198,14 +197,27 @@ object OpenID4VCI {
                 ?: mapOf()
         }
 
-        val credentialIds = when (credentialOffer) {
+        val credentialsOffered = when (credentialOffer) {
             is CredentialOffer.Draft13 -> credentialOffer.credentialConfigurationIds
             is CredentialOffer.Draft11 -> credentialOffer.credentials
         }
 
-        return credentialIds.mapNotNull { id ->
-            supportedCredentials[id]?.let { OfferedCredential.fromProviderMetadata(it) }
+        return credentialsOffered.mapNotNull { credentialOffered ->
+            when {
+                credentialOffered is JsonPrimitive && credentialOffered.isString -> {
+                    supportedCredentials[credentialOffered.content]?.let { OfferedCredential.fromProviderMetadata(it) }
+                }
+
+                credentialOffered is JsonObject -> {
+                    OfferedCredential.fromJSON(credentialOffered)
+                }
+
+                else -> {
+                    throw IllegalArgumentException("Entries of offer's offered credentials array can be either strings, or objects, but in this case they were neither")
+                }
+            }
         }
+
     }
 
     fun validateAuthorizationRequestQueryString(authorizationRequestQueryString: String): AuthorizationRequest {

@@ -27,7 +27,6 @@ data class IssuerConfiguration(
 data class PinConfiguration(
     val description: String,
     val pin: String? = null,
-
     val type: TxInputMode = TxInputMode.forPin(pin)
         ?: error("If no pin is provided, pin input `type` has to be provided, allowed values: ${TxInputMode.entries.joinToString()}."),
     val pinLength: Int = pin?.length ?: error("Neither pin nor pin length was supplied"),
@@ -95,7 +94,8 @@ data class IssuanceRequest(
     var credentialFormat: CredentialFormat? = null,
     val standardVersion: OpenID4VCIVersion? = OpenID4VCIVersion.DRAFT13,
     val display: List<DisplayProperties>? = null,
-    ) {
+    val draft11EncodeOfferedCredentialsByReference: Boolean? = true, //if set to false and only for standard version DRAFT11, offered credentials will be encoded by value, not by reference - required by EBSI Vector
+) {
     constructor(
         issuerKey: JsonObject,
         credentialConfigurationId: String,
@@ -114,25 +114,26 @@ data class IssuanceRequest(
         standardVersion: OpenID4VCIVersion? = OpenID4VCIVersion.DRAFT13,
         display: List<DisplayProperties>? = null,
     ) :
-        this(
-            issuerKey,
-            credentialConfigurationId,
-            credentialData,
-            vct,
-            null,
-            mapping,
-            selectiveDisclosure,
-            authenticationMethod,
-            vpRequestValue,
-            vpProfile,
-            useJar,
-            issuerDid,
-            x5Chain,
-            trustedRootCAs,
-            credentialFormat,
-            standardVersion,
-            display
-        )
+            this(
+                issuerKey,
+                credentialConfigurationId,
+                credentialData,
+                vct,
+                null,
+                mapping,
+                selectiveDisclosure,
+                authenticationMethod,
+                vpRequestValue,
+                vpProfile,
+                useJar,
+                issuerDid,
+                x5Chain,
+                trustedRootCAs,
+                credentialFormat,
+                standardVersion,
+                display,
+            )
+
     init {
         credentialData?.let {
             require(it.isNotEmpty()) {
@@ -153,5 +154,6 @@ data class IssuanceRequest(
 
 @Serializable
 data class IssuerOnboardingResponse(
-    val issuerKey: JsonElement, val issuerDid: String,
+    val issuerKey: JsonElement,
+    val issuerDid: String,
 )
