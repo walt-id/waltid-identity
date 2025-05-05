@@ -1,9 +1,9 @@
 package id.walt.issuer.issuance
 
 import id.walt.commons.interop.LspPotentialInterop
-import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
+import id.walt.w3c.utils.VCFormat
 import io.github.smiley4.ktoropenapi.config.ValueExampleDescriptorConfig
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -1297,7 +1297,8 @@ object IssuanceExamples {
               "type": "FullJsonSchemaValidator2021"
             }
           },
-          "useJar": true
+          "useJar": true,
+          "draft11EncodeOfferedCredentialsByReference": false
         }
     """.trimIndent()
     )
@@ -1349,6 +1350,7 @@ object IssuanceExamples {
             }
           },
           "useJar": true,
+          "draft11EncodeOfferedCredentialsByReference": false,
           "issuanceType": "DEFERRED"
         }
     """.trimIndent()
@@ -1399,7 +1401,8 @@ object IssuanceExamples {
               "id": "https://api-pilot.ebsi.eu/trusted-schemas-registry/v3/schemas/zDpWGUBenmqXzurskry9Nsk6vq2R8thh9VSeoRqguoyMD",
               "type": "FullJsonSchemaValidator2021"
             }
-          }
+          },
+          "draft11EncodeOfferedCredentialsByReference": false
         }
     """.trimIndent()
     )
