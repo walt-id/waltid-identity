@@ -165,7 +165,7 @@ class VerificationUseCase(
         if (maybePresentationSessionResult.isFailure) {
             return Result.failure(
                 IllegalStateException(
-                    "Verification failed: ${maybePresentationSessionResult.exceptionOrNull()!!.message}",
+                    "Verification failed (VerifiationUseCase): ${maybePresentationSessionResult.exceptionOrNull()!!.message}",
                     maybePresentationSessionResult.exceptionOrNull()
                 )
             )
