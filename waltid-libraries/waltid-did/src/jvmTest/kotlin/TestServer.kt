@@ -25,7 +25,9 @@ object TestServer {
         URI(this.javaClass.classLoader.getResource(fileName)!!.toString()).path.let {
             File(it).readText().replace(DID_WEB_PORT_PLACEHOLDER, DID_WEB_SSL_PORT.toString())
         }
-
+        
+    private val multiKeyDocumentResponse =
+        URI(this.javaClass.classLoader.getResource("did-web/multi-key.json")!!.toString()).path.let { File(it).readText() }
     private val keyStore = buildKeyStore {
         certificate("test") {
             password = "test123"
@@ -55,6 +57,9 @@ object TestServer {
             }
             get("/rsa/did.json") {
                 call.respond<JsonObject>(Json.decodeFromString<JsonObject>(loadDidWebReferenceFile("did-web/rsa.json")))
+            }
+            get("/multi-key/did.json") {
+                call.respond<JsonObject>(Json.decodeFromString<JsonObject>(multiKeyDocumentResponse))
             }
         }
     }
