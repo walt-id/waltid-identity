@@ -132,7 +132,7 @@ companion object {
 
 
     @Language("JSON")
-    val TEST_MAPPING_With_Display = """{
+    val TEST_MAPPING_WITH_DISPLAY = """{
   "id": "\u003cuuid\u003e",
   "display": "\u003cdisplay\u003e",
   "issuer": {
@@ -148,7 +148,7 @@ companion object {
     val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)
     val jsonVCObj = Json.decodeFromString<JsonObject>(TEST_W3VC)
     val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
-    val jsonMappingObjWithDisplay = Json.decodeFromString<JsonObject>(TEST_MAPPING_With_Display)
+    val jsonMappingObjWithDisplay = Json.decodeFromString<JsonObject>(TEST_MAPPING_WITH_DISPLAY)
 }
     @Test
     fun testJwt() = runTest {
