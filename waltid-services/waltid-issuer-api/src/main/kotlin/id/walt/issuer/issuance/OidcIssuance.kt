@@ -1,12 +1,11 @@
 package id.walt.issuer.issuance
 
+import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.issuer.issuance.OidcApi.metadataDraft11
 import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.CredentialOffer
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 
 object OidcIssuance {
 
@@ -20,20 +19,40 @@ object OidcIssuance {
     }
 
 
-    fun issuanceRequestsToCredentialOfferBuilder(issuanceRequests: List<IssuanceRequest>, standardVersion: OpenID4VCIVersion) =
-        issuanceRequestsToCredentialOfferBuilder(
-            issuanceRequests = *issuanceRequests.toTypedArray(),
-            standardVersion = standardVersion
+    fun issuanceRequestsToCredentialOfferBuilder(
+        issuanceRequests: List<IssuanceRequest>,
+        standardVersion: OpenID4VCIVersion,
+    ) = issuanceRequestsToCredentialOfferBuilder(
+            issuanceRequests = issuanceRequests.toTypedArray(),
+            standardVersion = standardVersion,
         )
 
-    fun issuanceRequestsToCredentialOfferBuilder(vararg issuanceRequests: IssuanceRequest, standardVersion: OpenID4VCIVersion): CredentialOffer.Builder<*> {
+    fun issuanceRequestsToCredentialOfferBuilder(
+        vararg issuanceRequests: IssuanceRequest,
+        standardVersion: OpenID4VCIVersion,
+    ): CredentialOffer.Builder<*> {
+
         val builder = when (standardVersion) {
-            OpenID4VCIVersion.DRAFT13 -> CredentialOffer.Draft13.Builder(OidcApi.baseUrl)
-            OpenID4VCIVersion.DRAFT11 -> CredentialOffer.Draft11.Builder(OidcApi.baseUrlDraft11)
+            OpenID4VCIVersion.DRAFT13 -> {
+                CredentialOffer.Draft13.Builder(OidcApi.baseUrl)
+            }
+
+            OpenID4VCIVersion.DRAFT11 -> {
+                CredentialOffer.Draft11.Builder(OidcApi.baseUrlDraft11)
+            }
         }
 
-        issuanceRequests.forEach { issuanceRequest ->
-            builder.addOfferedCredential(issuanceRequest.credentialConfigurationId)
+        if (standardVersion == OpenID4VCIVersion.DRAFT11 && issuanceRequests.first().draft11EncodeOfferedCredentialsByReference == false) {
+            issuanceRequests.forEach { issuanceRequest ->
+                builder.addOfferedCredentialByValue(buildJsonObject {
+                    put("format", metadataDraft11.credentialSupported!![issuanceRequest.credentialConfigurationId]!!.format.toJsonElement())
+                    put("types", metadataDraft11.credentialSupported!![issuanceRequest.credentialConfigurationId]!!.types!!.toJsonElement())
+                })
+            }
+        } else {
+            issuanceRequests.forEach { issuanceRequest ->
+                builder.addOfferedCredentialByReference(issuanceRequest.credentialConfigurationId)
+            }
         }
 
         return builder
