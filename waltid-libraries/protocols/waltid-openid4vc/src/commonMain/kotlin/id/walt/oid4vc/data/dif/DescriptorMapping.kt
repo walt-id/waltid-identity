@@ -16,7 +16,7 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 data class DescriptorMapping(
     val id: String? = null,
-    val format: VCFormat,
+    val format: VCFormat? = null,
     val path: String,
     @SerialName("path_nested") val pathNested: DescriptorMapping? = null,
     override val customParameters: Map<String, JsonElement> = mapOf()
