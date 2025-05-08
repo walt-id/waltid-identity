@@ -379,6 +379,13 @@ class WaltidServicesE2ETests {
 
         draft11.testIssuanceDraft11PreAuthFlow(preAuthFlowIssuanceReq, wallet)
 
+        val preAuthFlowIssuanceReqOfferedCredByValue = preAuthFlowIssuanceReq.copy(
+            standardVersion = OpenID4VCIVersion.DRAFT11,
+            draft11EncodeOfferedCredentialsByReference = false,
+        )
+
+        draft11.testIssuanceDraft11PreAuthFlow(preAuthFlowIssuanceReqOfferedCredByValue, wallet)
+
 
         // Test External Signature API Endpoints
         //In the context of these test cases, a new wallet is created and initialized
@@ -398,6 +405,7 @@ class WaltidServicesE2ETests {
         //region -Presentation Definition Policy (Verifier)-
         PresentationDefinitionPolicyTests().runTests()
         //endregion -Presentation Definition Policy (Verifier)-
+
     }
 
     /* @Test // enable to execute test selectively
@@ -416,7 +424,7 @@ class WaltidServicesE2ETests {
         lspPotentialVerification.testPotentialInteropTrack4()
     }*/
 
-//        @Test
+    //        @Test
     fun e2ePresDefPolicyTests() = E2ETest.testBlock(
         config = ServiceConfiguration("e2e-pres-def-tests"),
         features = listOf(
@@ -532,13 +540,17 @@ class WaltidServicesE2ETests {
     fun issuerCredentialsListTest() = runBlocking {
         var client = testHttpClient()
         assertFalse(
-            IssuerUseCaseImpl(IssuersService, client).
-                fetchCredentials("https://issuer.portal.walt-test.cloud/draft11/.well-known/openid-credential-issuer")
-                    .isEmpty()
+            IssuerUseCaseImpl(
+                IssuersService,
+                client
+            ).fetchCredentials("https://issuer.portal.walt-test.cloud/draft11/.well-known/openid-credential-issuer")
+                .isEmpty()
         )
         assertFalse(
-            IssuerUseCaseImpl(IssuersService, client).
-            fetchCredentials("https://issuer.portal.walt-test.cloud/draft13/.well-known/openid-credential-issuer")
+            IssuerUseCaseImpl(
+                IssuersService,
+                client
+            ).fetchCredentials("https://issuer.portal.walt-test.cloud/draft13/.well-known/openid-credential-issuer")
                 .isEmpty()
         )
     }
