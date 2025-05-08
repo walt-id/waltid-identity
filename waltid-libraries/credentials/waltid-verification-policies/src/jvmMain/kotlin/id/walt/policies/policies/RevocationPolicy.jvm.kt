@@ -6,6 +6,8 @@ import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.http.HttpHeaders.ContentType
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -43,7 +45,12 @@ actual class RevocationPolicy : RevocationPolicyMp() {
             }
         }
 
-        val response = runCatching { httpClient.get(statusListCredentialUrl!!).bodyAsText() }.getOrElse {
+        val response = runCatching { httpClient.get(statusListCredentialUrl!!){
+                   headers {
+                        append(ContentType, "text/plain")
+                        append(HttpHeaders.Accept, "text/plain")
+                    }
+        }.bodyAsText() }.getOrElse {
             return Result.failure(Throwable("Error when getting Status List Credential from  $statusListCredentialUrl"))
         }
         logger.debug { "Credential URL response: $response" }
