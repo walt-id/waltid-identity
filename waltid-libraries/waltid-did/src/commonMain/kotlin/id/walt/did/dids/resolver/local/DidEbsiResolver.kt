@@ -24,10 +24,8 @@ class DidEbsiResolver(
     private val client: HttpClient,
 ) : LocalResolverMethod("ebsi") {
 
-    val httpLogging = false
     private val didConformanceRegistryUrlBaseURL = "https://api-conformance.ebsi.eu/did-registry/v5/identifiers/"
     private val didPilotRegistryUrlBaseURL = "https://api-pilot.ebsi.eu/did-registry/v5/identifiers/"
-    private val json = Json { ignoreUnknownKeys = true }
 
     @JvmBlocking
     @JvmAsync
@@ -38,7 +36,12 @@ class DidEbsiResolver(
     }
 
     private suspend fun resolveDid(did: String): DidDocument {
-        val responseConformance = client.get(didConformanceRegistryUrlBaseURL + did).bodyAsText()
+        val responseConformance = client.get(didConformanceRegistryUrlBaseURL + did){
+            headers {
+                append(ContentType, "application/did+json")
+                append(HttpHeaders.Accept, "application/did+json")
+            }
+        }.bodyAsText()
         val docConformance = parseDidDocumentOrNull(responseConformance)
         if (docConformance != null) {
             return docConformance
