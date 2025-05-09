@@ -2,14 +2,14 @@ package id.walt
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.events.Action
-import id.walt.commons.events.Status
 import id.walt.commons.events.IssuanceEvent
-import id.walt.w3c.vc.vcs.W3CVC
+import id.walt.commons.events.Status
 import id.walt.crypto.keys.KeyManager
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.createCredentialOfferUri
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.sdjwt.SDMapBuilder
+import id.walt.w3c.vc.vcs.W3CVC
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -129,9 +129,26 @@ companion object {
   "issuanceDate": "\u003ctimestamp\u003e",
   "expirationDate": "\u003ctimestamp-in:365d\u003e"
 }"""
+
+
+    @Language("JSON")
+    val TEST_MAPPING_WITH_DISPLAY = """{
+  "id": "\u003cuuid\u003e",
+  "display": "\u003cdisplay\u003e",
+  "issuer": {
+    "id": "\u003cissuerDid\u003e"
+  },
+  "credentialSubject": {
+    "id": "\u003csubjectDid\u003e"
+  },
+  "issuanceDate": "\u003ctimestamp\u003e",
+  "expirationDate": "\u003ctimestamp-in:365d\u003e"
+}"""
+
     val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)
     val jsonVCObj = Json.decodeFromString<JsonObject>(TEST_W3VC)
     val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
+    val jsonMappingObjWithDisplay = Json.decodeFromString<JsonObject>(TEST_MAPPING_WITH_DISPLAY)
 }
     @Test
     fun testJwt() = runTest {
@@ -141,6 +158,23 @@ companion object {
                 credentialData = jsonVCObj,
                 credentialConfigurationId = "OpenBadgeCredential_jwt_vc_json",
                 mapping = jsonMappingObj,
+                issuerDid = TEST_ISSUER_DID
+            )
+
+        ConfigManager.testWithConfigs(testConfigs)
+        val offerUri = createCredentialOfferUri(listOf(issueRequest), CredentialFormat.jwt_vc_json)
+
+        assertEquals(true, offerUri.contains("//localhost:7002/draft13/?credential_offer"))
+    }
+
+    @Test
+    fun testIssuanceWithCredentialDisplayMapping() = runTest {
+        val issueRequest =
+            IssuanceRequest(
+                issuerKey = jsonKeyObj,
+                credentialData = jsonVCObj,
+                credentialConfigurationId = "OpenBadgeCredential_jwt_vc_json",
+                mapping = jsonMappingObjWithDisplay,
                 issuerDid = TEST_ISSUER_DID
             )
 
