@@ -45,7 +45,7 @@ open class SimpleAsyncJWTCryptoProvider(
                 continuation.resume(JwtVerificationResult(true))
             },
             {
-                console.log("Verification failed: ${it.message}")
+                console.log("Verification failed (SimpleAsyncJWTCryptoProvider): ${it.message}")
                 continuation.resume(JwtVerificationResult(false, it.message))
             }
         )
