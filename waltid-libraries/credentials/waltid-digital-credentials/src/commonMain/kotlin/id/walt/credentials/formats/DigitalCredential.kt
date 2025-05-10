@@ -10,6 +10,9 @@ sealed class DigitalCredential {
     abstract val signature: CredentialSignature?
     abstract val signed: String?
 
+    abstract var issuer: String?
+    abstract var subject: String?
+
     //fun sign()
     // also see `fun signAndDisclose` from `SelectivelyDisclosable.kt`
 

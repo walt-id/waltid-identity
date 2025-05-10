@@ -10,5 +10,9 @@ import kotlinx.serialization.json.JsonObject
 data class MdocsCredential(
     override val signature: CredentialSignature?,
     override val signed: String?, override val credentialData: JsonObject,
-    val docType: String
+    val docType: String,
+
+
+    override var issuer: String? = null,
+    override var subject: String? = null
 ) : DigitalCredential()
