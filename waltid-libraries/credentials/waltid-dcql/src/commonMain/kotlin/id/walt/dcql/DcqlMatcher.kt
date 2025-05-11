@@ -18,10 +18,10 @@ object DcqlMatcher {
      */
     fun match(
         query: DcqlQuery,
-        availableCredentials: List<Credential>,
-    ): Result<Map<String, List<Credential>>> {
+        availableCredentials: List<DcqlCredential>,
+    ): Result<Map<String, List<DcqlCredential>>> {
         log.debug { "Starting DCQL match. Query: $query, Available Credentials: ${availableCredentials.map { it.id }}" }
-        val individualMatches = mutableMapOf<String, List<Credential>>()
+        val individualMatches = mutableMapOf<String, List<DcqlCredential>>()
 
         // 1. Find matches for each individual CredentialQuery
         for (credQuery in query.credentials) {
@@ -93,7 +93,7 @@ object DcqlMatcher {
     // --- Helper Functions ---
 
     /** Placeholder: Check format-specific metadata constraints. */
-    private fun matchesMeta(credential: Credential, metaQuery: JsonObject?): Boolean {
+    private fun matchesMeta(credential: DcqlCredential, metaQuery: JsonObject?): Boolean {
         if (metaQuery == null) return true
         log.trace { "Checking metadata for credential ${credential.id} (simplified: returning true)" }
         // Actual implementation requires parsing metaQuery based on credential.format
@@ -103,7 +103,7 @@ object DcqlMatcher {
 
     /** Placeholder: Check issuer constraints. */
     private fun matchesTrustedAuthorities(
-        credential: Credential,
+        credential: DcqlCredential,
         authoritiesQuery: List<TrustedAuthoritiesQuery>?,
     ): Boolean {
         if (authoritiesQuery.isNullOrEmpty()) return true
@@ -115,7 +115,7 @@ object DcqlMatcher {
 
     /** Check if a credential satisfies the claims constraints. */
     private fun matchesClaims(
-        credential: Credential,
+        credential: DcqlCredential,
         claims: List<ClaimsQuery>?,
         claimSets: List<List<String>>?,
     ): Boolean {
@@ -153,7 +153,7 @@ object DcqlMatcher {
     }
 
     /** Check if a single claim exists at the path and matches optional values. */
-    private fun claimExistsAndMatches(credential: Credential, claimQuery: ClaimsQuery): Boolean {
+    private fun claimExistsAndMatches(credential: DcqlCredential, claimQuery: ClaimsQuery): Boolean {
         val claimValue = resolveClaimPath(credential.data, claimQuery.path)
         if (claimValue == null) {
             log.trace { "Claim path ${claimQuery.path} not found in credential ${credential.id}" }

@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class DcqlMatcherTest {
 
     // Sample Credentials
-    private val cred1 = SampleCredential(
+    private val cred1 = RawDcqlCredential(
         id = "cred-jwt-vc-1",
         format = "jwt_vc_json",
 //        issuer = "did:example:issuer1",
@@ -25,7 +25,7 @@ class DcqlMatcherTest {
             }
         }
     )
-    private val cred2 = SampleCredential(
+    private val cred2 = RawDcqlCredential(
         id = "cred-jwt-vc-2",
         format = "jwt_vc_json",
 //        issuer = "did:example:issuer2",
@@ -37,7 +37,7 @@ class DcqlMatcherTest {
             }
         }
     )
-    private val cred3_mdoc = SampleCredential(
+    private val cred3_mdoc = RawDcqlCredential(
         id = "cred-mdoc-3",
         format = "mso_mdoc",
 //        issuer = "did:example:issuer_mdoc",
@@ -52,7 +52,7 @@ class DcqlMatcherTest {
 
     private val allCreds = listOf(cred1, cred2, cred3_mdoc)
 
-    fun parseAndMatch(queryJson: String): Result<Map<String, List<Credential>>> {
+    fun parseAndMatch(queryJson: String): Result<Map<String, List<DcqlCredential>>> {
         println("Query: $queryJson")
 
         val queryResult = DcqlParser.parse(queryJson)
