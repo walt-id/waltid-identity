@@ -14,8 +14,8 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 
 @Serializable
-sealed class CredentialOffer() : JsonDataObject() {
-    abstract val grants: Map<String, GrantDetails?>
+sealed class CredentialOffer : JsonDataObject() {
+    abstract val grants: Map<String, GrantDetails>
     abstract val credentialIssuer: String
 
     abstract class Builder<T : CredentialOffer>(
@@ -67,7 +67,7 @@ sealed class CredentialOffer() : JsonDataObject() {
     @Serializable
     data class Draft13(
         @SerialName("credential_issuer") override val credentialIssuer: String,
-        @SerialName("grants") override val grants: Map<String, GrantDetails?> = mapOf(),
+        @SerialName("grants") override val grants: Map<String, GrantDetails> = mapOf(),
 
         @SerialName("credential_configuration_ids") val credentialConfigurationIds: JsonArray,
 
@@ -91,7 +91,7 @@ sealed class CredentialOffer() : JsonDataObject() {
     @Serializable
     data class Draft11(
         @SerialName("credential_issuer") override val credentialIssuer: String,
-        @SerialName("grants") override val grants: Map<String, GrantDetails?> = mapOf(),
+        @SerialName("grants") override val grants: Map<String, GrantDetails> = mapOf(),
 
         @SerialName("credentials") val credentials: JsonArray,
 
@@ -117,9 +117,11 @@ sealed class CredentialOffer() : JsonDataObject() {
 }
 
 object CredentialOfferJsonSerializer : JsonDataObjectSerializer<CredentialOffer>(CredentialOfferSerializer) {
-    public override fun transformSerialize(element: JsonElement) = JsonObject(super.transformSerialize(element).jsonObject)
-    public override fun transformDeserialize(element: JsonElement): JsonElement {return JsonObject(super.transformDeserialize(element).jsonObject)
-    }
+    public override fun transformSerialize(element: JsonElement) =
+        JsonObject(super.transformSerialize(element).jsonObject)
+
+    public override fun transformDeserialize(element: JsonElement) =
+        JsonObject(super.transformDeserialize(element).jsonObject)
 }
 
 object CredentialOfferSerializer : KSerializer<CredentialOffer> {
@@ -152,10 +154,14 @@ object CredentialOfferSerializer : KSerializer<CredentialOffer> {
         return when {
             "credential_configuration_ids" in transformedElement.jsonObject -> Json.decodeFromJsonElement(
                 CredentialOffer.Draft13.serializer(),
-                transformedElement
+                transformedElement,
             )
 
-            "credentials" in transformedElement.jsonObject -> Json.decodeFromJsonElement(CredentialOffer.Draft11.serializer(), transformedElement)
+            "credentials" in transformedElement.jsonObject -> Json.decodeFromJsonElement(
+                CredentialOffer.Draft11.serializer(),
+                transformedElement,
+            )
+
             else -> throw IllegalArgumentException("Unknown CredentialOffer type: missing expected fields")
         }
     }
