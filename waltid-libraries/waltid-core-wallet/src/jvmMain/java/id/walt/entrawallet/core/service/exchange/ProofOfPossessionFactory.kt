@@ -1,15 +1,14 @@
 package id.walt.entrawallet.core.service.exchange
 
-import org.cose.java.OneKey
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.did.dids.DidService
+import id.walt.entrawallet.core.service.oidc4vc.TestCredentialWallet
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.OfferedCredential
 import id.walt.oid4vc.data.ProofOfPossession
 import id.walt.oid4vc.data.ProofType
-import id.walt.entrawallet.core.service.oidc4vc.TestCredentialWallet
-import id.walt.entrawallet.core.service.oidc4vc.WALLET_BASE_URL
 import id.walt.oid4vc.providers.OpenIDClientConfig
+import org.cose.java.OneKey
 
 object ProofOfPossessionFactory {
     suspend fun new(
