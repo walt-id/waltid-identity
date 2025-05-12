@@ -3,11 +3,13 @@ package id.walt.oid4vc.requests
 import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.definitions.DcqlQuery
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.sdjwt.JWTCryptoProvider
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.datetime.Clock
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Duration
@@ -43,6 +45,8 @@ data class AuthorizationRequest(
     val request: String? = null,
     val presentationDefinition: PresentationDefinition? = null,
     val presentationDefinitionUri: String? = null,
+    @SerialName("dcql_query")
+    val dcqlQuery: DcqlQuery? = null,
     val clientIdScheme: ClientIdScheme? = null,
     val clientMetadata: OpenIDClientMetadata? = null,
     val clientMetadataUri: String? = null,
@@ -77,6 +81,7 @@ data class AuthorizationRequest(
             request?.let { put("request", listOf(it)) }
             presentationDefinition?.let { put("presentation_definition", listOf(it.toJSONString())) }
             presentationDefinitionUri?.let { put("presentation_definition_uri", listOf(it)) }
+            dcqlQuery?.let { put("dcql_query", listOf(it.toJSONString())) }
             clientIdScheme?.let { put("client_id_scheme", listOf(it.value)) }
             clientMetadata?.let { put("client_metadata", listOf(it.toJSONString())) }
             clientMetadataUri?.let { put("client_metadata_uri", listOf(it)) }
@@ -141,6 +146,7 @@ data class AuthorizationRequest(
             request?.let { put("request", JsonPrimitive(it)) }
             presentationDefinition?.let { put("presentation_definition", it.toJSON()) }
             presentationDefinitionUri?.let { put("presentation_definition_uri", JsonPrimitive(it)) }
+            dcqlQuery?.let { put("dcql_query", it.toJSON()) }
             clientIdScheme?.let { put("client_id_scheme", JsonPrimitive(it.value)) }
             clientMetadata?.let { put("client_metadata", it.toJSON()) }
             clientMetadataUri?.let { put("client_metadata_uri", JsonPrimitive(it)) }
@@ -210,6 +216,7 @@ data class AuthorizationRequest(
             "issuer_state",
             "presentation_definition",
             "presentation_definition_uri",
+            "dcql_query",
             "client_id_scheme",
             "client_metadata",
             "client_metadata_uri",
@@ -274,6 +281,7 @@ data class AuthorizationRequest(
                 parameters["request"]?.firstOrNull(),
                 parameters["presentation_definition"]?.firstOrNull()?.let { PresentationDefinition.fromJSONString(it) },
                 parameters["presentation_definition_uri"]?.firstOrNull(),
+                dcqlQuery = parameters["dcql_query"]?.firstOrNull()?.let { DcqlQuery.fromJSONString(it) },
                 parameters["client_id_scheme"]?.firstOrNull()?.let { ClientIdScheme.fromValue(it) },
                 (parameters["client_metadata"] ?: parameters["registration"])?.firstOrNull()?.let {
                     OpenIDClientMetadata.fromJSONString(it)
