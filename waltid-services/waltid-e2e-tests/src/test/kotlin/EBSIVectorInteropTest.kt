@@ -346,7 +346,6 @@ class EBSIVectorInteropTest(
 
         claimCredentialFromDanubeTech()
 
-        claimCredentialFromCorpoSign()
 
         claimCredential(
             offerUri = "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fidentfy.izer.tech%2Foffers%2F17116185-6ae0-4785-9f2e-29c772f9af16%3Frequested_vc_types%3DPreAuthIssuance%26pre-authorized_code%3Dabc",
@@ -354,6 +353,9 @@ class EBSIVectorInteropTest(
         )
 
         claimCredentialFromCERTH()
+
+        //These guys encode an "authorization_code": null key-value pair in the credential offer. If this is removed, it works so partially interoperable
+//        claimCredentialFromCorpoSign()
 
         //These guys are encoding the metadata of supported credentials incorrectly. Not gonna bother.
 //        claimCredentialFromGataca()
