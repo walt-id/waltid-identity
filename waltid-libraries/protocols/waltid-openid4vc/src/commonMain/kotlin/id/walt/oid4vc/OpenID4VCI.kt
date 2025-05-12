@@ -141,9 +141,9 @@ object OpenID4VCI {
                 runCatching { http.get(offerReq.credentialOfferUri) }.getOrElse { ex ->
                     throw UnresolvableCredentialOfferException(offerReq.credentialOfferUri, ex)
                 }.bodyAsText().let { text ->
-                        runCatching { CredentialOffer.fromJSONString(text) }.getOrElse { ex ->
-                            throw CouldNotParseCredentialOfferException(url = offerReq.credentialOfferUri, text = text, ex)
-                        }
+                    runCatching { CredentialOffer.fromJSONString(text) }.getOrElse { ex ->
+                        throw CouldNotParseCredentialOfferException(url = offerReq.credentialOfferUri, text = text, ex)
+                    }
                 }
             }
 
