@@ -406,7 +406,61 @@ class WaltidServicesE2ETests {
         PresentationDefinitionPolicyTests().runTests()
         //endregion -Presentation Definition Policy (Verifier)-
 
+        //region -EBSI Vector Wallet Credential Claim Test Suite (our Wallet, their Issuers)-
+        EBSIVectorInteropTest(client,wallet).runTest()
+        //endregion -EBSI Vector Wallet Credential Claim Test Suite (our Wallet, their Issuers)-
     }
+
+//    @Test
+//    fun e2eEBSIVectorOnlyTests() =
+//        E2ETest.testBlock(
+//            config = ServiceConfiguration("e2e-ebsi-vector-tests"),
+//            features = listOf(
+//                id.walt.issuer.FeatureCatalog,
+//                id.walt.verifier.FeatureCatalog,
+//                id.walt.webwallet.FeatureCatalog
+//            ),
+//            featureAmendments = mapOf(
+//                CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
+//                // CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
+//            ),
+//            init = {
+//                id.walt.webwallet.webWalletSetup()
+//                id.walt.did.helpers.WaltidServices.minimalInit()
+//                id.walt.webwallet.db.Db.start()
+//            },
+//            module = e2eTestModule,
+//            timeout = defaultTestTimeout
+//        ) {
+//            var client = testHttpClient()
+//            lateinit var accountId: Uuid
+//            lateinit var wallet: Uuid
+//            var authApi = AuthApi(client)
+//
+//            // the e2e http request tests here
+//
+//            //region -Auth-
+//
+//            authApi.run {
+//                userInfo(HttpStatusCode.Unauthorized)
+//                login(defaultEmailAccount) {
+//                    client = testHttpClient(token = it["token"]!!.jsonPrimitive.content)
+//                    authApi = AuthApi(client)
+//                }
+//            }
+//            authApi.run {
+//                userInfo(HttpStatusCode.OK) {
+//                    accountId = it.id
+//                }
+//                userSession()
+//                userWallets(accountId) {
+//                    wallet = it.wallets.first().id
+//                    println("Selected wallet: $wallet")
+//                }
+//            }
+//
+//            EBSIVectorInteropTest(client, wallet).runTest()
+//        }
 
     /* @Test // enable to execute test selectively
     fun lspIssuanceTests() = testBlock(timeout = defaultTestTimeout) {
