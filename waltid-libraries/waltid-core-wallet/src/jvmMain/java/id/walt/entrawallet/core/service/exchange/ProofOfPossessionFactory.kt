@@ -8,6 +8,8 @@ import id.walt.oid4vc.data.OfferedCredential
 import id.walt.oid4vc.data.ProofOfPossession
 import id.walt.oid4vc.data.ProofType
 import id.walt.entrawallet.core.service.oidc4vc.TestCredentialWallet
+import id.walt.entrawallet.core.service.oidc4vc.WALLET_BASE_URL
+import id.walt.oid4vc.providers.OpenIDClientConfig
 
 object ProofOfPossessionFactory {
     suspend fun new(
@@ -21,7 +23,7 @@ object ProofOfPossessionFactory {
         false -> didProofOfPossession(credentialWallet, offeredCredential, credentialOffer, nonce)
     }
 
-    private fun didProofOfPossession(
+    private suspend fun didProofOfPossession(
         credentialWallet: TestCredentialWallet,
         offeredCredential: OfferedCredential,
         credentialOffer: CredentialOffer,
@@ -30,6 +32,11 @@ object ProofOfPossessionFactory {
         did = credentialWallet.did,
         issuerUrl = credentialOffer.credentialIssuer,
         nonce = nonce,
+        client = OpenIDClientConfig(
+            clientID = credentialWallet.did,
+            clientSecret = null,
+            redirectUri = null,
+        ),
         proofType = offeredCredential.proofTypesSupported?.keys?.first() ?: ProofType.jwt
     )
 

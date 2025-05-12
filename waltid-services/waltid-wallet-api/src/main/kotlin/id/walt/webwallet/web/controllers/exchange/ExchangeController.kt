@@ -40,6 +40,7 @@ fun Application.exchange() = walletRoute {
             request {
                 queryParameter<String>("did") { description = "The DID to issue the credential(s) to" }
                 queryParameter<Boolean>("requireUserInput") { description = "Whether to claim as pending acceptance" }
+                queryParameter<String>("pinOrTxCode") { description = "The PIN value (Draft11) or TX_CODE (Draft13 onwards)" }
                 body<String> {
                     description = "The offer request to use"
                 }
@@ -52,6 +53,7 @@ fun Application.exchange() = walletRoute {
             val did = call.request.queryParameters["did"] ?: wallet.listDids().firstOrNull()?.did
             ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
             val requireUserInput = call.request.queryParameters["requireUserInput"].toBoolean()
+            val pinOrTxCode = call.request.queryParameters["pinOrTxCode"]
 
             val offer = call.receiveText()
 
@@ -62,7 +64,8 @@ fun Application.exchange() = walletRoute {
                     wallet = wallet.walletId,
                     did = did,
                     offer = offer,
-                    pending = requireUserInput
+                    pending = requireUserInput,
+                    pinOrTxCode = pinOrTxCode,
                 ).also {
                     wallet.addOperationHistory(
                         WalletOperationHistory.new(
