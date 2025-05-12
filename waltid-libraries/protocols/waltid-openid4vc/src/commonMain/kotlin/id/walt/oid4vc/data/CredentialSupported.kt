@@ -118,7 +118,7 @@ object CredentialSupportedMapSerializer : KSerializer<Map<String, CredentialSupp
  */
 
 object CredentialSupportedArraySerializer : KSerializer<Map<String, CredentialSupported>> {
-    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("Array<CredentialSupported>")
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("Map<String, CredentialSupported>")
 
     override fun deserialize(decoder: Decoder): Map<String, CredentialSupported> {
         val jsonDecoder = decoder as? JsonDecoder
@@ -127,9 +127,13 @@ object CredentialSupportedArraySerializer : KSerializer<Map<String, CredentialSu
         val jsonArray = jsonDecoder.decodeJsonElement() as? JsonArray
             ?: throw IllegalStateException("Invalid Decoder")
 
-        return jsonArray.mapIndexed { index, element ->
+        return jsonArray.mapIndexedNotNull { index, element ->
+            val jsonObject = element as? JsonObject ?: return@mapIndexedNotNull null
+
+            if("format" !in jsonObject) return@mapIndexedNotNull null
+
             val key = index.toString()
-            val value = Json.decodeFromJsonElement(CredentialSupported.serializer(), element)
+            val value = CredentialSupported.fromJSON(jsonObject)
             key to value
         }.toMap()
     }
