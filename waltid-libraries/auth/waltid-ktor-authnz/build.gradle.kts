@@ -4,7 +4,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.power-assert")
     kotlin("plugin.serialization")
-    id("io.ktor.plugin") version "3.1.2"
+    id("io.ktor.plugin") version "3.1.3"
     id("maven-publish")
 
     application
@@ -95,8 +95,8 @@ dependencies {
     implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
     // Logging
-    implementation("io.klogging:klogging-jvm:0.9.1")
-    implementation("io.klogging:slf4j-klogging:0.9.1")
+    implementation("io.klogging:klogging-jvm:0.9.4")
+    implementation("io.klogging:slf4j-klogging:0.9.4")
 
     /* --- Testing --- */
     testImplementation("io.ktor:ktor-client-logging")

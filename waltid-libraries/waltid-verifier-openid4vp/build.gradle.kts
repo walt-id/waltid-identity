@@ -6,7 +6,7 @@ plugins {
     id("com.github.ben-manes.versions")
 }
 
-group = "id.walt.protocols"
+group = "id.walt.verifier"
 
 repositories {
     mavenCentral()

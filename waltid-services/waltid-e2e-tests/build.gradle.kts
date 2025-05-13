@@ -15,7 +15,7 @@ repositories {
 }
 
 dependencies {
-    val ktorVersion = "3.1.2"
+    val ktorVersion = "3.1.3"
 
     // Testing
     testImplementation(kotlin("test"))
