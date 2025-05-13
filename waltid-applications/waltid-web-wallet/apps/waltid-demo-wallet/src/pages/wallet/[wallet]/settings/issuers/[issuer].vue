@@ -104,7 +104,7 @@ const currentWallet = useCurrentWallet();
 
 const issuer = route.params.issuer as string;
 const credentialType = ref("jwt_vc_json");
-const hardcodedIssuerDid = "did:example:1234567890";
+const hardcodedIssuerDid = "Eastern Wyoming College";
 
 const issuerCredentials = ref<IssuerCredentials | null>(null);
 const pending = ref(true);
@@ -112,7 +112,7 @@ const error = ref<any>(null);
 
 if (issuer === hardcodedIssuerDid) {
   issuerCredentials.value = {
-    credentials: [{ id: "University Degree", format: "jwt_vc_json" }],
+    credentials: [{ id: "EmailVerificationCredential", format: "jwt_vc_json" }],
     issuer: { uiEndpoint: "" }
   };
   pending.value = false;

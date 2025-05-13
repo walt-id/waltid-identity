@@ -2,11 +2,7 @@
   <div class="min-h-full">
     <div class="flex flex-1 flex-col min-h-screen">
       <div class="w-full">
-        <img
-          :src="logoImage"
-          alt="walt.id logo"
-          class="h-8 w-auto mx-auto mt-5"
-        />
+        <img src="/images/pcg-black-logo.png" alt="walt.id logo" class="h-8 w-auto mx-auto mt-5" />
       </div>
       <main class="flex-1 pb-8">
         <slot />
@@ -14,16 +10,9 @@
 
       <div class="fixed bottom-0 inset-x-0">
         <hr class="border-t border-gray-200" aria-hidden="true" />
-        <nav
-          class="flex justify-between bg-white px-4 py-2"
-          aria-label="Bottom navigation"
-        >
-          <NuxtLink
-            v-for="item in navigation"
-            :key="item.name"
-            :to="item.href"
-            class="flex flex-col items-center text-sm text-gray-500 hover:text-gray-900"
-          >
+        <nav class="flex justify-between bg-white px-4 py-2" aria-label="Bottom navigation">
+          <NuxtLink v-for="item in navigation" :key="item.name" :to="item.href"
+            class="flex flex-col items-center text-sm text-gray-500 hover:text-gray-900">
             <span v-html="item.icon" class="mt-1"></span>
             <span class="mt-1">{{ item.name }}</span>
           </NuxtLink>
