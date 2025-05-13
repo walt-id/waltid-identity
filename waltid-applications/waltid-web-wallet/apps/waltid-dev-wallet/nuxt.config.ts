@@ -179,9 +179,9 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       projectId: process.env.ProjectId,
-      issuerCallbackUrl: "http://localhost:7100",
-      credentialsRepositoryUrl: "http://localhost:3000",
-      demoWalletUrl: "https://wallet-dev.walt.id",
+      issuerCallbackUrl: process.env.ISSUER_CALLBACK_URL,
+      credentialsRepositoryUrl: process.env.CREDENTIALS_REPOSITORY_URL,
+      demoWalletUrl: process.env.DEMO_WALLET_URL,
     },
   },
 
