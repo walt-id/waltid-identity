@@ -35,7 +35,8 @@ val modules = listOfNotNull(
     ),
 
     * "$libraries:protocols".group(
-        "waltid-openid4vc"
+        "waltid-openid4vc",
+        "waltid-openid4vp",
     ),
 
     * "$libraries:sdjwt".group(
