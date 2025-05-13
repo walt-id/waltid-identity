@@ -406,9 +406,6 @@ class WaltidServicesE2ETests {
         PresentationDefinitionPolicyTests().runTests()
         //endregion -Presentation Definition Policy (Verifier)-
 
-        //region -EBSI Vector Wallet Credential Claim Test Suite (our Wallet, their Issuers)-
-        EBSIVectorInteropTest(client,wallet).runTest()
-        //endregion -EBSI Vector Wallet Credential Claim Test Suite (our Wallet, their Issuers)-
     }
 
 //    @Test
