@@ -3,7 +3,7 @@
     <!-- Mobile View -->
     <div class="flex flex-col sm:hidden">
       <div class="w-full">
-        <img src="/images/pcg-black-logo.png" alt="walt.id logo" class="h-8 w-auto mx-auto mt-5" />
+        <img src="/images/pcg-black-logo.png" alt="walt.id logo" class="h-24 w-auto mx-auto mt-5" />
       </div>
       <div
         class="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:flex-none lg:px-20 xl:px-24 lg:bg-white lg:bg-opacity-50">

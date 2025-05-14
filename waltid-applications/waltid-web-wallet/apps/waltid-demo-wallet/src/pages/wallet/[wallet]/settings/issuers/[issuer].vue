@@ -132,6 +132,8 @@ if (issuer === hardcodedIssuerDid) {
 async function issueHardcodedCredential() {
   if (issuer !== hardcodedIssuerDid) return;
 
+  const today = new Date();
+  const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
   const credentialOffer = await $fetch<string>('https://issuer.wy-demo.walt.id/openid4vc/jwt/issue', {
     method: 'POST',
     body: {
@@ -156,19 +158,22 @@ async function issueHardcodedCredential() {
           "VerifiableCredential",
           "EmailVerificationCredential"
         ],
-        "issuer": "did:example:issuer123",
+        "issuer": {
+          "id": "did:example:issuer123",
+          "name": "Eastern Wyoming College"
+        },
         "issuanceDate": "2025-05-12T15:00:00Z",
         "credentialSubject": {
           "id": "did:example:user456",
           "name": "Christine Schmidt",
-          "email": "user@example.com",
+          "email": "christine84122@gmail.com",
           "emailVerified": true,
-          "verifiedAt": "2025-05-12"
+          "verifiedAt": formattedDate,
         }
       },
       mapping: {
         id: "<uuid>",
-        issuer: "<issuerDid>",
+        issuer: { id: "<issuerDid>" },
         credentialSubject: { id: "<subjectDid>" },
         issuanceDate: "<timestamp>",
       },

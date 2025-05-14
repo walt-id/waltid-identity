@@ -3,10 +3,9 @@
         <div class="flex h-20 flex-shrink-0 border-b border-gray-200 bg-white justify-between items-center px-8">
             <NuxtLink :to="`/wallet/${currentWallet}`">
                 <div class="flex items-center px-4 gap-4">
-                    <img :src="logoImg" alt="walt.id logo" class="h-10" />
+                    <img src="/images/pcg-black-logo.png" alt="walt.id logo" class="h-10" />
                     <div>
                         <div class="text-[#002159] text-bold text-[20px]">ID WALLET</div>
-                        <div class="text-[#002159] text-[15px]">by walt.id</div>
                     </div>
                 </div>
             </NuxtLink>
@@ -36,7 +35,8 @@
                                     d="M20.6256 10.2949C20.6256 11.3235 20.1909 12.3099 19.4172 13.0373C18.6435 13.7646 17.5942 14.1732 16.5 14.1732C15.4058 14.1732 14.3565 13.7646 13.5828 13.0373C12.8091 12.3099 12.3744 11.3235 12.3744 10.2949C12.3744 9.26639 12.8091 8.27995 13.5828 7.55265C14.3565 6.82534 15.4058 6.41675 16.5 6.41675C17.5942 6.41675 18.6435 6.82534 19.4172 7.55265C20.1909 8.27995 20.6256 9.26639 20.6256 10.2949ZM8.25 24.8956C8.28535 22.8607 9.17009 20.9204 10.7134 19.4931C12.2568 18.0658 14.335 17.2659 16.5 17.2659C18.665 17.2659 20.7432 18.0658 22.2866 19.4931C23.8299 20.9204 24.7146 22.8607 24.75 24.8956C22.1618 26.0112 19.3473 26.587 16.5 26.5834C13.556 26.5834 10.7616 25.9794 8.25 24.8956Z"
                                     stroke="black" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                             </svg>
-                            <span class="ml-1 hidden text-sm font-medium text-gray-700 lg:block">{{ user.friendlyName }}</span>
+                            <span class="ml-1 hidden text-sm font-medium text-gray-700 lg:block">{{ user.friendlyName
+                            }}</span>
                             <ChevronDownIcon aria-hidden="true"
                                 class="ml-1 hidden h-5 w-5 flex-shrink-0 text-gray-400 lg:block" />
                         </MenuButton>

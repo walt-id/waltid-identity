@@ -7,8 +7,10 @@
 
         <div class="mb-8">
             <div class="text-2xl font-bold bold text-white">
-                {{ !isDetailView ? titleTitelized?.length > 20 ? titleTitelized?.slice(0, 20) + "..." :
-                    titleTitelized : titleTitelized }}
+                {{ !isDetailView ? titleTitelized?.split("Credential")[0] : titleTitelized }}
+            </div>
+            <div class="text-2xl font-bold bold text-white">
+                {{ !isDetailView ? "Credential" : "" }}
             </div>
         </div>
 
