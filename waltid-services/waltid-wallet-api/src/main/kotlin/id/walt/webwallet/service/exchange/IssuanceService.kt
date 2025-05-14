@@ -7,7 +7,10 @@ import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.GrantType
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.providers.TokenTarget
-import id.walt.oid4vc.requests.*
+import id.walt.oid4vc.requests.AuthorizationRequest
+import id.walt.oid4vc.requests.CredentialRequest
+import id.walt.oid4vc.requests.EntraIssuanceRequest
+import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.EntraIssuanceCompletionCode
 import id.walt.oid4vc.responses.EntraIssuanceCompletionErrorDetails
@@ -89,7 +92,7 @@ object IssuanceService : IssuanceServiceBase() {
         val grant = credentialOffer.grants[GrantType.pre_authorized_code.value]!!
         val preAuthorizedCode = grant.preAuthorizedCode!!
         val tokenReq = when {
-            grant.userPinRequired != true -> TokenRequest.PreAuthorizedCode(preAuthorizedCode)
+            grant.userPinRequired != null && grant.userPinRequired != true -> TokenRequest.PreAuthorizedCode(preAuthorizedCode)
             providerMetadata is OpenIDProviderMetadata.Draft11 -> TokenRequest.PreAuthorizedCode(
                 preAuthorizedCode = preAuthorizedCode,
                 userPIN = pinOrTxCode

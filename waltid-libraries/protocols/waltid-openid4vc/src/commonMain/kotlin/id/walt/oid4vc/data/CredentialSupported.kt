@@ -5,8 +5,6 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.MapSerializer
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -105,10 +103,39 @@ object CredentialSupportedListSerializer : KSerializer<List<CredentialSupported>
 }
 
 object CredentialSupportedMapSerializer : KSerializer<Map<String, CredentialSupported>> {
-    private val internalSerializer = MapSerializer(String.serializer(), CredentialSupportedSerializer)
-    override val descriptor: SerialDescriptor = internalSerializer.descriptor
-    override fun deserialize(decoder: Decoder) = internalSerializer.deserialize(decoder)
-    override fun serialize(encoder: Encoder, value: Map<String, CredentialSupported>) = internalSerializer.serialize(encoder, value)
+
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("Map<String, CredentialSupported>")
+
+    override fun deserialize(decoder: Decoder): Map<String, CredentialSupported> {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: throw IllegalStateException("Invalid Decoder")
+
+        val jsonObject = jsonDecoder.decodeJsonElement() as? JsonObject
+            ?: throw IllegalStateException("Invalid Decoder")
+
+        return jsonObject.mapNotNull { entry ->
+            val nestedJsonObject = entry.value as? JsonObject ?: return@mapNotNull null
+
+            if ("format" !in nestedJsonObject) return@mapNotNull null
+
+            val key = entry.key
+            val value = CredentialSupported.fromJSON(nestedJsonObject)
+            key to value
+        }.toMap()
+    }
+
+
+    override fun serialize(encoder: Encoder, value: Map<String, CredentialSupported>) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw IllegalStateException("Invalid Decoder")
+
+        jsonEncoder.encodeJsonElement(buildJsonObject {
+            value.forEach {
+                put(it.key, it.value.toJSON())
+            }
+        })
+
+    }
 }
 
 /**
@@ -130,7 +157,7 @@ object CredentialSupportedArraySerializer : KSerializer<Map<String, CredentialSu
         return jsonArray.mapIndexedNotNull { index, element ->
             val jsonObject = element as? JsonObject ?: return@mapIndexedNotNull null
 
-            if("format" !in jsonObject) return@mapIndexedNotNull null
+            if ("format" !in jsonObject) return@mapIndexedNotNull null
 
             val key = index.toString()
             val value = CredentialSupported.fromJSON(jsonObject)
