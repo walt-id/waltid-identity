@@ -177,7 +177,7 @@
       </div>
       <div class="flex-1 hidden lg:flex flex-col justify-center items-center">
         <img src="/images/pcg-white-logo.png" alt="pcg logo" class="h-48 relative" />
-        <h1 class="inline-block text-transparent bg-clip-text text-5xl text-white">
+        <h1 class="text-5xl text-white">
           Get Your Identity Wallet
         </h1>
       </div>

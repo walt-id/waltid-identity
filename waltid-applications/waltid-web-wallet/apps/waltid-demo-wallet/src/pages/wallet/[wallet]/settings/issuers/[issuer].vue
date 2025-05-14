@@ -132,7 +132,7 @@ if (issuer === hardcodedIssuerDid) {
 async function issueHardcodedCredential() {
   if (issuer !== hardcodedIssuerDid) return;
 
-  const credentialOffer = await $fetch<string>('https://issuer.demo.walt.id/openid4vc/jwt/issue', {
+  const credentialOffer = await $fetch<string>('https://issuer.wy-demo.walt.id/openid4vc/jwt/issue', {
     method: 'POST',
     body: {
       issuerKey: {
@@ -145,30 +145,32 @@ async function issueHardcodedCredential() {
           x: "T3T4-u1Xz3vAV2JwPNxWfs4pik_JLiArz_WTCvrCFUM"
         }
       },
-      credentialConfigurationId: "UniversityDegree_jwt_vc_json",
+      credentialConfigurationId: "EmailVerificationCredential_jwt_vc_json",
       credentialData: {
         "@context": [
           "https://www.w3.org/2018/credentials/v1",
-          "https://www.w3.org/2018/credentials/examples/v1"
+          "https://w3id.org/email/v1"
         ],
-        id: "http://example.gov/credentials/3732",
-        type: ["VerifiableCredential", "UniversityDegreeCredential"],
-        issuer: { id: "did:web:vc.transmute.world" },
-        issuanceDate: "2020-03-10T04:24:12.164Z",
-        credentialSubject: {
-          id: "did:example:ebfeb1f712ebc6f1c276e12ec21",
-          degree: {
-            type: "BachelorDegree",
-            name: "Bachelor of Science and Arts"
-          }
+        "id": "urn:uuid:123e4567-e89b-12d3-a456-426614174000",
+        "type": [
+          "VerifiableCredential",
+          "EmailVerificationCredential"
+        ],
+        "issuer": "did:example:issuer123",
+        "issuanceDate": "2025-05-12T15:00:00Z",
+        "credentialSubject": {
+          "id": "did:example:user456",
+          "name": "Christine Schmidt",
+          "email": "user@example.com",
+          "emailVerified": true,
+          "verifiedAt": "2025-05-12"
         }
       },
       mapping: {
         id: "<uuid>",
-        issuer: { id: "<issuerDid>" },
+        issuer: "<issuerDid>",
         credentialSubject: { id: "<subjectDid>" },
         issuanceDate: "<timestamp>",
-        expirationDate: "<timestamp-in:365d>"
       },
       issuerDid: "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"
     }
