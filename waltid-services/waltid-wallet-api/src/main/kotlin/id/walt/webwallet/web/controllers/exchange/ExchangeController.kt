@@ -40,7 +40,9 @@ fun Application.exchange() = walletRoute {
             request {
                 queryParameter<String>("did") { description = "The DID to issue the credential(s) to" }
                 queryParameter<Boolean>("requireUserInput") { description = "Whether to claim as pending acceptance" }
-                queryParameter<String>("pinOrTxCode") { description = "The PIN value (Draft11) or TX_CODE (Draft13 onwards)" }
+                queryParameter<String>("pinOrTxCode") {
+                    description = "The `pin` (Draft11), or `tx_code` (Draft13 and onwards), value that may be required as part of a pre-authorized code (credential issuance) flow"
+                }
                 body<String> {
                     description = "The offer request to use"
                 }
