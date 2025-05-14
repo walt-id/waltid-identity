@@ -96,6 +96,41 @@ class EBSIVectorInteropTest(
         )
     }
 
+    private suspend fun claimCredentialFromValidatedIdDraft13() {
+
+        val validatedIdIssuerBaseUrl = "https://labs-openid-interop.vididentity.net/api/issuance-pre-auth"
+
+        val pin = "1234"
+
+        val issuanceRequestPayload = """
+            {
+              "credentialTypeId": "33095f2f-6f80-4168-8301-abc815848aef",
+              "issuerDid": "did:ebsi:zpD3Qp8h4psvdgnTGMX6hfE",
+              "credentialSubject": {
+                "name": "Bianca",
+                "age": 30,
+                "surname": "Castafiori"
+              },
+              "oid4vciVersion": "Draft13",
+              "userPin": $pin
+            }
+        """.trimIndent()
+
+        lateinit var offerUri: String
+
+        httpClient.post(validatedIdIssuerBaseUrl) {
+            setBody(issuanceRequestPayload)
+        }.expectSuccess().body<JsonObject>().let {
+            offerUri = it["rawCredentialOffer"]!!.jsonPrimitive.content
+        }
+
+        claimCredential(
+            offerUri = offerUri,
+            issuerName = "ValidatedID Draft13",
+            pin = pin,
+        )
+    }
+
     private suspend fun claimCredentialFromTriveria() {
 
         val issuerWalletBaseUrl =
@@ -340,9 +375,10 @@ class EBSIVectorInteropTest(
 
         claimCredentialFromValidatedId()
 
+        claimCredentialFromValidatedIdDraft13()
+
         claimCredentialFromTriveria()
 
-        claimCredentialFromGoldman()
 
         claimCredentialFromDanubeTech()
 
@@ -353,6 +389,9 @@ class EBSIVectorInteropTest(
         )
 
         claimCredentialFromCERTH()
+
+        //Offline but we were compliant when tested
+//        claimCredentialFromGoldman()
 
         //These guys encode an "authorization_code": null key-value pair in the credential offer. If this is removed, it works so partially interoperable
 //        claimCredentialFromCorpoSign()

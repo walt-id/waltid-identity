@@ -6,7 +6,6 @@ import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.testing.E2ETest
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import id.walt.commons.web.plugins.httpJson
-import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.issuance.IssuanceExamples
@@ -19,6 +18,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
+import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.service.issuers.IssuersService
