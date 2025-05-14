@@ -495,6 +495,7 @@ object OpenID4VCI {
         return when (version) {
             OpenID4VCIVersion.DRAFT13 -> OpenIDProviderMetadata.Draft13(
                 issuer = baseUrl,
+                authorizationServers = setOf(baseUrl),
                 authorizationEndpoint = "$baseUrl/authorize",
                 pushedAuthorizationRequestEndpoint = "$baseUrl/par",
                 tokenEndpoint = "$baseUrl/token",
@@ -519,6 +520,7 @@ object OpenID4VCI {
 
             OpenID4VCIVersion.DRAFT11 -> OpenIDProviderMetadata.Draft11(
                 issuer = baseUrl,
+                authorizationServer = baseUrl,
                 authorizationEndpoint = "$baseUrl/authorize",
                 pushedAuthorizationRequestEndpoint = "$baseUrl/par",
                 tokenEndpoint = "$baseUrl/token",
