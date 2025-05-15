@@ -76,7 +76,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         }.expectSuccess().body<CredentialOffer.Draft13>()
 
         assertEquals(1, resolvedOffer.credentialConfigurationIds.size)
-        assertEquals(issuanceReq.credentialConfigurationId, resolvedOffer.credentialConfigurationIds.first())
+        assertEquals(issuanceReq.credentialConfigurationId, resolvedOffer.credentialConfigurationIds.first().jsonPrimitive.content)
 
         // === resolve issuer metadata ===
         val issuerMetadata =
@@ -85,7 +85,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
         assertContains(
             issuerMetadata.credentialConfigurationsSupported!!.keys,
-            resolvedOffer.credentialConfigurationIds.first()
+            resolvedOffer.credentialConfigurationIds.first().jsonPrimitive.content,
         )
 
         // === use credential offer request ===
@@ -223,7 +223,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
             setBody(offerUri)
         }.expectSuccess().body<CredentialOffer.Draft13>()
         assertEquals(1, resolvedOffer.credentialConfigurationIds.size)
-        assertEquals("identity_credential_vc+sd-jwt", resolvedOffer.credentialConfigurationIds.first())
+        assertEquals("identity_credential_vc+sd-jwt", resolvedOffer.credentialConfigurationIds.first().jsonPrimitive.content)
 
         // === resolve issuer metadata ===
         val issuerMetadata =
@@ -232,7 +232,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
         assertContains(
             issuerMetadata.credentialConfigurationsSupported!!.keys,
-            resolvedOffer.credentialConfigurationIds.first()
+            resolvedOffer.credentialConfigurationIds.first().jsonPrimitive.content,
         )
 
         // === use credential offer request ===

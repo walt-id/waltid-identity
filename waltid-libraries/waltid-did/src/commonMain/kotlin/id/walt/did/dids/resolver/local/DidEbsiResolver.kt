@@ -7,6 +7,8 @@ import id.walt.did.dids.document.DidEbsiDocument
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.http.HttpHeaders.ContentType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -22,9 +24,8 @@ class DidEbsiResolver(
     private val client: HttpClient,
 ) : LocalResolverMethod("ebsi") {
 
-    val httpLogging = false
-    private val didRegistryUrlBaseURL = "https://api-conformance.ebsi.eu/did-registry/v5/identifiers/"
-    private val json = Json { ignoreUnknownKeys = true }
+    private val didConformanceRegistryUrlBaseURL = "https://api-conformance.ebsi.eu/did-registry/v5/identifiers/"
+    private val didPilotRegistryUrlBaseURL = "https://api-pilot.ebsi.eu/did-registry/v5/identifiers/"
 
     @JvmBlocking
     @JvmAsync
@@ -35,16 +36,26 @@ class DidEbsiResolver(
     }
 
     private suspend fun resolveDid(did: String): DidDocument {
-        val url = didRegistryUrlBaseURL + did
-        return client.get(url).bodyAsText().let {
-            DidDocument(
-                DidEbsiDocument(
-                    DidDocument(
-                        jsonObject = Json.parseToJsonElement(it).jsonObject
-                    )
-                ).toMap()
-            )
+        val responseConformance = client.get(didConformanceRegistryUrlBaseURL + did){
+            headers {
+                append(ContentType, "application/did+json")
+                append(HttpHeaders.Accept, "application/did+json")
+            }
+        }.bodyAsText()
+        val docConformance = parseDidDocumentOrNull(responseConformance)
+        if (docConformance != null) {
+            return docConformance
         }
+
+        val responsePilot = client.get(didPilotRegistryUrlBaseURL + did) {
+            headers {
+                append(ContentType, "application/did+json")
+                append(HttpHeaders.Accept, "application/did+json")
+            }
+        }.bodyAsText()
+
+        return parseDidDocumentOrNull(responsePilot)
+            ?: throw IllegalStateException("Failed to resolve EBSI DID from both environments")
     }
 
     @JvmBlocking
@@ -83,5 +94,19 @@ class DidEbsiResolver(
             if (result.isSuccess && publicKeyJwk.contains("P-256")) return result
         }
         return JWKKey.importJWK(publicKeyJwks.first())
+    }
+
+    private fun parseDidDocumentOrNull(json: String): DidDocument? {
+        return try {
+            DidDocument(
+                DidEbsiDocument(
+                    DidDocument(
+                        jsonObject = Json.parseToJsonElement(json).jsonObject
+                    )
+                ).toMap()
+            )
+        } catch (e: Exception) {
+            null
+        }
     }
 }

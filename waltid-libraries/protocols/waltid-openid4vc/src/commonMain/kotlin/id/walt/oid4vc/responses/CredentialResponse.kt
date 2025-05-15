@@ -8,11 +8,14 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 @Serializable
 data class CredentialResponse private constructor(
@@ -20,7 +23,7 @@ data class CredentialResponse private constructor(
     val credential: JsonElement? = null,
     @SerialName("acceptance_token") val acceptanceToken: String? = null,
     @SerialName("c_nonce") val cNonce: String? = null,
-    @SerialName("c_nonce_expires_in") val cNonceExpiresIn: Duration? = null,
+    @SerialName("c_nonce_expires_in") @Serializable(with = DurationAsSecondsSerializer::class) val cNonceExpiresIn: Duration? = null,
     val error: String? = null,
     @SerialName("error_description") val errorDescription: String? = null,
     @SerialName("error_uri") val errorUri: String? = null,
@@ -94,4 +97,16 @@ object CredentialResponseListSerializer : KSerializer<List<CredentialResponse>> 
     override fun deserialize(decoder: Decoder): List<CredentialResponse> = internalSerializer.deserialize(decoder)
     override fun serialize(encoder: Encoder, value: List<CredentialResponse>) =
         internalSerializer.serialize(encoder, value)
+}
+
+object DurationAsSecondsSerializer : KSerializer<Duration> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("DurationAsSeconds", PrimitiveKind.INT)
+
+    override fun serialize(encoder: Encoder, value: Duration) {
+        encoder.encodeInt(value.inWholeSeconds.toInt())
+    }
+
+    override fun deserialize(decoder: Decoder): Duration {
+        return decoder.decodeInt().seconds
+    }
 }

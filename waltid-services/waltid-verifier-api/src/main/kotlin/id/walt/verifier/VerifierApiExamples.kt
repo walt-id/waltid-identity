@@ -111,7 +111,52 @@ object VerifierApiExamples {
         """.trimIndent()
     )
 
+    val EBSIVectorExampleInTimeIssuance = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "request_credentials":
+                [
+                    { "format": "jwt_vc", "type": "InTimeIssuance" }
+                ]
+            }
+        """.trimIndent()
+    )
 
+    val EBSIVectorExampleDeferredIssuance = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "request_credentials":
+                [
+                    { "format": "jwt_vc", "type": "DeferredIssuance" }
+                ]
+            }
+        """.trimIndent()
+    )
+
+    val EBSIVectorExamplePreAuthIssuance = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "request_credentials":
+                [
+                    { "format": "jwt_vc", "type": "PreAuthIssuance" }
+                ]
+            }
+        """.trimIndent()
+    )
+
+    val EBSIVectorExampleAllIssuance = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "request_credentials":
+                [
+                    { "format": "jwt_vc", "type": "InTimeIssuance" },
+                    { "format": "jwt_vc", "type": "DeferredIssuance" },
+                    { "format": "jwt_vc", "type": "PreAuthIssuance" }
+
+                ]
+            }
+        """.trimIndent()
+    )
     //language=json
     val dynamicPolicy = jsonObjectValueExampleDescriptorDsl(
         """
@@ -270,7 +315,9 @@ object VerifierApiExamples {
                 "vc_policies": ${vcPoliciesData("\"revoked-status-list\"")},
                 "request_credentials":
                 [
-                    { "input_descriptor": {
+                    {
+                     "format": "jwt_vc",
+                     "input_descriptor": {
                             "id": "e3d700aa-0988-4eb6-b9c9-e00f4b27f1d8",
                             "constraints":
                             {
@@ -294,8 +341,7 @@ object VerifierApiExamples {
                             }
                         }
                     }
-                ],
-                "openid_profile": "EBSIv3"
+                ]
             }
         """.trimIndent()
     )
