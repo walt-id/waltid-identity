@@ -8,6 +8,7 @@ import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.auth.ktorAuthnz
 import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
 import id.walt.ktorauthnz.tokens.jwttoken.JwtTokenHandler
+import id.walt.oid4vc.util.http
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.config.KtorAuthnzConfig
@@ -15,9 +16,13 @@ import id.walt.webwallet.service.OidcLoginService
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import id.walt.webwallet.service.account.authnz.AuthenticationService
 import id.walt.webwallet.web.controllers.auth.*
+import id.walt.webwallet.web.controllers.auth.oidc.oidcLog
+import id.walt.webwallet.web.controllers.auth.oidc.oidcLogNoco
 import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.web.model.KeycloakAccountRequest
 import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.http.auth.*
 import io.ktor.http.parsing.*
@@ -31,6 +36,7 @@ import io.ktor.server.response.*
 import io.ktor.server.sessions.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 
@@ -140,7 +146,25 @@ val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
                             accessTokenRequiresBasicAuth = false,
                             requestMethod = HttpMethod.Post,
                             defaultScopes = oidcConfig.oidcScopes
-                        )
+                        ).also {
+                            oidcLogNoco.trace {
+                                """Provider lookup for auth-oauth =
+                                    OAuth2ServerSettings:
+                                        name: ${it.name}
+                                        authorizeUrl: ${it.authorizeUrl}
+                                        accessTokenUrl: ${it.accessTokenUrl}
+                                        requestMethod: ${it.requestMethod.value}
+                                        clientId: ${it.clientId}
+                                        clientSecret: ${it.clientSecret}
+                                        defaultScopes: ${it.defaultScopes.joinToString(", ")}
+                                        accessTokenRequiresBasicAuth: ${it.accessTokenRequiresBasicAuth}
+                                        nonceManager: ${it.nonceManager::class.simpleName}
+                                        passParamsInURL: ${it.passParamsInURL}
+                                        extraAuthParameters: ${it.extraAuthParameters.joinToString { "${it.first}=${it.second}" }}
+                                        extraTokenParameters: ${it.extraTokenParameters.joinToString { "${it.first}=${it.second}" }}
+                                """.trimIndent()
+                            }
+                        }
                     }
                     urlProvider = { "${oidcConfig.publicBaseUrl}/wallet-api/auth/oidc-session" }
                 }
@@ -151,9 +175,41 @@ val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
                         realm = OidcLoginService.oidcRealm
                         verifier(OidcLoginService.jwkProvider)
 
-                        validate { credential -> JWTPrincipal(credential.payload) }
-                        challenge { _, _ ->
-                            call.respond(HttpStatusCode.Unauthorized, "Token is not valid or has expired")
+                        validate { credential ->
+                            oidcLog.trace { "Validating oauth-jwt: Payload ${credential.payload} (from $credential)" }
+                            JWTPrincipal(credential.payload)
+                        }
+                        challenge { defaultScheme, realm ->
+                            // The verification of the JWT was not successful. Either none was provided, or an
+                            // opaque token (not a JWT verifiable with the JWKS) was provided. If it is opaque,
+                            // we can try to retrieve the id_token through the token endpoint.
+
+                            val query = call.request.queryParameters
+
+                            if (query.contains("code")) { // try to redeem against token endpoint:
+                                oidcLog.trace { "Oauth-jwt challenge: Opaque token was received, will try to redeem - Scheme $defaultScheme, Realm $realm" }
+                                val code = call.request.queryParameters["code"]
+                                //val state = call.request.queryParameters["state"] // State is not required for this endpoint
+                                //val sessionState = call.request.queryParameters["session_state"] // Entra ID specific
+
+                                val parameters = ParametersBuilder().apply {
+                                    append("client_id", oidcConfig.clientId)
+                                    append("client_secret", oidcConfig.clientSecret)
+                                    append("scope", oidcConfig.oidcScopes.joinToString(" "))
+                                    append("code", code!!)
+                                    append("redirect_uri", "${oidcConfig.publicBaseUrl}/wallet-api/auth/oidc-session")
+                                    append("grant_type", "authorization_code")
+                                }.build()
+                                val resp = http.submitForm(oidcConfig.accessTokenUrl, parameters)
+
+                                val idToken = resp.body<JsonObject>()["id_token"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("OIDC Login failed: Missing id_token from token endpoint response")
+
+                                call.sessions.set(OidcTokenSession(idToken))
+                                call.respondRedirect("/login?oidc_login=true")
+                            } else {
+                                oidcLog.trace { "Oauth-jwt challenge: Invalid token - Scheme $defaultScheme, Realm $realm" }
+                                call.respond(HttpStatusCode.Unauthorized, "Token is not valid or has expired")
+                            }
                         }
                     }
                 }
