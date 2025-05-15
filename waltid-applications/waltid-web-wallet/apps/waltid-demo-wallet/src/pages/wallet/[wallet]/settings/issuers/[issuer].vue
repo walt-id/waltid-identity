@@ -17,10 +17,11 @@
             <div class="mb-8">
               <div class="text-2xl font-bold bold text-white">
                 {{
-                  credential.id.split("_")[0].length > 20
-                    ? credential.id.split("_")[0].substring(0, 20) + "..."
-                    : credential.id.split("_")[0]
+                  credential.id.split("_")[0].split('Credential')[0].replace(/([A-Z])/g, ' $1').trim()
                 }}
+              </div>
+              <div class="text-2xl font-bold bold text-white">
+                Credential
               </div>
             </div>
 
