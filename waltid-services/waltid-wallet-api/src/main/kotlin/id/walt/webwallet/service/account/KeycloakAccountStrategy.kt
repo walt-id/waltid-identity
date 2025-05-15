@@ -65,8 +65,9 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
             )
                 .toJsonObject()
 
+        require(oidcConfig.keycloakUserApi != null) { "keycloakUserApi missing in oidc.conf" }
         val res =
-            http.post(oidcConfig.keycloakUserApi) {
+            http.post(oidcConfig.keycloakUserApi!!) {
                 contentType(ContentType.Application.Json)
                 headers {
                     append("Content-Type", "application/json")
@@ -259,6 +260,7 @@ object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>
 
         val requestBody = requestParams.map { (k, v) -> "$k=$v" }.joinToString("&")
 
+        require(oidcConfig.keycloakUserApi != null) { "keycloakUserApi missing in oidc.conf" }
         val res =
             http.post(oidcConfig.keycloakUserApi + "/" + request.keycloakUserId + "/logout") {
                 contentType(ContentType.Application.Json)
