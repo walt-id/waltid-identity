@@ -56,6 +56,17 @@ data class RequestedCredential(
           )
         )
       )
+      VCFormat.jwt_vc -> InputDescriptorConstraints(
+        listOf(
+          InputDescriptorField(
+            path = listOf("$.vc.type"), filter = JsonObject(
+              mapOf(
+                "type" to JsonPrimitive("array"), "pattern" to JsonPrimitive(type)
+              )
+            )
+          )
+        )
+      )
       else -> InputDescriptorConstraints(
         listOf(
           InputDescriptorField(
