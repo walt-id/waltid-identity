@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 private val log = KotlinLogging.logger { }
 
@@ -21,6 +23,13 @@ class JsonObjectEnquirer {
         compiledJsonPaths.getOrPut(path) { JsonPath.compile(path) }
 
     fun filterConstraint(document: JsonObject, field: Field): Boolean {
+        /* Alternative if both vc-wrapped and non-wrapped should be used equally:
+        val resolvedPath = field.path.firstNotNullOfOrNull {
+            document.resolveOrNull(getJsonPath(it))
+                ?: if (it.startsWith("$.vc.")) document.resolveOrNull(getJsonPath("$." + it.removePrefix("$.vc.")))
+                else null
+        }
+        */
         val resolvedPath = field.path.firstNotNullOfOrNull { document.resolveOrNull(getJsonPath(it)) }
 
         return if (resolvedPath == null) {
@@ -28,8 +37,10 @@ class JsonObjectEnquirer {
         } else {
             if (field.filter != null) {
                 val schema = JsonSchema.fromJsonElement(field.filter)
-                when (resolvedPath) {
-                    is JsonArray -> resolvedPath.any { schema.validate(it, OutputCollector.flag()).valid }
+                when {
+                    field.filter["type"]?.jsonPrimitive?.contentOrNull?.lowercase() == "string" && resolvedPath is JsonArray -> resolvedPath.any {
+                        schema.validate(it, OutputCollector.flag()).valid
+                    }
                     else -> schema.validate(resolvedPath, OutputCollector.flag()).valid
                 }
             } else true
