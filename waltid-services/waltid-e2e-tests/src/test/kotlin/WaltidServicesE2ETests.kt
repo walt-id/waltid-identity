@@ -6,7 +6,6 @@ import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.testing.E2ETest
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import id.walt.commons.web.plugins.httpJson
-import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.issuance.IssuanceExamples
@@ -19,6 +18,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
+import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.service.issuers.IssuersService
@@ -407,6 +407,57 @@ class WaltidServicesE2ETests {
         //endregion -Presentation Definition Policy (Verifier)-
 
     }
+
+//    @Test
+//    fun e2eEBSIVectorOnlyTests() =
+//        E2ETest.testBlock(
+//            config = ServiceConfiguration("e2e-ebsi-vector-tests"),
+//            features = listOf(
+//                id.walt.issuer.FeatureCatalog,
+//                id.walt.verifier.FeatureCatalog,
+//                id.walt.webwallet.FeatureCatalog
+//            ),
+//            featureAmendments = mapOf(
+//                CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
+//                // CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
+//            ),
+//            init = {
+//                id.walt.webwallet.webWalletSetup()
+//                id.walt.did.helpers.WaltidServices.minimalInit()
+//                id.walt.webwallet.db.Db.start()
+//            },
+//            module = e2eTestModule,
+//            timeout = defaultTestTimeout
+//        ) {
+//            var client = testHttpClient()
+//            lateinit var accountId: Uuid
+//            lateinit var wallet: Uuid
+//            var authApi = AuthApi(client)
+//
+//            // the e2e http request tests here
+//
+//            //region -Auth-
+//
+//            authApi.run {
+//                userInfo(HttpStatusCode.Unauthorized)
+//                login(defaultEmailAccount) {
+//                    client = testHttpClient(token = it["token"]!!.jsonPrimitive.content)
+//                    authApi = AuthApi(client)
+//                }
+//            }
+//            authApi.run {
+//                userInfo(HttpStatusCode.OK) {
+//                    accountId = it.id
+//                }
+//                userSession()
+//                userWallets(accountId) {
+//                    wallet = it.wallets.first().id
+//                    println("Selected wallet: $wallet")
+//                }
+//            }
+//
+//            EBSIVectorInteropTest(client, wallet).runTest()
+//        }
 
     /* @Test // enable to execute test selectively
     fun lspIssuanceTests() = testBlock(timeout = defaultTestTimeout) {

@@ -3,9 +3,7 @@
 package id.walt.webwallet.service.oidc4vc
 
 
-import org.cose.java.AlgorithmID
 import com.nimbusds.jose.jwk.ECKey
-import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
@@ -40,12 +38,12 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.WaltIdJWTCryptoProvider
+import id.walt.w3c.utils.VCFormat
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
-import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -54,6 +52,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
+import org.cose.java.AlgorithmID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
@@ -73,12 +72,7 @@ class TestCredentialWallet(
     private val credentialsService = CredentialsService()
 
     private suspend fun resolveDidAuthentication(did: String): String {
-        return DidService.resolve(did).getOrElse {
-            ktorClient.post("https://core.ssikit.walt.id/v1/did/resolve") {
-                headers { contentType(ContentType.Application.Json) }
-                setBody("{ \"did\": \"${this@TestCredentialWallet.did}\" }")
-            }.body<JsonObject>()
-        }["authentication"]!!.jsonArray.first().let {
+        return DidService.resolve(did).getOrThrow()["authentication"]!!.jsonArray.first().let {
             if (it is JsonObject) {
                 it.jsonObject["id"]!!.jsonPrimitive.content
             } else {
@@ -95,6 +89,7 @@ class TestCredentialWallet(
             ?: throw IllegalArgumentException("No key given or found for given keyId ${debugStateMsg()}")
 
             val authKeyId = resolveDidAuthentication(did)
+
             val payloadToSign = Json.encodeToString(payload).encodeToByteArray()
             val headersToSign = mapOf("typ" to "JWT".toJsonElement(), "kid" to authKeyId.toJsonElement()).plus(
                 header?.toMap() ?: mapOf()

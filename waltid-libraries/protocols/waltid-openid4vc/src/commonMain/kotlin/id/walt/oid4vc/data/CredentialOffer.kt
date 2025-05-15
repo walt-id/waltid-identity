@@ -14,7 +14,7 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 
 @Serializable
-sealed class CredentialOffer() : JsonDataObject() {
+sealed class CredentialOffer : JsonDataObject() {
     abstract val grants: Map<String, GrantDetails>
     abstract val credentialIssuer: String
 
@@ -116,24 +116,52 @@ sealed class CredentialOffer() : JsonDataObject() {
 
 }
 
+object CredentialOfferJsonSerializer : JsonDataObjectSerializer<CredentialOffer>(CredentialOfferSerializer) {
+    public override fun transformSerialize(element: JsonElement) =
+        JsonObject(super.transformSerialize(element).jsonObject)
+
+    public override fun transformDeserialize(element: JsonElement) =
+        JsonObject(super.transformDeserialize(element).jsonObject)
+}
 
 object CredentialOfferSerializer : KSerializer<CredentialOffer> {
 
-    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("CredentialOffer")
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("CredentialOffer") {
+        val seenElements = mutableSetOf<String>()
+
+        val subclassDescriptors = listOf(
+            CredentialOffer.Draft11.serializer().descriptor,
+            CredentialOffer.Draft13.serializer().descriptor
+        )
+
+        for (subDescriptor in subclassDescriptors) {
+            for (index in 0 until subDescriptor.elementsCount) {
+                val name = subDescriptor.getElementName(index)
+                if (seenElements.add(name)) {
+                    element(name, subDescriptor.getElementDescriptor(index))
+                }
+            }
+        }
+    }
 
     override fun deserialize(decoder: Decoder): CredentialOffer {
         val jsonDecoder = decoder as? JsonDecoder ?: throw SerializationException("Invalid Decoder")
 
-        val jsonObject = jsonDecoder.decodeJsonElement().jsonObject
+        val rawJsonElement = jsonDecoder.decodeJsonElement()
 
-        // TODO: ()
+        val transformedElement = CredentialOfferJsonSerializer.transformDeserialize(rawJsonElement)
+
         return when {
-            "credential_configuration_ids" in jsonObject -> Json.decodeFromJsonElement(
+            "credential_configuration_ids" in transformedElement.jsonObject -> Json.decodeFromJsonElement(
                 CredentialOffer.Draft13.serializer(),
-                jsonObject
+                transformedElement,
             )
 
-            "credentials" in jsonObject -> Json.decodeFromJsonElement(CredentialOffer.Draft11.serializer(), jsonObject)
+            "credentials" in transformedElement.jsonObject -> Json.decodeFromJsonElement(
+                CredentialOffer.Draft11.serializer(),
+                transformedElement,
+            )
+
             else -> throw IllegalArgumentException("Unknown CredentialOffer type: missing expected fields")
         }
     }

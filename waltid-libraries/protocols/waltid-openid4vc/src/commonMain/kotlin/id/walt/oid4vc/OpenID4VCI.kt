@@ -233,8 +233,19 @@ object OpenID4VCI {
         providerMetadata: OpenIDProviderMetadata,
         tokenRequest: TokenRequest,
     ): TokenResponse {
-        val tokenEndpoint = providerMetadata.tokenEndpoint
-            ?: throw IllegalArgumentException("Missing token endpoint in issuer metadata.")
+
+        val tokenEndpoint = providerMetadata.tokenEndpoint ?: when (providerMetadata) {
+            is OpenIDProviderMetadata.Draft11 -> {
+                resolveOAuthServersTokenEndpoint(listOf(providerMetadata.authorizationServer!!))
+            }
+
+            is OpenIDProviderMetadata.Draft13 -> {
+                resolveOAuthServersTokenEndpoint(providerMetadata.authorizationServers!!.toList())
+            }
+
+        }
+
+        println("parsed tokenEndpoint = $tokenEndpoint")
 
         val response = http.submitForm(
             url = tokenEndpoint,
@@ -246,6 +257,26 @@ object OpenID4VCI {
         }
 
         return response.body<JsonObject>().let { TokenResponse.fromJSON(it) }
+    }
+
+    private suspend fun resolveOAuthServersTokenEndpoint(
+        authServerUrl: List<String>,
+    ): String {
+        val urls = authServerUrl.flatMap {
+            listOf(
+                getOAuthProviderMetadataUrl(it),
+                getOpenIdProviderMetadataUrl(it),
+            )
+        }
+
+        for (url in urls) {
+            val response = http.get(url)
+            if (response.status.isSuccess()) {
+                return response.body<JsonObject>()["token_endpoint"]!!.jsonPrimitive.content
+            }
+        }
+
+        throw IllegalStateException("Unable to resolve token_endpoint either directly, or indirectly, from the issuer's metadata")
     }
 
     suspend fun sendCredentialRequest(
