@@ -69,7 +69,7 @@ class DidCreateCmd : CliktCommand(
 
     override fun run() {
         runBlocking {
-            val key = KeyUtil(this@DidCreateCmd).getKey(keyFile)
+            val key = CliKeyUtil(this@DidCreateCmd).getKey(keyFile)
 
             val jwk = key.exportJWKPretty()
 
