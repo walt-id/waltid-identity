@@ -44,6 +44,22 @@ kotlin {
 //        }
 //    }
 
+    compilerOptions {
+        // Compilation warning on expect/actual classes
+        // https://youtrack.jetbrains.com/issue/KT-61573
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
+//    targets.all {
+//        compilations.all {
+//            kotlinOptions {
+//                // Compilation warning on expect/actual classes
+//                // https://youtrack.jetbrains.com/issue/KT-61573
+//                freeCompilerArgs += "-Xexpect-actual-classes"
+//            }
+//        }
+//    }
+
     jvm {
         compilations.all {
             compileTaskProvider.configure {
