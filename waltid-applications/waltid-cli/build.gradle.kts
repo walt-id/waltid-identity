@@ -24,15 +24,25 @@ repositories {
 kotlin {
     jvmToolchain(17)
 
-    targets.configureEach {
-        compilations.configureEach {
-            compileTaskProvider.configure {
-                compilerOptions {
-                    freeCompilerArgs.add("-Xexpect-actual-classes")
-                }
+//    mingwX64("windows")
+//    linuxX64("linux")
+    macosX64("macos") {
+        binaries {
+            executable {
+                entryPoint = "main"
             }
         }
     }
+
+//    targets.configureEach {
+//        compilations.configureEach {
+//            compileTaskProvider.configure {
+//                compilerOptions {
+//                    freeCompilerArgs.add("-Xexpect-actual-classes")
+//                }
+//            }
+//        }
+//    }
 
     jvm {
         compilations.all {
@@ -70,7 +80,6 @@ kotlin {
 
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
-                implementation("com.google.code.gson:gson:2.12.1")
 
                 // CLI
                 implementation("com.github.ajalt.clikt:clikt:5.0.3")
@@ -93,6 +102,11 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
+                // https://mvnrepository.com/artifact/com.github.ajalt.clikt/clikt-jvm
+                runtimeOnly("com.github.ajalt.clikt:clikt-jvm:5.0.3")
+
+                implementation("com.google.code.gson:gson:2.12.1")
+
                 // Logging
                 implementation("org.slf4j:slf4j-simple:2.0.16")
 
@@ -101,6 +115,10 @@ kotlin {
 
                 // BouncyCastle for PEM import
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.7")
+
+                // JSON
+                implementation("org.json:json:20240303")
+
             }
         }
         val jvmTest by getting {
@@ -142,6 +160,19 @@ kotlin {
             languageSettings.enableLanguageFeature("InlineClasses")
         }
     }
+}
+
+//tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+//    kotlinOptions {
+//        allWarningsAsErrors = false // default
+//        freeCompilerArgs += listOf("-Xreport-perf", "-Xno-param-assertions")
+//        // To suppress specific warnings (e.g., deprecations)
+//        // freeCompilerArgs += "-Xuse-experimental=kotlin.Experimental"
+//    }
+//}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.add("-nowarn")
 }
 
 /*tasks.test {
