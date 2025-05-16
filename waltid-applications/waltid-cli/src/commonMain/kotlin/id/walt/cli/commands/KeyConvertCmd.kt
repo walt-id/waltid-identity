@@ -191,9 +191,9 @@ class KeyConvertCmd : CliktCommand(
 
             if (passphrase == null) {
                 decipherKey = terminal.prompt("Key encrypted. Please, inform the passphrase to decipher it")!!
-                if (decipherKey == null) { // TODO: Can happen?
-                    return Result.failure(BadParameterValue(passphrase!!))
-                }
+//                if (decipherKey == null) { // TODO: Can happen?
+//                    return Result.failure(BadParameterValue(passphrase!!))
+//                }
             } else {
                 decipherKey = passphrase as String
             }

@@ -1,7 +1,6 @@
 package id.walt.cli
 
 import com.github.ajalt.clikt.core.*
-import com.github.ajalt.clikt.output.ParameterFormatter
 import com.github.ajalt.mordant.rendering.TextColors
 import com.github.ajalt.mordant.rendering.Whitespace
 import com.github.ajalt.mordant.widgets.Panel
@@ -81,27 +80,27 @@ fun printError(cmd: CliktCommand, e: Exception? = null, msg: String? = null) {
     println("\n")
 }
 
-fun printUsage(cmd: CliktCommand, e: CliktError) {
-    val ctx = (e as ContextCliktError).context
-    cmd.echoFormattedHelp(PrintHelpMessage(ctx))
-}
-
-fun parameterFormatter(context: Context): ParameterFormatter {
-    return object : ParameterFormatter {
-        override fun formatOption(name: String): String {
-            // return styleOptionName(name)
-            return context.theme.style("info")(name)
-        }
-
-        override fun formatArgument(name: String): String {
-            // return styleArgumentName(normalizeParameter(name))
-            return context.theme.style("info")("<${name.lowercase()}>")
-        }
-
-        override fun formatSubcommand(name: String): String {
-            // return styleSubcommandName(name)
-            return context.theme.style("info")(name)
-        }
-
-    }
-}
+//fun printUsage(cmd: CliktCommand, e: CliktError) {
+//    val ctx = (e as ContextCliktError).context
+//    cmd.echoFormattedHelp(PrintHelpMessage(ctx))
+//}
+//
+//fun parameterFormatter(context: Context): ParameterFormatter {
+//    return object : ParameterFormatter {
+//        override fun formatOption(name: String): String {
+//            // return styleOptionName(name)
+//            return context.theme.style("info")(name)
+//        }
+//
+//        override fun formatArgument(name: String): String {
+//            // return styleArgumentName(normalizeParameter(name))
+//            return context.theme.style("info")("<${name.lowercase()}>")
+//        }
+//
+//        override fun formatSubcommand(name: String): String {
+//            // return styleSubcommandName(name)
+//            return context.theme.style("info")(name)
+//        }
+//
+//    }
+//}
