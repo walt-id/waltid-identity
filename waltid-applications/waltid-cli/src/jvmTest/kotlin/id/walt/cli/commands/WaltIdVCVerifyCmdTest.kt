@@ -4,7 +4,8 @@ import com.github.ajalt.clikt.core.MissingOption
 import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.testing.test
-import id.walt.cli.util.KeyUtil
+import id.walt.cli.io.File
+import id.walt.cli.util.CliKeyUtil
 import id.walt.cli.util.VCUtil
 import io.ktor.http.*
 import io.ktor.server.engine.*
@@ -16,7 +17,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
-import java.io.File
 import kotlin.test.*
 
 class WaltIdVCVerifyCmdTest {
@@ -26,7 +26,7 @@ class WaltIdVCVerifyCmdTest {
     val resourcesPath = "src/jvmTest/resources"
 
     val keyFileName = "${resourcesPath}/key/ed25519_by_waltid_pvt_key.jwk"
-    val key = runBlocking { KeyUtil().getKey(File(keyFileName)) }
+    val key = runBlocking { CliKeyUtil().getKey(File(keyFileName)) }
     val issuerDid = "did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"
     val subjectDid = "did:key:z6Mkjm2gaGsodGchfG4k8P6KwCHZsVEPZho5VuEbY94qiBB9"
     val vcFilePath = "${resourcesPath}/vc/openbadgecredential_sample.json"
