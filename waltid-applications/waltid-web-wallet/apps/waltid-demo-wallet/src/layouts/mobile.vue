@@ -2,7 +2,7 @@
   <div class="min-h-full">
     <div class="flex flex-1 flex-col min-h-screen">
       <div class="w-full">
-        <img src="/images/pcg-black-logo.png" alt="walt.id logo" class="h-8 w-auto mx-auto mt-5" />
+        <img src="/images/pcg-black-logo.png" alt="walt.id logo" class="h-14 w-auto mx-auto mt-5" />
       </div>
       <main class="flex-1 pb-8">
         <slot />

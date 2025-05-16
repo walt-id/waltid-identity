@@ -28,7 +28,7 @@
         </div>
         <div v-else>
           <div ref="vcCardDiv"
-            :class="{ 'px-6 py-3 rounded-2xl shadow-2xl sm:shadow-lg h-full text-gray-900 bg-[url(/images/credential-bg.png)] bg-cover bg-center bg-no-repeat': true, 'lg:w-[550px]': true }">
+            :class="{ 'hidden sm:block px-6 py-3 rounded-2xl shadow-2xl sm:shadow-lg h-full text-gray-900 bg-[url(/images/credential-bg.png)] bg-cover bg-center bg-no-repeat': true, 'lg:w-[550px]': true }">
             <div
               v-if="credential.parsedDocument && 'credentialSubject' in credential.parsedDocument && 'wiserID' in (credential.parsedDocument.credentialSubject as Object)"
               class="text-black rounded-full text-xs text-right">
@@ -76,6 +76,51 @@
                     </div>
                   </div>
                   <div class="mt-4 flex justify-end w-full">
+                    <img src="/images/pcg-credential-logo.png" alt="Credential Logo" class="w-10 h-10" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div ref="vcCardDiv"
+            :class="{ 'block sm:hidden px-6 py-3 rounded-2xl shadow-2xl sm:shadow-lg h-full text-gray-900 bg-[url(/images/credential-bg.png)] bg-cover bg-center bg-no-repeat': true, 'lg:w-[550px]': true }">
+            <div
+              v-if="credential.parsedDocument && 'credentialSubject' in credential.parsedDocument && 'wiserID' in (credential.parsedDocument.credentialSubject as Object)"
+              class="text-[#3E4C59] rounded-full text-xs text-right">
+              wiserID
+              <span class="text-[#3E4C59] font-bold text-sm">{{ (credential.parsedDocument?.credentialSubject as
+                any).wiserID }}</span>
+            </div>
+            <div class="border-b-2 border-gray-200">
+              <div class="flex flex-col justify-between h-full">
+                <div class="flex items-center">
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M4.875 6.90625L6.09375 8.125L8.125 5.28125M11.375 6.5C11.375 7.14019 11.2489 7.77412 11.0039 8.36558C10.7589 8.95704 10.3998 9.49446 9.94715 9.94715C9.49446 10.3998 8.95704 10.7589 8.36558 11.0039C7.77412 11.2489 7.14019 11.375 6.5 11.375C5.85981 11.375 5.22588 11.2489 4.63442 11.0039C4.04296 10.7589 3.50554 10.3998 3.05285 9.94715C2.60017 9.49446 2.24108 8.95704 1.99609 8.36558C1.7511 7.77412 1.625 7.14019 1.625 6.5C1.625 5.20707 2.13861 3.96709 3.05285 3.05285C3.96709 2.13861 5.20707 1.625 6.5 1.625C7.79293 1.625 9.03291 2.13861 9.94715 3.05285C10.8614 3.96709 11.375 5.20707 11.375 6.5Z"
+                      stroke="#0F7DFA" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                  <div class="text-[#52606D] text-sm ml-1">Verified</div>
+                </div>
+                <div class="mt-1 text-[#1F2933] font-bold">{{ titleTitelized }}</div>
+              </div>
+            </div>
+            <div class="flex">
+              <div class="flex flex-col justify-between h-full w-full">
+                <div class="flex flex-wrap gap-3 mt-3">
+                  <template v-for="(value, key) in credentialManifest?.claims" :key="key">
+                    <div v-if="['Name', 'Email', 'Verified At', 'Date of Birth', 'Start Date'].includes(key)">
+                      <div class="text-[#52606D] text-xs">{{ key }}</div>
+                      <div class="text-[#3E4C59] text-sm font-bold">{{ value }}</div>
+                    </div>
+                  </template>
+                </div>
+                <div class="mt-4 flex justify-between w-full items-center">
+                  <div>
+                    <div class="text-[#52606D] text-xs">Issued by</div>
+                    <div class="text-[#3E4C59] text-sm font-bold">{{issuerName.split(" ").map((word) =>
+                      word.charAt(0).toUpperCase()).join("")}}</div>
+                  </div>
+                  <div>
                     <img src="/images/pcg-credential-logo.png" alt="Credential Logo" class="w-10 h-10" />
                   </div>
                 </div>

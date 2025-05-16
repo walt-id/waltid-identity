@@ -53,7 +53,7 @@
             class="w-full">
             <div class="flex items-start gap-x-3">
               <p class="mx-2 text-base font-semibold leading-6 text-gray-900">
-                {{ credential.id.split("_")[0] }}
+                {{ credential.id.split("_")[0].replace(/([A-Z])/g, ' $1').trim() }}
               </p>
             </div>
           </NuxtLink>
