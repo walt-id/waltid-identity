@@ -6,14 +6,12 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
-import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.mordant.terminal.YesNoPrompt
+import id.walt.cli.io.File
+import id.walt.cli.parameters.types.file
 import id.walt.cli.util.*
 import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.runBlocking
-import java.io.File
-import kotlin.io.path.Path
-import kotlin.io.path.absolutePathString
 
 class VCSignCmd : CliktCommand(
     name = "sign"
@@ -65,7 +63,7 @@ class VCSignCmd : CliktCommand(
 
     override fun run() {
 
-        val key = runBlocking { KeyUtil().getKey(keyFile) }
+        val key = runBlocking { CliKeyUtil().getKey(keyFile) }
         val issuerDid = issuerDid ?: runBlocking { DidUtil.createDid(DidMethod.KEY, key).did }
 
         validateIssuerKey(issuerDid, key)
@@ -122,7 +120,7 @@ class VCSignCmd : CliktCommand(
         if (signedVCFile.exists()) {
             if (!overwrite) {
                 if (YesNoPrompt(
-                        "The file \"${signedVCFile.path}\" already exists, do you want to overwrite it?",
+                        "The file \"${signedVCFile.toPath().toString()}\" already exists, do you want to overwrite it?",
                         terminal
                     ).ask() == false
                 ) {
@@ -130,21 +128,21 @@ class VCSignCmd : CliktCommand(
                     return null
                 }
             } else {
-                print.dim("""The file "${signedVCFile.path}" already exists and I will overwrite it.""")
+                print.dim("""The file "${signedVCFile.toPath().toString()}" already exists and I will overwrite it.""")
             }
         }
 
         signedVCFile.writeText(signedVC)
-        return signedVCFile.path
+        return signedVCFile.absolutePathString()
     }
 
 
     private fun getSignedVCFilePath(): String {
         val vcFileNamePrefix = vc.nameWithoutExtension
         val vcFileNameExtension = vc.extension
-        val vcFilePath = vc.parentFile.path
+        val vcFilePath = vc.parent
         val signedVCFileName = "${vcFileNamePrefix}.signed.${vcFileNameExtension}"
-        val signedVCFilePath = Path(vcFilePath, signedVCFileName).absolutePathString()
+        val signedVCFilePath = File(vcFilePath!!, signedVCFileName).absolutePathString()
         return signedVCFilePath
     }
 }

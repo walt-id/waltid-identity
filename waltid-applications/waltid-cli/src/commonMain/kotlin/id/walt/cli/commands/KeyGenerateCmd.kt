@@ -6,18 +6,15 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.enum
-import com.github.ajalt.clikt.parameters.types.path
 import com.github.ajalt.mordant.rendering.TextColors
 import com.github.ajalt.mordant.terminal.YesNoPrompt
+import id.walt.cli.io.File
+import id.walt.cli.parameters.types.file
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.runBlocking
-import kotlin.io.path.Path
-import kotlin.io.path.absolutePathString
-import kotlin.io.path.exists
-import kotlin.io.path.writeText
 
 class KeyGenerateCmd : CliktCommand(
     name = "generate"
@@ -53,7 +50,7 @@ class KeyGenerateCmd : CliktCommand(
         .default(KeyType.secp256r1)
 
     private val optOutputFilePath by option("-o", "--output")
-        .path()
+        .file()
         .help("File path to save the generated key. Default value is <keyId>.json")
 
     private val commonOptions by CommonOptions()
@@ -70,7 +67,7 @@ class KeyGenerateCmd : CliktCommand(
             print.green("Generated Key (JWK):")
             print.box(jwk)
 
-            val outputFile = optOutputFilePath ?: Path("${key.getKeyId()}.json")
+            val outputFile = optOutputFilePath ?: File("${key.getKeyId()}.json")
 
             if (outputFile.exists()
                 && YesNoPrompt(

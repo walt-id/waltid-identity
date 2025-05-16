@@ -67,7 +67,7 @@ fun handlePrintHelpMessage(cmd: WaltIdCmd, e: PrintHelpMessage) {
 
 fun printError(cmd: CliktCommand, e: Exception? = null, msg: String? = null) {
     println("\n")
-    val msgToPrint = msg ?: e?.localizedMessage
+    val msgToPrint = msg ?: e?.message //localizedMessage
     cmd.terminal.println(
         Panel(
             content = Text(

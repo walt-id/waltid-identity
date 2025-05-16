@@ -7,7 +7,8 @@ import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.choice
-import com.github.ajalt.clikt.parameters.types.file
+import id.walt.cli.io.File
+import id.walt.cli.parameters.types.file
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.VCUtil
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
@@ -18,7 +19,6 @@ import id.walt.policies.models.PolicyResult
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
-import java.io.File
 
 class VCVerifyCmd : CliktCommand(
     name = "verify"

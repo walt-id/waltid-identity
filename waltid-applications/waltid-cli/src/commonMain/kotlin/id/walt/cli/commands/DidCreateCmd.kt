@@ -6,19 +6,15 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.enum
-import com.github.ajalt.clikt.parameters.types.file
-import com.github.ajalt.clikt.parameters.types.path
 import com.github.ajalt.mordant.terminal.YesNoPrompt
+import id.walt.cli.io.File
+import id.walt.cli.net.URLEncoder
+import id.walt.cli.parameters.types.file
 import id.walt.cli.util.*
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
-import java.net.URLEncoder
-import kotlin.io.path.Path
-import kotlin.io.path.absolutePathString
-import kotlin.io.path.exists
-import kotlin.io.path.writeText
 
 class DidCreateCmd : CliktCommand(
     name = "create"
@@ -54,12 +50,14 @@ class DidCreateCmd : CliktCommand(
     private val keyFile by option("-k", "--key")
         .help("The subject's key to be used. If none is provided, a new one will be generated.")
         .file(canBeDir = false)
+
     private val useJwkJcsPub by option("-j", "--useJwkJcsPub")
         .help("Flag to enable JWK_JCS-Pub encoding (default=off). Applies only to the did:key method and is relevant in the context of EBSI.")
         .flag(default = false)
 
-    private val output by option("-o", "--did-doc-output")
-        .path()
+    private val output by option("-o", "---did-doc-output")
+        .file()
+        .default(File("did.json"))
         .help("File path to save the created DID Document (optional). If not specified, the did document will be saved at the <did>.json file.")
 
     private val webDomain by option("-wd", "--web-domain")
@@ -96,7 +94,7 @@ class DidCreateCmd : CliktCommand(
             } else
                 DidUtil.createDid(method, key)
 
-            val outputFile = output ?: Path("${URLEncoder.encode(result.did, "UTF-8")}.json")
+            val outputFile = output ?: File("${URLEncoder.encode(result.did, "UTF-8")}.json")
             if (outputFile.exists()
                 && YesNoPrompt(
                     "The file \"${outputFile.absolutePathString()}\" already exists, do you want to overwrite it?",

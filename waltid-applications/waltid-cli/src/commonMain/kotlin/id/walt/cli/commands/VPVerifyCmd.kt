@@ -3,7 +3,7 @@ package id.walt.cli.commands
 import com.github.ajalt.clikt.core.*
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
-import com.github.ajalt.clikt.parameters.types.path
+import id.walt.cli.parameters.types.file
 import id.walt.cli.util.JsonUtils.toJsonPrimitive
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
@@ -21,7 +21,6 @@ import id.walt.policies.models.PresentationVerificationResponse
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlin.io.path.readText
 import kotlin.time.Duration
 
 class VPVerifyCmd : CliktCommand(
@@ -74,16 +73,16 @@ class VPVerifyCmd : CliktCommand(
     ).help("The DID of the holder that created (signed) the verifiable presentation. If specified, the VP token signature will be validated against this value.")
         .default("")
 
-    private val presentationDefinitionPath by option("-pd", "--presentation-definition").path(
+    private val presentationDefinitionPath by option("-pd", "--presentation-definition").file(
         mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false
     ).help("The file path of the presentation definition (required).")
         .required()
 
-    private val presentationSubmissionPath by option("-ps", "--presentation-submission").path(
+    private val presentationSubmissionPath by option("-ps", "--presentation-submission").file(
         mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false
     ).help("The file path of the presentation submission (required).").required()
 
-    private val vpPath by option("-vp", "--verifiable-presentation").path(
+    private val vpPath by option("-vp", "--verifiable-presentation").file(
         mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false
     ).help("The file path of the verifiable presentation (required).").required()
 

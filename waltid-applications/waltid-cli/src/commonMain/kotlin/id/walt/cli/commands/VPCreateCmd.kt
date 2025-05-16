@@ -2,32 +2,27 @@ package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.*
 import com.github.ajalt.clikt.parameters.options.*
-import com.github.ajalt.clikt.parameters.types.file
-import com.github.ajalt.clikt.parameters.types.path
 import com.github.ajalt.mordant.terminal.YesNoPrompt
+import id.walt.cli.io.File
 import id.walt.cli.models.Credential
+import id.walt.cli.parameters.types.file
 import id.walt.cli.presexch.MatchPresentationDefinitionCredentialsUseCase
 import id.walt.cli.presexch.PresentationDefinitionFilterParser
 import id.walt.cli.presexch.PresentationSubmissionBuilder
 import id.walt.cli.presexch.strategies.DescriptorPresentationDefinitionMatchStrategy
 import id.walt.cli.presexch.strategies.FilterPresentationDefinitionMatchStrategy
-import id.walt.cli.util.KeyUtil
+import id.walt.cli.util.CliKeyUtil
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
-import id.walt.w3c.PresentationBuilder
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.utils.randomUUID
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.w3c.PresentationBuilder
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import java.io.File
-import kotlin.io.path.absolutePathString
-import kotlin.io.path.exists
-import kotlin.io.path.readText
-import kotlin.io.path.writeText
 
 class VPCreateCmd : CliktCommand(
     name = "create"
@@ -104,17 +99,17 @@ class VPCreateCmd : CliktCommand(
         .multiple(required = true)
 
     private val presentationDefinitionPath by option("-pd", "--presentation-definition")
-        .path(mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false)
+        .file(mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false)
         .help("The file path of the presentation definition based on which the VP token will be created (required).")
         .required()
 
     private val vpOutputFilePath by option("-vp", "--vp-output")
-        .path()
+        .file()
         .help("File path to save the created vp (required).")
         .required()
 
     private val presentationSubmissionOutputFilePath by option("-ps", "--presentation-submission-output")
-        .path()
+        .file()
         .help("File path to save the created vp (required).")
         .required()
 
@@ -184,7 +179,7 @@ class VPCreateCmd : CliktCommand(
         )
         //read the holder's signing key
         val holderSigningKey = runBlocking {
-            KeyUtil(this@VPCreateCmd).getKey(holderSigningKeyFile)
+            CliKeyUtil(this@VPCreateCmd).getKey(holderSigningKeyFile)
         }
         return VpCreateParameters(
             holderSigningKey,

@@ -3,20 +3,20 @@ package id.walt.cli.util
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.InvalidFileFormat
 import com.github.ajalt.mordant.rendering.TextStyles
+import id.walt.cli.exceptions.InvalidJWKFormat
+import id.walt.cli.io.File
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.runBlocking
-import java.io.File
-import java.text.ParseException
 
-class KeyUtil(private val cmd: CliktCommand? = null) {
+class CliKeyUtil(private val cmd: CliktCommand? = null) {
 
     suspend fun getKey(keyFile: File?): JWKKey {
         keyFile ?: return generateDefaultKey()
 
         try {
             return JWKKey.importJWK(keyFile.readText()).getOrThrow()
-        } catch (e: ParseException) {
+        } catch (e: InvalidJWKFormat) {
             throw InvalidFileFormat(keyFile.name, e.let { e.message!! })
         }
     }
