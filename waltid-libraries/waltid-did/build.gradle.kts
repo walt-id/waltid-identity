@@ -79,6 +79,37 @@ kotlin {
         binaries.library()
     }
 
+    // Required to build the native CLI executable
+//    macosX64 {
+//        compilations.getByName("main") {
+//            kotlinOptions.freeCompilerArgs += "-Xexport-kdoc"
+//        }
+//        binaries {
+//            framework {
+//                baseName = project.name
+//            }
+//        }
+//    }
+//    sourceSets {
+//        val macosMain by getting {
+//            dependsOn(commonMain)
+//            dependencies {
+//                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-macosx64:1.10.1")
+//                // add other macOS-specific dependencies
+//            }
+//        }
+//        val macosTest by getting {
+//            dependsOn(commonTest)
+//        }
+//    }
+    macosX64("macos") {
+        binaries {
+            framework {
+                baseName = "SharedModule"
+            }
+        }
+    }
+
     if (enableIosBuild) {
         iosArm64()
         iosSimulatorArm64()

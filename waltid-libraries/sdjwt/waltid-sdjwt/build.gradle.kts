@@ -71,6 +71,14 @@ kotlin {
         binaries.library()
     }
 
+    macosX64("macos") {
+        binaries {
+            framework {
+                baseName = "SharedModule"
+            }
+        }
+    }
+
     val hostOs = System.getProperty("os.name")
     val isMacOS = hostOs == "Mac OS X"
     val hostArch = System.getProperty("os.arch")

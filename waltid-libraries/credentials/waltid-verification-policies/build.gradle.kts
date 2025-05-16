@@ -56,6 +56,14 @@ kotlin {
         binaries.library()
     }
 
+    macosX64("macos") {
+        binaries {
+            framework {
+                baseName = "SharedModule"
+            }
+        }
+    }
+
     if (enableIosBuild) {
         iosArm64()
         iosSimulatorArm64()
