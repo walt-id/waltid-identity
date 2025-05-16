@@ -5,6 +5,8 @@ import id.walt.commons.testing.E2ETest.testHttpClient
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -44,11 +46,40 @@ class EBSIVectorInteropTest(
         }
     }
 
+    private suspend fun claimAndPresentCredentialIzertis() = test(
+        name = "EBSI Vector credential claim and present test case: Our wallet API with the credential issuer and verifier of Izertis",
+    ) {
+
+        val offerUri = "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fidentfy.izer.tech%2Foffers%2F17116185-6ae0-4785-9f2e-29c772f9af16%3Frequested_vc_types%3DPreAuthIssuance%26pre-authorized_code%3Dabc"
+        val issuerName = "Izertis"
+        val presentationRequestUrl = "openid://?request_uri=https%3A%2F%2Fidentfy.izer.tech%2F837d5d44-be2e-4fc5-a13c-520571dd8fcd%2Fpresentation-offer"
+
+        lateinit var credentials: List<WalletCredential>
+
+        claimCredential(
+            offerUri = offerUri,
+            issuerName = issuerName
+        ) {
+            credentials = it
+        }
+
+        val credential = credentials.first()
+
+        presentCredential(
+            presentationRequestUrl = presentationRequestUrl,
+            credentialId = credential.id,
+            verifierName = issuerName,
+            walletDid = did
+        )
+
+    }
+
     private suspend fun claimCredential(
         offerUri: String,
         issuerName: String = "",
         pin: String? = null,
         walletDid: String = did,
+        output: ((List<WalletCredential>) -> Unit)? = null
     ) = test(
         name = "EBSI Vector credential claim test case: Our wallet API with the credential issuer of $issuerName",
     ) {
@@ -60,8 +91,43 @@ class EBSIVectorInteropTest(
                 }
             }
             setBody(offerUri)
-        }.expectSuccess()
+        }.expectSuccess().apply {
+            val credentials = body<List<WalletCredential>>()
+            output?.invoke(credentials)
+        }
     }
+
+    private suspend fun presentCredential(
+        presentationRequestUrl: String,
+        credentialId: String,
+        verifierName: String = "",
+        walletDid: String = did,
+    ) = test(
+        name = "EBSI Vector present credential test case: Our wallet API with the verifier of $verifierName",
+    ) {
+        lateinit var resolvedPresentationOfferString: String
+        lateinit var presentationDefinition: String
+
+        httpClient.post("/wallet-api/wallet/$wallet/exchange/resolvePresentationRequest") {
+            contentType(ContentType.Text.Plain)
+            setBody(presentationRequestUrl)
+        }.expectSuccess().apply {
+            resolvedPresentationOfferString = body<String>()
+            presentationDefinition =
+                Url(resolvedPresentationOfferString).parameters.getOrFail("presentation_definition")
+        }
+
+        httpClient.post("/wallet-api/wallet/$wallet/exchange/matchCredentialsForPresentationDefinition") {
+            setBody(presentationDefinition)
+        }.expectSuccess()
+
+        val request = UsePresentationRequest(walletDid, resolvedPresentationOfferString, listOf(credentialId))
+        httpClient.post("/wallet-api/wallet/$wallet/exchange/usePresentationRequest") {
+            setBody(request)
+        }.expectSuccess()
+
+    }
+
 
     private suspend fun claimCredentialFromValidatedId() {
         val validatedIdIssuerBaseUrl = "https://labs-openid-interop.vididentity.net/api/issuance-pre-auth"
@@ -379,16 +445,16 @@ class EBSIVectorInteropTest(
 
         claimCredentialFromTriveria()
 
-
         claimCredentialFromDanubeTech()
-
 
         claimCredential(
             offerUri = "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fidentfy.izer.tech%2Foffers%2F17116185-6ae0-4785-9f2e-29c772f9af16%3Frequested_vc_types%3DPreAuthIssuance%26pre-authorized_code%3Dabc",
             issuerName = "Izertis",
         )
 
-        claimCredentialFromCERTH()
+        claimAndPresentCredentialIzertis()
+
+//        claimCredentialFromCERTH()
 
         //Offline but we were compliant when tested
 //        claimCredentialFromGoldman()
