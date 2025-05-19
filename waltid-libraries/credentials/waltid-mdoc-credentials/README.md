@@ -161,20 +161,22 @@ a267646f6354797065756f72672e69736f2e31383031332e352e312e6d444c6c6973737565725369
 ```
 </details>
 
-#### Issue an mDL document with Status List Revocation Information
+#### Mobile Security Object (MSO) Revocation
+
+To incorporate revocation information via the [IETF Status List](https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/) specification, create a `Status` entry structure with a 
+`StatusListInfo` field initialized accordingly, as illustrated in the following example: 
 
 ```kotlin
-// instantiate simple cose crypto provider for issuer keys and certificates
-val cryptoProvider = SimpleCOSECryptoProvider(
-  listOf(
-    COSECryptoProviderKeyInfo(ISSUER_KEY_ID, AlgorithmID.ECDSA_256, issuerKeyPair.public, issuerKeyPair.private, listOf(issuerCertificate), listOf(rootCaCertificate)),
-    COSECryptoProviderKeyInfo(DEVICE_KEY_ID, AlgorithmID.ECDSA_256, deviceKeyPair.public, deviceKeyPair.private),
+val ietfStatusListEntry = Status(
+  statusList = StatusListInfo(
+    index = 142u,
+    uri = "https://example.com/statuslists/1",
       ),
-    )
-// create device key info structure of device public key, for holder binding
-val deviceKeyInfo =
-    DeviceKeyInfo(DataElement.fromCBOR(OneKey(deviceKeyPair.public, null).AsCBOR().EncodeToBytes()))
+)
+```
+and then pass this revocation information as an argument in the signing operation of the mdoc, as illustrated below:
 
+```kotlin
 // build mdoc and sign using issuer key with holder binding to device key
 val mdoc = MDocBuilder("org.iso.18013.5.1.mDL")
     .addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDataElement())
@@ -189,15 +191,8 @@ val mdoc = MDocBuilder("org.iso.18013.5.1.mDL")
       deviceKeyInfo = deviceKeyInfo,
       cryptoProvider = cryptoProvider,
       keyID = ISSUER_KEY_ID,
-      status = Status(
-        statusList = StatusListInfo(
-          index = 142u,
-          uri = "https://example.com/statuslists/1",
-            ),
-          ),
+      status = ietfStatusListEntry, //STATUS LIST REVOCATION INFORMATION
         )
-println("SIGNED MDOC w/ Revocation Status:")
-println(Cbor.encodeToHexString(mdoc))
 ```
 
 _Example output_
@@ -248,6 +243,64 @@ a267646f6354797065756f72672e69736f2e31383031332e352e312e6d444c6c6973737565725369
 ```
 
 </details>
+
+_MSO of the signed mDoc as a hex-encoded string_
+
+```text
+d818590200a76776657273696f6e63312e306f646967657374416c676f726974686d675348412d3235366c76616c756544696765737473a1716f72672e69736f2e31383031332e352e31a3005820cd7c600e8894b9d0eb0ac322fb40ced31a4e9eecacfbc638445b77f16d73b1d40158206baf6dfa5313e0941956959a3e537d1879e5baf6942bba55fae48be88b8b952e025820ff5bde0324fc3185d6a87eb6a029673236386a50cfc5cb3b2dc3528f9bbcdb4e6d6465766963654b6579496e666fa1696465766963654b6579a401022001215820547dc19e36381fd5702b5942cde4e38bcbdb99709f3303ce5f8d7faeaf956b8922582077aa8ec57f077557aec10d61719242f13ef31f2ed89a137a9dad4dbd4b40061267646f6354797065756f72672e69736f2e31383031332e352e312e6d444c6c76616c6964697479496e666fa3667369676e6564c0781e323032352d30352d31365430373a30363a35352e3536353533333634345a6976616c696446726f6dc0781e323032352d30352d31365430373a30363a35352e3536353533363033395a6a76616c6964556e74696cc0781e323032362d30352d31365430373a30363a35352e3536353533363536305a66737461747573a16b7374617475735f6c697374a263696478188e63757269782168747470733a2f2f6578616d706c652e636f6d2f7374617475736c697374732f31
+```
+
+<details>
+<summary><i>View MSO in diagnostic notation</i></summary>
+
+```json
+{
+    "version": "1.0",
+    "digestAlgorithm": "SHA-256",
+    "valueDigests": {
+        "org.iso.18013.5.1": {
+            0: h'cd7c600e8894b9d0eb0ac322fb40ced31a4e9eecacfbc638445b77f16d73b1d4',
+            1: h'6baf6dfa5313e0941956959a3e537d1879e5baf6942bba55fae48be88b8b952e',
+            2: h'ff5bde0324fc3185d6a87eb6a029673236386a50cfc5cb3b2dc3528f9bbcdb4e',
+        },
+    },
+    "deviceKeyInfo": {
+        "deviceKey": {
+            1: 2,
+            -1: 1,
+            -2: h'547dc19e36381fd5702b5942cde4e38bcbdb99709f3303ce5f8d7faeaf956b89',
+            -3: h'77aa8ec57f077557aec10d61719242f13ef31f2ed89a137a9dad4dbd4b400612',
+        },
+    },
+    "docType": "org.iso.18013.5.1.mDL",
+    "validityInfo": {
+        "signed": 0("2025-05-16T07:06:55.565533644Z"),
+        "validFrom": 0("2025-05-16T07:06:55.565536039Z"),
+        "validUntil": 0("2026-05-16T07:06:55.565536560Z"),
+    },
+    "status": {
+        "status_list": {"idx": 142_0, "uri": "https://example.com/statuslists/1"},
+    },
+}
+```
+
+</details>
+
+The library also provides support for specifying revocation information in the `Status` structure via the identifier 
+list method. 
+
+To use this method, initialize the `Status` structure according to the following example:
+
+```kotlin
+val identifierListEntry = Status(
+  identifierList = IdentifierListInfo(
+    id = "cccc".decodeHex().toByteArray(),
+    uri = "https://example.com/identifierlists/1",
+      ),
+)
+```
+
+Note that the two revocation methods discussed here are **mutually exclusive**.
 
 #### Create, parse and verify a mdoc (mDL) request
 
@@ -528,9 +581,11 @@ Namespace: org.iso.18013.5.1
     )
 ```
 
-### Device Engagement
+### Create and parse Device Engagement structures
 
-#### Create NFC device engagement structure
+In the following, we provide examples for creating `DeviceEngagement` structures for all transports.
+
+#### NFC
 
 ```kotlin
 val nfcDeviceEngagement = DeviceEngagement(
@@ -573,7 +628,7 @@ a30063312e30018201d818585b3059301306072a8648ce3d020106082a8648ce3d03010703420004
 
 
 
-#### Create BLE device engagement structure
+#### BLE
 
 ```kotlin
 val bleDeviceEngagement = DeviceEngagement(
@@ -614,7 +669,7 @@ a30063312e30018201d818585b3059301306072a8648ce3d020106082a8648ce3d03010703420004
 
 </details>
 
-#### Create Wi-Fi Aware device engagement structure
+#### Wi-Fi Aware
 
 ```kotlin
 val wifiDeviceEngagement = DeviceEngagement(
@@ -652,6 +707,51 @@ a30063312e30018201d818585b3059301306072a8648ce3d020106082a8648ce3d03010703420004
   2: [
     [3, 1, {0: "secret-wifi-password", 3: h''}],
   ],
+}
+```
+
+</details>
+
+#### Parse a Device Engagement structure
+
+```kotlin
+val deviceEngagementHexString = "a30063312e30018201d818584ba4010220012158205a88d182bce5f42efa59943f33359d2e8a968ff289d93e5fa444b624343167fe225820b16e8cf858ddc7690407ba61d4c338237a8cfcf3de6aa672fc60a557aa32fc670281830201a300f401f50b5045efef742b2c4837a9a3b0e1d05a6917"
+val deviceEngagement = DeviceEngagement.fromCBORHex(deviceEngagementHexString)
+println("Parsed: $deviceEngagement")
+```
+
+_Example output_
+
+```text
+Parsed: DeviceEngagement(security=Security(cipherSuite=1, eDeviceKeyBytes=id.walt.mdoc.dataelement.EncodedCBORElement@3301500b), deviceRetrievalMethods=[BleDeviceRetrieval(type=BLE, version=1, retrievalOptions=BleOptions(supportMDocPeripheralServerMode=false, supportMDocCentralClientMode=true, mdocPeripheralServerModeUUID=null, mdocCentralClientModeUUID=[69, -17, -17, 116, 43, 44, 72, 55, -87, -93, -80, -31, -48, 90, 105, 23], mdocPeripheralServerModeDeviceAddress=null, mdocPeripheralServerModeL2CAPPSM=null))], serverRetrievalMethods=null, protocolInfo=null, originInfos=null, capabilities=null, optional={})
+```
+
+<details>
+<summary>View in diagnostic notation</summary>
+
+```json
+{
+    0: "1.0",
+    1: [
+        1,
+        24_0(<<{
+            1: 2,
+            -1: 1,
+            -2: h'5a88d182bce5f42efa59943f33359d2e8a968ff289d93e5fa444b624343167fe',
+            -3: h'b16e8cf858ddc7690407ba61d4c338237a8cfcf3de6aa672fc60a557aa32fc67',
+        }>>),
+    ],
+    2: [
+        [
+            2,
+            1,
+            {
+                0: false,
+                1: true,
+                11: h'45efef742b2c4837a9a3b0e1d05a6917',
+            },
+        ],
+    ],
 }
 ```
 
