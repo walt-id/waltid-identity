@@ -10,4 +10,5 @@ actual class Path actual constructor(val path: String) {
     actual fun toFile(): File = File(innerPath.toAbsolutePath().toString())
     actual fun exists(): Boolean = innerPath.exists()
     actual fun toAbsolutePath(): String = innerPath.toAbsolutePath().toString()
+    actual override fun toString(): String = toAbsolutePath()
 }

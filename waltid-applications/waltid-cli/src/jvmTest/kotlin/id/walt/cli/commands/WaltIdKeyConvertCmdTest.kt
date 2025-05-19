@@ -92,7 +92,7 @@ class WaltIdKeyConvertCmdTest {
         val inputFilename = "foo.jwk"
         val result = command.test(listOf("-i$inputFilename"))
 
-        val expected = """.*file "$inputFilename" does not exist.*""".toRegex(RegexOption.IGNORE_CASE)
+        val expected = """.*file ".*$inputFilename" does not exist.*""".toRegex(RegexOption.IGNORE_CASE)
         assertContains(result.stderr, expected)
     }
 

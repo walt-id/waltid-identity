@@ -110,7 +110,8 @@ class WaltIdVCSignCmdTest {
             command.parse(arrayOf("-k", invalidKeyFilePath, "-i", issuerDid, "-s", subjectDid, vcFilePath))
         }
 
-        val fileNotFoundMessage = "file \"$invalidKeyFilePath\" does not exist."
+//        val fileNotFoundMessage = "file \"$invalidKeyFilePath\" does not exist."
+        val fileNotFoundMessage = "$invalidKeyFilePath\" does not exist."
         failure.message?.let { assertContains(it, fileNotFoundMessage) }
     }
 
