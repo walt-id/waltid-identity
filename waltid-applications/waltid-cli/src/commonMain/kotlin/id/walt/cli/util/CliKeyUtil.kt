@@ -9,6 +9,8 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.runBlocking
 
+//import java.text.ParseException
+
 class CliKeyUtil(private val cmd: CliktCommand? = null) {
 
     suspend fun getKey(keyFile: File?): JWKKey {
@@ -17,6 +19,10 @@ class CliKeyUtil(private val cmd: CliktCommand? = null) {
         try {
             return JWKKey.importJWK(keyFile.readText()).getOrThrow()
         } catch (e: InvalidJWKFormat) {
+            throw InvalidFileFormat(keyFile.name, e.let { e.message!! })
+        } catch (e: Exception) {
+            // TODO Is it a good idea?
+            // Should be ParseException only but then it should be moved to a platform specific source set.
             throw InvalidFileFormat(keyFile.name, e.let { e.message!! })
         }
     }
