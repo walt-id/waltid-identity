@@ -1,5 +1,5 @@
 wallet.local {
-    reverse_proxy localhost:7101 # frontend
+    reverse_proxy localhost:7104 # frontend
     reverse_proxy /wallet-api/* localhost:7001 # backend
 }
 
