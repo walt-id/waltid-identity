@@ -40,8 +40,10 @@ dependencies {
     implementation("org.aaa4j.radius:aaa4j-radius-client:0.3.1")
 
     // LDAP
-    //implementation("org.apache.directory.server:apacheds-server-integ:2.0.0.AM27")
-    implementation("org.apache.directory.api:api-all:2.1.7") //TODO: resole CVE-2024-52046 -> https://mvnrepository.com/artifact/org.apache.directory.api/api-all/2.1.7
+    implementation("org.apache.directory.api:apache-ldap-api:2.1.7") {
+        exclude("org.apache.mina:mina-core") // Manually updated due to security CVE
+    }
+    implementation("org.apache.mina:mina-core:2.2.4")
 
     // TOTP/HOTP
     implementation("com.atlassian:onetime:2.1.2")
