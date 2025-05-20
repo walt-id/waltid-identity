@@ -401,7 +401,7 @@ class TestCredentialWallet(
             ?: "VerifiableCredential"
 
         DescriptorMapping(
-            id = getDescriptorId(type, presentationDefinition),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
+            id =  presentationDefinition?.inputDescriptors?.get(index)?.id ?: getDescriptorId(type, presentationDefinition),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
             format = VCFormat.jwt_vp,  // jwt_vp_json
             path = rootPath,
             pathNested = DescriptorMapping(
@@ -409,8 +409,8 @@ class TestCredentialWallet(
                     type,
                     presentationDefinition,
                 ),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
-                format = VCFormat.jwt_vc_json, // jwt_vc_json
-                path = "$rootPath.verifiableCredential[$index]", //.vp.verifiableCredentials
+                format = VCFormat.jwt_vc, // jwt_vc_json
+                path = "$rootPath.vp.verifiableCredential[$index]", //.vp.verifiableCredentials
             )
         )
     }
