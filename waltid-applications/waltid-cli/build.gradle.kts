@@ -116,6 +116,11 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
             }
         }
+
+        val macosTest by getting {
+            dependsOn(commonTest)
+        }
+
         val jvmMain by getting {
             dependencies {
                 // https://mvnrepository.com/artifact/com.github.ajalt.clikt/clikt-jvm
