@@ -2,7 +2,7 @@ package id.walt.cli
 
 import id.walt.cli.util.getResourcePath
 import id.walt.crypto.keys.KeyType
-import org.junit.jupiter.api.Disabled
+//import org.junit.jupiter.api.Disabled
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -154,7 +154,8 @@ class MainTest {
     }
 
     @Test
-    @Disabled("RSA key parameters are too long and are being cropped in IntelliJ")
+    //@Disabled("RSA key parameters are too long and are being cropped in IntelliJ")
+    @Ignore
     fun `should generate a new RSA key when 'key generate --keyType=RSA' is executed`() {
         val output = tapSystemOut { main(arrayOf("key", "generate", "--keyType=RSA")) }
 
@@ -165,7 +166,8 @@ class MainTest {
     }
 
     @Test
-    @Disabled
+//    @Disabled
+    @Ignore
     fun `should generate a RSA key in the specified file when 'key generate --keyType=RSA -o myRSAKey' is executed`() {
 
         val outputFileName = "myRSAKey.json"

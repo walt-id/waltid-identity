@@ -19,6 +19,10 @@ actual class Files {
 
         actual fun isSymbolicLink(it: Path): Boolean =
             java.nio.file.Files.isSymbolicLink(it.innerPath)
+
+        actual fun createTempFile(fileName: String, extension: String): File {
+            return File(java.io.File.createTempFile(fileName, ".$extension").absolutePath)
+        }
     }
 
 }

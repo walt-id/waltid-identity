@@ -2,10 +2,11 @@ package id.walt.cli
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.test.assertions.assertDoesNotThrow
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
-import org.junit.jupiter.api.assertDoesNotThrow
+//import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,7 +16,7 @@ class ImportAndExportTests {
     @Test
     @Ignore
     fun testRSA() {
-        testBidirectionalConversion(KeyType.RSA) // Not working. Keving is looking at it.
+        testBidirectionalConversion(KeyType.RSA) // Not working. Kevin is looking at it.
     }
 
     @Test
