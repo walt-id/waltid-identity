@@ -36,10 +36,10 @@ import io.ktor.http.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import id.walt.webwallet.db.models.insertAuthReqSession
+import io.ktor.util.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
 

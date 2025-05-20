@@ -156,8 +156,6 @@ object CredentialOfferSerializer : KSerializer<CredentialOffer> {
         val transformedElement = CredentialOfferJsonSerializer.transformDeserialize(rawJsonElement)
 
         return when {
-            "credential_configuration_ids" in jsonObject -> json.decodeFromJsonElement(CredentialOffer.Draft13.serializer(), jsonObject)
-            "credentials" in jsonObject -> json.decodeFromJsonElement(CredentialOffer.Draft11.serializer(), jsonObject)
             "credential_configuration_ids" in transformedElement.jsonObject -> Json.decodeFromJsonElement(
                 CredentialOffer.Draft13.serializer(),
                 transformedElement,

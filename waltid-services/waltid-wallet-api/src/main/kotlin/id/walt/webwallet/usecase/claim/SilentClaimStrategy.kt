@@ -40,6 +40,7 @@ class SilentClaimStrategy(
     suspend fun claim(did: String, offer: String) = issuanceService.useOfferRequest(
         offer = offer,
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
+        clientId = SSIKit2WalletService.testCIClientConfig.clientID
     ).mapNotNull {
         val credential = WalletCredential.parseDocument(it.document, it.id, it.format) ?: JsonObject(emptyMap())
         val manifest = WalletCredential.tryParseManifest(it.manifest) ?: JsonObject(emptyMap())
