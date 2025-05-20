@@ -153,7 +153,7 @@ data class AuthorizationRequest(
             .filterNot { it.value == JsonNull }
 
         values.forEach { (key, value) ->
-            url.parameters.append(key, value.jsonPrimitive.content)
+            url.parameters.append(key, if (value is JsonPrimitive) value.jsonPrimitive.content else value.toString())
         }
         return url.build()
     }
