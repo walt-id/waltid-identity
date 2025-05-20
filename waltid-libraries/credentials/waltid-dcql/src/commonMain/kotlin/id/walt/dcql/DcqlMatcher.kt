@@ -18,8 +18,8 @@ object DcqlMatcher {
      */
     fun match(
         query: DcqlQuery,
-        availableCredentials: List<DcqlCredential>,
-    ): Result<Map<String, List<DcqlCredential>>> {
+        availableCredentials: List<DcqlCredential>, // TODO: Have this be a flow
+    ): Result<Map<String, List<DcqlCredential>>> { // TODO: Have the result be a flow
         log.debug { "Starting DCQL match. Query: $query, Available Credentials: ${availableCredentials.map { it.id }}" }
         val individualMatches = mutableMapOf<String, List<DcqlCredential>>()
 

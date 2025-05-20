@@ -34,6 +34,7 @@ object CredentialAdapter {
     ): List<DcqlCredential> {
         return customCredentials.mapNotNull { (detectionResult, digitalCredential) ->
             val formatString = mapDetectionResultToFormat(detectionResult)
+
             if (formatString == null) {
                 null // Skip credentials we can't map
             } else {
