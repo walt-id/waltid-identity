@@ -29,6 +29,8 @@ data class SdJwtCredential(
     override val signature: CredentialSignature?,
     override val signed: String?,
 ) : DigitalCredential(), SelectivelyDisclosableVerifiableCredential {
+    override val format: String = "dc+sd-jwt"
+
     init {
         selfCheck()
     }

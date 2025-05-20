@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 sealed class AbstractW3C(
 ) : DigitalCredential(), SelectivelyDisclosableVerifiableCredential {
+
     init {
         selfCheck()
     }

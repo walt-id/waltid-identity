@@ -6,6 +6,8 @@ import kotlinx.serialization.json.JsonObject
 
 @Serializable
 sealed class DigitalCredential {
+    abstract val format: String
+
     abstract val credentialData: JsonObject
     abstract val signature: CredentialSignature?
     abstract val signed: String?

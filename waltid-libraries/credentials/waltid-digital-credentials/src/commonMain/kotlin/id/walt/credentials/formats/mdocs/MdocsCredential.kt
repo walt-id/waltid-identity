@@ -15,4 +15,6 @@ data class MdocsCredential(
 
     override var issuer: String? = null,
     override var subject: String? = null
-) : DigitalCredential()
+) : DigitalCredential() {
+    override val format: String = "mso_mdoc"
+}

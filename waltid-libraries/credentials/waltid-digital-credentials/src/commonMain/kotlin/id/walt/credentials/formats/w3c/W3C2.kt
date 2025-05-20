@@ -1,6 +1,10 @@
 package id.walt.credentials.formats
 
+import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.CredentialSignature
+import id.walt.credentials.signatures.DataIntegrityProofCredentialSignature
+import id.walt.credentials.signatures.JwtCredentialSignature
+import id.walt.credentials.signatures.SdJwtCredentialSignature
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -26,4 +30,11 @@ data class W3C2(
     override val signed: String?,
 ) : AbstractW3C() {
 
+    override val format: String = when (signature) {
+        is JwtCredentialSignature -> "jwt_vc_json"
+        is SdJwtCredentialSignature -> "jwt_vc_json"
+        is DataIntegrityProofCredentialSignature -> "ldp_vc"
+        is CoseCredentialSignature -> throw NotImplementedError("Unsupported format: $signature of ${this::class.simpleName}")
+        null -> "unsigned"
+    }
 }
