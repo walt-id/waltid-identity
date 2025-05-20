@@ -50,7 +50,7 @@ data class CredentialTypeConfig(
         "LegalPerson" to vc("VerifiableCredential", "LegalPerson"),
         "LegalRegistrationNumber" to vc("VerifiableCredential", "LegalRegistrationNumber"),
         "GaiaXTermsAndConditions" to vc("VerifiableCredential", "GaiaXTermsAndConditions"),
-
+        "DataspaceParticipantCredential" to vc("VerifiableCredential", "DataspaceParticipantCredential"),
         MDocTypes.ISO_MDL to vc(
             CredentialSupported(
                 format = CredentialFormat.mso_mdoc,
