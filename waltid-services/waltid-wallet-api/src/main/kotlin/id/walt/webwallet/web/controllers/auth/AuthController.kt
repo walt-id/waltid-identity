@@ -21,6 +21,7 @@ import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
+import id.walt.webwallet.db.models.getAuthReqSessionsById
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.web.InsufficientPermissionsException
@@ -167,6 +168,7 @@ fun ApplicationCall.getUserId() =
         ?: principal<UserIdPrincipal>() // bearer is registered with no name for some reason
         ?: throw UnauthorizedException("Could not find user authorization within request.")
 
+@OptIn(ExperimentalUuidApi::class)
 suspend fun ApplicationCall.getUserUUID() =
     runCatching {
         when {
@@ -176,17 +178,37 @@ suspend fun ApplicationCall.getUserUUID() =
         }
     }.getOrElse { throw IllegalArgumentException("Invalid user id: $it") }
 
-fun ApplicationCall.getWalletId() =
+
+@OptIn(ExperimentalUuidApi::class)
+fun ApplicationCall.getWalletId(userId: Uuid? = null) =
     runCatching {
         Uuid.parse(parameters["wallet"] ?: throw IllegalArgumentException("No wallet ID provided"))
     }.getOrElse { throw IllegalArgumentException("Invalid wallet ID provided: ${it.message}") }
         .also {
-            ensurePermissionsForWallet(AccountWalletPermissions.READ_ONLY, walletId = it)
+            when (userId) {
+                null -> ensurePermissionsForWallet(AccountWalletPermissions.READ_ONLY, walletId = it)
+                else -> ensurePermissionsForWallet(AccountWalletPermissions.READ_ONLY, walletId = it, userId = userId)
+            }
         }
 
 @OptIn(ExperimentalUuidApi::class)
 suspend fun ApplicationCall.getWalletService(walletId: Uuid? = null) =
     WalletServiceManager.getWalletService("", getUserUUID(), walletId ?: getWalletId()) // FIXME -> TENANT HERE
+
+@OptIn(ExperimentalUuidApi::class)
+fun ApplicationCall.getWalletServiceUnprotected() =
+    WalletServiceManager.getWalletService("", getUserUUIDByAuthReqSessions(), getWalletId(getUserUUIDByAuthReqSessions())) // FIXME -> TENANT HERE
+
+fun ApplicationCall.getUserUUIDByAuthReqSessions() : Uuid {
+    runCatching {
+        val authReqSessionId = parameters["authReqSessionId"] ?: throw UnauthorizedException("Could not find user for the authorization request.")
+
+        val session = getAuthReqSessionsById(id = authReqSessionId)
+
+        return session?.accountId ?: throw UnauthorizedException("Could not find account id for the authorization request.")
+    }.getOrElse { throw IllegalArgumentException("Invalid user id: $it") }
+}
+
 
 fun ApplicationCall.getUsersSessionToken(): String? =
     sessions.get(LoginTokenSession::class)?.token

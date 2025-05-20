@@ -13,6 +13,10 @@ import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 
+private val json = Json {
+    ignoreUnknownKeys = true
+}
+
 @Serializable
 sealed class CredentialOffer : JsonDataObject() {
     abstract val grants: Map<String, GrantDetails>
@@ -57,11 +61,11 @@ sealed class CredentialOffer : JsonDataObject() {
         fun build(): T = buildInternal()
     }
 
-    override fun toJSON() = Json.encodeToJsonElement(CredentialOfferSerializer, this).jsonObject
+    override fun toJSON() = json.encodeToJsonElement(CredentialOfferSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<CredentialOffer>() {
         override fun fromJSON(jsonObject: JsonObject) =
-            Json.decodeFromJsonElement(CredentialOfferSerializer, jsonObject)
+            json.decodeFromJsonElement(CredentialOfferSerializer, jsonObject)
     }
 
     @Serializable
@@ -152,6 +156,8 @@ object CredentialOfferSerializer : KSerializer<CredentialOffer> {
         val transformedElement = CredentialOfferJsonSerializer.transformDeserialize(rawJsonElement)
 
         return when {
+            "credential_configuration_ids" in jsonObject -> json.decodeFromJsonElement(CredentialOffer.Draft13.serializer(), jsonObject)
+            "credentials" in jsonObject -> json.decodeFromJsonElement(CredentialOffer.Draft11.serializer(), jsonObject)
             "credential_configuration_ids" in transformedElement.jsonObject -> Json.decodeFromJsonElement(
                 CredentialOffer.Draft13.serializer(),
                 transformedElement,

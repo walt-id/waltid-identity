@@ -12,28 +12,81 @@ import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.usecase.exchange.FilterData
-import id.walt.webwallet.web.controllers.auth.getUserUUID
-import id.walt.webwallet.web.controllers.auth.getWalletId
-import id.walt.webwallet.web.controllers.auth.getWalletService
 import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeOpenApiCommons
 import id.walt.webwallet.web.controllers.walletRoute
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
+import id.walt.webwallet.web.controllers.unprotectedWalletRoute
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.server.util.*
 import io.ktor.util.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlin.uuid.ExperimentalUuidApi
+import id.walt.webwallet.web.controllers.auth.*
+
+@OptIn(ExperimentalUuidApi::class)
+fun Application.redirects() = unprotectedWalletRoute {
+    route(
+        path = "exchange",
+        builder = ExchangeOpenApiCommons.exchangeRoute()
+    ) {
+
+        get("callback/{authReqSessionId}") {
+            val wallet = call.getWalletServiceUnprotected()
+
+            val authReqSessionId = call.parameters.getOrFail("authReqSessionId")
+            val code = call.request.queryParameters.toMap()["code"]?.firstOrNull()
+                ?: throw IllegalArgumentException("No code to use supplied")
+            val state = call.request.queryParameters.toMap()["state"]?.firstOrNull()
+                ?: throw IllegalArgumentException("No state to use supplied")
+
+            val accountId = call.getUserUUIDByAuthReqSessions()
+
+            runCatching {
+                WalletServiceManager.explicitClaimStrategy.handleCallback(
+                    tenant = wallet.tenant,
+                    account = accountId,
+                    wallet = wallet.walletId,
+                    authReqSessionId = authReqSessionId,
+                    code = code,
+                    state = state
+                ).also {
+                    wallet.addOperationHistory(
+                        WalletOperationHistory.new(
+                            tenant = wallet.tenant,
+                            wallet = wallet,
+                            "useOfferRequestAuthCallback",
+                            mapOf("authReqSessionId" to authReqSessionId, "state" to state)
+                        )
+                    )
+                }
+            }.onSuccess {
+                call.response.apply {
+                    status(HttpStatusCode.Found)
+                    header(
+                        HttpHeaders.Location,
+                        URLBuilder(it.second).apply {}.buildString()
+                    )
+                }
+            }
+        }
+    }
+}
+
 
 @OptIn(ExperimentalUuidApi::class)
 fun Application.exchange() = walletRoute {
-    route(ExchangeOpenApiCommons.EXCHANGE_ROOT_PATH, ExchangeOpenApiCommons.exchangeRoute()) {
+    route(
+        path = ExchangeOpenApiCommons.EXCHANGE_ROOT_PATH,
+        builder = ExchangeOpenApiCommons.exchangeRoute()
+    ) {
         post("useOfferRequest", {
             summary = "Claim credential(s) from an issuer"
 
@@ -54,6 +107,7 @@ fun Application.exchange() = walletRoute {
 
             val did = call.request.queryParameters["did"] ?: wallet.listDids().firstOrNull()?.did
             ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
+
             val requireUserInput = call.request.queryParameters["requireUserInput"].toBoolean()
             val pinOrTxCode = call.request.queryParameters["pinOrTxCode"]
 
@@ -85,6 +139,45 @@ fun Application.exchange() = walletRoute {
                 call.respond(HttpStatusCode.BadRequest, error.message ?: "Unknown error")
             }
         }
+
+        get("useOfferRequestAuth") {
+            val wallet = call.getWalletService()
+
+            val did = call.request.queryParameters["did"] ?: wallet.listDids().firstOrNull()?.did
+            ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
+
+            val offer = call.request.queryParameters.getOrFail("offer")
+
+            val successRedirectUri = call.request.queryParameters.getOrFail("successRedirectUri")
+
+            runCatching {
+                WalletServiceManager.explicitClaimStrategy.claimAuthorize(
+                    account = call.getUserUUID(),
+                    wallet = wallet.walletId,
+                    did = did,
+                    offer = offer,
+                    successRedirectUri = successRedirectUri
+                ).also {
+                    wallet.addOperationHistory(
+                        WalletOperationHistory.new(
+                            tenant = wallet.tenant,
+                            wallet = wallet,
+                            "useOfferRequestAuth",
+                            mapOf("did" to did, "offer" to offer)
+                        )
+                    )
+                }
+            }.onSuccess {
+                call.response.apply {
+                    status(HttpStatusCode.Found)
+                    header(
+                        HttpHeaders.Location,
+                        URLBuilder(it).apply {}.buildString()
+                    )
+                }
+            }
+        }
+
         post("matchCredentialsForPresentationDefinition", {
             summary = "Returns the credentials stored in the wallet that match the passed presentation definition"
 
