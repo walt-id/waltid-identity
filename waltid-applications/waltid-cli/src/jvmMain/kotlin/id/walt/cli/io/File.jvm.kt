@@ -60,5 +60,9 @@ actual class File actual constructor(val path: String) {
         return nativeFile.canWrite()
     }
 
+    actual fun delete(): Boolean {
+        return nativeFile.delete()
+    }
+
 }
 

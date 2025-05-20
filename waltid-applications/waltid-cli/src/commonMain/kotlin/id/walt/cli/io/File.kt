@@ -16,6 +16,7 @@ expect class File(path: String) {
     fun readText(): String
     fun toPath(): Path
     fun absolutePathString(): String
+    fun delete(): Boolean
 
     fun isFile(): Boolean
     fun isDirectory(): Boolean

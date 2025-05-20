@@ -1,27 +1,10 @@
 package id.walt.cli
 
+import id.walt.cli.io.File
 import id.walt.cli.util.getResourcePath
+import id.walt.cli.util.tapSystemOut
 import id.walt.crypto.keys.KeyType
-//import org.junit.jupiter.api.Disabled
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.PrintStream
 import kotlin.test.*
-
-private fun tapSystemOut(block: () -> Unit): String {
-    val stdoutCaptureStream = ByteArrayOutputStream()
-
-    val originalOut = System.out
-    System.setOut(PrintStream(stdoutCaptureStream))
-
-    try {
-        block.invoke()
-
-        return stdoutCaptureStream.toString()
-    } finally {
-        System.setOut(originalOut)
-    }
-}
 
 class MainTest {
 
@@ -316,7 +299,7 @@ class MainTest {
     }
 
     @Test
-    @Ignore("Failing with NoSuchSubcommand :-/ I'll check it later.")
+    @Ignore // "Failing with NoSuchSubcommand :-/ I'll check it later."
     fun `should print usage instructions when 'vc sign' command is called with no argument`() {
         val output = tapSystemOut { main(arrayOf("vc sign")) }
         assertContains(output, "Usage: waltid vc sign")
@@ -344,9 +327,9 @@ class MainTest {
     }
 
     @Test
-    @Ignore("Failing with NoSuchSubcommand :-/ I'll check it later.")
+    @Ignore // "Failing with NoSuchSubcommand :-/ I'll check it later."
     fun `should print usage instructions when 'vc verify' command is called with no argument`() {
-        val output = tapSystemOut { main(arrayOf("vc verify"))}
+        val output = tapSystemOut { main(arrayOf("vc verify")) }
         assertContains(output, "Usage: waltid vc verify")
     }
 
@@ -374,13 +357,13 @@ class MainTest {
     }
 
     @Test
-    fun `should succeed if the credentials expiration date (exp for JWTs) has not been exceeded when --policy=expired`() {
+    fun `should succeed if the credentials expiration date - exp for JWTs - has not been exceeded when --policy=expired`() {
         val output = tapSystemOut { main(arrayOf("vc", "verify", "--policy=expired", signedNotExpiredVCFilePath)) }
         assertContains(output, "expired: Success")
     }
 
     @Test
-    fun `should fail if the credentials expiration date (exp for JWTs) has been exceeded when --policy=expired`() {
+    fun `should fail if the credentials expiration date - exp for JWTs - has been exceeded when --policy=expired`() {
         val output = tapSystemOut { main(arrayOf("vc", "verify", "--policy=expired", signedExpiredVCFilePath)) }
         assertContains(output, "expired: Fail! VC expired since")
     }
@@ -532,16 +515,19 @@ class MainTest {
     private fun deleteGeneratedFile(output: String, expectedOutput: Regex) {
         val match = expectedOutput.find(output)
         var filePath: String? = null
+
         if (match != null) {
             filePath = match.groups[1]?.value
         } else {
             throw Exception("Filename not found in the output with pattern '${expectedOutput}'")
         }
 
-        File(filePath).delete()
+        deleteFile(filePath)
     }
 
-    private fun deleteFile(filename: String) {
-        File(filename).delete()
+    private fun deleteFile(filename: String?) {
+        if (filename != null) {
+            File(filename).delete()
+        }
     }
 }
