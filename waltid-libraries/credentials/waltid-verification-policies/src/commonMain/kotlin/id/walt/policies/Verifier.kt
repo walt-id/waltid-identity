@@ -150,9 +150,8 @@ object Verifier {
         specificCredentialPolicies: Map<String, List<PolicyRequest>>,
         presentationContext: Map<String, Any> = emptyMap(),
     ): PresentationVerificationResponse {
-        log.trace { "Verifying presentation with format $format: $vpToken" }
-
         val isW3CVp = runCatching { vpToken.decodeJws().payload.contains("vp") }.getOrElse { false }
+        log.trace { "Verifying presentation with format $format (is w3cvp=$isW3CVp): $vpToken" }
 
         return when {
             isW3CVp -> verifyW3CPresentation(format, vpToken, vpPolicies, globalVcPolicies, specificCredentialPolicies, presentationContext)
