@@ -51,7 +51,7 @@ object JwsUtils {
         require(
             dots == 2
                     || (allowMissingSignature && dots == 1)
-        ) { "String does not have correct JWS part amount (dots=$dots, allowMissingSignature=$allowMissingSignature): $this" }
+        ) { "String does not have correct JWS part amount (dots=$dots, allowMissingSignature=$allowMissingSignature): $jws" }
     }
 
     fun String.decodeJwsStrings(): JwsStringParts {
