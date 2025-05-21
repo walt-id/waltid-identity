@@ -17,7 +17,7 @@
 
                 <span v-else-if="now.getHours() >= 12">afternoon</span>
 
-                <span v-if="user?.friendlyName">,</span>
+                <span v-if="user?.friendlyName">, </span>
                 <span
                     :class="user?.friendlyName?.length > 25 ? 'truncate inline-block max-w-xs align-bottom' : ''"
                     :title="user?.friendlyName"
