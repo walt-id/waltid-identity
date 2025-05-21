@@ -25,29 +25,46 @@ val dataFunctions = mapOf<String, suspend (call: CredentialDataMergeUtils.Functi
         val displayList =
             context["display"]?.jsonArray ?: throw IllegalArgumentException("No display available for this credential")
         val displayJsonArray = JsonArray(
-            displayList.mapNotNull { entry ->
+            displayList.map { entry ->
                 val display = entry.jsonObject
-                val logo = display["logo"]!!.jsonObject
                 JsonObject(
-                    mapOf(
-                        "name" to display["name"]!!,
-                        "description" to display["description"]!!,
-                        "locale" to display["locale"]!!,
-                        "logo" to JsonObject(
-                            mapOf(
-                                "url" to logo["url"]!!,
-                                "altText" to logo["alt_text"]!!,
+                    buildMap {
+                        put("name", display["name"]!!)
+                        display["description"]?.let { put("description", it) }
+                        display["locale"]?.let { put("locale", it) }
+                        display["logo"]?.jsonObject?.let { logo ->
+                            put(
+                                "logo", JsonObject(
+                                    mapOf(
+                                        "url" to logo["url"]!!,
+                                        "altText" to logo["alt_text"]!!,
+                                    )
+                                )
                             )
-                        ),
-                        "backgroundColor" to display["background_color"]!!,
-                        "textColor" to display["text_color"]!!,
-                        "backgroundImage" to JsonObject(
-                            mapOf(
-                                "url" to logo["url"]!!,
-                                "altText" to logo["alt_text"]!!,
+                        }
+                        display["background_color"]?.let { put("backgroundColor", it) }
+                        display["text_color"]?.let { put("textColor", it) }
+                        display["background_image"]?.jsonObject?.let { bgImage ->
+                            put(
+                                "backgroundImage", JsonObject(
+                                    mapOf(
+                                        "url" to bgImage["url"]!!,
+                                        "altText" to bgImage["alt_text"]!!,
+                                    )
+                                )
                             )
-                        )
-                    )
+                        }
+                        display["customParameters"]?.jsonObject?.get("secondary_image")?.jsonObject?.let { secImage ->
+                            put(
+                                "secondaryImage", JsonObject(
+                                    mapOf(
+                                        "url" to secImage["url"]!!,
+                                        "altText" to secImage["alt_text"]!!,
+                                    )
+                                )
+                            )
+                        }
+                    }
                 )
             }
         )
