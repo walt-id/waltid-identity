@@ -33,8 +33,10 @@ class JsonObjectEnquirer {
         val resolvedPath = field.path.firstNotNullOfOrNull { document.resolveOrNull(getJsonPath(it)) }
 
         return if (resolvedPath == null) {
+            log.trace { "Unresolved field, failing constraint (Path ${field.path} not found in document $document)." }
             false
         } else {
+            log.trace { "Processing field filter: ${field.filter}" }
             if (field.filter != null) {
                 val schema = JsonSchema.fromJsonElement(field.filter)
                 when {
@@ -54,6 +56,7 @@ class JsonObjectEnquirer {
 
     fun filterDocumentsByConstraints(documents: Flow<JsonObject>, constraints: List<Field>): Flow<JsonObject> =
         documents.filter { document ->
+            log.trace { "Checking document against constraints: $document" }
             checkDocumentAgainstConstraints(document, constraints)
         }
 }
@@ -65,7 +68,7 @@ object PresentationDefinitionParser {
         inputDescriptor: PresentationDefinition.InputDescriptor,
     ): Flow<JsonObject> {
 
-        log.trace { "--- Checking descriptor ${inputDescriptor.name} --" }
+        log.trace { "--- Checking descriptor (name ${inputDescriptor.name}, id ${inputDescriptor.id}) --" }
 
         val enquirer = JsonObjectEnquirer()
 
