@@ -23,14 +23,17 @@ class JsonObjectEnquirer {
         compiledJsonPaths.getOrPut(path) { JsonPath.compile(path) }
 
     fun filterConstraint(document: JsonObject, field: Field): Boolean {
+        log.trace { "Processing constraint field: ${field.name ?: field.id ?: field}" }
+
         /* Alternative if both vc-wrapped and non-wrapped should be used equally:
-        val resolvedPath = field.path.firstNotNullOfOrNull {
-            document.resolveOrNull(getJsonPath(it))
-                ?: if (it.startsWith("$.vc.")) document.resolveOrNull(getJsonPath("$." + it.removePrefix("$.vc.")))
-                else null
-        }
-        */
+          val resolvedPath = field.path.firstNotNullOfOrNull {
+              document.resolveOrNull(getJsonPath(it))
+                  ?: if (it.startsWith("$.vc.")) document.resolveOrNull(getJsonPath("$." + it.removePrefix("$.vc.")))
+                  else null
+          }
+          */
         val resolvedPath = field.path.firstNotNullOfOrNull { document.resolveOrNull(getJsonPath(it)) }
+        log.trace { "Result of resolving ${field.path}: $resolvedPath" }
 
         return if (resolvedPath == null) {
             log.trace { "Unresolved field, failing constraint (Path ${field.path} not found in document $document)." }
