@@ -1,6 +1,9 @@
 package id.walt.webwallet.service
 
 import com.nimbusds.jose.JOSEObjectType
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.JWSObject
+import com.nimbusds.jose.Payload
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64URL
@@ -56,6 +59,7 @@ import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.usecase.event.EventLogUseCase
+import id.walt.webwallet.utils.JsonUtils.toJsonPrimitive
 import id.walt.webwallet.utils.StringUtils.couldBeJsonObject
 import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
 import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
@@ -76,6 +80,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.nio.charset.StandardCharsets
+import java.util.Base64
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -603,13 +608,41 @@ class SSIKit2WalletService(
 
     override suspend fun sign(alias: String, data: JsonElement): String {
         val key = findKey(alias) ?: throw NotFoundException("Key not found: $alias")
-        val headers = linkedMapOf(
-            "typ" to JOSEObjectType.JWT.type,
-            "kid" to alias
-        ).toJsonObject()
 
-        val dataBytes = data.toString().toByteArray(StandardCharsets.UTF_8)
-        val signature = key.signJws(dataBytes, headers)
+        // Check whether the given data is a partially initialised Flattened JWS+Json object
+        // https://datatracker.ietf.org/doc/html/rfc7515#section-7.2.2
+        val jwsObj = (data as? JsonObject)
+            ?.takeIf { it.keys == setOf("protected", "payload") }
+            ?.let {
+                val headerB64 = it["protected"]?.jsonPrimitive?.content
+                val payloadB64 = it["payload"]?.jsonPrimitive?.content
+                if (!headerB64.isNullOrBlank() && !payloadB64.isNullOrBlank()) {
+                    val header = JWSHeader.parse(Base64URL.from(headerB64))
+                    JWSObject(header, Payload(Base64.getUrlDecoder().decode(payloadB64)))
+                } else null
+            }
+
+        // For JWS+Json we take the header as given
+        val signature = if (jwsObj != null) {
+            val headers = jwsObj.header.toJSONObject().toMutableMap()
+            headers["kid"]?.toJsonPrimitive()?.content?.also { kid ->
+                if (kid != alias) throw IllegalArgumentException("JWT headers.kid must match alias: $alias")
+            }
+            headers["kid"] = JsonPrimitive(alias)
+            val dataBytes = jwsObj.payload.toString().toByteArray(Charsets.UTF_8)
+            key.signJws(dataBytes, headers.toJsonObject())
+        }
+
+        // Otherwise, we generate the header and use the given alias as kid
+        else {
+            val headers = linkedMapOf(
+                "typ" to JOSEObjectType.JWT.type,
+                "kid" to alias
+            ).toJsonObject()
+            val dataBytes = data.toString().toByteArray(Charsets.UTF_8)
+            key.signJws(dataBytes, headers)
+        }
+
         eventUseCase.log(
             action = EventType.Key.Sign,
             originator = "wallet",
