@@ -28,6 +28,7 @@ data class DisplayProperties(
     val locale: String? = null,
     @Serializable(LogoPropertiesSerializer::class) val logo: LogoProperties? = null,
     val description: String? = null,
+    @SerialName("secondary_image") @Serializable(LogoPropertiesSerializer::class) val secondaryImage: LogoProperties? = null,
     @SerialName("background_color") val backgroundColor: String? = null,
     @SerialName("background_image") @Serializable(LogoPropertiesSerializer::class) val backgroundImage: LogoProperties? = null,
     @SerialName("text_color") val textColor: String? = null,
