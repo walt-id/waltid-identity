@@ -154,8 +154,8 @@ class PresentationDefinitionPolicy : CredentialWrapperValidatorPolicy() {
 
         log.debug { "Verifying Presentation Definition. VP Holder DID: $vpHolderDid, Format: $format" }
 
-        val credentialsFlow: Flow<JsonObject> = when (format) {
-            VCFormat.sd_jwt_vc -> flowOf(data)
+        val credentialsFlow: Flow<JsonObject> = when {
+            format == VCFormat.sd_jwt_vc && !data.contains("vp") -> flowOf(data)
             else -> (data["vp"]?.jsonObject?.get("verifiableCredential")?.jsonArray?.mapNotNull { vc ->
                 vc.jsonPrimitive.contentOrNull?.let { SDJwt.parse(it) }?.fullPayload
             } ?: emptyList()).asFlow()
