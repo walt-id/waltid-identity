@@ -23,18 +23,23 @@ class JsonObjectEnquirer {
         compiledJsonPaths.getOrPut(path) { JsonPath.compile(path) }
 
     fun filterConstraint(document: JsonObject, field: Field): Boolean {
+        log.trace { "Processing constraint field: ${field.name ?: field.id ?: field}" }
+
         /* Alternative if both vc-wrapped and non-wrapped should be used equally:
-        val resolvedPath = field.path.firstNotNullOfOrNull {
-            document.resolveOrNull(getJsonPath(it))
-                ?: if (it.startsWith("$.vc.")) document.resolveOrNull(getJsonPath("$." + it.removePrefix("$.vc.")))
-                else null
-        }
-        */
+          val resolvedPath = field.path.firstNotNullOfOrNull {
+              document.resolveOrNull(getJsonPath(it))
+                  ?: if (it.startsWith("$.vc.")) document.resolveOrNull(getJsonPath("$." + it.removePrefix("$.vc.")))
+                  else null
+          }
+          */
         val resolvedPath = field.path.firstNotNullOfOrNull { document.resolveOrNull(getJsonPath(it)) }
+        log.trace { "Result of resolving ${field.path}: $resolvedPath" }
 
         return if (resolvedPath == null) {
+            log.trace { "Unresolved field, failing constraint (Path ${field.path} not found in document $document)." }
             false
         } else {
+            log.trace { "Processing field filter: ${field.filter}" }
             if (field.filter != null) {
                 val schema = JsonSchema.fromJsonElement(field.filter)
                 when {
@@ -54,6 +59,7 @@ class JsonObjectEnquirer {
 
     fun filterDocumentsByConstraints(documents: Flow<JsonObject>, constraints: List<Field>): Flow<JsonObject> =
         documents.filter { document ->
+            log.trace { "Checking document against constraints: $document" }
             checkDocumentAgainstConstraints(document, constraints)
         }
 }
@@ -65,7 +71,7 @@ object PresentationDefinitionParser {
         inputDescriptor: PresentationDefinition.InputDescriptor,
     ): Flow<JsonObject> {
 
-        log.trace { "--- Checking descriptor ${inputDescriptor.name} --" }
+        log.trace { "--- Checking descriptor (name ${inputDescriptor.name}, id ${inputDescriptor.id}) --" }
 
         val enquirer = JsonObjectEnquirer()
 
