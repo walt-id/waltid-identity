@@ -1,12 +1,12 @@
 services:
   wallet-api:
-    platform: linux/x86_64
-    image: docker.io/waltid/wallet-api:${VERSION_TAG:-latest}
+    platform: linux/amd64
+    image: ${IMAGE_PREFIX}waltid/wallet-api:${VERSION_TAG:-latest}
     profiles:
       - services
       - identity
       - all
-    pull_policy: always
+    pull_policy: missing
     build:
       context: ../
       dockerfile: waltid-services/waltid-wallet-api/Dockerfile
@@ -26,13 +26,13 @@ services:
       - ./wallet-api/data:/waltid-wallet-api/data
 
   issuer-api:
-    platform: linux/x86_64
-    image: docker.io/waltid/issuer-api:${VERSION_TAG:-latest}
+    platform: linux/amd64
+    image: ${IMAGE_PREFIX}waltid/issuer-api:${VERSION_TAG:-latest}
     profiles:
       - services
       - identity
       - all
-    pull_policy: always
+    pull_policy: missing
     build:
       context: ../
       dockerfile: waltid-services/waltid-issuer-api/Dockerfile
@@ -44,13 +44,13 @@ services:
       - ./issuer-api/config:/waltid-issuer-api/config
 
   verifier-api:
-    platform: linux/x86_64
-    image: docker.io/waltid/verifier-api:${VERSION_TAG:-latest}
+    platform: linux/amd64
+    image: ${IMAGE_PREFIX}waltid/verifier-api:${VERSION_TAG:-latest}
     profiles:
       - services
       - identity
       - all
-    pull_policy: always
+    pull_policy: missing
     build:
       context: ../
       dockerfile: waltid-services/waltid-verifier-api/Dockerfile
@@ -64,13 +64,13 @@ services:
       OPA_SERVER_URL: "http://opa-server:8181"
 
   waltid-demo-wallet:
-    platform: linux/x86_64
-    image: docker.io/waltid/waltid-demo-wallet:${VERSION_TAG:-latest}
+    platform: linux/amd64
+    image: ${IMAGE_PREFIX}waltid/waltid-demo-wallet:${VERSION_TAG:-latest}
     profiles:
       - apps
       - identity
       - all
-    pull_policy: always
+    pull_policy: missing
     build:
       context: ../
       dockerfile: waltid-applications/waltid-web-wallet/apps/waltid-demo-wallet/Dockerfile
@@ -83,13 +83,13 @@ services:
       PORT: $DEMO_WALLET_FRONTEND_PORT
 
   waltid-dev-wallet:
-    platform: linux/x86_64
-    image: docker.io/waltid/waltid-dev-wallet:${VERSION_TAG:-latest}
+    platform: linux/amd64
+    image: ${IMAGE_PREFIX}waltid/waltid-dev-wallet:${VERSION_TAG:-latest}
     profiles:
       - apps
       - identity
       - all
-    pull_policy: always
+    pull_policy: missing
     build:
       context: ../
       dockerfile: waltid-applications/waltid-web-wallet/apps/waltid-dev-wallet/Dockerfile
@@ -102,13 +102,13 @@ services:
       PORT: $DEV_WALLET_FRONTEND_PORT
 
   web-portal:
-    platform: linux/x86_64
-    image: docker.io/waltid/portal:${VERSION_TAG:-latest}
+    platform: linux/amd64
+    image: ${IMAGE_PREFIX}waltid/portal:${VERSION_TAG:-latest}
     profiles:
       - apps
       - identity
       - all
-    pull_policy: always
+    pull_policy: missing
     build:
       context: ../
       dockerfile: waltid-applications/waltid-web-portal/Dockerfile
@@ -122,13 +122,13 @@ services:
       PORT: $WEB_PORTAL_PORT
 
   vc-repo:
-    platform: linux/x86_64
-    image: docker.io/waltid/vc-repository:latest
+    platform: linux/amd64
+    image: waltid/vc-repository:latest
     profiles:
       - services
       - identity
       - all
-    pull_policy: always
+    pull_policy: missing
     depends_on:
       - caddy
     environment:
@@ -152,7 +152,7 @@ services:
       - $POSTGRES_DB_PORT:5432 #TODO: tcp/udp proxy with caddy
 
   vault:
-    image: hashicorp/vault:latest
+    image: hashicorp/vault:${VERSION_VAULT:-latest}
     profiles:
       - tse
       - all
@@ -174,7 +174,7 @@ services:
     restart: always
 
   vault-init:
-    image: hashicorp/vault:latest
+    image: hashicorp/vault:${VERSION_VAULT:-latest}
     profiles:
       - tse
       - all
@@ -190,7 +190,8 @@ services:
       - ./vault/init.sh:/vault/scripts/init.sh
 
   opa-server:
-    image: openpolicyagent/opa:latest
+    platform: linux/amd64
+    image: openpolicyagent/opa:${VERSION_OPA:-latest}
     container_name: opa-server
     profiles:
       - opa
