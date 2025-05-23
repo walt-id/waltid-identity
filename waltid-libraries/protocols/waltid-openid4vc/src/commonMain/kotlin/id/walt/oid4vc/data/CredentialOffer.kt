@@ -13,6 +13,10 @@ import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 
+private val json = Json {
+    ignoreUnknownKeys = true
+}
+
 @Serializable
 sealed class CredentialOffer : JsonDataObject() {
     abstract val grants: Map<String, GrantDetails>
@@ -57,11 +61,11 @@ sealed class CredentialOffer : JsonDataObject() {
         fun build(): T = buildInternal()
     }
 
-    override fun toJSON() = Json.encodeToJsonElement(CredentialOfferSerializer, this).jsonObject
+    override fun toJSON() = json.encodeToJsonElement(CredentialOfferSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<CredentialOffer>() {
         override fun fromJSON(jsonObject: JsonObject) =
-            Json.decodeFromJsonElement(CredentialOfferSerializer, jsonObject)
+            json.decodeFromJsonElement(CredentialOfferSerializer, jsonObject)
     }
 
     @Serializable
