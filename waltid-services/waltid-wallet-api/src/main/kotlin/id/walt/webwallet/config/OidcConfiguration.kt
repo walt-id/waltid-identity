@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class OidcConfiguration(
-    val publicBaseUrl: String = "http://localhost:7101",
+    val publicBaseUrl: String,
     val providerName: String,
     val oidcRealm: String,
     val oidcJwks: String,

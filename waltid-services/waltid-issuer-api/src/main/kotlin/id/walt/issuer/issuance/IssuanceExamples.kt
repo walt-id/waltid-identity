@@ -1,9 +1,9 @@
 package id.walt.issuer.issuance
 
 import id.walt.commons.interop.LspPotentialInterop
-import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
+import id.walt.w3c.utils.VCFormat
 import io.github.smiley4.ktoropenapi.config.ValueExampleDescriptorConfig
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -1253,7 +1253,7 @@ object IssuanceExamples {
 
     val ebsiCTExampleAuthInTimeDraft11 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
         {
-          "credentialConfigurationId": "InTimeIssuance_jwt_vc_json",
+          "credentialConfigurationId": "InTimeIssuance_jwt_vc",
           "standardVersion": "DRAFT11",
           "issuerKey": {
                   "type": "jwk",
@@ -1297,14 +1297,15 @@ object IssuanceExamples {
               "type": "FullJsonSchemaValidator2021"
             }
           },
-          "useJar": true
+          "useJar": true,
+          "draft11EncodeOfferedCredentialsByReference": false
         }
     """.trimIndent()
     )
 
     val ebsiCTExampleAuthDeferredDraft11 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
         {
-          "credentialConfigurationId": "DeferredIssuance_jwt_vc_json",
+          "credentialConfigurationId": "DeferredIssuance_jwt_vc",
           "standardVersion": "DRAFT11",
           "issuerKey": {
                   "type": "jwk",
@@ -1348,14 +1349,16 @@ object IssuanceExamples {
               "type": "FullJsonSchemaValidator2021"
             }
           },
-          "useJar": true
+          "useJar": true,
+          "draft11EncodeOfferedCredentialsByReference": false,
+          "issuanceType": "DEFERRED"
         }
     """.trimIndent()
     )
 
     val ebsiCTExamplePreAuthDraft11 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
         {
-          "credentialConfigurationId": "PreAuthIssuance_jwt_vc_json",
+          "credentialConfigurationId": "PreAuthIssuance_jwt_vc",
           "standardVersion": "DRAFT11",
           "issuerKey": {
                   "type": "jwk",
@@ -1398,14 +1401,15 @@ object IssuanceExamples {
               "id": "https://api-pilot.ebsi.eu/trusted-schemas-registry/v3/schemas/zDpWGUBenmqXzurskry9Nsk6vq2R8thh9VSeoRqguoyMD",
               "type": "FullJsonSchemaValidator2021"
             }
-          }
+          },
+          "draft11EncodeOfferedCredentialsByReference": false
         }
     """.trimIndent()
     )
 
     val ebsiCTExampleAuthInTimeDraft13 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
         {
-          "credentialConfigurationId": "InTimeIssuance_jwt_vc_json",
+          "credentialConfigurationId": "InTimeIssuance_jwt_vc",
           "standardVersion": "DRAFT13",
           "issuerKey": {
                   "type": "jwk",
@@ -1456,7 +1460,7 @@ object IssuanceExamples {
 
     val ebsiCTExampleAuthDeferredDraft13 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
         {
-          "credentialConfigurationId": "DeferredIssuance_jwt_vc_json",
+          "credentialConfigurationId": "DeferredIssuance_jwt_vc",
           "standardVersion": "DRAFT13",
           "issuerKey": {
                   "type": "jwk",
@@ -1500,14 +1504,15 @@ object IssuanceExamples {
               "type": "FullJsonSchemaValidator2021"
             }
           },
-          "useJar": true
+          "useJar": true,
+          "issuanceType": "DEFERRED"
         }
     """.trimIndent()
     )
 
     val ebsiCTExamplePreAuthDraft13 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
         {
-          "credentialConfigurationId": "PreAuthIssuance_jwt_vc_json",
+          "credentialConfigurationId": "PreAuthIssuance_jwt_vc",
           "standardVersion": "DRAFT13",
           "issuerKey": {
                   "type": "jwk",

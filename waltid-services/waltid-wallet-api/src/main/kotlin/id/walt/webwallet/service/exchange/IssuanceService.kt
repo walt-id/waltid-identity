@@ -5,8 +5,12 @@ import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.GrantType
+import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.providers.TokenTarget
-import id.walt.oid4vc.requests.*
+import id.walt.oid4vc.requests.AuthorizationRequest
+import id.walt.oid4vc.requests.CredentialRequest
+import id.walt.oid4vc.requests.EntraIssuanceRequest
+import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.EntraIssuanceCompletionCode
 import id.walt.oid4vc.responses.EntraIssuanceCompletionErrorDetails
@@ -26,7 +30,9 @@ object IssuanceService : IssuanceServiceBase() {
     override val logger = logger<IssuanceService>()
 
     suspend fun useOfferRequest(
-        offer: String, credentialWallet: TestCredentialWallet, clientId: String,
+        offer: String,
+        credentialWallet: TestCredentialWallet,
+        pinOrTxCode: String? = null,
     ) = let {
         logger.debug { "// -------- WALLET ----------" }
         logger.debug { "// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code" }
@@ -48,7 +54,7 @@ object IssuanceService : IssuanceServiceBase() {
             processCredentialOffer(
                 credentialOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(offer),
                 credentialWallet = credentialWallet,
-                clientId = clientId
+                pinOrTxCode = pinOrTxCode,
             )
         }
         // === original ===
@@ -66,8 +72,10 @@ object IssuanceService : IssuanceServiceBase() {
     private suspend fun processCredentialOffer(
         credentialOffer: CredentialOffer,
         credentialWallet: TestCredentialWallet,
-        clientId: String,
+        pinOrTxCode: String? = null,
     ): List<ProcessedCredentialOffer> {
+
+        logger.debug { "credentialOffer: $credentialOffer"}
 
         val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(credentialOffer)
 
@@ -81,10 +89,21 @@ object IssuanceService : IssuanceServiceBase() {
 
         logger.debug { "// fetch access token using pre-authorized code (skipping authorization step)" }
 
-        val tokenReq = TokenRequest.PreAuthorizedCode(
-            preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!,
-            clientId = clientId
-        )
+        val grant = credentialOffer.grants[GrantType.pre_authorized_code.value]!!
+        val preAuthorizedCode = grant.preAuthorizedCode!!
+        val tokenReq = when {
+            grant.userPinRequired != null && grant.userPinRequired != true -> TokenRequest.PreAuthorizedCode(preAuthorizedCode)
+            providerMetadata is OpenIDProviderMetadata.Draft11 -> TokenRequest.PreAuthorizedCode(
+                preAuthorizedCode = preAuthorizedCode,
+                userPIN = pinOrTxCode
+            )
+            else -> TokenRequest.PreAuthorizedCode(
+                preAuthorizedCode = preAuthorizedCode,
+                txCode = pinOrTxCode
+            )
+        }
+
+        logger.debug { "token request : $tokenReq" }
 
         val tokenResp =  OpenID4VCI.sendTokenRequest(
             providerMetadata = providerMetadata,

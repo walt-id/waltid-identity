@@ -189,8 +189,8 @@ val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
                             if (query.contains("code")) { // try to redeem against token endpoint:
                                 oidcLog.trace { "Oauth-jwt challenge: Opaque token was received, will try to redeem - Scheme $defaultScheme, Realm $realm" }
                                 val code = call.request.queryParameters["code"]
-                                //val state = call.request.queryParameters["state"]
-                                //val sessionState = call.request.queryParameters["session_state"]
+                                //val state = call.request.queryParameters["state"] // State is not required for this endpoint
+                                //val sessionState = call.request.queryParameters["session_state"] // Entra ID specific
 
                                 val parameters = ParametersBuilder().apply {
                                     append("client_id", oidcConfig.clientId)
@@ -202,7 +202,7 @@ val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
                                 }.build()
                                 val resp = http.submitForm(oidcConfig.accessTokenUrl, parameters)
 
-                                val idToken = resp.body<JsonObject>()["id_token"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing id_token")
+                                val idToken = resp.body<JsonObject>()["id_token"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("OIDC Login failed: Missing id_token from token endpoint response")
 
                                 call.sessions.set(OidcTokenSession(idToken))
                                 call.respondRedirect("/login?oidc_login=true")

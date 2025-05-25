@@ -53,7 +53,7 @@ class JwsSignatureScheme : SignatureScheme {
   @JsPromise
   @JsExport.Ignore
   suspend fun getIssuerKeyInfo(jws: String): KeyInfo {
-    val jwsParsed = jws.decodeJws()
+    val jwsParsed = jws.substringBefore("~").decodeJws()
     val keyId = jwsParsed.header[JwsHeader.KEY_ID]!!.jsonPrimitive.content
     val issuerId = (jwsParsed.payload[JwsOption.ISSUER]?.jsonPrimitive?.content ?: keyId)
     val key = if (DidUtils.isDidUrl(issuerId)) {

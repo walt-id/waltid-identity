@@ -1,6 +1,7 @@
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
+import id.walt.did.dids.DidService.resolve
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -46,9 +47,10 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
      */
     abstract fun getDidFor(session: S): String
 
-    private fun httpGetAsJson(url: Url): JsonElement? = httpGet(url).body?.let { Json.decodeFromString<JsonElement>(it) }
+    private fun httpGetAsJson(url: Url): JsonElement? =
+        httpGet(url).body?.let { Json.decodeFromString<JsonElement>(it) }
 
-    open fun generateDidProof(
+    open suspend fun generateDidProof(
         did: String,
         issuerUrl: String,
         nonce: String?,
@@ -57,20 +59,35 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
     ): ProofOfPossession {
         // NOTE: This object/method is obsolete and will be removed or replaced
         val keyId = resolveDID(did)
-        return when(proofType) {
-            ProofType.cwt ->
+        return when (proofType) {
+            ProofType.cwt -> {
                 ProofOfPossession.CWTProofBuilder(issuerUrl, client?.clientID, nonce).let { builder ->
                     builder.build(
                         signCWTToken(TokenTarget.PROOF_OF_POSSESSION, builder.payload, builder.headers, keyId)
                     )
                 }
+            }
+
             ProofType.ldp_vp -> TODO("ldp_vp proof not yet implemented")
-            else ->
-                ProofOfPossession.JWTProofBuilder(issuerUrl, client?.clientID, nonce, keyId).let { builder ->
+            else -> {
+                val didObj = resolve(did).getOrThrow()
+                val jwtHeaderKeyId = (didObj["authentication"] ?: didObj["assertionMethod"]
+                ?: didObj["verificationMethod"])?.jsonArray?.firstOrNull()?.let {
+                    if (it is JsonObject) it.jsonObject["id"]?.jsonPrimitive?.content
+                    else it.jsonPrimitive.contentOrNull
+                } ?: did
+                ProofOfPossession.JWTProofBuilder(
+                    issuerUrl = issuerUrl,
+                    clientId = client?.clientID,
+                    nonce = nonce,
+                    keyId = jwtHeaderKeyId,
+                ).let { builder ->
                     builder.build(
                         signToken(TokenTarget.PROOF_OF_POSSESSION, builder.payload, builder.headers, keyId)
                     )
                 }
+            }
+
         }
     }
 
@@ -82,17 +99,26 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         client: OpenIDClientConfig? = null,
         proofType: ProofType = ProofType.jwt
     ): ProofOfPossession {
-        return when(proofType) {
+        return when (proofType) {
             ProofType.cwt ->
-                ProofOfPossession.CWTProofBuilder(issuerUrl, client?.clientID, nonce, coseKey = cosePubKey).let { builder ->
-                    builder.build(
-                        signCWTToken(TokenTarget.PROOF_OF_POSSESSION, builder.payload, builder.headers, key.getKeyId())
-                    )
-                }
+                ProofOfPossession.CWTProofBuilder(issuerUrl, client?.clientID, nonce, coseKey = cosePubKey)
+                    .let { builder ->
+                        builder.build(
+                            signCWTToken(
+                                TokenTarget.PROOF_OF_POSSESSION,
+                                builder.payload,
+                                builder.headers,
+                                key.getKeyId()
+                            )
+                        )
+                    }
+
             ProofType.ldp_vp -> TODO("ldp_vp proof not yet implemented")
             else ->
-                ProofOfPossession.JWTProofBuilder(issuerUrl, client?.clientID, nonce,
-                    keyJwk = key.getPublicKey().exportJWKObject(), keyId = key.getKeyId()).let { builder ->
+                ProofOfPossession.JWTProofBuilder(
+                    issuerUrl, client?.clientID, nonce,
+                    keyJwk = key.getPublicKey().exportJWKObject(), keyId = key.getKeyId()
+                ).let { builder ->
                     builder.build(
                         signToken(TokenTarget.PROOF_OF_POSSESSION, builder.payload, builder.headers, key.getKeyId())
                     )
@@ -135,7 +161,8 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
                                     message = "Presentation definition URI cannot be resolved."
                                 )
                         )
-                    } ?: authorizationRequest.claims?.get("vp_token")?.jsonObject?.get("presentation_definition")?.jsonObject?.let {
+                    }
+                    ?: authorizationRequest.claims?.get("vp_token")?.jsonObject?.get("presentation_definition")?.jsonObject?.let {
                         PresentationDefinition.fromJSON(it)
                     } ?: throw AuthorizationError(
                         authorizationRequest,
@@ -157,10 +184,18 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         }
     }
 
-    protected abstract fun createSIOPSession(id: String, authorizationRequest: AuthorizationRequest?, expirationTimestamp: Instant): S
+    protected abstract fun createSIOPSession(
+        id: String,
+        authorizationRequest: AuthorizationRequest?,
+        expirationTimestamp: Instant
+    ): S
 
     //the authServerState is added because of AuthorizationSession()
-    override fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration, authServerState: String?): S {
+    override fun initializeAuthorization(
+        authorizationRequest: AuthorizationRequest,
+        expiresIn: Duration,
+        authServerState: String?
+    ): S {
         val resolvedAuthReq = resolveVPAuthorizationParameters(authorizationRequest)
         return if (validateAuthorizationRequest(resolvedAuthReq)) {
             createSIOPSession(
@@ -231,7 +266,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         )
     }
 
-    open fun executePreAuthorizedCodeFlow(
+    open suspend fun executePreAuthorizedCodeFlow(
         credentialOffer: CredentialOffer,
         holderDid: String,
         client: OpenIDClientConfig,
@@ -245,14 +280,19 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         )
         val issuerMetadataUrl = getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
         val issuerMetadata =
-            httpGetAsJson(Url(issuerMetadataUrl))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadata.Draft13 } ?: throw CredentialOfferError(
-                null,
-                credentialOffer,
-                CredentialOfferErrorCode.invalid_issuer,
-                "Could not resolve issuer provider metadata from $issuerMetadataUrl"
-            )
+            httpGetAsJson(Url(issuerMetadataUrl))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadata.Draft13 }
+                ?: throw CredentialOfferError(
+                    null,
+                    credentialOffer,
+                    CredentialOfferErrorCode.invalid_issuer,
+                    "Could not resolve issuer provider metadata from $issuerMetadataUrl"
+                )
         val authorizationServerMetadata = issuerMetadata.authorizationServers?.let { authServer ->
-            httpGetAsJson(Url(getCommonProviderMetadataUrl(authServer.first())))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) }
+            httpGetAsJson(Url(getCommonProviderMetadataUrl(authServer.first())))?.jsonObject?.let {
+                OpenIDProviderMetadata.fromJSON(
+                    it
+                )
+            }
         } ?: issuerMetadata
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, issuerMetadata)
 
@@ -263,7 +303,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
     }
 
     @OptIn(ExperimentalEncodingApi::class)
-    open fun executeFullAuthIssuance(
+    open suspend fun executeFullAuthIssuance(
         credentialOffer: CredentialOffer,
         holderDid: String,
         client: OpenIDClientConfig
@@ -276,14 +316,19 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         )
         val issuerMetadataUrl = getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
         val issuerMetadata =
-            httpGetAsJson(Url(issuerMetadataUrl))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadata.Draft13} ?: throw CredentialOfferError(
-                null,
-                credentialOffer,
-                CredentialOfferErrorCode.invalid_issuer,
-                "Could not resolve issuer provider metadata from $issuerMetadataUrl"
-            )
+            httpGetAsJson(Url(issuerMetadataUrl))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadata.Draft13 }
+                ?: throw CredentialOfferError(
+                    null,
+                    credentialOffer,
+                    CredentialOfferErrorCode.invalid_issuer,
+                    "Could not resolve issuer provider metadata from $issuerMetadataUrl"
+                )
         val authorizationServerMetadata = issuerMetadata.authorizationServers?.let { authServer ->
-            httpGetAsJson(Url(getCommonProviderMetadataUrl(authServer.first())))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadata.Draft13}
+            httpGetAsJson(Url(getCommonProviderMetadataUrl(authServer.first())))?.jsonObject?.let {
+                OpenIDProviderMetadata.fromJSON(
+                    it
+                ) as OpenIDProviderMetadata.Draft13
+            }
         } ?: issuerMetadata as OpenIDProviderMetadata.Draft13
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, issuerMetadata)
         val codeVerifier = if (client.useCodeChallenge) randomUUID() else null
@@ -361,7 +406,10 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         )
     }
 
-    open fun fetchDeferredCredential(credentialOffer: CredentialOffer, credentialResponse: CredentialResponse): CredentialResponse {
+    open fun fetchDeferredCredential(
+        credentialOffer: CredentialOffer,
+        credentialResponse: CredentialResponse
+    ): CredentialResponse {
         if (credentialResponse.acceptanceToken.isNullOrEmpty()) throw CredentialOfferError(
             null,
             credentialOffer,
@@ -370,12 +418,13 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         )
         val issuerMetadataUrl = getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
         val issuerMetadata =
-            httpGetAsJson(Url(issuerMetadataUrl))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadata.Draft13 } ?: throw CredentialOfferError(
-                null,
-                credentialOffer,
-                CredentialOfferErrorCode.invalid_issuer,
-                "Could not resolve issuer provider metadata from $issuerMetadataUrl"
-            )
+            httpGetAsJson(Url(issuerMetadataUrl))?.jsonObject?.let { OpenIDProviderMetadata.fromJSON(it) as OpenIDProviderMetadata.Draft13 }
+                ?: throw CredentialOfferError(
+                    null,
+                    credentialOffer,
+                    CredentialOfferErrorCode.invalid_issuer,
+                    "Could not resolve issuer provider metadata from $issuerMetadataUrl"
+                )
         if (issuerMetadata.deferredCredentialEndpoint.isNullOrEmpty()) throw CredentialOfferError(
             null,
             credentialOffer,
@@ -393,11 +442,17 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         return CredentialResponse.fromJSONString(deferredCredResp.body)
     }
 
-    protected open fun executeAuthorizedIssuanceCodeFlow(
-        authorizationServerMetadata: OpenIDProviderMetadata, issuerMetadata: OpenIDProviderMetadata,
+    protected open suspend fun executeAuthorizedIssuanceCodeFlow(
+        authorizationServerMetadata: OpenIDProviderMetadata,
+        issuerMetadata: OpenIDProviderMetadata,
         credentialOffer: CredentialOffer,
-        grantType: GrantType, offeredCredentials: List<OfferedCredential>, holderDid: String,
-        client: OpenIDClientConfig, authorizationCode: String? = null, codeVerifier: String? = null, userPIN: String? = null
+        grantType: GrantType,
+        offeredCredentials: List<OfferedCredential>,
+        holderDid: String,
+        client: OpenIDClientConfig,
+        authorizationCode: String? = null,
+        codeVerifier: String? = null,
+        userPIN: String? = null
     ): List<CredentialResponse> {
         val tokenReq = TokenRequest.PreAuthorizedCode(
             clientId = client.clientID,
@@ -408,14 +463,19 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         authorizationServerMetadata as OpenIDProviderMetadata.Draft13
         issuerMetadata as OpenIDProviderMetadata.Draft13
 
-        val tokenHttpResp = httpSubmitForm(Url(authorizationServerMetadata.tokenEndpoint!!), parametersOf(tokenReq.toHttpParameters()))
+        val tokenHttpResp =
+            httpSubmitForm(Url(authorizationServerMetadata.tokenEndpoint!!), parametersOf(tokenReq.toHttpParameters()))
         if (!tokenHttpResp.status.isSuccess() || tokenHttpResp.body == null) throw TokenError(
             tokenReq,
             TokenErrorCode.server_error,
             "Server returned error code ${tokenHttpResp.status}, or empty body"
         )
         val tokenResp = TokenResponse.fromJSONString(tokenHttpResp.body)
-        if (tokenResp.accessToken == null) throw TokenError(tokenReq, TokenErrorCode.server_error, "No access token returned by server")
+        if (tokenResp.accessToken == null) throw TokenError(
+            tokenReq,
+            TokenErrorCode.server_error,
+            "No access token returned by server"
+        )
 
         var nonce = tokenResp.cNonce
         return if (issuerMetadata.batchCredentialEndpoint.isNullOrEmpty() || offeredCredentials.size == 1) {
@@ -438,9 +498,15 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
             }
         } else {
             // execute batch credential request
-            executeBatchCredentialRequest(issuerMetadata.batchCredentialEndpoint!!, tokenResp.accessToken, offeredCredentials.map {
-                CredentialRequest.forOfferedCredential(it, generateDidProof(holderDid, credentialOffer.credentialIssuer, nonce, client))
-            })
+            executeBatchCredentialRequest(
+                issuerMetadata.batchCredentialEndpoint!!,
+                tokenResp.accessToken,
+                offeredCredentials.map {
+                    CredentialRequest.forOfferedCredential(
+                        it,
+                        generateDidProof(holderDid, credentialOffer.credentialIssuer, nonce, client)
+                    )
+                })
         }
     }
 
@@ -451,7 +517,10 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
     ): List<CredentialResponse> {
         val req = BatchCredentialRequest(credentialRequests)
         val httpResp =
-            httpPostObject(Url(batchEndpoint), req.toJSON(), Headers.build { set(HttpHeaders.Authorization, "Bearer $accessToken") })
+            httpPostObject(
+                Url(batchEndpoint),
+                req.toJSON(),
+                Headers.build { set(HttpHeaders.Authorization, "Bearer $accessToken") })
         if (!httpResp.status.isSuccess() || httpResp.body == null) throw BatchCredentialError(
             req,
             CredentialErrorCode.server_error,
@@ -477,11 +546,22 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         return CredentialResponse.fromJSONString(httpResp.body)
     }
 
-    protected open fun executeIdTokenAuthorization(idTokenRequestUri: Url, holderDid: String, client: OpenIDClientConfig): Url {
-        val authReq = AuthorizationRequest.fromHttpQueryString(idTokenRequestUri.encodedQuery).let { authorizationRequest ->
-            authorizationRequest.customParameters["request"]?.let { AuthorizationJSONRequest.fromJSON(JwtUtils.parseJWTPayload(it.first())) }
-                ?: authorizationRequest
-        }
+    protected open fun executeIdTokenAuthorization(
+        idTokenRequestUri: Url,
+        holderDid: String,
+        client: OpenIDClientConfig
+    ): Url {
+        val authReq =
+            AuthorizationRequest.fromHttpQueryString(idTokenRequestUri.encodedQuery).let { authorizationRequest ->
+                authorizationRequest.customParameters["request"]?.let {
+                    AuthorizationJSONRequest.fromJSON(
+                        JwtUtils.parseJWTPayload(
+                            it.first()
+                        )
+                    )
+                }
+                    ?: authorizationRequest
+            }
         if (authReq.responseMode != ResponseMode.direct_post || !authReq.responseType.contains(ResponseType.IdToken) || authReq.redirectUri.isNullOrEmpty())
             throw AuthorizationError(
                 authReq,
@@ -523,12 +603,19 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
                 clientId = client.clientID,
             )
         )
-        val httpResp = httpSubmitForm(Url(authReq.responseUri ?: authReq.redirectUri!!), parametersOf(tokenResp.toHttpParameters()))
+        val httpResp = httpSubmitForm(
+            Url(authReq.responseUri ?: authReq.redirectUri!!),
+            parametersOf(tokenResp.toHttpParameters())
+        )
         return when (httpResp.status) {
             HttpStatusCode.Found -> httpResp.headers[HttpHeaders.Location]
             HttpStatusCode.OK -> httpResp.body?.let { AuthorizationDirectPostResponse.fromJSONString(it) }?.redirectUri
             else -> null
-        }?.let { Url(it) } ?: throw AuthorizationError(authReq, AuthorizationErrorCode.invalid_request, "Request could not be executed")
+        }?.let { Url(it) } ?: throw AuthorizationError(
+            authReq,
+            AuthorizationErrorCode.invalid_request,
+            "Request could not be executed"
+        )
     }
 
 }

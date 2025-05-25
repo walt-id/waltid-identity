@@ -17,11 +17,17 @@ class ExplicitClaimStrategy(
 ) {
     @OptIn(ExperimentalUuidApi::class)
     suspend fun claim(
-        tenant: String, account: Uuid, wallet: Uuid, did: String, offer: String, pending: Boolean = true,
+        tenant: String,
+        account: Uuid,
+        wallet: Uuid,
+        did: String,
+        offer: String,
+        pending: Boolean = true,
+        pinOrTxCode: String? = null,
     ): List<WalletCredential> = issuanceService.useOfferRequest(
         offer = offer,
         credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
-        clientId = SSIKit2WalletService.testCIClientConfig.clientID
+        pinOrTxCode = pinOrTxCode,
     ).map { credentialDataResult ->
         ClaimCommons.convertCredentialDataResultToWalletCredential(
             credentialDataResult,

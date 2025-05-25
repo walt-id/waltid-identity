@@ -12,6 +12,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.condition.EnabledIf
 import org.junit.jupiter.params.ParameterizedTest
@@ -31,7 +32,7 @@ class EBSI_Conformance_Test {
     @ParameterizedTest
     @MethodSource
     @EnabledIf("vcTestsEnabled")
-    fun `issue in-time credential`(url: String, clientId: String, offerRequestCaller: credentialOfferRequestCaller) {
+    suspend fun `issue in-time credential`(url: String, clientId: String, offerRequestCaller: credentialOfferRequestCaller) {
         val credentialOfferRequest = getCredentialOfferRequest(url, clientId, offerRequestCaller)
         val credentialOffer = credentialWallet.resolveCredentialOffer(credentialOfferRequest)
         val credentialResponses =
@@ -48,7 +49,7 @@ class EBSI_Conformance_Test {
     @ParameterizedTest
     @MethodSource
     @EnabledIf("vcTestsEnabled")
-    fun `issue deferred credential`(url: String, clientId: String, offerRequestCaller: credentialOfferRequestCaller) {
+    suspend fun `issue deferred credential`(url: String, clientId: String, offerRequestCaller: credentialOfferRequestCaller) {
         val deferredCredentialOfferRequest = getCredentialOfferRequest(url, clientId, offerRequestCaller)
         val deferredCredentialOffer = credentialWallet.resolveCredentialOffer(deferredCredentialOfferRequest)
         val deferredCredentialResponses = credentialWallet.executeFullAuthIssuance(
@@ -73,7 +74,7 @@ class EBSI_Conformance_Test {
     @ParameterizedTest
     @MethodSource
     @EnabledIf("vcTestsEnabled")
-    fun `issue pre-authorized code credential`(
+    suspend fun `issue pre-authorized code credential`(
         url: String, clientId: String, offerRequestCaller: credentialOfferRequestCaller
     ) {
         val preAuthCredentialOfferRequest = getCredentialOfferRequest(url, clientId, offerRequestCaller)
@@ -93,7 +94,7 @@ class EBSI_Conformance_Test {
      */
     @Test
     @EnabledIf("vpTestsEnabled")
-    fun `issue credential using presentation exchange`(){
+    fun `issue credential using presentation exchange`() = runTest {
         val initIssuanceWithPresentationExchangeUrl =
             URLBuilder("https://api-conformance.ebsi.eu/conformance/v3/issuer-mock/initiate-credential-offer?credential_type=CTWalletQualificationCredential").run {
                 parameters.appendAll(StringValues.build {

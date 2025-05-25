@@ -48,6 +48,7 @@ sealed class TokenRequest() : HTTPDataObject() {
         override fun getSpecificParameters(): Map<String, List<String>> = buildMap {
             put("pre-authorized_code", listOf(preAuthorizedCode))
             txCode?.let { put("tx_code", listOf(it)) }
+            userPIN?.let { put("user_pin", listOf(it)) }
         }
     }
 

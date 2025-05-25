@@ -15,6 +15,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
 expect object JWTCryptoProviderManager {
@@ -38,6 +39,7 @@ class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
     }
   }
 
+  @OptIn(ExperimentalJsExport::class)
   @JvmBlocking
   @JvmAsync
   @JsPromise
