@@ -3,15 +3,11 @@ package id.walt.verifier.openid
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.credentials.CredentialFormat
-import id.walt.verifier.openid.models.dcql.ClaimsQuery
-import id.walt.verifier.openid.models.dcql.CredentialQuery
-import id.walt.verifier.openid.models.dcql.DcqlQuery
-import id.walt.verifier.openid.models.dcql.meta.W3cCredentialMeta
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import kotlinx.serialization.json.*
 
-object WaltidVerifier {
+/*object WaltidVerifier {
 
     fun createVerificationSession() {
 
@@ -63,10 +59,10 @@ object WaltidVerifier {
 
         println(Json.encodeToString(hostedAuthorizationRequest))
 
-        /*VerificationSession(
+        *//*VerificationSession(
             id = "id",
             authorizationRequest =
-        )*/
+        )*//*
 
     }
 
@@ -74,4 +70,4 @@ object WaltidVerifier {
 
 fun main() {
     WaltidVerifier.createVerificationSession()
-}
+}*/

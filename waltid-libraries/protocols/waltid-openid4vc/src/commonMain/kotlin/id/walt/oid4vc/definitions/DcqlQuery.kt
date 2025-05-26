@@ -1,5 +1,6 @@
 package id.walt.oid4vc.definitions
 
+/*
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.JsonDataObject
 import id.walt.oid4vc.data.JsonDataObjectFactory
@@ -32,3 +33,4 @@ data class DcqlQuery(
         )
     }
 }
+*/
