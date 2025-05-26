@@ -1,4 +1,4 @@
-package id.walt.verifier.openid.models.dcql
+package id.walt.dcql.models
 
 import kotlinx.serialization.Serializable
 
@@ -8,6 +8,9 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class CredentialSetQuery(
+    /** Each inner list contains CredentialQuery IDs that form one valid set */
     val options: List<List<String>>,
+
+    /** Is satisfying this set mandatory? */
     val required: Boolean = true,
 )

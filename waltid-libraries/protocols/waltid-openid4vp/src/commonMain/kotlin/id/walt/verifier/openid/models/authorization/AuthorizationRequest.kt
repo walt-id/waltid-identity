@@ -1,6 +1,6 @@
 package id.walt.verifier.openid.models.authorization
 
-import id.walt.verifier.openid.models.dcql.DcqlQuery
+import id.walt.dcql.models.DcqlQuery
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import io.ktor.http.*

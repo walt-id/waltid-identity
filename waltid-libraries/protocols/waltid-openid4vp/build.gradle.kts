@@ -54,10 +54,16 @@ kotlin {
                 implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
 
+                // Logging
                 implementation("io.github.oshai:kotlin-logging:7.0.5")
 
                 // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+
+                /*
+                 * walt.id:
+                 */
+                implementation(project(":waltid-libraries:credentials:waltid-dcql"))
             }
         }
     }

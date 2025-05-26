@@ -1,5 +1,7 @@
 package id.walt.dcql
 
+import id.walt.dcql.models.*
+import id.walt.dcql.models.meta.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.*
 import kotlin.Result

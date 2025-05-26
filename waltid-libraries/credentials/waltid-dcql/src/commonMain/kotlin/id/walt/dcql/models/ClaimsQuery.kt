@@ -1,4 +1,4 @@
-package id.walt.verifier.openid.models.dcql
+package id.walt.dcql.models
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
@@ -9,8 +9,12 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 @Serializable
 data class ClaimsQuery(
-    val id: String? = null, // Required if claim_sets is present in parent CredentialQuery
+    /** Required if claim_sets is present in parent CredentialQuery */
+    val id: String? = null,
+
+    /** Path to the claim (format-specific interpretation) */
     val path: List<String>,
-    // kotlinx.serialization.json.JsonPrimitive can represent string, number, boolean
+
+    /** Optional specific values to match */
     val values: List<JsonPrimitive>? = null,
 )

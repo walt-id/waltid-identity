@@ -1,4 +1,4 @@
-package id.walt.verifier.openid.models.dcql.meta
+package id.walt.dcql.models.meta
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -15,6 +15,13 @@ data class W3cCredentialMeta(
      * after the @context was applied that the Verifier accepts.
      */
     @SerialName("type_values")
-    val typeValues: List<List<String>>
+    val typeValues: List<List<String>> // Now non-nullable, spec says "REQUIRED. A non-empty array..."
+
     // Potentially add other W3C specific meta fields if defined by profiles
-) : CredentialQueryMeta
+) : CredentialQueryMeta {
+    init {
+        require(typeValues.isNotEmpty() && typeValues.all { it.isNotEmpty() }) {
+            "type_values must be a non-empty array of non-empty string arrays"
+        }
+    }
+}

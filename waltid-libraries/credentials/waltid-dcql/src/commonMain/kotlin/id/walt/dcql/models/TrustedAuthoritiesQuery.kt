@@ -1,4 +1,4 @@
-package id.walt.verifier.openid.models.dcql
+package id.walt.dcql.models
 
 import kotlinx.serialization.Serializable
 
@@ -8,6 +8,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class TrustedAuthoritiesQuery(
+    /**  e.g., "aki", "etsi_tl", "openid_federation" */
     val type: TrustedAuthorityType,
     val values: List<String>,
 )

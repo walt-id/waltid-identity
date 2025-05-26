@@ -1,4 +1,4 @@
-package id.walt.verifier.openid.models.dcql.meta
+package id.walt.dcql.models.meta
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -15,6 +15,10 @@ data class SdJwtVcMeta(
      * of the requested Verifiable Credential (the 'vct' claim in SD-JWT VC).
      */
     @SerialName("vct_values")
-    val vctValues: List<String>
+    val vctValues: List<String> // Now non-nullable, spec says "REQUIRED. A non-empty array..."
     // Potentially add other SD-JWT VC specific meta fields
-) : CredentialQueryMeta
+) : CredentialQueryMeta {
+    init {
+        require(vctValues.isNotEmpty()) { "vct_values must be a non-empty array" }
+    }
+}

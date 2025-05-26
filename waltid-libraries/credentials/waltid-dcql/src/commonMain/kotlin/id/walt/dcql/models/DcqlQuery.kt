@@ -1,4 +1,4 @@
-package id.walt.verifier.openid.models.dcql
+package id.walt.dcql.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
