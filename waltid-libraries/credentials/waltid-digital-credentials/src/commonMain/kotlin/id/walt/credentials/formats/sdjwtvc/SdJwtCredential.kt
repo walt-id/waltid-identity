@@ -4,10 +4,13 @@ import id.walt.credentials.CredentialDetectorTypes
 import id.walt.credentials.signatures.CredentialSignature
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 @SerialName("vc-sd_jwt")
 data class SdJwtCredential(
@@ -22,8 +25,10 @@ data class SdJwtCredential(
     override val credentialData: JsonObject,
     override val originalCredentialData: JsonObject? = null,
 
-    override var issuer: String?,
-    override var subject: String?,
+    @EncodeDefault
+    override var issuer: String? = null,
+    @EncodeDefault
+    override var subject: String? = null,
 
     // Signature
     override val signature: CredentialSignature?,

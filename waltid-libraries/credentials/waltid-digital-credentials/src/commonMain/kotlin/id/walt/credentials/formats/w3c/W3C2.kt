@@ -6,10 +6,13 @@ import id.walt.credentials.signatures.DataIntegrityProofCredentialSignature
 import id.walt.credentials.signatures.JwtCredentialSignature
 import id.walt.credentials.signatures.SdJwtCredentialSignature
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 @SerialName("vc-w3c_2")
 data class W3C2(
@@ -22,8 +25,10 @@ data class W3C2(
     override val credentialData: JsonObject,
     override val originalCredentialData: JsonObject? = null,
 
-    override var issuer: String?,
-    override var subject: String?,
+    @EncodeDefault
+    override var issuer: String? = null,
+    @EncodeDefault
+    override var subject: String? = null,
 
     // Signature
     override val signature: CredentialSignature?,

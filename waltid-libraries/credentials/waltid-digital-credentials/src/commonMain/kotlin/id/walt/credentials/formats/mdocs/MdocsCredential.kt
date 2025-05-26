@@ -1,10 +1,13 @@
 package id.walt.credentials.formats
 
 import id.walt.credentials.signatures.CredentialSignature
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 @SerialName("vc-mdocs")
 data class MdocsCredential(
@@ -12,9 +15,10 @@ data class MdocsCredential(
     override val signed: String?, override val credentialData: JsonObject,
     val docType: String,
 
-
+    @EncodeDefault
     override var issuer: String? = null,
-    override var subject: String? = null
+    @EncodeDefault
+    override var subject: String? = null,
 ) : DigitalCredential() {
     override val format: String = "mso_mdoc"
 }
