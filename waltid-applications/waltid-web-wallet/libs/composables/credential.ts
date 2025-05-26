@@ -79,7 +79,7 @@ export function useCredential(credential: Ref<WalletCredential | null>) {
     const credentialSubtitle = computed(() => manifest.value?.display?.card?.description ?? jwtJson.value?.name);
     const credentialImageUrl = computed(() => manifest.value?.display?.card?.logo?.uri ?? jwtJson.value?.issuer?.image?.id ?? jwtJson.value?.issuer?.image);
     const issuerName = computed(() => manifest.value?.display?.card?.issuedBy ?? jwtJson.value?.issuer?.name);
-    const issuerLogo = computed(() => jwtJson.value?.issuer.image.id ?? jwtJson.value?.issuer.image);
+    const issuerLogo = computed(() => jwtJson.value?.issuer?.image?.id ?? jwtJson.value?.issuer?.image);
     const issuerDid = computed(() => manifest.value?.input?.issuer ?? jwtJson.value?.issuer?.id ?? jwtJson.value?.issuer);
     const issuerKid = computed(() =>
         credential.value.format === "vc+sd-jwt" ? jwtJson.value?.iss ?? null : null
