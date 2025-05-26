@@ -4,7 +4,6 @@ import id.walt.dcql.models.*
 import id.walt.dcql.models.meta.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.*
-import kotlin.Result
 
 object DcqlMatcher {
 
@@ -28,12 +27,12 @@ object DcqlMatcher {
         // 1. Find matches for each individual CredentialQuery
         for (credQuery in query.credentials) {
             log.trace { "Processing CredentialQuery: ${credQuery.id} (format: ${credQuery.format})" }
-            val potentialMatches = availableCredentials.filter { it.format == credQuery.format }
+            val potentialMatches = availableCredentials.filter { it.format in credQuery.format.id }
             log.trace { "Potential matches for ${credQuery.id} based on format: ${potentialMatches.map { it.id }}" }
 
             val finalMatchesForQuery = potentialMatches.filter { credential ->
                 // Apply further filtering based on query constraints
-                matchesMeta(credential, credQuery.meta) &&
+                matchesMeta(credential, credQuery.meta, credQuery.format) &&
                         matchesTrustedAuthorities(credential, credQuery.trustedAuthorities) &&
                         matchesClaims(credential, credQuery.claims, credQuery.claimSets)
                 // Note: requireCryptographicHolderBinding check would happen during
@@ -70,7 +69,8 @@ object DcqlMatcher {
         // 3. Check if all *required* individual queries yielded at least one match
         // (This check is implicitly covered by required credential sets if they exist and cover all queries,
         // but added for clarity if no sets are defined or sets are optional)
-        val requiredIndividualQueryIds = query.credentials.map { it.id } // Assuming all individual queries are implicitly required unless part of an optional set
+        val requiredIndividualQueryIds =
+            query.credentials.map { it.id } // Assuming all individual queries are implicitly required unless part of an optional set
         val missingRequired = requiredIndividualQueryIds.filterNot { individualMatches.containsKey(it) }
 
         // Refine required check: Only fail if a query ID is NOT part of ANY satisfied OPTIONAL set AND is missing.
@@ -94,13 +94,100 @@ object DcqlMatcher {
 
     // --- Helper Functions ---
 
-    /** Placeholder: Check format-specific metadata constraints. */
-    private fun matchesMeta(credential: DcqlCredential, metaQuery: JsonObject?): Boolean {
-        if (metaQuery == null) return true
-        log.trace { "Checking metadata for credential ${credential.id} (simplified: returning true)" }
-        // Actual implementation requires parsing metaQuery based on credential.format
-        // Example: For W3C VC, check "type_values" against credential.data["type"]
-        return true // Simplified
+    private fun matchesMeta(
+        credential: DcqlCredential,
+        metaQuery: CredentialQueryMeta?,
+        expectedFormat: CredentialFormat
+    ): Boolean {
+        // If metaQuery is NoMeta, it means no specific constraints from the query side.
+        if (metaQuery == null || metaQuery is NoMeta) {
+            log.trace { "No specific meta query constraints (NoMeta) for credential ${credential.id}." }
+            return true
+        }
+
+        // Ensure the metaQuery type aligns with the credential's actual format
+        // This check is important if the metaQuery was constructed independently.
+        val formatMatchesQueryType = when (expectedFormat) {
+            CredentialFormat.JWT_VC_JSON, CredentialFormat.LDP_VC -> metaQuery is W3cCredentialMeta
+            CredentialFormat.DC_SD_JWT -> metaQuery is SdJwtVcMeta
+            CredentialFormat.MSO_MDOC -> metaQuery is MsoMdocMeta
+            CredentialFormat.AC_VP -> true // Assuming no specific meta for AC_VP yet or handled by GenericMeta
+            // Add other format checks if new CredentialQueryMeta types are added
+        }
+        if (!formatMatchesQueryType && metaQuery !is GenericMeta) { // Allow GenericMeta to try and match any format
+            log.warn {
+                "Meta query type ${metaQuery::class.simpleName} does not align with expected credential format $expectedFormat for credential ${credential.id}. " +
+                        "This indicates a mismatch in query construction or credential filtering."
+            }
+            return false
+        }
+
+
+        log.trace { "Checking typed metadata for credential ${credential.id} (format: ${credential.format}) against query: $metaQuery" }
+
+        fun isNotAllowedMetaFormat(vararg allowedMetaForm: CredentialFormat): Boolean =
+            credential.format !in allowedMetaForm.flatMap { it.id.toList() }
+
+        return when (metaQuery) {
+            is W3cCredentialMeta -> {
+                if (isNotAllowedMetaFormat(CredentialFormat.JWT_VC_JSON, CredentialFormat.LDP_VC)) {
+                    log.warn { "W3cCredentialMeta applied to non-W3C format ${credential.format} for ${credential.id}" }
+                    return false
+                }
+                val credTypesElement = credential.data["type"]
+                if (credTypesElement !is JsonArray) {
+                    log.warn { "W3C credential ${credential.id} 'type' field is missing or not an array." }
+                    return false
+                }
+                val credTypes = credTypesElement.mapNotNull { it.jsonPrimitive.contentOrNull }
+
+                // Spec B.1.1: "Each of the top-level arrays specifies one alternative to match..."
+                // "...Each inner array specifies a set of fully expanded types that MUST be present..."
+                // Spec B.1.1: "type_values: REQUIRED. A non-empty array of string arrays..."
+                // The init block in W3cCredentialMeta now enforces non-empty.
+                metaQuery.typeValues.any { requiredTypeSet ->
+                    requiredTypeSet.all { requiredType -> credTypes.contains(requiredType) }
+                }
+            }
+
+            is SdJwtVcMeta -> {
+                if (isNotAllowedMetaFormat(CredentialFormat.DC_SD_JWT)) {
+                    log.warn { "SdJwtVcMeta applied to non-SD-JWT format ${credential.format} for ${credential.id}" }
+                    return false
+                }
+                val vctClaim = credential.data["vct"]?.jsonPrimitive?.contentOrNull
+                if (vctClaim == null) {
+                    log.warn { "SD-JWT VC ${credential.id} 'vct' claim is missing." }
+                    return false
+                }
+                // Spec B.3.5: "vct_values: REQUIRED. A non-empty array of strings..."
+                // The init block in SdJwtVcMeta now enforces non-empty.
+                metaQuery.vctValues.contains(vctClaim)
+            }
+
+            is MsoMdocMeta -> {
+                if (isNotAllowedMetaFormat(CredentialFormat.MSO_MDOC)) {
+                    log.warn { "MsoMdocMeta applied to non-mdoc format ${credential.format} for ${credential.id}" }
+                    return false
+                }
+                val docTypeClaim = credential.data["docType"]?.jsonPrimitive?.contentOrNull // Or "doctype"
+                if (docTypeClaim == null) {
+                    log.warn { "Mdoc credential ${credential.id} 'docType' (or 'doctype') claim is missing." }
+                    return false
+                }
+                // doctypeValue is already non-nullable in MsoMdocMeta
+                metaQuery.doctypeValue == docTypeClaim
+            }
+
+            is GenericMeta -> {
+                log.trace { "GenericMeta check for ${credential.id}: ${metaQuery.properties}. (Simplified: returning true)" }
+                // Implement matching logic for generic properties (if needed?)
+                // e.g.: metaQuery.properties.all { (key, queryValue) -> credential.data[key] == queryValue }
+                true
+            }
+
+            is NoMeta -> true // This case is now handled at the beginning of the function.
+        }
     }
 
     /** Placeholder: Check issuer constraints. */
@@ -193,6 +280,7 @@ object DcqlMatcher {
                         null
                     }
                 }
+
                 else -> return null // Cannot traverse further
             }
             if (currentElement == null || currentElement is JsonNull) return null
