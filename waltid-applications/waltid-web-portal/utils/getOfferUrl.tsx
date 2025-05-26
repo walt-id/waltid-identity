@@ -101,7 +101,7 @@ const getOfferUrl = async (
             },
           };
           for (const key in offer.credentialSubject) {
-            if (typeof offer.credentialSubject[key] === 'string') {
+            if (typeof offer.credentialSubject[key] === 'string' || typeof offer.credentialSubject[key] === 'boolean') {
               payload.selectiveDisclosure.fields.credentialSubject.children.fields[
                 key
               ] = {

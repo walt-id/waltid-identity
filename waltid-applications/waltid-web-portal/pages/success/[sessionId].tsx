@@ -94,6 +94,7 @@ export default function Success() {
                   //   return sdItem;
                   // })
                 });
+                credentialWithSdJWTAttributes.type = parsed.vc?.type
                 return credentialWithSdJWTAttributes;
               }
             })
