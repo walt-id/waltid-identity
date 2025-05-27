@@ -61,7 +61,7 @@ data class AuthorizationRequest(
      * E.g., "fragment", "query", "direct_post", "direct_post.jwt", "dc_api", "dc_api.jwt".
      */
     @SerialName("response_mode")
-    val responseMode: OpenID4VPResponseMode? = null,
+    var responseMode: OpenID4VPResponseMode? = null,
 
     /**
      * REQUIRED. String value used to mitigate replay attacks.
