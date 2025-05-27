@@ -1,6 +1,7 @@
 package id.walt.policies.policies
 
 import id.walt.policies.policies.StreamUtils.getBitValue
+import id.walt.policies.policies.status.CredentialFetcher
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -24,6 +25,16 @@ import java.util.zip.GZIPInputStream
 actual class RevocationPolicy : RevocationPolicyMp() {
     @Transient
     private val logger = KotlinLogging.logger {}
+    //todo: inject through constructor (not allowed by interface atm - needs serializable)
+    @Transient
+    private val httpClient = HttpClient {
+        install(ContentNegotiation) {
+            json(Json { ignoreUnknownKeys = true })
+        }
+    }
+    @Transient
+    private val credentialFetcher = CredentialFetcher(httpClient)
+    //endtodo
 
     @JvmBlocking
     @JvmAsync
@@ -38,22 +49,7 @@ actual class RevocationPolicy : RevocationPolicyMp() {
         val statusListCredentialUrl = credentialStatus.jsonObject["statusListCredential"]?.jsonPrimitive?.content
         logger.debug { "Status list index: $statusListIndex" }
         logger.debug { "Credential URL: $statusListCredentialUrl" }
-
-        val httpClient = HttpClient {
-            install(ContentNegotiation) {
-                json(Json { ignoreUnknownKeys = true })
-            }
-        }
-
-        val response = runCatching { httpClient.get(statusListCredentialUrl!!){
-                   headers {
-                        append(ContentType, "text/plain")
-                        append(HttpHeaders.Accept, "text/plain")
-                    }
-        }.bodyAsText() }.getOrElse {
-            return Result.failure(Throwable("Error when getting Status List Credential from  $statusListCredentialUrl"))
-        }
-        logger.debug { "Credential URL response: $response" }
+        val response = credentialFetcher.fetch(statusListCredentialUrl!!).getOrThrow()
         // response is a jwt
         val bitValue = getRevocationStatusValue(response, statusListIndex).getOrElse {
             return Result.failure(Throwable(it.cause))
@@ -62,7 +58,7 @@ actual class RevocationPolicy : RevocationPolicyMp() {
         checkStatus(bitValue).getOrElse {
             return Result.failure(Throwable("Credential has been revoked"))
         }
-        return Result.success(statusListCredentialUrl!!)
+        return Result.success(statusListCredentialUrl)
     }
 
     private fun checkStatus(it: List<Char>) = runCatching {
