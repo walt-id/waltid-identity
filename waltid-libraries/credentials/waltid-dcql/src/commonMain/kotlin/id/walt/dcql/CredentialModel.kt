@@ -1,5 +1,6 @@
 package id.walt.dcql
 
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -12,14 +13,25 @@ interface DcqlCredential {
     val data: JsonObject // The actual credential data (claims, etc.)
 //    val issuer: String? // Issuer identifier (for trusted_authorities check)
     // Add other relevant properties like issuanceDate, expirationDate, etc. if needed
+
+    val disclosures: List<DcqlDisclosure>?
 }
 
-/**
- * A sample concrete implementation for testing purposes.
- */
+data class DcqlDisclosure(
+    val name: String,
+    val value: JsonElement,
+
+    // A place to pass a reference to the original (using which this class was created)
+    val original: Any? = null
+)
+
 data class RawDcqlCredential(
     override val id: String,
     override val format: String,
     override val data: JsonObject,
+    override val disclosures: List<DcqlDisclosure>? = null,
+
+    // A place to pass a reference to the original (using which this class was created)
+    val originalCredential: Any? = null
 //    override val issuer: String? = null,
 ) : DcqlCredential
