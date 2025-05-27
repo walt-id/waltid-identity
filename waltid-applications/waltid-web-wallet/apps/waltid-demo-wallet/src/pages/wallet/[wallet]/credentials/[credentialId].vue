@@ -190,7 +190,10 @@ const credentialManifest = computedAsync(async () => {
           if (data.image) {
             transformedManifest = {
               ...transformedManifest,
-              image: JSONPath({ path: data.image, json: jwtJson.value })[0]
+              image: JSONPath({ path: data.image, json: jwtJson.value })[0] ??
+                disclosures.value?.find(
+                  (disclosure) => disclosure[1] === data.image.split(".").pop(),
+                )?.[2],
             };
           }
           if (data.claims) {
