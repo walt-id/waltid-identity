@@ -175,7 +175,7 @@ export default function Success() {
               </svg>
             </button>
           )}
-          <div className="group w-80 h-64 sm:h-[225px] sm:w-[400px] [perspective:1000px]">
+          <div className="group h-[225px] w-[400px] [perspective:1000px]">
             <div className="relative h-full w-full rounded-xl shadow-xl transition-all duration-500 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
               <div className="absolute inset-0">
                 <div className="flex h-full w-full flex-col drop-shadow-sm rounded-xl py-7 px-8 text-gray-100 cursor-pointer overflow-hidden bg-gradient-to-r from-green-700 to-green-900 z-[-2]">
@@ -183,7 +183,7 @@ export default function Success() {
                     <WaltIcon height={35} width={35} outline type="white" />
                   </div>
                   <div className="mb-8 mt-12">
-                    <h6 className={'text-2xl font-bold '}>
+                    <h6 className={'text-2xl font-bold overflow-hidden text-ellipsis whitespace-nowrap'}>
                       {credentials[index]?.type
                         ? credentials[index]?.type[
                           credentials[index].type.length - 1
@@ -301,7 +301,7 @@ export default function Success() {
                 return (
                   <div
                     key={policy.name}
-                    className={`flex items-center gap-3 ${index % 2 == 1 ? 'justify-self-end' : ''}`}
+                    className={`flex items-center gap-3 overflow-hidden text-ellipsis whitespace-nowrap ${index % 2 == 1 ? 'sm:justify-self-end' : ''}`}
                   >
                     {policy.is_success ? (
                       <CheckCircleIcon className="h-4 text-green-600" />
