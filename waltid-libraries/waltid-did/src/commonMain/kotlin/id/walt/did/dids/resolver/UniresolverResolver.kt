@@ -70,10 +70,26 @@ class UniresolverResolver(var resolverUrl: String = DEFAULT_RESOLVER_URL) : DidR
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun resolveToKey(did: String): Result<Key> = resolve(did).fold(
-        onSuccess = {
-            VerificationMaterial.get(it)?.let {
-                KeyMaterial.get(it)
+    override suspend fun resolveToKey(did: String): Result<Key> = resolveToKeys(did).map { keys ->
+        keys.firstOrNull() ?: throw Exception("No verification material found.")
+    }
+    
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun resolveToKeys(did: String): Result<Set<Key>> = resolve(did).fold(
+        onSuccess = { jsonObject ->
+            VerificationMaterial.getAll(jsonObject)?.let { materials ->
+                val keys = materials.mapNotNull { material ->
+                    KeyMaterial.get(material).getOrNull()
+                }.toSet()
+                
+                if (keys.isNotEmpty()) {
+                    Result.success(keys)
+                } else {
+                    Result.failure(Exception("Could not convert verification materials to keys."))
+                }
             } ?: Result.failure(Exception("No verification material found."))
         },
         onFailure = {
