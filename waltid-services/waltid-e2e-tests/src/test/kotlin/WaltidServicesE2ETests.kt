@@ -6,7 +6,6 @@ import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.testing.E2ETest
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import id.walt.commons.web.plugins.httpJson
-import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.issuance.IssuanceExamples
@@ -19,6 +18,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
+import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.service.issuers.IssuersService
@@ -317,16 +317,16 @@ class WaltidServicesE2ETests {
                 assert(it.size > 1) { "no policies have run" }
             }
         }
-//        val lspPotentialIssuance = LspPotentialIssuance(testHttpClient(doFollowRedirects = false))
-//        lspPotentialIssuance.testTrack1()
-//        lspPotentialIssuance.testTrack2()
+        val lspPotentialIssuance = LspPotentialIssuance(testHttpClient(doFollowRedirects = false))
+        lspPotentialIssuance.testTrack1()
+        lspPotentialIssuance.testTrack2()
         val lspPotentialVerification = LspPotentialVerification(testHttpClient(doFollowRedirects = false))
-//        lspPotentialVerification.testPotentialInteropTrack3()
+        lspPotentialVerification.testPotentialInteropTrack3()
         lspPotentialVerification.testPotentialInteropTrack4()
         val lspPotentialWallet = setupTestWallet()
         lspPotentialWallet.testMDocIssuance(IssuanceExamples.mDLCredentialIssuanceData, true)
         lspPotentialWallet.testMDocIssuance(IssuanceExamples.mDLCredentialIssuanceDataJwtProof, false)
-//        lspPotentialWallet.testMdocPresentation()
+        lspPotentialWallet.testMdocPresentation()
         lspPotentialWallet.testSDJwtVCIssuance()
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
         lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
@@ -379,6 +379,13 @@ class WaltidServicesE2ETests {
 
         draft11.testIssuanceDraft11PreAuthFlow(preAuthFlowIssuanceReq, wallet)
 
+        val preAuthFlowIssuanceReqOfferedCredByValue = preAuthFlowIssuanceReq.copy(
+            standardVersion = OpenID4VCIVersion.DRAFT11,
+            draft11EncodeOfferedCredentialsByReference = false,
+        )
+
+        draft11.testIssuanceDraft11PreAuthFlow(preAuthFlowIssuanceReqOfferedCredByValue, wallet)
+
 
         // Test External Signature API Endpoints
         //In the context of these test cases, a new wallet is created and initialized
@@ -398,7 +405,59 @@ class WaltidServicesE2ETests {
         //region -Presentation Definition Policy (Verifier)-
         PresentationDefinitionPolicyTests().runTests()
         //endregion -Presentation Definition Policy (Verifier)-
+
     }
+
+//    @Test
+//    fun e2eEBSIVectorOnlyTests() =
+//        E2ETest.testBlock(
+//            config = ServiceConfiguration("e2e-ebsi-vector-tests"),
+//            features = listOf(
+//                id.walt.issuer.FeatureCatalog,
+//                id.walt.verifier.FeatureCatalog,
+//                id.walt.webwallet.FeatureCatalog
+//            ),
+//            featureAmendments = mapOf(
+//                CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
+//                // CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
+//            ),
+//            init = {
+//                id.walt.webwallet.webWalletSetup()
+//                id.walt.did.helpers.WaltidServices.minimalInit()
+//                id.walt.webwallet.db.Db.start()
+//            },
+//            module = e2eTestModule,
+//            timeout = defaultTestTimeout
+//        ) {
+//            var client = testHttpClient()
+//            lateinit var accountId: Uuid
+//            lateinit var wallet: Uuid
+//            var authApi = AuthApi(client)
+//
+//            // the e2e http request tests here
+//
+//            //region -Auth-
+//
+//            authApi.run {
+//                userInfo(HttpStatusCode.Unauthorized)
+//                login(defaultEmailAccount) {
+//                    client = testHttpClient(token = it["token"]!!.jsonPrimitive.content)
+//                    authApi = AuthApi(client)
+//                }
+//            }
+//            authApi.run {
+//                userInfo(HttpStatusCode.OK) {
+//                    accountId = it.id
+//                }
+//                userSession()
+//                userWallets(accountId) {
+//                    wallet = it.wallets.first().id
+//                    println("Selected wallet: $wallet")
+//                }
+//            }
+//
+//            EBSIVectorInteropTest(client, wallet).runTest()
+//        }
 
     /* @Test // enable to execute test selectively
     fun lspIssuanceTests() = testBlock(timeout = defaultTestTimeout) {
@@ -416,7 +475,7 @@ class WaltidServicesE2ETests {
         lspPotentialVerification.testPotentialInteropTrack4()
     }*/
 
-//        @Test
+    //        @Test
     fun e2ePresDefPolicyTests() = E2ETest.testBlock(
         config = ServiceConfiguration("e2e-pres-def-tests"),
         features = listOf(
@@ -532,13 +591,17 @@ class WaltidServicesE2ETests {
     fun issuerCredentialsListTest() = runBlocking {
         var client = testHttpClient()
         assertFalse(
-            IssuerUseCaseImpl(IssuersService, client).
-                fetchCredentials("https://issuer.portal.walt-test.cloud/draft11/.well-known/openid-credential-issuer")
-                    .isEmpty()
+            IssuerUseCaseImpl(
+                IssuersService,
+                client
+            ).fetchCredentials("https://issuer.portal.walt-test.cloud/draft11/.well-known/openid-credential-issuer")
+                .isEmpty()
         )
         assertFalse(
-            IssuerUseCaseImpl(IssuersService, client).
-            fetchCredentials("https://issuer.portal.walt-test.cloud/draft13/.well-known/openid-credential-issuer")
+            IssuerUseCaseImpl(
+                IssuersService,
+                client
+            ).fetchCredentials("https://issuer.portal.walt-test.cloud/draft13/.well-known/openid-credential-issuer")
                 .isEmpty()
         )
     }

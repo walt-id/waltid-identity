@@ -667,7 +667,7 @@ fun testCredentialIssuanceIsolatedFunctionsAuthCodeFlowRedirectWithCode(authCode
 
 fun testIsolatedFunctionsCreateCredentialOffer(baseUrl: String, issuerState: String, issuedCredentialId: String): String {
     val credOffer = CredentialOffer.Draft13.Builder(baseUrl)
-        .addOfferedCredential(issuedCredentialId)
+        .addOfferedCredentialByReference(issuedCredentialId)
         .addAuthorizationCodeGrant(issuerState)
         .build()
 

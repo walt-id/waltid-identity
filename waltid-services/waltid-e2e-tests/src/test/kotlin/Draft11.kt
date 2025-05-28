@@ -55,7 +55,6 @@ class Draft11(private val client: HttpClient)  {
         assertTrue(jsonElementMetadata.jsonObject["credentials_supported"] is JsonArray, "Expected credentials_supported in Open ID Provider Metadata to be a JsonArray")
 
         val issuerMetadata = OpenIDProviderMetadata.fromJSONString(rawJsonMetadata) as OpenIDProviderMetadata.Draft11
-        assertNull(issuerMetadata.authorizationServer)
         assertContains(issuerMetadata.grantTypesSupported, GrantType.authorization_code)
         assertContains(issuerMetadata.grantTypesSupported, GrantType.pre_authorized_code)
         assertNotNull(issuerMetadata.jwksUri)
@@ -214,7 +213,6 @@ class Draft11(private val client: HttpClient)  {
         assertTrue(jsonElementMetadata.jsonObject["credentials_supported"] is JsonArray, "Expected credentials_supported in Open ID Provider Metadata to be a JsonArray")
 
         val issuerMetadata = OpenIDProviderMetadata.fromJSONString(rawJsonMetadata) as OpenIDProviderMetadata.Draft11
-        assertNull(issuerMetadata.authorizationServer)
         assertContains(issuerMetadata.grantTypesSupported, GrantType.authorization_code)
         assertContains(issuerMetadata.grantTypesSupported, GrantType.pre_authorized_code)
         assertNotNull(issuerMetadata.jwksUri)

@@ -1,5 +1,6 @@
 package id.walt.webwallet.service
 
+import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64URL
@@ -33,6 +34,7 @@ import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.WalletCategoryData
 import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.db.models.WalletOperationHistories
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.category.CategoryService
@@ -400,6 +402,46 @@ class SSIKit2WalletService(
         KeyManager.resolveSerializedKey(it.document)
     } ?: throw NotFoundException("Key not found: $keyId")
 
+    private suspend fun findKey(alias: String): Key? {
+
+        val resolveSerializedKey: suspend (String) -> Key? = { kid ->
+            KeysService.get(walletId, kid)?.let {
+                KeyManager.resolveSerializedKey(it.document)
+            }
+        }
+
+        val resolveSerializedKeyFromDid: suspend (WalletDid) -> Key? = { did ->
+            DidService.resolveToKey(did.did).getOrNull()?.let { k ->
+                resolveSerializedKey(k.getKeyId())
+            }
+        }
+
+        // Try to resolve alias as keyId
+        resolveSerializedKey(alias)?.let {
+            logger.info { "Found key by kid: $alias" }
+            return it
+        }
+
+        // Try to resolve alias as did
+        val match = DidsService.list(walletId).firstOrNull { it.did == alias }
+        match?.let {
+            logger.info { "Found key by did: $alias" }
+            return resolveSerializedKeyFromDid(it)
+        }
+
+        // Try to resolve alias as verificationMethod.id
+        DidsService.list(walletId).firstNotNullOfOrNull { did ->
+            val doc = Json.parseToJsonElement(did.document).jsonObject
+            val methods = doc["verificationMethod"]?.jsonArray.orEmpty()
+            val match = methods.firstOrNull { it.jsonObject["id"]?.jsonPrimitive?.content == alias }
+            match?.let {
+                logger.info { "Found key by verificationMethod: $alias" }
+                return resolveSerializedKeyFromDid(did)
+            }
+        }
+        return null
+    }
+
     suspend fun getKeyByDid(did: String): Key =
         DidService.resolveToKey(did)
             .fold(onSuccess = { getKey(it.getKeyId()) }, onFailure = { throw it })
@@ -560,9 +602,10 @@ class SSIKit2WalletService(
     }
 
     override suspend fun sign(alias: String, data: JsonElement): String {
-        val key = getKey(alias)
-        val headers = mapOf(
-            "kid" to key.getKeyId()
+        val key = findKey(alias) ?: throw NotFoundException("Key not found: $alias")
+        val headers = linkedMapOf(
+            "typ" to JOSEObjectType.JWT.type,
+            "kid" to alias
         ).toJsonObject()
 
         val dataBytes = data.toString().toByteArray(StandardCharsets.UTF_8)
