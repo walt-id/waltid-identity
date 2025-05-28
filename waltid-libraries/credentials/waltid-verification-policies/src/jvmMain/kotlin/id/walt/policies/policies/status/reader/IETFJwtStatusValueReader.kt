@@ -1,6 +1,7 @@
 package id.walt.policies.policies.status.reader
 
 import id.walt.policies.policies.status.BitValueReader
+import id.walt.policies.policies.status.IETFStatusContent
 import id.walt.policies.policies.status.parser.ContentParser
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
