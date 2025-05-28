@@ -69,17 +69,27 @@ import kotlin.time.Duration.Companion.minutes
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
  */
 open class CIProvider(
-    val baseUrl: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.DRAFT13.versionString}"},
-    val baseUrlDraft11: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.DRAFT11.versionString}"},
+    val baseUrl: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.DRAFT13.versionString}" },
+    val baseUrlDraft11: String = let { ConfigManager.getConfig<OIDCIssuerServiceConfig>().baseUrl + "/${OpenID4VCIVersion.DRAFT11.versionString}" },
 
-    val config: CredentialIssuerConfig = CredentialIssuerConfig(credentialConfigurationsSupported = ConfigManager.getConfig<CredentialTypeConfig>().parse())
+    val config: CredentialIssuerConfig = CredentialIssuerConfig(
+        credentialConfigurationsSupported = ConfigManager.getConfig<CredentialTypeConfig>().parse()
+    )
 ) {
 
     val metadata
-        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrl, config.credentialConfigurationsSupported, OpenID4VCIVersion.DRAFT13) as OpenIDProviderMetadata.Draft13)
+        get() = (OpenID4VCI.createDefaultProviderMetadata(
+            baseUrl,
+            config.credentialConfigurationsSupported,
+            OpenID4VCIVersion.DRAFT13
+        ) as OpenIDProviderMetadata.Draft13)
 
     val metadataDraft11
-        get() = (OpenID4VCI.createDefaultProviderMetadata(baseUrlDraft11, config.credentialConfigurationsSupported, OpenID4VCIVersion.DRAFT11) as OpenIDProviderMetadata.Draft11)
+        get() = (OpenID4VCI.createDefaultProviderMetadata(
+            baseUrlDraft11,
+            config.credentialConfigurationsSupported,
+            OpenID4VCIVersion.DRAFT11
+        ) as OpenIDProviderMetadata.Draft11)
 
     companion object {
         private val log = KotlinLogging.logger { }
@@ -146,7 +156,8 @@ open class CIProvider(
     }
 
     fun getSessionForAccessToken(parsedAccessToken: JsonObject): IssuanceSession? {
-        val sessionId = parsedAccessToken.get(JWTClaims.Payload.subject)?.jsonPrimitive?.content ?: throw IllegalArgumentException("Access token has no subject or invalid subject type")
+        val sessionId = parsedAccessToken.get(JWTClaims.Payload.subject)?.jsonPrimitive?.content
+            ?: throw IllegalArgumentException("Access token has no subject or invalid subject type")
         return getSession(sessionId)
     }
 
@@ -185,9 +196,10 @@ open class CIProvider(
             return CredentialResult(
                 format = credentialRequest.format,
                 credential = null,
-                credentialId = randomUUID()).also {
-                    deferredCredentialRequests[it.credentialId!!] = credentialRequest
-                }
+                credentialId = randomUUID()
+            ).also {
+                deferredCredentialRequests[it.credentialId!!] = credentialRequest
+            }
         }
 
         return when (credentialRequest.format) {
@@ -234,58 +246,73 @@ open class CIProvider(
         log.debug { "RETRIEVING ISSUANCE REQUEST FOR CREDENTIAL REQUEST" }
         val request = findMatchingIssuanceRequest(
             credentialRequest, issuanceSession.issuanceRequests
-        ) ?: throw IllegalArgumentException("No matching issuance request found for this session: ${issuanceSession.id}!")
+        )
+            ?: throw IllegalArgumentException("No matching issuance request found for this session: ${issuanceSession.id}!")
 
         return CredentialResult(format = credentialRequest.format, credential = JsonPrimitive(runBlocking {
             val vc = request.credentialData ?: throw MissingFieldException(listOf("credentialData"), "credentialData")
             val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
 
             request.run {
-                val holderKeyJWK =  JWKKey.importJWK(holderKey.toString()).getOrNull()?.exportJWKObject()?.plus("kid" to JWKKey.importJWK(holderKey.toString()).getOrThrow().getKeyId())?.toJsonObject()
+                val holderKeyJWK = JWKKey.importJWK(holderKey.toString()).getOrNull()?.exportJWKObject()
+                    ?.plus("kid" to JWKKey.importJWK(holderKey.toString()).getOrThrow().getKeyId())?.toJsonObject()
 
                 when (credentialFormat) {
                     CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(
+
                         credentialRequest = credentialRequest,
                         credentialData = vc,
                         issuerId = issuerDid ?: baseUrl,
                         issuerKey = resolvedIssuerKey,
                         selectiveDisclosure = request.selectiveDisclosure,
                         dataMapping = request.mapping,
-                        display = vc.jsonObject["display"]?.jsonArray?.map {
+                        display = if (credentialRequest.display != null) credentialRequest.display else vc.jsonObject["display"]?.jsonArray?.map {
                             DisplayProperties.fromJSON(it.jsonObject)
-                        } ?: emptyList(),
+                        } ,
                         x5Chain = request.x5Chain).also {
-                        if(!issuanceSession.callbackUrl.isNullOrEmpty())
-                            sendCallback(issuanceSession.id, "sdjwt_issue", buildJsonObject { put("sdjwt", it) }, issuanceSession.callbackUrl)
+                        if (!issuanceSession.callbackUrl.isNullOrEmpty())
+                            sendCallback(
+                                issuanceSession.id,
+                                "sdjwt_issue",
+                                buildJsonObject { put("sdjwt", it) },
+                                issuanceSession.callbackUrl
+                            )
                     }
-                  else -> OpenID4VCI.generateW3CJwtVC(
-                      credentialRequest = credentialRequest,
-                      credentialData = vc,
-                      issuerKey = resolvedIssuerKey,
-                      issuerId = issuerDid
-                          ?: throw BadRequestException("Issuer API currently supports only issuer DID for issuer ID property in W3C credentials. Issuer DID was not given in issuance request."),
-                      selectiveDisclosure = request.selectiveDisclosure,
-                      dataMapping = request.mapping,
-                      x5Chain = request.x5Chain,
-                      display = credentialRequest.display
 
-                  ).also {
-                      if(!issuanceSession.callbackUrl.isNullOrEmpty())
-                          sendCallback(issuanceSession.id, "jwt_issue", buildJsonObject { put("jwt", it) }, issuanceSession.callbackUrl)
-                  }
-              }
+                    else -> OpenID4VCI.generateW3CJwtVC(
+                        credentialRequest = credentialRequest,
+                        credentialData = vc,
+                        issuerKey = resolvedIssuerKey,
+                        issuerId = issuerDid
+                            ?: throw BadRequestException("Issuer API currently supports only issuer DID for issuer ID property in W3C credentials. Issuer DID was not given in issuance request."),
+                        selectiveDisclosure = request.selectiveDisclosure,
+                        dataMapping = request.mapping,
+                        x5Chain = request.x5Chain,
+                        display = credentialRequest.display
+
+                    ).also {
+                        if (!issuanceSession.callbackUrl.isNullOrEmpty())
+                            sendCallback(
+                                issuanceSession.id,
+                                "jwt_issue",
+                                buildJsonObject { put("jwt", it) },
+                                issuanceSession.callbackUrl
+                            )
+                    }
+                }
             }.also { log.debug { "Respond VC: $it" } }
         }))
     }
 
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun extractHolderKey(proof: ProofOfPossession): COSECryptoProviderKeyInfo? {
-        when(proof.proofType) {
+        when (proof.proofType) {
             ProofType.cwt -> {
                 return proof.cwt?.base64UrlDecode()?.let {
                     COSESign1Utils.extractHolderKey(Cbor.decodeFromByteArray<COSESign1>(it))
                 }
             }
+
             else -> {
                 return proof.jwt?.let { JwtUtils.parseJWTHeader(it) }?.get(JWTClaims.Header.jwk)?.jsonObject?.let {
                     JWKKey.importJWK(it.toString()).getOrNull()?.let { key ->
@@ -306,8 +333,16 @@ open class CIProvider(
         credentialRequest: CredentialRequest,
         issuanceSession: IssuanceSession
     ): CredentialResult {
-        val proof = credentialRequest.proof ?: throw CredentialError(credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "No proof found on credential request")
-        val holderKey = extractHolderKey(proof) ?: throw CredentialError(credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "No holder key could be extracted from proof")
+        val proof = credentialRequest.proof ?: throw CredentialError(
+            credentialRequest,
+            CredentialErrorCode.invalid_or_missing_proof,
+            message = "No proof found on credential request"
+        )
+        val holderKey = extractHolderKey(proof) ?: throw CredentialError(
+            credentialRequest,
+            CredentialErrorCode.invalid_or_missing_proof,
+            message = "No holder key could be extracted from proof"
+        )
 
         val nonce = OpenID4VCI.getNonceFromProof(credentialRequest.proof!!) ?: throw CredentialError(
             credentialRequest,
@@ -317,13 +352,15 @@ open class CIProvider(
         println("RETRIEVING ISSUANCE REQUEST FOR CREDENTIAL REQUEST: $nonce")
         val request = findMatchingIssuanceRequest(
             credentialRequest, issuanceSession.issuanceRequests
-        ) ?: throw IllegalArgumentException("No matching issuance request found for this session: ${issuanceSession.id}!")
+        )
+            ?: throw IllegalArgumentException("No matching issuance request found for this session: ${issuanceSession.id}!")
         val issuerSignedItems = request.mdocData ?: throw MissingFieldException(listOf("mdocData"), "mdocData")
         val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
         val issuerKey = JWK.parse(runBlocking { resolvedIssuerKey.exportJWK() }).toECKey()
         val keyID = resolvedIssuerKey.getKeyId()
-        val cryptoProvider = SimpleCOSECryptoProvider(listOf(
-            COSECryptoProviderKeyInfo(
+        val cryptoProvider = SimpleCOSECryptoProvider(
+            listOf(
+                COSECryptoProviderKeyInfo(
                 keyID, AlgorithmID.ECDSA_256, issuerKey.toECPublicKey(), issuerKey.toECPrivateKey(),
                 x5Chain = request.x5Chain?.map { X509CertUtils.parse(it) } ?: listOf(),
                 trustedRootCAs = request.trustedRootCAs?.map { X509CertUtils.parse(it) } ?: listOf()
@@ -350,8 +387,13 @@ open class CIProvider(
                 )
             ), cryptoProvider, keyID
         ).also {
-            if(!issuanceSession.callbackUrl.isNullOrEmpty())
-                sendCallback(issuanceSession.id, "generated_mdoc", buildJsonObject { put("mdoc", it.toCBORHex()) }, issuanceSession.callbackUrl)
+            if (!issuanceSession.callbackUrl.isNullOrEmpty())
+                sendCallback(
+                    issuanceSession.id,
+                    "generated_mdoc",
+                    buildJsonObject { put("mdoc", it.toCBORHex()) },
+                    issuanceSession.callbackUrl
+                )
         }
         return CredentialResult(
             CredentialFormat.mso_mdoc, JsonPrimitive(mdoc.issuerSigned.toMapElement().toCBOR().encodeToBase64Url()),
@@ -387,14 +429,16 @@ open class CIProvider(
         )
     }
 
-    suspend fun getJwksSessions() : JsonObject{
+    suspend fun getJwksSessions(): JsonObject {
         var jwksList = buildJsonObject {
-            put("keys", buildJsonArray { add(buildJsonObject {
-                CI_TOKEN_KEY.getPublicKey().exportJWKObject().forEach {
-                    put(it.key, it.value)
-                }
-                put("kid", CI_TOKEN_KEY.getKeyId())
-            }) })
+            put("keys", buildJsonArray {
+                add(buildJsonObject {
+                    CI_TOKEN_KEY.getPublicKey().exportJWKObject().forEach {
+                        put(it.key, it.value)
+                    }
+                    put("kid", CI_TOKEN_KEY.getKeyId())
+                })
+            })
         }
         authSessions.getAll().forEach { session ->
             session.issuanceRequests.forEach {
@@ -408,7 +452,8 @@ open class CIProvider(
                             put("kid", resolvedIssuerKey.getPublicKey().getKeyId())
                         }
                         add(jwkWithKid)
-                        jwksList.forEach { it.value.jsonArray.forEach {
+                        jwksList.forEach {
+                            it.value.jsonArray.forEach {
                                 add(it)
                             }
                         }
@@ -421,7 +466,8 @@ open class CIProvider(
 
     fun getFormatByCredentialConfigurationId(id: String) = metadata.credentialConfigurationsSupported?.get(id)?.format
 
-    fun getTypesByCredentialConfigurationId(id: String) = metadata.credentialConfigurationsSupported?.get(id)?.credentialDefinition?.type
+    fun getTypesByCredentialConfigurationId(id: String) =
+        metadata.credentialConfigurationsSupported?.get(id)?.credentialDefinition?.type
 
     fun getDocTypeByCredentialConfigurationId(id: String) = metadata.credentialConfigurationsSupported?.get(id)?.docType
 
@@ -446,10 +492,12 @@ open class CIProvider(
                         val types = getTypesByCredentialConfigurationId(credentialConfigurationId)
                         types?.containsAll(credentialRequest.credentialDefinition?.type ?: emptyList()) ?: false
                     }
+
                     CredentialFormat.sd_jwt_vc -> {
                         val vct = metadata.getVctByCredentialConfigurationId(credentialConfigurationId)
                         vct == credentialRequest.vct
                     }
+
                     else -> {
                         val docType = getDocTypeByCredentialConfigurationId(credentialConfigurationId)
                         docType == credentialRequest.docType
@@ -470,7 +518,7 @@ open class CIProvider(
                 null  // Already expired
             }
         }
-        
+
         return session.copy(
             cNonce = randomUUID()
         ).also {
@@ -480,15 +528,15 @@ open class CIProvider(
 
     private fun isSupportedAuthorizationDetails(authorizationDetails: AuthorizationDetails): Boolean {
         return authorizationDetails.type == OPENID_CREDENTIAL_AUTHORIZATION_TYPE &&
-            config.credentialConfigurationsSupported.values.any { credentialSupported ->
-                credentialSupported.format == authorizationDetails.format &&
-                    ((authorizationDetails.credentialDefinition?.type != null && credentialSupported.credentialDefinition?.type?.containsAll(
-                        authorizationDetails.credentialDefinition!!.type!!
-                    ) == true) ||
-                        (authorizationDetails.docType != null && credentialSupported.docType == authorizationDetails.docType)
-                        )
-                // TODO: check other supported credential parameters
-            }
+                config.credentialConfigurationsSupported.values.any { credentialSupported ->
+                    credentialSupported.format == authorizationDetails.format &&
+                            ((authorizationDetails.credentialDefinition?.type != null && credentialSupported.credentialDefinition?.type?.containsAll(
+                                authorizationDetails.credentialDefinition!!.type!!
+                            ) == true) ||
+                                    (authorizationDetails.docType != null && credentialSupported.docType == authorizationDetails.docType)
+                                    )
+                    // TODO: check other supported credential parameters
+                }
     }
 
     fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean {
@@ -547,7 +595,8 @@ open class CIProvider(
     ): IssuanceSession = runBlocking {
         val sessionId = randomUUID()
 
-        val credentialOfferBuilder = OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests, standardVersion)
+        val credentialOfferBuilder =
+            OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests, standardVersion)
 
         when (issuanceRequests[0].authenticationMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> {
@@ -556,7 +605,8 @@ open class CIProvider(
                     txCode = txCode
                 )
             }
-            else ->  {
+
+            else -> {
                 credentialOfferBuilder.addAuthorizationCodeGrant(sessionId)
             }
         }
@@ -565,7 +615,7 @@ open class CIProvider(
             id = sessionId,
             authorizationRequest = null,
             expirationTimestamp = Clock.System.now().plus(expiresIn),
-            issuanceRequests= issuanceRequests,
+            issuanceRequests = issuanceRequests,
             txCode = txCode,
             txCodeValue = txCodeValue,
             credentialOffer = credentialOfferBuilder.build(),
@@ -596,7 +646,7 @@ open class CIProvider(
                     tokenKey = CI_TOKEN_KEY
                 ),
                 cNonce = updatedSession.cNonce,
-                cNonceExpiresIn = (updatedSession.expirationTimestamp - Clock.System.now()).also { it.inWholeSeconds.toInt()  }
+                cNonceExpiresIn = (updatedSession.expirationTimestamp - Clock.System.now()).also { it.inWholeSeconds.toInt() }
             )
         }
     }
@@ -739,7 +789,9 @@ open class CIProvider(
     fun getMetadataForVersion(
         standardVersion: String?,
     ): OpenIDProviderMetadata {
-        val version = OpenID4VCIVersion.from(standardVersion ?: throw IllegalArgumentException("standardVersion parameter is required"))
+        val version = OpenID4VCIVersion.from(
+            standardVersion ?: throw IllegalArgumentException("standardVersion parameter is required")
+        )
 
         return when (version) {
             OpenID4VCIVersion.DRAFT11 -> metadataDraft11
