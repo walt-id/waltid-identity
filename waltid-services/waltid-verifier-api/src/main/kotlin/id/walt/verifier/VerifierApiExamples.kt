@@ -315,7 +315,9 @@ object VerifierApiExamples {
                 "vc_policies": ${vcPoliciesData("\"revoked-status-list\"")},
                 "request_credentials":
                 [
-                    { "input_descriptor": {
+                    {
+                     "format": "jwt_vc",
+                     "input_descriptor": {
                             "id": "e3d700aa-0988-4eb6-b9c9-e00f4b27f1d8",
                             "constraints":
                             {
@@ -339,8 +341,7 @@ object VerifierApiExamples {
                             }
                         }
                     }
-                ],
-                "openid_profile": "EBSIv3"
+                ]
             }
         """.trimIndent()
     )

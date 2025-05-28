@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.oid4vc.data
 
 import id.walt.crypto.keys.Key
@@ -9,6 +11,8 @@ import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 @Serializable
 data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private constructor(
@@ -59,10 +63,16 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
             trustChain?.let { put("trust_chain", it) }
         }
         val payload = buildJsonObject {
-            clientId?.let { put("iss", it) }
-            put("aud", issuerUrl)
-            audience?.let { put("aud", it) }
+            clientId?.let {
+                put("iss", it)
+                put("sub", it)
+            }
+            put("jti", Uuid.random().toString())
+            audience?.let {
+                put("aud", it)
+            } ?: put("aud", issuerUrl)
             put("iat", Clock.System.now().epochSeconds)
+            put("exp", Clock.System.now().epochSeconds + 300)
             nonce?.let { put("nonce", it) }
         }
 

@@ -7,51 +7,34 @@
       <div class="flex justify-between items-center sm:hidden">
         <div
           class="cursor-pointer bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center text-black text-xs font-bold"
-          @click="navigateTo({ path: `/wallet/${walletId}` })"
-        >
+          @click="navigateTo({ path: `/wallet/${walletId}` })">
           X
         </div>
         <div
           class="cursor-pointer bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center text-black text-xs font-bold"
-          @click="deleteCredential"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            fill="currentColor"
-            class="bi bi-trash"
-            viewBox="0 0 16 16"
-          >
+          @click="deleteCredential">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash"
+            viewBox="0 0 16 16">
             <path
-              d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"
-            />
+              d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z" />
             <path
-              d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"
-            />
+              d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z" />
           </svg>
         </div>
       </div>
       <div v-if="credential" class="my-10 sm:flex justify-center">
-        <VerifiableCredentialCard
-          :credential="credential"
-          :isDetailView="true"
-        />
+        <VerifiableCredentialCard :credential="credential" :isDetailView="true" />
       </div>
 
       <!-- Desktop view -->
       <div class="hidden sm:block px-4 py-6 bg-white rounded-xl">
         <hr v-if="credentialManifest" class="w-full border-gray-200 my-2" />
-        <div
-          v-if="credentialManifest"
-          class="text-gray-500 font-bold mt-4 mb-8"
-        >
+        <div v-if="credentialManifest" class="text-gray-500 font-bold mt-4 mb-2">
           Subject Info
         </div>
-        <div
-          v-for="(value, key, index) in credentialManifest?.claims"
-          :key="key"
-        >
+        <img v-if="credentialManifest?.image" :src="credentialManifest?.image" alt="User Avatar"
+          class="h-28 mb-4 rounded-md" />
+        <div v-for="(value, key, index) in credentialManifest?.claims" :key="key">
           <div class="flex mt-3">
             <div class="text-gray-500 w-sm">{{ key }}</div>
             <div class="text-gray-500 font-bold w-2xl">{{ value }}</div>
@@ -61,11 +44,9 @@
         <div v-if="credential?.format === 'mso_mdoc'">
           <hr class="w-full border-gray-200 my-2" />
           <div class="text-gray-500 font-bold mt-4 mb-8">Subject Info</div>
-          <div
-            v-for="elem in jwtJson?.issuerSigned?.nameSpaces[
-              Object.keys(jwtJson?.issuerSigned?.nameSpaces)[0]
-            ]"
-          >
+          <div v-for="elem in jwtJson?.issuerSigned?.nameSpaces[
+            Object.keys(jwtJson?.issuerSigned?.nameSpaces)[0]
+          ]">
             <div class="flex mt-3">
               <div class="text-gray-500 w-sm">{{ elem.elementIdentifier }}</div>
               <div class="text-gray-500 font-bold w-2xl">
@@ -75,14 +56,8 @@
           </div>
         </div>
 
-        <hr
-          class="w-full border-gray-200 mb-2 mt-8"
-          v-if="issuerName || issuerDid"
-        />
-        <div
-          class="text-gray-500 font-bold mt-4 mb-8"
-          v-if="issuerName || issuerDid"
-        >
+        <hr class="w-full border-gray-200 mb-2 mt-8" v-if="issuerName || issuerDid" />
+        <div class="text-gray-500 font-bold mt-4 mb-8" v-if="issuerName || issuerDid">
           Issuer
         </div>
         <div class="flex mt-2" v-if="issuerName">
@@ -101,12 +76,15 @@
         </div>
         <div v-if="disclosures">
           <div v-for="disclosure in disclosures">
-            <div class="flex mt-2">
-              <div class="text-gray-500 w-sm">{{ disclosure[1] }}</div>
-              <div class="text-gray-500 font-bold overflow-scroll w-2xl">
-                {{ disclosure[2] }}
+            <template
+              v-if="!(jwtJson.type[jwtJson.type.length - 1] === 'KiwiAccessCredential' && disclosure[1] === 'portrait')">
+              <div class="flex mt-2">
+                <div class="text-gray-500 w-sm">{{ disclosure[1] }}</div>
+                <div class="text-gray-500 font-bold overflow-scroll w-2xl">
+                  {{ disclosure[2] }}
+                </div>
               </div>
-            </div>
+            </template>
           </div>
         </div>
         <hr class="w-full border-gray-200 my-2" />
@@ -122,66 +100,47 @@
           <div class="text-gray-500" v-else>No issuance date</div>
         </div>
         <div class="flex justify-between my-16">
-          <div
-            class="text-blue-500 cursor-pointer underline"
-            @click="showCredentialJson = !showCredentialJson"
-          >
+          <div class="text-blue-500 cursor-pointer underline" @click="showCredentialJson = !showCredentialJson">
             {{ showCredentialJson ? "Hide" : "Show" }} Credential JSON
           </div>
-          <div
-            class="text-red-500 cursor-pointer underline"
-            @click="deleteCredential"
-          >
+          <div class="text-red-500 cursor-pointer underline" @click="deleteCredential">
             Delete Credential
           </div>
         </div>
-        <div
-          v-if="showCredentialJson"
-          class="bg-gray-100 p-4 rounded-xl overflow-auto"
-        >
+        <div v-if="showCredentialJson" class="bg-gray-100 p-4 rounded-xl overflow-auto">
           <pre class="text-xs">{{ jwtJson }}</pre>
         </div>
       </div>
 
       <!-- Mobile view -->
-      <div
-        class="px-4 py-6 shadow-sm bg-white rounded-xl sm:hidden"
-        v-if="credentialManifest || credential?.format === 'mso_mdoc'"
-      >
+      <div class="px-4 py-6 shadow-sm bg-white rounded-xl sm:hidden"
+        v-if="credentialManifest || credential?.format === 'mso_mdoc'">
         <div v-if="credentialManifest">
+          <img v-if="credentialManifest?.image" :src="credentialManifest?.image" alt="User Avatar"
+            class="h-28 mb-4 rounded-md" />
           <div class="text-gray-600 font-bold mb-4">Credential Details</div>
-          <div
-            v-for="(value, key, index) in credentialManifest.claims"
-            :key="key"
-          >
+          <div v-for="(value, key, index) in credentialManifest.claims" :key="key">
             <div class="text-gray-500">{{ key }}</div>
             <div class="text-black">{{ value }}</div>
-            <hr
-              v-if="index !== Object.keys(credentialManifest.claims).length - 1"
-              class="w-full border-gray-200 my-2"
-            />
+            <hr v-if="index !== Object.keys(credentialManifest.claims).length - 1"
+              class="w-full border-gray-200 my-2" />
           </div>
         </div>
 
         <div v-if="credential?.format === 'mso_mdoc'">
           <div class="text-gray-600 font-bold mb-4">Credential Details</div>
-          <div
-            v-for="(elem, index) in jwtJson?.issuerSigned?.nameSpaces[
-              Object.keys(jwtJson?.issuerSigned?.nameSpaces)[0]
-            ]"
-          >
+          <div v-for="(elem, index) in jwtJson?.issuerSigned?.nameSpaces[
+            Object.keys(jwtJson?.issuerSigned?.nameSpaces)[0]
+          ]">
             <div class="text-gray-500">{{ elem.elementIdentifier }}</div>
             <div class="text-black">{{ elem.elementValue }}</div>
-            <hr
-              v-if="
-                index !==
-                jwtJson?.issuerSigned?.nameSpaces[
-                  Object.keys(jwtJson?.issuerSigned?.nameSpaces)[0]
-                ].length -
-                  1
-              "
-              class="w-full border-gray-200 my-2"
-            />
+            <hr v-if="
+              index !==
+              jwtJson?.issuerSigned?.nameSpaces[
+                Object.keys(jwtJson?.issuerSigned?.nameSpaces)[0]
+              ].length -
+              1
+            " class="w-full border-gray-200 my-2" />
           </div>
         </div>
       </div>
@@ -229,21 +188,34 @@ const credentialManifest = computedAsync(async () => {
     const { data } = await useFetch(
       `${runtimeConfig.public.credentialsRepositoryUrl}/api/manifest/${jwtJson.value?.type[jwtJson.value?.type.length - 1]}`,
       {
-        transform: (data: { claims: { [key: string]: string } }) => {
-          return {
-            ...data,
-            claims: Object.fromEntries(
-              Object.entries(data?.claims).map(([key, value]) => {
-                return [
-                  key,
-                  JSONPath({ path: value, json: jwtJson.value })[0] ??
+        transform: (data: { image?: string; claims: { [key: string]: string } }) => {
+          let transformedManifest = JSON.parse(JSON.stringify(data));
+          if (data.image) {
+            transformedManifest = {
+              ...transformedManifest,
+              image: JSONPath({ path: data.image, json: jwtJson.value })[0] ??
+                disclosures.value?.find(
+                  (disclosure) => disclosure[1] === data.image.split(".").pop(),
+                )?.[2],
+            };
+          }
+          if (data.claims) {
+            transformedManifest = {
+              ...transformedManifest,
+              claims: Object.fromEntries(
+                Object.entries(data?.claims).map(([key, value]) => {
+                  return [
+                    key,
+                    JSONPath({ path: value, json: jwtJson.value })[0] ??
                     disclosures.value?.find(
                       (disclosure) => disclosure[1] === value.split(".").pop(),
                     )?.[2],
-                ];
-              }),
-            ),
-          };
+                  ];
+                }),
+              ),
+            };
+          }
+          return transformedManifest;
         },
       },
     );

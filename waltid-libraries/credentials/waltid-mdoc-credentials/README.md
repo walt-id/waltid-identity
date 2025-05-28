@@ -24,6 +24,8 @@ This library implements the mdoc specification: [ISO/IEC 18013-5:2021](https://w
 * **Present** mdoc documents with selective disclosure of issuer-signed items and mdoc device authentication, based on COSE Mac0 or COSE Sign1.
 * **Create** mdoc requests object with COSE Sign1 reader authentication
 * Support for **integration** with various crypto libraries and frameworks, to perform the cryptographic operations and key management
+* **Full Device Engagement Support (NFC, QR, Wi-Fi Aware):** Proximity flow support for all transmission technologies as defined in ISO/IEC 18013-5 (e.g., static \& negotiated handover for NFC).
+* **Revocation Support for Mobile Security Object (MSO):** Support for MSO revocation status encoding via both [IETF Status List](https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/) and Identifier List methods.
 * **Multiplatform support**
   * Kotlin/Java for JVM
   * JavaScript
@@ -158,6 +160,147 @@ a267646f6354797065756f72672e69736f2e31383031332e352e312e6d444c6c6973737565725369
 }
 ```
 </details>
+
+#### Mobile Security Object (MSO) Revocation
+
+To incorporate revocation information via the [IETF Status List](https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/) specification, create a `Status` entry structure with a 
+`StatusListInfo` field initialized accordingly, as illustrated in the following example: 
+
+```kotlin
+val ietfStatusListEntry = Status(
+  statusList = StatusListInfo(
+    index = 142u,
+    uri = "https://example.com/statuslists/1",
+      ),
+)
+```
+and then pass this revocation information as an argument in the signing operation of the mdoc, as illustrated below:
+
+```kotlin
+// build mdoc and sign using issuer key with holder binding to device key
+val mdoc = MDocBuilder("org.iso.18013.5.1.mDL")
+    .addItemToSign("org.iso.18013.5.1", "family_name", "Doe".toDataElement())
+    .addItemToSign("org.iso.18013.5.1", "given_name", "John".toDataElement())
+    .addItemToSign("org.iso.18013.5.1", "birth_date", FullDateElement(LocalDate(1990, 1, 15)))
+    .sign(
+      validityInfo = ValidityInfo(
+        Clock.System.now(),
+        Clock.System.now(),
+        Clock.System.now().plus(365 * 24, DateTimeUnit.HOUR)
+      ),
+      deviceKeyInfo = deviceKeyInfo,
+      cryptoProvider = cryptoProvider,
+      keyID = ISSUER_KEY_ID,
+      status = ietfStatusListEntry, //STATUS LIST REVOCATION INFORMATION
+        )
+```
+
+_Example output_
+```text
+SIGNED MDOC w/ Revocation Status:
+a267646f6354797065756f72672e69736f2e31383031332e352e312e6d444c6c6973737565725369676e6564a26a6e616d65537061636573a1716f72672e69736f2e31383031332e352e3183d8185852a4686469676573744944006672616e646f6d50a7aa5c10f650c15126ab2c5e94ea0b7a71656c656d656e744964656e7469666965726b66616d696c795f6e616d656c656c656d656e7456616c756563446f65d8185852a4686469676573744944016672616e646f6d50a0f5adba0ff6aef77e6c8b3f9a1e1c5871656c656d656e744964656e7469666965726a676976656e5f6e616d656c656c656d656e7456616c7565644a6f686ed818585ba4686469676573744944026672616e646f6d50d29cf9b5f51da4ba29b9a3539157565371656c656d656e744964656e7469666965726a62697274685f646174656c656c656d656e7456616c7565d903ec6a313939302d30312d31356a697373756572417574688443a10126a1182159014b308201473081eea0030201020208e41bf1aa25a50dc8300a06082a8648ce3d04030230173115301306035504030c0c4d444f4320524f4f54204341301e170d3235303531363037303635355a170d3235303531373037303635355a301b3119301706035504030c104d444f432054657374204973737565723059301306072a8648ce3d020106082a8648ce3d03010703420004b98a99a317d6f68a22683eaa1d2d8c10db4229fd81d3124587672689f832e5d9c27c2e8ece4ebfd56575c52e313626f4376e194b48133b5ab3b06997b480eccaa320301e300c0603551d130101ff04023000300e0603551d0f0101ff040403020780300a06082a8648ce3d040302034800304502206da1d3cb6e761ee03c415ce4054bac8ccc0c89eba89a423a9885c3a3507dc2dd022100f2f4c5c444566993502f913a02011e83b756ee5319b2095ac037e34f3f5f5695590205d818590200a76776657273696f6e63312e306f646967657374416c676f726974686d675348412d3235366c76616c756544696765737473a1716f72672e69736f2e31383031332e352e31a3005820cd7c600e8894b9d0eb0ac322fb40ced31a4e9eecacfbc638445b77f16d73b1d40158206baf6dfa5313e0941956959a3e537d1879e5baf6942bba55fae48be88b8b952e025820ff5bde0324fc3185d6a87eb6a029673236386a50cfc5cb3b2dc3528f9bbcdb4e6d6465766963654b6579496e666fa1696465766963654b6579a401022001215820547dc19e36381fd5702b5942cde4e38bcbdb99709f3303ce5f8d7faeaf956b8922582077aa8ec57f077557aec10d61719242f13ef31f2ed89a137a9dad4dbd4b40061267646f6354797065756f72672e69736f2e31383031332e352e312e6d444c6c76616c6964697479496e666fa3667369676e6564c0781e323032352d30352d31365430373a30363a35352e3536353533333634345a6976616c696446726f6dc0781e323032352d30352d31365430373a30363a35352e3536353533363033395a6a76616c6964556e74696cc0781e323032362d30352d31365430373a30363a35352e3536353533363536305a66737461747573a16b7374617475735f6c697374a263696478188e63757269782168747470733a2f2f6578616d706c652e636f6d2f7374617475736c697374732f315840f2e190bf0985a19dd12660c6f2716de1dcfc88c44598527a0b1b36c187491078ebeaec8664c8b17ae538192e8393c3861375bf78e1ec856f4c618a4cc5f911d5
+```
+
+<details>
+<summary><i>View in diagnostic notation</i></summary>
+
+```json
+{
+  "docType": "org.iso.18013.5.1.mDL",
+  "issuerSigned": {
+    "nameSpaces": {
+      "org.iso.18013.5.1": [
+        24_0(<<{
+          "digestID": 0,
+          "random": h'a7aa5c10f650c15126ab2c5e94ea0b7a',
+          "elementIdentifier": "family_name",
+          "elementValue": "Doe",
+        }>>),
+        24_0(<<{
+          "digestID": 1,
+          "random": h'a0f5adba0ff6aef77e6c8b3f9a1e1c58',
+          "elementIdentifier": "given_name",
+          "elementValue": "John",
+        }>>),
+        24_0(<<{
+          "digestID": 2,
+          "random": h'd29cf9b5f51da4ba29b9a35391575653',
+          "elementIdentifier": "birth_date",
+          "elementValue": 1004_1("1990-01-15"),
+        }>>),
+      ],
+    },
+    "issuerAuth": [
+      h'a10126',
+      {
+        33_0: h'308201473081eea0030201020208e41bf1aa25a50dc8300a06082a8648ce3d04030230173115301306035504030c0c4d444f4320524f4f54204341301e170d3235303531363037303635355a170d3235303531373037303635355a301b3119301706035504030c104d444f432054657374204973737565723059301306072a8648ce3d020106082a8648ce3d03010703420004b98a99a317d6f68a22683eaa1d2d8c10db4229fd81d3124587672689f832e5d9c27c2e8ece4ebfd56575c52e313626f4376e194b48133b5ab3b06997b480eccaa320301e300c0603551d130101ff04023000300e0603551d0f0101ff040403020780300a06082a8648ce3d040302034800304502206da1d3cb6e761ee03c415ce4054bac8ccc0c89eba89a423a9885c3a3507dc2dd022100f2f4c5c444566993502f913a02011e83b756ee5319b2095ac037e34f3f5f5695',
+      },
+      h'd818590200a76776657273696f6e63312e306f646967657374416c676f726974686d675348412d3235366c76616c756544696765737473a1716f72672e69736f2e31383031332e352e31a3005820cd7c600e8894b9d0eb0ac322fb40ced31a4e9eecacfbc638445b77f16d73b1d40158206baf6dfa5313e0941956959a3e537d1879e5baf6942bba55fae48be88b8b952e025820ff5bde0324fc3185d6a87eb6a029673236386a50cfc5cb3b2dc3528f9bbcdb4e6d6465766963654b6579496e666fa1696465766963654b6579a401022001215820547dc19e36381fd5702b5942cde4e38bcbdb99709f3303ce5f8d7faeaf956b8922582077aa8ec57f077557aec10d61719242f13ef31f2ed89a137a9dad4dbd4b40061267646f6354797065756f72672e69736f2e31383031332e352e312e6d444c6c76616c6964697479496e666fa3667369676e6564c0781e323032352d30352d31365430373a30363a35352e3536353533333634345a6976616c696446726f6dc0781e323032352d30352d31365430373a30363a35352e3536353533363033395a6a76616c6964556e74696cc0781e323032362d30352d31365430373a30363a35352e3536353533363536305a66737461747573a16b7374617475735f6c697374a263696478188e63757269782168747470733a2f2f6578616d706c652e636f6d2f7374617475736c697374732f31',
+      h'f2e190bf0985a19dd12660c6f2716de1dcfc88c44598527a0b1b36c187491078ebeaec8664c8b17ae538192e8393c3861375bf78e1ec856f4c618a4cc5f911d5',
+    ],
+  },
+}
+```
+
+</details>
+
+_MSO of the signed mDoc as a hex-encoded string_
+
+```text
+d818590200a76776657273696f6e63312e306f646967657374416c676f726974686d675348412d3235366c76616c756544696765737473a1716f72672e69736f2e31383031332e352e31a3005820cd7c600e8894b9d0eb0ac322fb40ced31a4e9eecacfbc638445b77f16d73b1d40158206baf6dfa5313e0941956959a3e537d1879e5baf6942bba55fae48be88b8b952e025820ff5bde0324fc3185d6a87eb6a029673236386a50cfc5cb3b2dc3528f9bbcdb4e6d6465766963654b6579496e666fa1696465766963654b6579a401022001215820547dc19e36381fd5702b5942cde4e38bcbdb99709f3303ce5f8d7faeaf956b8922582077aa8ec57f077557aec10d61719242f13ef31f2ed89a137a9dad4dbd4b40061267646f6354797065756f72672e69736f2e31383031332e352e312e6d444c6c76616c6964697479496e666fa3667369676e6564c0781e323032352d30352d31365430373a30363a35352e3536353533333634345a6976616c696446726f6dc0781e323032352d30352d31365430373a30363a35352e3536353533363033395a6a76616c6964556e74696cc0781e323032362d30352d31365430373a30363a35352e3536353533363536305a66737461747573a16b7374617475735f6c697374a263696478188e63757269782168747470733a2f2f6578616d706c652e636f6d2f7374617475736c697374732f31
+```
+
+<details>
+<summary><i>View MSO in diagnostic notation</i></summary>
+
+```json
+{
+    "version": "1.0",
+    "digestAlgorithm": "SHA-256",
+    "valueDigests": {
+        "org.iso.18013.5.1": {
+            0: h'cd7c600e8894b9d0eb0ac322fb40ced31a4e9eecacfbc638445b77f16d73b1d4',
+            1: h'6baf6dfa5313e0941956959a3e537d1879e5baf6942bba55fae48be88b8b952e',
+            2: h'ff5bde0324fc3185d6a87eb6a029673236386a50cfc5cb3b2dc3528f9bbcdb4e',
+        },
+    },
+    "deviceKeyInfo": {
+        "deviceKey": {
+            1: 2,
+            -1: 1,
+            -2: h'547dc19e36381fd5702b5942cde4e38bcbdb99709f3303ce5f8d7faeaf956b89',
+            -3: h'77aa8ec57f077557aec10d61719242f13ef31f2ed89a137a9dad4dbd4b400612',
+        },
+    },
+    "docType": "org.iso.18013.5.1.mDL",
+    "validityInfo": {
+        "signed": 0("2025-05-16T07:06:55.565533644Z"),
+        "validFrom": 0("2025-05-16T07:06:55.565536039Z"),
+        "validUntil": 0("2026-05-16T07:06:55.565536560Z"),
+    },
+    "status": {
+        "status_list": {"idx": 142_0, "uri": "https://example.com/statuslists/1"},
+    },
+}
+```
+
+</details>
+
+The library also provides support for specifying revocation information in the `Status` structure via the identifier 
+list method. 
+
+To use this method, initialize the `Status` structure according to the following example:
+
+```kotlin
+val identifierListEntry = Status(
+  identifierList = IdentifierListInfo(
+    id = "cccc".decodeHex().toByteArray(),
+    uri = "https://example.com/identifierlists/1",
+      ),
+)
+```
+
+Note that the two revocation methods discussed here are **mutually exclusive**.
 
 #### Create, parse and verify a mdoc (mDL) request
 
@@ -436,6 +579,200 @@ Namespace: org.iso.18013.5.1
       ),
       cryptoProvider
     )
+```
+
+### Create and parse Device Engagement structures
+
+In the following, we provide examples for creating `DeviceEngagement` structures for all transports.
+
+#### NFC
+
+```kotlin
+val nfcDeviceEngagement = DeviceEngagement(
+  security = id.walt.mdoc.deviceengagement.Security(
+    cipherSuite = 1,
+    eDeviceKeyBytes = EncodedCBORElement(deviceKeyPair.public.encoded),
+      ),
+  deviceRetrievalMethods = listOf(
+    NfcDeviceRetrieval(
+      retrievalOptions = NfcOptions(
+        commandDataFieldMaxLength = 6700u,
+        responseDataFieldMaxLength = 8000u,
+          )
+    )
+  ),
+)
+```
+
+_CBOR data (hex encoded string):_
+
+```text
+a30063312e30018201d818585b3059301306072a8648ce3d020106082a8648ce3d030107034200046a7ac7352aae33fa1f39a7c88208c5f697cf987a7947c96b1c65381f4badcf86b0a1d7b2ecddd97c87b907063cd2237285302260f125ef9666acfadcf152d37a0281830101a200191a2c01191f40
+```
+
+<details>
+<summary>View in diagnostic notation</summary>
+
+```json
+{
+  0: "1.0",
+  1: [
+    1,
+    24_0(h'3059301306072a8648ce3d020106082a8648ce3d030107034200046a7ac7352aae33fa1f39a7c88208c5f697cf987a7947c96b1c65381f4badcf86b0a1d7b2ecddd97c87b907063cd2237285302260f125ef9666acfadcf152d37a'),
+  ],
+  2: [[1, 1, {0: 6700_1, 1: 8000_1}]],
+}
+```
+
+</details>
+
+
+
+#### BLE
+
+```kotlin
+val bleDeviceEngagement = DeviceEngagement(
+  security = id.walt.mdoc.deviceengagement.Security(
+    cipherSuite = 1,
+    eDeviceKeyBytes = EncodedCBORElement(deviceKeyPair.public.encoded),
+      ),
+  deviceRetrievalMethods = listOf(
+    BleDeviceRetrieval(
+      retrievalOptions = BleOptions(
+        supportMDocPeripheralServerMode = false,
+        supportMDocCentralClientMode = true,
+          ),
+        )
+  ),
+)
+```
+
+_CBOR data (hex encoded string):_
+
+```text
+a30063312e30018201d818585b3059301306072a8648ce3d020106082a8648ce3d03010703420004fffd6b9f97a7efc1bf83a4b43244062f17b06b1d8967388ab4c97c8a6b846fbdd764ac35707a295c59ddc543c017a8d8c187b60a70e66f36cb0bbb6dd42d09ec0281830201a200f401f5
+```
+
+<details>
+<summary>View in diagnostic notation</summary>
+
+```json
+{
+  0: "1.0",
+  1: [
+    1,
+    24_0(h'3059301306072a8648ce3d020106082a8648ce3d03010703420004fffd6b9f97a7efc1bf83a4b43244062f17b06b1d8967388ab4c97c8a6b846fbdd764ac35707a295c59ddc543c017a8d8c187b60a70e66f36cb0bbb6dd42d09ec'),
+  ],
+  2: [[2, 1, {0: false, 1: true}]],
+}
+```
+
+</details>
+
+#### Wi-Fi Aware
+
+```kotlin
+val wifiDeviceEngagement = DeviceEngagement(
+  security = id.walt.mdoc.deviceengagement.Security(
+    cipherSuite = 1,
+    eDeviceKeyBytes = EncodedCBORElement(deviceKeyPair.public.encoded),
+  ),
+  deviceRetrievalMethods = listOf(
+    WifiDeviceRetrieval(
+      retrievalOptions = WifiOptions(
+        passPhrase = "secret-wifi-password",
+        bandInfoSupportedBands = ByteArray(0), //replace with band info (Wi-Fi aware carrier configuration record).
+      ),
+    ),
+  ),
+)
+```
+
+_CBOR data (hex encoded string):_
+
+```text
+a30063312e30018201d818585b3059301306072a8648ce3d020106082a8648ce3d0301070342000436ad02b227ccffe8b1595fcdf83283c218a901b87aa80444e8baf897cadcbe2be4ada64a54b90530d5797d9c4bdf4b57e7f9dcc21726290c4280ee7d77749c5a0281830301a200747365637265742d776966692d70617373776f72640340
+```
+
+<details>
+<summary>View in diagnostic notation</summary>
+
+```json
+{
+  0: "1.0",
+  1: [
+    1,
+    24_0(h'3059301306072a8648ce3d020106082a8648ce3d0301070342000436ad02b227ccffe8b1595fcdf83283c218a901b87aa80444e8baf897cadcbe2be4ada64a54b90530d5797d9c4bdf4b57e7f9dcc21726290c4280ee7d77749c5a'),
+  ],
+  2: [
+    [3, 1, {0: "secret-wifi-password", 3: h''}],
+  ],
+}
+```
+
+</details>
+
+#### Parse a Device Engagement structure
+
+```kotlin
+val deviceEngagementHexString = "a30063312e30018201d818584ba4010220012158205a88d182bce5f42efa59943f33359d2e8a968ff289d93e5fa444b624343167fe225820b16e8cf858ddc7690407ba61d4c338237a8cfcf3de6aa672fc60a557aa32fc670281830201a300f401f50b5045efef742b2c4837a9a3b0e1d05a6917"
+val deviceEngagement = DeviceEngagement.fromCBORHex(deviceEngagementHexString)
+println("Parsed: $deviceEngagement")
+```
+
+_Example output_
+
+```text
+Parsed: DeviceEngagement(security=Security(cipherSuite=1, eDeviceKeyBytes=id.walt.mdoc.dataelement.EncodedCBORElement@3301500b), deviceRetrievalMethods=[BleDeviceRetrieval(type=BLE, version=1, retrievalOptions=BleOptions(supportMDocPeripheralServerMode=false, supportMDocCentralClientMode=true, mdocPeripheralServerModeUUID=null, mdocCentralClientModeUUID=[69, -17, -17, 116, 43, 44, 72, 55, -87, -93, -80, -31, -48, 90, 105, 23], mdocPeripheralServerModeDeviceAddress=null, mdocPeripheralServerModeL2CAPPSM=null))], serverRetrievalMethods=null, protocolInfo=null, originInfos=null, capabilities=null, optional={})
+```
+
+<details>
+<summary>View in diagnostic notation</summary>
+
+```json
+{
+    0: "1.0",
+    1: [
+        1,
+        24_0(<<{
+            1: 2,
+            -1: 1,
+            -2: h'5a88d182bce5f42efa59943f33359d2e8a968ff289d93e5fa444b624343167fe',
+            -3: h'b16e8cf858ddc7690407ba61d4c338237a8cfcf3de6aa672fc60a557aa32fc67',
+        }>>),
+    ],
+    2: [
+        [
+            2,
+            1,
+            {
+                0: false,
+                1: true,
+                11: h'45efef742b2c4837a9a3b0e1d05a6917',
+            },
+        ],
+    ],
+}
+```
+
+</details>
+
+#### Server Retrieval Methods
+
+The following example illustrates how to construct server retrieval methods that can be attached in any device 
+engagement structure
+
+```kotlin
+val serverRetrievalMethods = ServerRetrievalMethods(
+  webAPI = ServerRetrievalInformation(
+    issuerURL = "https://example-webapi-issuer-url.com",
+    serverRetrievalToken = "secret-token1",
+      ),
+  oidc = ServerRetrievalInformation(
+    issuerURL = "https://example-oidc-issuer-url.com",
+    serverRetrievalToken = "secret-token2",
+      ),
+)
 ```
 
 ## Join the community

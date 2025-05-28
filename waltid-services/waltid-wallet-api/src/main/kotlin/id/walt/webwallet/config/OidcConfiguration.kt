@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class OidcConfiguration(
-    val publicBaseUrl: String = "http://localhost:7101",
+    val publicBaseUrl: String,
     val providerName: String,
     val oidcRealm: String,
     val oidcJwks: String,
@@ -15,7 +15,7 @@ data class OidcConfiguration(
     val logoutUrl: String,
     val clientId: String,
     val clientSecret: String,
-    val keycloakUserApi: String,
+    val keycloakUserApi: String? = null,
 ) : WalletConfig() {
     @Serializable
     data class OidcJwksCacheConfiguration(

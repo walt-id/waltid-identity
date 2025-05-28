@@ -1,6 +1,5 @@
 package id.walt.policies
 
-import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.policies.models.PolicyRequest
 import id.walt.policies.models.PolicyResult
@@ -9,6 +8,7 @@ import id.walt.policies.models.PresentationVerificationResponse
 import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDJwtVC
+import id.walt.w3c.utils.VCFormat
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -26,7 +26,7 @@ import kotlin.time.measureTime
 @JsExport
 object Verifier {
 
-    private val log = KotlinLogging.logger {  }
+    private val log = KotlinLogging.logger { }
 
     private fun JsonObject.getW3CType() = (this["type"] ?: this["vc"]?.jsonObject?.get("type") ?: this["vp"]?.jsonObject?.get("type")
     ?: throw IllegalArgumentException("No `type` supplied: $this")).let {
@@ -39,6 +39,18 @@ object Verifier {
 
         }
     }
+
+    private fun JsonObject.getSdjwtVcType() =
+        (this["vct"] ?: this["vc"]?.jsonObject?.get("vct") ?: throw IllegalArgumentException("No `vct` supplied: $this")).let {
+            when (it) {
+                is JsonPrimitive -> it.content
+                else -> throw IllegalArgumentException("Invalid type of `type`-attribute: ${it::class.simpleName}")
+            }
+        }
+
+    private fun JsonObject.getAnyType() = runCatching { getW3CType() }
+        .recover { getSdjwtVcType() }
+        .getOrElse { throw IllegalArgumentException("Cannot determine any type for: $this") }
 
     @JvmBlocking
     @JvmAsync
@@ -138,13 +150,23 @@ object Verifier {
         specificCredentialPolicies: Map<String, List<PolicyRequest>>,
         presentationContext: Map<String, Any> = emptyMap(),
     ): PresentationVerificationResponse {
-        return when(format) {
-            VCFormat.sd_jwt_vc -> verifySDJwtVCPresentation(vpToken, vpPolicies, globalVcPolicies, specificCredentialPolicies, presentationContext)
-            VCFormat.mso_mdoc -> TODO()
+        val isW3CVp = runCatching { vpToken.decodeJws().payload.contains("vp") }.getOrElse { false }
+        log.trace { "Verifying presentation with format $format (is w3cvp=$isW3CVp): $vpToken" }
+
+        return when {
+            isW3CVp -> verifyW3CPresentation(format, vpToken, vpPolicies, globalVcPolicies, specificCredentialPolicies, presentationContext)
+
+            format == VCFormat.mso_mdoc -> TODO("mdoc presentations are not yet supported")
+            format == VCFormat.sd_jwt_vc -> verifySDJwtVCPresentation(vpToken, vpPolicies, globalVcPolicies, specificCredentialPolicies, presentationContext)
+
             else -> verifyW3CPresentation(format, vpToken, vpPolicies, globalVcPolicies, specificCredentialPolicies, presentationContext)
         }
     }
 
+    /**
+     * "W3C" in this case refers to the Verifiable *Presentation* (which in itself is a special
+     * kind of credential). The VP can contain SD-JWT VC etc., but itself it is still W3C.
+     */
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -212,7 +234,8 @@ object Verifier {
 
                 // VCs
                 verifiableCredentialJwts.forEach { credentialJwt ->
-                    val credentialType = credentialJwt.decodeJws().payload.getW3CType()
+                    val credentialType = credentialJwt.substringBefore("~").decodeJws().payload.getAnyType()
+
                     val vcIdx = addResultEntryFor(credentialType)
 
                     /* Global VC Policies */
@@ -240,9 +263,11 @@ object Verifier {
         specificCredentialPolicies: Map<String, List<PolicyRequest>>,
         presentationContext: Map<String, Any> = emptyMap(),
     ): PresentationVerificationResponse {
+        log.trace { "Verifying SD-JWT VC Presentation, vp_token: $vpToken" }
         val sdJwtVC = SDJwtVC.parse(vpToken)
         val payload = sdJwtVC.fullPayload
-        val vpType =  sdJwtVC.type ?: sdJwtVC.vct ?: ""
+        val vpType = sdJwtVC.type ?: sdJwtVC.vct ?: ""
+        log.trace { "SD-JWT VC Presentation vpType: $vpType" }
 
         val results = ArrayList<PresentationResultEntry>()
 
@@ -269,7 +294,7 @@ object Verifier {
                 runPolicyRequests(0, vpToken, vpPolicies)
 
                 // VCs
-                if(globalVcPolicies.size > 0 || specificCredentialPolicies.containsKey(vpType)) {
+                if (globalVcPolicies.size > 0 || specificCredentialPolicies.containsKey(vpType)) {
                     results.add(PresentationResultEntry(vpType))
 
                     /* Global VC Policies */
@@ -286,6 +311,7 @@ object Verifier {
         return PresentationVerificationResponse(results, time, policiesRun)
     }
 
+
     private val EMPTY_MAP = emptyMap<String, Any>()
 
     @JvmBlocking
@@ -295,6 +321,5 @@ object Verifier {
     @Suppress("UNCHECKED_CAST" /* as? */)
     suspend fun verifyJws(jwt: String): Result<JsonObject> = JwtSignaturePolicy().verify(jwt, null, EMPTY_MAP) as? Result<JsonObject>
         ?: Result.failure(IllegalArgumentException("Could not get JSONObject from VC verification"))
-
 
 }

@@ -168,7 +168,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         }
 
         if (tokenResponse.vpToken is JsonObject) TODO("Token response is jsonobject - not yet handled")
-        val presentationFormat = tokenResponse.presentationSubmission?.descriptorMap?.firstOrNull()?.format ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
+        val presentationFormat = tokenResponse.presentationSubmission?.descriptorMap?.firstOrNull()?.format ?: tokenResponse.presentationSubmission?.descriptorMap?.firstOrNull()?.pathNested?.format ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
 
         logger.debug { "VP token: $vpToken" }
         logger.info { "OpenID4VP profile: ${session.openId4VPProfile}" }
