@@ -266,9 +266,9 @@ open class CIProvider(
                         issuerKey = resolvedIssuerKey,
                         selectiveDisclosure = request.selectiveDisclosure,
                         dataMapping = request.mapping,
-                        display = if (credentialRequest.display != null) credentialRequest.display else vc.jsonObject["display"]?.jsonArray?.map {
+                        display = credentialRequest.display ?: vc["display"]?.jsonArray?.map {
                             DisplayProperties.fromJSON(it.jsonObject)
-                        } ,
+                        },
                         x5Chain = request.x5Chain).also {
                         if (!issuanceSession.callbackUrl.isNullOrEmpty())
                             sendCallback(
