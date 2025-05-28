@@ -10,6 +10,7 @@ import { sendToWebWallet } from "@/utils/sendToWebWallet";
 import nextConfig from "@/next.config";
 import BackButton from "@/components/walt/button/BackButton";
 import { CredentialFormats, mapFormat } from "@/types/credentials";
+import { checkVerificationResult, getStateFromUrl } from "@/utils/checkVerificationResult";
 
 const BUTTON_COPY_TEXT_DEFAULT = 'Copy offer URL';
 const BUTTON_COPY_TEXT_COPIED = 'Copied';
@@ -92,6 +93,15 @@ export default function Verification() {
       );
       setverifyURL(response.data);
       setLoading(false);
+
+      const state = getStateFromUrl(response.data);
+      if (state) {
+        checkVerificationResult(env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER, state).then((result) => {
+          if (result) {
+            router.push(`/success/${state}`);
+          }
+        });
+      }
     };
     getverifyURL();
   }, []);
