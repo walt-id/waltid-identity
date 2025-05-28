@@ -1,6 +1,7 @@
 package id.walt.policies.policies.status.reader
 
 import id.walt.policies.policies.status.BitValueReader
+import id.walt.policies.policies.status.StatusContent
 import id.walt.policies.policies.status.parser.ContentParser
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.Json

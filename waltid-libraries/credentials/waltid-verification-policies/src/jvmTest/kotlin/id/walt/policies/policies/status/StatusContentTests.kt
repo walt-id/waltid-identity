@@ -1,4 +1,4 @@
-package id.walt.policies.policies.status.reader
+package id.walt.policies.policies.status
 
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
