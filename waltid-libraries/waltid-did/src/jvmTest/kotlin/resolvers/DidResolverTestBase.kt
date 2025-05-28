@@ -54,6 +54,17 @@ abstract class DidResolverTestBase {
         }
     }
 
+    open fun `given a did String, when calling resolveToKeys, then the result is valid keys set`(
+        did: String,
+        key: JsonObject,
+        assert: resolverAssertion<Set<Key>>,
+    ) {
+        allowFailWithSocketTimeout {
+            val result = runBlocking { resolver.resolveToKeys(did) }
+            assert(did, key, result)
+        }
+    }
+
     companion object {
 
         //region-DidDocument assertions-
@@ -141,6 +152,70 @@ abstract class DidResolverTestBase {
             val publicKey = runBlocking { result.getOrNull()!!.getPublicKey().exportJWKObject() }
             assert(rsaKeyChecks(publicKey, key))
         }
+
+        //region -KeySet assertions-
+        private val keysSetAssertions: resolverAssertion<Set<Key>> = { did, key, result ->
+            val keysResult = result.getOrNull()
+            assert(result.isSuccess)
+            assertNotNull(keysResult)
+            assert(keysResult.isNotEmpty())
+
+            // At least one of the keys should match the expected key
+            val foundMatchingKey = keysResult.any { resolvedKey ->
+                val publicKey = runBlocking { resolvedKey.getPublicKey().exportJWKObject() }
+                defaultKeyChecks(publicKey, key)
+            }
+            assert(foundMatchingKey)
+        }
+
+        /**
+         * Runs tests against **ed25519** specific fields.
+         * Inherits [keysSetAssertions]
+         */
+        val ed25519KeysSetAssertions: resolverAssertion<Set<Key>> = { did, key, result ->
+            keysSetAssertions(did, key, result)
+            val keysResult = result.getOrNull()!!
+
+            // At least one of the keys should be an Ed25519 key matching the expected properties
+            val foundMatchingKey = keysResult.any { resolvedKey ->
+                val publicKey = runBlocking { resolvedKey.getPublicKey().exportJWKObject() }
+                ed25519KeyChecks(publicKey, key)
+            }
+            assert(foundMatchingKey)
+        }
+
+        /**
+         * Runs tests against **secp256-k1/-r1** specific fields.
+         * Inherits [ed25519KeysSetAssertions]
+         */
+        val secp256KeysSetAssertions: resolverAssertion<Set<Key>> = { did, key, result ->
+            ed25519KeysSetAssertions(did, key, result)
+            val keysResult = result.getOrNull()!!
+
+            // At least one of the keys should be a secp256 key matching the expected properties
+            val foundMatchingKey = keysResult.any { resolvedKey ->
+                val publicKey = runBlocking { resolvedKey.getPublicKey().exportJWKObject() }
+                secp256KeyChecks(publicKey, key)
+            }
+            assert(foundMatchingKey)
+        }
+
+        /**
+         * Runs tests against **rsa** specific fields.
+         * Inherits [keysSetAssertions]
+         */
+        val rsaKeysSetAssertions: resolverAssertion<Set<Key>> = { did, key, result ->
+            keysSetAssertions(did, key, result)
+            val keysResult = result.getOrNull()!!
+
+            // At least one of the keys should be an RSA key matching the expected properties
+            val foundMatchingKey = keysResult.any { resolvedKey ->
+                val publicKey = runBlocking { resolvedKey.getPublicKey().exportJWKObject() }
+                rsaKeyChecks(publicKey, key)
+            }
+            assert(foundMatchingKey)
+        }
+        //endregion -KeySet assertions-
         //endregion -Key assertions-
 
         private val verificationMethodAssertions: (
