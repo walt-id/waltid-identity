@@ -3,7 +3,7 @@ package id.walt.crypto.keys.jwk
 import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.*
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.*
 import kotlin.test.assertNotNull
 
 class JWKKeyTest {
@@ -171,7 +171,10 @@ class JWKKeyTest {
             @Test
             fun `should be able to export private key`() = runTest {
                 try {
-                    key.exportJWK()
+                    val jwk = key.exportJWK()
+                    assertNotNull(jwk)
+                    assertInstanceOf<String>(jwk)
+                    assertTrue(jwk.isNotEmpty())
                 } catch (e: Exception) {
                     fail("It should be able to export RSA private key in JWK format")
                 }
@@ -180,7 +183,10 @@ class JWKKeyTest {
             @Test
             fun `should be able to export public key`() = runTest {
                 try {
-                    key.getPublicKey().exportJWK()
+                    val jwk = key.getPublicKey().exportJWK()
+                    assertNotNull(jwk)
+                    assertInstanceOf<String>(jwk)
+                    assertTrue(jwk.isNotEmpty())
                 } catch (e: Exception) {
                     fail("It should be able to export RSA public key in JWK format")
                 }
@@ -208,7 +214,14 @@ class JWKKeyTest {
                 """.trimIndent()
 
                 try {
-                    JWKKey.importJWK(jwk)
+                    val result = JWKKey.importJWK(jwk)
+                    assertTrue(result.isSuccess)
+
+                    val key = result.getOrNull()
+                    assertNotNull(key)
+                    assertInstanceOf<JWKKey>(key)
+                    assertEquals(key.keyType, KeyType.RSA)
+                    assertEquals("70e5e3c4-7cd4-45d4-8849-592efeb5d8ef", key.getKeyId())
                 } catch (e: Exception) {
                     fail("It should be able to import RSA private key in JWK format")
                 }
@@ -230,7 +243,13 @@ class JWKKeyTest {
                 """.trimIndent()
 
                 try {
-                    JWKKey.importJWK(jwk)
+                    val result = JWKKey.importJWK(jwk)
+                    val key = result.getOrNull()
+                    assertNotNull(key)
+                    assertInstanceOf<JWKKey>(key)
+                    assertEquals(key.keyType, KeyType.RSA)
+                    assertEquals("70e5e3c4-7cd4-45d4-8849-592efeb5d8ef", key.getKeyId())
+                    assertFalse(key.hasPrivateKey)
                 } catch (e: Exception) {
                     fail("It should be able to import RSA public key in JWK format")
                 }
@@ -241,6 +260,12 @@ class JWKKeyTest {
                 val jwkString = key.exportJWK()
                 val result = JWKKey.importJWK(jwkString)
                 assertTrue(result.isSuccess)
+
+                val importedKey = result.getOrNull()
+                assertNotNull(importedKey)
+                assertInstanceOf<JWKKey>(importedKey)
+                assertEquals(importedKey.keyType, KeyType.RSA)
+                assertEquals(key.getKeyId(), importedKey.getKeyId())
             }
         }
 
@@ -250,7 +275,10 @@ class JWKKeyTest {
             @Test
             fun `should be able to export private key`() = runTest {
                 try {
-                    key.exportPEM()
+                    val pem = key.exportPEM()
+                    assertNotNull(pem)
+                    assertInstanceOf<String>(pem)
+                    assertTrue(pem.isNotEmpty())
                 } catch (e: Exception) {
                     fail("It should be able to export RSA private key in PEM format")
                 }
@@ -259,7 +287,10 @@ class JWKKeyTest {
             @Test
             fun `should be able to export public key`() = runTest {
                 try {
-                    key.getPublicKey().exportPEM()
+                    val pem = key.getPublicKey().exportPEM()
+                    assertNotNull(pem)
+                    assertInstanceOf<String>(pem)
+                    assertTrue(pem.isNotEmpty())
                 } catch (e: Exception) {
                     fail("It should be able to export RSA public key in PEM format")
                 }
@@ -302,6 +333,11 @@ class JWKKeyTest {
 
                 val result = JWKKey.importPEM(pem)
                 assertTrue(result.isSuccess)
+
+                val key = result.getOrNull()
+                assertNotNull(key)
+                assertInstanceOf<JWKKey>(key)
+                assertEquals(key.keyType, KeyType.RSA)
             }
 
             @Test
@@ -322,6 +358,12 @@ class JWKKeyTest {
 
                 val result = JWKKey.importPEM(pem)
                 assertTrue(result.isSuccess)
+
+                val key = result.getOrNull()
+                assertNotNull(key)
+                assertInstanceOf<JWKKey>(key)
+                assertEquals(key.keyType, KeyType.RSA)
+                assertFalse(key.hasPrivateKey)
             }
 
             @Test
@@ -330,6 +372,12 @@ class JWKKeyTest {
 
                 val result = JWKKey.importPEM(pemString)
                 assertTrue(result.isSuccess)
+
+                val importedKey = result.getOrNull()
+                assertNotNull(importedKey)
+                assertInstanceOf<JWKKey>(importedKey)
+                assertEquals(importedKey.keyType, KeyType.RSA)
+                assertEquals(key.getKeyId(), importedKey.getKeyId())
             }
         }
 
@@ -352,7 +400,10 @@ class JWKKeyTest {
             @Test
             fun `should be able to export private key`() = runTest {
                 try {
-                    key.exportJWK()
+                    val jwk = key.exportJWK()
+                    assertNotNull(jwk)
+                    assertInstanceOf<String>(jwk)
+                    assertTrue(jwk.isNotEmpty())
                 } catch (e: Exception) {
                     fail("It should be able to export secp256k1 private key in JWK format")
                 }
@@ -361,7 +412,10 @@ class JWKKeyTest {
             @Test
             fun `should be able to export public key`() = runTest {
                 try {
-                    key.getPublicKey().exportJWK()
+                    val jwk = key.getPublicKey().exportJWK()
+                    assertNotNull(jwk)
+                    assertInstanceOf<String>(jwk)
+                    assertTrue(jwk.isNotEmpty())
                 } catch (e: Exception) {
                     fail("It should be able to export secp256k1 public key in JWK format")
                 }
@@ -375,24 +429,27 @@ class JWKKeyTest {
                 //  > https://pem2jwk.vercel.app/
                 val jwk = """
                 {
-                  "keys": [
-                    {
-                      "kty": "EC",
-                      "crv": "secp256k1",
-                      "x": "cYcEC83heFKRMHgiPckJ7Awt0uf6ZGo_qhjFL8yPkbk",
-                      "y": "qcdBRuGUMTWovbJFDClbpxYVjwGF3wLjuYeddV8AJYc",
-                      "ext": true,
-                      "d": "jrA04vDF2bRETWehJFuNKXp_I-wcdS51YUs4VW90ds0",
-                      "kid": "898ed47c11fd1e50b8f50969f",
-                      "alg": "RS256",
-                      "use": "sig"
-                    }
-                  ]
+                  "kty": "EC",
+                  "crv": "secp256k1",
+                  "x": "cYcEC83heFKRMHgiPckJ7Awt0uf6ZGo_qhjFL8yPkbk",
+                  "y": "qcdBRuGUMTWovbJFDClbpxYVjwGF3wLjuYeddV8AJYc",
+                  "ext": true,
+                  "d": "jrA04vDF2bRETWehJFuNKXp_I-wcdS51YUs4VW90ds0",
+                  "kid": "898ed47c11fd1e50b8f50969f",
+                  "alg": "RS256",
+                  "use": "sig"
                 }
                 """.trimIndent()
 
                 try {
-                    JWKKey.importJWK(jwk)
+                    val result = JWKKey.importJWK(jwk)
+                    assertTrue(result.isSuccess)
+
+                    val key = result.getOrNull()
+                    assertNotNull(key)
+                    assertInstanceOf<JWKKey>(key)
+                    assertEquals(key.keyType, KeyType.secp256k1)
+                    assertEquals("898ed47c11fd1e50b8f50969f", key.getKeyId())
                 } catch (e: Exception) {
                     fail("It should be able to import secp256k1 private key in JWK format")
                 }
@@ -406,23 +463,25 @@ class JWKKeyTest {
                 //  > https://pem2jwk.vercel.app/
                 val jwk = """
                 {
-                  "keys": [
-                    {
-                      "kty": "EC",
-                      "crv": "secp256k1",
-                      "x": "LQEX880TgRiaYuOzHZaHI7-3_cOeGp8n9rNYZjiRj0c",
-                      "y": "zrMZHN9JPg-BaZMtm5E5nTdSlPmVzN-RiRO811hjEaQ",
-                      "ext": true,
-                      "kid": "d9c821eb1717ea2eecc554541bf",
-                      "alg": "RS256",
-                      "use": "sig"
-                    }
-                  ]
+                  "kty": "EC",
+                  "crv": "secp256k1",
+                  "x": "LQEX880TgRiaYuOzHZaHI7-3_cOeGp8n9rNYZjiRj0c",
+                  "y": "zrMZHN9JPg-BaZMtm5E5nTdSlPmVzN-RiRO811hjEaQ",
+                  "ext": true,
+                  "kid": "d9c821eb1717ea2eecc554541bf",
+                  "alg": "RS256",
+                  "use": "sig"
                 }
                 """.trimIndent()
 
                 try {
-                    JWKKey.importJWK(jwk)
+                    val result = JWKKey.importJWK(jwk)
+                    val key = result.getOrNull()
+                    assertNotNull(key)
+                    assertInstanceOf<JWKKey>(key)
+                    assertEquals(KeyType.secp256k1, key.keyType)
+                    assertEquals("d9c821eb1717ea2eecc554541bf", key.getKeyId())
+                    assertFalse(key.hasPrivateKey)
                 } catch (e: Exception) {
                     fail("It should be able to import secp256k1 public key in JWK format")
                 }
@@ -433,6 +492,12 @@ class JWKKeyTest {
                 val jwkString = key.exportJWK()
                 val result = JWKKey.importJWK(jwkString)
                 assertTrue(result.isSuccess)
+
+                val importedKey = result.getOrNull()
+                assertNotNull(importedKey)
+                assertInstanceOf<JWKKey>(importedKey)
+                assertEquals(KeyType.secp256k1, importedKey.keyType)
+                assertEquals(key.getKeyId(), importedKey.getKeyId())
             }
         }
 
@@ -442,7 +507,10 @@ class JWKKeyTest {
             @Test
             fun `should be able to export private key`() = runTest {
                 try {
-                    key.exportPEM()
+                    val pem = key.exportPEM()
+                    assertNotNull(pem)
+                    assertInstanceOf<String>(pem)
+                    assertTrue(pem.isNotEmpty())
                 } catch (e: Exception) {
                     fail("It should be able to export secp256k1 private key in PEM format")
                 }
@@ -451,7 +519,10 @@ class JWKKeyTest {
             @Test
             fun `should be able to export public key`() = runTest {
                 try {
-                    key.getPublicKey().exportPEM()
+                    val pem = key.getPublicKey().exportPEM()
+                    kotlin.test.assertNotNull(pem)
+                    assertInstanceOf<String>(pem)
+                    assertTrue(pem.isNotEmpty())
                 } catch (e: Exception) {
                     fail("It should be able to export secp256k1 public key in PEM format")
                 }
@@ -471,6 +542,11 @@ class JWKKeyTest {
 
                 val result = JWKKey.importPEM(pem)
                 assertTrue(result.isSuccess)
+
+                val key = result.getOrNull()
+                assertNotNull(key)
+                assertInstanceOf<JWKKey>(key)
+                assertEquals(key.keyType, KeyType.secp256k1)
             }
 
             @Test
@@ -486,6 +562,12 @@ class JWKKeyTest {
 
                 val result = JWKKey.importPEM(pem)
                 assertTrue(result.isSuccess)
+
+                val key = result.getOrNull()
+                assertNotNull(key)
+                assertInstanceOf<JWKKey>(key)
+                assertEquals(KeyType.secp256k1, key.keyType)
+                assertFalse(key.hasPrivateKey)
             }
 
             @Test
@@ -494,6 +576,12 @@ class JWKKeyTest {
 
                 val result = JWKKey.importPEM(pemString)
                 assertTrue(result.isSuccess)
+
+                val importedKey = result.getOrNull()
+                assertNotNull(importedKey)
+                assertInstanceOf<JWKKey>(importedKey)
+                assertEquals(KeyType.secp256k1, importedKey.keyType)
+                assertEquals(key.getKeyId(), importedKey.getKeyId())
             }
         }
     }
@@ -515,7 +603,10 @@ class JWKKeyTest {
             @Test
             fun `should be able to export private key`() = runTest {
                 try {
-                    key.exportJWK()
+                    val jwk = key.exportJWK()
+                    assertNotNull(jwk)
+                    assertInstanceOf<String>(jwk)
+                    assertTrue(jwk.isNotEmpty())
                 } catch (e: Exception) {
                     fail("It should be able to export secp256r1 private key in JWK format")
                 }
@@ -524,7 +615,10 @@ class JWKKeyTest {
             @Test
             fun `should be able to export public key`() = runTest {
                 try {
-                    key.getPublicKey().exportJWK()
+                    val jwk = key.getPublicKey().exportJWK()
+                    assertNotNull(jwk)
+                    assertInstanceOf<String>(jwk)
+                    assertTrue(jwk.isNotEmpty())
                 } catch (e: Exception) {
                     fail("It should be able to export secp256r1 public key in JWK format")
                 }
@@ -536,26 +630,43 @@ class JWKKeyTest {
                 //  > openssl ecparam -name secp256r1 -genkey -noout -out private_key.pem
                 // Converted to JWK with
                 //  > https://pem2jwk.vercel.app/
+//                val jwk = """
+//                {
+//                  "kty": "EC",
+//                  "crv": "p256",
+//                  "x": "20U-Zvrlqp1m0psn4BD9m1SvZjfUIt2BEX6biLglBpc",
+//                  "y": "WXncPDNHXD_4-j_IItht9Cl9A9_khRnzazp9sAXOTC8",
+//                  "ext": true,
+//                  "d": "si5F8eQ6ttEZCaMh-2EkOJxRQj7YPs6mL49Xm3sxLoo",
+//                  "kid": "820119b503a2b16dc5520f",
+//                  "alg": "RS256",
+//                  "use": "sig"
+//                }
+//                """.trimIndent()
+
                 val jwk = """
                 {
-                  "keys": [
-                    {
-                      "kty": "EC",
-                      "crv": "p256",
-                      "x": "20U-Zvrlqp1m0psn4BD9m1SvZjfUIt2BEX6biLglBpc",
-                      "y": "WXncPDNHXD_4-j_IItht9Cl9A9_khRnzazp9sAXOTC8",
-                      "ext": true,
-                      "d": "si5F8eQ6ttEZCaMh-2EkOJxRQj7YPs6mL49Xm3sxLoo",
-                      "kid": "820119b503a2b16dc5520f",
-                      "alg": "RS256",
-                      "use": "sig"
-                    }
-                  ]
+                    "kty": "EC",
+                    "crv": "p256",
+                    "x": "03KtiEl2Q57uR87xoBoY2ELhPo9mUatZ0i70B7OXdeo",
+                    "y": "6tGOPx13S_IBNYMVkMe8UJKJl0svWClDVorm2lf3InM",
+                    "ext": true,
+                    "d": "umCOa9kAOUwqfnOdheIGEzCSY5XB6tOa8x8Boi7v34c",
+                    "kid": "cb65a58215c2c32c63c83d",
+                    "alg": "ES256",
+                    "use": "sig"
                 }
                 """.trimIndent()
 
                 try {
-                    JWKKey.importJWK(jwk)
+                    val result = JWKKey.importJWK(jwk)
+                    assertTrue(result.isSuccess)
+
+                    val key = result.getOrNull()
+                    assertNotNull(key)
+                    assertInstanceOf<JWKKey>(key)
+                    assertEquals(KeyType.secp256r1, key.keyType)
+                    assertEquals("820119b503a2b16dc5520f", key.getKeyId())
                 } catch (e: Exception) {
                     fail("It should be able to import secp256r1 private key in JWK format")
                 }
@@ -585,7 +696,15 @@ class JWKKeyTest {
                 """.trimIndent()
 
                 try {
-                    JWKKey.importJWK(jwk)
+                    val result = JWKKey.importJWK(jwk)
+                    assertTrue(result.isSuccess)
+
+                    val key =result.getOrNull()
+                    assertNotNull(key)
+                    assertInstanceOf<JWKKey>(key)
+                    assertEquals(KeyType.secp256r1, key.keyType)
+                    assertEquals("e76b9d2617b6fece0bec", key.getKeyId())
+                    assertFalse(key.hasPrivateKey)
                 } catch (e: Exception) {
                     fail("It should be able to import secp256r1 public key in JWK format")
                 }
@@ -596,6 +715,12 @@ class JWKKeyTest {
                 val jwkString = key.exportJWK()
                 val result = JWKKey.importJWK(jwkString)
                 assertTrue(result.isSuccess)
+
+                val importedKey = result.getOrNull()
+                assertNotNull(importedKey)
+                assertInstanceOf<JWKKey>(importedKey)
+                assertEquals(importedKey.keyType, KeyType.RSA)
+                assertEquals(key.getKeyId(), importedKey.getKeyId())
             }
         }
 
@@ -605,7 +730,10 @@ class JWKKeyTest {
             @Test
             fun `should be able to export private key`() = runTest {
                 try {
-                    key.exportPEM()
+                    val pem = key.exportPEM()
+                    assertNotNull(pem)
+                    assertInstanceOf<String>(pem)
+                    assertTrue(pem.isNotEmpty())
                 } catch (e: Exception) {
                     fail("It should be able to export secp256r1 private key in PEM format")
                 }
@@ -614,7 +742,10 @@ class JWKKeyTest {
             @Test
             fun `should be able to export public key`() = runTest {
                 try {
-                    key.getPublicKey().exportPEM()
+                    val pem = key.getPublicKey().exportPEM()
+                    assertNotNull(pem)
+                    assertInstanceOf<String>(pem)
+                    assertTrue(pem.isNotEmpty())
                 } catch (e: Exception) {
                     fail("It should be able to export secp256r1 public key in PEM format")
                 }
@@ -635,6 +766,11 @@ class JWKKeyTest {
 
                 val result = JWKKey.importPEM(pem)
                 assertTrue(result.isSuccess)
+
+                val importedKey = result.getOrNull()
+                assertNotNull(importedKey)
+                assertInstanceOf<JWKKey>(importedKey)
+                assertEquals(KeyType.secp256r1, importedKey.keyType)
             }
 
             @Test
@@ -650,6 +786,12 @@ class JWKKeyTest {
 
                 val result = JWKKey.importPEM(pem)
                 assertTrue(result.isSuccess)
+
+                val importedKey = result.getOrNull()
+                assertNotNull(importedKey)
+                assertInstanceOf<JWKKey>(importedKey)
+                assertEquals(KeyType.secp256r1, importedKey.keyType)
+                assertFalse(importedKey.hasPrivateKey)
             }
 
             @Test
@@ -658,6 +800,12 @@ class JWKKeyTest {
 
                 val result = JWKKey.importPEM(pemString)
                 assertTrue(result.isSuccess)
+
+                val importedKey = result.getOrNull()
+                assertNotNull(importedKey)
+                assertInstanceOf<JWKKey>(importedKey)
+                assertEquals(KeyType.secp256r1, importedKey.keyType)
+                assertEquals(key.getKeyId(), importedKey.getKeyId())
             }
         }
     }
