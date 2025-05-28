@@ -22,7 +22,7 @@ data class DcqlDisclosure(
     val value: JsonElement,
 
     // A place to pass a reference to the original (using which this class was created)
-    val original: Any? = null
+    //val original: Any? = null // no longer needed?
 )
 
 data class RawDcqlCredential(
