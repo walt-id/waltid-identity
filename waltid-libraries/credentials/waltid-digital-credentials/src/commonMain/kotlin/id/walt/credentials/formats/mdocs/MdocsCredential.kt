@@ -1,10 +1,12 @@
 package id.walt.credentials.formats
 
 import id.walt.credentials.signatures.CredentialSignature
+import id.walt.crypto.keys.Key
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -21,4 +23,8 @@ data class MdocsCredential(
     override var subject: String? = null,
 ) : DigitalCredential() {
     override val format: String = "mso_mdoc"
+
+    override suspend fun verify(publicKey: Key): Result<JsonElement> {
+        TODO("Not yet implemented: verify mdocs")
+    }
 }
