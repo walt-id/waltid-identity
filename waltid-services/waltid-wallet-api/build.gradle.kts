@@ -7,6 +7,7 @@ plugins {
     id("io.ktor.plugin") version "3.1.2"
     kotlin("plugin.serialization")
     id("com.github.ben-manes.versions")
+    `maven-publish`
 }
 
 group = "id.walt"
@@ -192,4 +193,18 @@ dependencies {
     testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
     testImplementation("io.mockk:mockk:1.13.16")
     testImplementation("io.klogging:klogging-jvm:0.9.1")
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("mavenJava") {
+            from(components["java"])
+            groupId = project.group.toString()
+            artifactId = project.extensions.getByType<JavaApplication>().applicationName
+        }
+    }
+    repositories {
+        // ./gradlew :waltid-services:waltid-wallet-api:publishToMavenLocal
+        mavenLocal()
+    }
 }
