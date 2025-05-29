@@ -1,6 +1,5 @@
 package id.walt.verifier
 
-import id.walt.commons.interop.LspPotentialInterop
 import io.github.smiley4.ktoropenapi.config.ValueExampleDescriptorConfig
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -350,7 +349,7 @@ object VerifierApiExamples {
         """
             {
                 "request_credentials": [ { "format": "mso_mdoc", "doc_type": "org.iso.18013.5.1.mDL" } ],
-                "trusted_root_cas":[ ${Json.encodeToJsonElement(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT)} ],
+                "trusted_root_cas":[ ${Json.encodeToJsonElement("-----BEGIN CERTIFICATE-----\nMIIBZTCCAQugAwIBAgII2x50/ui7K2wwCgYIKoZIzj0EAwIwFzEVMBMGA1UEAwwMTURPQyBST09UIENBMCAXDTI1MDUxNDE0MDI1M1oYDzIwNzUwNTAyMTQwMjUzWjAXMRUwEwYDVQQDDAxNRE9DIFJPT1QgQ0EwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARY/Swb4KSMi1n0p8zewsX6ssZvwdgJ+eWwgf81YmOJeRPHnuvIMth9NTpBdi6RUodKrowR5u9A+pMlPVuVn/F4oz8wPTAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIBBjAdBgNVHQ4EFgQUxaGwGuK+ZbdzYNqADTyJ/gqLRwkwCgYIKoZIzj0EAwIDSAAwRQIhAOEYhbDYF/1kgDgy4anwZfoULmwt4vt08U6EU2AjXI09AiACCM7m3FnO7bc+xYQRT+WBkZXe/Om4bVmlIK+av+SkCA==\n-----END CERTIFICATE-----\n")} ],
                 "openid_profile": "ISO_18013_7_MDOC"
             }
 
