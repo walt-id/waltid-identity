@@ -8,14 +8,20 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class W3CEntry(
-    val id: String,
+    val id: String? = null,
     val type: String,
-    val statusPurpose: String,
-    val statusListIndex: String,
-    val statusSize: Int,
-    val statusListCredential: String,
-    val statusMessage: List<Status>? = null,
-    val statusReference: String? = null,
+    @SerialName("statusPurpose")
+    val purpose: String,
+    @SerialName("statusListIndex")
+    val index: ULong,
+    @SerialName("statusSize")
+    val size: Int,
+    @SerialName("statusListCredential")
+    val uri: String,
+    @SerialName("statusMessage")
+    val statuses: List<Status>? = null,
+    @SerialName("statusReference")
+    val reference: String? = null,
 ) {
     @Serializable
     data class Status(
@@ -34,7 +40,7 @@ data class IETFEntry(
     @Serializable
     data class StatusListField(
         @SerialName("idx")
-        val index: Int,
+        val index: ULong,
         val uri: String,
     )
 }
