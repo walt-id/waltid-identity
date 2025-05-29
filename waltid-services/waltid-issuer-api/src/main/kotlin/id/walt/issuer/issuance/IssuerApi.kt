@@ -5,6 +5,7 @@ import id.walt.did.dids.DidService
 import id.walt.issuer.issuance.OidcApi.buildCredentialOfferUri
 import id.walt.issuer.issuance.OidcApi.buildOfferUri
 import id.walt.issuer.issuance.OidcApi.getFormatByCredentialConfigurationId
+import id.walt.issuer.issuance.openapi.MdocDocs
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.w3c.vc.vcs.W3CVC
@@ -72,20 +73,30 @@ fun createCredentialOfferUri(
 
 private const val example_title = "Missing credentialData in the request body."
 
+fun RequestConfig.statusCallbackUriHeader() = headerParameter<String>("statusCallbackUri") {
+    description = "Callback to push state changes of the issuance process to"
+    required = false
+}
+
+fun RequestConfig.sessionTtlHeader() = headerParameter<Long>("sessionTtl") {
+    description = "Custom session time-to-live in seconds"
+    required = false
+}
+
 fun Application.issuerApi() {
     routing {
         route("", {
             tags = listOf("Credential Issuance")
         }) {
-            fun RequestConfig.statusCallbackUriHeader() = headerParameter<String>("statusCallbackUri") {
-                description = "Callback to push state changes of the issuance process to"
-                required = false
-            }
-
-            fun RequestConfig.sessionTtlHeader() = headerParameter<Long>("sessionTtl") {
-                description = "Custom session time-to-live in seconds"
-                required = false
-            }
+//            fun RequestConfig.statusCallbackUriHeader() = headerParameter<String>("statusCallbackUri") {
+//                description = "Callback to push state changes of the issuance process to"
+//                required = false
+//            }
+//
+//            fun RequestConfig.sessionTtlHeader() = headerParameter<Long>("sessionTtl") {
+//                description = "Custom session time-to-live in seconds"
+//                required = false
+//            }
 
             fun RoutingContext.getCallbackUriHeader() = call.request.header("statusCallbackUri")
 
@@ -401,27 +412,8 @@ fun Application.issuerApi() {
                     post("issue", {
                         summary = "Signs a credential based on the IEC/ISO18013-5 mdoc/mDL format."
                         description = "This endpoint issues a mdoc and returns an issuance URL "
-                        request {
-                            statusCallbackUriHeader()
-                            sessionTtlHeader()
-                            body<IssuanceRequest> {
-                                description =
-                                    "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example(
-                                    "mDL example",
-                                    IssuanceExamples.mDLCredentialIssuanceExample
-                                )
-//                                example(
-//                                    "mDL/MDOC example with CWT proof",
-//                                    IssuanceExamples.mDLCredentialIssuanceExample
-//                                )
-//                                example(
-//                                    "mDL/MDOC example with JWT proof",
-//                                    IssuanceExamples.mDLCredentialIssuanceJwtProofExample
-//                                )
-                                required = true
-                            }
-                        }
+
+                        request(MdocDocs.requestConfig())
                     }) {
                         val mdocIssuanceRequest = call.receive<IssuanceRequest>()
                         val offerUri = createCredentialOfferUri(
