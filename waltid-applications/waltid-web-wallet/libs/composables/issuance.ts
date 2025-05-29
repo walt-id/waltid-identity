@@ -107,27 +107,32 @@ export async function useIssuance(query: any) {
     const failed = ref(false);
     const failMessage = ref("Unknown error occurred.");
     async function acceptCredential() {
+
         const did: string | null = selectedDid.value?.did ?? dids.value[0]?.did ?? null;
         if (did === null) { return; }
 
-        try {
-            await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/useOfferRequest?did=${did}`, {
-                method: "POST",
-                body: request,
-            });
-            navigateTo(`/wallet/${currentWallet.value}`);
-        } catch (e: any) {
-            failed.value = true;
+        if (!credentialOffer["grants"]["urn:ietf:params:oauth:grant-type:pre-authorized_code"]) {
+            window.location.href = `/wallet-api/wallet/${currentWallet.value}/exchange/useOfferRequestAuth?did=${did}&successRedirectUri=${window.location.origin}/wallet/${currentWallet.value}&offer=${request}`
+        } else {
+            try {
+                await $fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/useOfferRequest?did=${did}`, {
+                    method: "POST",
+                    body: request,
+                });
+                navigateTo(`/wallet/${currentWallet.value}`);
+            } catch (e: any) {
+                failed.value = true;
 
-            let errorMessage = e?.data.startsWith("{") ? JSON.parse(e.data) : e.data ?? e;
-            errorMessage = errorMessage?.message ?? errorMessage;
+                let errorMessage = e?.data.startsWith("{") ? JSON.parse(e.data) : e.data ?? e;
+                errorMessage = errorMessage?.message ?? errorMessage;
 
-            failMessage.value = errorMessage;
+                failMessage.value = errorMessage;
 
-            console.log("Error: ", e?.data);
-            alert("Error occurred while trying to receive credential: " + failMessage.value);
+                console.log("Error: ", e?.data);
+                alert("Error occurred while trying to receive credential: " + failMessage.value);
 
-            throw e;
+                throw e;
+            }
         }
     }
 

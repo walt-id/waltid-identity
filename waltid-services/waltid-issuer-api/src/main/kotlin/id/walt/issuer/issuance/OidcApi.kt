@@ -1,5 +1,6 @@
 package id.walt.issuer.issuance
 
+
 import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -103,8 +104,11 @@ object OidcApi : CIProvider() {
                 }
             }) {
                 call.respond(
-                    HttpStatusCode.OK,
-                    JWTVCIssuerMetadata(issuer = metadata.issuer, jwksUri = metadata.jwksUri)
+                    status = HttpStatusCode.OK,
+                    message = JWTVCIssuerMetadata(
+                        issuer = metadata.issuer,
+                        jwksUri = metadata.jwksUri
+                    )
                 )
             }
 
@@ -583,10 +587,10 @@ object OidcApi : CIProvider() {
                     // should redirect to authorization request redirect uri with the code
                     val session = getSessionByAuthServerState(call.request.rawQueryParameters.toMap()["state"]!![0])
                     val authResp = OpenID4VC.processCodeFlowAuthorization(
-                        session?.authorizationRequest!!,
-                        session.id,
-                        metadata,
-                        CI_TOKEN_KEY
+                        authorizationRequest = session?.authorizationRequest!!,
+                        sessionId = session.id,
+                        providerMetadata = metadata,
+                        tokenKey = CI_TOKEN_KEY
                     )
 
                     val redirectUri = when (session.authorizationRequest.isReferenceToPAR) {
