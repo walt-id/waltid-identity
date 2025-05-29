@@ -1,4 +1,4 @@
-package id.walt.policies.policies.status
+package id.walt.policies.policies.status.bit
 
 import id.walt.policies.policies.status.expansion.StatusListExpansionAlgorithm
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -6,12 +6,12 @@ import java.io.InputStream
 
 class BitValueReader(
     private val expansionAlgorithm: StatusListExpansionAlgorithm,
+    private val bitRepresentationStrategy: BitRepresentationStrategy,
 ) {
     private val BITS_PER_BYTE_UNSIGNED = 8u
     private val logger = KotlinLogging.logger {}
 
-    fun get(bitstring: String, idx: ULong? = null, bitSize: Int = 1) =
-        idx?.let { getBitValue(expansionAlgorithm(bitstring), it, bitSize) }
+    fun get(bitstring: String, idx: ULong, bitSize: Int = 1) = getBitValue(expansionAlgorithm(bitstring), idx, bitSize)
 
     private fun getBitValue(inputStream: InputStream, index: ULong, bitSize: Int): List<Char> =
         inputStream.use { stream ->
@@ -46,22 +46,13 @@ class BitValueReader(
         return result.map { if (it) '1' else '0' }
     }
 
-    private fun ByteArray.toBitSequence(order: BitOrder = BitOrder.BIG_ENDIAN): Sequence<Boolean> =
+    private fun ByteArray.toBitSequence(): Sequence<Boolean> =
         this.fold(emptySequence<Boolean>()) { acc, byte ->
-            val bitProcessingOrder = when (order) {
-                BitOrder.BIG_ENDIAN -> 7 downTo 0
-                BitOrder.LITTLE_ENDIAN -> 0..7
-            }
-            acc + bitProcessingOrder.map { i -> (byte.toUInt() shr i) and 1u == 1u }.asSequence()
+            acc + bitRepresentationStrategy().map { i -> (byte.toUInt() shr i) and 1u == 1u }.asSequence()
         }
 
     private fun bitmap(byteArray: ByteArray) = byteArray.map { byte ->
         // Convert byte to binary string
         String.format("%8s", Integer.toBinaryString(byte.toInt() and 0xFF)).replace(' ', '0')
-    }
-
-    enum class BitOrder {
-        BIG_ENDIAN,
-        LITTLE_ENDIAN
     }
 }
