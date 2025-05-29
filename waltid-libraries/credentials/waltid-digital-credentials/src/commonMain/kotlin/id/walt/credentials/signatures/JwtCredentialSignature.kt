@@ -8,4 +8,5 @@ import kotlinx.serialization.Serializable
 data class JwtCredentialSignature(
     val signature: String
 ) : CredentialSignature() {
+
 }

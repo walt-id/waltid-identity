@@ -7,6 +7,7 @@ enum class RenderStrings(val renderString: RenderString) {
     SIMPLE(RENDER_SIMPLE),
     ISO8601(RENDER_ISO8601),
     ANSI(RENDER_ANSI),
+    ANSI_LONG(renderAnsi(15, 35)),
     CLEF(RENDER_CLEF),
     GELF(RENDER_GELF),
     ECS(RENDER_ECS),
