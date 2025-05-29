@@ -1,5 +1,5 @@
 package id.walt.policies.policies.status.parser
 
-interface ContentParser<T> {
+interface ContentParser<out T> {
     fun parse(response: String): T
 }
