@@ -11,6 +11,7 @@ abstract class StatusValueReaderBase<K, T : StatusContent>(
     private val bitValueReader: BitValueReader,
 ) : StatusValueReader {
     protected val logger = KotlinLogging.logger {}
+    //todo: not really needed for cwt parsing
     protected val jsonModule = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -20,7 +21,7 @@ abstract class StatusValueReaderBase<K, T : StatusContent>(
         val payload = parser.parse(response)
         logger.debug { "Payload: $payload" }
         val statusList = parseStatusList(payload)
-        logger.debug { "EncodedList: $statusList" }
+        logger.debug { "EncodedList: ${statusList.list}" }
         val bitValue = bitValueReader.get(statusList.list, statusListIndex, statusList.size)
         logger.debug { "EncodedList[$statusListIndex] = $bitValue" }
         // ensure bitValue always consists of valid binary characters (0,1)
