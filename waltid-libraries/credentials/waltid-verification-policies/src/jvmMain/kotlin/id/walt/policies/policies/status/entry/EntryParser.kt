@@ -1,30 +1,39 @@
 package id.walt.policies.policies.status.entry
 
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.serializer
 
-interface EntryParser<T> {
-    fun parse(json: JsonElement): List<T>
+sealed interface EntryParser<out T> {
+    fun parse(json: JsonElement): T
+
+    companion object {
+
+        fun <T> objectParser(
+            json: Json,
+            elementSerializer: KSerializer<T>,
+        ): EntryParser<T> {
+            return DefaultEntryParser(json, elementSerializer)
+        }
+
+        fun <T> listParser(
+            json: Json,
+            elementSerializer: KSerializer<T>,
+        ): EntryParser<List<T>> {
+            return DefaultEntryParser(json, ListSerializer(elementSerializer))
+        }
+
+        inline fun <reified T> new(
+            json: Json,
+            isList: Boolean,
+        ) = serializer<T>().let { if (isList) listParser(json, it) else objectParser(json, it) }
+    }
 }
 
-class ListEntryParser<T>(
-    private val jsonModule: Json,
+internal class DefaultEntryParser<out T>(
+    private val json: Json, private val serializer: KSerializer<T>
 ) : EntryParser<T> {
-    override fun parse(json: JsonElement): List<T> = jsonModule.decodeFromJsonElement<List<T>>(json)
-}
-
-class ObjectEntryParser<T>(
-    private val jsonModule: Json,
-    private val serializer: KSerializer<T>
-) : EntryParser<T> {
-    override fun parse(json: JsonElement): List<T> = listOf(jsonModule.decodeFromJsonElement(serializer, json))
-}
-
-inline fun <reified T> createEntryParser(jsonModule: Json, list: Boolean = false): EntryParser<T> = if (list) {
-    ListEntryParser(jsonModule)
-} else {
-    ObjectEntryParser(jsonModule, serializer<T>())
+    override fun parse(json: JsonElement): T = this.json.decodeFromJsonElement(serializer, json)
 }
