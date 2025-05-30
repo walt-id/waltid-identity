@@ -237,7 +237,7 @@ fun Application.verifierApi() {
                 val stateId = call.request.header("stateId")
                 val openId4VPProfile = call.request.header("openId4VPProfile")
                 // Parse session TTL from header if provided
-                val sessionTtl = call.request.header("sessionTtl")?.toLongOrNull()?.let { it.seconds }
+                val sessionTtl = call.request.header("sessionTtl")?.toLongOrNull()?.seconds
 
                 val body = call.receive<JsonObject>()
 
@@ -255,7 +255,10 @@ fun Application.verifierApi() {
                     openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull
                         ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
                         ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
-                    trustedRootCAs = body["trusted_root_cas"]?.jsonArray,
+                    trustedRootCAs = listOfNotNull(
+                        body["trusted_root_cas"] as? JsonArray,
+                        body["trustedRootCAs"] as? JsonArray,
+                    ).takeIf { it.isNotEmpty() }?.flatMap { it }?.let { JsonArray(it)},
                     sessionTtl = sessionTtl
                 )
 
@@ -481,7 +484,7 @@ fun Application.verifierApi() {
             val stateId = Uuid.random().toString()
             // Parse session TTL from query parameter if provided
             val sessionTtl =
-                params["sessionTtl"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull?.toLongOrNull()?.let { it.seconds }
+                params["sessionTtl"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull?.toLongOrNull()?.seconds
 
             val session = verificationUseCase.createSession(
                 vpPoliciesJson = null,
