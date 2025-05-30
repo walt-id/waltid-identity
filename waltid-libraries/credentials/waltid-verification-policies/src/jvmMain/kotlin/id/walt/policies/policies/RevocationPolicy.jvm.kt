@@ -1,7 +1,7 @@
 package id.walt.policies.policies
 
 import id.walt.policies.policies.status.CredentialFetcher
-import id.walt.policies.policies.status.W3CStatusPolicyArguments
+import id.walt.policies.policies.status.W3CCredentialStatusPolicyAttribute
 import id.walt.policies.policies.status.entry.W3CEntry
 import id.walt.policies.policies.status.parser.JsonElementParser
 import id.walt.policies.policies.status.parser.JwtParser
@@ -49,7 +49,7 @@ actual class RevocationPolicy : RevocationPolicyMp() {
         )
         // parse status entry
         val entry = JsonElementParser(serializer<W3CEntry>()).parse(credentialStatus)
-        val arguments = (args as? W3CStatusPolicyArguments) ?: W3CStatusPolicyArguments(
+        val arguments = (args as? W3CCredentialStatusPolicyAttribute) ?: W3CCredentialStatusPolicyAttribute(
             purpose = "revocation",
             type = "StatusList2021",
             value = 0u
