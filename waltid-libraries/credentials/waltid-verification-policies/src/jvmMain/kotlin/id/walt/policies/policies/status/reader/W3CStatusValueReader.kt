@@ -7,7 +7,7 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 
 class W3CStatusValueReader(
-    parser: ContentParser<JsonObject>,
+    parser: ContentParser<String, JsonObject>,
 ) : JwtStatusValueReaderBase<W3CStatusContent>(parser) {
 
     override fun parseStatusList(payload: JsonObject): W3CStatusContent {

@@ -7,7 +7,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
 abstract class JwtStatusValueReaderBase<T : StatusContent>(
-    private val parser: ContentParser<JsonObject>,
+    private val parser: ContentParser<String, JsonObject>,
 ) : StatusValueReader<T> {
     protected val logger = KotlinLogging.logger {}
 

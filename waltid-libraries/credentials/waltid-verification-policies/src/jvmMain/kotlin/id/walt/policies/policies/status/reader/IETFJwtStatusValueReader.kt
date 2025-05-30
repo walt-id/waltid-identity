@@ -7,7 +7,7 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 
 class IETFJwtStatusValueReader(
-    parser: ContentParser<JsonObject>,
+    parser: ContentParser<String, JsonObject>,
 ) : JwtStatusValueReaderBase<IETFStatusContent>(parser) {
     override fun parseStatusList(payload: JsonObject): IETFStatusContent {
         val statusList = payload["status_list"]?.jsonObject!!
