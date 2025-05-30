@@ -11,13 +11,11 @@ import id.walt.policies.policies.status.expansion.RevocationList2020ExpansionAlg
 import id.walt.policies.policies.status.expansion.StatusList2021ExpansionAlgorithm
 import id.walt.policies.policies.status.expansion.StatusListExpansionAlgorithm
 import id.walt.policies.policies.status.reader.StatusValueReader
-import io.github.oshai.kotlinlogging.KotlinLogging
 
 class W3CStatusValidator(
     private val fetcher: CredentialFetcher,
     private val reader: StatusValueReader<W3CStatusContent>,
-) : StatusValidator<W3CEntry, W3CStatusPolicyArguments> {
-    private val logger = KotlinLogging.logger {}
+) : StatusValidatorBase<W3CEntry, W3CStatusPolicyArguments>() {
 
     override suspend fun validate(entry: W3CEntry, arguments: W3CStatusPolicyArguments): Result<String> = runCatching {
         val statusList = processStatus(entry.uri, entry.index).getOrElse { return Result.failure(Throwable(it.cause)) }
@@ -57,10 +55,4 @@ class W3CStatusValidator(
         "RevocationList2020" -> RevocationList2020ExpansionAlgorithm()
         else -> TODO("not supported")
     }
-
-    private fun isBinaryValue(value: List<Char>) = setOf('0', '1').let { valid ->
-        value.all { it in valid }
-    }
-
-    private fun binToInt(bin: String) = bin.toInt(2)
 }
