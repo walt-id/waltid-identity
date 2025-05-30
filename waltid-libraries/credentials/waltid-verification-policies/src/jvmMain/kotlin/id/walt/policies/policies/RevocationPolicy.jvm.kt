@@ -2,8 +2,8 @@ package id.walt.policies.policies
 
 import id.walt.policies.policies.status.CredentialFetcher
 import id.walt.policies.policies.status.W3CStatusPolicyArguments
-import id.walt.policies.policies.status.entry.EntryParser
 import id.walt.policies.policies.status.entry.W3CEntry
+import id.walt.policies.policies.status.parser.JsonElementParser
 import id.walt.policies.policies.status.parser.JwtParser
 import id.walt.policies.policies.status.reader.W3CStatusValueReader
 import id.walt.policies.policies.status.validator.W3CStatusValidator
@@ -31,8 +31,7 @@ actual class RevocationPolicy : RevocationPolicyMp() {
             json(Json { ignoreUnknownKeys = true })
         }
     }
-    @Transient
-    private val jsonModule = Json { ignoreUnknownKeys = true }
+
     @Transient
     private val credentialFetcher = CredentialFetcher(httpClient)
     @Transient
@@ -49,7 +48,7 @@ actual class RevocationPolicy : RevocationPolicyMp() {
             JsonObject(mapOf("policy_available" to JsonPrimitive(false)))
         )
         // parse status entry
-        val entry = EntryParser.objectParser(jsonModule, serializer<W3CEntry>()).parse(credentialStatus)
+        val entry = JsonElementParser(serializer<W3CEntry>()).parse(credentialStatus)
         val arguments = (args as? W3CStatusPolicyArguments) ?: W3CStatusPolicyArguments(
             purpose = "revocation",
             type = "StatusList2021",
