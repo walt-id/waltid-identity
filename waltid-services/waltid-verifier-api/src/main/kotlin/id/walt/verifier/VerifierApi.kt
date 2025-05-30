@@ -211,6 +211,9 @@ fun Application.verifierApi() {
                             VerifierApiExamples.EbsiVerifiablePDA1
                         )
                         example("MDoc verification example", VerifierApiExamples.lspPotentialMdocExample)
+                        example("mDL Request all mandatory fields example") {
+                            value = VerifierApiExamples.mDLRequiredFieldsExample
+                        }
                         example("SD-JWT-VC verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
                         example(
                             "SD-JWT-VC verification example with mandatory fields",
