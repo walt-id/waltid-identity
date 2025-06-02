@@ -16,14 +16,15 @@ object MdocDocs {
         """
         {
             "issuerKey": {
-                "type": "jwk",
-                "jwk": {
-                    "kty": "EC",
-                    "d": "KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ",
-                    "crv": "P-256",
-                    "x": "G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM",
-                    "y": "ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"
-                }
+              "type": "jwk",
+              "jwk": {
+                "kty": "EC",
+                "d": "-wSIL_tMH7-mO2NAfHn03I8ZWUHNXVzckTTb96Wsc1s",
+                "crv": "P-256",
+                "kid": "sW5yv0UmZ3S0dQuUrwlR9I3foREBHHFwXhGJGqGEVf0",
+                "x": "Pzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5U",
+                "y": "6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo"
+              }
             },
             "credentialConfigurationId": "org.iso.18013.5.1.mDL",
             "mdocData": {
@@ -33,8 +34,8 @@ object MdocDocs {
                     "birth_date": "1986-03-22",
                     "issue_date": "2019-10-20",
                     "expiry_date": "2024-10-20",
-                    "issuing_country": "US",
-                    "issuing_authority": "CA DMV",
+                    "issuing_country": "AT",
+                    "issuing_authority": "AT DMV",
                     "document_number": "123456789",
                     "portrait": [141, 182, 121, 111, 238, 50, 120, 94, 54, 111, 113, 13, 241, 12, 12],
                     "driving_privileges": ${
@@ -51,11 +52,11 @@ object MdocDocs {
                 }
             }
         },
-                    "un_distinguishing_sign": "US"
+                    "un_distinguishing_sign": "AT"
                 }
             },
             "x5Chain": [
-                "-----BEGIN CERTIFICATE-----\nMIIBeTCCAR8CFHrWgrGl5KdefSvRQhR+aoqdf48+MAoGCCqGSM49BAMCMBcxFTATBgNVBAMMDE1ET0MgUk9PVCBDQTAgFw0yNTA1MTQxNDA4MDlaGA8yMDc1MDUwMjE0MDgwOVowZTELMAkGA1UEBhMCQVQxDzANBgNVBAgMBlZpZW5uYTEPMA0GA1UEBwwGVmllbm5hMRAwDgYDVQQKDAd3YWx0LmlkMRAwDgYDVQQLDAd3YWx0LmlkMRAwDgYDVQQDDAd3YWx0LmlzMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG0RINBiF+oQUD3d5DGnegQuXenI29JDaMGoMvioKRBN53d4UazakS2unu8BnsEtxutS2kqRhYBPYk9RAriU3gTAKBggqhkjOPQQDAgNIADBFAiAOMwM7hH7q9Di+mT6qCi4LvB+kH8OxMheIrZ2eRPxtDQIhALHzTxwvN8Udt0Z2Cpo8JBihqacfeXkIxVAO8XkxmXhB\n-----END CERTIFICATE-----"
+                "-----BEGIN CERTIFICATE-----\nMIICCTCCAbCgAwIBAgIUfqyiArJZoX7M61/473UAVi2/UpgwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDY0MTEzWhcNMjYwOTAyMDY0MTEzWjAzMQswCQYDVQQGEwJBVDEkMCIGA1UEAwwbV2FsdGlkIFRlc3QgRG9jdW1lbnQgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5Xp3CFQDMrMpR/SQ0jt/jTOqExk1PRzjQ79aKpIsJM1mqOBrDCBqTAfBgNVHSMEGDAWgBTxCn2nWMrE70qXb614U14BweY2azAdBgNVHQ4EFgQUx5qkOLC4lpl1xpYZGmF9HLxtp0gwDgYDVR0PAQH/BAQDAgeAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCQGA1UdHwQdMBswGaAXoBWGE2h0dHBzOi8vd2FsdC5pZC9jcmwwCgYIKoZIzj0EAwIDRwAwRAIgHTap3c6yCUNhDVfZWBPMKj9dCWZbrME03kh9NJTbw1ECIAvVvuGll9O21eR16SkJHHAA1pPcovhcTvF9fz9cc66M\n-----END CERTIFICATE-----\n"
             ]
         }
     """.trimIndent()
@@ -125,16 +126,16 @@ object MdocDocs {
                                 put("weight", 100.toJsonElement())
                                 put("eye_colour", "black".toJsonElement())
                                 put("hair_colour", "black".toJsonElement())
-                                put("birth_place", "Kentucky".toJsonElement())
+                                put("birth_place", "Vienna".toJsonElement())
                                 put("resident_address", "Some Street 4".toJsonElement())
                                 put("portrait_capture_date", "2018-08-09".toJsonElement())
                                 put("age_in_years", 33.toJsonElement())
                                 put("age_birth_year", 1986.toJsonElement())
 
-                                put("issuing_jurisdiction", "US-CA".toJsonElement())
-                                put("nationality", "US".toJsonElement())
-                                put("resident_city", "New York".toJsonElement())
-                                put("resident_state", "New York".toJsonElement())
+                                put("issuing_jurisdiction", "AT-9".toJsonElement())
+                                put("nationality", "AT".toJsonElement())
+                                put("resident_city", "Vienna".toJsonElement())
+                                put("resident_state", "Vienna".toJsonElement())
                                 put("resident_postal_code", "07008".toJsonElement())
                                 put("biometric_template_face", listOf(141, 182, 121, 111, 238, 50, 120, 94, 54, 111, 113, 13, 241, 12, 12).toJsonElement())
                                 put("family_name_national_character", "Doe".toJsonElement())

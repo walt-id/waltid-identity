@@ -210,19 +210,36 @@ fun Application.verifierApi() {
                             "Example with EBSI PDA1 Presentation Definition",
                             VerifierApiExamples.EbsiVerifiablePDA1
                         )
-                        example("MDoc verification example", VerifierApiExamples.lspPotentialMdocExample)
-                        example("mDL Request all mandatory fields example") {
+                        example("mDL Request presentation of all mandatory fields example") {
                             value = VerifierApiExamples.mDLRequiredFieldsExample
+                        }
+                        example("mDL Request presentation of birth date & validity fields only example") {
+                            value = VerifierApiExamples.mDLBirthDateSelectiveDisclosureExample
+                        }
+                        example("mDL Request presentation of age over 18 attestation & validity fields only example (assumes `age_over_18` field exists in issued mDL)") {
+                            value = VerifierApiExamples.mDLAgeOver18AttestationExample
                         }
                         example("SD-JWT-VC verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
                         example(
                             "SD-JWT-VC verification example with mandatory fields",
                             VerifierApiExamples.sdJwtVCExampleWithRequiredFields
                         )
-                        example("EBSI-VECTOR interoperability test - InTimeIssuance", VerifierApiExamples.EBSIVectorExampleInTimeIssuance)
-                        example("EBSI-VECTOR interoperability test - DeferredIssuance", VerifierApiExamples.EBSIVectorExampleDeferredIssuance)
-                        example("EBSI-VECTOR interoperability test - PreAuthIssuance", VerifierApiExamples.EBSIVectorExamplePreAuthIssuance)
-                        example("EBSI-VECTOR interoperability test - All", VerifierApiExamples.EBSIVectorExampleAllIssuance)
+                        example(
+                            "EBSI-VECTOR interoperability test - InTimeIssuance",
+                            VerifierApiExamples.EBSIVectorExampleInTimeIssuance
+                        )
+                        example(
+                            "EBSI-VECTOR interoperability test - DeferredIssuance",
+                            VerifierApiExamples.EBSIVectorExampleDeferredIssuance
+                        )
+                        example(
+                            "EBSI-VECTOR interoperability test - PreAuthIssuance",
+                            VerifierApiExamples.EBSIVectorExamplePreAuthIssuance
+                        )
+                        example(
+                            "EBSI-VECTOR interoperability test - All",
+                            VerifierApiExamples.EBSIVectorExampleAllIssuance
+                        )
 
                     }
                 }
@@ -261,7 +278,7 @@ fun Application.verifierApi() {
                     trustedRootCAs = listOfNotNull(
                         body["trusted_root_cas"] as? JsonArray,
                         body["trustedRootCAs"] as? JsonArray,
-                    ).takeIf { it.isNotEmpty() }?.flatMap { it }?.let { JsonArray(it)},
+                    ).takeIf { it.isNotEmpty() }?.flatMap { it }?.let { JsonArray(it) },
                     sessionTtl = sessionTtl
                 )
 
@@ -301,7 +318,13 @@ fun Application.verifierApi() {
                                 presentation_submission = PresentationSubmissionFormParam(
                                     id = "1",
                                     definition_id = "1",
-                                    descriptor_map = listOf(DescriptorMappingFormParam("1", VCFormat.jwt_vc_json, "$.vc.type"))
+                                    descriptor_map = listOf(
+                                        DescriptorMappingFormParam(
+                                            "1",
+                                            VCFormat.jwt_vc_json,
+                                            "$.vc.type"
+                                        )
+                                    )
                                 ),
                                 response = null
                             )
@@ -336,7 +359,11 @@ fun Application.verifierApi() {
                             session.walletInitiatedAuthState != null -> {
                                 val state = session.walletInitiatedAuthState
                                 call.respondRedirect(
-                                    "openid://?state=$state&error=invalid_request&error_description=${getErrorDescription(it)}"
+                                    "openid://?state=$state&error=invalid_request&error_description=${
+                                        getErrorDescription(
+                                            it
+                                        )
+                                    }"
                                 )
                             }
 
