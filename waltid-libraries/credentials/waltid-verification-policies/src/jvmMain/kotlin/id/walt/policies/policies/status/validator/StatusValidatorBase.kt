@@ -3,10 +3,9 @@ package id.walt.policies.policies.status.validator
 import id.walt.policies.policies.status.CredentialFetcher
 import id.walt.policies.policies.status.CredentialStatusPolicyAttribute
 import id.walt.policies.policies.status.StatusContent
-import id.walt.policies.policies.status.bit.BigEndianRepresentation
-import id.walt.policies.policies.status.bit.BitValueReader
 import id.walt.policies.policies.status.entry.StatusEntry
-import id.walt.policies.policies.status.expansion.StatusListExpansionAlgorithm
+import id.walt.policies.policies.status.errors.StatusRetrievalError
+import id.walt.policies.policies.status.errors.StatusVerificationError
 import id.walt.policies.policies.status.reader.StatusValueReader
 import io.github.oshai.kotlinlogging.KotlinLogging
 
@@ -16,40 +15,41 @@ abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : Crede
 ) : StatusValidator<M, T> {
     protected val logger = KotlinLogging.logger {}
 
-
-    override suspend fun validate(entry: M, attribute: T): Result<String> = runCatching {
+    override suspend fun validate(entry: M, attribute: T): Result<Unit> = runCatching {
         logger.debug { "Credential URL: ${entry.uri}" }
         // download status credential
-        val statusListContent = fetcher.fetch(entry.uri).getOrThrow()
+        val statusListContent = fetcher.fetch(entry.uri)
+            .getOrElse { throw StatusRetrievalError(it.message ?: "Status credential download error") }
         // parse status list, response is a jwt
-        val statusList = reader.read(statusListContent).getOrThrow()
-        val bitValueReader = BitValueReader(
-            expansionAlgorithm = getStatusListExpansionAlgorithm(statusList = statusList),
-            bitRepresentationStrategy = BigEndianRepresentation()
-        )
-        val bitValue = bitValueReader.get(
-            bitstring = statusList.list,
-            idx = entry.index,
-            bitSize = statusList.size,
-        )
-        customValidations(statusList, attribute)
-        logger.debug { "Status list index: ${entry.index}" }
+        val statusList = reader.read(statusListContent)
+            .getOrElse { throw StatusRetrievalError(it.message ?: "Status credential parsing error") }
+        val bitValue = getBitValue(statusList, entry.index)
         logger.debug { "EncodedList[${entry.index}] = $bitValue" }
-        require(bitValue.isNotEmpty()) { "Null or empty bit value" }
-        // ensure bitValue always consists of valid binary characters (0,1)
-        require(isBinaryValue(bitValue)) { "Invalid bit value: $bitValue" }
-        val binaryString = bitValue.joinToString("")
-        require(binToInt(binaryString).toUInt() == attribute.value)
-        binaryString
+        customValidations(statusList, attribute)
+        statusValidations(bitValue, attribute)
     }
 
-    protected abstract fun getStatusListExpansionAlgorithm(statusList: K): StatusListExpansionAlgorithm
+    protected abstract fun getBitValue(statusList: K, index: ULong): List<Char>
 
     protected abstract fun customValidations(statusList: K, attribute: T)
 
-    protected fun isBinaryValue(value: List<Char>) = setOf('0', '1').let { valid ->
+    private fun statusValidations(bitValue: List<Char>, attribute: T) {
+        if (bitValue.isEmpty()) {
+            throw StatusVerificationError("Null or empty bit value")
+        }
+        // ensure bitValue always consists of valid binary characters (0,1)
+        if (!isBinaryValue(bitValue)) {
+            throw StatusVerificationError("Invalid bit value: $bitValue")
+        }
+        val binaryString = bitValue.joinToString("")
+        if (binToInt(binaryString).toUInt() != attribute.value) {
+            throw StatusVerificationError("Status validation failed: expected ${attribute.value}, but got $binaryString")
+        }
+    }
+
+    private fun isBinaryValue(value: List<Char>) = setOf('0', '1').let { valid ->
         value.all { it in valid }
     }
 
-    protected fun binToInt(bin: String) = bin.toInt(2)
+    private fun binToInt(bin: String) = bin.toInt(2)
 }

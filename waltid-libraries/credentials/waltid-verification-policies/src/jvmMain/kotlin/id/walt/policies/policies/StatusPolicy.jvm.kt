@@ -1,6 +1,7 @@
 package id.walt.policies.policies
 
 import id.walt.policies.policies.status.*
+import id.walt.policies.policies.status.bit.BitValueReaderFactory
 import id.walt.policies.policies.status.entry.IETFEntry
 import id.walt.policies.policies.status.entry.W3CEntry
 import id.walt.policies.policies.status.parser.JsonElementParser
@@ -47,15 +48,17 @@ actual class StatusPolicy : StatusPolicyMp() {
     @Transient
     private val ietfJwtStatusReader = IETFJwtStatusValueReader(jwtParser)
     @Transient
-    private val w3cStatusValidator = W3CStatusValidator(credentialFetcher, w3cStatusReader)
+    private val bitValueReaderFactory = BitValueReaderFactory()
     @Transient
-    private val ietfStatusValidator = IETFStatusValidator(credentialFetcher, ietfJwtStatusReader)
+    private val w3cStatusValidator = W3CStatusValidator(credentialFetcher, w3cStatusReader, bitValueReaderFactory)
+    @Transient
+    private val ietfStatusValidator = IETFStatusValidator(credentialFetcher, ietfJwtStatusReader, bitValueReaderFactory)
     //endtodo
 
     @JvmBlocking
     @JvmAsync
     actual override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
-        requireNotNull(args) { "args can't be null" }
+        requireNotNull(args) { "args required" }
         require(args is CredentialStatusPolicyArgument) { "args must be a CredentialStatusPolicyArgument" }
         val statusElement = data.getStatusEntryElement(args)
         //todo: [RevocationPolicy] passes when no entry found - should this follow the same pattern?
@@ -70,19 +73,19 @@ actual class StatusPolicy : StatusPolicyMp() {
         is W3CStatusPolicyListArguments -> processListW3C(data, args)
     }
 
-    private suspend fun processW3C(data: JsonElement, attribute: W3CCredentialStatusPolicyAttribute): Result<String> {
+    private suspend fun processW3C(data: JsonElement, attribute: W3CCredentialStatusPolicyAttribute): Result<Unit> {
         val statusEntry = w3cEntryParser.parse(data)
         return w3cStatusValidator.validate(statusEntry, attribute)
     }
 
-    private suspend fun processListW3C(data: JsonElement, attribute: W3CStatusPolicyListArguments): Result<List<String>> {
+    private suspend fun processListW3C(data: JsonElement, attribute: W3CStatusPolicyListArguments): Result<List<Unit>> {
         val statusEntries = w3cListEntryParser.parse(data)
         //check the arguments list is less or equal to entry list
         require(statusEntries.size >= attribute.list.size) { "Arguments list size mismatch: ${statusEntries.size} expecting ${attribute.list.size}" }
         //match each argument with its corresponding entry
         val sortedEntries = statusEntries.sortedBy { it.purpose }
         val sortedAttributes = attribute.list.sortedBy { it.purpose }
-        val validationResults: List<Result<String>> = sortedEntries.zip(sortedAttributes) { entry, attr ->
+        val validationResults: List<Result<Unit>> = sortedEntries.zip(sortedAttributes) { entry, attr ->
             w3cStatusValidator.validate(entry, attr)
         }
         require(validationResults.isNotEmpty()) {
@@ -105,11 +108,11 @@ actual class StatusPolicy : StatusPolicyMp() {
                 validationResults.firstOrNull { it.isFailure }?.exceptionOrNull()?.message ?: "Unknown validation error"
             "Verification failed: $firstFailureMessage"
         }
-        val successfulStrings: List<String> = validationResults.map { it.getOrThrow() }
+        val successfulStrings: List<Unit> = validationResults.map { it.getOrThrow() }
         return Result.success(successfulStrings)
     }
 
-    private suspend fun processIETF(data: JsonElement, attribute: IETFCredentialStatusPolicyAttribute): Result<String> {
+    private suspend fun processIETF(data: JsonElement, attribute: IETFCredentialStatusPolicyAttribute): Result<Unit> {
         val statusEntry = ietfEntryParser.parse(data)
         return ietfStatusValidator.validate(statusEntry, attribute)
     }
