@@ -42,8 +42,9 @@ abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : Crede
             throw StatusVerificationError("Invalid bit value: $bitValue")
         }
         val binaryString = bitValue.joinToString("")
-        if (binToInt(binaryString).toUInt() != attribute.value) {
-            throw StatusVerificationError("Status validation failed: expected ${attribute.value}, but got $binaryString")
+        val intValue = binToInt(binaryString)
+        if (intValue.toUInt() != attribute.value) {
+            throw StatusVerificationError("Status validation failed: expected ${attribute.value}, but got $intValue")
         }
     }
 
