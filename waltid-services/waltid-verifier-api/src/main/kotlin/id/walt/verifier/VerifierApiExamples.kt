@@ -358,6 +358,9 @@ object VerifierApiExamples {
         """.trimIndent()
     )
 
+    val iacaRootCertificate =
+        "-----BEGIN CERTIFICATE-----\nMIIBtDCCAVmgAwIBAgIUAOXLkeu9penFRno6oDcOBgT1odYwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDYzOTQ0WhcNNDAwNTI5MDYzOTQ0WjAoMQswCQYDVQQGEwJBVDEZMBcGA1UEAwwQV2FsdGlkIFRlc3QgSUFDQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABAZGrRN7Oeanhn7MOaGU6HhaCt8ZMySk/nRHefLbRq8lChr+PS6JqpCJ503sEvByXzPDgPsp0urKg/y0E+F7q9+jYTBfMB0GA1UdDgQWBBTxCn2nWMrE70qXb614U14BweY2azASBgNVHRMBAf8ECDAGAQH/AgEAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAOBgNVHQ8BAf8EBAMCAQYwCgYIKoZIzj0EAwIDSQAwRgIhAOM37BjC48KhsSlU6mdJwlTLrad9VzlXVKc1GmjoCNm1AiEAkFRJalpz62QCOby9l7Vkq0LAdWVKiFMd0DmSxjsdT2U=\n-----END CERTIFICATE-----\n"
+
     val mDLRequiredFieldsExample = buildJsonObject {
         put("request_credentials", buildJsonArray {
             add(buildJsonObject {
@@ -447,7 +450,99 @@ object VerifierApiExamples {
             })
         })
         put("trustedRootCAs", buildJsonArray {
-            add("-----BEGIN CERTIFICATE-----\nMIIBZTCCAQugAwIBAgII2x50/ui7K2wwCgYIKoZIzj0EAwIwFzEVMBMGA1UEAwwMTURPQyBST09UIENBMCAXDTI1MDUxNDE0MDI1M1oYDzIwNzUwNTAyMTQwMjUzWjAXMRUwEwYDVQQDDAxNRE9DIFJPT1QgQ0EwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARY/Swb4KSMi1n0p8zewsX6ssZvwdgJ+eWwgf81YmOJeRPHnuvIMth9NTpBdi6RUodKrowR5u9A+pMlPVuVn/F4oz8wPTAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIBBjAdBgNVHQ4EFgQUxaGwGuK+ZbdzYNqADTyJ/gqLRwkwCgYIKoZIzj0EAwIDSAAwRQIhAOEYhbDYF/1kgDgy4anwZfoULmwt4vt08U6EU2AjXI09AiACCM7m3FnO7bc+xYQRT+WBkZXe/Om4bVmlIK+av+SkCA==\n-----END CERTIFICATE-----\n".toJsonElement())
+            add(iacaRootCertificate.toJsonElement())
+        })
+        put("openid_profile", OpenId4VPProfile.ISO_18013_7_MDOC.toString().toJsonElement())
+    }
+
+    val mDLBirthDateSelectiveDisclosureExample = buildJsonObject {
+        put("request_credentials", buildJsonArray {
+            add(buildJsonObject {
+                put("id", "mDL-request".toJsonElement())
+                put("input_descriptor", buildJsonObject {
+                    put("id", "org.iso.18013.5.1.mDL".toJsonElement())
+                    put("format", buildJsonObject {
+                        put("mso_mdoc", buildJsonObject {
+                            put("alg", buildJsonArray {
+                                add("ES256")
+                                add("EdDSA")
+                            })
+                        })
+                    })
+                    put("constraints", buildJsonObject {
+                        put("fields", buildJsonArray {
+                            add(buildJsonObject {
+                                put("path", buildJsonArray {
+                                    add("$['org.iso.18013.5.1']['birth_date']")
+                                })
+                                put("intent_to_retain", false.toJsonElement())
+                            })
+                            add(buildJsonObject {
+                                put("path", buildJsonArray {
+                                    add("$['org.iso.18013.5.1']['issue_date']")
+                                })
+                                put("intent_to_retain", false.toJsonElement())
+                            })
+                            add(buildJsonObject {
+                                put("path", buildJsonArray {
+                                    add("$['org.iso.18013.5.1']['expiry_date']")
+                                })
+                                put("intent_to_retain", false.toJsonElement())
+                            })
+                        })
+                        put("limit_disclosure", "required".toJsonElement())
+                    })
+                })
+            })
+        })
+        put("trustedRootCAs", buildJsonArray {
+            add(iacaRootCertificate.toJsonElement())
+        })
+        put("openid_profile", OpenId4VPProfile.ISO_18013_7_MDOC.toString().toJsonElement())
+    }
+
+    val mDLAgeOver18AttestationExample = buildJsonObject {
+        put("request_credentials", buildJsonArray {
+            add(buildJsonObject {
+                put("id", "mDL-request".toJsonElement())
+                put("input_descriptor", buildJsonObject {
+                    put("id", "org.iso.18013.5.1.mDL".toJsonElement())
+                    put("format", buildJsonObject {
+                        put("mso_mdoc", buildJsonObject {
+                            put("alg", buildJsonArray {
+                                add("ES256")
+                                add("EdDSA")
+                            })
+                        })
+                    })
+                    put("constraints", buildJsonObject {
+                        put("fields", buildJsonArray {
+                            add(buildJsonObject {
+                                put("path", buildJsonArray {
+                                    add("$['org.iso.18013.5.1']['age_over_18']")
+                                })
+                                put("intent_to_retain", false.toJsonElement())
+                            })
+                            add(buildJsonObject {
+                                put("path", buildJsonArray {
+                                    add("$['org.iso.18013.5.1']['issue_date']")
+                                })
+                                put("intent_to_retain", false.toJsonElement())
+                            })
+                            add(buildJsonObject {
+                                put("path", buildJsonArray {
+                                    add("$['org.iso.18013.5.1']['expiry_date']")
+                                })
+                                put("intent_to_retain", false.toJsonElement())
+                            })
+                        })
+                        put("limit_disclosure", "required".toJsonElement())
+                    })
+                })
+            })
+        })
+        put("trustedRootCAs", buildJsonArray {
+            add(iacaRootCertificate.toJsonElement())
         })
         put("openid_profile", OpenId4VPProfile.ISO_18013_7_MDOC.toString().toJsonElement())
     }
