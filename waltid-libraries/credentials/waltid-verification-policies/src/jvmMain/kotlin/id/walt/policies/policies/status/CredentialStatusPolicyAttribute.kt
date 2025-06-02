@@ -19,9 +19,9 @@ sealed class CredentialStatusPolicyAttribute : CredentialStatusPolicyArgument() 
 @Serializable
 @SerialName("w3c")
 data class W3CCredentialStatusPolicyAttribute(
+    override val value: UInt,
     val purpose: String,
     val type: String,
-    override val value: UInt,
 ) : CredentialStatusPolicyAttribute()
 
 @Serializable
