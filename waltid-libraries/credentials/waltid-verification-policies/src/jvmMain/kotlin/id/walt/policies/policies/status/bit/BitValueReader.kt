@@ -5,13 +5,17 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.InputStream
 
 class BitValueReader(
-    private val expansionAlgorithm: StatusListExpansionAlgorithm,
     private val bitRepresentationStrategy: BitRepresentationStrategy,
 ) {
     private val BITS_PER_BYTE_UNSIGNED = 8u
     private val logger = KotlinLogging.logger {}
 
-    fun get(bitstring: String, idx: ULong, bitSize: Int = 1) = getBitValue(expansionAlgorithm(bitstring), idx, bitSize)
+    fun get(
+        bitstring: String,
+        idx: ULong,
+        bitSize: Int = 1,
+        expansionAlgorithm: StatusListExpansionAlgorithm,
+    ) = getBitValue(expansionAlgorithm(bitstring), idx, bitSize)
 
     private fun getBitValue(inputStream: InputStream, index: ULong, bitSize: Int): List<Char> =
         inputStream.use { stream ->
