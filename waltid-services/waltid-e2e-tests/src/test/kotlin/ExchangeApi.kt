@@ -101,6 +101,6 @@ class ExchangeApi(private val client: HttpClient) {
     ) = test("/wallet-api/wallet/{wallet}/exchange/usePresentationRequest - present credentials") {
         client.post("/wallet-api/wallet/$wallet/exchange/usePresentationRequest") {
             setBody(request)
-        }.expectStatus()
+        }.also { println("usePresentationRequest result: ${it.bodyAsText()}") }.expectStatus()
     }
 }
