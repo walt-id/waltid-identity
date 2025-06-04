@@ -406,6 +406,10 @@ class WaltidServicesE2ETests {
         PresentationDefinitionPolicyTests().runTests()
         //endregion -Presentation Definition Policy (Verifier)-
 
+        //region -ISO mDL Onboarding Service (Issuer)-
+        IssuerIsoMdlOnboardingServiceTests().runTests()
+        //endregion -ISO mDL Onboarding Service (Issuer)-
+
     }
 
 //    @Test

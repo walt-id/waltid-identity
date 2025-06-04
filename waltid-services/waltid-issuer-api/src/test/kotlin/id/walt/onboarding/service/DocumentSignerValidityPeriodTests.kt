@@ -31,7 +31,7 @@ class DocumentSignerValidityPeriodTest {
     @Test
     fun `document signer validity period must be within IACA validity period`() = runTest {
         val timeNow = Clock.System.now()
-        val iacaNotAfter = timeNow.plus((2 * 365L).toDuration(DurationUnit.DAYS))
+        val iacaNotAfter = timeNow.plus((365L).toDuration(DurationUnit.DAYS))
         val iacaResponse = onboardTestIACA(iacaNotAfter)
 
         val iacaSigner = IACASignerData(
@@ -86,7 +86,7 @@ class DocumentSignerValidityPeriodTest {
                         commonName = "DSC ending after IACA",
                         crlDistributionPointUri = "https://iaca.example.com/crl",
                         notBefore = timeNow.plus((30L).toDuration(DurationUnit.DAYS)),
-                        notAfter = timeNow.plus((1L).toDuration(DurationUnit.DAYS))
+                        notAfter = timeNow.plus((366L).toDuration(DurationUnit.DAYS))
                     )
                 )
             )
