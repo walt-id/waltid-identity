@@ -59,7 +59,7 @@ actual class StatusPolicy : StatusPolicyMp() {
     @JvmAsync
     actual override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
         requireNotNull(args) { "args required" }
-        require(args is CredentialStatusPolicyArgument) { "args must be a CredentialStatusPolicyArgument" }
+        require(args is StatusPolicyArgument) { "args must be a CredentialStatusPolicyArgument" }
         val statusElement = data.getStatusEntryElement(args)
         //todo: [RevocationPolicy] passes when no entry found - should this follow the same pattern?
         requireNotNull(statusElement) { "Corresponding status entry not found" }
@@ -67,13 +67,13 @@ actual class StatusPolicy : StatusPolicyMp() {
         return result
     }
 
-    private suspend fun processStatusEntry(data: JsonElement, args: CredentialStatusPolicyArgument) = when (args) {
-        is IETFCredentialStatusPolicyAttribute -> processIETF(data, args)
-        is W3CCredentialStatusPolicyAttribute -> processW3C(data, args)
+    private suspend fun processStatusEntry(data: JsonElement, args: StatusPolicyArgument) = when (args) {
+        is IETFStatusPolicyAttribute -> processIETF(data, args)
+        is W3CStatusPolicyAttribute -> processW3C(data, args)
         is W3CStatusPolicyListArguments -> processListW3C(data, args)
     }
 
-    private suspend fun processW3C(data: JsonElement, attribute: W3CCredentialStatusPolicyAttribute): Result<Unit> {
+    private suspend fun processW3C(data: JsonElement, attribute: W3CStatusPolicyAttribute): Result<Unit> {
         val statusEntry = w3cEntryParser.parse(data)
         return w3cStatusValidator.validate(statusEntry, attribute)
     }
@@ -112,13 +112,13 @@ actual class StatusPolicy : StatusPolicyMp() {
         return Result.success(successfulStrings)
     }
 
-    private suspend fun processIETF(data: JsonElement, attribute: IETFCredentialStatusPolicyAttribute): Result<Unit> {
+    private suspend fun processIETF(data: JsonElement, attribute: IETFStatusPolicyAttribute): Result<Unit> {
         val statusEntry = ietfEntryParser.parse(data)
         return ietfStatusValidator.validate(statusEntry, attribute)
     }
 
-    private fun JsonObject.getStatusEntryElement(args: CredentialStatusPolicyArgument) = when (args) {
-        is IETFCredentialStatusPolicyAttribute -> this["status"]
-        is W3CCredentialStatusPolicyAttribute, is W3CStatusPolicyListArguments -> this["vc"]?.jsonObject?.get("credentialStatus")
+    private fun JsonObject.getStatusEntryElement(args: StatusPolicyArgument) = when (args) {
+        is IETFStatusPolicyAttribute -> this["status"]
+        is W3CStatusPolicyAttribute, is W3CStatusPolicyListArguments -> this["vc"]?.jsonObject?.get("credentialStatus")
     }
 }

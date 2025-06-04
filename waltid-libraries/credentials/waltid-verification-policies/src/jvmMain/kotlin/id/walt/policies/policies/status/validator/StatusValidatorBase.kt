@@ -1,7 +1,7 @@
 package id.walt.policies.policies.status.validator
 
 import id.walt.policies.policies.status.CredentialFetcher
-import id.walt.policies.policies.status.CredentialStatusPolicyAttribute
+import id.walt.policies.policies.status.StatusPolicyAttribute
 import id.walt.policies.policies.status.StatusContent
 import id.walt.policies.policies.status.entry.StatusEntry
 import id.walt.policies.policies.status.errors.StatusRetrievalError
@@ -9,7 +9,7 @@ import id.walt.policies.policies.status.errors.StatusVerificationError
 import id.walt.policies.policies.status.reader.StatusValueReader
 import io.github.oshai.kotlinlogging.KotlinLogging
 
-abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : CredentialStatusPolicyAttribute>(
+abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : StatusPolicyAttribute>(
     private val fetcher: CredentialFetcher,
     private val reader: StatusValueReader<K>,
 ) : StatusValidator<M, T> {
