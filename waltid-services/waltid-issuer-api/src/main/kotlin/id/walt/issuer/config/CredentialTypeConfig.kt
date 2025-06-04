@@ -80,6 +80,7 @@ data class CredentialTypeConfig(
         "LegalPerson" to vc("VerifiableCredential", "LegalPerson"),
         "LegalRegistrationNumber" to vc("VerifiableCredential", "LegalRegistrationNumber"),
         "GaiaXTermsAndConditions" to vc("VerifiableCredential", "GaiaXTermsAndConditions"),
+        "DataspaceParticipantCredential" to vc("VerifiableCredential", "DataspaceParticipantCredential"),
         "KiwiAccessCredential_jwt_vc_json" to vc(
             CredentialSupported(
                 format = CredentialFormat.jwt_vc_json,
