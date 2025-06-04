@@ -56,7 +56,7 @@ actual class RevocationPolicy : RevocationPolicyMp() {
         logger.debug { "Credential URL response: $response" }
         // response is a jwt
         val bitValue = getRevocationStatusValue(response, statusListIndex).getOrElse {
-            return Result.failure(Throwable(it.cause))
+            return Result.failure(Throwable(it))
         }
 
         checkStatus(bitValue).getOrElse {
