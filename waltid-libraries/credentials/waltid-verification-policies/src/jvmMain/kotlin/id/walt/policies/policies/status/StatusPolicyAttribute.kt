@@ -1,44 +1,43 @@
 package id.walt.policies.policies.status
 
+import id.walt.policies.policies.status.Values.BITSTRING_STATUS_LIST_ENTRY
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 
-private const val bistringStatusListEntry = "BitstringStatusListEntry"
-
-sealed class CredentialStatusPolicyArgument
+sealed class StatusPolicyArgument
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 @JsonClassDiscriminator("discriminator")
-sealed class CredentialStatusPolicyAttribute : CredentialStatusPolicyArgument() {
+sealed class StatusPolicyAttribute : StatusPolicyArgument() {
     abstract val value: UInt
 }
 
 @Serializable
 @SerialName("w3c")
-data class W3CCredentialStatusPolicyAttribute(
+data class W3CStatusPolicyAttribute(
     override val value: UInt,
     val purpose: String,
     val type: String,
-) : CredentialStatusPolicyAttribute()
+) : StatusPolicyAttribute()
 
 @Serializable
 @SerialName("ietf")
-data class IETFCredentialStatusPolicyAttribute(
+data class IETFStatusPolicyAttribute(
     override val value: UInt,
-) : CredentialStatusPolicyAttribute()
+) : StatusPolicyAttribute()
 
 @Serializable
 @SerialName("w3c-list")
 data class W3CStatusPolicyListArguments(
-    val list: List<W3CCredentialStatusPolicyAttribute>,
-) : CredentialStatusPolicyArgument() {
+    val list: List<W3CStatusPolicyAttribute>,
+) : StatusPolicyArgument() {
     init {
         require(list.isNotEmpty()) { "List cannot be empty" }
-        require(list.all { it.type == bistringStatusListEntry }) {
-            "All entries must be of type $bistringStatusListEntry"
+        require(list.all { it.type == BITSTRING_STATUS_LIST_ENTRY }) {
+            "All entries must be of type $BITSTRING_STATUS_LIST_ENTRY"
         }
     }
 }

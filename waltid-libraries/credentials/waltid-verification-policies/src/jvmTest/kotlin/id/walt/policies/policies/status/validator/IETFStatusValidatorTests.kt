@@ -1,9 +1,10 @@
-package id.walt.policies.policies.status
+package id.walt.policies.policies.status.validator
 
+import id.walt.policies.policies.status.IETFStatusContent
+import id.walt.policies.policies.status.IETFStatusPolicyAttribute
 import id.walt.policies.policies.status.bit.BitRepresentationStrategy
 import id.walt.policies.policies.status.bit.LittleEndianRepresentation
 import id.walt.policies.policies.status.entry.IETFEntry
-import id.walt.policies.policies.status.validator.IETFStatusValidator
 import io.mockk.coEvery
 import io.mockk.every
 import org.junit.jupiter.api.BeforeEach
@@ -14,7 +15,7 @@ import java.util.stream.Stream
 
 @DisplayName("IETFStatusValidator Tests")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class IETFStatusValidatorTests : StatusValidatorTestsBase<IETFEntry, IETFCredentialStatusPolicyAttribute, IETFStatusContent>() {
+class IETFStatusValidatorTests : StatusValidatorTestsBase<IETFEntry, IETFStatusPolicyAttribute, IETFStatusContent>() {
 
     @BeforeEach
     fun setup() {
@@ -38,7 +39,7 @@ class IETFStatusValidatorTests : StatusValidatorTestsBase<IETFEntry, IETFCredent
         )
     )
 
-    override fun createAttribute(scenario: TestScenario, value: UInt) = IETFCredentialStatusPolicyAttribute(
+    override fun createAttribute(scenario: TestScenario, value: UInt) = IETFStatusPolicyAttribute(
         value = value
     )
 

@@ -1,5 +1,15 @@
-package id.walt.policies.policies.status
+package id.walt.policies.policies.status.validator
 
+import id.walt.policies.policies.status.CredentialFetcher
+import id.walt.policies.policies.status.StatusContent
+import id.walt.policies.policies.status.StatusPolicyAttribute
+import id.walt.policies.policies.status.Values.BITSTRING_STATUS_LIST
+import id.walt.policies.policies.status.Values.BITSTRING_STATUS_LIST_ENTRY
+import id.walt.policies.policies.status.Values.REVOCATION_LIST_2020
+import id.walt.policies.policies.status.Values.REVOCATION_LIST_2020_ENTRY
+import id.walt.policies.policies.status.Values.STATUS_LIST_2021
+import id.walt.policies.policies.status.Values.STATUS_LIST_2021_ENTRY
+import id.walt.policies.policies.status.Values.TOKEN_STATUS_LIST
 import id.walt.policies.policies.status.bit.BitRepresentationStrategy
 import id.walt.policies.policies.status.bit.BitValueReader
 import id.walt.policies.policies.status.bit.BitValueReaderFactory
@@ -8,7 +18,6 @@ import id.walt.policies.policies.status.errors.StatusRetrievalError
 import id.walt.policies.policies.status.errors.StatusVerificationError
 import id.walt.policies.policies.status.expansion.*
 import id.walt.policies.policies.status.reader.StatusValueReader
-import id.walt.policies.policies.status.validator.StatusValidator
 import io.mockk.*
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -26,7 +35,7 @@ import java.util.stream.Stream
 import kotlin.reflect.KClass
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-abstract class StatusValidatorTestsBase<M : StatusEntry, K : CredentialStatusPolicyAttribute, T : StatusContent> {
+abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribute, T : StatusContent> {
 
     protected val uri = "https://example.com/status"
     protected val statusListContent = "jwt_content"
@@ -258,27 +267,27 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : CredentialStatusPol
         fun w3cTestScenarios() = Stream.of(
             arguments(
                 named(
-                    "RevocationList2020", TestScenario(
-                        statusType = "RevocationList2020",
-                        entryType = "RevocationList2020Status",
+                    REVOCATION_LIST_2020, TestScenario(
+                        statusType = REVOCATION_LIST_2020,
+                        entryType = REVOCATION_LIST_2020_ENTRY,
                         expansionAlgorithmType = RevocationList2020ExpansionAlgorithm::class
                     )
                 )
             ),
             arguments(
                 named(
-                    "StatusList2021", TestScenario(
-                        statusType = "StatusList2021",
-                        entryType = "StatusList2021Entry",
+                    STATUS_LIST_2021, TestScenario(
+                        statusType = STATUS_LIST_2021,
+                        entryType = STATUS_LIST_2021_ENTRY,
                         expansionAlgorithmType = StatusList2021ExpansionAlgorithm::class
                     )
                 )
             ),
             arguments(
                 named(
-                    "BitstringStatusList", TestScenario(
-                        statusType = "BitstringStatusList",
-                        entryType = "BitstringStatusListEntry",
+                    BITSTRING_STATUS_LIST, TestScenario(
+                        statusType = BITSTRING_STATUS_LIST,
+                        entryType = BITSTRING_STATUS_LIST_ENTRY,
                         expansionAlgorithmType = BitstringStatusListExpansionAlgorithm::class
                     )
                 )
@@ -289,8 +298,8 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : CredentialStatusPol
         fun ietfTestScenarios() = Stream.of(
             arguments(
                 named(
-                    "TokenStatusList", TestScenario(
-                        statusType = "TokenStatusList",
+                    TOKEN_STATUS_LIST, TestScenario(
+                        statusType = TOKEN_STATUS_LIST,
                         expansionAlgorithmType = TokenStatusListExpansionAlgorithm::class
                     )
                 )

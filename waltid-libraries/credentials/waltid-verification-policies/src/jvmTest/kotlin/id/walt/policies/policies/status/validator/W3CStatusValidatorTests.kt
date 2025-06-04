@@ -1,10 +1,11 @@
-package id.walt.policies.policies.status
+package id.walt.policies.policies.status.validator
 
+import id.walt.policies.policies.status.W3CStatusContent
+import id.walt.policies.policies.status.W3CStatusPolicyAttribute
 import id.walt.policies.policies.status.bit.BigEndianRepresentation
 import id.walt.policies.policies.status.bit.BitRepresentationStrategy
 import id.walt.policies.policies.status.entry.W3CEntry
 import id.walt.policies.policies.status.errors.StatusVerificationError
-import id.walt.policies.policies.status.validator.W3CStatusValidator
 import io.mockk.coEvery
 import io.mockk.every
 import kotlinx.coroutines.test.runTest
@@ -17,7 +18,7 @@ import java.util.stream.Stream
 
 @DisplayName("W3CStatusValidator Tests")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CCredentialStatusPolicyAttribute, W3CStatusContent>() {
+class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CStatusPolicyAttribute, W3CStatusContent>() {
 
     @BeforeEach
     fun setup() {
@@ -43,7 +44,7 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CCredential
         uri = uri
     )
 
-    override fun createAttribute(scenario: TestScenario, value: UInt) = W3CCredentialStatusPolicyAttribute(
+    override fun createAttribute(scenario: TestScenario, value: UInt) = W3CStatusPolicyAttribute(
         value = value,
         purpose = "revocation",
         type = scenario.statusType
@@ -66,7 +67,7 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CCredential
     inner class W3CSpecificValidationErrorScenarios {
 
         @ParameterizedTest
-        @MethodSource("id.walt.policies.policies.status.StatusValidatorTestsBase#w3cTestScenarios")
+        @MethodSource("id.walt.policies.policies.status.validator.StatusValidatorTestsBase#w3cTestScenarios")
         @DisplayName("Should throw StatusVerificationError when purpose doesn't match")
         fun shouldRejectPurposeMismatch(scenario: TestScenario) = runTest {
             val entry = createEntry(scenario, size = 3)
@@ -83,7 +84,7 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CCredential
         }
 
         @ParameterizedTest
-        @MethodSource("id.walt.policies.policies.status.StatusValidatorTestsBase#w3cTestScenarios")
+        @MethodSource("id.walt.policies.policies.status.validator.StatusValidatorTestsBase#w3cTestScenarios")
         @DisplayName("Should throw StatusVerificationError when type doesn't match")
         fun shouldRejectTypeMismatch(scenario: TestScenario) = runTest {
             val entry = createEntry(scenario, size = 3)
@@ -105,7 +106,7 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CCredential
         type: String,
         value: UInt,
         purpose: String = "revocation"
-    ) = W3CCredentialStatusPolicyAttribute(
+    ) = W3CStatusPolicyAttribute(
         value = value,
         purpose = purpose,
         type = type

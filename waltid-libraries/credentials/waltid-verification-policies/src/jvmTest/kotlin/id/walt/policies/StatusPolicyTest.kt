@@ -1,8 +1,8 @@
 package id.walt.policies
 
 import id.walt.policies.policies.StatusPolicy
-import id.walt.policies.policies.status.CredentialStatusPolicyArgument
-import id.walt.policies.policies.status.W3CCredentialStatusPolicyAttribute
+import id.walt.policies.policies.status.StatusPolicyArgument
+import id.walt.policies.policies.status.W3CStatusPolicyAttribute
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -53,8 +53,8 @@ class StatusPolicyTest {
         assertEquals(!expectValid, result.isFailure)
     }
 
-    private fun getW3cArgs(purpose: String = "revocation"): CredentialStatusPolicyArgument =
-        W3CCredentialStatusPolicyAttribute(
+    private fun getW3cArgs(purpose: String = "revocation"): StatusPolicyArgument =
+        W3CStatusPolicyAttribute(
             value = 0u,
             purpose = purpose,
             type = "StatusList2021"
