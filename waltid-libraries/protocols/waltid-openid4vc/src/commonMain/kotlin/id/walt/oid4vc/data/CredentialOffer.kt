@@ -176,8 +176,8 @@ object CredentialOfferSerializer : KSerializer<CredentialOffer> {
     override fun serialize(encoder: Encoder, value: CredentialOffer) {
         val json by lazy {
             Json {
-                serializersModule = CredentialOfferSerializersModule; classDiscriminatorMode =
-                ClassDiscriminatorMode.NONE
+                serializersModule = CredentialOfferSerializersModule; classDiscriminatorMode = ClassDiscriminatorMode.NONE
+                ignoreUnknownKeys = true
             }
         }
         val jsonElement = json.encodeToJsonElement(CredentialOffer.serializer(), value)
