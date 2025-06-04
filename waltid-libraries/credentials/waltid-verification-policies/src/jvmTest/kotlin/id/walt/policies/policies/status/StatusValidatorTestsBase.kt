@@ -1,5 +1,12 @@
 package id.walt.policies.policies.status
 
+import id.walt.policies.policies.status.Values.BITSTRING_STATUS_LIST
+import id.walt.policies.policies.status.Values.BITSTRING_STATUS_LIST_ENTRY
+import id.walt.policies.policies.status.Values.REVOCATION_LIST_2020
+import id.walt.policies.policies.status.Values.REVOCATION_LIST_2020_ENTRY
+import id.walt.policies.policies.status.Values.STATUS_LIST_2021
+import id.walt.policies.policies.status.Values.STATUS_LIST_2021_ENTRY
+import id.walt.policies.policies.status.Values.TOKEN_STATUS_LIST
 import id.walt.policies.policies.status.bit.BitRepresentationStrategy
 import id.walt.policies.policies.status.bit.BitValueReader
 import id.walt.policies.policies.status.bit.BitValueReaderFactory
@@ -258,27 +265,27 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
         fun w3cTestScenarios() = Stream.of(
             arguments(
                 named(
-                    "RevocationList2020", TestScenario(
-                        statusType = "RevocationList2020",
-                        entryType = "RevocationList2020Status",
+                    REVOCATION_LIST_2020, TestScenario(
+                        statusType = REVOCATION_LIST_2020,
+                        entryType = REVOCATION_LIST_2020_ENTRY,
                         expansionAlgorithmType = RevocationList2020ExpansionAlgorithm::class
                     )
                 )
             ),
             arguments(
                 named(
-                    "StatusList2021", TestScenario(
-                        statusType = "StatusList2021",
-                        entryType = "StatusList2021Entry",
+                    STATUS_LIST_2021, TestScenario(
+                        statusType = STATUS_LIST_2021,
+                        entryType = STATUS_LIST_2021_ENTRY,
                         expansionAlgorithmType = StatusList2021ExpansionAlgorithm::class
                     )
                 )
             ),
             arguments(
                 named(
-                    "BitstringStatusList", TestScenario(
-                        statusType = "BitstringStatusList",
-                        entryType = "BitstringStatusListEntry",
+                    BITSTRING_STATUS_LIST, TestScenario(
+                        statusType = BITSTRING_STATUS_LIST,
+                        entryType = BITSTRING_STATUS_LIST_ENTRY,
                         expansionAlgorithmType = BitstringStatusListExpansionAlgorithm::class
                     )
                 )
@@ -289,8 +296,8 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
         fun ietfTestScenarios() = Stream.of(
             arguments(
                 named(
-                    "TokenStatusList", TestScenario(
-                        statusType = "TokenStatusList",
+                    TOKEN_STATUS_LIST, TestScenario(
+                        statusType = TOKEN_STATUS_LIST,
                         expansionAlgorithmType = TokenStatusListExpansionAlgorithm::class
                     )
                 )
