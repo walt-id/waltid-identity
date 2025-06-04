@@ -46,10 +46,10 @@ actual class RevocationPolicy : RevocationPolicyMp() {
         }
 
         val response = runCatching { httpClient.get(statusListCredentialUrl!!){
-                   headers {
-                        append(ContentType, "text/plain")
-                        append(HttpHeaders.Accept, "text/plain")
-                    }
+            headers {
+                append(ContentType, "text/plain")
+                append(HttpHeaders.Accept, "text/plain")
+            }
         }.bodyAsText() }.getOrElse {
             return Result.failure(Throwable("Error when getting Status List Credential from  $statusListCredentialUrl"))
         }
