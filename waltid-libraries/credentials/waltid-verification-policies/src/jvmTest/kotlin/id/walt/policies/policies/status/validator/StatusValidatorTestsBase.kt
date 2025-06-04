@@ -1,8 +1,8 @@
 package id.walt.policies.policies.status.validator
 
 import id.walt.policies.policies.status.CredentialFetcher
-import id.walt.policies.policies.status.StatusContent
-import id.walt.policies.policies.status.StatusPolicyAttribute
+import id.walt.policies.policies.status.model.StatusContent
+import id.walt.policies.policies.status.model.StatusPolicyAttribute
 import id.walt.policies.policies.status.Values.BITSTRING_STATUS_LIST
 import id.walt.policies.policies.status.Values.BITSTRING_STATUS_LIST_ENTRY
 import id.walt.policies.policies.status.Values.REVOCATION_LIST_2020
@@ -13,9 +13,9 @@ import id.walt.policies.policies.status.Values.TOKEN_STATUS_LIST
 import id.walt.policies.policies.status.bit.BitRepresentationStrategy
 import id.walt.policies.policies.status.bit.BitValueReader
 import id.walt.policies.policies.status.bit.BitValueReaderFactory
-import id.walt.policies.policies.status.entry.StatusEntry
-import id.walt.policies.policies.status.errors.StatusRetrievalError
-import id.walt.policies.policies.status.errors.StatusVerificationError
+import id.walt.policies.policies.status.model.StatusEntry
+import id.walt.policies.policies.status.model.StatusRetrievalError
+import id.walt.policies.policies.status.model.StatusVerificationError
 import id.walt.policies.policies.status.expansion.*
 import id.walt.policies.policies.status.reader.StatusValueReader
 import io.mockk.*

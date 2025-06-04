@@ -1,11 +1,11 @@
 package id.walt.policies.policies.status.validator
 
-import id.walt.policies.policies.status.W3CStatusContent
-import id.walt.policies.policies.status.W3CStatusPolicyAttribute
+import id.walt.policies.policies.status.model.W3CStatusContent
+import id.walt.policies.policies.status.model.W3CStatusPolicyAttribute
 import id.walt.policies.policies.status.bit.BigEndianRepresentation
 import id.walt.policies.policies.status.bit.BitRepresentationStrategy
-import id.walt.policies.policies.status.entry.W3CEntry
-import id.walt.policies.policies.status.errors.StatusVerificationError
+import id.walt.policies.policies.status.model.W3CEntry
+import id.walt.policies.policies.status.model.StatusVerificationError
 import io.mockk.coEvery
 import io.mockk.every
 import kotlinx.coroutines.test.runTest

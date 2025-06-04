@@ -1,8 +1,8 @@
 package id.walt.policies
 
 import id.walt.policies.policies.StatusPolicy
-import id.walt.policies.policies.status.StatusPolicyArgument
-import id.walt.policies.policies.status.W3CStatusPolicyAttribute
+import id.walt.policies.policies.status.model.StatusPolicyArgument
+import id.walt.policies.policies.status.model.W3CStatusPolicyAttribute
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*

@@ -1,4 +1,4 @@
-package id.walt.policies.policies.status.errors
+package id.walt.policies.policies.status.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

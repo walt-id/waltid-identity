@@ -1,5 +1,8 @@
 package id.walt.policies.policies.status
 
+import id.walt.policies.policies.status.model.IETFStatusContent
+import id.walt.policies.policies.status.model.StatusContent
+import id.walt.policies.policies.status.model.W3CStatusContent
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
