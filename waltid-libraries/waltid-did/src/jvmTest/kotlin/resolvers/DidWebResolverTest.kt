@@ -38,6 +38,16 @@ class DidWebResolverTest : DidResolverTestBase() {
     ) {
         super.`given a did String, when calling resolveToKey, then the result is valid key`(did, key, assert)
     }
+    
+    @ParameterizedTest
+    @MethodSource
+    override fun `given a did String, when calling resolveToKeys, then the result is valid keys set`(
+        did: String,
+        key: JsonObject,
+        assert: resolverAssertion<Set<Key>>,
+    ) {
+        super.`given a did String, when calling resolveToKeys, then the result is valid keys set`(did, key, assert)
+    }
 
     companion object {
 
@@ -61,11 +71,76 @@ class DidWebResolverTest : DidResolverTestBase() {
 
         @JvmStatic
         fun `given a did String, when calling resolve, then the result is a valid did document`(): Stream<Arguments> =
-            testData(secp256DidAssertions, ed25519DidAssertions, rsaDidAssertions)
+            Stream.concat(
+                testData(secp256DidAssertions, ed25519DidAssertions, rsaDidAssertions),
+                Stream.of(
+                    // Test multi-key DID document
+                    arguments(
+                        "did:web:localhost%3A${TestServer.DID_WEB_SSL_PORT}:multi-key",
+                        // Doesn't matter which key we specify here, we're just testing that the document is resolved
+                        Json.decodeFromString<JsonObject>("{\"alg\":\"EdDSA\",\"crv\":\"Ed25519\",\"kid\":\"key1\",\"kty\":\"OKP\",\"use\":\"sig\",\"x\":\"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM\"}"),
+                        { did: String, key: JsonObject, result: Result<DidDocument> ->
+                            // Ensure we got a successful result
+                            assert(result.isSuccess)
+                            
+                            // Get the document
+                            val doc = result.getOrThrow()
+                            
+                            // Test that we got a document
+                            assert(doc != null)
+                            
+                            // Verify document contains verification methods
+                            val hasVerificationMethods = doc.get("verificationMethod") != null
+                            assert(hasVerificationMethods) { "No verification methods found in document" }
+                        }
+                    )
+                )
+            )
 
         @JvmStatic
         fun `given a did String, when calling resolveToKey, then the result is valid key`(): Stream<Arguments> =
-            testData(secp256KeyAssertions, ed25519KeyAssertions, rsaKeyAssertions)
+            Stream.concat(
+                testData(secp256KeyAssertions, ed25519KeyAssertions, rsaKeyAssertions),
+                Stream.of(
+                    // Test that resolveToKey returns just one key from a multi-key DID
+                    arguments(
+                        "did:web:localhost%3A${TestServer.DID_WEB_SSL_PORT}:multi-key",
+                        // We use Ed25519 key details, but the actual returned key might be any of the three - we'll accept any
+                        Json.decodeFromString<JsonObject>("{\"alg\":\"EdDSA\",\"crv\":\"Ed25519\",\"kid\":\"key1\",\"kty\":\"OKP\",\"use\":\"sig\",\"x\":\"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM\"}"),
+                        { did: String, key: JsonObject, result: Result<Key> ->
+                            // Just check that we got some key successfully
+                            assert(result.isSuccess)
+                            assert(result.getOrThrow() != null)
+                            
+                            // Just having a non-null key is sufficient for this test
+                            val key = result.getOrThrow()
+                            assert(key != null)
+                        }
+                    )
+                )
+            )
+            
+        @JvmStatic
+        fun `given a did String, when calling resolveToKeys, then the result is valid keys set`(): Stream<Arguments> =
+            Stream.concat(
+                testData(secp256KeysSetAssertions, ed25519KeysSetAssertions, rsaKeysSetAssertions),
+                Stream.of(
+                    // Multi-key test with all three key types
+                    arguments(
+                        "did:web:localhost%3A${TestServer.DID_WEB_SSL_PORT}:multi-key",
+                        // We'll use the Ed25519 key for the test verification
+                        Json.decodeFromString<JsonObject>("{\"alg\":\"EdDSA\",\"crv\":\"Ed25519\",\"kid\":\"key1\",\"kty\":\"OKP\",\"use\":\"sig\",\"x\":\"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM\"}"),
+                        { did: String, key: JsonObject, result: Result<Set<Key>> ->
+                            // Ensure we got a successful result with multiple keys
+                            assert(result.isSuccess)
+                            val keys = result.getOrThrow()
+                            
+                            // Test that we got exactly 3 keys
+                            assert(keys.size == 3) { "Expected 3 keys, got ${keys.size}" }
+                        }
+                    )
+                )
+            )
 
         private fun <T> testData(
             secpAssertions: resolverAssertion<T>,

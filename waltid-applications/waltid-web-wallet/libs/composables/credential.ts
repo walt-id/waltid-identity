@@ -11,7 +11,10 @@ export type WalletCredential = {
     disclosures?: string;
     addedOn: string;
     manifest?: string;
-    parsedDocument?: object;
+    parsedDocument?: {
+        [key: string]: any;
+        display?: Array<Object>;
+    }
     format: string;
 };
 
@@ -43,7 +46,7 @@ export function useCredential(credential: Ref<WalletCredential | null>) {
         } else return null;
     });
 
-    const manifest = computed(() => (credential.value?.manifest && credential.value.manifest != "{}" ? (typeof credential.value.manifest === 'string' ? JSON.parse(credential.value.manifest) : credential.value.manifest) : null));
+    const manifest = computed(() => (credential.value?.manifest && credential.value.manifest != "{}" ? (typeof credential.value.manifest === 'string' ? JSON.parse(credential.value.manifest) : credential.value.manifest) : credential.value?.parsedDocument?.display?.[0] ?? null));
     const manifestClaims = computed(() => manifest.value?.display?.claims);
 
     // Function to resolve VCT URL and fetch the name parameter
@@ -76,6 +79,7 @@ export function useCredential(credential: Ref<WalletCredential | null>) {
     const credentialSubtitle = computed(() => manifest.value?.display?.card?.description ?? jwtJson.value?.name);
     const credentialImageUrl = computed(() => manifest.value?.display?.card?.logo?.uri ?? jwtJson.value?.issuer?.image?.id ?? jwtJson.value?.issuer?.image);
     const issuerName = computed(() => manifest.value?.display?.card?.issuedBy ?? jwtJson.value?.issuer?.name);
+    const issuerLogo = computed(() => jwtJson.value?.issuer?.image?.id ?? jwtJson.value?.issuer?.image);
     const issuerDid = computed(() => manifest.value?.input?.issuer ?? jwtJson.value?.issuer?.id ?? jwtJson.value?.issuer);
     const issuerKid = computed(() =>
         credential.value.format === "vc+sd-jwt" ? jwtJson.value?.iss ?? null : null
@@ -111,6 +115,7 @@ export function useCredential(credential: Ref<WalletCredential | null>) {
         credentialSubtitle,
         credentialImageUrl,
         issuerName,
+        issuerLogo,
         issuerDid,
         issuerKid,
         credentialIssuerService,
