@@ -124,7 +124,7 @@ object StreamUtils {
 }
 
 fun get(bitstring: String, idx: ULong? = null, bitSize: Int = 1) =
-    idx?.let { getBitValue(GZIPInputStream(Base64Utils.decode(bitstring).inputStream()), it, bitSize) }
+    idx?.let { getBitValue(GZIPInputStream(Base64Utils.urlDecode(bitstring.substring(1)).inputStream()), it, bitSize) }
 
 fun isBinaryValue(value: List<Char>) = setOf('0', '1').let { valid ->
     value.all { it in valid }
