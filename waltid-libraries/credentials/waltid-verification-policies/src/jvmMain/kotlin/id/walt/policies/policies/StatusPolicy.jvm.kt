@@ -2,8 +2,12 @@ package id.walt.policies.policies
 
 import id.walt.policies.policies.status.*
 import id.walt.policies.policies.status.bit.BitValueReaderFactory
-import id.walt.policies.policies.status.entry.IETFEntry
-import id.walt.policies.policies.status.entry.W3CEntry
+import id.walt.policies.policies.status.model.IETFEntry
+import id.walt.policies.policies.status.model.IETFStatusPolicyAttribute
+import id.walt.policies.policies.status.model.StatusPolicyArgument
+import id.walt.policies.policies.status.model.W3CEntry
+import id.walt.policies.policies.status.model.W3CStatusPolicyAttribute
+import id.walt.policies.policies.status.model.W3CStatusPolicyListArguments
 import id.walt.policies.policies.status.parser.JsonElementParser
 import id.walt.policies.policies.status.parser.JwtParser
 import id.walt.policies.policies.status.reader.IETFJwtStatusValueReader
