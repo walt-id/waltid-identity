@@ -173,6 +173,7 @@ class TSEKey(
         return Base64.decode(signatureBase64)
     }
 
+    @OptIn(ExperimentalEncodingApi::class)
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -188,7 +189,7 @@ class TSEKey(
 
         val signable = "$header.$payload"
 
-        val signatureBase64 = signRaw(signable.encodeToByteArray()) as String
+        val signatureBase64 = Base64.encode(signRaw(signable.encodeToByteArray()) as ByteArray)
         val signatureBase64Url = signatureBase64.base64toBase64Url()
 
         return "$signable.$signatureBase64Url"
