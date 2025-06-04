@@ -15,8 +15,6 @@ import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import java.io.InputStream
-import java.util.Base64
-import java.util.BitSet
 import java.util.zip.GZIPInputStream
 
 
@@ -89,11 +87,6 @@ actual class RevocationPolicy : RevocationPolicyMp() {
         bitValue
     }
 
-}
-
-object Base64Utils {
-    fun decode(base64: String): ByteArray = Base64.getDecoder().decode(base64)
-    fun urlDecode(base64Url: String): ByteArray = Base64.getUrlDecoder().decode(base64Url)
 }
 
 object StreamUtils {
