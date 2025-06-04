@@ -1,0 +1,60 @@
+package id.walt.policies
+
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.application.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
+import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import io.ktor.server.util.*
+import kotlinx.serialization.json.Json
+
+object StatusCredentialTestServer {
+    private const val port = 8080
+    private const val url = "http://localhost:$port"
+    private const val statusCredentialPath = "credentials"
+    private var serverStarted = false
+
+    private val resourceReader = StatusTestUtils.TestResourceReader()
+    val credentials = resourceReader.readResourcesBySubfolder(
+        "status",
+        placeholderValue = "$url/$statusCredentialPath",
+    )
+
+    private val server by lazy {
+        println("Initializing embedded webserver...")
+        embeddedServer(Netty, configure = {
+            connector {
+                port = 8080
+            }
+        }, module = { module() })
+    }
+
+    fun start() {
+        if (!serverStarted) {
+            println("Starting status credential test server...")
+            server.start()
+            serverStarted = true
+        }
+    }
+
+    fun stop() {
+        if (serverStarted) {
+            println("Stopping status credential test server...")
+            server.stop()
+        }
+    }
+
+    private fun Application.module() {
+        install(ContentNegotiation) {
+            json(Json { ignoreUnknownKeys = true })
+        }
+        routing {
+            get("credentials/{id}") {
+                val id = call.parameters.getOrFail("id")
+                call.respond<String>(credentials.values.flatten().find { it.id == id }!!.data.statusCredential)
+            }
+        }
+    }
+}
