@@ -17,7 +17,7 @@ import java.util.stream.Stream
 
 @DisplayName("W3CStatusValidator Tests")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CCredentialStatusPolicyAttribute, W3CStatusContent>() {
+class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CStatusPolicyAttribute, W3CStatusContent>() {
 
     @BeforeEach
     fun setup() {
@@ -43,7 +43,7 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CCredential
         uri = uri
     )
 
-    override fun createAttribute(scenario: TestScenario, value: UInt) = W3CCredentialStatusPolicyAttribute(
+    override fun createAttribute(scenario: TestScenario, value: UInt) = W3CStatusPolicyAttribute(
         value = value,
         purpose = "revocation",
         type = scenario.statusType
@@ -105,7 +105,7 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CCredential
         type: String,
         value: UInt,
         purpose: String = "revocation"
-    ) = W3CCredentialStatusPolicyAttribute(
+    ) = W3CStatusPolicyAttribute(
         value = value,
         purpose = purpose,
         type = type

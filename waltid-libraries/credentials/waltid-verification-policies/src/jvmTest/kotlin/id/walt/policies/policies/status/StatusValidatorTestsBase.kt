@@ -26,7 +26,7 @@ import java.util.stream.Stream
 import kotlin.reflect.KClass
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-abstract class StatusValidatorTestsBase<M : StatusEntry, K : CredentialStatusPolicyAttribute, T : StatusContent> {
+abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribute, T : StatusContent> {
 
     protected val uri = "https://example.com/status"
     protected val statusListContent = "jwt_content"

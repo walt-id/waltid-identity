@@ -1,7 +1,7 @@
 package id.walt.policies.policies.status.validator
 
 import id.walt.policies.policies.status.CredentialFetcher
-import id.walt.policies.policies.status.IETFCredentialStatusPolicyAttribute
+import id.walt.policies.policies.status.IETFStatusPolicyAttribute
 import id.walt.policies.policies.status.IETFStatusContent
 import id.walt.policies.policies.status.bit.BitValueReaderFactory
 import id.walt.policies.policies.status.bit.LittleEndianRepresentation
@@ -13,7 +13,7 @@ class IETFStatusValidator(
     fetcher: CredentialFetcher,
     reader: StatusValueReader<IETFStatusContent>,
     bitValueReaderFactory: BitValueReaderFactory,
-) : StatusValidatorBase<IETFStatusContent, IETFEntry, IETFCredentialStatusPolicyAttribute>(fetcher, reader) {
+) : StatusValidatorBase<IETFStatusContent, IETFEntry, IETFStatusPolicyAttribute>(fetcher, reader) {
     private val bitValueReader = bitValueReaderFactory.new(strategy = LittleEndianRepresentation())
 
     override fun getBitValue(statusList: IETFStatusContent, index: ULong): List<Char> = bitValueReader.get(
@@ -23,5 +23,5 @@ class IETFStatusValidator(
         expansionAlgorithm = TokenStatusListExpansionAlgorithm(),
     )
 
-    override fun customValidations(statusList: IETFStatusContent, attribute: IETFCredentialStatusPolicyAttribute) = Unit
+    override fun customValidations(statusList: IETFStatusContent, attribute: IETFStatusPolicyAttribute) = Unit
 }
