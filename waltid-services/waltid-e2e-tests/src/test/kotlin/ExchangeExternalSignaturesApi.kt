@@ -1,12 +1,11 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-import org.cose.java.AlgorithmID
 import cbor.Cbor
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.commons.interop.LspPotentialInterop
 import id.walt.commons.testing.E2ETest.getBaseURL
+import id.walt.commons.testing.E2ETest.test
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
-import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -28,6 +27,7 @@ import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDisclosure
 import id.walt.sdjwt.utils.Base64Utils.encodeToBase64Url
 import id.walt.verifier.oidc.RequestedCredential
+import id.walt.w3c.utils.VCFormat
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures
@@ -50,6 +50,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
+import org.cose.java.AlgorithmID
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.assertEquals
@@ -281,78 +282,92 @@ class ExchangeExternalSignatures {
     }
 
     private suspend fun regularJwtVcJsonTestCases() {
-        testPreAuthorizedOID4VCI(
-            issuanceRequests = listOf(openBadgeIssuanceRequest),
-        )
-        testOID4VP(openbadgePresentationRequest)
-        clearWalletCredentials()
-        testPreAuthorizedOID4VCI(
-            useOptionalParameters = false,
-            issuanceRequests = listOf(openBadgeIssuanceRequest),
-        )
-        testOID4VP(openbadgePresentationRequest)
-        clearWalletCredentials()
-        testPreAuthorizedOID4VCI(
-            useOptionalParameters = false,
-            issuanceRequests = listOf(
-                openBadgeIssuanceRequest,
-                universityDegreeIssuanceRequest,
-            ),
-        )
-        testOID4VP(openbadgeUniversityDegreePresentationRequest)
-        clearWalletCredentials()
-        testPreAuthorizedOID4VCI(
-            useOptionalParameters = true,
-            issuanceRequests = listOf(
-                openBadgeIssuanceRequest,
-                universityDegreeIssuanceRequest,
-            ),
-        )
-        testOID4VP(openbadgeUniversityDegreePresentationRequest)
-        clearWalletCredentials()
+        test("External signatures - regularJwtVcJsonTestCases") {
+            testPreAuthorizedOID4VCI(
+                issuanceRequests = listOf(openBadgeIssuanceRequest),
+            )
+            testOID4VP(openbadgePresentationRequest)
+            clearWalletCredentials()
+            testPreAuthorizedOID4VCI(
+                useOptionalParameters = false,
+                issuanceRequests = listOf(openBadgeIssuanceRequest),
+            )
+            testOID4VP(openbadgePresentationRequest)
+            clearWalletCredentials()
+            testPreAuthorizedOID4VCI(
+                useOptionalParameters = false,
+                issuanceRequests = listOf(
+                    openBadgeIssuanceRequest,
+                    universityDegreeIssuanceRequest,
+                ),
+            )
+            testOID4VP(openbadgeUniversityDegreePresentationRequest)
+            clearWalletCredentials()
+            testPreAuthorizedOID4VCI(
+                useOptionalParameters = true,
+                issuanceRequests = listOf(
+                    openBadgeIssuanceRequest,
+                    universityDegreeIssuanceRequest,
+                ),
+            )
+            testOID4VP(openbadgeUniversityDegreePresentationRequest)
+            clearWalletCredentials()
+        }
     }
 
     private suspend fun mDocTestCases() {
-        testPreAuthorizedOID4VCI(
-            useOptionalParameters = false,
-            issuanceRequests = listOf(mDocIssuanceRequest),
-        )
-        clearWalletCredentials()
+        test("External signatures - mDocTestCases") {
+            testPreAuthorizedOID4VCI(
+                useOptionalParameters = false,
+                issuanceRequests = listOf(mDocIssuanceRequest),
+            )
+            clearWalletCredentials()
+        }
     }
 
     private suspend fun w3cSdJwtVcTestCases() {
-        testPreAuthorizedOID4VCI(
-            useOptionalParameters = false,
-            issuanceRequests = listOf(
-                openbadgeSdJwtIssuanceRequest,
-            ),
-        )
-        testOID4VP(openbadgeSdJwtPresentationRequest)
-        testOID4VP(openbadgeSdJwtPresentationRequest, true)
-        testOID4VP(openbadgeSdJwtPresentationRequest, true, true)
+        test("External signatures - w3cSdJwtVcTestCases - noOptionalParameters") {
+            testPreAuthorizedOID4VCI(
+                useOptionalParameters = false,
+                issuanceRequests = listOf(
+                    openbadgeSdJwtIssuanceRequest,
+                ),
+            )
+        }
+        test("External signatures - w3cSdJwtVcTestCases - Default") {
+            testOID4VP(openbadgeSdJwtPresentationRequest)
+        }
+        test("External signatures - w3cSdJwtVcTestCases - addDisclosures") {
+            testOID4VP(openbadgeSdJwtPresentationRequest, addDisclosures = true)
+        }
+        test("External signatures - w3cSdJwtVcTestCases - addDisclosures & forgeDisclosures") {
+            testOID4VP(openbadgeSdJwtPresentationRequest, addDisclosures = true, forgeDisclosures = true)
+        }
         clearWalletCredentials()
     }
 
     private suspend fun ietfSdJwtVcTestCases() {
-        testPreAuthorizedOID4VCI(
-            useOptionalParameters = false,
-            issuanceRequests = listOf(
-                identityCredentialIETFSdJwtDidIssuanceRequest,
-            ),
-        )
-        testOID4VPSdJwtVc()
-        testOID4VPSdJwtVc(true)
-        testOID4VPSdJwtVc(true, true)
-        clearWalletCredentials()
-        testPreAuthorizedOID4VCI(
-            useOptionalParameters = false,
-            issuanceRequests = listOf(
-                identityCredentialIETFSdJwtX5cIssuanceRequest,
-            ),
-        )
-        testOID4VPSdJwtVc()
-        testOID4VPSdJwtVc(true)
-        clearWalletCredentials()
+        test("External signatures - ietfSdJwtVcTestCases") {
+            testPreAuthorizedOID4VCI(
+                useOptionalParameters = false,
+                issuanceRequests = listOf(
+                    identityCredentialIETFSdJwtDidIssuanceRequest,
+                ),
+            )
+            testOID4VPSdJwtVc()
+            testOID4VPSdJwtVc(true)
+            testOID4VPSdJwtVc(true, true)
+            clearWalletCredentials()
+            testPreAuthorizedOID4VCI(
+                useOptionalParameters = false,
+                issuanceRequests = listOf(
+                    identityCredentialIETFSdJwtX5cIssuanceRequest,
+                ),
+            )
+            testOID4VPSdJwtVc()
+            testOID4VPSdJwtVc(true)
+            clearWalletCredentials()
+        }
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -497,6 +512,7 @@ class ExchangeExternalSignatures {
         addDisclosures: Boolean = false,
         forgeDisclosures: Boolean = false,
     ) {
+        println("-- External Signatures Test OID4VP: addDisclosures = $addDisclosures, forgeDisclosures = $forgeDisclosures, presentationRequests = $presentationRequest")
         lateinit var presentationRequestURL: String
         lateinit var verificationID: String
         lateinit var resolvedPresentationRequestURL: String
@@ -528,9 +544,11 @@ class ExchangeExternalSignatures {
             presentationRequest = presentationRequestURL,
             selectedCredentialIdList = matchedCredentialList.map { it.id },
             disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }.associate {
-                Pair(it.id, listOf(
-                    if(forgeDisclosures) forgeSDisclosureString(it.disclosures!!) else it.disclosures!!
-                ))
+                Pair(
+                    it.id, listOf(
+                        if (forgeDisclosures) forgeSDisclosureString(it.disclosures!!) else it.disclosures!!
+                    )
+                )
             } else null,
         )
         println(prepareRequest)
@@ -539,29 +557,33 @@ class ExchangeExternalSignatures {
         }.expectSuccess()
         val prepareResponse = response.body<PrepareOID4VPResponse>()
         val submitResponse = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/submit") {
-            setBody(SubmitOID4VPRequest.build(prepareResponse,
-                disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }.associate {
-                    Pair(it.id, listOf(
-                        if(forgeDisclosures) forgeSDisclosureString(it.disclosures!!) else it.disclosures!!
-                    ))
-                } else null,
-                w3cJwtVpProof = prepareResponse.w3CJwtVpProofParameters?.let { params ->
-                    holderKey.signJws(
-                        params.payload.toJsonElement().toString().toByteArray(),
-                        params.header,
-                    )
-                },
-                ietfSdJwtVpProofs = prepareResponse.ietfSdJwtVpProofParameters?.map { params ->
-                    IETFSdJwtVpTokenProof(
-                        credentialId = params.credentialId, sdJwtVc = params.sdJwtVc, vpTokenProof = holderKey.signJws(
+            setBody(
+                SubmitOID4VPRequest.build(
+                    prepareResponse,
+                    disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }.associate {
+                        Pair(
+                            it.id, listOf(
+                                if (forgeDisclosures) forgeSDisclosureString(it.disclosures!!) else it.disclosures!!
+                            )
+                        )
+                    } else null,
+                    w3cJwtVpProof = prepareResponse.w3CJwtVpProofParameters?.let { params ->
+                        holderKey.signJws(
                             params.payload.toJsonElement().toString().toByteArray(),
                             params.header,
                         )
-                    )
-                })
+                    },
+                    ietfSdJwtVpProofs = prepareResponse.ietfSdJwtVpProofParameters?.map { params ->
+                        IETFSdJwtVpTokenProof(
+                            credentialId = params.credentialId, sdJwtVc = params.sdJwtVc, vpTokenProof = holderKey.signJws(
+                                params.payload.toJsonElement().toString().toByteArray(),
+                                params.header,
+                            )
+                        )
+                    })
             )
         }
-        if(!forgeDisclosures)
+        if (!forgeDisclosures)
             submitResponse.expectSuccess()
         else
             submitResponse.expectFailure()
@@ -595,12 +617,13 @@ class ExchangeExternalSignatures {
             setBody(buildJsonObject {
                 put(
                     "request_credentials", JsonArray(
-                        listOf(RequestedCredential(
-                            format = VCFormat.sd_jwt_vc,
-                            vct = "${getBaseURL()}/identity_credential",
-                        ).let {
-                            Json.encodeToJsonElement(it)
-                        })
+                        listOf(
+                            RequestedCredential(
+                                format = VCFormat.sd_jwt_vc,
+                                vct = "${getBaseURL()}/identity_credential",
+                            ).let {
+                                Json.encodeToJsonElement(it)
+                            })
                     )
                 )
             })
@@ -626,9 +649,11 @@ class ExchangeExternalSignatures {
             presentationRequest = presentationRequestURL,
             selectedCredentialIdList = matchedCredentialList.map { it.id },
             disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }.associate {
-                Pair(it.id, listOf(
-                    if(forgeDisclosures) forgeSDisclosureString(it.disclosures!!) else it.disclosures!!
-                ))
+                Pair(
+                    it.id, listOf(
+                        if (forgeDisclosures) forgeSDisclosureString(it.disclosures!!) else it.disclosures!!
+                    )
+                )
             } else null,
         )
         println(prepareRequest)
@@ -637,29 +662,33 @@ class ExchangeExternalSignatures {
         }.expectSuccess()
         val prepareResponse = response.body<PrepareOID4VPResponse>()
         val submitResponse = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/submit") {
-            setBody(SubmitOID4VPRequest.build(prepareResponse,
-                disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }.associate {
-                    Pair(it.id, listOf(
-                        if(forgeDisclosures) forgeSDisclosureString(it.disclosures!!) else it.disclosures!!
-                    ))
-                } else null,
-                w3cJwtVpProof = prepareResponse.w3CJwtVpProofParameters?.let { params ->
-                    holderKey.signJws(
-                        params.payload.toJsonElement().toString().toByteArray(),
-                        params.header,
-                    )
-                },
-                ietfSdJwtVpProofs = prepareResponse.ietfSdJwtVpProofParameters?.map { params ->
-                    IETFSdJwtVpTokenProof(
-                        credentialId = params.credentialId, sdJwtVc = params.sdJwtVc, vpTokenProof = holderKey.signJws(
+            setBody(
+                SubmitOID4VPRequest.build(
+                    prepareResponse,
+                    disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }.associate {
+                        Pair(
+                            it.id, listOf(
+                                if (forgeDisclosures) forgeSDisclosureString(it.disclosures!!) else it.disclosures!!
+                            )
+                        )
+                    } else null,
+                    w3cJwtVpProof = prepareResponse.w3CJwtVpProofParameters?.let { params ->
+                        holderKey.signJws(
                             params.payload.toJsonElement().toString().toByteArray(),
                             params.header,
                         )
-                    )
-                })
+                    },
+                    ietfSdJwtVpProofs = prepareResponse.ietfSdJwtVpProofParameters?.map { params ->
+                        IETFSdJwtVpTokenProof(
+                            credentialId = params.credentialId, sdJwtVc = params.sdJwtVc, vpTokenProof = holderKey.signJws(
+                                params.payload.toJsonElement().toString().toByteArray(),
+                                params.header,
+                            )
+                        )
+                    })
             )
         }
-        if(!forgeDisclosures)
+        if (!forgeDisclosures)
             submitResponse.expectSuccess()
         else
             submitResponse.expectFailure()
@@ -740,24 +769,26 @@ class ExchangeExternalSignatures {
         }.expectSuccess()
         val prepareResponse = response.body<PrepareOID4VPResponse>()
         client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/submit") {
-            setBody(SubmitOID4VPRequest.build(prepareResponse,
-                disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }.associate {
-                    Pair(it.id, listOf(it.disclosures!!))
-                } else null,
-                w3cJwtVpProof = prepareResponse.w3CJwtVpProofParameters?.let { params ->
-                    holderKey.signJws(
-                        params.payload.toJsonElement().toString().toByteArray(),
-                        params.header,
-                    )
-                },
-                ietfSdJwtVpProofs = prepareResponse.ietfSdJwtVpProofParameters?.map { params ->
-                    IETFSdJwtVpTokenProof(
-                        credentialId = params.credentialId, sdJwtVc = params.sdJwtVc, vpTokenProof = holderKey.signJws(
+            setBody(
+                SubmitOID4VPRequest.build(
+                    prepareResponse,
+                    disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }.associate {
+                        Pair(it.id, listOf(it.disclosures!!))
+                    } else null,
+                    w3cJwtVpProof = prepareResponse.w3CJwtVpProofParameters?.let { params ->
+                        holderKey.signJws(
                             params.payload.toJsonElement().toString().toByteArray(),
                             params.header,
                         )
-                    )
-                })
+                    },
+                    ietfSdJwtVpProofs = prepareResponse.ietfSdJwtVpProofParameters?.map { params ->
+                        IETFSdJwtVpTokenProof(
+                            credentialId = params.credentialId, sdJwtVc = params.sdJwtVc, vpTokenProof = holderKey.signJws(
+                                params.payload.toJsonElement().toString().toByteArray(),
+                                params.header,
+                            )
+                        )
+                    })
             )
         }.expectSuccess()
         verifierSessionApi.get(verificationID) { sessionInfo ->
