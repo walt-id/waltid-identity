@@ -1,5 +1,8 @@
-package id.walt.policies.policies.status
+package id.walt.policies.policies.status.validator
 
+import id.walt.policies.policies.status.CredentialFetcher
+import id.walt.policies.policies.status.StatusContent
+import id.walt.policies.policies.status.StatusPolicyAttribute
 import id.walt.policies.policies.status.Values.BITSTRING_STATUS_LIST
 import id.walt.policies.policies.status.Values.BITSTRING_STATUS_LIST_ENTRY
 import id.walt.policies.policies.status.Values.REVOCATION_LIST_2020
@@ -15,7 +18,6 @@ import id.walt.policies.policies.status.errors.StatusRetrievalError
 import id.walt.policies.policies.status.errors.StatusVerificationError
 import id.walt.policies.policies.status.expansion.*
 import id.walt.policies.policies.status.reader.StatusValueReader
-import id.walt.policies.policies.status.validator.StatusValidator
 import io.mockk.*
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
