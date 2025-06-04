@@ -1,11 +1,11 @@
 package id.walt.policies.policies.status.validator
 
 import id.walt.policies.policies.status.CredentialFetcher
-import id.walt.policies.policies.status.IETFStatusPolicyAttribute
-import id.walt.policies.policies.status.IETFStatusContent
+import id.walt.policies.policies.status.model.IETFStatusPolicyAttribute
+import id.walt.policies.policies.status.model.IETFStatusContent
 import id.walt.policies.policies.status.bit.BitValueReaderFactory
 import id.walt.policies.policies.status.bit.LittleEndianRepresentation
-import id.walt.policies.policies.status.entry.IETFEntry
+import id.walt.policies.policies.status.model.IETFEntry
 import id.walt.policies.policies.status.expansion.TokenStatusListExpansionAlgorithm
 import id.walt.policies.policies.status.reader.StatusValueReader
 

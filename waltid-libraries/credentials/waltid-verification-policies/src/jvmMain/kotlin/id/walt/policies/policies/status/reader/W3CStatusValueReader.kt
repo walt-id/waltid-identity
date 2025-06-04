@@ -1,6 +1,6 @@
 package id.walt.policies.policies.status.reader
 
-import id.walt.policies.policies.status.W3CStatusContent
+import id.walt.policies.policies.status.model.W3CStatusContent
 import id.walt.policies.policies.status.parser.ContentParser
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement

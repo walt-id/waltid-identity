@@ -4,12 +4,12 @@ import id.walt.policies.policies.status.CredentialFetcher
 import id.walt.policies.policies.status.Values.BITSTRING_STATUS_LIST
 import id.walt.policies.policies.status.Values.REVOCATION_LIST_2020
 import id.walt.policies.policies.status.Values.STATUS_LIST_2021
-import id.walt.policies.policies.status.W3CStatusContent
-import id.walt.policies.policies.status.W3CStatusPolicyAttribute
+import id.walt.policies.policies.status.model.W3CStatusContent
+import id.walt.policies.policies.status.model.W3CStatusPolicyAttribute
 import id.walt.policies.policies.status.bit.BigEndianRepresentation
 import id.walt.policies.policies.status.bit.BitValueReaderFactory
-import id.walt.policies.policies.status.entry.W3CEntry
-import id.walt.policies.policies.status.errors.StatusVerificationError
+import id.walt.policies.policies.status.model.W3CEntry
+import id.walt.policies.policies.status.model.StatusVerificationError
 import id.walt.policies.policies.status.expansion.BitstringStatusListExpansionAlgorithm
 import id.walt.policies.policies.status.expansion.RevocationList2020ExpansionAlgorithm
 import id.walt.policies.policies.status.expansion.StatusList2021ExpansionAlgorithm

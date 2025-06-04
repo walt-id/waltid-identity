@@ -1,10 +1,10 @@
 package id.walt.policies.policies.status.validator
 
-import id.walt.policies.policies.status.IETFStatusContent
-import id.walt.policies.policies.status.IETFStatusPolicyAttribute
+import id.walt.policies.policies.status.model.IETFStatusContent
+import id.walt.policies.policies.status.model.IETFStatusPolicyAttribute
 import id.walt.policies.policies.status.bit.BitRepresentationStrategy
 import id.walt.policies.policies.status.bit.LittleEndianRepresentation
-import id.walt.policies.policies.status.entry.IETFEntry
+import id.walt.policies.policies.status.model.IETFEntry
 import io.mockk.coEvery
 import io.mockk.every
 import org.junit.jupiter.api.BeforeEach

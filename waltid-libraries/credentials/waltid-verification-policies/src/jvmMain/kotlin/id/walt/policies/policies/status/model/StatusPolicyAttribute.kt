@@ -1,4 +1,4 @@
-package id.walt.policies.policies.status
+package id.walt.policies.policies.status.model
 
 import id.walt.policies.policies.status.Values.BITSTRING_STATUS_LIST_ENTRY
 import kotlinx.serialization.ExperimentalSerializationApi
