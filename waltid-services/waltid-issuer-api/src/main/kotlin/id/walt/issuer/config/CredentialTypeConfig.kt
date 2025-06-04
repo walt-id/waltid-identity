@@ -80,7 +80,33 @@ data class CredentialTypeConfig(
         "LegalPerson" to vc("VerifiableCredential", "LegalPerson"),
         "LegalRegistrationNumber" to vc("VerifiableCredential", "LegalRegistrationNumber"),
         "GaiaXTermsAndConditions" to vc("VerifiableCredential", "GaiaXTermsAndConditions"),
+        "DataspaceParticipantCredential" to vc("VerifiableCredential", "DataspaceParticipantCredential"),
+        "KiwiAccessCredential_jwt_vc_json" to vc(
+            CredentialSupported(
+                format = CredentialFormat.jwt_vc_json,
+                cryptographicBindingMethodsSupported = setOf("did"),
+                credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
 
+                display = listOf(
+                    DisplayProperties(
+                        name = "Kiwi Access Card",
+                        locale = "en-US",
+                        description = "An official evidence of age and identity card for use across New Zealand.",
+                        logo = LogoProperties(
+                            url = "https://kiwiaccess.co.nz/wp-content/uploads/2018/10/Kiwi-Access-Logo-White.png",
+                            altText = "Logo"
+                        ),
+                        backgroundColor = "#FFFFFF",
+                        textColor = "#78350f",
+                        backgroundImage = LogoProperties(
+                            url = "https://e-com.demo.walt.id/img/credential-bg.png",
+                            altText = "Background"
+                        ),
+                    )
+                ),
+                credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableAttestation" , "KiwiAccessCredential"))
+            )
+        ),
         MDocTypes.ISO_MDL to vc(
             CredentialSupported(
                 format = CredentialFormat.mso_mdoc,
@@ -91,7 +117,7 @@ data class CredentialTypeConfig(
                 docType = MDocTypes.ISO_MDL
             )
         ),
-        /*       "testCredential+jwt-vc-json" to vc(
+        /*       "testCredential_jwt_vc_json" to vc(
                    CredentialSupported(
                        format = CredentialFormat.jwt_vc_json,
                        cryptographicBindingMethodsSupported = setOf("did"),
