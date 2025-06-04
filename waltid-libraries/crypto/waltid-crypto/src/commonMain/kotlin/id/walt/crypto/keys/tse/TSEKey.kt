@@ -21,7 +21,6 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
-import kotlinx.coroutines.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -29,6 +28,8 @@ import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.random.Random
@@ -57,15 +58,6 @@ class TSEKey(
         accessKey = accessKey ?: throw IllegalArgumentException("Either auth or accessKey must be provided")
     )
 
-    @OptIn(DelicateCoroutinesApi::class)
-    private inline fun <T> lazySuspended(
-        crossinline block: suspend CoroutineScope.() -> T,
-    ): Deferred<T> = GlobalScope.async(Dispatchers.Unconfined, start = CoroutineStart.LAZY) {
-        block.invoke(this)
-        //retrieveKeyType()
-    }
-
-
     private suspend fun httpRequest(
         method: HttpMethod = HttpMethod.Get,
         url: String = "keys/$id",
@@ -82,15 +74,6 @@ class TSEKey(
         }
     }
 
-    @Suppress("NON_EXPORTABLE_TYPE")
-    @Transient
-    //val retrievedKeyType = lazySuspended { retrieveKeyType() }
-    val retrievedKeyType = lazySuspended { retrieveKeyType() }
-
-    @Suppress("NON_EXPORTABLE_TYPE")
-    @Transient
-    val retrievedPublicKey = lazySuspended { retrievePublicKey() }
-
     @Transient
     override var keyType: KeyType
         get() = _keyType!!
@@ -103,26 +86,34 @@ class TSEKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun init() {
-        if (_keyType == null) _keyType = coroutineScope { retrievedKeyType.await() }
+        if (_keyType == null) _keyType = retrieveKeyType()
     }
 
-    private suspend fun getBackingPublicKey(): ByteArray = _publicKey ?: retrievedPublicKey.await()
+    private suspend fun getBackingPublicKey(): ByteArray = _publicKey ?: retrievePublicKey().also { _publicKey = it }
 
     private fun throwTSEError(msg: String): Nothing =
         throw RuntimeException("Invalid TSE server ($server) response: $msg")
 
+    @OptIn(ExperimentalEncodingApi::class)
     private suspend fun retrievePublicKey(): ByteArray {
         logger.debug { "Retrieving public key: ${this.id}" }
+
         val keyData = httpRequest(HttpMethod.Get, "keys/$id")
             .tseJsonDataBody().jsonObject["keys"]?.jsonObject ?: throw KeyNotFoundException(id = id)
 
-        // TO\\DO: try this
         val keyStr = keyData["1"]?.jsonObject?.get("public_key")?.jsonPrimitive?.content
             ?: throw KeyNotFoundException(id = id)
 
-        logger.debug { "Key string is: $keyStr" }
+        logger.debug { "Public key PEM-encoded string is: $keyStr" }
 
-        return keyStr.decodeBase64Bytes()
+        val base64PublicKey = keyStr.lineSequence()
+            .filterNot { it.startsWith("-----") }
+            .joinToString("")
+            .replace("\\s".toRegex(), "") // Remove all whitespace just in case
+
+        logger.debug { "Base64 public key is: $base64PublicKey" }
+
+        return Base64.decode(base64PublicKey)
     }
 
     private suspend fun retrieveKeyType(): KeyType = tseKeyToKeyTypeMapping(
@@ -137,7 +128,6 @@ class TSEKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-//    override suspend fun getKeyId(): String = id
     override suspend fun getKeyId(): String = getPublicKey().getKeyId()
 
     @JvmBlocking
@@ -167,6 +157,7 @@ class TSEKey(
     @JsExport.Ignore
     override suspend fun exportPEM(): String = throw IllegalArgumentException("The private key should not be exposed.")
 
+    @OptIn(ExperimentalEncodingApi::class)
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -179,7 +170,7 @@ class TSEKey(
                 "No signature returned from TSE server"
             )
 
-        return signatureBase64
+        return Base64.decode(signatureBase64)
     }
 
     @JvmBlocking
@@ -187,10 +178,11 @@ class TSEKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
-        val header = Json.encodeToString(mutableMapOf(
-            "typ" to "JWT".toJsonElement(),
-            "alg" to keyType.jwsAlg().toJsonElement(),
-        ).apply { putAll(headers) }).encodeToByteArray().encodeToBase64Url()
+        val header = Json.encodeToString(
+            mutableMapOf(
+                "typ" to "JWT".toJsonElement(),
+                "alg" to keyType.jwsAlg().toJsonElement(),
+            ).apply { putAll(headers) }).encodeToByteArray().encodeToBase64Url()
 
         val payload = plaintext.encodeToBase64Url()
 
@@ -259,6 +251,7 @@ class TSEKey(
                 ?: throw KeyNotFoundException(message = "No keys/1/public_key in data response")
         ).value
 
+    @OptIn(ExperimentalEncodingApi::class)
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -269,7 +262,7 @@ class TSEKey(
         return JWKKey.importRawPublicKey(
             type = keyType,
             rawPublicKey = getBackingPublicKey(),
-            metadata = null, // todo: import with explicit `keySize`
+            metadata = null,
         )
     }
 
@@ -350,9 +343,6 @@ class TSEKey(
                 metadata.namespace?.let { header("X-Vault-Namespace", metadata.namespace) }
                 setBody(mapOf("type" to keyTypeToTseKeyMapping(type)))
             }.tseJsonDataBody()
-
-            fun throwTSEError(msg: String): Nothing =
-                throw RuntimeException("Invalid TSE server (${metadata.server}) response: $msg")
 
             val keyName = keyData["name"]?.jsonPrimitive?.content
                 ?: throw TSEError.MissingKeyNameException()
