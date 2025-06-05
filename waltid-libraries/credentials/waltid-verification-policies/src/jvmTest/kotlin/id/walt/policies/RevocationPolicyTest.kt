@@ -3,7 +3,6 @@ package id.walt.policies
 import id.walt.policies.StatusCredentialTestServer.credentials
 import id.walt.policies.StatusTestUtils.StatusTestContext
 import id.walt.policies.policies.RevocationPolicy
-import id.walt.policies.policies.status.model.W3CStatusPolicyAttribute
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -43,11 +42,10 @@ class RevocationPolicyTest {
         @JvmStatic
         fun verify(): Stream<Arguments> = statusList2021Scenarios().stream().map { arguments(it) }
 
-        private fun statusList2021Scenarios(attribute: W3CStatusPolicyAttribute? = null) =
+        private fun statusList2021Scenarios() =
             credentials["statuslist2021"]!!.map {
                 StatusTestContext(
                     credential = it.data.holderCredential,
-                    attribute = attribute,
                     expectValid = !it.data.revoked
                 )
             }
