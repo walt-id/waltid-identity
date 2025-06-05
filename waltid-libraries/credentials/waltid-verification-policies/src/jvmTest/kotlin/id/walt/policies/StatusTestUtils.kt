@@ -24,6 +24,7 @@ object StatusTestUtils {
             @SerialName("holder-credential")
             val holderCredential: JsonObject,
             val revoked: Boolean,
+            val attribute: StatusPolicyAttribute,
         )
     }
 
