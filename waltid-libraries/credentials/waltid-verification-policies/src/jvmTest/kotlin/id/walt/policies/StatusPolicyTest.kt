@@ -1,12 +1,9 @@
 package id.walt.policies
 
-import id.walt.policies.StatusTestUtils.statusList2021Scenarios
+import id.walt.policies.StatusCredentialTestServer.credentials
+import id.walt.policies.StatusTestUtils.StatusTestContext
 import id.walt.policies.policies.StatusPolicy
-import id.walt.policies.policies.status.Values.STATUS_LIST_2021
-import id.walt.policies.policies.status.model.W3CStatusPolicyAttribute
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.TestInstance
@@ -33,8 +30,8 @@ class StatusPolicyTest {
 
     @ParameterizedTest
     @MethodSource
-    fun verify(context: StatusTestUtils.TestContext) = runTest {
-        val json = Json.parseToJsonElement(context.credential).jsonObject
+    fun verify(context: StatusTestContext) = runTest {
+        val json = context.credential
         val result = sut.verify(json, context.attribute, emptyMap())
         assertEquals(context.expectValid, result.isSuccess)
         assertEquals(!context.expectValid, result.isFailure)
@@ -42,12 +39,12 @@ class StatusPolicyTest {
 
     companion object {
         @JvmStatic
-        fun verify(): Stream<Arguments> = statusList2021Scenarios(
-            W3CStatusPolicyAttribute(
-                value = 0u,
-                purpose = "revocation",
-                type = STATUS_LIST_2021
+        fun verify(): Stream<Arguments> = credentials.values.flatten().map {
+            StatusTestContext(
+                credential = it.data.holderCredential,
+                attribute = it.data.attribute,
+                expectValid = !it.data.revoked
             )
-        ).stream().map { arguments(it) }
+        }.stream().map { arguments(it) }
     }
 }
