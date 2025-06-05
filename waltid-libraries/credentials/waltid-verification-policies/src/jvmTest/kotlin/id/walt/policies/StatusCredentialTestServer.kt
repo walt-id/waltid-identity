@@ -11,15 +11,15 @@ import io.ktor.server.util.*
 import kotlinx.serialization.json.Json
 
 object StatusCredentialTestServer {
-    private const val port = 8080
-    private const val url = "http://localhost:$port"
-    private const val statusCredentialPath = "credentials"
+    private const val PORT = 8080
+    private const val URL = "http://localhost:$PORT"
+    private const val STATUS_CREDENTIAL_PATH = "credentials"
     private var serverStarted = false
 
     private val resourceReader = StatusTestUtils.TestResourceReader()
     val credentials = resourceReader.readResourcesBySubfolder(
         "status",
-        placeholderValue = "$url/$statusCredentialPath",
+        placeholderValue = "$URL/$STATUS_CREDENTIAL_PATH",
     )
 
     private val server by lazy {
