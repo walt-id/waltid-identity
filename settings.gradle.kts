@@ -30,11 +30,13 @@ val modules = listOfNotNull(
         "waltid-digital-credentials",
         "waltid-mdoc-credentials",
         "waltid-dif-definitions-parser",
+        "waltid-dcql",
         "waltid-verification-policies"
     ),
 
     * "$libraries:protocols".group(
-        "waltid-openid4vc"
+        "waltid-openid4vc",
+        "waltid-openid4vp",
     ),
 
     * "$libraries:sdjwt".group(

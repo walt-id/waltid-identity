@@ -55,6 +55,23 @@ object CredentialParser {
         }
     }
 
+    fun JsonElement?.getString(key: String): String? = this?.jsonObject[key]?.jsonPrimitive?.contentOrNull
+    operator fun JsonElement?.get(key: String): JsonElement? = this?.jsonObject[key]
+
+    fun JsonElement?.getItAsStringOrId() = when (this) {
+        null -> null
+        is JsonNull -> null
+        is JsonObject -> this.getString("id")
+        is JsonPrimitive -> this.content
+        else -> throw UnsupportedOperationException("Unsupported JSON type: $this")
+    }
+
+    fun getCredentialDataIssuer(data: JsonObject) = data["issuer"].getItAsStringOrId() ?: data["vc"]["issuer"].getItAsStringOrId()
+    fun getJwtHeaderOrDataIssuer(data: JsonObject) = data.getString("iss") ?: getCredentialDataIssuer(data)
+
+    fun getCredentialDataSubject(data: JsonObject) = data["credentialSubject"].getItAsStringOrId() ?: data["vc"]["credentialSubject"].getItAsStringOrId()
+    fun getJwtHeaderOrDataSubject(data: JsonObject) = data.getString("sub") ?: getCredentialDataSubject(data)
+
     private fun handleMdocs(credential: String, base64: Boolean = false): Pair<CredentialDetectionResult, MdocsCredential> {
         val mapElement = if(base64) Cbor.decodeFromByteArray<MapElement>(base64Url.decode(credential)) else Cbor.decodeFromHexString<MapElement>(credential)
         // detect if this is the issuer-signed structure or the full mdoc
@@ -137,7 +154,10 @@ object CredentialParser {
                         signed = signedCredentialWithoutDisclosures,
                         signedWithDisclosures = credential,
                         credentialData = fullCredentialData,
-                        originalCredentialData = payload
+                        originalCredentialData = payload,
+
+                        issuer = getCredentialDataIssuer(payload),
+                        subject = getCredentialDataSubject(payload)
                     )
 
             payload.contains("@context") || payload.contains("type") -> {
@@ -150,7 +170,10 @@ object CredentialParser {
                         signed = signedCredentialWithoutDisclosures,
                         signedWithDisclosures = credential,
                         credentialData = fullCredentialData,
-                        originalCredentialData = payload
+                        originalCredentialData = payload,
+
+                        issuer = getCredentialDataIssuer(payload),
+                        subject = getCredentialDataSubject(payload)
                     )
 
                     W3CSubType.W3C_2 -> W3C2(
@@ -160,7 +183,10 @@ object CredentialParser {
                         signed = signedCredentialWithoutDisclosures,
                         signedWithDisclosures = credential,
                         credentialData = fullCredentialData,
-                        originalCredentialData = payload
+                        originalCredentialData = payload,
+
+                        issuer = getCredentialDataIssuer(payload),
+                        subject = getCredentialDataSubject(payload)
                     )
                 }
                 detectedSdjwtSigned(CredentialPrimaryDataType.W3C, w3cModelVersion) to credential
@@ -176,7 +202,10 @@ object CredentialParser {
                         signed = signedCredentialWithoutDisclosures,
                         signedWithDisclosures = credential,
                         credentialData = fullCredentialData,
-                        originalCredentialData = payload
+                        originalCredentialData = payload,
+
+                        issuer = getCredentialDataIssuer(payload),
+                        subject = getCredentialDataSubject(payload)
                     )
 
             payload.contains("vc") -> parseSdJwt(credential, payload["vc"]!!.jsonObject, signature)
@@ -222,7 +251,10 @@ object CredentialParser {
                                 signature = DataIntegrityProofCredentialSignature(proofElement),
                                 signed = credential,
                                 signedWithDisclosures = null,
-                                credentialData = parsedJson
+                                credentialData = parsedJson,
+
+                                issuer = getCredentialDataIssuer(parsedJson),
+                                subject = getCredentialDataSubject(parsedJson)
                             )
 
                             else -> throw NotImplementedError("Unknown W3C proofType: $proofType")
@@ -241,7 +273,10 @@ object CredentialParser {
                         signature = null,
                         signed = null,
                         signedWithDisclosures = null,
-                        credentialData = parsedJson
+                        credentialData = parsedJson,
+
+                        issuer = getCredentialDataIssuer(parsedJson),
+                        subject = getCredentialDataSubject(parsedJson)
                     )
                     // TODO: signed version?
                     parsedJson.contains("vct") -> detectedUnsigned(
@@ -253,11 +288,15 @@ object CredentialParser {
                         signature = null,
                         signed = null,
                         signedWithDisclosures = null,
-                        credentialData = parsedJson
+                        credentialData = parsedJson,
+
+                        issuer = getCredentialDataIssuer(parsedJson),
+                        subject = getCredentialDataSubject(parsedJson)
                     )
 
                     parsedJson.contains("@context") && parsedJson.contains("type") -> {
                         val w3cModelVersion = detectW3CDataModelVersion(parsedJson)
+
                         val credential = when (w3cModelVersion) {
                             W3CSubType.W3C_1_1 -> W3C11(
                                 disclosables = containedDisclosables,
@@ -265,7 +304,10 @@ object CredentialParser {
                                 signature = null,
                                 signed = null,
                                 signedWithDisclosures = null,
-                                credentialData = parsedJson
+                                credentialData = parsedJson,
+
+                                issuer = getCredentialDataIssuer(parsedJson),
+                                subject = getCredentialDataSubject(parsedJson)
                             )
 
                             W3CSubType.W3C_2 -> W3C2(
@@ -274,7 +316,10 @@ object CredentialParser {
                                 signature = null,
                                 signed = null,
                                 signedWithDisclosures = null,
-                                credentialData = parsedJson
+                                credentialData = parsedJson,
+
+                                issuer = getCredentialDataIssuer(parsedJson),
+                                subject = getCredentialDataSubject(parsedJson)
                             )
                         }
 
@@ -310,8 +355,13 @@ object CredentialParser {
                         }
 
                         unsignedCredentialDetection.copy(
-                            first = unsignedCredentialDetection.first.copy(signaturePrimary = SignaturePrimaryType.JWT),
-                            second = signedCredential
+                            first = unsignedCredentialDetection.first.copy(
+                                signaturePrimary = SignaturePrimaryType.JWT
+                            ),
+                            second = signedCredential.apply {
+                                issuer = getJwtHeaderOrDataIssuer(payload)
+                                subject = getJwtHeaderOrDataSubject(payload)
+                            }
                         )
                     }
                 }
