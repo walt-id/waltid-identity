@@ -19,7 +19,8 @@ class AwsSDKKeyTest {
                 "aud" to JsonPrimitive("TOKEN")
             )
         )
-        const val payload = "Hello, World!"
+        // 4352 chars > 4096 bytes of maximum payload size for RSA keys in AWS KMS
+        val payload = buildString { repeat(256) { append("Hello, World!!!!!") } }
         val TESTABLE_KEY_TYPES = listOf(KeyType.RSA, KeyType.secp256r1, KeyType.secp256k1)
     }
 

@@ -30,6 +30,10 @@ dependencies {
 
     // JOSE
     implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+
+    // Hashing with SHA-2
+    implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
+    implementation("org.kotlincrypto.hash:sha2")
 }
 
 java {
