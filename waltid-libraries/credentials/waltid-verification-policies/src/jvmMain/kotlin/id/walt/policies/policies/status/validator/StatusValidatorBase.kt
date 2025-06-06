@@ -23,13 +23,13 @@ abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : Statu
         // parse status list, response is a jwt
         val statusList = reader.read(statusListContent)
             .getOrElse { throw StatusRetrievalError(it.message ?: "Status credential parsing error") }
-        val bitValue = getBitValue(statusList, entry.index)
+        val bitValue = getBitValue(statusList, entry)
         logger.debug { "EncodedList[${entry.index}] = $bitValue" }
         customValidations(statusList, attribute)
         statusValidations(bitValue, attribute)
     }
 
-    protected abstract fun getBitValue(statusList: K, index: ULong): List<Char>
+    protected abstract fun getBitValue(statusList: K, entry: M): List<Char>
 
     protected abstract fun customValidations(statusList: K, attribute: T)
 
