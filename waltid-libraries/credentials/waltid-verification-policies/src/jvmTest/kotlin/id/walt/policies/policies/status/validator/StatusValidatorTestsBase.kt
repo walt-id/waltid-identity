@@ -48,7 +48,6 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
     protected abstract fun createAttribute(scenario: TestScenario, value: UInt): K
     protected abstract fun createStatusContent(scenario: TestScenario, size: Int): T
     protected abstract fun getBitRepresentationStrategy(): BitRepresentationStrategy
-//    protected abstract fun getContentSize(content: T): Int
 
     protected val mockFetcher: CredentialFetcher = mockk()
     protected val mockStatusReader: StatusValueReader<T> = mockk()
@@ -224,9 +223,9 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
     }
 
     protected suspend fun testValidationError(scenario: TestScenario, bitValue: List<Char>, statusSize: Int, expectedMessage: String) {
-        val entry = createEntry(scenario, size = 3)
+        val entry = createEntry(scenario, size = statusSize)
         val attribute = createAttribute(scenario, 5u)
-        val content = createStatusContent(scenario, size = 3)
+        val content = createStatusContent(scenario, size = statusSize)
 
         setupValidationScenario(scenario, content, bitValue, statusSize)
 
