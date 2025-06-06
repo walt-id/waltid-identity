@@ -41,7 +41,7 @@ object StatusTestUtils {
                     try {
                         val resourceData =
                             JSON_MAPPER.decodeFromString<StatusResource.StatusResourceData>(jsonFile.readText())
-                        val computedId = jsonFile.nameWithoutExtension
+                        val computedId = "${subfolder.name}-${jsonFile.nameWithoutExtension}"
                         val updatedResourceData = resourceData.copy(
                             holderCredential = updateJsonObjectPlaceholders(
                                 resourceData.holderCredential,
