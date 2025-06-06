@@ -1,8 +1,8 @@
-package id.walt.policies
+package id.walt.policies.policies.status.status
 
-import id.walt.policies.StatusCredentialTestServer.credentials
-import id.walt.policies.StatusTestUtils.StatusTestContext
-import id.walt.policies.policies.RevocationPolicy
+import id.walt.policies.policies.status.status.StatusCredentialTestServer.credentials
+import id.walt.policies.policies.status.status.StatusTestUtils.StatusTestContext
+import id.walt.policies.policies.StatusPolicy
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -15,8 +15,8 @@ import java.util.stream.Stream
 import kotlin.test.assertEquals
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class RevocationPolicyTest {
-    private val sut = RevocationPolicy()
+class StatusPolicyTest {
+    private val sut = StatusPolicy()
 
     @BeforeAll
     fun startServer() {
@@ -32,22 +32,19 @@ class RevocationPolicyTest {
     @MethodSource
     fun verify(context: StatusTestContext) = runTest {
         val json = context.credential
-        val result = sut.verify(json, null, emptyMap())
+        val result = sut.verify(json, context.attribute, emptyMap())
         assertEquals(context.expectValid, result.isSuccess)
         assertEquals(!context.expectValid, result.isFailure)
     }
 
-
     companion object {
         @JvmStatic
-        fun verify(): Stream<Arguments> = statusList2021Scenarios().stream().map { arguments(it) }
-
-        private fun statusList2021Scenarios() =
-            credentials["statuslist2021"]!!.map {
-                StatusTestContext(
-                    credential = it.data.holderCredential,
-                    expectValid = it.data.valid
-                )
-            }
+        fun verify(): Stream<Arguments> = credentials.values.flatten().map {
+            StatusTestContext(
+                credential = it.data.holderCredential,
+                attribute = it.data.attribute,
+                expectValid = it.data.valid
+            )
+        }.stream().map { arguments(it) }
     }
 }
