@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 object JsonObjectUtils {
     fun updateJsonObjectPlaceholders(
-        jsonObject: JsonObject, placeholder: String, vararg placeholderValue: String
+        jsonObject: JsonObject, placeholder: String, valueSeparator: String, vararg placeholderValue: String
     ): JsonObject {
         val updatedMap = jsonObject.toMutableMap()
 
@@ -24,8 +24,8 @@ object JsonObjectUtils {
                     }
                 }
 
-                is JsonObject -> updateJsonObjectPlaceholders(value, placeholder, *placeholderValue)
-                is JsonArray -> updateJsonArrayPlaceholders(value, placeholder, *placeholderValue)
+                is JsonObject -> updateJsonObjectPlaceholders(value, placeholder, valueSeparator, *placeholderValue)
+                is JsonArray -> updateJsonArrayPlaceholders(value, placeholder, valueSeparator, *placeholderValue)
                 else -> value
             }
         }
@@ -34,7 +34,7 @@ object JsonObjectUtils {
     }
 
     fun updateJsonArrayPlaceholders(
-        jsonArray: JsonArray, placeholder: String, vararg placeholderValue: String
+        jsonArray: JsonArray, placeholder: String, valueSeparator: String, vararg placeholderValue: String
     ): JsonArray {
         val updatedList = jsonArray.map { element ->
             when (element) {
@@ -50,8 +50,8 @@ object JsonObjectUtils {
                     }
                 }
 
-                is JsonObject -> updateJsonObjectPlaceholders(element, placeholder, *placeholderValue)
-                is JsonArray -> updateJsonArrayPlaceholders(element, placeholder, *placeholderValue)
+                is JsonObject -> updateJsonObjectPlaceholders(element, placeholder, valueSeparator, *placeholderValue)
+                is JsonArray -> updateJsonArrayPlaceholders(element, placeholder, valueSeparator, *placeholderValue)
                 else -> element
             }
         }
