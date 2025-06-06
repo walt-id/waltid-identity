@@ -23,7 +23,7 @@ object StatusTestUtils {
             val statusCredential: String,
             @SerialName("holder-credential")
             val holderCredential: JsonObject,
-            val revoked: Boolean,
+            val valid: Boolean,
             val attribute: StatusPolicyAttribute,
         )
     }
