@@ -43,7 +43,7 @@ class StatusPolicyTest {
             StatusTestContext(
                 credential = it.data.holderCredential,
                 attribute = it.data.attribute,
-                expectValid = !it.data.revoked
+                expectValid = it.data.valid
             )
         }.stream().map { arguments(it) }
     }
