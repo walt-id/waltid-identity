@@ -1,8 +1,9 @@
 package id.walt.policies.policies.status.status
 
-import id.walt.policies.policies.status.status.StatusCredentialTestServer.credentials
-import id.walt.policies.policies.status.status.StatusTestUtils.StatusTestContext
 import id.walt.policies.policies.StatusPolicy
+import id.walt.policies.policies.status.model.W3CStatusPolicyAttribute
+import id.walt.policies.policies.status.model.W3CStatusPolicyListArguments
+import id.walt.policies.policies.status.status.StatusCredentialTestServer.credentials
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -30,21 +31,19 @@ class StatusPolicyTest {
 
     @ParameterizedTest
     @MethodSource
-    fun verify(context: StatusTestContext) = runTest {
-        val json = context.credential
-        val result = sut.verify(json, context.attribute, emptyMap())
-        assertEquals(context.expectValid, result.isSuccess)
-        assertEquals(!context.expectValid, result.isFailure)
+    fun verify(context: StatusResourceData) = runTest {
+        val json = context.holderCredential
+        val attribute = when (context) {
+            is MultiStatusResourceData -> W3CStatusPolicyListArguments(list = context.attribute.map { it as W3CStatusPolicyAttribute })
+            is SingleStatusResourceData -> context.attribute
+        }
+        val result = sut.verify(json, attribute, emptyMap())
+        assertEquals(context.valid, result.isSuccess)
+        assertEquals(!context.valid, result.isFailure)
     }
 
     companion object {
         @JvmStatic
-        fun verify(): Stream<Arguments> = credentials.values.flatten().map {
-            StatusTestContext(
-                credential = it.data.holderCredential,
-                attribute = it.data.attribute,
-                expectValid = it.data.valid
-            )
-        }.stream().map { arguments(it) }
+        fun verify(): Stream<Arguments> = credentials.values.flatten().map { it.data }.stream().map { arguments(it) }
     }
 }

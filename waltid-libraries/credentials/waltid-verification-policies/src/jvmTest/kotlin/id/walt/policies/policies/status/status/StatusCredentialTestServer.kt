@@ -1,16 +1,13 @@
 package id.walt.policies.policies.status.status
 
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.engine.connector
-import io.ktor.server.engine.embeddedServer
-import io.ktor.server.netty.Netty
-import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.response.respond
-import io.ktor.server.routing.get
-import io.ktor.server.routing.routing
-import io.ktor.server.util.getOrFail
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.application.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
+import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import io.ktor.server.util.*
 import kotlinx.serialization.json.Json
 
 object StatusCredentialTestServer {
@@ -56,7 +53,12 @@ object StatusCredentialTestServer {
         routing {
             get("credentials/{id}") {
                 val id = call.parameters.getOrFail("id")
-                call.respond<String>(credentials.values.flatten().find { it.id == id }!!.data.statusCredential)
+                val data = credentials.values.flatten().find { it.id == id }!!.data
+                val statusCredential = when (data) {
+                    is MultiStatusResourceData -> data.statusCredential.find { it.id == id }!!.jwt
+                    is SingleStatusResourceData -> data.statusCredential
+                }
+                call.respond<String>(statusCredential)
             }
         }
     }
