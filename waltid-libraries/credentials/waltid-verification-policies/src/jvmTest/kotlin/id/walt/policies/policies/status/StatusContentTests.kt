@@ -24,7 +24,6 @@ class StatusContentTest {
         val content = W3CStatusContent(
             type = "BitstringStatusList",
             purpose = "revocation",
-            size = 8,
             list = "H4sIAAAAAAAAAGNgYGBgZGBkYGLg5mBg4GRgYuBjYGHgYeBh4GNgZeDl4GbgY-Bk4OXgZOBiEGDgYhBg4GIQYOBmEGDgZhBh4GYQYeBiEGPgYhBn4GIQYOBmEGDgZhBg4GYQ"
         )
 
@@ -35,7 +34,6 @@ class StatusContentTest {
         assert(decoded is W3CStatusContent)
         assertEquals("BitstringStatusList", (decoded as W3CStatusContent).type)
         assertEquals("revocation", decoded.purpose)
-        assertEquals(8, decoded.size)
         assertEquals("H4sIAAAAAAAAAGNgYGBgZGBkYGLg5mBg4GRgYuBjYGHgYeBh4GNgZeDl4GbgY-Bk4OXgZOBiEGDgYhBg4GIQYOBmEGDgZhBh4GYQYeBiEGPgYhBn4GIQYOBmEGDgZhBg4GYQ", decoded.list)
     }
 
@@ -52,7 +50,6 @@ class StatusContentTest {
         assertEquals(content, decoded)
         assert(decoded is W3CStatusContent)
         assertEquals("revocation", (decoded as W3CStatusContent).purpose) // default value
-        assertEquals(1, decoded.size) // default value
     }
 
     @Test
@@ -70,7 +67,6 @@ class StatusContentTest {
 
         assertEquals("BitstringStatusList", decoded.type)
         assertEquals("suspension", decoded.purpose)
-        assertEquals(4, decoded.size)
         assertEquals("base64EncodedData", decoded.list)
     }
 
@@ -123,7 +119,6 @@ class StatusContentTest {
         val w3cContent: StatusContent = W3CStatusContent(
             type = "BitstringStatusList",
             purpose = "revocation",
-            size = 2,
             list = "w3cData"
         )
 
@@ -177,7 +172,6 @@ class StatusContentTest {
 
         assertEquals("BitstringStatusList", (decodedW3c as W3CStatusContent).type)
         assertEquals("revocation", decodedW3c.purpose)
-        assertEquals(2, decodedW3c.size)
         assertEquals("w3cData", decodedW3c.list)
 
         assertEquals(4, (decodedIetf as IETFStatusContent).size)
@@ -188,7 +182,6 @@ class StatusContentTest {
     fun `test abstract properties are accessible`() {
         val w3cContent: StatusContent = W3CStatusContent(
             type = "test",
-            size = 5,
             list = "testList"
         )
 
@@ -197,9 +190,7 @@ class StatusContentTest {
             list = "anotherList"
         )
 
-        assertEquals(5, w3cContent.size)
         assertEquals("testList", w3cContent.list)
-        assertEquals(10, ietfContent.size)
         assertEquals("anotherList", ietfContent.list)
     }
 
@@ -266,21 +257,18 @@ class StatusContentTest {
         val content1 = W3CStatusContent(
             type = "test",
             purpose = "revocation",
-            size = 8,
             list = "data123"
         )
 
         val content2 = W3CStatusContent(
             type = "test",
             purpose = "revocation",
-            size = 8,
             list = "data123"
         )
 
         val content3 = W3CStatusContent(
             type = "test",
             purpose = "suspension",
-            size = 8,
             list = "data123"
         )
 
@@ -294,15 +282,13 @@ class StatusContentTest {
         val original = W3CStatusContent(
             type = "original",
             purpose = "revocation",
-            size = 4,
             list = "originalData"
         )
 
-        val modified = original.copy(purpose = "suspension", size = 8)
+        val modified = original.copy(purpose = "suspension")
 
         assertEquals("original", modified.type)
         assertEquals("suspension", modified.purpose)
-        assertEquals(8, modified.size)
         assertEquals("originalData", modified.list)
     }
 
@@ -311,7 +297,6 @@ class StatusContentTest {
         val w3cContent = W3CStatusContent(
             type = "test",
             purpose = "revocation",
-            size = 2,
             list = "testData"
         )
 

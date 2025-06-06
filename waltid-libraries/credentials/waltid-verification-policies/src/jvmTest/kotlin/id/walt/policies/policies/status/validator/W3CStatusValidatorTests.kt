@@ -1,11 +1,11 @@
 package id.walt.policies.policies.status.validator
 
-import id.walt.policies.policies.status.model.W3CStatusContent
-import id.walt.policies.policies.status.model.W3CStatusPolicyAttribute
 import id.walt.policies.policies.status.bit.BigEndianRepresentation
 import id.walt.policies.policies.status.bit.BitRepresentationStrategy
-import id.walt.policies.policies.status.model.W3CEntry
 import id.walt.policies.policies.status.model.StatusVerificationError
+import id.walt.policies.policies.status.model.W3CEntry
+import id.walt.policies.policies.status.model.W3CStatusContent
+import id.walt.policies.policies.status.model.W3CStatusPolicyAttribute
 import io.mockk.coEvery
 import io.mockk.every
 import kotlinx.coroutines.test.runTest
@@ -53,13 +53,10 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CStatusPoli
     override fun createStatusContent(scenario: TestScenario, size: Int) = W3CStatusContent(
         type = scenario.statusType,
         purpose = "revocation",
-        size = size,
         list = "encoded_list"
     )
 
     override fun getBitRepresentationStrategy(): BitRepresentationStrategy = BigEndianRepresentation()
-
-    override fun getContentSize(content: W3CStatusContent): Int = content.size
 
     @Nested
     @DisplayName("W3C-specific validation error scenarios")
@@ -70,11 +67,12 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CStatusPoli
         @MethodSource("id.walt.policies.policies.status.validator.StatusValidatorTestsBase#w3cTestScenarios")
         @DisplayName("Should throw StatusVerificationError when purpose doesn't match")
         fun shouldRejectPurposeMismatch(scenario: TestScenario) = runTest {
-            val entry = createEntry(scenario, size = 3)
+            val statusSize = 3
+            val entry = createEntry(scenario, size = statusSize)
             val attribute = createW3CAttribute(scenario.statusType, 5u, purpose = "wrong-purpose")
-            val content = createStatusContent(scenario, size = 3)
+            val content = createStatusContent(scenario, size = statusSize)
 
-            setupValidationScenario(scenario, content, listOf('1', '0', '1'))
+            setupValidationScenario(scenario, content, listOf('1', '0', '1'), statusSize)
 
             val exception = assertThrows<StatusVerificationError> { sut.validate(entry, attribute).getOrThrow() }
             assertEquals(
@@ -87,11 +85,12 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CStatusPoli
         @MethodSource("id.walt.policies.policies.status.validator.StatusValidatorTestsBase#w3cTestScenarios")
         @DisplayName("Should throw StatusVerificationError when type doesn't match")
         fun shouldRejectTypeMismatch(scenario: TestScenario) = runTest {
-            val entry = createEntry(scenario, size = 3)
+            val statusSize = 3
+            val entry = createEntry(scenario, size = statusSize)
             val attribute = createW3CAttribute("wrong-type", 5u)
-            val content = createStatusContent(scenario, size = 3)
+            val content = createStatusContent(scenario, size = statusSize)
 
-            setupValidationScenario(scenario, content, listOf('1', '0', '1'))
+            setupValidationScenario(scenario, content, listOf('1', '0', '1'), statusSize)
 
             val exception = assertThrows<StatusVerificationError> { sut.validate(entry, attribute).getOrThrow() }
             assertEquals(

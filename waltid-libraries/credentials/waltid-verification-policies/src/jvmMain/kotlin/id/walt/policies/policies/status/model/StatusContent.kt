@@ -9,7 +9,6 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 @Serializable
 @JsonClassDiscriminator("status")
 sealed class StatusContent {
-    abstract val size: Int
     abstract val list: String
 }
 
@@ -19,8 +18,6 @@ data class W3CStatusContent(
     val type: String,
     @SerialName("statusPurpose")
     val purpose: String? = "revocation",
-    @SerialName("statusSize")
-    override val size: Int = 1,
     @SerialName("encodedList")
     override val list: String,
 ) : StatusContent()
@@ -29,7 +26,7 @@ data class W3CStatusContent(
 @SerialName("IETFStatusContent")
 data class IETFStatusContent(
     @SerialName("bits")
-    override val size: Int = 1,
+    val size: Int = 1,
     @SerialName("lst")
     override val list: String,
 ) : StatusContent()

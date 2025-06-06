@@ -48,7 +48,7 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
     protected abstract fun createAttribute(scenario: TestScenario, value: UInt): K
     protected abstract fun createStatusContent(scenario: TestScenario, size: Int): T
     protected abstract fun getBitRepresentationStrategy(): BitRepresentationStrategy
-    protected abstract fun getContentSize(content: T): Int
+//    protected abstract fun getContentSize(content: T): Int
 
     protected val mockFetcher: CredentialFetcher = mockk()
     protected val mockStatusReader: StatusValueReader<T> = mockk()
@@ -170,21 +170,21 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
         @MethodSource("getTestScenarios")
         @DisplayName("Should throw StatusVerificationError for empty bit values")
         fun shouldRejectEmptyBitValues(scenario: TestScenario) = runTest {
-            testValidationError(scenario, emptyList(), "Null or empty bit value")
+            testValidationError(scenario, emptyList(), 1, "Null or empty bit value")
         }
 
         @ParameterizedTest
         @MethodSource("getTestScenarios")
         @DisplayName("Should throw StatusVerificationError for invalid bit characters")
         fun shouldRejectInvalidBitCharacters(scenario: TestScenario) = runTest {
-            testValidationError(scenario, listOf('1', '0', '2'), "Invalid bit value: [1, 0, 2]")
+            testValidationError(scenario, listOf('1', '0', '2'), 3, "Invalid bit value: [1, 0, 2]")
         }
 
         @ParameterizedTest
         @MethodSource("getTestScenarios")
         @DisplayName("Should throw StatusVerificationError for letter characters")
         fun shouldRejectLetterCharacters(scenario: TestScenario) = runTest {
-            testValidationError(scenario, listOf('1', 'a', '0'), "Invalid bit value: [1, a, 0]")
+            testValidationError(scenario, listOf('1', 'a', '0'), 3, "Invalid bit value: [1, a, 0]")
         }
 
         @ParameterizedTest
@@ -216,28 +216,28 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
         val attribute = createAttribute(scenario, expectedValue)
         val content = createStatusContent(scenario, size = statusSize)
 
-        setupValidationScenario(scenario, content, bitValue)
+        setupValidationScenario(scenario, content, bitValue, statusSize)
 
         val result = sut.validate(entry, attribute)
         assertTrue(result.isSuccess)
-        verifyAllInteractions(getContentSize(content), scenario.expansionAlgorithmType)
+        verifyAllInteractions(statusSize, scenario.expansionAlgorithmType)
     }
 
-    protected suspend fun testValidationError(scenario: TestScenario, bitValue: List<Char>, expectedMessage: String) {
+    protected suspend fun testValidationError(scenario: TestScenario, bitValue: List<Char>, statusSize: Int, expectedMessage: String) {
         val entry = createEntry(scenario, size = 3)
         val attribute = createAttribute(scenario, 5u)
         val content = createStatusContent(scenario, size = 3)
 
-        setupValidationScenario(scenario, content, bitValue)
+        setupValidationScenario(scenario, content, bitValue, statusSize)
 
         val exception = assertThrows<StatusVerificationError> { sut.validate(entry, attribute).getOrThrow() }
         assertTrue(exception.message.contains(expectedMessage))
     }
 
-    protected fun setupValidationScenario(scenario: TestScenario, content: T, bitValue: List<Char>) {
+    protected fun setupValidationScenario(scenario: TestScenario, content: T, bitValue: List<Char>, statusSize: Int) {
         setupSuccessfulFetchAndRead(content)
         every {
-            mockBitValueReader.get(any(), index, getContentSize(content), ofType(scenario.expansionAlgorithmType))
+            mockBitValueReader.get(any(), index, statusSize, ofType(scenario.expansionAlgorithmType))
         } returns bitValue
     }
 
