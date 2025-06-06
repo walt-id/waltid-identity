@@ -46,7 +46,7 @@ class RevocationPolicyTest {
             credentials["statuslist2021"]!!.map {
                 StatusTestContext(
                     credential = it.data.holderCredential,
-                    expectValid = !it.data.revoked
+                    expectValid = it.data.valid
                 )
             }
     }
