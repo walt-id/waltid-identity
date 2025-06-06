@@ -10,6 +10,7 @@ import java.io.File
 import java.net.URISyntaxException
 
 const val STATUS_CREDENTIAL_PATH_PLACEHOLDER = "<STATUS-CREDENTIAL-PATH-PLACEHOLDER>"
+private const val PLACEHOLDER_VALUE_SEPARATOR = "/"
 
 object StatusTestUtils {
 
@@ -47,6 +48,7 @@ object StatusTestUtils {
                             holderCredential = updateJsonObjectPlaceholders(
                                 resourceData.holderCredential,
                                 STATUS_CREDENTIAL_PATH_PLACEHOLDER,
+                                PLACEHOLDER_VALUE_SEPARATOR,
                                 placeholderValue,
                                 computedId
                             )
