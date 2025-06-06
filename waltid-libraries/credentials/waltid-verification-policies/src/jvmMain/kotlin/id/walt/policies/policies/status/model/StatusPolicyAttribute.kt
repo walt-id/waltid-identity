@@ -1,6 +1,6 @@
 package id.walt.policies.policies.status.model
 
-import id.walt.policies.policies.status.Values.BITSTRING_STATUS_LIST_ENTRY
+import id.walt.policies.policies.status.Values.BITSTRING_STATUS_LIST
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -36,8 +36,8 @@ data class W3CStatusPolicyListArguments(
 ) : StatusPolicyArgument() {
     init {
         require(list.isNotEmpty()) { "List cannot be empty" }
-        require(list.all { it.type == BITSTRING_STATUS_LIST_ENTRY }) {
-            "All entries must be of type $BITSTRING_STATUS_LIST_ENTRY"
+        require(list.all { it.type == BITSTRING_STATUS_LIST }) {
+            "All entries must be of type $BITSTRING_STATUS_LIST"
         }
     }
 }
