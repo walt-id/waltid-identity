@@ -1,34 +1,14 @@
 package id.walt.policies.policies.status.status
 
-import id.walt.policies.JsonObjectUtils.updateJsonObjectPlaceholders
-import id.walt.policies.policies.status.model.StatusPolicyAttribute
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import java.io.File
 import java.net.URISyntaxException
 
 const val STATUS_CREDENTIAL_PATH_PLACEHOLDER = "<STATUS-CREDENTIAL-PATH-PLACEHOLDER>"
-private const val PLACEHOLDER_VALUE_SEPARATOR = "/"
+const val PLACEHOLDER_VALUE_SEPARATOR = "/"
 
 object StatusTestUtils {
 
-    @Serializable
-    data class StatusResource(
-        val id: String,
-        val data: StatusResourceData,
-    ) {
-        @Serializable
-        data class StatusResourceData(
-            @SerialName("status-credential")
-            val statusCredential: String,
-            @SerialName("holder-credential")
-            val holderCredential: JsonObject,
-            val valid: Boolean,
-            val attribute: StatusPolicyAttribute,
-        )
-    }
 
     class TestResourceReader {
         companion object {
@@ -37,25 +17,15 @@ object StatusTestUtils {
 
         fun readResourcesBySubfolder(
             rootResourcePath: String, placeholderValue: String
-        ): Map<String, List<StatusResource>> = getResourceAsFile(rootResourcePath).let { rootDir ->
+        ): Map<String, List<TestStatusResource>> = getResourceAsFile(rootResourcePath).let { rootDir ->
             rootDir.listFiles()?.filter { it.isDirectory }?.associate { subfolder ->
                 val entries = subfolder.listFiles { _, name -> name.endsWith(".json") }?.map { jsonFile ->
                     try {
-                        val resourceData =
-                            JSON_MAPPER.decodeFromString<StatusResource.StatusResourceData>(jsonFile.readText())
+                        val resourceData = JSON_MAPPER.decodeFromString<StatusResourceData>(jsonFile.readText())
                         val computedId = "${subfolder.name}-${jsonFile.nameWithoutExtension}"
-                        val updatedResourceData = resourceData.copy(
-                            holderCredential = updateJsonObjectPlaceholders(
-                                resourceData.holderCredential,
-                                STATUS_CREDENTIAL_PATH_PLACEHOLDER,
-                                PLACEHOLDER_VALUE_SEPARATOR,
-                                placeholderValue,
-                                computedId
-                            )
-                        )
-                        StatusResource(
-                            id = computedId, data = updatedResourceData
-                        )
+                        val updatedResourceData = resourceData.updateHolderCredential(placeholderValue, computedId)
+                            .updateStatusCredential(computedId)
+                        TestStatusResource(id = computedId, data = updatedResourceData)
                     } catch (e: Exception) {
                         throw RuntimeException("Failed to parse JSON file: ${jsonFile.path}", e)
                     }
@@ -74,10 +44,4 @@ object StatusTestUtils {
             }
         }
     }
-
-    data class StatusTestContext(
-        val credential: JsonObject,
-        val attribute: StatusPolicyAttribute? = null,
-        val expectValid: Boolean,
-    )
 }
