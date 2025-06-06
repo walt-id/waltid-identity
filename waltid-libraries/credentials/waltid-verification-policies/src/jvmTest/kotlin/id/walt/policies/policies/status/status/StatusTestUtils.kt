@@ -1,4 +1,4 @@
-package id.walt.policies
+package id.walt.policies.policies.status.status
 
 import id.walt.policies.JsonObjectUtils.updateJsonObjectPlaceholders
 import id.walt.policies.policies.status.model.StatusPolicyAttribute
@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.io.File
+import java.net.URISyntaxException
 
 const val STATUS_CREDENTIAL_PATH_PLACEHOLDER = "<STATUS-CREDENTIAL-PATH-PLACEHOLDER>"
 
@@ -66,7 +67,7 @@ object StatusTestUtils {
                 ?: throw IllegalArgumentException("Test resource path not found: $resourcePath (URL was null)")
             return try {
                 File(resourceUrl.toURI())
-            } catch (e: java.net.URISyntaxException) {
+            } catch (e: URISyntaxException) {
                 throw IllegalArgumentException("Invalid test resource path syntax: $resourcePath", e)
             }
         }
