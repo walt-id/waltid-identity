@@ -55,7 +55,7 @@ object StatusCredentialTestServer {
                 val id = call.parameters.getOrFail("id")
                 val data = credentials.values.flatten().find { it.id == id }!!.data
                 val statusCredential = when (data) {
-                    is MultiStatusResourceData -> data.statusCredential.find { it.id == id }!!.jwt
+                    is MultiStatusResourceData -> data.statusCredential.find { it.id == id }!!.content
                     is SingleStatusResourceData -> data.statusCredential
                 }
                 call.respond<String>(statusCredential)

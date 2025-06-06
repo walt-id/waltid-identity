@@ -18,7 +18,7 @@ data class TestStatusResource(
 
 @Serializable
 sealed class StatusResourceData {
-    abstract val holderCredential: JsonObject
+    abstract val holderCredential: JsonObject//no cwt, atm
     abstract val valid: Boolean
 
     abstract fun updateHolderCredential(vararg values: String): StatusResourceData
@@ -66,7 +66,7 @@ data class MultiStatusResourceData(
     @Serializable
     data class StatusCredential(
         val id: String,
-        val jwt: String,
+        val content: String,
     )
 
     override fun updateHolderCredential(vararg values: String): MultiStatusResourceData =
