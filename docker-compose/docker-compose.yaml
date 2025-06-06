@@ -22,7 +22,6 @@ services:
       - "waltid.enterprise.localhost:host-gateway"
     volumes:
       - ./wallet-api/config:/waltid-wallet-api/config
-      - ./wallet-api/walt.yaml:/waltid-wallet-api/walt.yaml
       - ./wallet-api/data:/waltid-wallet-api/data
 
   issuer-api:
