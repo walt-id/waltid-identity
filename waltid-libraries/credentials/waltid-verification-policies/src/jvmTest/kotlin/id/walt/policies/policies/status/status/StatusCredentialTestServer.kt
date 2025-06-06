@@ -53,13 +53,24 @@ object StatusCredentialTestServer {
         routing {
             get("credentials/{id}") {
                 val id = call.parameters.getOrFail("id")
-                val data = credentials.values.flatten().find { it.id == id }!!.data
-                val statusCredential = when (data) {
-                    is MultiStatusResourceData -> data.statusCredential.find { it.id == id }!!.jwt
-                    is SingleStatusResourceData -> data.statusCredential
-                }
+                val statusCredential = getStatusCredentialContent(credentials.values.flatten(), id)
+                requireNotNull(statusCredential)
                 call.respond<String>(statusCredential)
             }
         }
     }
+
+    private fun getStatusCredentialContent(resources: List<TestStatusResource>, targetId: String): String? =
+        // match TestStatusResource id
+        resources.find { it.id == targetId }?.let { testResource ->
+            when (val data = testResource.data) {
+                is MultiStatusResourceData -> data.statusCredential.firstOrNull()?.content
+                is SingleStatusResourceData -> data.statusCredential
+            }
+        } ?: // match MultiStatusResourceData id
+        resources
+            .mapNotNull { it.data as? MultiStatusResourceData }
+            .flatMap { it.statusCredential }
+            .find { it.id == targetId }
+            ?.content
 }

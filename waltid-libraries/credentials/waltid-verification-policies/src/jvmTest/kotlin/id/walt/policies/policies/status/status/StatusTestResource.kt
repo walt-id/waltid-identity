@@ -3,10 +3,12 @@ package id.walt.policies.policies.status.status
 import id.walt.policies.JsonObjectUtils.updateJsonArrayPlaceholders
 import id.walt.policies.JsonObjectUtils.updateJsonObjectPlaceholders
 import id.walt.policies.policies.status.model.StatusPolicyAttribute
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonArray
 
 @Serializable
 data class TestStatusResource(
@@ -16,10 +18,21 @@ data class TestStatusResource(
 
 @Serializable
 sealed class StatusResourceData {
-    abstract val holderCredential: JsonObject
+    abstract val holderCredential: JsonObject//no cwt, atm
     abstract val valid: Boolean
+
     abstract fun updateHolderCredential(vararg values: String): StatusResourceData
     abstract fun updateStatusCredential(vararg values: String): StatusResourceData
+
+    protected fun updateHolderCredentialJson(
+        holderCredential: JsonObject,
+        vararg values: String
+    ): JsonObject = updateJsonObjectPlaceholders(
+        jsonObject = holderCredential,
+        placeholder = STATUS_CREDENTIAL_PATH_PLACEHOLDER,
+        valueSeparator = PLACEHOLDER_VALUE_SEPARATOR,
+        placeholderValue = values
+    )
 }
 
 @Serializable
@@ -33,14 +46,8 @@ data class SingleStatusResourceData(
     val attribute: StatusPolicyAttribute,
 ) : StatusResourceData() {
 
-    override fun updateHolderCredential(vararg values: String): SingleStatusResourceData = copy(
-        holderCredential = updateJsonObjectPlaceholders(
-            holderCredential,
-            STATUS_CREDENTIAL_PATH_PLACEHOLDER,
-            PLACEHOLDER_VALUE_SEPARATOR,
-            *values
-        )
-    )
+    override fun updateHolderCredential(vararg values: String): SingleStatusResourceData =
+        copy(holderCredential = updateHolderCredentialJson(holderCredential, *values))
 
     override fun updateStatusCredential(vararg values: String): StatusResourceData = this
 }
@@ -56,38 +63,27 @@ data class MultiStatusResourceData(
     val attribute: List<StatusPolicyAttribute>,
 ) : StatusResourceData() {
 
-    @Transient
-    @Contextual
-    private val json = Json { ignoreUnknownKeys = true }
-
     @Serializable
     data class StatusCredential(
         val id: String,
-        val jwt: String,
+        val content: String,
     )
 
-    override fun updateHolderCredential(vararg values: String): MultiStatusResourceData = copy(
-        holderCredential = updateJsonObjectPlaceholders(
-            jsonObject = holderCredential,
-            placeholder = STATUS_CREDENTIAL_PATH_PLACEHOLDER,
-            valueSeparator = PLACEHOLDER_VALUE_SEPARATOR,
-            placeholderValue = values
-        )
-    )
+    override fun updateHolderCredential(vararg values: String): MultiStatusResourceData =
+        copy(holderCredential = updateHolderCredentialJson(holderCredential, *values))
 
-    override fun updateStatusCredential(vararg values: String): StatusResourceData = copy(
-        statusCredential = updateStatusCredentialPlaceholder(*values)
-    )
+    override fun updateStatusCredential(vararg values: String): MultiStatusResourceData =
+        copy(statusCredential = updateStatusCredentialList(*values))
 
     //not nice, but ¯\_(ツ)_/¯
-    private fun updateStatusCredentialPlaceholder(vararg values: String): List<StatusCredential> {
-        val array = json.encodeToJsonElement<List<StatusCredential>>(statusCredential).jsonArray
-        val updated = updateJsonArrayPlaceholders(
-            jsonArray = array,
+    private fun updateStatusCredentialList(vararg values: String): List<StatusCredential> {
+        val credentialArray = JSON_MAPPER.encodeToJsonElement(statusCredential).jsonArray
+        val updatedArray = updateJsonArrayPlaceholders(
+            jsonArray = credentialArray,
             placeholder = STATUS_CREDENTIAL_PATH_PLACEHOLDER,
             valueSeparator = PLACEHOLDER_VALUE_SEPARATOR,
             placeholderValue = values
         )
-        return json.decodeFromJsonElement<List<StatusCredential>>(updated)
+        return JSON_MAPPER.decodeFromJsonElement(updatedArray)
     }
 }
