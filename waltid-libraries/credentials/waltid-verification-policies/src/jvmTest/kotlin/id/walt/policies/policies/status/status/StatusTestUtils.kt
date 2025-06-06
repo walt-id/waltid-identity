@@ -7,13 +7,12 @@ import java.net.URISyntaxException
 const val STATUS_CREDENTIAL_PATH_PLACEHOLDER = "<STATUS-CREDENTIAL-PATH-PLACEHOLDER>"
 const val PLACEHOLDER_VALUE_SEPARATOR = "/"
 
+val JSON_MAPPER = Json { ignoreUnknownKeys = true }
+
 object StatusTestUtils {
 
 
     class TestResourceReader {
-        companion object {
-            private val JSON_MAPPER = Json { ignoreUnknownKeys = true }
-        }
 
         fun readResourcesBySubfolder(
             rootResourcePath: String, placeholderValue: String
