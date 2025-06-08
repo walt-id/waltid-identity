@@ -1,13 +1,8 @@
 package id.walt.policies.policies
 
-import id.walt.policies.policies.status.*
+import id.walt.policies.policies.status.CredentialFetcher
 import id.walt.policies.policies.status.bit.BitValueReaderFactory
-import id.walt.policies.policies.status.model.IETFEntry
-import id.walt.policies.policies.status.model.IETFStatusPolicyAttribute
-import id.walt.policies.policies.status.model.StatusPolicyArgument
-import id.walt.policies.policies.status.model.W3CEntry
-import id.walt.policies.policies.status.model.W3CStatusPolicyAttribute
-import id.walt.policies.policies.status.model.W3CStatusPolicyListArguments
+import id.walt.policies.policies.status.model.*
 import id.walt.policies.policies.status.parser.JsonElementParser
 import id.walt.policies.policies.status.parser.JwtParser
 import id.walt.policies.policies.status.reader.IETFJwtStatusValueReader
@@ -82,38 +77,37 @@ actual class StatusPolicy : StatusPolicyMp() {
         return w3cStatusValidator.validate(statusEntry, attribute)
     }
 
-    private suspend fun processListW3C(data: JsonElement, attribute: W3CStatusPolicyListArguments): Result<List<Unit>> {
-        val statusEntries = w3cListEntryParser.parse(data)
-        //check the arguments list is less or equal to entry list
-        require(statusEntries.size >= attribute.list.size) { "Arguments list size mismatch: ${statusEntries.size} expecting ${attribute.list.size}" }
-        //match each argument with its corresponding entry
-        val sortedEntries = statusEntries.sortedBy { it.purpose }
-        val sortedAttributes = attribute.list.sortedBy { it.purpose }
-        val validationResults: List<Result<Unit>> = sortedEntries.zip(sortedAttributes) { entry, attr ->
-            w3cStatusValidator.validate(entry, attr)
-        }
-        require(validationResults.isNotEmpty()) {
-            if (attribute.list.isEmpty()) {
-                "Verification failed: Attribute list is empty."
-            } else {
-                // This implies attribute.list was not empty, but statusEntries might have been empty or shorter.
-                "Verification failed: No matching status entries found for attributes, or status entries list is empty/shorter."
+    private suspend fun processListW3C(data: JsonElement, attribute: W3CStatusPolicyListArguments): Result<Unit> =
+        runCatching {
+            val statusEntries = w3cListEntryParser.parse(data)
+            //check the arguments list is less or equal to entry list
+            require(statusEntries.size >= attribute.list.size) { "Arguments list size mismatch: ${statusEntries.size} expecting ${attribute.list.size}" }
+            //match each argument with its corresponding entry
+            val sortedEntries = statusEntries.sortedBy { it.purpose }
+            val sortedAttributes = attribute.list.sortedBy { it.purpose }
+            val validationResults: List<Result<Unit>> = sortedEntries.zip(sortedAttributes) { entry, attr ->
+                w3cStatusValidator.validate(entry, attr)
+            }
+            if (validationResults.isEmpty()) {
+                throw IllegalArgumentException(emptyResultMessage(attribute))
+            }
+            if (validationResults.any { it.isFailure }) {
+                throw IllegalArgumentException(failResultMessage(validationResults))
             }
         }
-        require(validationResults.all { it.isSuccess }) {
-            // Find the first failure to include its message in the error.
-            val firstFailureMessage = validationResults.firstOrNull { it.isFailure }
-                ?.exceptionOrNull()?.message ?: "Unknown validation error"
-            "Verification failed: $firstFailureMessage"
-        }
-        require(validationResults.all { it.isSuccess }) {
-            // Find the first failure to include its message in the error.
-            val firstFailureMessage =
-                validationResults.firstOrNull { it.isFailure }?.exceptionOrNull()?.message ?: "Unknown validation error"
-            "Verification failed: $firstFailureMessage"
-        }
-        val successfulStrings: List<Unit> = validationResults.map { it.getOrThrow() }
-        return Result.success(successfulStrings)
+
+    private fun failResultMessage(validationResults: List<Result<Unit>>) =
+        // Find the first failure to include its message in the error.
+        validationResults.filter { it.isFailure }.map { it.exceptionOrNull()?.message ?: "Unknown validation error" }
+            .let {
+                "Verification failed: ${it.joinToString(System.lineSeparator())}"
+            }
+
+    private fun emptyResultMessage(attribute: W3CStatusPolicyListArguments) = if (attribute.list.isEmpty()) {
+        "Verification failed: Attribute list is empty."
+    } else {
+        // This implies attribute.list was not empty, but statusEntries might have been empty or shorter.
+        "Verification failed: No matching status entries found for attributes, or status entries list is empty/shorter."
     }
 
     private suspend fun processIETF(data: JsonElement, attribute: IETFStatusPolicyAttribute): Result<Unit> {
