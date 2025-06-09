@@ -2,9 +2,11 @@ package id.walt.policies.policies
 
 import id.walt.policies.policies.status.CredentialFetcher
 import id.walt.policies.policies.status.bit.BitValueReaderFactory
-import id.walt.policies.policies.status.model.*
 import id.walt.policies.policies.status.content.JsonElementParser
 import id.walt.policies.policies.status.content.JwtParser
+import id.walt.policies.policies.status.entry.IETFEntryExtractor
+import id.walt.policies.policies.status.entry.W3CEntryExtractor
+import id.walt.policies.policies.status.model.*
 import id.walt.policies.policies.status.reader.IETFJwtStatusValueReader
 import id.walt.policies.policies.status.reader.W3CStatusValueReader
 import id.walt.policies.policies.status.validator.IETFStatusValidator
@@ -17,7 +19,6 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.serializer
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -35,11 +36,15 @@ actual class StatusPolicy : StatusPolicyMp() {
     @Transient
     private val credentialFetcher = CredentialFetcher(httpClient)
     @Transient
-    private val w3cEntryParser = JsonElementParser(serializer<W3CEntry>())
+    private val w3cEntryExtractor = W3CEntryExtractor()
     @Transient
-    private val w3cListEntryParser = JsonElementParser(serializer<List<W3CEntry>>())
+    private val ietfEntryExtractor = IETFEntryExtractor()
     @Transient
-    private val ietfEntryParser = JsonElementParser(serializer<IETFEntry>())
+    private val w3cEntryContentParser = JsonElementParser(serializer<W3CEntry>())
+    @Transient
+    private val w3cListEntryContentParser = JsonElementParser(serializer<List<W3CEntry>>())
+    @Transient
+    private val ietfEntryContentParser = JsonElementParser(serializer<IETFEntry>())
     @Transient
     private val jwtParser = JwtParser()
     @Transient
@@ -59,9 +64,9 @@ actual class StatusPolicy : StatusPolicyMp() {
     actual override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
         requireNotNull(args) { "args required" }
         require(args is StatusPolicyArgument) { "args must be a CredentialStatusPolicyArgument" }
-        val statusElement = data.getStatusEntryElement(args)
+        val statusElement = getStatusEntryElementExtractor(args).extract(data)
         //todo: [RevocationPolicy] passes when no entry found - should this follow the same pattern?
-        requireNotNull(statusElement) { "Corresponding status entry not found" }
+        requireNotNull(statusElement) { "No status entry found" }
         val result = processStatusEntry(statusElement, args)
         return result
     }
@@ -73,13 +78,13 @@ actual class StatusPolicy : StatusPolicyMp() {
     }
 
     private suspend fun processW3C(data: JsonElement, attribute: W3CStatusPolicyAttribute): Result<Unit> {
-        val statusEntry = w3cEntryParser.parse(data)
+        val statusEntry = w3cEntryContentParser.parse(data)
         return w3cStatusValidator.validate(statusEntry, attribute)
     }
 
     private suspend fun processListW3C(data: JsonElement, attribute: W3CStatusPolicyListArguments): Result<Unit> =
         runCatching {
-            val statusEntries = w3cListEntryParser.parse(data)
+            val statusEntries = w3cListEntryContentParser.parse(data)
             //check the arguments list is less or equal to entry list
             require(statusEntries.size >= attribute.list.size) { "Arguments list size mismatch: ${statusEntries.size} expecting ${attribute.list.size}" }
             //match each argument with its corresponding entry
@@ -111,12 +116,12 @@ actual class StatusPolicy : StatusPolicyMp() {
     }
 
     private suspend fun processIETF(data: JsonElement, attribute: IETFStatusPolicyAttribute): Result<Unit> {
-        val statusEntry = ietfEntryParser.parse(data)
+        val statusEntry = ietfEntryContentParser.parse(data)
         return ietfStatusValidator.validate(statusEntry, attribute)
     }
 
-    private fun JsonObject.getStatusEntryElement(args: StatusPolicyArgument) = when (args) {
-        is IETFStatusPolicyAttribute -> this["status"]
-        is W3CStatusPolicyAttribute, is W3CStatusPolicyListArguments -> this["vc"]?.jsonObject?.get("credentialStatus")
+    private fun getStatusEntryElementExtractor(args: StatusPolicyArgument) = when (args) {
+        is IETFStatusPolicyAttribute -> ietfEntryExtractor
+        is W3CStatusPolicyAttribute, is W3CStatusPolicyListArguments -> w3cEntryExtractor
     }
 }
