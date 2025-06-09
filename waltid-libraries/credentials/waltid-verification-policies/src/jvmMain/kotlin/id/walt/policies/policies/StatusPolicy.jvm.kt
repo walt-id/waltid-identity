@@ -3,8 +3,8 @@ package id.walt.policies.policies
 import id.walt.policies.policies.status.CredentialFetcher
 import id.walt.policies.policies.status.bit.BitValueReaderFactory
 import id.walt.policies.policies.status.model.*
-import id.walt.policies.policies.status.parser.JsonElementParser
-import id.walt.policies.policies.status.parser.JwtParser
+import id.walt.policies.policies.status.content.JsonElementParser
+import id.walt.policies.policies.status.content.JwtParser
 import id.walt.policies.policies.status.reader.IETFJwtStatusValueReader
 import id.walt.policies.policies.status.reader.W3CStatusValueReader
 import id.walt.policies.policies.status.validator.IETFStatusValidator
