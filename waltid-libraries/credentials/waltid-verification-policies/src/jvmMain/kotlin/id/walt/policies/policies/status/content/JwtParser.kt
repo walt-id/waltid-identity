@@ -1,4 +1,4 @@
-package id.walt.policies.policies.status.parser
+package id.walt.policies.policies.status.content
 
 import id.walt.policies.policies.Base64Utils
 import kotlinx.serialization.json.Json
