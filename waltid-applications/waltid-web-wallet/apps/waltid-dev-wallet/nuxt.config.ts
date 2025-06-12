@@ -7,7 +7,7 @@ export default defineNuxtConfig({
   srcDir: "src",
 
   devServer: {
-    port: 7101,
+    port: 7104,
   },
 
   modules: [
@@ -167,6 +167,9 @@ export default defineNuxtConfig({
         "@waltid-web-wallet": path.resolve(__dirname, "../../libs"),
       },
     },
+    server: {
+      allowedHosts: true
+    }
     /*server: {
             proxy: {
                 '/api': {
