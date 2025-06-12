@@ -30,9 +30,9 @@ jobs:
         run: |
           sed -i "s/1.0.0-SNAPSHOT/${{ inputs.version }}/g" build.gradle.kts
       - name: Fully build the project (runs assemble + check)
-        run: ./gradlew build --no-daemon --stacktrace
+        run: ./gradlew build --no-daemon
       - name: Run allTests task
-        run: ./gradlew allTests --no-daemon --stacktrace
+        run: ./gradlew allTests --no-daemon
       - name: Publish
         if: ${{ inputs.publish }}
         env:
