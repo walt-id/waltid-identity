@@ -5,12 +5,7 @@ import id.walt.policies.policies.status.content.JsonElementParser
 import id.walt.policies.policies.status.content.JwtParser
 import id.walt.policies.policies.status.entry.IETFEntryExtractor
 import id.walt.policies.policies.status.entry.W3CEntryExtractor
-import id.walt.policies.policies.status.model.IETFEntry
-import id.walt.policies.policies.status.model.IETFStatusPolicyAttribute
-import id.walt.policies.policies.status.model.StatusPolicyArgument
-import id.walt.policies.policies.status.model.W3CEntry
-import id.walt.policies.policies.status.model.W3CStatusPolicyAttribute
-import id.walt.policies.policies.status.model.W3CStatusPolicyListArguments
+import id.walt.policies.policies.status.model.*
 import id.walt.policies.policies.status.reader.IETFJwtStatusValueReader
 import id.walt.policies.policies.status.reader.W3CStatusValueReader
 import id.walt.policies.policies.status.validator.IETFStatusValidator
@@ -20,8 +15,9 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.serializer
-import kotlin.compareTo
 
 object StatusPolicyImplementation {
     private val httpClient = HttpClient {
@@ -54,18 +50,22 @@ object StatusPolicyImplementation {
 
     private val ietfStatusValidator = IETFStatusValidator(credentialFetcher, ietfJwtStatusReader, bitValueReaderFactory)
 
-    suspend fun processStatusEntry(data: JsonElement, args: StatusPolicyArgument) = when (args) {
+    suspend fun verifyWithAttributes(data: JsonObject, attributes: StatusPolicyArgument): Result<Any> =
+        getStatusEntryElementExtractor(attributes).extract(data)?.let { processStatusEntry(it, attributes) }
+            ?: Result.success(JsonObject(mapOf("policy_available" to JsonPrimitive(false))))
+
+    private suspend fun processStatusEntry(data: JsonElement, args: StatusPolicyArgument) = when (args) {
         is IETFStatusPolicyAttribute -> processIETF(data, args)
         is W3CStatusPolicyAttribute -> processW3C(data, args)
         is W3CStatusPolicyListArguments -> processListW3C(data, args)
     }
 
-    suspend fun processW3C(data: JsonElement, attribute: W3CStatusPolicyAttribute): Result<Unit> {
+    private suspend fun processW3C(data: JsonElement, attribute: W3CStatusPolicyAttribute): Result<Unit> {
         val statusEntry = w3cEntryContentParser.parse(data)
         return w3cStatusValidator.validate(statusEntry, attribute)
     }
 
-    suspend fun processListW3C(data: JsonElement, attribute: W3CStatusPolicyListArguments): Result<Unit> =
+    private suspend fun processListW3C(data: JsonElement, attribute: W3CStatusPolicyListArguments): Result<Unit> =
         runCatching {
             val statusEntries = w3cListEntryContentParser.parse(data)
             //check the arguments list is less or equal to entry list
@@ -84,24 +84,24 @@ object StatusPolicyImplementation {
             }
         }
 
-    fun failResultMessage(validationResults: List<Result<Unit>>) =
+    private fun failResultMessage(validationResults: List<Result<Unit>>) =
         validationResults.filter { it.isFailure }.map { it.exceptionOrNull()?.message ?: "Unknown validation error" }
             .let {
                 "Verification failed: ${it.joinToString(System.lineSeparator())}"
             }
 
-    fun emptyResultMessage(attribute: W3CStatusPolicyListArguments) = if (attribute.list.isEmpty()) {
+    private fun emptyResultMessage(attribute: W3CStatusPolicyListArguments) = if (attribute.list.isEmpty()) {
         "Verification failed: Attribute list is empty."
     } else {
         "Verification failed: No matching status entries found for attributes, or status entries list is empty/shorter."
     }
 
-    suspend fun processIETF(data: JsonElement, attribute: IETFStatusPolicyAttribute): Result<Unit> {
+    private suspend fun processIETF(data: JsonElement, attribute: IETFStatusPolicyAttribute): Result<Unit> {
         val statusEntry = ietfEntryContentParser.parse(data)
         return ietfStatusValidator.validate(statusEntry, attribute)
     }
 
-    fun getStatusEntryElementExtractor(args: StatusPolicyArgument) = when (args) {
+    private fun getStatusEntryElementExtractor(args: StatusPolicyArgument) = when (args) {
         is IETFStatusPolicyAttribute -> ietfEntryExtractor
         is W3CStatusPolicyAttribute, is W3CStatusPolicyListArguments -> w3cEntryExtractor
     }
