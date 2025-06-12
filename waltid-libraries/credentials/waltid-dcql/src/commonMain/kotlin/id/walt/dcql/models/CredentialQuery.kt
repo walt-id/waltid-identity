@@ -31,7 +31,7 @@ data class CredentialQuery(
      */
     /** Format-specific metadata constraints */
     @Serializable(with = CredentialQueryMetaPolymorphicSerializer::class)
-    val meta: CredentialQueryMeta? = NoMeta,
+    val meta: CredentialQueryMeta = NoMeta, // mandatory to be set since draft 29
     /*
     * Default to NoMeta if not provided,
     * assuming serializer handles {} as NoMeta.

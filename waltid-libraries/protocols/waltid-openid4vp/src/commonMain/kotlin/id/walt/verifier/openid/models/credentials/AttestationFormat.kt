@@ -5,7 +5,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * Formats for Verifier Attestations.
- * See Section 5.1 (verifier_attestations) of OpenID4VP spec.
+ * See verifier_info of OpenID4VP spec.
+ *
+ * -> now "verifier_info" since draft 29
  */
 @Serializable
 enum class AttestationFormat {

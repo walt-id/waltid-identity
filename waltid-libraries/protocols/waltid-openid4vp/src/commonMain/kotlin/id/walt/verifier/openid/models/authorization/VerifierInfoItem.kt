@@ -7,9 +7,11 @@ import kotlinx.serialization.Serializable
 /**
  * Represents a Verifier Attestation object.
  * See: Section 5.1 (verifier_attestations parameter)
+ *
+ * -> now "verifier_info" since draft 29
  */
 @Serializable
-data class VerifierAttestationItem(
+data class VerifierInfoItem(
     val format: AttestationFormat,
     val data: String, // Could be a JWT string or other format-specific data
     @SerialName("credential_ids")
