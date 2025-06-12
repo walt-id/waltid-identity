@@ -226,9 +226,63 @@ class IssuerIsoMdlOnboardingServiceTests {
 
     }
 
+    private suspend fun testDSValidityPeriodLargerThan457Days() = test(
+        name = "Document signer certificate validity period cannot be larger than 457 days"
+    ) {
+
+        val timeNow = Clock.System.now()
+        val iacaResponse = client.post("/onboard/iso-mdl/iacas") {
+            setBody(
+                IACAOnboardingRequest(
+                    certificateData = IACACertificateData(
+                        country = "US",
+                        commonName = "Test IACA",
+                        issuerAlternativeNameConf = IssuerAlternativeNameConfiguration(uri = "https://iaca.example.com"),
+                        notAfter = timeNow.plus((365L).toDuration(DurationUnit.DAYS)),
+                        crlDistributionPointUri = "https://iaca.example.com/crl"
+                    )
+                )
+            )
+        }.expectSuccess().body<IACAOnboardingResponse>()
+
+        val iacaSigner = IACASignerData(
+            certificateData = IACACertificateData(
+                country = "US",
+                commonName = "Test IACA",
+                issuerAlternativeNameConf = IssuerAlternativeNameConfiguration(uri = "https://iaca.example.com"),
+                notBefore = iacaResponse.certificateData.notBefore,
+                notAfter = iacaResponse.certificateData.notAfter,
+                crlDistributionPointUri = "https://iaca.example.com/crl"
+            ),
+            iacaKey = iacaResponse.iacaKey
+        )
+
+        /**
+         * In the following invalid request payload, we use buildJsonObject
+         * and not the request payload of the data class because we don't want to get
+         * an initialization error from the data class, we want to see that the HTTP
+         * call actually fails.
+         */
+
+        // Invalid: DS certificate starts before IACA
+        client.post("/onboard/iso-mdl/document-signers") {
+            setBody(buildJsonObject {
+                put("iacaSigner", Json.encodeToJsonElement(iacaSigner))
+                put("certificateData", buildJsonObject {
+                    put("country", "US".toJsonElement())
+                    put("commonName", "Valid DSC".toJsonElement())
+                    put("crlDistributionPointUri", "Valid DSC".toJsonElement())
+                    put("notBefore", Json.encodeToJsonElement(timeNow.minus((1L).toDuration(DurationUnit.DAYS))))
+                    put("notAfter", Json.encodeToJsonElement(timeNow.plus((458L).toDuration(DurationUnit.DAYS))))
+                })
+            })
+        }.expectFailure()
+    }
+
     suspend fun runTests() {
         testOnboardIACARootGeneratesValidCertificate()
         testOnboardDocumentSignerGeneratesValidCertificate()
         testDSValidityPeriodWithinIACAValidityPeriod()
+        testDSValidityPeriodLargerThan457Days()
     }
 }
