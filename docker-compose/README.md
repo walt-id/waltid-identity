@@ -152,7 +152,6 @@ docker-compose down -v
 
 - wallet API:
     - `wallet-api/config` - wallet configuration
-    - `wallet-api/walt.yaml` - nft configuration
 - issuer API:
     - `issuer-api/config`
 - verifier API:
