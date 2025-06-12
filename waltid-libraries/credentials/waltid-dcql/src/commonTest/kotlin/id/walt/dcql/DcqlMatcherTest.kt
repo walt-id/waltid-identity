@@ -61,7 +61,7 @@ class DcqlMatcherTest {
 
         val matchResult = DcqlMatcher.match(query, allCreds)
         println("Match result: $matchResult")
-        return matchResult
+        return matchResult.map { it.mapValues { it.value.map { it.credential } } }
     }
 
     @Test
