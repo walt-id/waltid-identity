@@ -156,7 +156,7 @@ object CredentialParser {
                         credentialData = fullCredentialData,
                         originalCredentialData = payload,
 
-                        issuer = getCredentialDataIssuer(payload),
+                        issuer = getJwtHeaderOrDataIssuer(payload),
                         subject = getCredentialDataSubject(payload)
                     )
 
@@ -204,7 +204,7 @@ object CredentialParser {
                         credentialData = fullCredentialData,
                         originalCredentialData = payload,
 
-                        issuer = getCredentialDataIssuer(payload),
+                        issuer = getJwtHeaderOrDataIssuer(payload),
                         subject = getCredentialDataSubject(payload)
                     )
 
