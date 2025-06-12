@@ -502,7 +502,7 @@ object DcqlMatcher {
     }
 
     /** Basic JSON path resolver. Needs enhancement for arrays, different formats. */
-    private fun resolveClaimPath(data: JsonObject, path: List<String>): JsonElement? {
+    fun resolveClaimPath(data: JsonObject, path: List<String>): JsonElement? {
         var currentElement: JsonElement? = data
         for (segment in path) {
             when (currentElement) {
