@@ -3,6 +3,7 @@ package id.walt.crypto.keys.aws
 import aws.sdk.kotlin.services.kms.KmsClient
 import aws.sdk.kotlin.services.kms.model.*
 import id.walt.crypto.exceptions.KeyTypeNotSupportedException
+import id.walt.crypto.exceptions.SigningException
 import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyMeta
@@ -20,6 +21,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import org.kotlincrypto.hash.sha2.SHA256
 
 
 @Serializable
@@ -66,11 +68,16 @@ class AWSKey(
     }
 
     override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+        if (!awsSigningAlgorithm.endsWith("_SHA_256")){
+            throw SigningException("failed to sign - unsupported hashing algorithm: $awsSigningAlgorithm")
+        }
+        val digestedMessage = AWSKey.sha256(plaintext)
+
         val signRequest = SignRequest {
             this.keyId = id
             signingAlgorithm = SigningAlgorithmSpec.fromValue(awsSigningAlgorithm)
-            message = plaintext
-            messageType = MessageType.Raw
+            message = digestedMessage
+            messageType = MessageType.Digest // Using digest mode to handle payloads larger than 4096 bytes
         }
 
         return KmsClient { region = config.region }.use { kmsClient ->
@@ -106,12 +113,18 @@ class AWSKey(
         signed: ByteArray,
         detachedPlaintext: ByteArray?
     ): Result<ByteArray> {
+        if (!awsSigningAlgorithm.endsWith("_SHA_256")){
+            throw SigningException("failed to verofy - unsupported hashing algorithm: $awsSigningAlgorithm")
+        }
+        val messageToVerify = detachedPlaintext ?: return Result.failure(IllegalArgumentException("Detached plaintext is required for verification"))
+        val digestedMessage = AWSKey.sha256(messageToVerify)
+
         val verifyRequest = VerifyRequest {
             this.keyId = id
             signingAlgorithm = SigningAlgorithmSpec.fromValue(awsSigningAlgorithm)
-            message = detachedPlaintext
+            message = digestedMessage
             this.signature = signed
-            messageType = MessageType.Raw
+            messageType = MessageType.Digest
         }
 
         return KmsClient { region = config.region }.use { kmsClient ->
@@ -218,6 +231,9 @@ $encodedPk
             "RSA_2048" -> KeyType.RSA
             else -> throw KeyTypeNotSupportedException(type)
         }
+
+        // Utility to perform SHA-256 digest on binary data
+        fun sha256(data: ByteArray): ByteArray = SHA256().digest(data)
     }
 
 }
