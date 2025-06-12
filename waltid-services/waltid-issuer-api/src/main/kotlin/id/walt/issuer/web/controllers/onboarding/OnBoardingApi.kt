@@ -83,6 +83,7 @@ fun Application.onboardingApi() {
                                 "  - If provided, `notBefore` must not be in the past\n" +
                                 "  - `notAfter`, if present, must be later than `notBefore`\n" +
                                 "  - `crlDistributionPointUri` is required\n" +
+                                "  - The certificate's validity period cannot exceed 457 days\n" +
                                 "\n" +
                                 "  ### Defaults:\n" +
                                 "  - A local `secp256r1` signing key will be generated for the document signer if **no** other backend is specified\n" +
