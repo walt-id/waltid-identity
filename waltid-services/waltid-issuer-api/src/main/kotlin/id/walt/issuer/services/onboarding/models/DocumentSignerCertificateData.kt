@@ -49,6 +49,10 @@ data class DocumentSignerCertificateData(
             "Document signer certificate data notBefore must be before (and not equal to) notAfter"
         }
 
+        require( finalNotAfter.minus(finalNotBefore) <= (457L).toDuration(DurationUnit.DAYS)) {
+            "Document signer certificates should not have a validity that is larger than 457 days"
+        }
+
     }
 
 }

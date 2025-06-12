@@ -8,6 +8,8 @@ import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.days
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 class DocumentSignerOnboardingRequestTest {
 
@@ -119,6 +121,16 @@ class DocumentSignerOnboardingRequestTest {
         val now = Clock.System.now()
         assertFailsWith<IllegalArgumentException> {
             validDSCertData.copy(notBefore = now, notAfter = now)
+        }
+    }
+
+    @Test
+    fun `document signer certificate validity larger than 457 days throws`() {
+        val now = Clock.System.now()
+        assertFailsWith<IllegalArgumentException> {
+            validDSCertData.copy(
+                notAfter = now.plus((458L).toDuration(DurationUnit.DAYS)),
+            )
         }
     }
 }
