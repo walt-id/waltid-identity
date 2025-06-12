@@ -11,6 +11,7 @@ import kotlinx.serialization.json.encodeToJsonElement
 import org.bouncycastle.asn1.*
 import org.bouncycastle.asn1.x509.*
 import java.io.ByteArrayInputStream
+import java.math.BigInteger
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.*
@@ -54,6 +55,22 @@ class IssuerIsoMdlOnboardingServiceTests {
         }.expectSuccess().body<IACAOnboardingResponse>()
 
         val cert = parseCertificate(response.certificatePEM)
+
+        // === Serial Number checks ===
+        // 1. Must be positive
+        assertTrue(cert.serialNumber.signum() > 0, "Serial number must be positive")
+
+        // 2. Must be non-zero
+        assertTrue(cert.serialNumber != BigInteger.ZERO, "Serial number must not be zero")
+
+        // 3. Must be <= 20 octets (160 bits)
+        assertTrue(cert.serialNumber.bitLength() <= 160, "Serial number must not exceed 20 bytes (160 bits)")
+
+        // 4. Must contain at least 63 bits (required)
+        assertTrue(cert.serialNumber.bitLength() >= 63, "Serial number must contain at least 63 bits of entropy")
+
+        // 5. Should contain at least 71 bits (recommended)
+        assertTrue(cert.serialNumber.bitLength() >= 71, "Serial number should contain at least 71 bits of entropy")
 
         assertEquals("US", cert.issuerX500Principal.name.substringAfter("C=").take(2))
         assertEquals(cert.subjectX500Principal, cert.issuerX500Principal) // self-signed
@@ -109,6 +126,22 @@ class IssuerIsoMdlOnboardingServiceTests {
         }.expectSuccess().body<DocumentSignerOnboardingResponse>()
 
         val cert = parseCertificate(response.certificatePEM)
+
+        // === Serial Number checks ===
+        // 1. Must be positive
+        assertTrue(cert.serialNumber.signum() > 0, "Serial number must be positive")
+
+        // 2. Must be non-zero
+        assertTrue(cert.serialNumber != BigInteger.ZERO, "Serial number must not be zero")
+
+        // 3. Must be <= 20 octets (160 bits)
+        assertTrue(cert.serialNumber.bitLength() <= 160, "Serial number must not exceed 20 bytes (160 bits)")
+
+        // 4. Must contain at least 63 bits (required)
+        assertTrue(cert.serialNumber.bitLength() >= 63, "Serial number must contain at least 63 bits of entropy")
+
+        // 5. Should contain at least 71 bits (recommended)
+        assertTrue(cert.serialNumber.bitLength() >= 71, "Serial number should contain at least 71 bits of entropy")
 
         assertEquals("US", cert.subjectX500Principal.name.substringAfter("C=").take(2))
         assertTrue(cert.basicConstraints == -1) // not a CA
