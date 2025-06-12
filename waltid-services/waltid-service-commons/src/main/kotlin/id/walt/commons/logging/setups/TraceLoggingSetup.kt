@@ -30,6 +30,10 @@ data object TraceLoggingSetup : LoggingSetup("trace", {
         fromMinLevel(Level.DEBUG) { toSink("stdout") }
     }
     logging {
+        fromLoggerBase("io.ktor.client.plugins", stopOnMatch = true)
+        fromMinLevel(Level.DEBUG) { toSink("stdout") }
+    }
+    logging {
         fromLoggerBase("io.ktor", stopOnMatch = true)
         fromMinLevel(Level.TRACE) { toSink("stdout") }
     }
