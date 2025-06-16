@@ -294,8 +294,6 @@ fun Application.verifierApi() {
                 )
             }
 
-
-
             post("/verify/{state}", {
                 tags = listOf("OIDC")
                 summary = "Verify vp_token response, for a verification request identified by the state"
