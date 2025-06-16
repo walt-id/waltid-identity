@@ -276,9 +276,9 @@ fun Application.verifierApi() {
                         ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
                         ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
                     trustedRootCAs = listOfNotNull(
-                        body["trusted_root_cas"] as? JsonArray,
-                        body["trustedRootCAs"] as? JsonArray,
-                    ).takeIf { it.isNotEmpty() }?.flatMap { it }?.let { JsonArray(it) },
+                        body["trusted_root_cas"],
+                        body["trustedRootCAs"],
+                    ).takeIf { it.isNotEmpty() }?.flatMap { it as JsonArray }?.let { JsonArray(it) },
                     sessionTtl = sessionTtl
                 )
 
