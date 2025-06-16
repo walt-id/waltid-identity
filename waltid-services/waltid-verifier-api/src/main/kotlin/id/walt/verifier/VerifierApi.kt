@@ -255,7 +255,7 @@ fun Application.verifierApi() {
                 val statusCallbackUri = call.request.header("statusCallbackUri")
                 val statusCallbackApiKey = call.request.header("statusCallbackApiKey")
                 val stateId = call.request.header("stateId")
-                val openId4VPProfile = call.request.header("openId4VPProfile")
+                val openId4VPProfileHeaderParam = call.request.header("openId4VPProfile")
                 // Parse session TTL from header if provided
                 val sessionTtl = call.request.header("sessionTtl")?.toLongOrNull()?.seconds
 
@@ -273,7 +273,7 @@ fun Application.verifierApi() {
                     statusCallbackApiKey = statusCallbackApiKey,
                     stateId = stateId,
                     openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull
-                        ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
+                        ?: openId4VPProfileHeaderParam)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
                         ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
                     trustedRootCAs = body["trusted_root_cas"]?.jsonArray,
                     sessionTtl = sessionTtl
