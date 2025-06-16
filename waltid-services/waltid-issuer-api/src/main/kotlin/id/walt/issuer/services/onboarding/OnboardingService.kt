@@ -368,7 +368,7 @@ object OnboardingService {
                     )
                     val finalJsonObject = jsonObject.toMutableMap().apply {
                         this["jwk"] = jwkObject.jsonObject
-                    }
+                    }.toMap()
                     JsonObject(finalJsonObject)
                 }
 
