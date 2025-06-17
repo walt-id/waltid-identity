@@ -558,4 +558,64 @@ object VerifierApiExamples {
             {"request_credentials":[{"format":"vc+sd-jwt","vct":"https://issuer.portal.walt-test.cloud/identity_credential","input_descriptor":{"id":"https://issuer.portal.walt-test.cloud/identity_credential","format":{"vc+sd-jwt":{}},"constraints":{"fields":[{"path":["${'$'}.vct"],"filter":{"type":"string","pattern":"https://issuer.portal.walt-test.cloud/identity_credential"}},{"path":["${'$'}.birthdate"],"filter":{"type":"string","pattern":".*"}}],"limit_disclosure":"required"}}}],"vp_policies":["signature_sd-jwt-vc","presentation-definition"],"vc_policies":["not-before","expired"]}
         """.trimIndent()
     )
+
+
+    fun w3cStatusPolicy(type: String = "BitstringStatusList", purpose: String = "revocation", value: UInt = 0u) =
+        jsonObjectValueExampleDescriptorDsl(
+            """
+            {
+                "request_credentials":
+                [
+                    { "format": "jwt_vc_json", "type": "OpenBadgeCredential" }
+                ],
+                "policy": "credential-status",
+                "args":  ${w3cStatusPolicyArgument(purpose, type, value)}
+            }
+            """.trimIndent()
+        )
+
+    private fun w3cStatusPolicyArgument(purpose: String, type: String, value: UInt): String =
+        """
+            {
+                "discriminator": "w3c",
+                "value": $value,
+                "purpose": "$purpose",
+                "type": "$type"
+            }
+        """.trimIndent()
+
+    val w3cListStatusPolicy = jsonObjectValueExampleDescriptorDsl(
+        """
+        {
+            "request_credentials":
+            [
+                { "format": "jwt_vc_json", "type": "OpenBadgeCredential" }
+            ],
+            "policy": "credential-status",
+            "args": {
+                "discriminator": "w3c-list",
+                "list": [
+                    ${w3cStatusPolicyArgument("revocation", "BitstringStatusList", 0u)},
+                    ${w3cStatusPolicyArgument("suspension", "BitstringStatusList", 0u)}
+                ]
+            }
+        }
+    """.trimIndent()
+    )
+
+    val ietfStatusPolicy = jsonObjectValueExampleDescriptorDsl(
+        """
+        {
+            "request_credentials":
+            [
+                { "format": "vc+sd-jwt", "vct": "http://localhost:7002/identity_credential" }
+            ],
+            "policy": "credential-status",
+            "args":  {
+                "discriminator": "ietf",
+                "value": 0
+            }
+        }
+    """.trimIndent()
+    )
 }
