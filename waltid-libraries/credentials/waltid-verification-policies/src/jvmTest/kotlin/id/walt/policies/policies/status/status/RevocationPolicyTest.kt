@@ -1,7 +1,7 @@
 package id.walt.policies.policies.status.status
 
 import id.walt.policies.policies.RevocationPolicy
-import id.walt.policies.policies.status.status.StatusCredentialTestServer.credentials
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -18,13 +18,13 @@ class RevocationPolicyTest {
     private val sut = RevocationPolicy()
 
     @BeforeAll
-    fun startServer() {
-        StatusCredentialTestServer.start()
+    fun startServer() = runBlocking {
+        server.start()
     }
 
     @AfterAll
     fun stopServer() {
-        StatusCredentialTestServer.stop()
+        server.stop()
     }
 
     @ParameterizedTest
@@ -39,9 +39,12 @@ class RevocationPolicyTest {
 
 
     companion object {
+
+        private val server = StatusCredentialTestServer()
+
         @JvmStatic
         fun verify(): Stream<Arguments> = statusList2021Scenarios().stream().map { arguments(it) }
 
-        private fun statusList2021Scenarios() = credentials["statuslist2021"]!!.map { it.data }
+        private fun statusList2021Scenarios() = server.credentials["statuslist2021"]!!.map { it.data }
     }
 }

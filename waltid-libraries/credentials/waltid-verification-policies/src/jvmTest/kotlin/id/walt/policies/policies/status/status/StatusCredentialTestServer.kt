@@ -10,40 +10,46 @@ import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import kotlinx.serialization.json.Json
 
-object StatusCredentialTestServer {
-    private const val PORT = 8080
-    private const val URL = "http://localhost:$PORT"
-    private const val STATUS_CREDENTIAL_PATH = "credentials"
-    private var serverStarted = false
+class StatusCredentialTestServer {
 
-    private val resourceReader = StatusTestUtils.TestResourceReader()
-    val credentials = resourceReader.readResourcesBySubfolder(
-        "status",
-        placeholderValue = "$URL/$STATUS_CREDENTIAL_PATH",
-    )
+    private lateinit var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>
+    private lateinit var baseUrl: String
 
-    private val server by lazy {
-        println("Initializing embedded webserver...")
-        embeddedServer(Netty, configure = {
-            connector {
-                port = 8080
-            }
-        }, module = { module() })
-    }
+    lateinit var credentials: Map<String, List<TestStatusResource>>
+        private set
 
-    fun start() {
-        if (!serverStarted) {
-            println("Starting status credential test server...")
-            server.start()
-            serverStarted = true
+    val port: Int
+        get() = _port ?: throw IllegalStateException("Server not started yet")
+
+    private var _port: Int? = null
+    private var started = false
+
+    suspend fun start() {
+        if (!started) {
+            server = embeddedServer(Netty, port = 0, module = { module() }).start(wait = false)
+
+            _port = server.engine.resolvedConnectors().first().port
+            baseUrl = "http://localhost:$port"
+
+            credentials = resourceReader.readResourcesBySubfolder(
+                "status",
+                placeholderValue = "$baseUrl/$STATUS_CREDENTIAL_PATH"
+            )
+
+            started = true
         }
     }
 
     fun stop() {
-        if (serverStarted) {
-            println("Stopping status credential test server...")
+        if (started) {
             server.stop()
+            started = false
         }
+    }
+
+    companion object {
+        private const val STATUS_CREDENTIAL_PATH = "credentials"
+        private val resourceReader = StatusTestUtils.TestResourceReader()
     }
 
     private fun Application.module() {
