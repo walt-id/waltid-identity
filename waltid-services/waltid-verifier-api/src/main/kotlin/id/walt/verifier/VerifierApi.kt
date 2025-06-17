@@ -210,16 +210,36 @@ fun Application.verifierApi() {
                             "Example with EBSI PDA1 Presentation Definition",
                             VerifierApiExamples.EbsiVerifiablePDA1
                         )
-                        example("MDoc verification example", VerifierApiExamples.lspPotentialMdocExample)
+                        example("mDL Request presentation of all mandatory fields example") {
+                            value = VerifierApiExamples.mDLRequiredFieldsExample
+                        }
+                        example("mDL Request presentation of birth date & validity fields only example") {
+                            value = VerifierApiExamples.mDLBirthDateSelectiveDisclosureExample
+                        }
+                        example("mDL Request presentation of age over 18 attestation & validity fields only example (assumes `age_over_18` field exists in issued mDL)") {
+                            value = VerifierApiExamples.mDLAgeOver18AttestationExample
+                        }
                         example("SD-JWT-VC verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
                         example(
                             "SD-JWT-VC verification example with mandatory fields",
                             VerifierApiExamples.sdJwtVCExampleWithRequiredFields
                         )
-                        example("EBSI-VECTOR interoperability test - InTimeIssuance", VerifierApiExamples.EBSIVectorExampleInTimeIssuance)
-                        example("EBSI-VECTOR interoperability test - DeferredIssuance", VerifierApiExamples.EBSIVectorExampleDeferredIssuance)
-                        example("EBSI-VECTOR interoperability test - PreAuthIssuance", VerifierApiExamples.EBSIVectorExamplePreAuthIssuance)
-                        example("EBSI-VECTOR interoperability test - All", VerifierApiExamples.EBSIVectorExampleAllIssuance)
+                        example(
+                            "EBSI-VECTOR interoperability test - InTimeIssuance",
+                            VerifierApiExamples.EBSIVectorExampleInTimeIssuance
+                        )
+                        example(
+                            "EBSI-VECTOR interoperability test - DeferredIssuance",
+                            VerifierApiExamples.EBSIVectorExampleDeferredIssuance
+                        )
+                        example(
+                            "EBSI-VECTOR interoperability test - PreAuthIssuance",
+                            VerifierApiExamples.EBSIVectorExamplePreAuthIssuance
+                        )
+                        example(
+                            "EBSI-VECTOR interoperability test - All",
+                            VerifierApiExamples.EBSIVectorExampleAllIssuance
+                        )
 
                     }
                 }
@@ -235,9 +255,9 @@ fun Application.verifierApi() {
                 val statusCallbackUri = call.request.header("statusCallbackUri")
                 val statusCallbackApiKey = call.request.header("statusCallbackApiKey")
                 val stateId = call.request.header("stateId")
-                val openId4VPProfile = call.request.header("openId4VPProfile")
+                val openId4VPProfileHeaderParam = call.request.header("openId4VPProfile")
                 // Parse session TTL from header if provided
-                val sessionTtl = call.request.header("sessionTtl")?.toLongOrNull()?.let { it.seconds }
+                val sessionTtl = call.request.header("sessionTtl")?.toLongOrNull()?.seconds
 
                 val body = call.receive<JsonObject>()
 
@@ -252,8 +272,8 @@ fun Application.verifierApi() {
                     statusCallbackUri = statusCallbackUri,
                     statusCallbackApiKey = statusCallbackApiKey,
                     stateId = stateId,
-                    openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.contentOrNull
-                        ?: openId4VPProfile)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
+                    openId4VPProfile = (body["openid_profile"]?.jsonPrimitive?.content
+                        ?: openId4VPProfileHeaderParam)?.let { OpenId4VPProfile.valueOf(it.uppercase()) }
                         ?: OpenId4VPProfile.fromAuthorizeBaseURL(authorizeBaseUrl),
                     trustedRootCAs = body["trusted_root_cas"]?.jsonArray,
                     sessionTtl = sessionTtl
@@ -274,8 +294,6 @@ fun Application.verifierApi() {
                 )
             }
 
-
-
             post("/verify/{state}", {
                 tags = listOf("OIDC")
                 summary = "Verify vp_token response, for a verification request identified by the state"
@@ -295,7 +313,13 @@ fun Application.verifierApi() {
                                 presentation_submission = PresentationSubmissionFormParam(
                                     id = "1",
                                     definition_id = "1",
-                                    descriptor_map = listOf(DescriptorMappingFormParam("1", VCFormat.jwt_vc_json, "$.vc.type"))
+                                    descriptor_map = listOf(
+                                        DescriptorMappingFormParam(
+                                            "1",
+                                            VCFormat.jwt_vc_json,
+                                            "$.vc.type"
+                                        )
+                                    )
                                 ),
                                 response = null
                             )
@@ -330,7 +354,11 @@ fun Application.verifierApi() {
                             session.walletInitiatedAuthState != null -> {
                                 val state = session.walletInitiatedAuthState
                                 call.respondRedirect(
-                                    "openid://?state=$state&error=invalid_request&error_description=${getErrorDescription(it)}"
+                                    "openid://?state=$state&error=invalid_request&error_description=${
+                                        getErrorDescription(
+                                            it
+                                        )
+                                    }"
                                 )
                             }
 
@@ -481,7 +509,7 @@ fun Application.verifierApi() {
             val stateId = Uuid.random().toString()
             // Parse session TTL from query parameter if provided
             val sessionTtl =
-                params["sessionTtl"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull?.toLongOrNull()?.let { it.seconds }
+                params["sessionTtl"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull?.toLongOrNull()?.seconds
 
             val session = verificationUseCase.createSession(
                 vpPoliciesJson = null,

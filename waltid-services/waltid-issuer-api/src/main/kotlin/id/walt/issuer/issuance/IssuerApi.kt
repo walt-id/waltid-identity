@@ -1,14 +1,14 @@
 package id.walt.issuer.issuance
 
-import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyManager
-import id.walt.crypto.keys.KeySerialization
 import id.walt.did.dids.DidService
 import id.walt.issuer.issuance.OidcApi.buildCredentialOfferUri
 import id.walt.issuer.issuance.OidcApi.buildOfferUri
 import id.walt.issuer.issuance.OidcApi.getFormatByCredentialConfigurationId
+import id.walt.issuer.issuance.openapi.MdocDocs
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.requests.CredentialOfferRequest
+import id.walt.w3c.vc.vcs.W3CVC
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.config.RequestConfig
 import io.github.smiley4.ktoropenapi.post
@@ -20,7 +20,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.reflect.KClass
@@ -29,7 +28,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger {}
-suspend fun createCredentialOfferUri(
+fun createCredentialOfferUri(
     issuanceRequests: List<IssuanceRequest>,
     credentialFormat: CredentialFormat,
     callbackUrl: String? = null,
@@ -39,7 +38,9 @@ suspend fun createCredentialOfferUri(
     val overwrittenIssuanceRequests = issuanceRequests.map {
         it.copy(
             credentialFormat = credentialFormat,
-            vct = if (credentialFormat == CredentialFormat.sd_jwt_vc) OidcApi.metadata.getVctByCredentialConfigurationId(it.credentialConfigurationId)
+            vct = if (credentialFormat == CredentialFormat.sd_jwt_vc) OidcApi.metadata.getVctByCredentialConfigurationId(
+                it.credentialConfigurationId
+            )
                 ?: throw IllegalArgumentException("VCT not found") else null
         )
     }
@@ -55,7 +56,10 @@ suspend fun createCredentialOfferUri(
 
     val offerRequest = CredentialOfferRequest(
         credentialOffer = null,
-        credentialOfferUri = buildCredentialOfferUri(overwrittenIssuanceRequests.first().standardVersion!!, issuanceSession.id)
+        credentialOfferUri = buildCredentialOfferUri(
+            overwrittenIssuanceRequests.first().standardVersion!!,
+            issuanceSession.id
+        )
     )
 
     logger.debug { "offerRequest: $offerRequest" }
@@ -69,159 +73,34 @@ suspend fun createCredentialOfferUri(
 
 private const val example_title = "Missing credentialData in the request body."
 
+fun RequestConfig.statusCallbackUriHeader() = headerParameter<String>("statusCallbackUri") {
+    description = "Callback to push state changes of the issuance process to"
+    required = false
+}
+
+fun RequestConfig.sessionTtlHeader() = headerParameter<Long>("sessionTtl") {
+    description = "Custom session time-to-live in seconds"
+    required = false
+}
+
 fun Application.issuerApi() {
     routing {
-        route("onboard", {
-            tags = listOf("Issuer onboarding")
-        }) {
-            post("issuer", {
-                summary = "Onboards a new issuer."
-                description = "Creates an issuer keypair and an associated DID based on the provided configuration."
-
-                request {
-                    body<OnboardingRequest> {
-                        description = "Issuer onboarding request (key & DID) config."
-                        example(
-                            "did:jwk + JWK key (Ed25519)",
-                            IssuanceExamples.issuerOnboardingRequestDefaultEd25519Example
-                        )
-                        example(
-                            "did:jwk + JWK key (secp256r1)",
-                            IssuanceExamples.issuerOnboardingRequestDefaultSecp256r1Example
-                        )
-                        example(
-                            "did:jwk + JWK key (secp256k1)",
-                            IssuanceExamples.issuerOnboardingRequestDefaultSecp256k1Example
-                        )
-                        example("did:jwk + JWK key (RSA)", IssuanceExamples.issuerOnboardingRequestDefaultRsaExample)
-                        example("did:web + JWK key (Secp256k1)", IssuanceExamples.issuerOnboardingRequestDidWebExample)
-                        example(
-                            "did:key + TSE key (Hashicorp Vault Transit Engine - Ed25519) + AppRole (Auth)",
-                            IssuanceExamples.issuerOnboardingRequestTseExampleAppRole
-                        )
-                        example(
-                            "did:key + TSE key (Hashicorp Vault Transit Engine - Ed25519) + UserPass (Auth)",
-                            IssuanceExamples.issuerOnboardingRequestTseExampleUserPass
-                        )
-                        example(
-                            "did:key + TSE key (Hashicorp Vault Transit Engine - Ed25519) + AccessKey (Auth)",
-                            IssuanceExamples.issuerOnboardingRequestTseExampleAccessKey
-                        )
-                        example(
-                            "did:jwk + OCI key (Oracle Cloud Infrastructure - Secp256r1)",
-                            IssuanceExamples.issuerOnboardingRequestOciExample
-                        )
-                        example(
-                            "did:jwk + OCI REST API key  (Oracle Cloud Infrastructure - Secp256r1)",
-                            IssuanceExamples.issuerOnboardingRequestOciRestApiExample
-                        )
-                        example(
-                            "did:jwk + AWS REST API key  (AWS - Secp256r1) + AccessKey (Auth)",
-                            IssuanceExamples.issuerOnboardingRequestAwsRestApiExampleWithDirectAccess
-                        )
-                        example(
-                            "did:jwk + AWS REST API key  (AWS - Secp256r1) + Role (Auth)",
-                            IssuanceExamples.issuerOnboardingRequestAwsRestApiExampleWithRole
-                        )
-                        example(
-                            "did:jwk + Azure REST API key  (Azure - Secp256r1)",
-                            IssuanceExamples.issuerOnboardingRequestAzureRestApiExample
-                        )
-                        example(
-                            "did:jwk + AWS SDK key  (AWS - Secp256r1)",
-                            IssuanceExamples.issuerOnboardingRequestAwsSdkExample
-                        )
-                        required = true
-                    }
-                }
-
-                response {
-                    "200" to {
-                        description = "Issuer onboarding response"
-                        body<IssuerOnboardingResponse> {
-                            example(
-                                "Local JWK key (Secp256r1) + did:jwk",
-                                IssuanceExamples.issuerOnboardingResponseDefaultExample,
-                            )
-                            example(
-                                "Local JWK key (Secp256r1) + did:web",
-                                IssuanceExamples.issuerOnboardingResponseDidWebExample,
-                            )
-                            example(
-                                "Remote TSE Ed25519 key + did:key",
-                                IssuanceExamples.issuerOnboardingResponseTseExample,
-                            )
-                            example(
-                                "Remote OCI Secp256r1 key + did:jwk",
-                                IssuanceExamples.issuerOnboardingResponseOciExample,
-                            )
-                            example(
-                                "Remote OCI REST API Secp256r1 key + did:jwk",
-                                IssuanceExamples.issuerOnboardingResponseOciRestApiExample,
-                            )
-                        }
-                    }
-                    "400" to {
-                        description = "Bad request"
-
-                    }
-                }
-            }) {
-                val req = call.receive<OnboardingRequest>()
-                val keyConfig = req.key.config?.mapValues { (key, value) ->
-                    if (key == "signingKeyPem") {
-                        JsonPrimitive(value.jsonPrimitive.content.trimIndent().replace(" ", ""))
-
-                    } else {
-                        value
-                    }
-                }
-
-                val keyGenerationRequest = req.key.copy(config = keyConfig?.let { it1 -> JsonObject(it1) })
-                val key = KeyManager.createKey(keyGenerationRequest)
-
-                val did = DidService.registerDefaultDidMethodByKey(
-                    req.did.method,
-                    key,
-                    req.did.config?.mapValues { it.value.jsonPrimitive } ?: emptyMap()).did
-
-
-                val serializedKey = KeySerialization.serializeKeyToJson(key)
-
-
-                val issuanceKey = if (req.key.backend == "jwk") {
-                    val jsonObject = serializedKey.jsonObject
-                    val jwkObject = jsonObject["jwk"] ?: throw IllegalArgumentException(
-                        "No JWK key found in serialized key."
-                    )
-                    val finalJsonObject = jsonObject.toMutableMap().apply {
-                        this["jwk"] = jwkObject.jsonObject
-                    }
-                    JsonObject(finalJsonObject)
-                } else {
-                    serializedKey
-                }
-                call.respond(
-                    HttpStatusCode.OK, IssuerOnboardingResponse(issuanceKey, did)
-                )
-            }
-        }
         route("", {
             tags = listOf("Credential Issuance")
         }) {
-            fun RequestConfig.statusCallbackUriHeader() = headerParameter<String>("statusCallbackUri") {
-                description = "Callback to push state changes of the issuance process to"
-                required = false
-            }
-
-            fun RequestConfig.sessionTtlHeader() = headerParameter<Long>("sessionTtl") {
-                description = "Custom session time-to-live in seconds"
-                required = false
-            }
+//            fun RequestConfig.statusCallbackUriHeader() = headerParameter<String>("statusCallbackUri") {
+//                description = "Callback to push state changes of the issuance process to"
+//                required = false
+//            }
+//
+//            fun RequestConfig.sessionTtlHeader() = headerParameter<Long>("sessionTtl") {
+//                description = "Custom session time-to-live in seconds"
+//                required = false
+//            }
 
             fun RoutingContext.getCallbackUriHeader() = call.request.header("statusCallbackUri")
 
-            fun RoutingContext.getSessionTtl() = call.request.header("sessionTtl")?.toLongOrNull()?.let { it.seconds }
+            fun RoutingContext.getSessionTtl() = call.request.header("sessionTtl")?.toLongOrNull()?.seconds
 
             route("raw") {
                 route("jwt") {
@@ -295,8 +174,14 @@ fun Application.issuerApi() {
                             body<IssuanceRequest> {
                                 description =
                                     "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("OpenBadgeCredential example", IssuanceExamples.openBadgeCredentialIssuanceExample)
-                                example("UniversityDegreeCredential example", IssuanceExamples.universityDegreeIssuanceCredentialExample)
+                                example(
+                                    "OpenBadgeCredential example",
+                                    IssuanceExamples.openBadgeCredentialIssuanceExample
+                                )
+                                example(
+                                    "UniversityDegreeCredential example",
+                                    IssuanceExamples.universityDegreeIssuanceCredentialExample
+                                )
                                 example(
                                     "OpenBadgeCredential example with Authorization Code Flow and Id Token",
                                     IssuanceExamples.openBadgeCredentialIssuanceExampleWithIdToken
@@ -443,7 +328,10 @@ fun Application.issuerApi() {
                                     "SD-JWT-VC example featuring selectively disclosable sub and iat claims",
                                     IssuanceExamples.sdJwtVCExampleWithSDSub
                                 )
-                                example("SD-JWT-VC example with issuer DID", IssuanceExamples.sdJwtVCWithIssuerDidExample)
+                                example(
+                                    "SD-JWT-VC example with issuer DID",
+                                    IssuanceExamples.sdJwtVCWithIssuerDidExample
+                                )
                                 required = true
                             }
                         }
@@ -524,17 +412,8 @@ fun Application.issuerApi() {
                     post("issue", {
                         summary = "Signs a credential based on the IEC/ISO18013-5 mdoc/mDL format."
                         description = "This endpoint issues a mdoc and returns an issuance URL "
-                        request {
-                            statusCallbackUriHeader()
-                            sessionTtlHeader()
-                            body<IssuanceRequest> {
-                                description =
-                                    "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("mDL/MDOC example with CWT proof", IssuanceExamples.mDLCredentialIssuanceExample)
-                                example("mDL/MDOC example with JWT proof", IssuanceExamples.mDLCredentialIssuanceJwtProofExample)
-                                required = true
-                            }
-                        }
+
+                        request(MdocDocs.requestConfig())
                     }) {
                         val mdocIssuanceRequest = call.receive<IssuanceRequest>()
                         val offerUri = createCredentialOfferUri(
