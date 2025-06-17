@@ -223,15 +223,8 @@ fun Application.verifierApi() {
                         example("mDL Request presentation of age over 18 attestation & validity fields only example (assumes `age_over_18` field exists in issued mDL)") {
                             value = VerifierApiExamples.mDLAgeOver18AttestationExample
                         }
-                        example("SD-JWT-VC verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
-                        example(
-                            "SD-JWT-VC verification example with mandatory fields",
-                            VerifierApiExamples.sdJwtVCExampleWithRequiredFields
-                        )
-                        example("EBSI-VECTOR interoperability test - InTimeIssuance", VerifierApiExamples.EBSIVectorExampleInTimeIssuance)
-                        example("EBSI-VECTOR interoperability test - DeferredIssuance", VerifierApiExamples.EBSIVectorExampleDeferredIssuance)
-                        example("EBSI-VECTOR interoperability test - PreAuthIssuance", VerifierApiExamples.EBSIVectorExamplePreAuthIssuance)
-                        example("EBSI-VECTOR interoperability test - All", VerifierApiExamples.EBSIVectorExampleAllIssuance)
+                        addSdJwtVcExamples()
+                        addEbsiVectorInteropTestExamples()
                         addCredentialStatusExamples()
                     }
                 }
@@ -550,6 +543,27 @@ private fun getErrorDescription(it: Throwable): String? = when (it.message) {
         "<\$presentation_submission.descriptor_map[x].id> is revoked"
 
     else -> null
+}
+
+private fun SimpleBodyConfig.addSdJwtVcExamples() {
+    example("SD-JWT-VC verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
+    example(
+        "SD-JWT-VC verification example with mandatory fields", VerifierApiExamples.sdJwtVCExampleWithRequiredFields
+    )
+}
+
+private fun SimpleBodyConfig.addEbsiVectorInteropTestExamples() {
+    example(
+        "EBSI-VECTOR interoperability test - InTimeIssuance", VerifierApiExamples.EBSIVectorExampleInTimeIssuance
+    )
+    example(
+        "EBSI-VECTOR interoperability test - DeferredIssuance",
+        VerifierApiExamples.EBSIVectorExampleDeferredIssuance
+    )
+    example(
+        "EBSI-VECTOR interoperability test - PreAuthIssuance", VerifierApiExamples.EBSIVectorExamplePreAuthIssuance
+    )
+    example("EBSI-VECTOR interoperability test - All", VerifierApiExamples.EBSIVectorExampleAllIssuance)
 }
 
 private fun SimpleBodyConfig.addCredentialStatusExamples() {
