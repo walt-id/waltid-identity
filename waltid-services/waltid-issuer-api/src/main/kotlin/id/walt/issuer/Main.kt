@@ -12,6 +12,7 @@ import id.walt.issuer.entra.entraIssuance
 import id.walt.issuer.issuance.OidcApi.oidcApi
 import id.walt.issuer.issuance.issuerApi
 import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
+import id.walt.issuer.web.controllers.onboarding.onboardingApi
 import id.walt.issuer.web.plugins.configureHTTP
 import id.walt.issuer.web.plugins.configureMonitoring
 import id.walt.issuer.web.plugins.configureRouting
@@ -44,7 +45,9 @@ fun Application.issuerModule(withPlugins: Boolean = true) {
     if (withPlugins) {
         configurePlugins()
     }
+
     oidcApi()
+    onboardingApi()
     issuerApi();
 
     { entraIssuance() } whenFeature FeatureCatalog.entra

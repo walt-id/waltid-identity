@@ -2,8 +2,6 @@
 
 package id.walt.verifier.oidc
 
-import org.cose.java.AlgorithmID
-import org.cose.java.OneKey
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
@@ -50,8 +48,10 @@ import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
+import org.cose.java.AlgorithmID
+import org.cose.java.OneKey
 import java.security.cert.X509Certificate
-import java.util.Base64
+import java.util.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -218,7 +218,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
             ?: throw BadRequestException("Issuer's Public Key Missing: The x5c header in the JWT is either missing or does not contain the expected X.509 certificate chain. Please ensure that the x5c header is correctly formatted and includes the issuer’s public key")
         return parsedMdoc.verify(
             MDocVerificationParams(
-                VerificationType.forPresentation,
+                verificationTypes = VerificationType.forPresentation,
                 issuerKeyID = "ISSUER_KEY_ID",
                 deviceKeyID = "DEVICE_KEY_ID",
                 deviceAuthentication = DeviceAuthentication(
@@ -228,7 +228,14 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
                 )
             ), SimpleCOSECryptoProvider(
                 listOf(
-                    COSECryptoProviderKeyInfo("ISSUER_KEY_ID", AlgorithmID.ECDSA_256, issuerKey, null, listOf(), getAdditionalTrustedRootCAs(session)),
+                    COSECryptoProviderKeyInfo(
+                        "ISSUER_KEY_ID",
+                        AlgorithmID.ECDSA_256,
+                        issuerKey,
+                        null,
+                        listOf(),
+                        getAdditionalTrustedRootCAs(session)
+                    ),
                     COSECryptoProviderKeyInfo("DEVICE_KEY_ID", AlgorithmID.ECDSA_256, deviceKey.AsPublicKey(), null)
                 )
             )
