@@ -3,7 +3,7 @@ package id.walt.policies.policies.status.status
 import id.walt.policies.policies.StatusPolicy
 import id.walt.policies.policies.status.model.W3CStatusPolicyAttribute
 import id.walt.policies.policies.status.model.W3CStatusPolicyListArguments
-import id.walt.policies.policies.status.status.StatusCredentialTestServer.credentials
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -20,13 +20,13 @@ class StatusPolicyTest {
     private val sut = StatusPolicy()
 
     @BeforeAll
-    fun startServer() {
-        StatusCredentialTestServer.start()
+    fun startServer() = runBlocking {
+        server.start()
     }
 
     @AfterAll
     fun stopServer() {
-        StatusCredentialTestServer.stop()
+        server.stop()
     }
 
     @ParameterizedTest
@@ -43,7 +43,10 @@ class StatusPolicyTest {
     }
 
     companion object {
+
+        private val server = StatusCredentialTestServer()
+
         @JvmStatic
-        fun verify(): Stream<Arguments> = credentials.values.flatten().map { it.data }.stream().map { arguments(it) }
+        fun verify(): Stream<Arguments> = server.credentials.values.flatten().map { it.data }.stream().map { arguments(it) }
     }
 }
