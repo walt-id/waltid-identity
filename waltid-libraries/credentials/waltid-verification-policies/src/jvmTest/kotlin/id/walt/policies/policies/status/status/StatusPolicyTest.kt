@@ -5,6 +5,8 @@ import id.walt.policies.policies.status.model.W3CStatusPolicyAttribute
 import id.walt.policies.policies.status.model.W3CStatusPolicyListArguments
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.TestInstance
@@ -18,6 +20,7 @@ import kotlin.test.assertEquals
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class StatusPolicyTest {
     private val sut = StatusPolicy()
+    private val jsonModule = Json { ignoreUnknownKeys = true }
 
     @BeforeAll
     fun startServer() = runBlocking {
@@ -37,7 +40,8 @@ class StatusPolicyTest {
             is MultiStatusResourceData -> W3CStatusPolicyListArguments(list = context.attribute.map { it as W3CStatusPolicyAttribute })
             is SingleStatusResourceData -> context.attribute
         }
-        val result = sut.verify(json, attribute, emptyMap())
+        val jsonAttribute = jsonModule.encodeToJsonElement(attribute)
+        val result = sut.verify(json, jsonAttribute, emptyMap())
         assertEquals(context.valid, result.isSuccess)
         assertEquals(!context.valid, result.isFailure)
     }
