@@ -1,4 +1,4 @@
-package id.walt.issuer
+package id.walt.issuance2
 
 object Values {
     const val VERSION = "1.SNAPSHOT"

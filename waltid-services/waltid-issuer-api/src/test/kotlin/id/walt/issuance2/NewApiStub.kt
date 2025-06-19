@@ -1,4 +1,4 @@
-package id.walt.issuer.issuance2
+package id.walt.issuance2
 
 import id.walt.issuer.issuance.NewIssuanceRequest
 import io.github.smiley4.ktoropenapi.post

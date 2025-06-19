@@ -8,10 +8,10 @@ import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.WebService
 import id.walt.crypto.keys.aws.WaltCryptoAws
 import id.walt.did.helpers.WaltidServices
-import id.walt.issuer.entra.entraIssuance
+import id.walt.issuer.feat.entra.entraIssuance
 import id.walt.issuer.issuance.OidcApi.oidcApi
 import id.walt.issuer.issuance.issuerApi
-import id.walt.issuer.lspPotential.lspPotentialIssuanceTestApi
+import id.walt.issuer.feat.lspPotential.lspPotentialIssuanceTestApi
 import id.walt.issuer.web.controllers.onboarding.onboardingApi
 import id.walt.issuer.web.plugins.configureHTTP
 import id.walt.issuer.web.plugins.configureMonitoring

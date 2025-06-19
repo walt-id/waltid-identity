@@ -1,4 +1,4 @@
-package id.walt.issuer
+package id.walt.issuance2
 
 import id.walt.commons.logging.LoggingManager
 import id.walt.commons.logging.setups.TraceLoggingSetup

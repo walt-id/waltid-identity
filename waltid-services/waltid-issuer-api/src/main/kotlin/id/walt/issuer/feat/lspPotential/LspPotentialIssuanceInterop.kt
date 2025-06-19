@@ -1,11 +1,11 @@
-package id.walt.issuer.lspPotential
+package id.walt.issuer.feat.lspPotential
 
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.commons.interop.LspPotentialInterop
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
-import id.walt.issuer.issuance.IssuanceExamples
+import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.createCredentialOfferUri
 import id.walt.oid4vc.data.AuthenticationMethod
