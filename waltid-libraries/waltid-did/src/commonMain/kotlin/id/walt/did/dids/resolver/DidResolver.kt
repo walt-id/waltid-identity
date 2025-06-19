@@ -30,7 +30,7 @@ interface DidResolver {
     @JsPromise
     @JsExport.Ignore
     suspend fun resolveToKey(did: String): Result<Key>
-    
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
