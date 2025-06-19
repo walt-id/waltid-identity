@@ -28,20 +28,22 @@ object Verifier {
 
     private val log = KotlinLogging.logger { }
 
-    private fun JsonObject.getW3CType() = (this["type"] ?: this["vc"]?.jsonObject?.get("type") ?: this["vp"]?.jsonObject?.get("type")
-    ?: throw IllegalArgumentException("No `type` supplied: $this")).let {
-        when (it) {
-            is JsonArray -> (it.lastOrNull()
-                ?: throw IllegalArgumentException("Empty `type` array! Please provide an type in the list.")).jsonPrimitive.content
+    private fun JsonObject.getW3CType() =
+        (this["type"] ?: this["vc"]?.jsonObject?.get("type") ?: this["vp"]?.jsonObject?.get("type")
+        ?: throw IllegalArgumentException("No `type` supplied: $this")).let {
+            when (it) {
+                is JsonArray -> (it.lastOrNull()
+                    ?: throw IllegalArgumentException("Empty `type` array! Please provide an type in the list.")).jsonPrimitive.content
 
-            is JsonPrimitive -> it.content
-            else -> throw IllegalArgumentException("Invalid type of `type`-attribute: ${it::class.simpleName}")
+                is JsonPrimitive -> it.content
+                else -> throw IllegalArgumentException("Invalid type of `type`-attribute: ${it::class.simpleName}")
 
+            }
         }
-    }
 
     private fun JsonObject.getSdjwtVcType() =
-        (this["vct"] ?: this["vc"]?.jsonObject?.get("vct") ?: throw IllegalArgumentException("No `vct` supplied: $this")).let {
+        (this["vct"] ?: this["vc"]?.jsonObject?.get("vct")
+        ?: throw IllegalArgumentException("No `vct` supplied: $this")).let {
             when (it) {
                 is JsonPrimitive -> it.content
                 else -> throw IllegalArgumentException("Invalid type of `type`-attribute: ${it::class.simpleName}")
@@ -154,12 +156,32 @@ object Verifier {
         log.trace { "Verifying presentation with format $format (is w3cvp=$isW3CVp): $vpToken" }
 
         return when {
-            isW3CVp -> verifyW3CPresentation(format, vpToken, vpPolicies, globalVcPolicies, specificCredentialPolicies, presentationContext)
+            isW3CVp -> verifyW3CPresentation(
+                format = format,
+                vpToken = vpToken,
+                vpPolicies = vpPolicies,
+                globalVcPolicies = globalVcPolicies,
+                specificCredentialPolicies = specificCredentialPolicies,
+                presentationContext = presentationContext
+            )
 
             format == VCFormat.mso_mdoc -> TODO("mdoc presentations are not yet supported")
-            format == VCFormat.sd_jwt_vc -> verifySDJwtVCPresentation(vpToken, vpPolicies, globalVcPolicies, specificCredentialPolicies, presentationContext)
+            format == VCFormat.sd_jwt_vc -> verifySDJwtVCPresentation(
+                vpToken = vpToken,
+                vpPolicies = vpPolicies,
+                globalVcPolicies = globalVcPolicies,
+                specificCredentialPolicies = specificCredentialPolicies,
+                presentationContext = presentationContext
+            )
 
-            else -> verifyW3CPresentation(format, vpToken, vpPolicies, globalVcPolicies, specificCredentialPolicies, presentationContext)
+            else -> verifyW3CPresentation(
+                format = format,
+                vpToken = vpToken,
+                vpPolicies = vpPolicies,
+                globalVcPolicies = globalVcPolicies,
+                specificCredentialPolicies = specificCredentialPolicies,
+                presentationContext = presentationContext
+            )
         }
     }
 
@@ -206,29 +228,43 @@ object Verifier {
                 }
 
                 suspend fun runPolicyRequests(idx: Int, jwt: String, policies: List<PolicyRequest>) =
-                    runPolicyRequests(jwt, policies, presentationContext, onSuccess = { policyResult ->
-                        resultMutex.withLock {
-                            policiesRun++
-                            results[idx].policyResults.add(policyResult)
+                    runPolicyRequests(
+                        jwt = jwt,
+                        policyRequests = policies,
+                        context = presentationContext,
+                        onSuccess = { policyResult ->
+                            resultMutex.withLock {
+                                policiesRun++
+                                results[idx].policyResults.add(policyResult)
+                            }
+                        },
+                        onError = { policyResult, exception ->
+                            resultMutex.withLock {
+                                policiesRun++
+                                results[idx].policyResults.add(policyResult)
+                            }
                         }
-                    }, onError = { policyResult, exception ->
-                        resultMutex.withLock {
-                            policiesRun++
-                            results[idx].policyResults.add(policyResult)
-                        }
-                    })
+                    )
 
                 /* VP Policies */
                 when (payload.contains("vp")) {
                     true -> {
                         val vpIdx = addResultEntryFor(vpType)
-                        runPolicyRequests(vpIdx, vpToken, vpPolicies)
+                        runPolicyRequests(
+                            idx = vpIdx,
+                            jwt = vpToken,
+                            policies = vpPolicies
+                        )
                     }
 
                     else -> {
                         val vpIdx = 0
                         results.add(PresentationResultEntry(vpToken))
-                        runPolicyRequests(vpIdx, vpToken, vpPolicies)
+                        runPolicyRequests(
+                            idx = vpIdx,
+                            jwt = vpToken,
+                            policies = vpPolicies
+                        )
                     }
                 }
 
@@ -239,17 +275,29 @@ object Verifier {
                     val vcIdx = addResultEntryFor(credentialType)
 
                     /* Global VC Policies */
-                    runPolicyRequests(vcIdx, credentialJwt, globalVcPolicies)
+                    runPolicyRequests(
+                        idx = vcIdx,
+                        jwt = credentialJwt,
+                        policies = globalVcPolicies
+                    )
 
                     /* Specific Credential Policies */
                     specificCredentialPolicies[credentialType]?.let { specificPolicyRequests ->
-                        runPolicyRequests(vcIdx, credentialJwt, specificPolicyRequests)
+                        runPolicyRequests(
+                            idx = vcIdx,
+                            jwt = credentialJwt,
+                            policies = specificPolicyRequests
+                        )
                     }
                 }
             }
         }
 
-        return PresentationVerificationResponse(results, time, policiesRun)
+        return PresentationVerificationResponse(
+            results = results,
+            time = time,
+            policiesRun = policiesRun
+        )
     }
 
     @JvmBlocking
@@ -277,38 +325,59 @@ object Verifier {
         val time = measureTime {
             coroutineScope {
                 suspend fun runPolicyRequests(idx: Int, jwt: String, policies: List<PolicyRequest>) =
-                    runPolicyRequests(jwt, policies, presentationContext, onSuccess = { policyResult ->
-                        resultMutex.withLock {
-                            policiesRun++
-                            results[idx].policyResults.add(policyResult)
-                        }
-                    }, onError = { policyResult, exception ->
-                        resultMutex.withLock {
-                            policiesRun++
-                            results[idx].policyResults.add(policyResult)
-                        }
-                    })
+                    runPolicyRequests(
+                        jwt = jwt,
+                        policyRequests = policies,
+                        context = presentationContext,
+                        onSuccess = { policyResult ->
+                            resultMutex.withLock {
+                                policiesRun++
+                                results[idx].policyResults.add(policyResult)
+                            }
+                        },
+                        onError = { policyResult, exception ->
+                            resultMutex.withLock {
+                                policiesRun++
+                                results[idx].policyResults.add(policyResult)
+                            }
+                        })
 
                 /* VP Policies */
                 results.add(PresentationResultEntry(vpToken))
-                runPolicyRequests(0, vpToken, vpPolicies)
+                runPolicyRequests(
+                    idx = 0,
+                    jwt = vpToken,
+                    policies = vpPolicies
+                )
 
                 // VCs
                 if (globalVcPolicies.size > 0 || specificCredentialPolicies.containsKey(vpType)) {
                     results.add(PresentationResultEntry(vpType))
 
                     /* Global VC Policies */
-                    runPolicyRequests(1, vpToken, globalVcPolicies)
+                    runPolicyRequests(
+                        idx = 1,
+                        jwt = vpToken,
+                        policies = globalVcPolicies
+                    )
 
                     /* Specific Credential Policies */
                     specificCredentialPolicies[vpType]?.let { specificPolicyRequests ->
-                        runPolicyRequests(1, vpToken, specificPolicyRequests)
+                        runPolicyRequests(
+                            idx = 1,
+                            jwt = vpToken,
+                            policies = specificPolicyRequests
+                        )
                     }
                 }
             }
         }
 
-        return PresentationVerificationResponse(results, time, policiesRun)
+        return PresentationVerificationResponse(
+            results = results,
+            time = time,
+            policiesRun = policiesRun
+        )
     }
 
 
@@ -319,7 +388,8 @@ object Verifier {
     @JsPromise
     @JsExport.Ignore
     @Suppress("UNCHECKED_CAST" /* as? */)
-    suspend fun verifyJws(jwt: String): Result<JsonObject> = JwtSignaturePolicy().verify(jwt, null, EMPTY_MAP) as? Result<JsonObject>
-        ?: Result.failure(IllegalArgumentException("Could not get JSONObject from VC verification"))
+    suspend fun verifyJws(jwt: String): Result<JsonObject> =
+        JwtSignaturePolicy().verify(jwt, null, EMPTY_MAP) as? Result<JsonObject>
+            ?: Result.failure(IllegalArgumentException("Could not get JSONObject from VC verification"))
 
 }
