@@ -244,8 +244,6 @@ object OpenID4VCI {
 
         }
 
-        println("parsed tokenEndpoint = $tokenEndpoint")
-
         val response = http.submitForm(
             url = tokenEndpoint,
             formParameters = parametersOf(tokenRequest.toHttpParameters())

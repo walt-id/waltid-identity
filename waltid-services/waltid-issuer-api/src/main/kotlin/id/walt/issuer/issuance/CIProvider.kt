@@ -347,7 +347,9 @@ open class CIProvider(
             errorCode = CredentialErrorCode.invalid_or_missing_proof,
             message = "No nonce found on proof"
         )
-        println("RETRIEVING ISSUANCE REQUEST FOR CREDENTIAL REQUEST: $nonce")
+
+        log.debug {"RETRIEVING ISSUANCE REQUEST FOR CREDENTIAL REQUEST: $nonce"}
+
         val request = findMatchingIssuanceRequest(
             credentialRequest = credentialRequest,
             issuanceRequests = issuanceSession.issuanceRequests
