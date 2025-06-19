@@ -23,8 +23,11 @@ export async function checkVerificationResult(verifierURL: string, sessionId: st
 
                 const data = response.data;
 
-                if (data.tokenResponse) {
+                if (data.verificationResult === true) {
                     return resolve(true);
+                }
+                else if (data.verificationResult === false) {
+                    return resolve(false);
                 }
 
                 setTimeout(poll, 1000); // poll again after 1 second
