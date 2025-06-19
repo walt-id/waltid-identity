@@ -59,7 +59,7 @@ object OpenID4VCI {
         val success: Boolean,
         errorCode: CredentialErrorCode? = null,
         val message: String? = null
-    ) {}
+    )
 
     fun getCredentialOfferRequestUrl(
         credOffer: CredentialOffer,
@@ -107,7 +107,6 @@ object OpenID4VCI {
     fun parseCredentialOfferRequestUrl(credOfferReqUrl: String): CredentialOfferRequest {
         return CredentialOfferRequest.fromHttpParameters(Url(credOfferReqUrl).parameters.toMap())
     }
-
 
     private fun Throwable?.causeName() = this?.let { ex -> ex::class.simpleName }
 
@@ -258,7 +257,6 @@ object OpenID4VCI {
 
         return response.body<JsonObject>().let { TokenResponse.fromJSON(it) }
     }
-
     private suspend fun resolveOAuthServersTokenEndpoint(
         authServerUrl: List<String>,
     ): String {
@@ -327,9 +325,18 @@ object OpenID4VCI {
 
     fun validateTokenRequestRaw(tokenRequestRaw: Map<String, List<String>>, authorizationCode: String): TokenRequest {
         val tokenRequest = parseTokenRequest(tokenRequestRaw)
-        validateAuthorizationCode(tokenRequest, authorizationCode).let {
-            if (!it) throw TokenError(tokenRequest, TokenErrorCode.invalid_request, "Code is not valid")
+
+        validateAuthorizationCode(
+            tokenRequest = tokenRequest,
+            authorizationCode = authorizationCode
+        ).let {
+            if (!it) throw TokenError(
+                tokenRequest = tokenRequest,
+                errorCode = TokenErrorCode.invalid_request,
+                message = "Code is not valid"
+            )
         }
+
         return tokenRequest
     }
 
@@ -347,7 +354,10 @@ object OpenID4VCI {
     }
 
     suspend fun signToken(privateKey: Key, payload: JsonObject, headers: Map<String, JsonElement>? = null): String {
-        return privateKey.signJws(payload.toString().toByteArray(), headers ?: emptyMap())
+        return privateKey.signJws(
+            plaintext = payload.toString().toByteArray(),
+            headers = headers ?: emptyMap()
+        )
     }
 
     fun validateTokenResponse(
@@ -381,7 +391,7 @@ object OpenID4VCI {
         presentationDefinition: PresentationDefinition? = null
     ): AuthorizationCodeWithAuthorizationRequestResponse {
         val authorizationResponseServerMode = ResponseMode.direct_post
-        val redirectUri = clientId + "/direct_post"
+        val redirectUri = "$clientId/direct_post"
         val scope = setOf("openid")
 
         return AuthorizationCodeWithAuthorizationRequestResponse.success(
@@ -469,14 +479,16 @@ object OpenID4VCI {
         // 4. Verify VP or ID Token
         val policies =
             Json.parseToJsonElement("""["signature", "expired", "not-before"]""").jsonArray.parsePolicyRequests()
+
         val presentationFormat = presentationSubmission?.descriptorMap?.firstOrNull()?.format ?: VCFormat.jwt
+
         Verifier.verifyPresentation(
-            presentationFormat,
+            format = presentationFormat,
             vpToken = token,
             vpPolicies = policies,
             globalVcPolicies = policies,
             specificCredentialPolicies = emptyMap(),
-            when (presentationSubmission != null) {
+            presentationContext = when (presentationSubmission != null) {
                 true -> mapOf("presentationSubmission" to presentationSubmission)
                 else -> emptyMap()
             }
@@ -555,7 +567,7 @@ object OpenID4VCI {
             ?.let { payload ->
                 payload.value[MapKey(ProofOfPossession.CWTProofBuilder.LABEL_NONCE)].let {
                     when (it) {
-                        is ByteStringElement -> io.ktor.utils.io.core.String(it.value)
+                        is ByteStringElement -> String(it.value)
                         is StringElement -> it.value
                         else -> throw Error("Invalid nonce type")
                     }
@@ -628,34 +640,51 @@ object OpenID4VCI {
         credentialId: String,
         tokenKey: Key
     ): String {
-        return OpenID4VC.generateToken(sessionId, issuer, TokenTarget.DEFERRED_CREDENTIAL, credentialId, tokenKey)
+        return OpenID4VC.generateToken(
+            sub = sessionId,
+            issuer = issuer,
+            audience = TokenTarget.DEFERRED_CREDENTIAL,
+            tokenId = credentialId,
+            tokenKey = tokenKey
+        )
     }
 
     suspend fun generateSdJwtVC(
         credentialRequest: CredentialRequest,
-        credentialData: JsonObject, issuerId: String, issuerKey: Key,
+        credentialData: JsonObject,
+        issuerId: String,
+        issuerKey: Key,
         selectiveDisclosure: SDMap? = null,
-        dataMapping: JsonObject? = null, x5Chain: List<String>? = null,
+        dataMapping: JsonObject? = null,
+        x5Chain: List<String>? = null,
         display: List<DisplayProperties>? = null,
     ): String {
-        val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
-            credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
-        )
+        val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }
+            ?: throw CredentialError(
+                credentialRequest = credentialRequest,
+                errorCode = CredentialErrorCode.invalid_or_missing_proof,
+                message = "Proof must be JWT proof"
+            )
+
         val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content
+
         val holderKey = proofHeader[JWTClaims.Header.jwk]?.jsonObject
+
         if (holderKey.isNullOrEmpty() && holderKid.isNullOrEmpty()) throw CredentialError(
-            credentialRequest,
-            CredentialErrorCode.invalid_or_missing_proof,
+            credentialRequest = credentialRequest,
+            errorCode = CredentialErrorCode.invalid_or_missing_proof,
             message = "Proof JWT header must contain kid or jwk claim"
         )
+
         val holderDid =
             if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else null
 
         val holderKeyJWK = JWKKey.importJWK(holderKey.toString()).getOrNull()?.exportJWKObject()
-            ?.plus("kid" to JWKKey.importJWK(holderKey.toString()).getOrThrow().getKeyId())?.toJsonObject()
+            ?.plus(JWTClaims.Header.keyID to JWKKey.importJWK(holderKey.toString()).getOrThrow().getKeyId())
+            ?.toJsonObject()
 
         val sdPayload = SDPayload.createSDPayload(
-            credentialData.mergeSDJwtVCPayloadWithMapping(
+            fullPayload = credentialData.mergeSDJwtVCPayloadWithMapping(
                 mapping = dataMapping ?: JsonObject(emptyMap()),
                 context = mapOf(
                     "subjectDid" to holderDid,
@@ -671,56 +700,83 @@ object OpenID4VCI {
                         else -> JsonPrimitive(value.toString())
                     }
                 },
-                dataFunctions
+                data = dataFunctions
             ),
-            selectiveDisclosure ?: SDMap(mapOf())
+            disclosureMap = selectiveDisclosure ?: SDMap(mapOf())
         )
-        val cnf = holderDid?.let { buildJsonObject { put("kid", holderDid) } }
+
+        val cnf = holderDid?.let { buildJsonObject { put(JWTClaims.Header.keyID, holderDid) } }
             ?: holderKeyJWK?.let { buildJsonObject { put("jwk", holderKeyJWK) } }
             ?: throw IllegalArgumentException("Either holderKey or holderDid must be given")
 
         val defaultPayloadProperties = defaultPayloadProperties(
-            issuerId, cnf, credentialRequest.vct
+            issuerId = issuerId,
+            cnf = cnf,
+            vct = credentialRequest.vct
                 ?: throw CredentialError(
-                    credentialRequest,
-                    CredentialErrorCode.invalid_request,
-                    "VCT must be set on credential request"
+                    credentialRequest = credentialRequest,
+                    errorCode = CredentialErrorCode.invalid_request,
+                    message = "VCT must be set on credential request"
                 )
         ).plus("display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray)
+
         val undisclosedPayload = sdPayload.undisclosedPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
+
         val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
+
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
 
         val headers = mapOf(
-            "kid" to getKidHeader(issuerKey, issuerDid),
-            "typ" to SD_JWT_VC_TYPE_HEADER
+            JWTClaims.Header.keyID to getKidHeader(issuerKey, issuerDid),
+            JWTClaims.Header.type to SD_JWT_VC_TYPE_HEADER
         ).plus(x5Chain?.let {
-            mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
+            mapOf(JWTClaims.Header.x5c to JsonArray(it.map { cert -> cert.toJsonElement() }))
         } ?: mapOf())
 
-        val finalSdPayload = SDPayload.createSDPayload(fullPayload, undisclosedPayload)
+        val finalSdPayload = SDPayload.createSDPayload(
+            fullPayload = fullPayload,
+            undisclosedPayload = undisclosedPayload
+        )
 
         val jwt = issuerKey.signJws(
-            finalSdPayload.undisclosedPayload.toString().encodeToByteArray(),
-            headers.mapValues { it.value.toJsonElement() })
-        return SDJwtVC(SDJwt.createFromSignedJwt(jwt, finalSdPayload)).toString()
+            plaintext = finalSdPayload.undisclosedPayload.toString().encodeToByteArray(),
+            headers = headers.mapValues { it.value.toJsonElement() }
+        )
+
+        return SDJwtVC(
+            SDJwt.createFromSignedJwt(
+                signedJwt = jwt,
+                sdPayload = finalSdPayload
+            )
+        ).toString()
     }
 
     suspend fun generateW3CJwtVC(
         credentialRequest: CredentialRequest,
-        credentialData: JsonObject, issuerKey: Key, issuerId: String,
+        credentialData: JsonObject,
+        issuerKey: Key,
+        issuerId: String,
         selectiveDisclosure: SDMap? = null,
-        dataMapping: JsonObject? = null, x5Chain: List<String>? = null, display: List<DisplayProperties>? = null
+        dataMapping: JsonObject? = null,
+        x5Chain: List<String>? = null,
+        display: List<DisplayProperties>? = null
     ): String {
-        val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
-            credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
-        )
+        val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }
+            ?: throw CredentialError(
+                credentialRequest = credentialRequest,
+                errorCode = CredentialErrorCode.invalid_or_missing_proof,
+                message = "Proof must be JWT proof"
+            )
+
         val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content
+
         val holderDid =
             if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else null
+
         val additionalJwtHeaders = x5Chain?.let {
-            mapOf("x5c" to JsonArray(it.map { cert -> cert.toJsonElement() }))
+            mapOf(JWTClaims.Header.x5c to JsonArray(it.map { cert -> cert.toJsonElement() }))
         } ?: mapOf()
+
         return W3CVC(credentialData).let { vc ->
             when (selectiveDisclosure.isNullOrEmpty()) {
                 true -> vc.mergingJwtIssue(
@@ -747,7 +803,6 @@ object OpenID4VCI {
         }
     }
 }
-
 
 enum class OpenID4VCIVersion(val versionString: String) {
     DRAFT11("draft11"),

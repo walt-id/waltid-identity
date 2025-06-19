@@ -797,7 +797,6 @@ open class CIProvider(
         return when (version) {
             OpenID4VCIVersion.DRAFT13 -> baseUrl
             OpenID4VCIVersion.DRAFT11 -> baseUrlDraft11
-            else -> throw IllegalArgumentException("Unsupported version: $version")
         }
     }
 

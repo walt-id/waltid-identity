@@ -25,7 +25,6 @@ import id.walt.oid4vc.util.randomUUID
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.*
 
 object OpenID4VC {
@@ -129,7 +128,13 @@ object OpenID4VC {
 
 
     suspend fun generateAuthorizationCodeFor(sessionId: String, issuer: String, tokenKey: Key): String {
-        return generateToken(sessionId, issuer, TokenTarget.TOKEN, null, tokenKey)
+        return generateToken(
+            sub = sessionId,
+            issuer = issuer,
+            audience = TokenTarget.TOKEN,
+            tokenId = null,
+            tokenKey = tokenKey
+        )
     }
 
     suspend fun validateAndParseTokenRequest(
@@ -226,8 +231,8 @@ object OpenID4VC {
     ): AuthorizationCodeResponse {
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
             throw AuthorizationError(
-                authorizationRequest,
-                AuthorizationErrorCode.invalid_request,
+                authorizationRequest = authorizationRequest,
+                errorCode = AuthorizationErrorCode.invalid_request,
                 message = "Invalid response type ${authorizationRequest.responseType}, for authorization code flow."
             )
 
@@ -236,14 +241,20 @@ object OpenID4VC {
             ?: error("Unknown metadata type: $providerMetadata")
 
         val issuer = providerMetadata.issuer ?: throw AuthorizationError(
-            authorizationRequest,
-            AuthorizationErrorCode.server_error,
-            "No issuer configured in given provider metadata"
+            authorizationRequest = authorizationRequest,
+            errorCode = AuthorizationErrorCode.server_error,
+            message = "No issuer configured in given provider metadata"
         )
-        val code = generateAuthorizationCodeFor(sessionId, issuer, tokenKey)
+
+        val code = generateAuthorizationCodeFor(
+            sessionId = sessionId,
+            issuer = issuer,
+            tokenKey = tokenKey
+        )
+
         return AuthorizationCodeResponse.success(
-            code,
-            mapOf("state" to listOf(authorizationRequest.state ?: randomUUID()))
+            code = code,
+            customParameters = mapOf("state" to listOf(authorizationRequest.state ?: randomUUID()))
         )
     }
 
@@ -264,19 +275,27 @@ object OpenID4VC {
             && !authorizationRequest.responseType.contains(ResponseType.IdToken)
         )
             throw AuthorizationError(
-                authorizationRequest,
-                AuthorizationErrorCode.invalid_request,
+                authorizationRequest = authorizationRequest,
+                errorCode = AuthorizationErrorCode.invalid_request,
                 message = "Invalid response type ${authorizationRequest.responseType}, for implicit authorization flow."
             )
+
         log.debug { "> processImplicitFlowAuthorization: generateTokenResponse..." }
         val issuer = providerMetadata.issuer ?: throw AuthorizationError(
-            authorizationRequest,
-            AuthorizationErrorCode.server_error,
-            "No issuer configured in given provider metadata"
+            authorizationRequest = authorizationRequest,
+            errorCode = AuthorizationErrorCode.server_error,
+            message = "No issuer configured in given provider metadata"
         )
         return TokenResponse.success(
-            generateToken(sessionId, issuer, TokenTarget.ACCESS, null, tokenKey),
-            "bearer", state = authorizationRequest.state,
+            accessToken = generateToken(
+                sub = sessionId,
+                issuer = issuer,
+                audience = TokenTarget.ACCESS,
+                tokenId = null,
+                tokenKey = tokenKey
+            ),
+            tokenType = "bearer",
+            state = authorizationRequest.state,
             expiresIn = Clock.System.now().epochSeconds + 864000L // ten days in seconds
         )
     }
@@ -291,15 +310,16 @@ object OpenID4VC {
             ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
             ?: error("Unknown metadata type: $providerMetadata")
 
-        // Verify nonce - need to add Id token nonce session
+        // Verify nonce - need to add id token nonce session
         // if (payload[JWTClaims.Payload.nonce] != session.)
 
         // Generate code and proceed as regular authorization request
         val mappedState = mapOf("state" to listOf(authorizationRequest.state!!))
+
         val issuer = providerMetadata.issuer ?: throw AuthorizationError(
-            authorizationRequest,
-            AuthorizationErrorCode.server_error,
-            "No issuer configured in given provider metadata"
+            authorizationRequest = authorizationRequest,
+            errorCode = AuthorizationErrorCode.server_error,
+            message = "No issuer configured in given provider metadata"
         )
 
         val code = generateAuthorizationCodeFor(
@@ -315,6 +335,7 @@ object OpenID4VC {
     }
 
     const val PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX = "urn:ietf:params:oauth:request_uri:"
+
     fun getPushedAuthorizationRequestUri(sessionId: String): String =
         "$PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX${sessionId}"
 
@@ -323,7 +344,7 @@ object OpenID4VC {
     )
 
     // ------------------------------------------
-    // Simple cryptographics operation interface implementations
+    // Simple cryptographic operation interface implementations
     suspend fun signToken(
         target: TokenTarget,
         payload: JsonObject,
@@ -337,9 +358,9 @@ object OpenID4VC {
         val headers = (header?.toMutableMap() ?: mutableMapOf())
             .plus(
                 mapOf(
-                    "alg" to "ES256".toJsonElement(),
-                    "type" to "jwt".toJsonElement(),
-                    "kid" to keyId.toJsonElement()
+                    JWTClaims.Header.algorithm to "ES256".toJsonElement(),
+                    JWTClaims.Header.type to "jwt".toJsonElement(),
+                    JWTClaims.Header.keyID to keyId.toJsonElement()
                 )
             )
 
@@ -348,7 +369,7 @@ object OpenID4VC {
         }
     }
 
-    suspend fun signCWTToken(
+    fun signCWTToken(
         target: TokenTarget,
         payload: MapElement,
         privKey: Key,
@@ -366,8 +387,8 @@ object OpenID4VC {
         val key = when {
             tokenHeader["jwk"] != null -> JWKKey.importJWK(tokenHeader["jwk"].toString()).getOrThrow()
 
-            tokenHeader["kid"] != null -> {
-                val kid = tokenHeader["kid"]!!.jsonPrimitive.content.split("#")[0]
+            tokenHeader[JWTClaims.Header.keyID] != null -> {
+                val kid = tokenHeader[JWTClaims.Header.keyID]!!.jsonPrimitive.content.split("#")[0]
                 when {
                     DidUtils.isDidUrl(kid) -> {
                         log.debug { "Resolving DID: $kid" }
@@ -390,8 +411,7 @@ object OpenID4VC {
         return key.verifyJws(token).also { log.debug { "VERIFICATION IS: $it" } }.isSuccess
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
-    suspend fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean {
+    fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean {
         // May not be required anymore (removed from https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#cwt-proof-type)
         log.debug { "Verifying JWS: $token" }
         log.debug { "JWS Verification: target: $target" }
@@ -399,13 +419,13 @@ object OpenID4VC {
         return COSESign1Utils.verifyCOSESign1Signature(target, token)
     }
 
-    fun parseTokenPayload(token: String): JsonObject {
+    private fun parseTokenPayload(token: String): JsonObject {
         return token.substringAfter(".").substringBefore(".").let {
             Json.decodeFromString(it.decodeFromBase64Url().decodeToString())
         }
     }
 
-    fun parseTokenHeader(token: String): JsonObject {
+    private fun parseTokenHeader(token: String): JsonObject {
         return token.substringBefore(".").let {
             Json.decodeFromString(it.decodeFromBase64Url().decodeToString())
         }
