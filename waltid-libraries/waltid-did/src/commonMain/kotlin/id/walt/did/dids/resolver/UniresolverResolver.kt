@@ -73,7 +73,7 @@ class UniresolverResolver(var resolverUrl: String = DEFAULT_RESOLVER_URL) : DidR
     override suspend fun resolveToKey(did: String): Result<Key> = resolveToKeys(did).map { keys ->
         keys.firstOrNull() ?: throw Exception("No verification material found.")
     }
-    
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -84,7 +84,7 @@ class UniresolverResolver(var resolverUrl: String = DEFAULT_RESOLVER_URL) : DidR
                 val keys = materials.mapNotNull { material ->
                     KeyMaterial.get(material).getOrNull()
                 }.toSet()
-                
+
                 if (keys.isNotEmpty()) {
                     Result.success(keys)
                 } else {
