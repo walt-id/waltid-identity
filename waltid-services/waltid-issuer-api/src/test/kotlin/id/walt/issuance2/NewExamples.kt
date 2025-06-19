@@ -1,4 +1,4 @@
-package id.walt.issuer.issuance2
+package id.walt.issuance2
 
 import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.issuer.issuance.IssuanceConfiguration
