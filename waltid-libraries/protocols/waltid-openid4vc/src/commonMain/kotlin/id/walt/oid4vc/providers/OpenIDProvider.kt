@@ -119,7 +119,6 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         val did = kid.substringBefore("#")
 
         if (iss != sub || iss != did || sub != did) {
-            println("$sub $iss $did")
             throw IllegalArgumentException("Invalid payload in token. sub != iss != did")
         }
 
@@ -264,7 +263,6 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     }
 
     open fun processImplicitFlowAuthorization(authorizationRequest: AuthorizationRequest): TokenResponse {
-        println("> processImplicitFlowAuthorization for $authorizationRequest")
         if (!authorizationRequest.responseType.contains(ResponseType.Token) && !authorizationRequest.responseType.contains(
                 ResponseType.VpToken
             )
@@ -275,9 +273,9 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                 AuthorizationErrorCode.invalid_request,
                 message = "Invalid response type ${authorizationRequest.responseType}, for implicit authorization flow."
             )
-        println("> processImplicitFlowAuthorization: Generating authorizationSession (getOrInitAuthorizationSession)...")
+
         val authorizationSession = getOrInitAuthorizationSession(authorizationRequest)
-        println("> processImplicitFlowAuthorization: generateTokenResponse...")
+
         return generateTokenResponse(
             authorizationSession,
             TokenRequest.AuthorizationCode(
