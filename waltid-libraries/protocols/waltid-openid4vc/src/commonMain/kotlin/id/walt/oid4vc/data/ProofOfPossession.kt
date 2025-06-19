@@ -62,6 +62,7 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
             x5c?.let { put("x5c", it) }
             trustChain?.let { put("trust_chain", it) }
         }
+        @OptIn(ExperimentalUuidApi::class)
         val payload = buildJsonObject {
             clientId?.let {
                 put("iss", it)

@@ -37,7 +37,8 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     abstract val metadata: OpenIDProviderMetadata.Draft13
     abstract val config: OpenIDProviderConfig
 
-    protected open fun createDefaultProviderMetadata() = OpenID4VCI.createDefaultProviderMetadata(baseUrl, emptyMap(), OpenID4VCIVersion.DRAFT13)
+    protected open fun createDefaultProviderMetadata() =
+        OpenID4VCI.createDefaultProviderMetadata(baseUrl, emptyMap(), OpenID4VCIVersion.DRAFT13)
 
     fun getCommonProviderMetadataUrl(): String {
         return URLBuilder(baseUrl).apply {
@@ -149,7 +150,11 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
 
     abstract fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean
 
-    abstract fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration, authServerState: String?): S
+    abstract fun initializeAuthorization(
+        authorizationRequest: AuthorizationRequest,
+        expiresIn: Duration,
+        authServerState: String?
+    ): S
 
     open fun processCodeFlowAuthorization(authorizationRequest: AuthorizationRequest): AuthorizationCodeResponse {
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
@@ -160,7 +165,10 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             )
         val authorizationSession = getOrInitAuthorizationSession(authorizationRequest)
         val code = generateAuthorizationCodeFor(authorizationSession)
-        return AuthorizationCodeResponse.success(code, mapOf("state" to listOf(authorizationRequest.state ?: randomUUID())))
+        return AuthorizationCodeResponse.success(
+            code,
+            mapOf("state" to listOf(authorizationRequest.state ?: randomUUID()))
+        )
     }
 
     open fun processDirectPost(state: String, tokenPayload: JsonObject): AuthorizationCodeResponse {
@@ -257,7 +265,9 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
 
     open fun processImplicitFlowAuthorization(authorizationRequest: AuthorizationRequest): TokenResponse {
         println("> processImplicitFlowAuthorization for $authorizationRequest")
-        if (!authorizationRequest.responseType.contains(ResponseType.Token) && !authorizationRequest.responseType.contains(ResponseType.VpToken)
+        if (!authorizationRequest.responseType.contains(ResponseType.Token) && !authorizationRequest.responseType.contains(
+                ResponseType.VpToken
+            )
             && !authorizationRequest.responseType.contains(ResponseType.IdToken)
         )
             throw AuthorizationError(
@@ -326,7 +336,10 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         expiresIn = authorizationSession.expirationTimestamp - Clock.System.now()
     )
 
-    protected open fun getOrInitAuthorizationSession(authorizationRequest: AuthorizationRequest, authServerState: String? = null): S {
+    protected open fun getOrInitAuthorizationSession(
+        authorizationRequest: AuthorizationRequest,
+        authServerState: String? = null
+    ): S {
         return when (authorizationRequest.isReferenceToPAR) {
             true -> getPushedAuthorizationSession(authorizationRequest)
             false -> initializeAuthorization(authorizationRequest, 5.minutes, authServerState)
