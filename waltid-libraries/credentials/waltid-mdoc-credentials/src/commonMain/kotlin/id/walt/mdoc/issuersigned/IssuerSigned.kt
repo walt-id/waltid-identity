@@ -42,7 +42,7 @@ data class IssuerSigned(
                         decodedObj.value[MapKey("elementValue")]!!.toUIJson()
                     )
                 }
-            } )
+            })
         }
     }
 
@@ -52,9 +52,11 @@ data class IssuerSigned(
          */
         fun fromMapElement(mapElement: MapElement) = IssuerSigned(
             mapElement.value[MapKey("nameSpaces")]?.let {
-                (it as MapElement).value.map { entry -> Pair(
-                    entry.key.str,
-                    (entry.value as ListElement).value.map { item -> item as EncodedCBORElement }) }.toMap()
+                (it as MapElement).value.map { entry ->
+                    Pair(
+                        entry.key.str,
+                        (entry.value as ListElement).value.map { item -> item as EncodedCBORElement })
+                }.toMap()
             },
             mapElement.value[MapKey("issuerAuth")]?.let {
                 COSESign1((it as ListElement).value)

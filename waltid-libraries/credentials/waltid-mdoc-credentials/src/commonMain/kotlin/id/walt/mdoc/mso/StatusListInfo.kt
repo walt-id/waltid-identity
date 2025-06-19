@@ -121,12 +121,12 @@ data class StatusListInfo(
 
 }
 
-internal object StatusListInfoSerializer: KSerializer<StatusListInfo> {
+internal object StatusListInfoSerializer : KSerializer<StatusListInfo> {
 
     override val descriptor = buildClassSerialDescriptor("StatusListInfo")
 
     override fun serialize(encoder: Encoder, value: StatusListInfo) {
-        when(encoder) {
+        when (encoder) {
             is JsonEncoder -> {
                 encoder.encodeSerializableValue(JsonObject.serializer(), value.toJSON())
             }
@@ -138,7 +138,7 @@ internal object StatusListInfoSerializer: KSerializer<StatusListInfo> {
     }
 
     override fun deserialize(decoder: Decoder): StatusListInfo {
-        return when(decoder) {
+        return when (decoder) {
             is JsonDecoder -> {
                 StatusListInfo.fromJSON(decoder.decodeJsonElement().jsonObject)
             }

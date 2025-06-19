@@ -15,43 +15,43 @@ import kotlinx.serialization.encoding.Encoder
  */
 @Serializable(with = ReaderAuthenticationSerializer::class)
 class ReaderAuthentication internal constructor(
-  val data: List<AnyDataElement>
+    val data: List<AnyDataElement>
 ) {
-  /**
-   * Reader authentication object
-   * @param sessionTranscript Session transcript of the ongoing reader session
-   * @param itemsRequest CBOR encoded items requests
-   */
-  constructor(sessionTranscript: ListElement, itemsRequest: EncodedCBORElement) : this(
-    listOf(
-      StringElement("ReaderAuthentication"),
-      sessionTranscript,
-      itemsRequest
+    /**
+     * Reader authentication object
+     * @param sessionTranscript Session transcript of the ongoing reader session
+     * @param itemsRequest CBOR encoded items requests
+     */
+    constructor(sessionTranscript: ListElement, itemsRequest: EncodedCBORElement) : this(
+        listOf(
+            StringElement("ReaderAuthentication"),
+            sessionTranscript,
+            itemsRequest
+        )
     )
-  )
 
-  /**
-   * Serialize to CBOR data
-   */
-  @OptIn(ExperimentalSerializationApi::class)
-  fun toCBOR() = Cbor.encodeToByteArray(ReaderAuthenticationSerializer, this)
+    /**
+     * Serialize to CBOR data
+     */
+    @OptIn(ExperimentalSerializationApi::class)
+    fun toCBOR() = Cbor.encodeToByteArray(ReaderAuthenticationSerializer, this)
 
-  /**
-   * Convert to CBOR data element
-   */
-  fun toDE() = ListElement(data)
+    /**
+     * Convert to CBOR data element
+     */
+    fun toDE() = ListElement(data)
 }
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializer(forClass = ReaderAuthentication::class)
-internal object ReaderAuthenticationSerializer: KSerializer<ReaderAuthentication> {
-  override fun deserialize(decoder: Decoder): ReaderAuthentication {
-    return ReaderAuthentication(
-      decoder.decodeSerializableValue(ListSerializer(DataElementSerializer))
-    )
-  }
+internal object ReaderAuthenticationSerializer : KSerializer<ReaderAuthentication> {
+    override fun deserialize(decoder: Decoder): ReaderAuthentication {
+        return ReaderAuthentication(
+            decoder.decodeSerializableValue(ListSerializer(DataElementSerializer))
+        )
+    }
 
-  override fun serialize(encoder: Encoder, value: ReaderAuthentication) {
-    encoder.encodeSerializableValue(ListSerializer(DataElementSerializer), value.data)
-  }
+    override fun serialize(encoder: Encoder, value: ReaderAuthentication) {
+        encoder.encodeSerializableValue(ListSerializer(DataElementSerializer), value.data)
+    }
 }

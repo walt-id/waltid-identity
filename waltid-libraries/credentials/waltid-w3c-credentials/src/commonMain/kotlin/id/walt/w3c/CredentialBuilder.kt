@@ -29,6 +29,7 @@ enum class CredentialBuilderType {
 
     MdocsCredentialBuilder // TODO
 }
+
 @OptIn(ExperimentalJsExport::class, ExperimentalUuidApi::class)
 @JsExport
 class CredentialBuilder(

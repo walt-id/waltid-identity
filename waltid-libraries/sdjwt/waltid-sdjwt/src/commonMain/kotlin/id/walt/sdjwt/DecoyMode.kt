@@ -10,6 +10,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.js.JsExport
 
 private val log = KotlinLogging.logger { }
+
 /**
  * Mode for adding decoy digests on SD-JWT issuance
  * @property NONE: no decoy digests to be added (or mode is unknown, e.g. when parsing SD-JWTs)
@@ -28,7 +29,7 @@ enum class DecoyMode {
     companion object {
         @JsExport.Ignore
         fun fromJSON(json: JsonElement): DecoyMode {
-            log.trace {"Parsing DecoyMode from $json" }
+            log.trace { "Parsing DecoyMode from $json" }
             return (if (json is JsonObject) {
                 json.jsonObject["name"]?.jsonPrimitive?.content
             } else {
