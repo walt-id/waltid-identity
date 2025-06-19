@@ -1,4 +1,4 @@
-package id.walt.verifier
+package id.walt.verifier.openapi
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.data.OpenId4VPProfile
