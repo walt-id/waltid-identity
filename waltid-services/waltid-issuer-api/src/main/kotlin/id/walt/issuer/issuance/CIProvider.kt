@@ -219,78 +219,87 @@ open class CIProvider(
         issuanceSession: IssuanceSession
     ): CredentialResult {
         if (credentialRequest.format == CredentialFormat.mso_mdoc) throw CredentialError(
-            credentialRequest, CredentialErrorCode.unsupported_credential_format
+            credentialRequest = credentialRequest,
+            errorCode = CredentialErrorCode.unsupported_credential_format
         )
 
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
-            credentialRequest, CredentialErrorCode.invalid_or_missing_proof, message = "Proof must be JWT proof"
+            credentialRequest = credentialRequest,
+            errorCode = CredentialErrorCode.invalid_or_missing_proof,
+            message = "Proof must be JWT proof"
         )
 
         val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content
         val holderKey = proofHeader[JWTClaims.Header.jwk]?.jsonObject
 
         if (holderKey.isNullOrEmpty() && holderKid.isNullOrEmpty()) throw CredentialError(
-            credentialRequest,
-            CredentialErrorCode.invalid_or_missing_proof,
+            credentialRequest = credentialRequest,
+            errorCode = CredentialErrorCode.invalid_or_missing_proof,
             message = "Proof JWT header must contain kid or jwk claim"
         )
 
         log.debug { "RETRIEVING ISSUANCE REQUEST FOR CREDENTIAL REQUEST" }
         val request = findMatchingIssuanceRequest(
-            credentialRequest, issuanceSession.issuanceRequests
+            credentialRequest = credentialRequest,
+            issuanceRequests = issuanceSession.issuanceRequests
         )
             ?: throw IllegalArgumentException("No matching issuance request found for this session: ${issuanceSession.id}!")
 
-        return CredentialResult(format = credentialRequest.format, credential = JsonPrimitive(runBlocking {
-            val vc = request.credentialData ?: throw MissingFieldException(listOf("credentialData"), "credentialData")
-            val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
+        return CredentialResult(
+            format = credentialRequest.format,
+            credential = JsonPrimitive(runBlocking {
+                val vc = request.credentialData
+                    ?: throw MissingFieldException(listOf("credentialData"), "credentialData")
 
-            request.run {
-                when (credentialFormat) {
-                    CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(
-                        credentialRequest = credentialRequest,
-                        credentialData = vc,
-                        issuerId = issuerDid ?: baseUrl,
-                        issuerKey = resolvedIssuerKey,
-                        selectiveDisclosure = request.selectiveDisclosure,
-                        dataMapping = request.mapping,
-                        display = credentialRequest.display ?: vc["display"]?.jsonArray?.map {
-                            DisplayProperties.fromJSON(it.jsonObject)
-                        },
-                        x5Chain = request.x5Chain
-                    ).also {
-                        if (!issuanceSession.callbackUrl.isNullOrEmpty())
-                            sendCallback(
-                                sessionId = issuanceSession.id,
-                                type = "sdjwt_issue",
-                                data = buildJsonObject { put("sdjwt", it) },
-                                callbackUrl = issuanceSession.callbackUrl
-                            )
+                val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
+
+                request.run {
+                    when (credentialFormat) {
+                        CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(
+                            credentialRequest = credentialRequest,
+                            credentialData = vc,
+                            issuerId = issuerDid ?: baseUrl,
+                            issuerKey = resolvedIssuerKey,
+                            selectiveDisclosure = request.selectiveDisclosure,
+                            dataMapping = request.mapping,
+                            display = credentialRequest.display ?: vc["display"]?.jsonArray?.map {
+                                DisplayProperties.fromJSON(it.jsonObject)
+                            },
+                            x5Chain = request.x5Chain
+                        ).also {
+                            if (!issuanceSession.callbackUrl.isNullOrEmpty())
+                                sendCallback(
+                                    sessionId = issuanceSession.id,
+                                    type = "sdjwt_issue",
+                                    data = buildJsonObject { put("sdjwt", it) },
+                                    callbackUrl = issuanceSession.callbackUrl
+                                )
+                        }
+
+                        else -> OpenID4VCI.generateW3CJwtVC(
+                            credentialRequest = credentialRequest,
+                            credentialData = vc,
+                            issuerKey = resolvedIssuerKey,
+                            issuerId = issuerDid
+                                ?: throw BadRequestException("Issuer API currently supports only issuer DID for issuer ID property in W3C credentials. Issuer DID was not given in issuance request."),
+                            selectiveDisclosure = request.selectiveDisclosure,
+                            dataMapping = request.mapping,
+                            x5Chain = request.x5Chain,
+                            display = credentialRequest.display
+
+                        ).also {
+                            if (!issuanceSession.callbackUrl.isNullOrEmpty())
+                                sendCallback(
+                                    sessionId = issuanceSession.id,
+                                    type = "jwt_issue",
+                                    data = buildJsonObject { put("jwt", it) },
+                                    callbackUrl = issuanceSession.callbackUrl
+                                )
+                        }
                     }
-
-                    else -> OpenID4VCI.generateW3CJwtVC(
-                        credentialRequest = credentialRequest,
-                        credentialData = vc,
-                        issuerKey = resolvedIssuerKey,
-                        issuerId = issuerDid
-                            ?: throw BadRequestException("Issuer API currently supports only issuer DID for issuer ID property in W3C credentials. Issuer DID was not given in issuance request."),
-                        selectiveDisclosure = request.selectiveDisclosure,
-                        dataMapping = request.mapping,
-                        x5Chain = request.x5Chain,
-                        display = credentialRequest.display
-
-                    ).also {
-                        if (!issuanceSession.callbackUrl.isNullOrEmpty())
-                            sendCallback(
-                                sessionId = issuanceSession.id,
-                                type = "jwt_issue",
-                                data = buildJsonObject { put("jwt", it) },
-                                callbackUrl = issuanceSession.callbackUrl
-                            )
-                    }
-                }
-            }.also { log.debug { "Respond VC: $it" } }
-        }))
+                }.also { log.debug { "Respond VC: $it" } }
+            })
+        )
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -323,19 +332,19 @@ open class CIProvider(
         issuanceSession: IssuanceSession
     ): CredentialResult {
         val proof = credentialRequest.proof ?: throw CredentialError(
-            credentialRequest,
-            CredentialErrorCode.invalid_or_missing_proof,
+            credentialRequest = credentialRequest,
+            errorCode = CredentialErrorCode.invalid_or_missing_proof,
             message = "No proof found on credential request"
         )
         val holderKey = extractHolderKey(proof) ?: throw CredentialError(
-            credentialRequest,
-            CredentialErrorCode.invalid_or_missing_proof,
+            credentialRequest = credentialRequest,
+            errorCode = CredentialErrorCode.invalid_or_missing_proof,
             message = "No holder key could be extracted from proof"
         )
 
         val nonce = OpenID4VCI.getNonceFromProof(credentialRequest.proof!!) ?: throw CredentialError(
-            credentialRequest,
-            CredentialErrorCode.invalid_or_missing_proof,
+            credentialRequest = credentialRequest,
+            errorCode = CredentialErrorCode.invalid_or_missing_proof,
             message = "No nonce found on proof"
         )
         println("RETRIEVING ISSUANCE REQUEST FOR CREDENTIAL REQUEST: $nonce")
@@ -346,48 +355,71 @@ open class CIProvider(
             ?: throw IllegalArgumentException("No matching issuance request found for this session: ${issuanceSession.id}!")
 
         val issuerSignedItems = request.mdocData ?: throw MissingFieldException(listOf("mdocData"), "mdocData")
+
         val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
+
         val issuerKey = JWK.parse(runBlocking { resolvedIssuerKey.exportJWK() }).toECKey()
+
         val keyID = resolvedIssuerKey.getKeyId()
+
         val cryptoProvider = SimpleCOSECryptoProvider(
             listOf(
                 COSECryptoProviderKeyInfo(
-                    keyID, AlgorithmID.ECDSA_256, issuerKey.toECPublicKey(), issuerKey.toECPrivateKey(),
+                    keyID = keyID,
+                    algorithmID = AlgorithmID.ECDSA_256,
+                    publicKey = issuerKey.toECPublicKey(),
+                    privateKey = issuerKey.toECPrivateKey(),
                     x5Chain = request.x5Chain?.map { X509CertUtils.parse(it) } ?: listOf(),
                     trustedRootCAs = request.trustedRootCAs?.map { X509CertUtils.parse(it) } ?: listOf()
                 )
-            ))
+            )
+        )
+
         val mdoc = MDocBuilder(
             credentialRequest.docType
                 ?: throw CredentialError(
-                    credentialRequest,
-                    CredentialErrorCode.invalid_request,
+                    credentialRequest = credentialRequest,
+                    errorCode = CredentialErrorCode.invalid_request,
                     message = "Missing doc type in credential request"
                 )
         ).apply {
             issuerSignedItems.forEach { namespace ->
                 namespace.value.forEach { property ->
-                    addItemToSign(namespace.key, property.key, property.value.toDataElement())
+                    addItemToSign(
+                        nameSpace = namespace.key,
+                        elementIdentifier = property.key,
+                        elementValue = property.value.toDataElement()
+                    )
                 }
             }
         }.sign( // TODO: expiration date!
-            ValidityInfo(Clock.System.now(), Clock.System.now(), Clock.System.now().plus(365 * 24, DateTimeUnit.HOUR)),
-            DeviceKeyInfo(
-                DataElement.fromCBOR(
-                    OneKey(holderKey.publicKey, null).AsCBOR().EncodeToBytes()
+            validityInfo = ValidityInfo(
+                signed = Clock.System.now(),
+                validFrom = Clock.System.now(),
+                validUntil = Clock.System.now().plus(365 * 24, DateTimeUnit.HOUR)
+            ),
+            deviceKeyInfo = DeviceKeyInfo(
+                deviceKey = DataElement.fromCBOR(
+                    OneKey(
+                        holderKey.publicKey,
+                        null
+                    ).AsCBOR().EncodeToBytes()
                 )
-            ), cryptoProvider, keyID
+            ),
+            cryptoProvider = cryptoProvider,
+            keyID = keyID
         ).also {
             if (!issuanceSession.callbackUrl.isNullOrEmpty())
                 sendCallback(
-                    issuanceSession.id,
-                    "generated_mdoc",
-                    buildJsonObject { put("mdoc", it.toCBORHex()) },
-                    issuanceSession.callbackUrl
+                    sessionId = issuanceSession.id,
+                    type = "generated_mdoc",
+                    data = buildJsonObject { put("mdoc", it.toCBORHex()) },
+                    callbackUrl = issuanceSession.callbackUrl
                 )
         }
         return CredentialResult(
-            CredentialFormat.mso_mdoc, JsonPrimitive(mdoc.issuerSigned.toMapElement().toCBOR().encodeToBase64Url()),
+            format = CredentialFormat.mso_mdoc,
+            credential = JsonPrimitive(mdoc.issuerSigned.toMapElement().toCBOR().encodeToBase64Url()),
             customParameters = mapOf("credential_encoding" to JsonPrimitive("issuer-signed"))
         )
     }
@@ -406,8 +438,8 @@ open class CIProvider(
                 ?.get(JWTClaims.Header.keyID)
                 ?.jsonPrimitive?.content
                 ?: throw CredentialError(
-                    credReq,
-                    CredentialErrorCode.invalid_or_missing_proof,
+                    credentialRequest = credReq,
+                    errorCode = CredentialErrorCode.invalid_or_missing_proof,
                     message = "Proof must be JWT proof"
                 )
         }.distinct()
@@ -558,8 +590,9 @@ open class CIProvider(
         } else {
             getVerifiedSession(authorizationRequest.issuerState!!)?.copy(authorizationRequest = authorizationRequest)
                 ?: throw AuthorizationError(
-                    authorizationRequest, AuthorizationErrorCode.invalid_request,
-                    "No valid issuance session found for given issuer state"
+                    authorizationRequest = authorizationRequest,
+                    errorCode = AuthorizationErrorCode.invalid_request,
+                    message = "No valid issuance session found for given issuer state"
                 )
         }.also {
             val updatedSession = IssuanceSession(
