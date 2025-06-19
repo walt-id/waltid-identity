@@ -167,6 +167,7 @@ fun ApplicationCall.getUserId() =
         ?: principal<UserIdPrincipal>() // bearer is registered with no name for some reason
         ?: throw UnauthorizedException("Could not find user authorization within request.")
 
+@OptIn(ExperimentalUuidApi::class)
 suspend fun ApplicationCall.getUserUUID() =
     runCatching {
         when {
@@ -176,6 +177,7 @@ suspend fun ApplicationCall.getUserUUID() =
         }
     }.getOrElse { throw IllegalArgumentException("Invalid user id: $it") }
 
+@OptIn(ExperimentalUuidApi::class)
 fun ApplicationCall.getWalletId() =
     runCatching {
         Uuid.parse(parameters["wallet"] ?: throw IllegalArgumentException("No wallet ID provided"))
