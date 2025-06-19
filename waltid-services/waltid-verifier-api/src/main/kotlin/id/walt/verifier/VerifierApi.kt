@@ -119,6 +119,7 @@ private const val fixedPresentationDefinitionForEbsiConformanceTest =
 private val verificationUseCase =
     VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
 
+@OptIn(ExperimentalUuidApi::class)
 fun Application.verifierApi() {
     routing {
 
@@ -331,46 +332,50 @@ fun Application.verifierApi() {
                 }
             }) {
                 logger.trace { "POST verify/state" }
+
                 val sessionId = call.parameters.getOrFail("state")
                 logger.trace { "State: $sessionId" }
-                verificationUseCase.verify(sessionId, call.request.call.receiveParameters().toMap())
-                    .also {
-                        verificationUseCase.notifySubscribers(sessionId)
-                    }.onSuccess {
-                        val session = verificationUseCase.getSession(sessionId)
-                        if (session.walletInitiatedAuthState != null) {
+
+                verificationUseCase.verify(
+                    sessionId = sessionId,
+                    tokenResponseParameters = call.request.call.receiveParameters().toMap()
+                ).also {
+                    verificationUseCase.notifySubscribers(sessionId)
+                }.onSuccess {
+                    val session = verificationUseCase.getSession(sessionId)
+                    if (session.walletInitiatedAuthState != null) {
+                        val state = session.walletInitiatedAuthState
+                        val code = Uuid.random().toString()
+                        call.respondRedirect("openid://?code=$code&state=$state")
+                    } else {
+                        call.respond(HttpStatusCode.OK, it)
+                    }
+                }.onFailure {
+                    logger.debug(it) { "Verification failed ($it)" }
+                    val errorDescription = it.message ?: "Verification failed"
+                    logger.error { "Error: $errorDescription" }
+                    val session = verificationUseCase.getSession(sessionId)
+                    when {
+                        session.walletInitiatedAuthState != null -> {
                             val state = session.walletInitiatedAuthState
-                            val code = Uuid.random().toString()
-                            call.respondRedirect("openid://?code=$code&state=$state")
-                        } else {
-                            call.respond(HttpStatusCode.OK, it)
+                            call.respondRedirect(
+                                "openid://?state=$state&error=invalid_request&error_description=${
+                                    getErrorDescription(
+                                        it
+                                    )
+                                }"
+                            )
                         }
-                    }.onFailure {
-                        logger.debug(it) { "Verification failed ($it)" }
-                        val errorDescription = it.message ?: "Verification failed"
-                        logger.error { "Error: $errorDescription" }
-                        val session = verificationUseCase.getSession(sessionId)
-                        when {
-                            session.walletInitiatedAuthState != null -> {
-                                val state = session.walletInitiatedAuthState
-                                call.respondRedirect(
-                                    "openid://?state=$state&error=invalid_request&error_description=${
-                                        getErrorDescription(
-                                            it
-                                        )
-                                    }"
-                                )
-                            }
 
-                            it is FailedVerificationException && it.redirectUrl != null -> {
-                                call.respond(HttpStatusCode.BadRequest, it.redirectUrl)
-                            }
+                        it is FailedVerificationException && it.redirectUrl != null -> {
+                            call.respond(HttpStatusCode.BadRequest, it.redirectUrl)
+                        }
 
-                            else -> {
-                                throw it
-                            }
+                        else -> {
+                            throw it
                         }
                     }
+                }
             }
 
             get("/session/{id}", {

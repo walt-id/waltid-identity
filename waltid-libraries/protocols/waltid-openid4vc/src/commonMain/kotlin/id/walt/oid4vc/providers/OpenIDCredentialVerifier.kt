@@ -122,7 +122,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         // https://json-schema.org/specification
         // https://github.com/OptimumCode/json-schema-validator
         // Calculate the remaining time to live based on the session's expiration timestamp
-        val remainingTtl = session.expirationTimestamp?.let {
+        val remainingTtl = session.expirationTimestamp.let {
             val now = Clock.System.now()
             if (it > now) {
                 it - now  // Calculate duration between now and expiration
@@ -133,9 +133,16 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
 
         return session.copy(
             tokenResponse = tokenResponse,
-            verificationResult = doVerify(tokenResponse, session)
+            verificationResult = doVerify(
+                tokenResponse = tokenResponse,
+                session = session
+            )
         ).also {
-            putSession(it.id, it, remainingTtl)
+            putSession(
+                id = it.id,
+                session = it,
+                ttl = remainingTtl
+            )
         }
     }
 
