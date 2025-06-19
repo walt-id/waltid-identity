@@ -41,9 +41,12 @@ data class PresentationDefinition(
         override fun fromJSON(jsonObject: JsonObject) =
             Json.decodeFromJsonElement(PresentationDefinitionSerializer, jsonObject)
 
-        fun defaultGenerationFromVcTypesForCredentialFormat(types: List<String>, format: CredentialFormat): PresentationDefinition {
+        fun defaultGenerationFromVcTypesForCredentialFormat(
+            types: List<String>,
+            format: CredentialFormat
+        ): PresentationDefinition {
             return PresentationDefinition(inputDescriptors = types.map { type ->
-                when(format) {
+                when (format) {
                     CredentialFormat.sd_jwt_vc -> generateDefaultSDJwtVCInputDescriptor(type)
                     CredentialFormat.mso_mdoc -> generateDefaultMDOCInputDescriptor(type)
                     else -> generateDefaultW3CInputDescriptor(type)
@@ -73,9 +76,11 @@ data class PresentationDefinition(
             constraints = InputDescriptorConstraints(
                 limitDisclosure = DisclosureLimitation.required,
                 fields = listOf(
-                    InputDescriptorField(path = listOf("$.vct"), filter = JsonObject(
-                        mapOf("type" to JsonPrimitive("string"), "pattern" to JsonPrimitive(type))
-                    ))
+                    InputDescriptorField(
+                        path = listOf("$.vct"), filter = JsonObject(
+                            mapOf("type" to JsonPrimitive("string"), "pattern" to JsonPrimitive(type))
+                        )
+                    )
                 )
             )
         )

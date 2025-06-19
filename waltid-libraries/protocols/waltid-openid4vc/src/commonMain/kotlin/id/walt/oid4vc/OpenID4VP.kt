@@ -78,7 +78,10 @@ object OpenID4VP {
      * @param presentationRequest Presentation request to be rendered
      * @param authorizationEndpoint Authorization endpoint of the wallet (same-device flow), default: "openid4vp://authorize" (cross-device flow)
      */
-    fun getAuthorizationUrl(presentationRequest: AuthorizationRequest, authorizationEndpoint: String = "openid4vp://authorize") =
+    fun getAuthorizationUrl(
+        presentationRequest: AuthorizationRequest,
+        authorizationEndpoint: String = "openid4vp://authorize"
+    ) =
         "$authorizationEndpoint?${presentationRequest.toHttpQueryString()}"
 
     /**
@@ -86,9 +89,10 @@ object OpenID4VP {
      * @param url Presentation request Url
      * @return Presentation request
      */
-    suspend fun parsePresentationRequestFromUrl(url: String): AuthorizationRequest = AuthorizationRequest.fromHttpParametersAuto(
-        Url(url).parameters.toMap()
-    )
+    suspend fun parsePresentationRequestFromUrl(url: String): AuthorizationRequest =
+        AuthorizationRequest.fromHttpParametersAuto(
+            Url(url).parameters.toMap()
+        )
 
     // TODO: Extract flow details (implicit/code flow, same-device/cross-device) if necessary/possible
 
@@ -164,15 +168,31 @@ object OpenID4VP {
      */
     fun generateMDocOID4VPHandover(authorizationRequest: AuthorizationRequest, mdocNonce: String): ListElement {
         val clientIdToHash = ListElement(listOf(StringElement(authorizationRequest.clientId), StringElement(mdocNonce)))
-        val responseUriToHash = ListElement(listOf(
-            StringElement(authorizationRequest.responseUri ?: throw AuthorizationError(authorizationRequest, AuthorizationErrorCode.invalid_request, "Authorization request has no response_uri, which is required for generating MDoc-OID4VPHandover")),
-            StringElement(mdocNonce)
-        ))
+        val responseUriToHash = ListElement(
+            listOf(
+                StringElement(
+                    authorizationRequest.responseUri ?: throw AuthorizationError(
+                        authorizationRequest,
+                        AuthorizationErrorCode.invalid_request,
+                        "Authorization request has no response_uri, which is required for generating MDoc-OID4VPHandover"
+                    )
+                ),
+                StringElement(mdocNonce)
+            )
+        )
 
-        return ListElement(listOf(
-            ByteStringElement(SHA256().digest(clientIdToHash.toCBOR())),
-            ByteStringElement(SHA256().digest(responseUriToHash.toCBOR())),
-            StringElement(authorizationRequest.nonce ?: throw AuthorizationError(authorizationRequest, AuthorizationErrorCode.invalid_request, "Authorization request has no nonce, which is required for generating MDoc-OID4VPHandover"))
-        ))
+        return ListElement(
+            listOf(
+                ByteStringElement(SHA256().digest(clientIdToHash.toCBOR())),
+                ByteStringElement(SHA256().digest(responseUriToHash.toCBOR())),
+                StringElement(
+                    authorizationRequest.nonce ?: throw AuthorizationError(
+                        authorizationRequest,
+                        AuthorizationErrorCode.invalid_request,
+                        "Authorization request has no nonce, which is required for generating MDoc-OID4VPHandover"
+                    )
+                )
+            )
+        )
     }
 }
