@@ -1,8 +1,11 @@
-package id.walt.issuer.issuance
+package id.walt.issuer.issuance.openapi.issuerapi
 
 import id.walt.commons.interop.LspPotentialInterop
 import id.walt.crypto.keys.KeyType
-import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
+import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.issuer.issuance.IssuerOnboardingResponse
+import id.walt.issuer.issuance.OnboardingRequest
+import id.walt.issuer.feat.lspPotential.LspPotentialIssuanceInterop
 import id.walt.w3c.utils.VCFormat
 import io.github.smiley4.ktoropenapi.config.ValueExampleDescriptorConfig
 import kotlinx.serialization.json.Json
@@ -478,7 +481,9 @@ object IssuanceExamples {
        }
     """.trimIndent()
 
-    val mDLCredentialIssuanceJwtProofExample = typedValueExampleDescriptorDsl<IssuanceRequest>(mDLCredentialIssuanceDataJwtProof)
+    val mDLCredentialIssuanceJwtProofExample = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        mDLCredentialIssuanceDataJwtProof
+    )
 
     // language=JSON
     val batchExampleJwt = typedValueExampleDescriptorDsl<List<IssuanceRequest>>(
