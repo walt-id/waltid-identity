@@ -110,10 +110,11 @@ object OpenID4VP {
     ): PresentationDefinition =
         authorizationRequest.presentationDefinition ?: authorizationRequest.presentationDefinitionUri?.let { uri ->
             http.get(uri).bodyAsText().let { PresentationDefinition.fromJSONString(it) }
-        } ?: scopeMapping?.let { authorizationRequest.scope.firstNotNullOfOrNull(it) } ?: throw AuthorizationError(
-            authorizationRequest,
-            AuthorizationErrorCode.invalid_request,
-            "No presentation definition found on given presentation request"
+        } ?: scopeMapping?.let { authorizationRequest.scope.firstNotNullOfOrNull(it) }
+        ?: throw AuthorizationError(
+            authorizationRequest = authorizationRequest,
+            errorCode = AuthorizationErrorCode.invalid_request,
+            message = "No presentation definition found on given presentation request"
         )
 
     /**
@@ -134,15 +135,15 @@ object OpenID4VP {
     ): TokenResponse {
         return if (presentationResult.presentations.size == 1) {
             TokenResponse.success(
-                VpTokenParameter.fromJsonElement(presentationResult.presentations.first()),
-                presentationResult.presentationSubmission,
+                vpToken = VpTokenParameter.fromJsonElement(presentationResult.presentations.first()),
+                presentationSubmission = presentationResult.presentationSubmission,
                 state = state,
                 idToken = idToken
             )
         } else {
             TokenResponse.success(
-                VpTokenParameter.fromJsonElement(JsonArray(presentationResult.presentations)),
-                presentationResult.presentationSubmission,
+                vpToken = VpTokenParameter.fromJsonElement(JsonArray(presentationResult.presentations)),
+                presentationSubmission = presentationResult.presentationSubmission,
                 state = state,
                 idToken = idToken
             )
@@ -171,10 +172,11 @@ object OpenID4VP {
         val responseUriToHash = ListElement(
             listOf(
                 StringElement(
-                    authorizationRequest.responseUri ?: throw AuthorizationError(
-                        authorizationRequest,
-                        AuthorizationErrorCode.invalid_request,
-                        "Authorization request has no response_uri, which is required for generating MDoc-OID4VPHandover"
+                    authorizationRequest.responseUri
+                        ?: throw AuthorizationError(
+                        authorizationRequest = authorizationRequest,
+                        errorCode = AuthorizationErrorCode.invalid_request,
+                        message = "Authorization request has no response_uri, which is required for generating MDoc-OID4VPHandover"
                     )
                 ),
                 StringElement(mdocNonce)
@@ -186,10 +188,11 @@ object OpenID4VP {
                 ByteStringElement(SHA256().digest(clientIdToHash.toCBOR())),
                 ByteStringElement(SHA256().digest(responseUriToHash.toCBOR())),
                 StringElement(
-                    authorizationRequest.nonce ?: throw AuthorizationError(
-                        authorizationRequest,
-                        AuthorizationErrorCode.invalid_request,
-                        "Authorization request has no nonce, which is required for generating MDoc-OID4VPHandover"
+                    authorizationRequest.nonce
+                        ?: throw AuthorizationError(
+                        authorizationRequest = authorizationRequest,
+                        errorCode = AuthorizationErrorCode.invalid_request,
+                        message = "Authorization request has no nonce, which is required for generating MDoc-OID4VPHandover"
                     )
                 )
             )
