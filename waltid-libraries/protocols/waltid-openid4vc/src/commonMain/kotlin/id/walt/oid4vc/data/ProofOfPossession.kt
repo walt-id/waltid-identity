@@ -4,6 +4,7 @@ package id.walt.oid4vc.data
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.mdoc.cose.COSECryptoProvider
 import id.walt.mdoc.dataelement.*
 import id.walt.oid4vc.definitions.JWTClaims
@@ -13,7 +14,6 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 @Serializable
 data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private constructor(
@@ -75,7 +75,7 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
                 put(JWTClaims.Payload.issuer, it)
                 put(JWTClaims.Payload.subject, it)
             }
-            put(JWTClaims.Payload.jwtID, Uuid.random().toString())
+            put(JWTClaims.Payload.jwtID, randomUUIDString())
             audience?.let {
                 put(JWTClaims.Payload.audience, it)
             } ?: put(JWTClaims.Payload.audience, issuerUrl)
