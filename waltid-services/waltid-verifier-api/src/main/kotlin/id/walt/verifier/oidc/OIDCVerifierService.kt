@@ -8,6 +8,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.mdoc.COSECryptoProviderKeyInfo
@@ -27,7 +28,6 @@ import id.walt.oid4vc.providers.CredentialVerifierConfig
 import id.walt.oid4vc.providers.OpenIDCredentialVerifier
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.oid4vc.util.randomUUID
 import id.walt.policies.VerificationPolicy
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest
@@ -265,7 +265,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     }
 
     private suspend fun resolveIssuerKeyFromSdJwt(sdJwt: SDJwtVC): Key {
-        val kid = sdJwt.keyID ?: randomUUID()
+        val kid = sdJwt.keyID ?: randomUUIDString()
         return if (!sdJwt.issuer.isNullOrEmpty() && DidUtils.isDidUrl(sdJwt.issuer!!)) {
             DidService.resolveToKey(sdJwt.issuer!!).getOrThrow()
         } else {
@@ -277,7 +277,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     }
 
     private suspend fun resolveIssuerKeysFromSdJwt(sdJwt: SDJwtVC): Set<Key> {
-        val kid = sdJwt.keyID ?: randomUUID()
+        val kid = sdJwt.keyID ?: randomUUIDString()
 
         return if (!sdJwt.issuer.isNullOrEmpty() && DidUtils.isDidUrl(sdJwt.issuer!!)) {
             DidService.resolveToKeys(sdJwt.issuer!!).getOrThrow()

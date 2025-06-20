@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
-
 package id.walt.oid4vc
 
 import com.nimbusds.jose.JWSAlgorithm
@@ -11,6 +9,7 @@ import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
 import id.walt.mdoc.dataelement.MapElement
 import id.walt.oid4vc.data.OpenIDProviderMetadata
@@ -43,8 +42,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
 import kotlin.time.Duration
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 const val EBSI_WALLET_PORT = 8011
 const val EBSI_WALLET_BASE_URL = "http://localhost:${EBSI_WALLET_PORT}"
@@ -219,7 +216,7 @@ class EBSITestWallet(
         return PresentationResult(
             presentations = listOf(JsonPrimitive(presentationJwtStr)),
             presentationSubmission = PresentationSubmission(
-                id = Uuid.random().toString(),
+                id = randomUUIDString(),
                 definitionId = session.presentationDefinition!!.id,
                 descriptorMap = getDescriptorMap(jwtCredentials, credentialDescriptorMapping)
             )

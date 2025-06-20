@@ -2,6 +2,7 @@
 
 package id.walt.webwallet.usecase.claim
 
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.webwallet.db.models.Notification
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.seeker.Seeker
@@ -23,7 +24,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-
+@OptIn(ExperimentalUuidApi::class)
 class SilentClaimStrategy(
     private val issuanceService: IssuanceService,
     private val credentialService: CredentialsService,
@@ -126,7 +127,7 @@ class SilentClaimStrategy(
     private fun prepareNotifications(account: Uuid, credentials: Array<WalletCredential>, type: String) =
         credentials.map {
             Notification(
-                id = Uuid.random().toString(),//TODO: converted back and forth (see notification-service)
+                id = randomUUIDString(),//TODO: converted back and forth (see notification-service)
                 account = account.toString(),
                 wallet = it.wallet.toString(),
                 type = type,
