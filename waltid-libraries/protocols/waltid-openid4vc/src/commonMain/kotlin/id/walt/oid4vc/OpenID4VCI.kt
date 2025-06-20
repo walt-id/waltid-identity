@@ -518,9 +518,9 @@ object OpenID4VCI {
                 subjectTypesSupported = setOf(SubjectType.public),
                 credentialIssuer = baseUrl, // (EBSI) this should be just "$baseUrl"  https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-11.2.1
                 responseTypesSupported = setOf(
-                    "code",
-                    "vp_token",
-                    "id_token"
+                    ResponseType.Code.value,
+                    ResponseType.VpToken.value,
+                    ResponseType.IdToken.value
                 ),  // (EBSI) this is required one  https://www.rfc-editor.org/rfc/rfc8414.html#section-2
                 idTokenSigningAlgValuesSupported = setOf("ES256"), // (EBSI) https://openid.net/specs/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-
                 codeChallengeMethodsSupported = listOf("S256"),
@@ -543,9 +543,9 @@ object OpenID4VCI {
                 subjectTypesSupported = setOf(SubjectType.public),
                 credentialIssuer = baseUrl, // (EBSI) this should be just "$baseUrl"  https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-11.2.1
                 responseTypesSupported = setOf(
-                    "code",
-                    "vp_token",
-                    "id_token"
+                    ResponseType.Code.value,
+                    ResponseType.VpToken.value,
+                    ResponseType.IdToken.value
                 ),  // (EBSI) this is required one  https://www.rfc-editor.org/rfc/rfc8414.html#section-2
                 idTokenSigningAlgValuesSupported = setOf("ES256"), // (EBSI) https://openid.net/specs/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-
                 codeChallengeMethodsSupported = listOf("S256"),
