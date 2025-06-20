@@ -106,28 +106,9 @@ object VerifierApiDocs {
                 example("mDL Request presentation of age over 18 attestation & validity fields only example (assumes `age_over_18` field exists in issued mDL)") {
                     value = VerifierApiExamples.mDLAgeOver18AttestationExample
                 }
-                example("SD-JWT-VC verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
-                example(
-                    "SD-JWT-VC verification example with mandatory fields",
-                    VerifierApiExamples.sdJwtVCExampleWithRequiredFields
-                )
-                example(
-                    "EBSI-VECTOR interoperability test - InTimeIssuance",
-                    VerifierApiExamples.EBSIVectorExampleInTimeIssuance
-                )
-                example(
-                    "EBSI-VECTOR interoperability test - DeferredIssuance",
-                    VerifierApiExamples.EBSIVectorExampleDeferredIssuance
-                )
-                example(
-                    "EBSI-VECTOR interoperability test - PreAuthIssuance",
-                    VerifierApiExamples.EBSIVectorExamplePreAuthIssuance
-                )
-                example(
-                    "EBSI-VECTOR interoperability test - All",
-                    VerifierApiExamples.EBSIVectorExampleAllIssuance
-                )
-
+                addSdJwtVcExamples()
+                addEbsiVectorInteropTestExamples()
+                addCredentialStatusExamples()
             }
         }
 
