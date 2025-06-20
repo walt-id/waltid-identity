@@ -29,11 +29,17 @@ data class SDisclosure internal constructor(
          * Parse an encoded disclosure string
          */
         @OptIn(ExperimentalEncodingApi::class)
-        fun parse(disclosure: String) = Json.parseToJsonElement(disclosure.decodeFromBase64Url().decodeToString()).jsonArray.let {
-            if (it.size != 3) {
-                throw Exception("Invalid selective disclosure")
+        fun parse(disclosure: String) =
+            Json.parseToJsonElement(disclosure.decodeFromBase64Url().decodeToString()).jsonArray.let {
+                if (it.size != 3) {
+                    throw Exception("Invalid selective disclosure")
+                }
+                SDisclosure(
+                    disclosure = disclosure,
+                    salt = it[0].jsonPrimitive.content,
+                    key = it[1].jsonPrimitive.content,
+                    value = it[2]
+                )
             }
-            SDisclosure(disclosure, it[0].jsonPrimitive.content, it[1].jsonPrimitive.content, it[2])
-        }
     }
 }

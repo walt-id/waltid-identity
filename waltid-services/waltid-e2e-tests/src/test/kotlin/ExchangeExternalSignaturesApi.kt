@@ -12,9 +12,9 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.utils.randomUUID
-import id.walt.issuer.issuance.IssuanceExamples
+import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
-import id.walt.issuer.lspPotential.LspPotentialIssuanceInterop
+import id.walt.issuer.feat.lspPotential.LspPotentialIssuanceInterop
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.MapElement

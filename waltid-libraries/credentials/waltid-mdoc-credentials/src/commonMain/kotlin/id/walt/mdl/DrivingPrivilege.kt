@@ -115,12 +115,12 @@ data class DrivingPrivilege(
     }
 }
 
-internal object DrivingPrivilegeSerializer: KSerializer<DrivingPrivilege> {
+internal object DrivingPrivilegeSerializer : KSerializer<DrivingPrivilege> {
 
     override val descriptor = buildClassSerialDescriptor("DrivingPrivilege")
 
     override fun serialize(encoder: Encoder, value: DrivingPrivilege) {
-        when(encoder) {
+        when (encoder) {
             is JsonEncoder -> {
                 encoder.encodeSerializableValue(JsonObject.serializer(), value.toJSON())
             }
@@ -132,7 +132,7 @@ internal object DrivingPrivilegeSerializer: KSerializer<DrivingPrivilege> {
     }
 
     override fun deserialize(decoder: Decoder): DrivingPrivilege {
-        return when(decoder) {
+        return when (decoder) {
             is JsonDecoder -> {
                 DrivingPrivilege.fromJSON(decoder.decodeJsonElement().jsonObject)
             }

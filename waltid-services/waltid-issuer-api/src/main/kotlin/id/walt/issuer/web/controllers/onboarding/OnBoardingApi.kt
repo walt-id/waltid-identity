@@ -1,8 +1,8 @@
 package id.walt.issuer.web.controllers.onboarding
 
-import id.walt.issuer.issuance.IssuanceExamples
 import id.walt.issuer.issuance.IssuerOnboardingResponse
 import id.walt.issuer.issuance.OnboardingRequest
+import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
 import id.walt.issuer.services.onboarding.OnboardingService
 import id.walt.issuer.services.onboarding.models.DocumentSignerOnboardingRequest
 import id.walt.issuer.services.onboarding.models.IACAOnboardingRequest

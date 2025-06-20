@@ -21,7 +21,13 @@ open class SDJwt internal constructor(
     val keyBindingJwt: KeyBindingJwt? = null,
     val isPresentation: Boolean = false
 ) {
-    internal constructor(sdJwt: SDJwt) : this(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJwt.keyBindingJwt, sdJwt.isPresentation)
+    internal constructor(sdJwt: SDJwt) : this(
+        sdJwt.jwt,
+        sdJwt.header,
+        sdJwt.sdPayload,
+        sdJwt.keyBindingJwt,
+        sdJwt.isPresentation
+    )
 
     /**
      * Encoded disclosures, included in this SD-JWT
@@ -77,7 +83,7 @@ open class SDJwt internal constructor(
     open fun toString(formatForPresentation: Boolean, withKBJwt: Boolean = true): String {
         return listOf(jwt)
             .plus(disclosures)
-            .plus((if(withKBJwt) keyBindingJwt else null)?.let { listOf(it) }
+            .plus((if (withKBJwt) keyBindingJwt else null)?.let { listOf(it) }
                 ?: (if (formatForPresentation) listOf("") else listOf()))
             .joinToString(SEPARATOR_STR)
     }
@@ -124,7 +130,13 @@ open class SDJwt internal constructor(
      * @param kbKeyId Optional key ID of the key to be used for signature, if required by crypto provider
      */
     @JsName("presentWithKB")
-    fun present(sdMap: SDMap?, audience: String, nonce: String, kbCryptoProvider: JWTCryptoProvider, kbKeyId: String? = null) =
+    fun present(
+        sdMap: SDMap?,
+        audience: String,
+        nonce: String,
+        kbCryptoProvider: JWTCryptoProvider,
+        kbKeyId: String? = null
+    ) =
         present(sdMap, KeyBindingJwt.sign(present(sdMap).toString(), audience, nonce, kbCryptoProvider, kbKeyId))
 
     /**
@@ -136,8 +148,17 @@ open class SDJwt internal constructor(
      * @param kbKeyId Optional key ID of the key to be used for signature, if required by crypto provider
      */
     @JsName("presentAllWithKB")
-    fun present(discloseAll: Boolean, audience: String, nonce: String, kbCryptoProvider: JWTCryptoProvider, kbKeyId: String? = null) =
-        present(discloseAll, KeyBindingJwt.sign(present(discloseAll).toString(), audience, nonce, kbCryptoProvider, kbKeyId))
+    fun present(
+        discloseAll: Boolean,
+        audience: String,
+        nonce: String,
+        kbCryptoProvider: JWTCryptoProvider,
+        kbKeyId: String? = null
+    ) =
+        present(
+            discloseAll,
+            KeyBindingJwt.sign(present(discloseAll).toString(), audience, nonce, kbCryptoProvider, kbKeyId)
+        )
 
     /**
      * TODO: make use of Key interface from waltid-crypto lib instead or also?
@@ -183,12 +204,15 @@ open class SDJwt internal constructor(
          */
         @OptIn(ExperimentalEncodingApi::class)
         fun parse(sdJwt: String): SDJwt {
-            val matchResult = Regex(SD_JWT_PATTERN).matchEntire(sdJwt) ?: throw IllegalArgumentException("Invalid SD-JWT format: $sdJwt")
+            val matchResult = Regex(SD_JWT_PATTERN).matchEntire(sdJwt)
+                ?: throw IllegalArgumentException("Invalid SD-JWT format: $sdJwt")
             val matchedGroups = matchResult.groups as MatchNamedGroupCollection
             val disclosures = matchedGroups["disclosures"]?.value?.trim(SEPARATOR)?.split(SEPARATOR)?.toSet() ?: setOf()
             return SDJwt(
                 matchedGroups["sdjwt"]!!.value,
-                Json.parseToJsonElement(matchedGroups["header"]!!.value.decodeFromBase64Url().decodeToString()).jsonObject,
+                Json.parseToJsonElement(
+                    matchedGroups["header"]!!.value.decodeFromBase64Url().decodeToString()
+                ).jsonObject,
                 SDPayload.parse(
                     matchedGroups["body"]!!.value,
                     disclosures
@@ -213,7 +237,10 @@ open class SDJwt internal constructor(
          * @throws Exception if SD-JWT cannot be parsed
          */
         @JsExport.Ignore
-        suspend fun verifyAndParseAsync(sdJwt: String, jwtCryptoProvider: AsyncJWTCryptoProvider): VerificationResult<SDJwt> {
+        suspend fun verifyAndParseAsync(
+            sdJwt: String,
+            jwtCryptoProvider: AsyncJWTCryptoProvider
+        ): VerificationResult<SDJwt> {
             return parse(sdJwt).verifyAsync(jwtCryptoProvider)
         }
 

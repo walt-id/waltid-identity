@@ -28,7 +28,7 @@ enum class VerificationRelationshipType {
     KeyAgreement;
 
     override fun toString(): String {
-        return when(this) {
+        return when (this) {
             AssertionMethod -> "assertionMethod"
             Authentication -> "authentication"
             CapabilityDelegation -> "capabilityDelegation"

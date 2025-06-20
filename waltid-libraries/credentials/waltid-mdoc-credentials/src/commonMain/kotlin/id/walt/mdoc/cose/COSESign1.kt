@@ -17,8 +17,8 @@ import kotlinx.serialization.encoding.Encoder
 @Serializable(with = COSESign1Serializer::class)
 class COSESign1(
     override val data: List<AnyDataElement>
-): COSESimpleBase<COSESign1>() {
-    constructor(): this(listOf())
+) : COSESimpleBase<COSESign1>() {
+    constructor() : this(listOf())
 
     override fun detachPayload() = COSESign1(replacePayload(NullElement()))
     override fun attachPayload(payload: ByteArray) = COSESign1(replacePayload(ByteStringElement(payload)))

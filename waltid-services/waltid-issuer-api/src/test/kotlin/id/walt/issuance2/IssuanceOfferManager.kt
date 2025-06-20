@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-package id.walt.issuer.issuance2
+package id.walt.issuance2
 
 
 import id.walt.commons.persistence.ConfiguredPersistence

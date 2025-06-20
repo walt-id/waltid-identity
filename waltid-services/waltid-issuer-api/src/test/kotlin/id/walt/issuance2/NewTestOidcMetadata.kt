@@ -1,8 +1,7 @@
-package id.walt.issuer
+package id.walt.issuance2
 
 import id.walt.commons.logging.LoggingManager
 import id.walt.commons.logging.setups.TraceLoggingSetup
-import id.walt.issuer.issuance2.IssuanceOfferManager
 import id.walt.oid4vc.data.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*

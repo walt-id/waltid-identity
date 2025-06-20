@@ -61,7 +61,7 @@ object IssuanceServiceExternalSignatures : IssuanceServiceBase() {
             clientId = did
         )
 
-        val tokenResp =  OpenID4VCI.sendTokenRequest(
+        val tokenResp = OpenID4VCI.sendTokenRequest(
             providerMetadata = providerMetadata,
             tokenRequest = tokenReq
         )

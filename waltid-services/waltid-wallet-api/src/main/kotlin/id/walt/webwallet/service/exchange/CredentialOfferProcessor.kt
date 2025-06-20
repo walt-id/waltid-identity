@@ -4,12 +4,8 @@ import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.requests.BatchCredentialRequest
 import id.walt.oid4vc.requests.CredentialRequest
-import id.walt.webwallet.utils.WalletHttpClients
-import io.klogging.logger
 
 object CredentialOfferProcessor {
-    private val http = WalletHttpClients.getHttpClient()
-    private val logger = logger<CredentialOfferProcessor>()
     suspend fun process(
         credentialRequests: List<CredentialRequest>,
         providerMetadata: OpenIDProviderMetadata,

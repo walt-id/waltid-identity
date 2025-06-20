@@ -61,46 +61,51 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         ).also {
             putSession(it.id, it, sessionTtl ?: expiresIn)
         }
-        val presentationDefinitionUri = when(openId4VPProfile) {
+        val presentationDefinitionUri = when (openId4VPProfile) {
             OpenId4VPProfile.ISO_18013_7_MDOC, OpenId4VPProfile.HAIP -> null
             else -> preparePresentationDefinitionUri(presentationDefinition, session.id)
         }
         val authReq = AuthorizationRequest(
             // here add VpToken if response type is null
             responseType = setOf(responseType!!),
-            clientId = when(openId4VPProfile) {
+            clientId = when (openId4VPProfile) {
                 OpenId4VPProfile.DEFAULT -> config.redirectUri
                 OpenId4VPProfile.ISO_18013_7_MDOC -> config.redirectUri
                 OpenId4VPProfile.EBSIV3 -> config.redirectUri.replace("/openid4vc/verify", "")
                 else -> config.clientIdMap[clientIdScheme] ?: config.defaultClientId
             },
             responseMode = responseMode,
-            redirectUri = when(openId4VPProfile) {
+            redirectUri = when (openId4VPProfile) {
                 OpenId4VPProfile.EBSIV3 -> prepareResponseOrRedirectUri(session.id, responseMode)
                 else -> when (responseMode) {
                     ResponseMode.query, ResponseMode.fragment, ResponseMode.form_post -> prepareResponseOrRedirectUri(
                         session.id,
                         responseMode
                     )
+
                     else -> null
                 }
             },
-            responseUri = when(openId4VPProfile) {
+            responseUri = when (openId4VPProfile) {
                 OpenId4VPProfile.EBSIV3 -> null
                 else -> when (responseMode) {
-                    ResponseMode.direct_post, ResponseMode.direct_post_jwt -> prepareResponseOrRedirectUri(session.id, responseMode)
+                    ResponseMode.direct_post, ResponseMode.direct_post_jwt -> prepareResponseOrRedirectUri(
+                        session.id,
+                        responseMode
+                    )
+
                     else -> null
                 }
             },
             presentationDefinitionUri = presentationDefinitionUri,
-            presentationDefinition =  when(openId4VPProfile) {
+            presentationDefinition = when (openId4VPProfile) {
                 OpenId4VPProfile.EBSIV3 -> presentationDefinition // some wallets support presentation_definition only, even ebsiconformancetest wallet
                 else -> when (presentationDefinitionUri) {
                     null -> presentationDefinition
                     else -> null
                 }
             },
-            scope =  when(openId4VPProfile) {
+            scope = when (openId4VPProfile) {
                 OpenId4VPProfile.EBSIV3 -> setOf("openid")
                 else -> scope
             },
@@ -117,7 +122,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
         // https://json-schema.org/specification
         // https://github.com/OptimumCode/json-schema-validator
         // Calculate the remaining time to live based on the session's expiration timestamp
-        val remainingTtl = session.expirationTimestamp?.let {
+        val remainingTtl = session.expirationTimestamp.let {
             val now = Clock.System.now()
             if (it > now) {
                 it - now  // Calculate duration between now and expiration
@@ -125,12 +130,19 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
                 null  // Already expired
             }
         }
-        
+
         return session.copy(
             tokenResponse = tokenResponse,
-            verificationResult = doVerify(tokenResponse, session)
+            verificationResult = doVerify(
+                tokenResponse = tokenResponse,
+                session = session
+            )
         ).also {
-            putSession(it.id, it, remainingTtl)
+            putSession(
+                id = it.id,
+                session = it,
+                ttl = remainingTtl
+            )
         }
     }
 
