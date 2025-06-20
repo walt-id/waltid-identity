@@ -229,6 +229,19 @@ fun Application.verifierApi() {
                     }
                 }
 
+                response {
+                    HttpStatusCode.OK to {
+                        description = "URL for the holder wallet to continue verification"
+                        body<String> {
+                            example("Verifier URL") {
+                                mediaTypes = listOf(ContentType.Text.Plain)
+                                value =
+                                    "openid4vp://authorize?response_type=vp_token&client_id=http://localhost:7003/openid4vc/verify&response_mode=direct_post&state=LKOOZaV5zjHu&presentation_definition_uri=http://localhost:7003/openid4vc/pd/LKOOZaV5zjHu&client_id_scheme=redirect_uri&client_metadata={\"authorization_encrypted_response_alg\":\"ECDH-ES\",\"authorization_encrypted_response_enc\":\"A256GCM\"}&nonce=ccd05d9b-0ab0-4403-95fe-f3ae274f2969&response_uri=http://localhost:7003/openid4vc/verify/LKOOZaV5zjHu"
+                            }
+                        }
+                    }
+                }
+
             }) {
 
                 val authorizeBaseUrl = call.request.header("authorizeBaseUrl") ?: defaultAuthorizeBaseUrl
@@ -371,19 +384,17 @@ fun Application.verifierApi() {
                 }
                 response {
                     HttpStatusCode.OK to {
+                        description = "Session info"
                         // body<PresentationSessionInfo> { // cannot encode duration
-                        body<SwaggerPresentationSessionInfo> {
-                            description = "Session info"
-                        }
+                        body<SwaggerPresentationSessionInfo> {}
                     }
                     HttpStatusCode.NotFound to {
+                        description = "Session not found or invalid"
                         body<String> {
-                            description = "Session not found or invalid"
                             example("Session not found") {
                                 value = "Invalid id provided (expired?): 123"
                             }
                         }
-
                     }
 
                 }
@@ -406,8 +417,14 @@ fun Application.verifierApi() {
                     }
                 }
                 response {
-                    HttpStatusCode.OK to { body<JsonObject>() }
-                    HttpStatusCode.NotFound to { body<String>() }
+                    HttpStatusCode.OK to {
+                        description = "Presentation definition object"
+                        body<JsonObject>()
+                    }
+                    HttpStatusCode.NotFound to {
+                        description = "Not found"
+                        body<String>()
+                    }
                 }
             }) {
                 val id = call.parameters["id"]
@@ -421,7 +438,12 @@ fun Application.verifierApi() {
             get("policy-list", {
                 tags = listOf("Credential Verification")
                 summary = "List registered policies"
-                response { HttpStatusCode.OK to { body<Map<String, String?>>() } }
+                response {
+                    HttpStatusCode.OK to {
+                        description = "List of registered policies"
+                        body<Map<String, String?>>()
+                    }
+                }
             }) {
                 call.respond(PolicyManager.listPolicyDescriptions())
             }

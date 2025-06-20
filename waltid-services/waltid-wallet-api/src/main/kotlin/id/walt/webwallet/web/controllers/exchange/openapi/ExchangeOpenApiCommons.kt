@@ -30,8 +30,8 @@ object ExchangeOpenApiCommons {
 
     fun useOfferRequestEndpointResponseParams(): ResponsesConfig.() -> Unit = {
         HttpStatusCode.OK to {
+            description = "List of credentials"
             body<List<WalletCredential>> {
-                description = "List of credentials"
             }
         }
     }

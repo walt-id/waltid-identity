@@ -20,6 +20,7 @@ fun Application.history() = walletRoute {
             summary = "Show operation history"
             response {
                 HttpStatusCode.OK to {
+                    description = "Operation history"
                     body<List<WalletOperationHistory>>()
                 }
             }

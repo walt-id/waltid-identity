@@ -51,9 +51,8 @@ fun Application.eventLogs() = walletRoute {
             }
             response {
                 HttpStatusCode.OK to {
-                    body<EventLogFilterResult> {
-                        description = "The event log result"
-                    }
+                    description = "The event log result"
+                    body<EventLogFilterResult> {}
                 }
             }
         }) {

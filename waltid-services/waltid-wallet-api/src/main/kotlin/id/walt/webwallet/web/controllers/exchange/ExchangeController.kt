@@ -93,9 +93,8 @@ fun Application.exchange() = walletRoute {
             }
             response {
                 HttpStatusCode.OK to {
-                    body<List<JsonObject>> {
-                        description = "Credentials that match the presentation definition"
-                    }
+                    description = "Credentials that match the presentation definition"
+                    body<List<JsonObject>> {}
                 }
             }
         }) {
@@ -113,9 +112,8 @@ fun Application.exchange() = walletRoute {
             }
             response {
                 HttpStatusCode.OK to {
-                    body<List<FilterData>> {
-                        description = "Filters that failed to fulfill the presentation definition"
-                    }
+                    description = "Filters that failed to fulfill the presentation definition"
+                    body<List<FilterData>> {}
                 }
             }
         }) {
@@ -215,6 +213,7 @@ fun Application.exchange() = walletRoute {
             }
             response {
                 HttpStatusCode.OK to {
+                    description = "Resolved presentation request"
                     body<String>()
                 }
             }
@@ -232,9 +231,8 @@ fun Application.exchange() = walletRoute {
             }
             response {
                 HttpStatusCode.OK to {
-                    body<CredentialOffer> {
-                        description = "Resolved credential offer"
-                    }
+                    description = "Resolved credential offer"
+                    body<CredentialOffer> {}
                 }
             }
         }) {
