@@ -3,7 +3,7 @@ package id.walt.cli.commands
 import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.util.getResourcePath
-import id.walt.did.utils.randomUUID
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.File
 import kotlin.test.Ignore
@@ -166,7 +166,7 @@ class WaltIdDidResolveCmdTest {
         )
         assertDoesNotThrow {
             for (keyFile in keyFileList) {
-                val tempOutputFile = "${randomUUID()}.json"
+                val tempOutputFile = "${randomUUIDString()}.json"
                 File(tempOutputFile).deleteOnExit()
                 val did = didCreateCmd.test("-j -k $keyFile -o $tempOutputFile").output.lines().let { lines -> lines[lines.lastIndex - 1] }
                 command.test("-d $did")
