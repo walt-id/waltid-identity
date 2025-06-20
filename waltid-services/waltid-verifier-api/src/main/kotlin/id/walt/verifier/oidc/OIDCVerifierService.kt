@@ -61,7 +61,11 @@ import kotlin.time.Duration.Companion.minutes
 object OIDCVerifierService : OpenIDCredentialVerifier(
     config = CredentialVerifierConfig(
         ConfigManager.getConfig<OIDCVerifierServiceConfig>().baseUrl.let { "$it/openid4vc/verify" },
-        clientIdMap = ConfigManager.getConfig<OIDCVerifierServiceConfig>().x509SanDnsClientId?.let { mapOf(ClientIdScheme.X509SanDns to it) }
+        clientIdMap = ConfigManager.getConfig<OIDCVerifierServiceConfig>().x509SanDnsClientId?.let {
+            mapOf(
+                ClientIdScheme.X509SanDns to it
+            )
+        }
             ?: emptyMap())
 ) {
     private val logger = KotlinLogging.logger {}
@@ -84,13 +88,13 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     )
 
     // Persistence
-    val presentationSessions = ConfiguredPersistence<PresentationSession>(
-        "presentation_session", defaultExpiration = 5.minutes,
+    private val presentationSessions = ConfiguredPersistence<PresentationSession>(
+        discriminator = "presentation_session",
+        defaultExpiration = 5.minutes,
         encoding = { Json.encodeToString(it) },
         decoding = {
-            println("Decoding $it to PresentationSession")
-
-            Json.decodeFromString(it) },
+            Json.decodeFromString(it)
+        },
     )
 
     // Todo: Make this automatic?
@@ -113,12 +117,14 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     val format = Json { serializersModule = module; encodeDefaults = true }
 
     val sessionVerificationInfos = ConfiguredPersistence<SessionVerificationInformation>(
-        "session_verification_infos", defaultExpiration = 5.minutes,
+        discriminator = "session_verification_infos",
+        defaultExpiration = 5.minutes,
         encoding = { format.encodeToString(it) },
         decoding = { format.decodeFromString(it) },
     )
     val policyResults = ConfiguredPersistence<PresentationVerificationResponseSurrogate>(
-        "policy_results", defaultExpiration = 5.minutes,
+        discriminator = "policy_results",
+        defaultExpiration = 5.minutes,
         encoding = { format.encodeToString(it) },
         decoding = { format.decodeFromString(it) },
     )
@@ -126,7 +132,10 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
     override fun getSession(id: String) = presentationSessions[id]
         ?: throw NotFoundException("Id parameter $id doesn't refer to an existing session, or session expired")
-    override fun putSession(id: String, session: PresentationSession, ttl: Duration?) = presentationSessions.put(id, session, ttl)
+
+    override fun putSession(id: String, session: PresentationSession, ttl: Duration?) =
+        presentationSessions.put(id, session, ttl)
+
     override fun getSessionByAuthServerState(authServerState: String): PresentationSession? {
         TODO("Not yet implemented")
     }
@@ -168,7 +177,9 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         }
 
         if (tokenResponse.vpToken is JsonObject) TODO("Token response is jsonobject - not yet handled")
-        val presentationFormat = tokenResponse.presentationSubmission?.descriptorMap?.firstOrNull()?.format ?: tokenResponse.presentationSubmission?.descriptorMap?.firstOrNull()?.pathNested?.format ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
+        val presentationFormat = tokenResponse.presentationSubmission?.descriptorMap?.firstOrNull()?.format
+            ?: tokenResponse.presentationSubmission?.descriptorMap?.firstOrNull()?.pathNested?.format
+            ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
 
         logger.debug { "VP token: $vpToken" }
         logger.info { "OpenID4VP profile: ${session.openId4VPProfile}" }
@@ -180,7 +191,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
             else -> {
                 val results = runBlocking {
                     Verifier.verifyPresentation(
-                        presentationFormat,
+                        format = presentationFormat,
                         vpToken = vpToken,
                         vpPolicies = policies.vpPolicies,
                         globalVcPolicies = policies.vcPolicies,
@@ -208,35 +219,46 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
     private fun verifyMdoc(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
         val mdocHandoverRestored = OpenID4VP.generateMDocOID4VPHandover(
-            session.authorizationRequest!!,
-            Base64.getUrlDecoder().decode(tokenResponse.jwsParts!!.header["apu"]!!.jsonPrimitive.content).decodeToString()
+            authorizationRequest = session.authorizationRequest!!,
+            mdocNonce = Base64.getUrlDecoder().decode(tokenResponse.jwsParts!!.header["apu"]!!.jsonPrimitive.content)
+                .decodeToString()
         )
+
         val parsedDeviceResponse = DeviceResponse.fromCBORBase64URL(tokenResponse.vpToken!!.jsonPrimitive.content)
+
         val parsedMdoc = parsedDeviceResponse.documents[0]
+
         val deviceKey = OneKey(CBORObject.DecodeFromBytes(parsedMdoc.MSO!!.deviceKeyInfo.deviceKey.toCBOR()))
+
         val issuerKey = parsedMdoc.issuerSigned.issuerAuth?.x5Chain?.let { X509CertUtils.parse(it) }?.publicKey
             ?: throw BadRequestException("Issuer's Public Key Missing: The x5c header in the JWT is either missing or does not contain the expected X.509 certificate chain. Please ensure that the x5c header is correctly formatted and includes the issuer’s public key")
+
         return parsedMdoc.verify(
             MDocVerificationParams(
                 verificationTypes = VerificationType.forPresentation,
                 issuerKeyID = "ISSUER_KEY_ID",
                 deviceKeyID = "DEVICE_KEY_ID",
                 deviceAuthentication = DeviceAuthentication(
-                    ListElement(listOf(NullElement(), NullElement(), mdocHandoverRestored)),
-                    session.authorizationRequest!!.presentationDefinition?.inputDescriptors?.first()?.id!!,
-                    EncodedCBORElement(MapElement(mapOf()))
+                    sessionTranscript = ListElement(listOf(NullElement(), NullElement(), mdocHandoverRestored)),
+                    docType = session.authorizationRequest!!.presentationDefinition?.inputDescriptors?.first()?.id!!,
+                    deviceNameSpaces = EncodedCBORElement(MapElement(mapOf()))
                 )
             ), SimpleCOSECryptoProvider(
                 listOf(
                     COSECryptoProviderKeyInfo(
-                        "ISSUER_KEY_ID",
-                        AlgorithmID.ECDSA_256,
-                        issuerKey,
-                        null,
-                        listOf(),
-                        getAdditionalTrustedRootCAs(session)
+                        keyID = "ISSUER_KEY_ID",
+                        algorithmID = AlgorithmID.ECDSA_256,
+                        publicKey = issuerKey,
+                        privateKey = null,
+                        x5Chain = listOf(),
+                        trustedRootCAs = getAdditionalTrustedRootCAs(session)
                     ),
-                    COSECryptoProviderKeyInfo("DEVICE_KEY_ID", AlgorithmID.ECDSA_256, deviceKey.AsPublicKey(), null)
+                    COSECryptoProviderKeyInfo(
+                        keyID = "DEVICE_KEY_ID",
+                        algorithmID = AlgorithmID.ECDSA_256,
+                        publicKey = deviceKey.AsPublicKey(),
+                        privateKey = null
+                    )
                 )
             )
         )
@@ -244,24 +266,27 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
 
     private suspend fun resolveIssuerKeyFromSdJwt(sdJwt: SDJwtVC): Key {
         val kid = sdJwt.keyID ?: randomUUID()
-        return if(!sdJwt.issuer.isNullOrEmpty() && DidUtils.isDidUrl(sdJwt.issuer!!)) {
+        return if (!sdJwt.issuer.isNullOrEmpty() && DidUtils.isDidUrl(sdJwt.issuer!!)) {
             DidService.resolveToKey(sdJwt.issuer!!).getOrThrow()
         } else {
-            sdJwt.header.get("x5c")?.jsonArray?.last()?.let {
+            sdJwt.header["x5c"]?.jsonArray?.last()?.let {
                 return JWKKey.importPEM(it.jsonPrimitive.content).getOrThrow().let { JWKKey(it.jwk, kid) }
-            } ?: throw UnsupportedOperationException("Resolving issuer key from SD-JWT is only supported for issuer did in kid header and PEM cert in x5c header parameter")
+            }
+                ?: throw UnsupportedOperationException("Resolving issuer key from SD-JWT is only supported for issuer did in kid header and PEM cert in x5c header parameter")
         }
     }
-    
+
     private suspend fun resolveIssuerKeysFromSdJwt(sdJwt: SDJwtVC): Set<Key> {
         val kid = sdJwt.keyID ?: randomUUID()
-        return if(!sdJwt.issuer.isNullOrEmpty() && DidUtils.isDidUrl(sdJwt.issuer!!)) {
+
+        return if (!sdJwt.issuer.isNullOrEmpty() && DidUtils.isDidUrl(sdJwt.issuer!!)) {
             DidService.resolveToKeys(sdJwt.issuer!!).getOrThrow()
         } else {
-            sdJwt.header.get("x5c")?.jsonArray?.last()?.let {
+            sdJwt.header["x5c"]?.jsonArray?.last()?.let {
                 val key = JWKKey.importPEM(it.jsonPrimitive.content).getOrThrow().let { JWKKey(it.jwk, kid) }
                 setOf(key)
-            } ?: throw UnsupportedOperationException("Resolving issuer key from SD-JWT is only supported for issuer did in kid header and PEM cert in x5c header parameter")
+            }
+                ?: throw UnsupportedOperationException("Resolving issuer key from SD-JWT is only supported for issuer did in kid header and PEM cert in x5c header parameter")
         }
     }
 
@@ -269,12 +294,13 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val sdJwtVC = SDJwtVC.parse(tokenResponse.vpToken!!.jsonPrimitive.content)
         require(sdJwtVC.isPresentation && sdJwtVC.keyBindingJwt != null) { "SD-JWT is not a presentation and/or doesn't contain a holder key binding JWT" }
         val holderKey = JWKKey.importJWK(sdJwtVC.holderKeyJWK.toString()).getOrThrow()
-        
+
         // Get all possible issuer keys
         val issuerKeys = resolveIssuerKeysFromSdJwt(sdJwtVC)
-        val issuerKey = issuerKeys.firstOrNull() ?: 
-            throw IllegalStateException("No issuer keys found in the DID document")
-        
+
+        val issuerKey =
+            issuerKeys.firstOrNull() ?: throw IllegalStateException("No issuer keys found in the DID document")
+
         // Create a map of all possible issuer keys by their key IDs
         val keyMap = issuerKeys.associateBy { it.getKeyId() }.toMutableMap()
 
@@ -282,12 +308,12 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         keyMap[sdJwtVC.keyID ?: issuerKey.getKeyId()] = issuerKey
         // Add the holder key
         keyMap[holderKey.getKeyId()] = holderKey
-        
+
         val verificationResult = sdJwtVC.verifyVC(
-            WaltIdJWTCryptoProvider(keyMap),
+            jwtCryptoProvider = WaltIdJWTCryptoProvider(keyMap),
             requiresHolderKeyBinding = true,
-            session.authorizationRequest!!.clientId,
-            session.authorizationRequest!!.nonce!!
+            audience = session.authorizationRequest!!.clientId,
+            nonce = session.authorizationRequest!!.nonce!!
         )
         return verificationResult.verified
     }

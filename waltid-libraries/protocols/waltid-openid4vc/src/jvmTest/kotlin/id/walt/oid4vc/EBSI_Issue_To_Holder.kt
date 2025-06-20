@@ -187,7 +187,7 @@ class EBSIIssueToHolderConformanceTest {
         httpResp = ktorClient.submitForm(
             url = idTokenReqMap["redirect_uri"]!!.first(),
             formParameters = parameters {
-                append("id_token", idToken)
+                append(ResponseType.IdToken.value, idToken)
                 append("state", idTokenReqMap["state"]!!.first())
             }
         )

@@ -72,7 +72,7 @@ object Issuer {
         subjectDid = subjectDid,
         mappings = mappings,
         display = display,
-        completeJwtWithDefaultCredentialData
+        completeJwtWithDefaultCredentialData = completeJwtWithDefaultCredentialData
     ).run {
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
         w3cVc.signJws(

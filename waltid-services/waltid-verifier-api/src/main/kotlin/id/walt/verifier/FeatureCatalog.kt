@@ -8,7 +8,7 @@ import id.walt.verifier.entra.EntraConfig
 
 object FeatureCatalog : ServiceFeatureCatalog {
 
-    val verifierService = BaseFeature("verifier-service", "Verifier Service Implementation", OIDCVerifierServiceConfig::class)
+    private val verifierService = BaseFeature("verifier-service", "Verifier Service Implementation", OIDCVerifierServiceConfig::class)
 
     val entra = OptionalFeature("entra", "Enable Microsoft Entra support", EntraConfig::class, false)
     val lspPotential = OptionalFeature("lsp-potential", "Enable LSP Potential Interop test endpoints", default = false)

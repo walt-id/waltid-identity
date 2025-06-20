@@ -67,33 +67,44 @@ class VerificationUseCase(
         }
 
         val presentationFormat = getPresentationFormat(requestedCredentials)
-        val vpPolicies = vpPoliciesJson?.jsonArray?.parsePolicyRequests() ?: getDefaultVPPolicyRequests(presentationFormat)
+
+        val vpPolicies =
+            vpPoliciesJson?.jsonArray?.parsePolicyRequests() ?: getDefaultVPPolicyRequests(presentationFormat)
         val vcPolicies = vcPoliciesJson?.jsonArray?.parsePolicyRequests() ?: getDefaultVCPolicies(presentationFormat)
 
-        val presentationDefinition = PresentationDefinition(inputDescriptors = requestedCredentials.map { it.toInputDescriptor() })
+        val presentationDefinition = PresentationDefinition(
+            inputDescriptors = requestedCredentials.map { it.toInputDescriptor() }
+        )
 
         logger.debug { "Presentation definition: " + presentationDefinition.toJSON() }
 
         val session = OIDCVerifierService.initializeAuthorization(
-            presentationDefinition, responseMode = responseMode, sessionId = stateId,
+            presentationDefinition = presentationDefinition,
+            responseMode = responseMode,
+            sessionId = stateId,
             ephemeralEncKey = when (responseMode) {
                 ResponseMode.direct_post_jwt -> runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
                 else -> null
             },
-            clientIdScheme = this.getClientIdScheme(openId4VPProfile, OIDCVerifierService.config.defaultClientIdScheme),
+            clientIdScheme = this.getClientIdScheme(
+                openId4VPProfile = openId4VPProfile,
+                defaultClientIdScheme = OIDCVerifierService.config.defaultClientIdScheme
+            ),
             openId4VPProfile = openId4VPProfile,
             walletInitiatedAuthState = walletInitiatedAuthState,
             responseType = responseType,
             trustedRootCAs = trustedRootCAs?.map { it.jsonPrimitive.content }
         )
 
-        val specificPolicies = requestedCredentials.filter { !it.policies.isNullOrEmpty() }.associate {
+        val specificPolicies = requestedCredentials.filter {
+            !it.policies.isNullOrEmpty()
+        }.associate {
             it.id to it.policies!!.parsePolicyRequests()
         }
 
         OIDCVerifierService.sessionVerificationInfos.set(
-            session.id,
-            OIDCVerifierService.SessionVerificationInformation(
+            id = session.id,
+            value = OIDCVerifierService.SessionVerificationInformation(
                 vpPolicies = vpPolicies,
                 vcPolicies = vcPolicies,
                 specificPolicies = specificPolicies,
@@ -107,8 +118,9 @@ class VerificationUseCase(
                     )
                 }
             ),
-            sessionTtl
+            ttl = sessionTtl
         )
+
         session
     }
 
@@ -129,11 +141,25 @@ class VerificationUseCase(
         sessionTtl: Duration? = null,
     ): PresentationSession {
         return createSession(
-            vpPoliciesJson, vcPoliciesJson,
-            requestCredentialsJson = JsonArray(Json.decodeFromJsonElement<PresentationDefinition>(presentationDefinitionJson).inputDescriptors.map {
-                RequestedCredential(inputDescriptor = it, policies = null).toJsonElement()
-            }), responseMode, responseType, successRedirectUri, errorRedirectUri, statusCallbackUri, statusCallbackApiKey, stateId,
-            openId4VPProfile, walletInitiatedAuthState, trustedRootCAs, sessionTtl
+            vpPoliciesJson = vpPoliciesJson,
+            vcPoliciesJson = vcPoliciesJson,
+            requestCredentialsJson = JsonArray(
+                Json.decodeFromJsonElement<PresentationDefinition>(
+                    presentationDefinitionJson
+                ).inputDescriptors.map {
+                    RequestedCredential(inputDescriptor = it, policies = null).toJsonElement()
+                }),
+            responseMode = responseMode,
+            responseType = responseType,
+            successRedirectUri = successRedirectUri,
+            errorRedirectUri = errorRedirectUri,
+            statusCallbackUri = statusCallbackUri,
+            statusCallbackApiKey = statusCallbackApiKey,
+            stateId = stateId,
+            openId4VPProfile = openId4VPProfile,
+            walletInitiatedAuthState = walletInitiatedAuthState,
+            trustedRootCAs = trustedRootCAs,
+            sessionTtl = sessionTtl
         )
     }
 
@@ -148,30 +174,33 @@ class VerificationUseCase(
     suspend fun verify(sessionId: String, tokenResponseParameters: Map<String, List<String>>): Result<String> {
         logger.debug { "Verifying session $sessionId" }
         val session = OIDCVerifierService.getSession(sessionId)
+
         val tokenResponse = when (TokenResponse.isDirectPostJWT(tokenResponseParameters)) {
             true -> TokenResponse.fromDirectPostJWT(
-                tokenResponseParameters,
-                runBlocking { session.ephemeralEncKey?.exportJWKObject() }
+                parameters = tokenResponseParameters,
+                encKeyJwk = runBlocking { session.ephemeralEncKey?.exportJWKObject() }
                     ?: throw IllegalArgumentException("No ephemeral reader key found on session"))
 
             else -> TokenResponse.fromHttpParameters(tokenResponseParameters)
         }
-        val sessionVerificationInfo = OIDCVerifierService.sessionVerificationInfos[session.id] ?: return Result.failure(
-            NotFoundException("No session verification information found for session id: ${session.id}")
-        )
+        val sessionVerificationInfo = OIDCVerifierService.sessionVerificationInfos[session.id]
+            ?: return Result.failure(
+                NotFoundException("No session verification information found for session id: ${session.id}")
+            )
 
         val maybePresentationSessionResult = runCatching { OIDCVerifierService.verify(tokenResponse, session) }
 
         if (maybePresentationSessionResult.isFailure) {
             return Result.failure(
                 IllegalStateException(
-                    "Verification failed (VerifiationUseCase): ${maybePresentationSessionResult.exceptionOrNull()!!.message}",
+                    "Verification failed (VerificationUseCase): ${maybePresentationSessionResult.exceptionOrNull()!!.message}",
                     maybePresentationSessionResult.exceptionOrNull()
                 )
             )
         }
 
         val presentationSession = maybePresentationSessionResult.getOrThrow()
+
         if (presentationSession.verificationResult == true) {
             val redirectUri = sessionVerificationInfo.successRedirectUri?.replace("\$id", session.id) ?: ""
             logger.debug { "Presentation is successful, redirecting to: $redirectUri" }
@@ -184,7 +213,12 @@ class VerificationUseCase(
 
 
             return if (policyResults == null) {
-                Result.failure(FailedVerificationException(redirectUri, IllegalArgumentException("Verification policies did not succeed")))
+                Result.failure(
+                    FailedVerificationException(
+                        redirectUri,
+                        IllegalArgumentException("Verification policies did not succeed")
+                    )
+                )
             } else {
                 val failedPolicies =
                     policyResults.results.flatMap { it.policyResults.map { it } }.filter { !it.isSuccess }
@@ -199,7 +233,8 @@ class VerificationUseCase(
     fun getResult(sessionId: String): Result<PresentationSessionInfo> {
         val session = OIDCVerifierService.getSession(sessionId)
 
-        val policyResults = OIDCVerifierService.policyResults[session.id]?.let { Json.encodeToJsonElement(it).jsonObject }
+        val policyResults =
+            OIDCVerifierService.policyResults[session.id]?.let { Json.encodeToJsonElement(it).jsonObject }
 
         return Result.success(
             PresentationSessionInfo.fromPresentationSession(
@@ -248,7 +283,9 @@ class VerificationUseCase(
     }
 
     private fun getPresentationFormat(requestedCredentials: List<RequestedCredential>): VCFormat {
-        val credentialFormat = requestedCredentials.map { it.format ?: it.inputDescriptor?.format?.keys?.first() }.distinct().singleOrNull()
+        val credentialFormat =
+            requestedCredentials.map { it.format ?: it.inputDescriptor?.format?.keys?.first() }.distinct()
+                .singleOrNull()
         if (credentialFormat == null) throw IllegalArgumentException("Credentials formats must be distinct for a presentation request")
         return when (credentialFormat) {
             VCFormat.mso_mdoc -> VCFormat.mso_mdoc
@@ -260,11 +297,12 @@ class VerificationUseCase(
         }
     }
 
-    private fun getDefaultVPPolicyRequests(presentationFormat: VCFormat): List<PolicyRequest> = when (presentationFormat) {
-        //VCFormat.mso_mdoc -> TODO()
-        VCFormat.sd_jwt_vc -> listOf(PolicyRequest(SdJwtVCSignaturePolicy()))
-        else -> listOf(PolicyRequest(JwtSignaturePolicy()))
-    }
+    private fun getDefaultVPPolicyRequests(presentationFormat: VCFormat): List<PolicyRequest> =
+        when (presentationFormat) {
+            //VCFormat.mso_mdoc -> TODO()
+            VCFormat.sd_jwt_vc -> listOf(PolicyRequest(SdJwtVCSignaturePolicy()))
+            else -> listOf(PolicyRequest(JwtSignaturePolicy()))
+        }
 
     private fun getDefaultVCPolicies(presentationFormat: VCFormat): List<PolicyRequest> = when (presentationFormat) {
         //VCFormat.mso_mdoc -> TODO()
@@ -274,7 +312,7 @@ class VerificationUseCase(
 }
 
 object LspPotentialInteropEvent {
-    const val POTENTIAL_ROOT_CA_CERT = "-----BEGIN CERTIFICATE-----\n" +
+    private const val POTENTIAL_ROOT_CA_CERT = "-----BEGIN CERTIFICATE-----\n" +
             "MIIBZDCCAQmgAwIBAgII2x50/ui7K2wwCgYIKoZIzj0EAwIwFzEVMBMGA1UEAwwMTURPQyBST09UIENBMB4XDTI1MDUwNTA5NDAxNVoXDTI2MDUwNTA5NDAxNVowFzEVMBMGA1UEAwwMTURPQyBST09UIENBMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWP0sG+CkjItZ9KfM3sLF+rLGb8HYCfnlsIH/NWJjiXkTx57ryDLYfTU6QXYukVKHSq6MEebvQPqTJT1blZ/xeKM/MD0wDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFMWhsBrivmW3c2DagA08if4Ki0cJMAoGCCqGSM49BAMCA0kAMEYCIQCierJhChwclbWNvUo0uqQRxDlIFHIGIjPuWP/Hq165YgIhALTywPN4vTXm0Z6MGNlvfbwWXdyoZ7D5XmkjvljXJfBt\n" +
             "-----END CERTIFICATE-----\n"
     const val POTENTIAL_ROOT_CA_PRIV = "-----BEGIN PRIVATE KEY-----\n" +
@@ -283,16 +321,16 @@ object LspPotentialInteropEvent {
     const val POTENTIAL_ROOT_CA_PUB = "-----BEGIN PUBLIC KEY-----\n" +
             "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWP0sG+CkjItZ9KfM3sLF+rLGb8HYCfnlsIH/NWJjiXkTx57ryDLYfTU6QXYukVKHSq6MEebvQPqTJT1blZ/xeA==\n" +
             "-----END PUBLIC KEY-----\n"
-    const val POTENTIAL_ISSUER_CERT = "-----BEGIN CERTIFICATE-----\n" +
+    private const val POTENTIAL_ISSUER_CERT = "-----BEGIN CERTIFICATE-----\n" +
             "MIIBeTCCAR8CFHrWgrGl5KdefSvRQhR+aoqdf48+MAoGCCqGSM49BAMCMBcxFTATBgNVBAMMDE1ET0MgUk9PVCBDQTAgFw0yNTA1MTQxNDA4MDlaGA8yMDc1MDUwMjE0MDgwOVowZTELMAkGA1UEBhMCQVQxDzANBgNVBAgMBlZpZW5uYTEPMA0GA1UEBwwGVmllbm5hMRAwDgYDVQQKDAd3YWx0LmlkMRAwDgYDVQQLDAd3YWx0LmlkMRAwDgYDVQQDDAd3YWx0LmlzMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG0RINBiF+oQUD3d5DGnegQuXenI29JDaMGoMvioKRBN53d4UazakS2unu8BnsEtxutS2kqRhYBPYk9RAriU3gTAKBggqhkjOPQQDAgNIADBFAiAOMwM7hH7q9Di+mT6qCi4LvB+kH8OxMheIrZ2eRPxtDQIhALHzTxwvN8Udt0Z2Cpo8JBihqacfeXkIxVAO8XkxmXhB\n" +
             "-----END CERTIFICATE-----"
-    const val POTENTIAL_ISSUER_PUB = "-----BEGIN PUBLIC KEY-----\n" +
+    private const val POTENTIAL_ISSUER_PUB = "-----BEGIN PUBLIC KEY-----\n" +
             "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG0RINBiF+oQUD3d5DGnegQuXenI29JDaMGoMvioKRBN53d4UazakS2unu8BnsEtxutS2kqRhYBPYk9RAriU3gQ==\n" +
             "-----END PUBLIC KEY-----\n"
-    const val POTENTIAL_ISSUER_PRIV = "-----BEGIN PRIVATE KEY-----\n" +
+    private const val POTENTIAL_ISSUER_PRIV = "-----BEGIN PRIVATE KEY-----\n" +
             "MEECAQAwEwYHKoZIzj0CAQYIKoZIzj0DAQcEJzAlAgEBBCAoniTdVyXlKP0x+rius1cGbYyg+hjf8CT88hH8SCwWFA==\n" +
             "-----END PRIVATE KEY-----\n"
-    const val POTENTIAL_ISSUER_KEY_ID = "potential-lsp-issuer-key-01"
+    private const val POTENTIAL_ISSUER_KEY_ID = "potential-lsp-issuer-key-01"
     val POTENTIAL_ISSUER_CRYPTO_PROVIDER_INFO = loadPotentialIssuerKeys()
     val POTENTIAL_JWT_CRYPTO_PROVIDER = SimpleJWTCryptoProvider(
         JWSAlgorithm.ES256,
@@ -315,8 +353,10 @@ object LspPotentialInteropEvent {
         val factory = CertificateFactory.getInstance("X.509")
         val rootCaCert = (factory.generateCertificate(POTENTIAL_ROOT_CA_CERT.byteInputStream())) as X509Certificate
         val issuerCert = (factory.generateCertificate(POTENTIAL_ISSUER_CERT.byteInputStream())) as X509Certificate
-        val issuerPub = KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(readKeySpec(POTENTIAL_ISSUER_PUB)))
-        val issuerPriv = KeyFactory.getInstance("EC").generatePrivate(PKCS8EncodedKeySpec(readKeySpec(POTENTIAL_ISSUER_PRIV)))
+        val issuerPub =
+            KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(readKeySpec(POTENTIAL_ISSUER_PUB)))
+        val issuerPriv =
+            KeyFactory.getInstance("EC").generatePrivate(PKCS8EncodedKeySpec(readKeySpec(POTENTIAL_ISSUER_PRIV)))
         return COSECryptoProviderKeyInfo(
             POTENTIAL_ISSUER_KEY_ID,
             AlgorithmID.ECDSA_256,
