@@ -23,6 +23,7 @@ import id.walt.sdjwt.SDJWTVCTypeMetadata
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.config.RequestConfig
 import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -136,7 +137,11 @@ object OidcApi : CIProvider() {
             tags = listOf("oidc")
         }) {
 
-            post("{standardVersion}/par") {
+            post("{standardVersion}/par", {
+                request {
+                    standardVersionPathParameter()
+                }
+            }) {
                 val authReq = AuthorizationRequest.fromHttpParameters(call.receiveParameters().toMap())
                 try {
                     val session = initializeIssuanceSession(authReq, 5.minutes, null)
@@ -160,7 +165,11 @@ object OidcApi : CIProvider() {
                 call.respond(HttpStatusCode.OK, getJwksSessions())
             }
 
-            get("{standardVersion}/authorize") {
+            get("{standardVersion}/authorize", {
+                request {
+                    standardVersionPathParameter()
+                }
+            }) {
                 val standardVersion = call.parameters["standardVersion"]
                     ?: throw IllegalArgumentException("standardVersion parameter is required")
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
@@ -356,7 +365,12 @@ object OidcApi : CIProvider() {
                 }
             }
 
-            post("{standardVersion}/direct_post") {
+            post("{standardVersion}/direct_post", {
+                request {
+                    standardVersionPathParameter()
+                }
+            }) {
+
                 val params = call.receiveParameters().toMap()
                 logger.info { "/direct_post params: $params" }
 
@@ -425,7 +439,11 @@ object OidcApi : CIProvider() {
                 }
             }
 
-            post("{standardVersion}/token") {
+            post("{standardVersion}/token", {
+                request {
+                    standardVersionPathParameter()
+                }
+            }) {
                 val params = call.receiveParameters().toMap()
 
                 logger.info { "/token params: $params" }
@@ -446,6 +464,7 @@ object OidcApi : CIProvider() {
             get("{standardVersion}/credentialOffer", {
                 summary = "Gets a credential offer based on the session id"
                 request {
+                    standardVersionPathParameter()
                     queryParameter<String>("id") { required = true }
                 }
             }) {
@@ -464,7 +483,11 @@ object OidcApi : CIProvider() {
                 call.respond(credentialOffer.toJSON())
             }
 
-            post("{standardVersion}/credential") {
+            post("{standardVersion}/credential", {
+                request {
+                    standardVersionPathParameter()
+                }
+            }) {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ") ?: call.respond(
                     HttpStatusCode.Unauthorized
                 )
@@ -500,10 +523,14 @@ object OidcApi : CIProvider() {
 
             }
 
-            post("{standardVersion}/credential_deferred") {
+            post("{standardVersion}/credential_deferred", {
+                request {
+                    standardVersionPathParameter()
+                }
+            }) {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
                 if (accessToken.isNullOrEmpty() || !OpenID4VC.verifyTokenSignature(
-                        target= TokenTarget.DEFERRED_CREDENTIAL,
+                        target = TokenTarget.DEFERRED_CREDENTIAL,
                         token = accessToken,
                         tokenKey = CI_TOKEN_KEY
                     )
@@ -519,7 +546,11 @@ object OidcApi : CIProvider() {
                 }
             }
 
-            post("{standardVersion}/batch_credential") {
+            post("{standardVersion}/batch_credential", {
+                request {
+                    standardVersionPathParameter()
+                }
+            }) {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
                 val parsedToken = accessToken?.let {
                     OpenID4VC.verifyAndParseToken(
@@ -572,7 +603,11 @@ object OidcApi : CIProvider() {
 
                 }
 
-                get("/external_login/{internalAuthReq}") {
+                get("/external_login/{internalAuthReq}", {
+                    request {
+                        pathParameter<String>("internalAuthReq") { required = true }
+                    }
+                }) {
                     // Redirects to 'authorizeUrl' automatically
                 }
 
