@@ -357,7 +357,7 @@ object OidcApi : CIProvider() {
                 val params = call.receiveParameters().toMap()
                 logger.info { "/direct_post params: $params" }
 
-                if (params["state"]?.get(0) == null || (params["id_token"]?.get(0) == null && params["vp_token"]?.get(0) == null)) {
+                if (params["state"]?.get(0) == null || (params[ResponseType.IdToken.value]?.get(0) == null && params[ResponseType.VpToken.value]?.get(0) == null)) {
                     call.respond(
                         status = HttpStatusCode.BadRequest,
                         message ="missing state/id_token/vp_token parameter"
@@ -367,14 +367,14 @@ object OidcApi : CIProvider() {
 
                 try {
                     val state = params["state"]?.get(0)!!
-                    if (params["id_token"]?.get(0) != null) {
-                        val idToken = params["id_token"]?.get(0)!!
+                    if (params[ResponseType.IdToken.value]?.get(0) != null) {
+                        val idToken = params[ResponseType.IdToken.value]?.get(0)!!
 
                         // Verify and Parse ID Token
                         OpenID4VC.verifyAndParseIdToken(idToken)
 
                     } else {
-                        val vpToken = params["vp_token"]?.get(0)!!
+                        val vpToken = params[ResponseType.VpToken.value]?.get(0)!!
                         val presSub = params["presentation_submission"]?.get(0)!!
                         val presentationFormat =
                             PresentationSubmission.fromJSONString(presSub).descriptorMap.firstOrNull()?.format
