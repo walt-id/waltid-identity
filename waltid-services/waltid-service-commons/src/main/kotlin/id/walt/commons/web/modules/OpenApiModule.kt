@@ -4,18 +4,8 @@ import com.sksamuel.hoplite.simpleName
 import id.walt.commons.config.statics.BuildConfig
 import id.walt.commons.config.statics.ServiceConfig
 import io.github.smiley4.ktoropenapi.OpenApi
-import io.github.smiley4.ktoropenapi.config.ExampleEncoder
-import io.github.smiley4.ktoropenapi.config.InfoConfig
-import io.github.smiley4.ktoropenapi.config.OpenApiPluginConfig
-import io.github.smiley4.ktoropenapi.config.SchemaGenerator
-import io.github.smiley4.ktoropenapi.config.descriptors.AnyOfTypeDescriptor
-import io.github.smiley4.ktoropenapi.config.descriptors.ArrayTypeDescriptor
-import io.github.smiley4.ktoropenapi.config.descriptors.EmptyTypeDescriptor
-import io.github.smiley4.ktoropenapi.config.descriptors.KTypeDescriptor
-import io.github.smiley4.ktoropenapi.config.descriptors.RefTypeDescriptor
-import io.github.smiley4.ktoropenapi.config.descriptors.SerialTypeDescriptor
-import io.github.smiley4.ktoropenapi.config.descriptors.SwaggerTypeDescriptor
-import io.github.smiley4.ktoropenapi.config.descriptors.TypeDescriptor
+import io.github.smiley4.ktoropenapi.config.*
+import io.github.smiley4.ktoropenapi.config.descriptors.*
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.openApi
 import io.github.smiley4.ktoropenapi.route
@@ -28,6 +18,7 @@ import io.klogging.noCoLogger
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.swagger.v3.oas.models.media.Schema
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
@@ -50,7 +41,53 @@ object OpenApiModule {
 
             schemas {
                 val kotlinxGenerator = SchemaGenerator.kotlinx()
-                val reflectionGenerator = SchemaGenerator.reflection()
+                val reflectionGenerator = SchemaGenerator.reflection {
+                    explicitNullTypes = false
+                    overwrite(SchemaGenerator.TypeOverwrites.File())
+                    overwrite(
+                        SchemaOverwriteModule(
+                            identifier = kotlinx.serialization.json.JsonElement::class.qualifiedName!!,
+                            schema = {
+                                Schema<Any>().also {
+                                    it.types = setOf("object")
+                                    it.additionalProperties = Schema<Any>()
+                                }
+                            },
+                        )
+                    )
+                    overwrite(
+                        SchemaOverwriteModule(
+                            identifier = kotlinx.serialization.json.JsonObject::class.qualifiedName!!,
+                            schema = {
+                                Schema<Any>().also {
+                                    it.types = setOf("object")
+                                    it.additionalProperties = Schema<Any>()
+                                }
+                            },
+                        )
+                    )
+                    overwrite(
+                        SchemaOverwriteModule(
+                            identifier = "id.walt.sdjwt.SDMap",
+                            schema = {
+                                Schema<Any>().also {
+                                    it.types = setOf("object")
+                                    it.additionalProperties = Schema<Any>()
+                                }
+                            },
+                        )
+                    )
+                    overwrite(
+                        SchemaOverwriteModule(
+                            identifier = kotlinx.serialization.json.JsonArray::class.qualifiedName!!,
+                            schema = {
+                                Schema<Any>().also {
+                                    it.types = setOf("array")
+                                }
+                            },
+                        )
+                    )
+                }
 
                 fun InitialTypeData.schemaName() =
                     when (this) {
@@ -73,11 +110,11 @@ object OpenApiModule {
                 val kotlinxEncoder = ExampleEncoder.kotlinx()
                 val reflectionEncoder = ExampleEncoder.internal()
 
-                fun TypeDescriptor.typeName(): String = when(this) {
+                fun TypeDescriptor.typeName(): String = when (this) {
                     is SwaggerTypeDescriptor -> "${schema.name} ${schema.type} (SwaggerType)"
                     is KTypeDescriptor -> type.simpleName + "<" + type.arguments.joinToString { it.type?.simpleName.toString() } + "> (KType)"
                     is SerialTypeDescriptor -> "${descriptor.serialName} (SerialType)"
-                    is AnyOfTypeDescriptor -> "Any of ${this.types.map { it.typeName() } } (AnyOfType)"
+                    is AnyOfTypeDescriptor -> "Any of ${this.types.map { it.typeName() }} (AnyOfType)"
                     is ArrayTypeDescriptor -> "Array of ${this.type.typeName()} (ArrayType)"
                     is EmptyTypeDescriptor -> "Empty Type (EmptyType)"
                     is RefTypeDescriptor -> "$schemaId (RefType)"
@@ -111,7 +148,6 @@ object OpenApiModule {
                 }
                 license {
                     name = "Apache 2.0"
-                    identifier = "Apache-2.0"
                     url = "https://www.apache.org/licenses/LICENSE-2.0.html"
                 }
 
@@ -148,6 +184,9 @@ object OpenApiModule {
             }
 
             get("/", {
+                // This is hidden, because in the api.json would be strange empty URL if
+                // this is enabled.
+                hidden = true
                 summary = "Redirect to swagger interface for API documentation"
             }) {
                 call.respondRedirect("swagger")

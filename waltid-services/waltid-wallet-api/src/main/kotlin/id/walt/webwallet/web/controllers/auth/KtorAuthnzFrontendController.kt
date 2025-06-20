@@ -27,6 +27,7 @@ fun Application.ktorAuthnzFrontendRoutes() {
                     summary = "Return user ID if logged in"
                     response {
                         HttpStatusCode.OK to {
+                            description = "User account"
                             body<Account>()
                         }
                     }
