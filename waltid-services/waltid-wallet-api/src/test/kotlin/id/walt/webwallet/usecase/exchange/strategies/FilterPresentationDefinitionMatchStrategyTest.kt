@@ -4,6 +4,7 @@ package id.walt.webwallet.usecase.exchange.strategies
 
 import TestUtils
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
@@ -21,8 +22,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
-
 
 class FilterPresentationDefinitionMatchStrategyTest {
 
@@ -38,7 +37,7 @@ class FilterPresentationDefinitionMatchStrategyTest {
         Json.decodeFromString<List<FilterData>>(TestUtils.loadResource("presentation-definition/filters/filter-composite.json"))
     private val credentials = listOf(
         WalletCredential(
-            wallet = Uuid.random(),
+            wallet = randomUUID(),
             id = "array-type",
             document = """
                 {
@@ -54,7 +53,7 @@ class FilterPresentationDefinitionMatchStrategyTest {
             format = CredentialFormat.ldp_vc
         ),
         WalletCredential(
-            wallet = Uuid.random(),
+            wallet = randomUUID(),
             id = "primitive-type",
             document = """
                 {
@@ -70,7 +69,7 @@ class FilterPresentationDefinitionMatchStrategyTest {
             format = CredentialFormat.ldp_vc
         ),
         WalletCredential(
-            wallet = Uuid.random(),
+            wallet = randomUUID(),
             id = "primitive-type",
             document = """
                 {

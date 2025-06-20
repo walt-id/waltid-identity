@@ -2,6 +2,7 @@
 
 package id.walt.webwallet.usecase.notification
 
+import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.webwallet.db.models.Notification
 import id.walt.webwallet.db.models.WalletCredential
@@ -20,7 +21,6 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 
 class NotificationFilterUseCaseTest {
@@ -55,7 +55,7 @@ class NotificationFilterUseCaseTest {
     private val credentials = listOf(
         // pending
         WalletCredential(
-            wallet = Uuid.random(),
+            wallet = randomUUID(),
             id = "credential-id#1",
             document = "{}",
             disclosures = null,
@@ -67,7 +67,7 @@ class NotificationFilterUseCaseTest {
         ),
         // not pending
         WalletCredential(
-            wallet = Uuid.random(),
+            wallet = randomUUID(),
             id = "credential-id#2",
             document = "{}",
             disclosures = null,
@@ -95,14 +95,14 @@ class NotificationFilterUseCaseTest {
 
     @Test
     fun `filter pending credentials`() = runTest {
-        val result = sut.filter(Uuid.random(), pendingFilter)
+        val result = sut.filter(randomUUID(), pendingFilter)
         assertEquals(expected = 1, actual = result.size)
         assertEquals(expected = notificationDTOs[0], actual = result[0])
     }
 
     @Test
     fun `filter non-pending credentials`() = runTest {
-        val result = sut.filter(Uuid.random(), notPendingFilter)
+        val result = sut.filter(randomUUID(), notPendingFilter)
         assertEquals(expected = 1, actual = result.size)
         assertEquals(expected = notificationDTOs[1], actual = result[0])
     }

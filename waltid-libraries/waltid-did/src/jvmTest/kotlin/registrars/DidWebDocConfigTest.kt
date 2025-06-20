@@ -3,6 +3,7 @@ package registrars
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.document.models.service.RegisteredServiceType
 import id.walt.did.dids.document.models.service.ServiceEndpointURL
 import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
@@ -11,7 +12,6 @@ import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.registrar.dids.ServiceConfiguration
 import id.walt.did.dids.registrar.dids.VerificationMethodConfiguration
 import id.walt.did.dids.registrar.local.web.DidWebRegistrar
-import id.walt.did.utils.randomUUID
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -140,7 +140,7 @@ class DidWebDocConfigTest {
                         verificationConfigurationMap = mapOf(
                             VerificationRelationshipType.Authentication to setOf(
                                 VerificationMethodConfiguration(
-                                    publicKeyId = randomUUID(),
+                                    publicKeyId = randomUUIDString(),
                                 )
                             ),
                         ),
@@ -165,7 +165,7 @@ class DidWebDocConfigTest {
                                 VerificationMethodConfiguration(
                                     publicKeyId = it.getKeyId(),
                                 )
-                            }.toSet() + VerificationMethodConfiguration(randomUUID()),
+                            }.toSet() + VerificationMethodConfiguration(randomUUIDString()),
                         ),
                     ),
                 )

@@ -1,6 +1,7 @@
 package id.walt.cli.models
 
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -16,7 +17,7 @@ data class Credential(
             val jwsParts = jwsStr.decodeJws(withSignature = true)
             val credentialId =
                 jwsParts.payload["vc"]!!.jsonObject["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-                    ?: id.walt.oid4vc.util.randomUUID()
+                    ?: randomUUIDString()
             when (val type = jwsParts.header["typ"]?.jsonPrimitive?.content?.lowercase()) {
                 "jwt" -> {
                     return Credential(

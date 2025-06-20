@@ -1,6 +1,7 @@
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService.resolve
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
@@ -12,7 +13,6 @@ import id.walt.oid4vc.interfaces.IVPTokenProvider
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
 import id.walt.oid4vc.util.JwtUtils
-import id.walt.oid4vc.util.randomUUID
 import io.ktor.http.*
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
@@ -199,7 +199,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         val resolvedAuthReq = resolveVPAuthorizationParameters(authorizationRequest)
         return if (validateAuthorizationRequest(resolvedAuthReq)) {
             createSIOPSession(
-                id = randomUUID(),
+                id = randomUUIDString(),
                 authorizationRequest = resolvedAuthReq,
                 expirationTimestamp = Clock.System.now().plus(expiresIn)
             )
@@ -330,7 +330,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
             }
         } ?: issuerMetadata as OpenIDProviderMetadata.Draft13
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, issuerMetadata)
-        val codeVerifier = if (client.useCodeChallenge) randomUUID() else null
+        val codeVerifier = if (client.useCodeChallenge) randomUUIDString() else null
 
         val codeChallenge =
             codeVerifier?.let { Base64.UrlSafe.encode(SHA256().digest(it.toByteArray(Charsets.UTF_8))).trimEnd('=') }

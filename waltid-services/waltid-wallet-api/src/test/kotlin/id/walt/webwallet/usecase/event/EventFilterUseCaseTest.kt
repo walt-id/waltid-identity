@@ -2,6 +2,7 @@
 
 package id.walt.webwallet.usecase.event
 
+import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.webwallet.service.events.*
 import id.walt.webwallet.usecase.entity.EntityNameResolutionUseCase
 import id.walt.webwallet.utils.JsonUtils
@@ -18,15 +19,15 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 class EventFilterUseCaseTest {
     private val eventServiceMock = mockk<EventService>()
     private val issuerNameResolutionMock = mockk<EntityNameResolutionUseCase>()
     private val verifierNameResolutionMock = mockk<EntityNameResolutionUseCase>()
     private val sut = EventFilterUseCase(eventServiceMock, issuerNameResolutionMock, verifierNameResolutionMock)
-    private val account = Uuid.random()
-    private val wallet = Uuid.random()
+    private val account = randomUUID()
+    private val wallet = randomUUID()
     private val issuerData = CredentialEventDataActor.Organization.Issuer(
         did = "String",
         name = null,

@@ -1,10 +1,10 @@
 package id.walt.policies.policies
 
 import id.walt.w3c.utils.VCFormat
-import id.walt.w3c.utils.randomUUID
 import id.walt.crypto.exceptions.VerificationException
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.policies.JwtVerificationPolicy
@@ -29,7 +29,7 @@ class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
   override val supportedVCFormats = setOf(VCFormat.sd_jwt_vc)
 
   private suspend fun resolveIssuerKeyFromSdJwt(sdJwt: SDJwtVC): Key {
-    val kid = sdJwt.issuer ?: randomUUID()
+    val kid = sdJwt.issuer ?: randomUUIDString()
     return if(DidUtils.isDidUrl(kid)) {
       DidService.resolveToKey(kid).getOrThrow()
     } else {
@@ -40,7 +40,7 @@ class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
   }
   
   private suspend fun resolveIssuerKeysFromSdJwt(sdJwt: SDJwtVC): Set<Key> {
-    val kid = sdJwt.issuer ?: randomUUID()
+    val kid = sdJwt.issuer ?: randomUUIDString()
     return if(DidUtils.isDidUrl(kid)) {
       DidService.resolveToKeys(kid).getOrThrow()
     } else {

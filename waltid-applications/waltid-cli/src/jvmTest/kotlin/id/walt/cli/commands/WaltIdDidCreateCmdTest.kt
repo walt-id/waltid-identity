@@ -5,7 +5,7 @@ import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.util.getResourcePath
-import id.walt.did.utils.randomUUID
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.File
@@ -193,7 +193,7 @@ class WaltIdDidCreateCmdTest {
             getResourcePath(this, "key/secp256r1_by_waltid_pub_pvt_key.jwk"),
         )
         for (keyFile in keyFileList) {
-            val tempOutputFile = "${randomUUID()}.json"
+            val tempOutputFile = "${randomUUIDString()}.json"
             File(tempOutputFile).deleteOnExit()
             assertContains(command.test("-j -k \"$keyFile\" -o '$tempOutputFile'").output, "did:key:z[a-km-zA-HJ-NP-Z1-9]+".toRegex())
         }

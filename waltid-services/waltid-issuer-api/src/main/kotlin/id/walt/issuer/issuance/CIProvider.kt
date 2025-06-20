@@ -12,6 +12,7 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.issuer.config.CredentialTypeConfig
 import id.walt.issuer.config.OIDCIssuerServiceConfig
 import id.walt.mdoc.COSECryptoProviderKeyInfo
@@ -40,7 +41,6 @@ import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
 import id.walt.oid4vc.util.COSESign1Utils
 import id.walt.oid4vc.util.JwtUtils
-import id.walt.oid4vc.util.randomUUID
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.plugins.*
@@ -188,7 +188,7 @@ open class CIProvider(
             return CredentialResult(
                 format = credentialRequest.format,
                 credential = null,
-                credentialId = randomUUID()
+                credentialId = randomUUIDString()
             ).also {
                 deferredCredentialRequests[it.credentialId!!] = credentialRequest
             }
@@ -545,7 +545,7 @@ open class CIProvider(
         }
 
         return session.copy(
-            cNonce = randomUUID()
+            cNonce = randomUUIDString()
         ).also {
             putSession(it.id, it, remainingTtl)
         }
@@ -583,7 +583,7 @@ open class CIProvider(
                 )
             }
             IssuanceSession(
-                id = randomUUID(),
+                id = randomUUIDString(),
                 authorizationRequest = authorizationRequest,
                 expirationTimestamp = Clock.System.now().plus(expiresIn),
                 issuanceRequests = listOf(),
@@ -622,7 +622,7 @@ open class CIProvider(
         txCodeValue: String? = null,
         standardVersion: OpenID4VCIVersion = OpenID4VCIVersion.DRAFT13
     ): IssuanceSession = runBlocking {
-        val sessionId = randomUUID()
+        val sessionId = randomUUIDString()
 
         val credentialOfferBuilder =
             OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests, standardVersion)

@@ -9,6 +9,7 @@ import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.VpTokenParameter
@@ -54,7 +55,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
 fun Application.exchangeExternalSignatures() = walletRoute {
@@ -149,7 +149,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 val matchedCredentials = walletService.getCredentialsByIds(req.selectedCredentialIdList)
                 logger.debug { "Matched credentials: $matchedCredentials" }
 
-                val presentationId = "urn:uuid:" + Uuid.random().toString().lowercase()
+                val presentationId = "urn:uuid:" + randomUUIDString().lowercase()
                 val keyId = walletDID.keyId
                 logger.debug { "keyId: $keyId" }
                 val didFirstAuthKeyId = ExchangeUtils.getFirstAuthKeyIdFromDidDocument(walletDID.document)

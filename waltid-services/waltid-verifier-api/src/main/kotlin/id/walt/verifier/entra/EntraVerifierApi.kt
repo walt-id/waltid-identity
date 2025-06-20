@@ -1,6 +1,7 @@
 package id.walt.verifier.entra
 
 import id.walt.commons.config.ConfigManager
+import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.policies.Verifier.runPolicyRequest
 import id.walt.policies.models.PolicyRequest
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
@@ -132,7 +133,7 @@ object EntraVerifierApi {
     private val configuredCallbackUrl = config.callbackUrl
 
     private fun createCallbackMapping(data: MappedData): Uuid {
-        val uuid = Uuid.random()
+        val uuid = randomUUID()
         callbackMapping[uuid] = data
 
         return uuid
