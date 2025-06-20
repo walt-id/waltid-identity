@@ -370,7 +370,7 @@ object DcqlMatcher {
                     log.warn { "W3cCredentialMeta applied to non-W3C format ${credential.format} for ${credential.id}" }
                     return false
                 }
-                val credTypesElement = credential.data["type"]
+                val credTypesElement = credential.data["type"] ?: credential.data["vc"]?.jsonObject["type"]
                 if (credTypesElement !is JsonArray) {
                     log.warn { "W3C credential ${credential.id} 'type' field is missing or not an array." }
                     return false
@@ -503,7 +503,7 @@ object DcqlMatcher {
 
     /** Basic JSON path resolver. Needs enhancement for arrays, different formats. */
     fun resolveClaimPath(data: JsonObject, path: List<String>): JsonElement? {
-        var currentElement: JsonElement? = data
+        var currentElement: JsonElement? = data["vc"] as? JsonObject ?: data
         for (segment in path) {
             when (currentElement) {
                 is JsonObject -> currentElement = currentElement[segment]
