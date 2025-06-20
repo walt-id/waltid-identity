@@ -11,9 +11,6 @@ import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.policies.PolicyManager
 import id.walt.sdjwt.SimpleJWTCryptoProvider
-import id.walt.verifier.VerifierApiExamples.ietfStatusPolicy
-import id.walt.verifier.VerifierApiExamples.w3cListStatusPolicy
-import id.walt.verifier.VerifierApiExamples.w3cStatusPolicy
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerificationUseCase
@@ -25,8 +22,6 @@ import id.walt.verifier.openapi.VerifierApiDocs.getSessionDocs
 import id.walt.verifier.openapi.VerifierApiDocs.getVerifyDocs
 import id.walt.verifier.openapi.VerifierApiDocs.getVerifyStateDocs
 import id.walt.w3c.utils.VCFormat
-import io.github.smiley4.ktoropenapi.config.SimpleBodyConfig
-import io.github.smiley4.ktoropenapi.config.SimpleBodyConfig
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -325,48 +320,4 @@ private fun getErrorDescription(it: Throwable): String? = when (it.message) {
         "<\$presentation_submission.descriptor_map[x].id> is revoked"
 
     else -> null
-}
-
-private fun SimpleBodyConfig.addCredentialStatusExamples() {
-    example("Credential status - BitstringStatusList", w3cStatusPolicy("BitstringStatusList", "revocation"))
-    example(
-        "Credential status - BitstringStatusList custom valid value",
-        w3cStatusPolicy("BitstringStatusList", "custom", 2u)
-    )
-    example("Credential status - StatusList2021", w3cStatusPolicy("StatusList2021", "revocation"))
-    example("Credential status - RevocationList2020", w3cStatusPolicy("RevocationList2020", "revocation"))
-    example("Credential status - multiple statuses", w3cListStatusPolicy)
-    example("Credential status - TokenStatusList", ietfStatusPolicy)
-}
-private fun SimpleBodyConfig.addSdJwtVcExamples() {
-    example("SD-JWT-VC verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
-    example(
-        "SD-JWT-VC verification example with mandatory fields", VerifierApiExamples.sdJwtVCExampleWithRequiredFields
-    )
-}
-
-private fun SimpleBodyConfig.addEbsiVectorInteropTestExamples() {
-    example(
-        "EBSI-VECTOR interoperability test - InTimeIssuance", VerifierApiExamples.EBSIVectorExampleInTimeIssuance
-    )
-    example(
-        "EBSI-VECTOR interoperability test - DeferredIssuance",
-        VerifierApiExamples.EBSIVectorExampleDeferredIssuance
-    )
-    example(
-        "EBSI-VECTOR interoperability test - PreAuthIssuance", VerifierApiExamples.EBSIVectorExamplePreAuthIssuance
-    )
-    example("EBSI-VECTOR interoperability test - All", VerifierApiExamples.EBSIVectorExampleAllIssuance)
-}
-
-private fun SimpleBodyConfig.addCredentialStatusExamples() {
-    example("Credential status - BitstringStatusList", w3cStatusPolicy("BitstringStatusList", "revocation"))
-    example(
-        "Credential status - BitstringStatusList custom valid value",
-        w3cStatusPolicy("BitstringStatusList", "custom", 2u)
-    )
-    example("Credential status - StatusList2021", w3cStatusPolicy("StatusList2021", "revocation"))
-    example("Credential status - RevocationList2020", w3cStatusPolicy("RevocationList2020", "revocation"))
-    example("Credential status - multiple statuses", w3cListStatusPolicy)
-    example("Credential status - TokenStatusList", ietfStatusPolicy)
 }
