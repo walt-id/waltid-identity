@@ -72,19 +72,19 @@ kotlin {
     }
 
     val hostOs = System.getProperty("os.name")
-    val isMacOS = hostOs == "Mac OS X"
+    // val isMacOS = hostOs == "Mac OS X"
     val hostArch = System.getProperty("os.arch")
     if (hostOs in listOf("Windows", "Linux") && hostArch == "aarch64") {
         println("Native compilation is not yet supported for aarch64 on Windows / Linux.")
     } else {
-        val isMingwX64 = hostOs.startsWith("Windows")
+        // val isMingwX64 = hostOs.startsWith("Windows")
 
         if (enableIosBuild) {
             iosArm64()
             iosSimulatorArm64()
         }
 
-        when {
+        /*when {
             isMacOS -> {
                 // macosX64("native")
             }
@@ -92,7 +92,7 @@ kotlin {
             hostOs == "Linux" -> linuxX64("native")
             isMingwX64 -> mingwX64("native")
             else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
-        }
+        }*/
     }
 
     sourceSets {
@@ -158,6 +158,7 @@ kotlin {
                 iosSimulatorArm64Test.dependsOn(this)
             }
         }
+        applyDefaultHierarchyTemplate()
     }
 }
 
