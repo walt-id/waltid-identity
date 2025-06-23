@@ -6,5 +6,5 @@ import java.util.zip.GZIPInputStream
 
 class BitstringStatusListExpansionAlgorithm : StatusListExpansionAlgorithm {
     override operator fun invoke(bitstring: String): InputStream =
-        GZIPInputStream(Base64Utils.urlDecode(bitstring).inputStream())
+        GZIPInputStream(Base64Utils.urlDecode(bitstring.drop(1)).inputStream())
 }
