@@ -258,6 +258,12 @@ object VerifierService {
         )
     }
 
+    suspend fun getSessionPresentedCredentials(
+        sessionId: String,
+    ): Nothing {
+        TODO()
+    }
+
 
     suspend fun notifySubscribers(sessionId: String) = runCatching {
         OIDCVerifierService.sessionVerificationInfos[sessionId]?.statusCallback?.let {

@@ -13,12 +13,7 @@ import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerifierService
 import id.walt.verifier.oidc.VerifierService.FailedVerificationException
-import id.walt.verifier.openapi.VerifierApiDocs.getPdDocs
-import id.walt.verifier.openapi.VerifierApiDocs.getPolicyListDocs
-import id.walt.verifier.openapi.VerifierApiDocs.getRequestDocs
-import id.walt.verifier.openapi.VerifierApiDocs.getSessionDocs
-import id.walt.verifier.openapi.VerifierApiDocs.getVerifyDocs
-import id.walt.verifier.openapi.VerifierApiDocs.getVerifyStateDocs
+import id.walt.verifier.openapi.VerifierApiDocs
 import id.walt.w3c.utils.VCFormat
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
@@ -74,7 +69,7 @@ fun Application.verifierApi() {
 
         route("openid4vc", {
         }) {
-            post("verify", getVerifyDocs()) {
+            post("verify", VerifierApiDocs.getVerifyDocs()) {
                 val authorizeBaseUrl = call.request.header("authorizeBaseUrl") ?: defaultAuthorizeBaseUrl
                 val responseMode =
                     call.request.header("responseMode")?.let { ResponseMode.fromString(it) }
@@ -123,7 +118,7 @@ fun Application.verifierApi() {
                 )
             }
 
-            post("/verify/{state}", getVerifyStateDocs()) {
+            post("/verify/{state}", VerifierApiDocs.getVerifyStateDocs()) {
                 logger.trace { "POST verify/state" }
 
                 val sessionId = call.parameters.getOrFail("state")
@@ -171,14 +166,21 @@ fun Application.verifierApi() {
                 }
             }
 
-            get("/session/{id}", getSessionDocs()) {
+            get("/session/{id}", VerifierApiDocs.getSessionDocs()) {
                 val id = call.parameters.getOrFail("id")
                 VerifierService.getResult(id).getOrThrow().let {
                     call.respond(HttpStatusCode.OK, it)
                 }
             }
 
-            get("/pd/{id}", getPdDocs()) {
+            get(
+                path = "/session/{id}/presented-credentials",
+                builder = VerifierApiDocs.getPresentedCredentialsDocs()
+            ) {
+                val id = call.parameters.getOrFail("id")
+            }
+
+            get("/pd/{id}", VerifierApiDocs.getPdDocs()) {
                 val id = call.parameters["id"]
 
                 VerifierService.getPresentationDefinition(id ?: "").onSuccess {
@@ -188,11 +190,11 @@ fun Application.verifierApi() {
                 }
             }
 
-            get("policy-list", getPolicyListDocs()) {
+            get("policy-list", VerifierApiDocs.getPolicyListDocs()) {
                 call.respond(PolicyManager.listPolicyDescriptions())
             }
 
-            get("/request/{id}", getRequestDocs()) {
+            get("/request/{id}", VerifierApiDocs.getRequestDocs()) {
                 val id = call.parameters.getOrFail("id")
                 VerifierService.getSignedAuthorizationRequestObject(id).onSuccess {
                     call.respondText(it, ContentType.parse("application/oauth-authz-req+jwt"), HttpStatusCode.OK)
