@@ -152,28 +152,19 @@ object Verifier {
         specificCredentialPolicies: Map<String, List<PolicyRequest>>,
         presentationContext: Map<String, Any> = emptyMap(),
     ): PresentationVerificationResponse {
-        val isW3CVp = runCatching { vpToken.decodeJws().payload.contains("vp") }.getOrElse { false }
-        log.trace { "Verifying presentation with format $format (is w3cvp=$isW3CVp): $vpToken" }
+        log.trace { "Verifying presentation with format $format and serialized vp_token $vpToken" }
 
-        return when {
-            isW3CVp -> verifyW3CPresentation(
-                format = format,
+        return when (format) {
+
+            VCFormat.mso_mdoc -> TODO("mdoc presentations are not yet supported")
+
+            VCFormat.sd_jwt_vc -> verifySDJwtVCPresentation(
                 vpToken = vpToken,
                 vpPolicies = vpPolicies,
                 globalVcPolicies = globalVcPolicies,
                 specificCredentialPolicies = specificCredentialPolicies,
                 presentationContext = presentationContext
             )
-
-            format == VCFormat.mso_mdoc -> TODO("mdoc presentations are not yet supported")
-            format == VCFormat.sd_jwt_vc -> verifySDJwtVCPresentation(
-                vpToken = vpToken,
-                vpPolicies = vpPolicies,
-                globalVcPolicies = globalVcPolicies,
-                specificCredentialPolicies = specificCredentialPolicies,
-                presentationContext = presentationContext
-            )
-
             else -> verifyW3CPresentation(
                 format = format,
                 vpToken = vpToken,
