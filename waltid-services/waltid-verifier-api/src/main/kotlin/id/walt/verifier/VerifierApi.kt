@@ -2,7 +2,6 @@
 
 package id.walt.verifier
 
-import com.nimbusds.jose.JWSAlgorithm
 import id.walt.commons.config.ConfigManager
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
@@ -10,7 +9,6 @@ import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.policies.PolicyManager
-import id.walt.sdjwt.SimpleJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerificationUseCase
@@ -26,11 +24,7 @@ import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
 import io.klogging.logger
-import io.ktor.client.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.request.*
@@ -71,22 +65,8 @@ const val defaultAuthorizeBaseUrl = "openid4vp://authorize"
 
 private val logger = logger("Verifier API")
 
-
-private val httpClient = HttpClient {
-    install(ContentNegotiation) {
-        json()
-    }
-    install(Logging) {
-        logger = Logger.SIMPLE
-        level = LogLevel.ALL
-    }
-}
-
 private const val fixedPresentationDefinitionForEbsiConformanceTest =
     "{\"id\":\"any\",\"format\":{\"jwt_vp\":{\"alg\":[\"ES256\"]}},\"input_descriptors\":[{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}},{\"id\":\"any\",\"format\":{\"jwt_vc\":{\"alg\":[\"ES256\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.vc.type\"],\"filter\":{\"type\":\"array\",\"contains\":{\"const\":\"VerifiableAttestation\"}}}]}}]}"
-
-private val verificationUseCase =
-    VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
 
 @OptIn(ExperimentalUuidApi::class)
 fun Application.verifierApi() {
@@ -110,7 +90,7 @@ fun Application.verifierApi() {
 
                 val body = call.receive<JsonObject>()
 
-                val session = verificationUseCase.createSession(
+                val session = VerificationUseCase.createSession(
                     vpPoliciesJson = body["vp_policies"],
                     vcPoliciesJson = body["vc_policies"],
                     requestCredentialsJson = body["request_credentials"]
@@ -149,13 +129,13 @@ fun Application.verifierApi() {
                 val sessionId = call.parameters.getOrFail("state")
                 logger.trace { "State: $sessionId" }
 
-                verificationUseCase.verify(
+                VerificationUseCase.verify(
                     sessionId = sessionId,
                     tokenResponseParameters = call.request.call.receiveParameters().toMap()
                 ).also {
-                    verificationUseCase.notifySubscribers(sessionId)
+                    VerificationUseCase.notifySubscribers(sessionId)
                 }.onSuccess {
-                    val session = verificationUseCase.getSession(sessionId)
+                    val session = VerificationUseCase.getSession(sessionId)
                     if (session.walletInitiatedAuthState != null) {
                         val state = session.walletInitiatedAuthState
                         val code = Uuid.random().toString()
@@ -167,7 +147,7 @@ fun Application.verifierApi() {
                     logger.debug(it) { "Verification failed ($it)" }
                     val errorDescription = it.message ?: "Verification failed"
                     logger.error { "Error: $errorDescription" }
-                    val session = verificationUseCase.getSession(sessionId)
+                    val session = VerificationUseCase.getSession(sessionId)
                     when {
                         session.walletInitiatedAuthState != null -> {
                             val state = session.walletInitiatedAuthState
@@ -193,7 +173,7 @@ fun Application.verifierApi() {
 
             get("/session/{id}", getSessionDocs()) {
                 val id = call.parameters.getOrFail("id")
-                verificationUseCase.getResult(id).getOrThrow().let {
+                VerificationUseCase.getResult(id).getOrThrow().let {
                     call.respond(HttpStatusCode.OK, it)
                 }
             }
@@ -201,7 +181,7 @@ fun Application.verifierApi() {
             get("/pd/{id}", getPdDocs()) {
                 val id = call.parameters["id"]
 
-                verificationUseCase.getPresentationDefinition(id ?: "").onSuccess {
+                VerificationUseCase.getPresentationDefinition(id ?: "").onSuccess {
                     call.respond(it.toJSON())
                 }.onFailure {
                     throw NotFoundException("Presentation definition not found for id: $id")
@@ -214,7 +194,7 @@ fun Application.verifierApi() {
 
             get("/request/{id}", getRequestDocs()) {
                 val id = call.parameters.getOrFail("id")
-                verificationUseCase.getSignedAuthorizationRequestObject(id).onSuccess {
+                VerificationUseCase.getSignedAuthorizationRequestObject(id).onSuccess {
                     call.respondText(it, ContentType.parse("application/oauth-authz-req+jwt"), HttpStatusCode.OK)
                 }.onFailure {
                     logger.debug(it) { "Cannot view request session ($it)" }
@@ -273,7 +253,7 @@ fun Application.verifierApi() {
             val sessionTtl =
                 params["sessionTtl"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull?.toLongOrNull()?.seconds
 
-            val session = verificationUseCase.createSession(
+            val session = VerificationUseCase.createSession(
                 vpPoliciesJson = null,
                 vcPoliciesJson = buildJsonArray {
                     add("signature")
