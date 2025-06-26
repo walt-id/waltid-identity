@@ -28,7 +28,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlin.time.Duration
 
-object VerificationUseCase {
+object VerifierService {
 
     private val http = HttpClient {
         install(ContentNegotiation) {

@@ -11,8 +11,8 @@ import id.walt.oid4vc.data.ResponseType
 import id.walt.policies.PolicyManager
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
-import id.walt.verifier.oidc.VerificationUseCase
-import id.walt.verifier.oidc.VerificationUseCase.FailedVerificationException
+import id.walt.verifier.oidc.VerifierService
+import id.walt.verifier.oidc.VerifierService.FailedVerificationException
 import id.walt.verifier.openapi.VerifierApiDocs.getPdDocs
 import id.walt.verifier.openapi.VerifierApiDocs.getPolicyListDocs
 import id.walt.verifier.openapi.VerifierApiDocs.getRequestDocs
@@ -90,7 +90,7 @@ fun Application.verifierApi() {
 
                 val body = call.receive<JsonObject>()
 
-                val session = VerificationUseCase.createSession(
+                val session = VerifierService.createSession(
                     vpPoliciesJson = body["vp_policies"],
                     vcPoliciesJson = body["vc_policies"],
                     requestCredentialsJson = body["request_credentials"]
@@ -129,13 +129,13 @@ fun Application.verifierApi() {
                 val sessionId = call.parameters.getOrFail("state")
                 logger.trace { "State: $sessionId" }
 
-                VerificationUseCase.verify(
+                VerifierService.verify(
                     sessionId = sessionId,
                     tokenResponseParameters = call.request.call.receiveParameters().toMap()
                 ).also {
-                    VerificationUseCase.notifySubscribers(sessionId)
+                    VerifierService.notifySubscribers(sessionId)
                 }.onSuccess {
-                    val session = VerificationUseCase.getSession(sessionId)
+                    val session = VerifierService.getSession(sessionId)
                     if (session.walletInitiatedAuthState != null) {
                         val state = session.walletInitiatedAuthState
                         val code = Uuid.random().toString()
@@ -147,7 +147,7 @@ fun Application.verifierApi() {
                     logger.debug(it) { "Verification failed ($it)" }
                     val errorDescription = it.message ?: "Verification failed"
                     logger.error { "Error: $errorDescription" }
-                    val session = VerificationUseCase.getSession(sessionId)
+                    val session = VerifierService.getSession(sessionId)
                     when {
                         session.walletInitiatedAuthState != null -> {
                             val state = session.walletInitiatedAuthState
@@ -173,7 +173,7 @@ fun Application.verifierApi() {
 
             get("/session/{id}", getSessionDocs()) {
                 val id = call.parameters.getOrFail("id")
-                VerificationUseCase.getResult(id).getOrThrow().let {
+                VerifierService.getResult(id).getOrThrow().let {
                     call.respond(HttpStatusCode.OK, it)
                 }
             }
@@ -181,7 +181,7 @@ fun Application.verifierApi() {
             get("/pd/{id}", getPdDocs()) {
                 val id = call.parameters["id"]
 
-                VerificationUseCase.getPresentationDefinition(id ?: "").onSuccess {
+                VerifierService.getPresentationDefinition(id ?: "").onSuccess {
                     call.respond(it.toJSON())
                 }.onFailure {
                     throw NotFoundException("Presentation definition not found for id: $id")
@@ -194,7 +194,7 @@ fun Application.verifierApi() {
 
             get("/request/{id}", getRequestDocs()) {
                 val id = call.parameters.getOrFail("id")
-                VerificationUseCase.getSignedAuthorizationRequestObject(id).onSuccess {
+                VerifierService.getSignedAuthorizationRequestObject(id).onSuccess {
                     call.respondText(it, ContentType.parse("application/oauth-authz-req+jwt"), HttpStatusCode.OK)
                 }.onFailure {
                     logger.debug(it) { "Cannot view request session ($it)" }
@@ -253,7 +253,7 @@ fun Application.verifierApi() {
             val sessionTtl =
                 params["sessionTtl"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull?.toLongOrNull()?.seconds
 
-            val session = VerificationUseCase.createSession(
+            val session = VerifierService.createSession(
                 vpPoliciesJson = null,
                 vcPoliciesJson = buildJsonArray {
                     add("signature")
