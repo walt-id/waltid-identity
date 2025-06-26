@@ -304,7 +304,6 @@ object Verifier {
     ): PresentationVerificationResponse {
         log.trace { "Verifying SD-JWT VC Presentation, vp_token: $vpToken" }
         val sdJwtVC = SDJwtVC.parse(vpToken)
-        val payload = sdJwtVC.fullPayload
         val vpType = sdJwtVC.type ?: sdJwtVC.vct ?: ""
         log.trace { "SD-JWT VC Presentation vpType: $vpType" }
 
