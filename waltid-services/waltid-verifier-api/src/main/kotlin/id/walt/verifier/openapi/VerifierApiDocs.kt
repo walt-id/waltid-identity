@@ -2,13 +2,16 @@ package id.walt.verifier.openapi
 
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
-import id.walt.oid4vc.data.dif.*
-import id.walt.verifier.*
+import id.walt.verifier.DescriptorMappingFormParam
+import id.walt.verifier.PresentationSubmissionFormParam
+import id.walt.verifier.TokenResponseFormParam
+import id.walt.verifier.defaultAuthorizeBaseUrl
 import id.walt.verifier.oidc.SwaggerPresentationSessionInfo
 import id.walt.w3c.utils.VCFormat
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.*
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 object VerifierApiDocs {
     fun getVerifyDocs(): RouteConfig.() -> Unit = {
@@ -232,30 +235,4 @@ object VerifierApiDocs {
         }
     }
 
-    private val prettyJson = Json { prettyPrint = true }
-
-    val verifiableIdPresentationDefinitionExample = JsonObject(
-        mapOf(
-            "policies" to JsonArray(listOf(JsonPrimitive("signature"))),
-            "presentation_definition" to
-                    PresentationDefinition(
-                        "<automatically assigned>", listOf(
-                            InputDescriptor(
-                                "VerifiableId",
-                                format = mapOf(VCFormat.jwt_vc_json to VCFormatDefinition(alg = setOf("EdDSA"))),
-                                constraints = InputDescriptorConstraints(
-                                    fields = listOf(
-                                        InputDescriptorField(
-                                            path = listOf("$.type"),
-                                            filter = buildJsonObject {
-                                                put("type", JsonPrimitive("string"))
-                                                put("pattern", JsonPrimitive("VerifiableId"))
-                                            })
-                                    )
-                                )
-                            )
-                        )
-                    ).toJSON(),
-        )
-    ).let { prettyJson.encodeToString(it) }
 }
