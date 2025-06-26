@@ -178,6 +178,17 @@ fun Application.verifierApi() {
                 builder = VerifierApiDocs.getPresentedCredentialsDocs()
             ) {
                 val id = call.parameters.getOrFail("id")
+                VerifierService.getSessionPresentedCredentials(id).onSuccess {
+                    call.respond(
+                        status = HttpStatusCode.OK,
+                        message = it,
+                    )
+                }.onFailure {
+                    call.respond(
+                        status = HttpStatusCode.BadRequest,
+                        message = it,
+                    )
+                }
             }
 
             get("/pd/{id}", VerifierApiDocs.getPdDocs()) {
