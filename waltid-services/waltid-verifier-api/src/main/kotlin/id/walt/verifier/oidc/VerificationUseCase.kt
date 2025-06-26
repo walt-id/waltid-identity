@@ -1,11 +1,9 @@
 package id.walt.verifier.oidc
 
-import org.cose.java.AlgorithmID
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSASigner
 import com.nimbusds.jose.crypto.ECDSAVerifier
 import com.nimbusds.jose.jwk.ECKey
-import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -24,6 +22,7 @@ import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.policies.policies.SdJwtVCSignaturePolicy
 import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.SimpleJWTCryptoProvider
+import id.walt.w3c.utils.VCFormat
 import io.klogging.logger
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -31,6 +30,7 @@ import io.ktor.http.*
 import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
+import org.cose.java.AlgorithmID
 import java.security.KeyFactory
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
@@ -163,7 +163,7 @@ class VerificationUseCase(
         )
     }
 
-    fun getSession(sessionId: String): PresentationSession = sessionId.let { OIDCVerifierService.getSession(it) }
+    fun getSession(sessionId: String): PresentationSession = OIDCVerifierService.getSession(sessionId)
 
     data class FailedVerificationException(
         val redirectUrl: String?,
