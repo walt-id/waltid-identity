@@ -15,21 +15,33 @@ import id.walt.policies.models.PolicyRequest
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.policies.policies.SdJwtVCSignaturePolicy
-import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.w3c.utils.VCFormat
 import io.klogging.logger
 import io.ktor.client.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlin.time.Duration
 
-class VerificationUseCase(
-    val http: HttpClient, cryptoProvider: JWTCryptoProvider,
-) {
+object VerificationUseCase {
+
+    private val http = HttpClient {
+        install(ContentNegotiation) {
+            json()
+        }
+        install(Logging) {
+            logger = Logger.SIMPLE
+            level = LogLevel.ALL
+        }
+    }
+
     private val logger = logger("Verification")
+
     suspend fun createSession(
         vpPoliciesJson: JsonElement?,
         vcPoliciesJson: JsonElement?,
