@@ -7,9 +7,6 @@ import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.did.dids.DidService
-import id.walt.did.dids.DidUtils
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.EncodedCBORElement
@@ -27,7 +24,6 @@ import id.walt.oid4vc.providers.CredentialVerifierConfig
 import id.walt.oid4vc.providers.OpenIDCredentialVerifier
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.oid4vc.util.randomUUID
 import id.walt.policies.VerificationPolicy
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest
@@ -37,7 +33,6 @@ import id.walt.policies.policies.vp.HolderBindingPolicy
 import id.walt.policies.policies.vp.MaximumCredentialsPolicy
 import id.walt.policies.policies.vp.MinimumCredentialsPolicy
 import id.walt.policies.policies.vp.PresentationDefinitionPolicy
-import id.walt.sdjwt.SDJwtVC
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.plugins.*
@@ -261,20 +256,6 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
                 )
             )
         )
-    }
-
-    private suspend fun resolveIssuerKeysFromSdJwt(sdJwt: SDJwtVC): Set<Key> {
-        val kid = sdJwt.keyID ?: randomUUID()
-
-        return if (!sdJwt.issuer.isNullOrEmpty() && DidUtils.isDidUrl(sdJwt.issuer!!)) {
-            DidService.resolveToKeys(sdJwt.issuer!!).getOrThrow()
-        } else {
-            sdJwt.header["x5c"]?.jsonArray?.last()?.let {
-                val key = JWKKey.importPEM(it.jsonPrimitive.content).getOrThrow().let { JWKKey(it.jwk, kid) }
-                setOf(key)
-            }
-                ?: throw UnsupportedOperationException("Resolving issuer key from SD-JWT is only supported for issuer did in kid header and PEM cert in x5c header parameter")
-        }
     }
 
     override fun initializeAuthorization(
