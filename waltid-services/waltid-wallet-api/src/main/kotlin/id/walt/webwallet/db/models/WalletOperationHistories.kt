@@ -1,6 +1,5 @@
 package id.walt.webwallet.db.models
 
-import id.walt.commons.temp.UuidSerializer
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.webwallet.db.kotlinxUuid
 import id.walt.webwallet.service.WalletService
@@ -37,11 +36,8 @@ object WalletOperationHistories : UUIDTable("wallet_operation_histories") {
 @Serializable
 data class WalletOperationHistory(
     val tenant: String,
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
     val id: Uuid? = Uuid.random(),
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
     val account: Uuid,
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
     val wallet: Uuid,
     val timestamp: Instant,
     val operation: String,

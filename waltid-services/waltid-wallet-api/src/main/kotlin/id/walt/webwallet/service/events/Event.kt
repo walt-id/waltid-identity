@@ -2,7 +2,6 @@
 
 package id.walt.webwallet.service.events
 
-import id.walt.commons.temp.UuidSerializer
 import id.walt.webwallet.db.models.Events
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -26,9 +25,7 @@ data class Event(
     val timestamp: Instant = Clock.System.now(),
     val tenant: String,
     val originator: String? = null,
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
     val account: Uuid,
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
     val wallet: Uuid? = null,
     val credentialId: String? = null,
     val data: JsonObject,

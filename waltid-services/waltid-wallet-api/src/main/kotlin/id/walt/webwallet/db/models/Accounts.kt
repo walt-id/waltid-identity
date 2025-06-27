@@ -2,7 +2,6 @@
 
 package id.walt.webwallet.db.models
 
-import id.walt.commons.temp.UuidSerializer
 import id.walt.webwallet.db.kotlinxUuid
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
@@ -42,7 +41,6 @@ object Accounts : Table("accounts") {
 @Serializable
 data class Account(
     val tenant: String,
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
     val id: Uuid,
     val name: String? = null,
     val email: String? = null,

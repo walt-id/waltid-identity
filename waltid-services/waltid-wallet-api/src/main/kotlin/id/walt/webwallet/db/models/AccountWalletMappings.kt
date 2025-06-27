@@ -2,7 +2,6 @@
 
 package id.walt.webwallet.db.models
 
-import id.walt.commons.temp.UuidSerializer
 import id.walt.webwallet.db.kotlinxUuid
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
@@ -36,13 +35,11 @@ object AccountWalletMappings : Table("account_wallet_mapping") {
 
 @Serializable
 data class AccountWalletListing(
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
     val account: Uuid,
     val wallets: List<WalletListing>,
 ) {
     @Serializable
     data class WalletListing(
-        @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
         val id: Uuid,
         val name: String,
         val createdOn: Instant,
