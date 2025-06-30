@@ -4,6 +4,7 @@ package id.walt.webwallet.db.models
 
 import id.walt.webwallet.db.kotlinxUuid
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.timestamp
@@ -35,11 +36,13 @@ object AccountWalletMappings : Table("account_wallet_mapping") {
 
 @Serializable
 data class AccountWalletListing(
+    @Contextual
     val account: Uuid,
     val wallets: List<WalletListing>,
 ) {
     @Serializable
     data class WalletListing(
+        @Contextual
         val id: Uuid,
         val name: String,
         val createdOn: Instant,

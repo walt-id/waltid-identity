@@ -16,6 +16,7 @@ import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.web.model.*
 import kotlinx.datetime.toKotlinInstant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.exposed.sql.and
@@ -205,6 +206,7 @@ object AccountsService {
 
 @Serializable
 data class RegistrationResult(
+    @Contextual
     val id: Uuid,
 )
 
@@ -215,23 +217,27 @@ sealed class AuthenticatedUser {
 
 @Serializable
 data class UsernameAuthenticatedUser(
+    @Contextual
     override val id: Uuid,
     val username: String,
 ) : AuthenticatedUser()
 
 @Serializable
 data class AddressAuthenticatedUser(
+    @Contextual
     override val id: Uuid,
     val address: String,
 ) : AuthenticatedUser()
 
 @Serializable
 data class KeycloakAuthenticatedUser(
+    @Contextual
     override val id: Uuid,
     val keycloakUserId: String,
 ) : AuthenticatedUser()
 
 @Serializable
 data class X5CAuthenticatedUser(
+    @Contextual
     override val id: Uuid,
 ) : AuthenticatedUser()

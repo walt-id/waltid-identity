@@ -6,6 +6,7 @@ import id.walt.webwallet.db.models.Events
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -25,7 +26,9 @@ data class Event(
     val timestamp: Instant = Clock.System.now(),
     val tenant: String,
     val originator: String? = null,
+    @Contextual
     val account: Uuid,
+    @Contextual
     val wallet: Uuid? = null,
     val credentialId: String? = null,
     val data: JsonObject,

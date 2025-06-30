@@ -5,6 +5,7 @@ package id.walt.webwallet.db.models
 import id.walt.webwallet.db.kotlinxUuid
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import org.jetbrains.exposed.sql.ResultRow
@@ -41,6 +42,7 @@ object Accounts : Table("accounts") {
 @Serializable
 data class Account(
     val tenant: String,
+    @Contextual
     val id: Uuid,
     val name: String? = null,
     val email: String? = null,
