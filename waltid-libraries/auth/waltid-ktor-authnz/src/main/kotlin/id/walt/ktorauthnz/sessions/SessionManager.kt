@@ -1,16 +1,14 @@
 package id.walt.ktorauthnz.sessions
 
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.flows.AuthFlow
 import kotlinx.datetime.Clock
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 object SessionManager {
 
     suspend fun newSession(authFlow: AuthFlow): AuthSession {
-        val sessionId = Uuid.random().toString()
+        val sessionId = randomUUIDString()
 
         val newSession = AuthSession(
             id = sessionId,

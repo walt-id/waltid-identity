@@ -13,19 +13,15 @@ import com.nimbusds.jose.util.X509CertChainUtils
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import id.walt.commons.config.ConfigManager
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.JwtVerificationResult
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
-
-
 import java.io.File
 import java.io.FileReader
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 object RequestSigningCryptoProvider : JWTCryptoProvider {
     val signingKey: ECKey = ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningKeyFile?.let {
         runBlocking {
@@ -35,13 +31,13 @@ object RequestSigningCryptoProvider : JWTCryptoProvider {
                     (ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey().toECPublicKey())
                 )
                     .privateKey(ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey().toECPrivateKey())
-                    .keyID(Uuid.random().toString())
+                    .keyID(randomUUIDString())
                     .build()
             else
                 null
         }
     }
-        ?: ECKeyGenerator(Curve.P_256).keyUse(KeyUse.SIGNATURE).keyID(Uuid.random().toString()).generate()
+        ?: ECKeyGenerator(Curve.P_256).keyUse(KeyUse.SIGNATURE).keyID(randomUUIDString()).generate()
 
     val certificateChain: String? = ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningCertFile?.let {
         runBlocking {

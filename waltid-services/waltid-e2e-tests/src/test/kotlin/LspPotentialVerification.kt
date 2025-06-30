@@ -1,6 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
-
-
 import org.cose.java.AlgorithmID
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.ECDSASigner
@@ -15,6 +12,7 @@ import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.EncodedCBORElement
@@ -48,12 +46,9 @@ import kotlinx.serialization.json.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 class LspPotentialVerification(private val client: HttpClient) {
 
-    @OptIn(ExperimentalUuidApi::class)
     suspend fun testPotentialInteropTrack3() = test("test track 3") {
         println("Starting test")
 
@@ -105,7 +100,7 @@ class LspPotentialVerification(private val client: HttpClient) {
             assertEquals("A256GCM", presReq.clientMetadata!!.authorizationEncryptedResponseEnc!!)
 
             // Step 5: Create encrypted presentation response
-            val mdocNonce = Uuid.random().toString()
+            val mdocNonce = randomUUIDString()
             val mdocHandover = OpenID4VP.generateMDocOID4VPHandover(presReq, mdocNonce)
             val holderKeyNimbus = ECKey.parse(holderKey.exportJWK())
             val deviceCryptoProvider = SimpleCOSECryptoProvider(

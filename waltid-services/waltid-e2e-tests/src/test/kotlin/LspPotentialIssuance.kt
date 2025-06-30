@@ -9,6 +9,7 @@ import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
@@ -29,7 +30,6 @@ import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.JWTVCIssuerMetadata
 import id.walt.sdjwt.SDJwtVC
 import id.walt.verifier.lspPotential.LspPotentialVerificationInterop
@@ -87,7 +87,7 @@ class LspPotentialIssuance(val client: HttpClient) {
         // ### step 11: confirm issuance (nothing to do)
 
         // ### step 12-15: authorization
-        val codeVerifier = randomUUID()
+        val codeVerifier = randomUUIDString()
 
         val codeChallenge =
             codeVerifier.let { Base64.UrlSafe.encode(SHA256().digest(it.toByteArray(Charsets.UTF_8))).trimEnd('=') }
@@ -274,7 +274,7 @@ class LspPotentialIssuance(val client: HttpClient) {
         // ### step 11: confirm issuance (nothing to do)
 
         // ### step 12-15: authorization
-        val codeVerifier = randomUUID()
+        val codeVerifier = randomUUIDString()
 
         val codeChallenge =
             codeVerifier.let { Base64.UrlSafe.encode(SHA256().digest(it.toByteArray(Charsets.UTF_8))).trimEnd('=') }

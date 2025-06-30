@@ -2,6 +2,7 @@ package id.walt.w3c
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -12,10 +13,8 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Duration.Companion.minutes
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalJsExport::class, ExperimentalUuidApi::class)
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class PresentationBuilder {
 
@@ -39,7 +38,7 @@ class PresentationBuilder {
     /**
      * jti: JWT ID
      */
-    var presentationId = "urn:uuid:" + Uuid.random().toString()
+    var presentationId = "urn:uuid:" + randomUUIDString()
 
     /**
      * single use Nonce (usually set to a challenge requested by the relying party)

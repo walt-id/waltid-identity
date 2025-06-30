@@ -2,6 +2,7 @@ package id.walt.oid4vc
 
 import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.*
@@ -27,10 +28,7 @@ import kotlinx.serialization.json.*
 import org.junit.jupiter.api.BeforeAll
 import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 class VP_JVM_Test {
 
     val http = HttpClient {
@@ -169,7 +167,7 @@ class VP_JVM_Test {
                         )
                     )
                 )
-            ), ResponseMode.query, setOf(ResponseType.VpToken), "http://blank", Uuid.random().toString(),
+            ), ResponseMode.query, setOf(ResponseType.VpToken), "http://blank", randomUUIDString(),
             "test", setOf(), "test-verifier", ClientIdScheme.PreRegistered, ClientMetadataParameter.fromClientMetadata(
                 OpenIDClientMetadata(listOf(testWallet.baseUrl))
             )

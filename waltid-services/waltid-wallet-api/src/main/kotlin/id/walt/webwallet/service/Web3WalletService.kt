@@ -1,10 +1,9 @@
 package id.walt.webwallet.service
 
+import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.webwallet.db.models.Web3Wallets
 import id.walt.webwallet.service.dto.LinkedWalletDataTransferObject
 import id.walt.webwallet.service.dto.WalletDataTransferObject
-
-
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -23,7 +22,7 @@ object Web3WalletService {
         Web3Wallets.insert {
             it[Web3Wallets.tenant] = tenant
             it[Web3Wallets.accountId] = accountId
-            it[id] = Uuid.random()
+            it[id] = randomUUID()
             it[address] = wallet.address
             it[ecosystem] = wallet.ecosystem
             it[owner] = false

@@ -6,6 +6,7 @@ import com.nimbusds.jose.JWSAlgorithm
 import id.walt.commons.config.ConfigManager
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
@@ -43,7 +44,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 private val SERVER_URL by lazy {
     runBlocking {
@@ -88,7 +88,6 @@ private const val fixedPresentationDefinitionForEbsiConformanceTest =
 private val verificationUseCase =
     VerificationUseCase(httpClient, SimpleJWTCryptoProvider(JWSAlgorithm.EdDSA, null, null))
 
-@OptIn(ExperimentalUuidApi::class)
 fun Application.verifierApi() {
     routing {
 
@@ -158,7 +157,7 @@ fun Application.verifierApi() {
                     val session = verificationUseCase.getSession(sessionId)
                     if (session.walletInitiatedAuthState != null) {
                         val state = session.walletInitiatedAuthState
-                        val code = Uuid.random().toString()
+                        val code = randomUUIDString()
                         call.respondRedirect("openid://?code=$code&state=$state")
                     } else {
                         call.respond(HttpStatusCode.OK, it)
@@ -268,7 +267,7 @@ fun Application.verifierApi() {
             val walletInitiatedAuthState = params["state"]?.jsonArray?.get(0)?.jsonPrimitive?.content
             val scope = params["scope"]?.jsonArray.toString().replace("\"", "").replace("[", "").replace("]", "")
 
-            val stateId = Uuid.random().toString()
+            val stateId = randomUUIDString()
             // Parse session TTL from query parameter if provided
             val sessionTtl =
                 params["sessionTtl"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull?.toLongOrNull()?.seconds

@@ -2,7 +2,7 @@ package id.walt.oid4vc.requests
 
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.http
-import id.walt.oid4vc.util.randomUUID
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.utils.io.core.*
@@ -40,7 +40,7 @@ data class EntraIssuanceRequest(
                 put("iat", it)
                 put("exp", it + 3600)
             }
-            put("jti", randomUUID())
+            put("jti", randomUUIDString())
             put("attestations", buildJsonObject {
                 // * Get id_token_hint, if any, to add to response, or else generate id_token/input claims according to alternative attestation mode
                 // Attestation modes: https://learn.microsoft.com/en-us/entra/verified-id/rules-and-display-definitions-model
