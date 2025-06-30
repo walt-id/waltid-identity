@@ -20,6 +20,7 @@ enum class AccountWalletPermissions(val power: Int) {
 
 object AccountWalletMappings : Table("account_wallet_mapping") {
     val tenant = varchar("tenant", 128).default("")
+    @OptIn(ExperimentalUuidApi::class)
     val accountId = kotlinxUuid("id")
     val wallet = reference("wallet", Wallets)
 
