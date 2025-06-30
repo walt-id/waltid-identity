@@ -11,15 +11,31 @@ data object TraceLoggingSetup : LoggingSetup("trace", {
 
     logging {
         fromLoggerBase("com.zaxxer.hikari", stopOnMatch = true)
-        fromMinLevel(Level.INFO) {
-            toSink("stdout")
-        }
+        fromMinLevel(Level.INFO) { toSink("stdout") }
+    }
+    logging {
+        fromLoggerBase("io.ktor.server.routing", stopOnMatch = true)
+        fromMinLevel(Level.DEBUG) { toSink("stdout") }
+    }
+    logging {
+        fromLoggerBase("io.ktor.server.plugin.c", stopOnMatch = true)
+        fromMinLevel(Level.DEBUG) { toSink("stdout") }
+    }
+    logging {
+        fromLoggerBase("io.ktor.server.plugin", stopOnMatch = true)
+        fromMinLevel(Level.DEBUG) { toSink("stdout") }
+    }
+    logging {
+        fromLoggerBase("io.ktor.server.engine", stopOnMatch = true)
+        fromMinLevel(Level.DEBUG) { toSink("stdout") }
+    }
+    logging {
+        fromLoggerBase("io.ktor.client.plugins", stopOnMatch = true)
+        fromMinLevel(Level.DEBUG) { toSink("stdout") }
     }
     logging {
         fromLoggerBase("io.ktor", stopOnMatch = true)
-        fromMinLevel(Level.DEBUG) {
-            toSink("stdout")
-        }
+        fromMinLevel(Level.TRACE) { toSink("stdout") }
     }
     logging {
         fromLoggerBase("org.sqlite.core.NativeDB", stopOnMatch = true)
