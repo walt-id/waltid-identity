@@ -1,7 +1,11 @@
-package id.walt.verifier
+package id.walt.verifier.openapi
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.oid4vc.data.OpenId4VPProfile
+import id.walt.verifier.openapi.VerifierApiExamples.ietfStatusPolicy
+import id.walt.verifier.openapi.VerifierApiExamples.w3cListStatusPolicy
+import id.walt.verifier.openapi.VerifierApiExamples.w3cStatusPolicy
+import io.github.smiley4.ktoropenapi.config.SimpleBodyConfig
 import io.github.smiley4.ktoropenapi.config.ValueExampleDescriptorConfig
 import kotlinx.serialization.json.*
 
@@ -559,7 +563,6 @@ object VerifierApiExamples {
         """.trimIndent()
     )
 
-
     fun w3cStatusPolicy(type: String = "BitstringStatusList", purpose: String = "revocation", value: UInt = 0u) =
         jsonObjectValueExampleDescriptorDsl(
             """
@@ -618,4 +621,38 @@ object VerifierApiExamples {
         }
     """.trimIndent()
     )
+}
+
+fun SimpleBodyConfig.addCredentialStatusExamples() {
+    example("Credential status - BitstringStatusList", w3cStatusPolicy("BitstringStatusList", "revocation"))
+    example(
+        "Credential status - BitstringStatusList custom valid value",
+        w3cStatusPolicy("BitstringStatusList", "custom", 2u)
+    )
+    example("Credential status - StatusList2021", w3cStatusPolicy("StatusList2021", "revocation"))
+    example("Credential status - RevocationList2020", w3cStatusPolicy("RevocationList2020", "revocation"))
+    example("Credential status - multiple statuses", w3cListStatusPolicy)
+    example("Credential status - TokenStatusList", ietfStatusPolicy)
+}
+
+
+fun SimpleBodyConfig.addSdJwtVcExamples() {
+    example("SD-JWT-VC verification example", VerifierApiExamples.lspPotentialSDJwtVCExample)
+    example(
+        "SD-JWT-VC verification example with mandatory fields", VerifierApiExamples.sdJwtVCExampleWithRequiredFields
+    )
+}
+
+fun SimpleBodyConfig.addEbsiVectorInteropTestExamples() {
+    example(
+        "EBSI-VECTOR interoperability test - InTimeIssuance", VerifierApiExamples.EBSIVectorExampleInTimeIssuance
+    )
+    example(
+        "EBSI-VECTOR interoperability test - DeferredIssuance",
+        VerifierApiExamples.EBSIVectorExampleDeferredIssuance
+    )
+    example(
+        "EBSI-VECTOR interoperability test - PreAuthIssuance", VerifierApiExamples.EBSIVectorExamplePreAuthIssuance
+    )
+    example("EBSI-VECTOR interoperability test - All", VerifierApiExamples.EBSIVectorExampleAllIssuance)
 }

@@ -27,7 +27,8 @@ import kotlin.js.JsExport
 class W3CVCSerializer : KSerializer<W3CVC> {
     override val descriptor: SerialDescriptor = JsonObject.serializer().descriptor
     override fun deserialize(decoder: Decoder): W3CVC = W3CVC(decoder.decodeSerializableValue(JsonObject.serializer()))
-    override fun serialize(encoder: Encoder, value: W3CVC) = encoder.encodeSerializableValue(JsonObject.serializer(), value.toJsonObject())
+    override fun serialize(encoder: Encoder, value: W3CVC) =
+        encoder.encodeSerializableValue(JsonObject.serializer(), value.toJsonObject())
 }
 
 @OptIn(ExperimentalJsExport::class)
@@ -40,8 +41,9 @@ data class W3CVC(
 
     fun getType() = (get("type") ?: error("No `type` in W3C VC!")).jsonArray.map { it.jsonPrimitive.content }
 
-    fun toJsonObject(additionalProperties: Map<String, JsonElement> = emptyMap()): JsonObject
-        = JsonObject(content.plus(additionalProperties))
+    fun toJsonObject(additionalProperties: Map<String, JsonElement> = emptyMap()): JsonObject =
+        JsonObject(content.plus(additionalProperties))
+
     fun toJson(): String = Json.encodeToString(content)
     fun toPrettyJson(): String = prettyJson.encodeToString(content)
 
@@ -67,17 +69,25 @@ data class W3CVC(
                 JwsOption.ISSUER to JsonPrimitive(issuerId),
                 JwsOption.SUBJECT to JsonPrimitive(subjectDid),
                 *(additionalJwtOptions.entries.map { it.toPair() }.toTypedArray())
-            ))
+            )
+        )
 
-        val sdPayload = SDPayload.createSDPayload(payload,
-            SDMapBuilder(disclosureMap.decoyMode).addField(JwsOption.VC, sd=false, children = disclosureMap).build())
+        val sdPayload = SDPayload.createSDPayload(
+            payload,
+            SDMapBuilder(disclosureMap.decoyMode).addField(JwsOption.VC, sd = false, children = disclosureMap).build()
+        )
         val signable = Json.encodeToString(sdPayload.undisclosedPayload).toByteArray()
 
-        val signed = issuerKey.signJws(signable, additionalJwtHeaders.plus(mapOf(
-            JwsHeader.KEY_ID to kid.toJsonElement())
-        ))
+        val signed = issuerKey.signJws(
+            signable, additionalJwtHeaders.plus(
+                mapOf(
+                    JwsHeader.KEY_ID to kid.toJsonElement()
+                )
+            )
+        )
         return SDJwt.createFromSignedJwt(signed, sdPayload).toString()
     }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise

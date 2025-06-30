@@ -18,6 +18,7 @@ object CredentialDataMergeUtils {
 
     fun JsonPrimitive.isTemplate() =
         this.content.let { it.first() == '<' && it.last() == '>' && it.length > 2 && !it.contains(" ") }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -53,6 +54,7 @@ object CredentialDataMergeUtils {
         log.debug { "Called function: $functionCall, got: $result" }
         return result
     }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -130,6 +132,7 @@ object CredentialDataMergeUtils {
             return context[func] ?: throw IllegalArgumentException("Cannot find in context: $func")
         }
     }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise

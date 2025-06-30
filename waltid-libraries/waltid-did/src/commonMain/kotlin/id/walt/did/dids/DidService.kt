@@ -64,7 +64,7 @@ object DidService {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun init(resolverUrl: String? = null, registrarUrl: String? = null, ) {
+    suspend fun init(resolverUrl: String? = null, registrarUrl: String? = null) {
         registerAllResolvers(DidResolverRegistrations.curatedDidResolvers(resolverUrl))
         registerAllRegistrars(DidRegistrarRegistrations.curatedDidRegistrars(registrarUrl))
 
@@ -89,7 +89,9 @@ object DidService {
         updateRegistrarsForMethods()
     }
 
-    fun registerRegistrar(registrar: DidRegistrar) = if (registrar !in didRegistrars) didRegistrars.add(registrar) else false
+    fun registerRegistrar(registrar: DidRegistrar) =
+        if (registrar !in didRegistrars) didRegistrars.add(registrar) else false
+
     fun unregisterRegistrar(registrar: DidRegistrar) = didRegistrars.remove(registrar)
 
     fun registerResolverForMethod(method: String, resolver: DidResolver) = resolverMethods.put(method, resolver)
@@ -153,7 +155,7 @@ object DidService {
     @JsExport.Ignore
     suspend fun resolveToKey(did: String): Result<Key> =
         getResolverForDid(did).resolveToKey(did)
-        
+
     @JvmBlocking
     @JvmAsync
     @JsPromise

@@ -11,17 +11,17 @@ import kotlinx.serialization.Serializable
  * @param keyInfo May contain extra info about this key
  */
 @Serializable
-class DeviceKeyInfo (
-  val deviceKey: MapElement,
-  val keyAuthorizations: MapElement? = null,
-  val keyInfo: MapElement? = null
+class DeviceKeyInfo(
+    val deviceKey: MapElement,
+    val keyAuthorizations: MapElement? = null,
+    val keyInfo: MapElement? = null
 ) {
-  /**
-   * Convert to CBOR map element
-   */
-  fun toMapElement() = buildMap {
-    put("deviceKey", deviceKey)
-    keyAuthorizations?.let { put("keyAuthorizations", it) }
-    keyInfo?.let { put("keyInfo", it) }
-  }.toDataElement()
+    /**
+     * Convert to CBOR map element
+     */
+    fun toMapElement() = buildMap {
+        put("deviceKey", deviceKey)
+        keyAuthorizations?.let { put("keyAuthorizations", it) }
+        keyInfo?.let { put("keyInfo", it) }
+    }.toDataElement()
 }

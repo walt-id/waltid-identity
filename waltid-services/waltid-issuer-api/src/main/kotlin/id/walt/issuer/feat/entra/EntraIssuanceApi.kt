@@ -1,4 +1,4 @@
-package id.walt.issuer.entra
+package id.walt.issuer.feat.entra
 
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -98,8 +98,6 @@ fun Application.entraIssuance() {
 object EntraIssuanceApi {
     suspend fun entraIssuance(authorization: EntraAuthorizationInformation, req: EntraIssuanceRequestData): String {
         println("--- ENTRA ISSUANCE TEST ---")
-
-        val pin: String? = null //"0288"
 
         println("============ Issuer ============")
 

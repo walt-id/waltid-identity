@@ -973,7 +973,7 @@ class OpenID4VCI_Test {
         assertNotNull(credentialResponse.credential)
 
         println("Signed credential is: ${credentialResponse.credential}")
-        println("Credential data is: ${credentialResponse.credential.jsonPrimitive.content.decodeJws().payload["vc"]?.jsonObject}")
+        println("Credential data is: ${credentialResponse.credential!!.jsonPrimitive.content.decodeJws().payload["vc"]?.jsonObject}")
     }
 }
 

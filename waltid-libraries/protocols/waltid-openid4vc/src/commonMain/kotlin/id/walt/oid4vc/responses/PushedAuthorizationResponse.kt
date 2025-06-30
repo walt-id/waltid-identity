@@ -11,7 +11,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Duration
 
-@Serializable
+@Serializable @ConsistentCopyVisibility
 data class PushedAuthorizationResponse private constructor(
     @SerialName("request_uri") val requestUri: String? = null,
     @SerialName("expires_in") val expiresIn: Duration? = null,

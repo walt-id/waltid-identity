@@ -43,7 +43,14 @@ data class CredentialResponse private constructor(
             cNonce: String? = null,
             cNonceExpiresIn: Duration? = null,
             customParameters: Map<String, JsonElement> = mapOf()
-        ) = CredentialResponse(format, JsonPrimitive(credentialString), null, cNonce, cNonceExpiresIn, customParameters = customParameters)
+        ) = CredentialResponse(
+            format,
+            JsonPrimitive(credentialString),
+            null,
+            cNonce,
+            cNonceExpiresIn,
+            customParameters = customParameters
+        )
 
         fun success(
             format: CredentialFormat,
@@ -59,7 +66,14 @@ data class CredentialResponse private constructor(
             cNonce: String? = null,
             cNonceExpiresIn: Duration? = null,
             customParameters: Map<String, JsonElement> = mapOf()
-        ) = CredentialResponse(format, null, acceptanceToken, cNonce, cNonceExpiresIn, customParameters = customParameters)
+        ) = CredentialResponse(
+            format,
+            null,
+            acceptanceToken,
+            cNonce,
+            cNonceExpiresIn,
+            customParameters = customParameters
+        )
 
         fun error(
             error: CredentialErrorCode,

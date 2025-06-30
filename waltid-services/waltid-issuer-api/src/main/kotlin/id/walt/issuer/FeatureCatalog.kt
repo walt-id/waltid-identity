@@ -9,19 +9,19 @@ import id.walt.issuer.config.OIDCIssuerServiceConfig
 
 object FeatureCatalog : ServiceFeatureCatalog {
 
-    val credentialTypes = BaseFeature(
+    private val credentialTypes = BaseFeature(
         "credential-types",
         "Configure the credential types available in this issuer instance",
         mapOf("credential-issuer-metadata" to CredentialTypeConfig::class)
     )
 
-    val issuerService = BaseFeature(
+    private val issuerService = BaseFeature(
         "issuer-service",
         "Issuer Service Implementation",
         OIDCIssuerServiceConfig::class
     )
 
-    val authenticationService = BaseFeature(
+    private val authenticationService = BaseFeature(
         "authentication-service",
         "Authentication Service Implementation",
         AuthenticationServiceConfig::class

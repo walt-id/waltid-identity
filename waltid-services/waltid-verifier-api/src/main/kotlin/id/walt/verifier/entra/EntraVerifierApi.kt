@@ -129,16 +129,19 @@ object EntraVerifierApi {
 
     val config = ConfigManager.getConfig<EntraConfig>()
 
-    val configuredCallbackUrl = config.callbackUrl
+    private val configuredCallbackUrl = config.callbackUrl
 
-    fun createCallbackMapping(data: MappedData): Uuid {
+    private fun createCallbackMapping(data: MappedData): Uuid {
         val uuid = Uuid.random()
         callbackMapping[uuid] = data
 
         return uuid
     }
 
-    suspend fun createPresentationRequest(req: EntraVerificationRequest, data: VerifierData): Result<EntraVerifyResponse> {
+    suspend fun createPresentationRequest(
+        req: EntraVerificationRequest,
+        data: VerifierData
+    ): Result<EntraVerifyResponse> {
         val accessToken = req.authorization.getAccessToken()
 
 
@@ -150,13 +153,15 @@ object EntraVerifierApi {
             headers = JsonObject(mapOf("api-key" to JsonPrimitive("1234")))
         )
 
-        val createPresentationRequestBody = EntraCreatePresentationRequest.fromEntraVerificationRequest(req = req, callback = callback)
+        val createPresentationRequestBody =
+            EntraCreatePresentationRequest.fromEntraVerificationRequest(req = req, callback = callback)
 
-        val response = http.post("https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createPresentationRequest") {
-            header(HttpHeaders.Authorization, accessToken)
-            contentType(ContentType.Application.Json)
-            setBody(createPresentationRequestBody)
-        }
+        val response =
+            http.post("https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createPresentationRequest") {
+                header(HttpHeaders.Authorization, accessToken)
+                contentType(ContentType.Application.Json)
+                setBody(createPresentationRequestBody)
+            }
 
         return runCatching {
             check(response.status == HttpStatusCode.Created) { "Entra did not respond with CREATED" }
@@ -205,7 +210,8 @@ fun Application.entraVerifierApi() {
                 response { HttpStatusCode.OK to { body<EntraVerifyResponse>() } }
             }) {
                 val verifyRequest = call.receive<EntraVerifyRequest>()
-                val res = EntraVerifierApi.createPresentationRequest(verifyRequest.entraVerification, verifyRequest.data)
+                val res =
+                    EntraVerifierApi.createPresentationRequest(verifyRequest.entraVerification, verifyRequest.data)
 
                 call.respond(res.getOrThrow())
             }

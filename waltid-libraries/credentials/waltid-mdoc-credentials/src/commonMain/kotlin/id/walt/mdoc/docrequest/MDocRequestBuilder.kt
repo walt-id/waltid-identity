@@ -10,42 +10,55 @@ import id.walt.mdoc.readerauth.ReaderAuthentication
  * @param docType doc type of requested document
  */
 class MDocRequestBuilder(val docType: String) {
-  val nameSpaces = mutableMapOf<String, MutableMap<String, Boolean>>()
+    val nameSpaces = mutableMapOf<String, MutableMap<String, Boolean>>()
 
-  /**
-   * Add request for issuer signed data element
-   * @param nameSpace Name space of the data element
-   * @param elementIdentifier Element identifier
-   * @param intentToRetain  Whether the reader intends to retain (store) the element data in a long term storage
-   * @return this builder object
-   */
-  fun addDataElementRequest(nameSpace: String, elementIdentifier: String, intentToRetain: Boolean): MDocRequestBuilder {
-    nameSpaces.getOrPut(nameSpace) { mutableMapOf() }[elementIdentifier] = intentToRetain
-    return this
-  }
+    /**
+     * Add request for issuer signed data element
+     * @param nameSpace Name space of the data element
+     * @param elementIdentifier Element identifier
+     * @param intentToRetain  Whether the reader intends to retain (store) the element data in a long term storage
+     * @return this builder object
+     */
+    fun addDataElementRequest(
+        nameSpace: String,
+        elementIdentifier: String,
+        intentToRetain: Boolean
+    ): MDocRequestBuilder {
+        nameSpaces.getOrPut(nameSpace) { mutableMapOf() }[elementIdentifier] = intentToRetain
+        return this
+    }
 
-  private fun buildEncodedItemsRequest() = EncodedCBORElement(ItemsRequest(
-    docType = docType.toDataElement(),
-    nameSpaces = nameSpaces.map { ns ->
-      Pair(MapKey(ns.key), ns.value.map { item ->
-        Pair(MapKey(item.key), BooleanElement(item.value))
-      }.toMap().toDataElement())
-    }.toMap().toDataElement()
-  ).toMapElement())
+    private fun buildEncodedItemsRequest() = EncodedCBORElement(
+        ItemsRequest(
+            docType = docType.toDataElement(),
+            nameSpaces = nameSpaces.map { ns ->
+                Pair(MapKey(ns.key), ns.value.map { item ->
+                    Pair(MapKey(item.key), BooleanElement(item.value))
+                }.toMap().toDataElement())
+            }.toMap().toDataElement()
+        ).toMapElement()
+    )
 
-  /**
-   * Build mdoc request object
-   * @param readerAuth authentication COSE Sign1 structure, if required
-   * @return the mdoc request object
-   */
-  fun build(readerAuth: COSESign1? = null) = MDocRequest(
-    buildEncodedItemsRequest(),
-    readerAuth
-  )
+    /**
+     * Build mdoc request object
+     * @param readerAuth authentication COSE Sign1 structure, if required
+     * @return the mdoc request object
+     */
+    fun build(readerAuth: COSESign1? = null) = MDocRequest(
+        buildEncodedItemsRequest(),
+        readerAuth
+    )
 
-  fun sign(sessionTranscript: ListElement, cryptoProvider: COSECryptoProvider, keyID: String? = null): MDocRequest {
-    val encodedItemsRequest = buildEncodedItemsRequest()
-    val readerAuth = cryptoProvider.sign1(EncodedCBORElement(ReaderAuthentication(sessionTranscript, encodedItemsRequest).toCBOR()).toCBOR(), null, null, keyID)
-    return MDocRequest(encodedItemsRequest, readerAuth.detachPayload())
-  }
+    fun sign(sessionTranscript: ListElement, cryptoProvider: COSECryptoProvider, keyID: String? = null): MDocRequest {
+        val encodedItemsRequest = buildEncodedItemsRequest()
+        val readerAuth = cryptoProvider.sign1(
+            EncodedCBORElement(
+                ReaderAuthentication(
+                    sessionTranscript,
+                    encodedItemsRequest
+                ).toCBOR()
+            ).toCBOR(), null, null, keyID
+        )
+        return MDocRequest(encodedItemsRequest, readerAuth.detachPayload())
+    }
 }

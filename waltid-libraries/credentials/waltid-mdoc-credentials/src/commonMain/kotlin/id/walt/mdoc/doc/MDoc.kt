@@ -83,8 +83,8 @@ data class MDoc(
      */
     fun verifyValidity(): Boolean {
         val mso = MSO ?: throw Exception("No MSO object found on this mdoc")
-        return mso.validityInfo.validFrom.value <= Clock.System.now()      && // 5.2
-        mso.validityInfo.validUntil.value >= Clock.System.now()               // 5.3
+        return mso.validityInfo.validFrom.value <= Clock.System.now() && // 5.2
+                mso.validityInfo.validUntil.value >= Clock.System.now()               // 5.3
     }
 
     /**
@@ -112,8 +112,13 @@ data class MDoc(
      * @param cryptoProvider The crypto provider implementation to use for the verification
      * @param keyID Optional key ID of the key to use, if crypto provider requires it
      */
-    fun verifyDeviceSignature(deviceAuthentication: DeviceAuthentication, cryptoProvider: COSECryptoProvider, keyID: String?): Boolean {
-        val deviceSignature = deviceSigned?.deviceAuth?.deviceSignature ?: throw Exception("No device signature found on MDoc")
+    fun verifyDeviceSignature(
+        deviceAuthentication: DeviceAuthentication,
+        cryptoProvider: COSECryptoProvider,
+        keyID: String?
+    ): Boolean {
+        val deviceSignature =
+            deviceSigned?.deviceAuth?.deviceSignature ?: throw Exception("No device signature found on MDoc")
         return cryptoProvider.verify1(
             deviceSignature.attachPayload(getDeviceSignedPayload(deviceAuthentication)),
             keyID
@@ -130,15 +135,20 @@ data class MDoc(
         return deviceMac.attachPayload(getDeviceSignedPayload(deviceAuthentication)).verify(ephemeralMACKey)
     }
 
-    private fun verifyDeviceSigOrMac(verificationParams: MDocVerificationParams, cryptoProvider: COSECryptoProvider): Boolean {
+    private fun verifyDeviceSigOrMac(
+        verificationParams: MDocVerificationParams,
+        cryptoProvider: COSECryptoProvider
+    ): Boolean {
         val mdocDeviceAuth = deviceSigned?.deviceAuth ?: throw Exception("MDoc has no device authentication")
-        val deviceAuthenticationPayload = verificationParams.deviceAuthentication ?: throw Exception("No device authentication payload given, for check of device signature or MAC")
-        return if(mdocDeviceAuth.deviceMac != null) {
+        val deviceAuthenticationPayload = verificationParams.deviceAuthentication
+            ?: throw Exception("No device authentication payload given, for check of device signature or MAC")
+        return if (mdocDeviceAuth.deviceMac != null) {
             verifyDeviceMAC(
                 deviceAuthenticationPayload,
-                verificationParams.ephemeralMacKey ?: throw Exception("No ephemeral MAC key given, for check of device MAC")
+                verificationParams.ephemeralMacKey
+                    ?: throw Exception("No ephemeral MAC key given, for check of device MAC")
             )
-        } else if(mdocDeviceAuth.deviceSignature != null) {
+        } else if (mdocDeviceAuth.deviceSignature != null) {
             verifyDeviceSignature(
                 deviceAuthenticationPayload,
                 cryptoProvider, verificationParams.deviceKeyID
@@ -154,7 +164,7 @@ data class MDoc(
     fun verify(verificationParams: MDocVerificationParams, cryptoProvider: COSECryptoProvider): Boolean {
         // check points 1-5 of ISO 18013-5: 9.3.1
         return VerificationType.all.all { type ->
-            !verificationParams.verificationTypes.has(type) || when(type) {
+            !verificationParams.verificationTypes.has(type) || when (type) {
                 VerificationType.VALIDITY -> verifyValidity()
                 VerificationType.DOC_TYPE -> verifyDocType()
                 VerificationType.CERTIFICATE_CHAIN -> verifyCertificate(cryptoProvider, verificationParams.issuerKeyID)
@@ -177,7 +187,8 @@ data class MDoc(
         )
     }
 
-    private fun getDeviceSignedPayload(deviceAuthentication: DeviceAuthentication) = EncodedCBORElement(deviceAuthentication.toDE()).toCBOR()
+    private fun getDeviceSignedPayload(deviceAuthentication: DeviceAuthentication) =
+        EncodedCBORElement(deviceAuthentication.toDE()).toCBOR()
 
     /**
      * Present this mdoc to reader, using device signature
@@ -187,8 +198,14 @@ data class MDoc(
      * @param keyID Optional key ID of the key to use, if crypto provider requires it
      * @return MDoc with device-signed data containing the created signature
      */
-    fun presentWithDeviceSignature(mDocRequest: MDocRequest, deviceAuthentication: DeviceAuthentication, cryptoProvider: COSECryptoProvider, keyID: String? = null): MDoc {
-        val coseSign1 = cryptoProvider.sign1(getDeviceSignedPayload(deviceAuthentication), null, null, keyID).detachPayload()
+    fun presentWithDeviceSignature(
+        mDocRequest: MDocRequest,
+        deviceAuthentication: DeviceAuthentication,
+        cryptoProvider: COSECryptoProvider,
+        keyID: String? = null
+    ): MDoc {
+        val coseSign1 =
+            cryptoProvider.sign1(getDeviceSignedPayload(deviceAuthentication), null, null, keyID).detachPayload()
         return MDoc(
             docType,
             selectDisclosures(mDocRequest),
@@ -203,12 +220,18 @@ data class MDoc(
      * @param ephemeralMACKey   Ephemeral key used for creating the MAC, as negotiated during session establishment
      * @return MDoc with device-signed data containing the created MAC
      */
-    fun presentWithDeviceMAC(mDocRequest: MDocRequest, deviceAuthentication: DeviceAuthentication, ephemeralMACKey: ByteArray): MDoc {
-        val coseMac0 = COSEMac0.createWithHMAC256(getDeviceSignedPayload(deviceAuthentication), ephemeralMACKey).detachPayload()
+    fun presentWithDeviceMAC(
+        mDocRequest: MDocRequest,
+        deviceAuthentication: DeviceAuthentication,
+        ephemeralMACKey: ByteArray
+    ): MDoc {
+        val coseMac0 =
+            COSEMac0.createWithHMAC256(getDeviceSignedPayload(deviceAuthentication), ephemeralMACKey).detachPayload()
         return MDoc(
             docType,
             selectDisclosures(mDocRequest),
-            DeviceSigned(EncodedCBORElement(MapElement(mapOf())), DeviceAuth(coseMac0)))
+            DeviceSigned(EncodedCBORElement(MapElement(mapOf())), DeviceAuth(coseMac0))
+        )
     }
 
     /**
@@ -231,6 +254,7 @@ data class MDoc(
      * Serialize to CBOR data
      */
     fun toCBOR() = toMapElement().toCBOR()
+
     /**
      * Serialize to CBOR hex string
      */
@@ -242,6 +266,7 @@ data class MDoc(
          */
         @OptIn(ExperimentalSerializationApi::class)
         fun fromCBOR(cbor: ByteArray) = Cbor.decodeFromByteArray<MDoc>(cbor)
+
         /**
          * Deserialize from CBOR hex string
          */
@@ -252,8 +277,10 @@ data class MDoc(
          * Convert from CBOR map element
          */
         fun fromMapElement(mapElement: MapElement) = MDoc(
-            mapElement.value[MapKey("docType")] as? StringElement ?: throw SerializationException("No docType property found on object"),
-            (mapElement.value[MapKey("issuerSigned")] as? MapElement)?.let { IssuerSigned.fromMapElement(it) } ?: throw SerializationException("No issuerSigned property found on object"),
+            mapElement.value[MapKey("docType")] as? StringElement
+                ?: throw SerializationException("No docType property found on object"),
+            (mapElement.value[MapKey("issuerSigned")] as? MapElement)?.let { IssuerSigned.fromMapElement(it) }
+                ?: throw SerializationException("No issuerSigned property found on object"),
             (mapElement.value[MapKey("deviceSigned")] as? MapElement)?.let { DeviceSigned.fromMapElement(it) },
             mapElement.value[MapKey("errors")] as? MapElement
         )
@@ -266,6 +293,7 @@ internal object MDocSerializer : KSerializer<MDoc> {
     override fun serialize(encoder: Encoder, value: MDoc) {
         encoder.encodeSerializableValue(DataElementSerializer, value.toMapElement())
     }
+
     override fun deserialize(decoder: Decoder): MDoc {
         return MDoc.fromMapElement(decoder.decodeSerializableValue(DataElementSerializer) as MapElement)
     }

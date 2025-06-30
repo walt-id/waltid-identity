@@ -54,10 +54,10 @@ data class Capabilities(
         //on with the equals() method of the DataElement 🤷
         if (optional.size != other.optional.size) return false
 
-        optional.entries.forEach {curEntry ->
-            if(!other.optional.containsKey(curEntry.key)) return false
+        optional.entries.forEach { curEntry ->
+            if (!other.optional.containsKey(curEntry.key)) return false
 
-            if(other.optional[curEntry.key]!!.toCBORHex() != curEntry.value.toCBORHex()) return false
+            if (other.optional[curEntry.key]!!.toCBORHex() != curEntry.value.toCBORHex()) return false
         }
 
         return true
@@ -81,7 +81,7 @@ data class Capabilities(
             readerAuthAllSupport?.let {
                 put(MapKey(3), readerAuthAllSupport.toDataElement())
             }
-            optional.takeIf{ it.isNotEmpty() }?.entries?.forEach { (key, value) ->
+            optional.takeIf { it.isNotEmpty() }?.entries?.forEach { (key, value) ->
                 put(MapKey(key), value)
             }
         }

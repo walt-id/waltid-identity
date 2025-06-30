@@ -56,6 +56,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 fun Application.exchangeExternalSignatures() = walletRoute {
     val logger = KotlinLogging.logger { }
     route(
