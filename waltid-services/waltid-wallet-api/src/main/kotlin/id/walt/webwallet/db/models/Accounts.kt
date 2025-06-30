@@ -16,6 +16,7 @@ import kotlin.uuid.Uuid
 
 object Accounts : Table("accounts") {
     val tenant = varchar("tenant", 128).default("")
+    @OptIn(ExperimentalUuidApi::class)
     val id = kotlinxUuid("id").uniqueIndex()
 
     val name = varchar("name", 128).nullable()
@@ -27,6 +28,7 @@ object Accounts : Table("accounts") {
 
     val createdOn = timestamp("createdOn")
 
+    @OptIn(ExperimentalUuidApi::class)
     override val primaryKey = PrimaryKey(tenant, id)
 
     /*
