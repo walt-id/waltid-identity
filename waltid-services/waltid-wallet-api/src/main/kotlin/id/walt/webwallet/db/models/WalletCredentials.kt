@@ -11,6 +11,7 @@ import id.walt.webwallet.manifest.provider.ManifestProvider
 import id.walt.webwallet.utils.JsonUtils
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -41,6 +42,7 @@ object WalletCredentials : Table("credentials") {
 
 @Serializable
 data class WalletCredential @OptIn(ExperimentalUuidApi::class) constructor(
+    @Contextual
     val wallet: Uuid,
     val id: String,
     val document: String,

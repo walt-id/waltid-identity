@@ -6,6 +6,7 @@ import id.walt.webwallet.service.WalletService
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -36,8 +37,11 @@ object WalletOperationHistories : UUIDTable("wallet_operation_histories") {
 @Serializable
 data class WalletOperationHistory(
     val tenant: String,
+    @Contextual
     val id: Uuid? = Uuid.random(),
+    @Contextual
     val account: Uuid,
+    @Contextual
     val wallet: Uuid,
     val timestamp: Instant,
     val operation: String,
