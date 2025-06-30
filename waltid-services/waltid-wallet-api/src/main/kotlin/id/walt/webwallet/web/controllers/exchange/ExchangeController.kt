@@ -41,7 +41,8 @@ fun Application.exchange() = walletRoute {
                 queryParameter<String>("did") { description = "The DID to issue the credential(s) to" }
                 queryParameter<Boolean>("requireUserInput") { description = "Whether to claim as pending acceptance" }
                 queryParameter<String>("pinOrTxCode") {
-                    description = "The `pin` (Draft11), or `tx_code` (Draft13 and onwards), value that may be required as part of a pre-authorized code (credential issuance) flow"
+                    description =
+                        "The `pin` (Draft11), or `tx_code` (Draft13 and onwards), value that may be required as part of a pre-authorized code (credential issuance) flow"
                 }
                 body<String> {
                     description = "The offer request to use"
@@ -94,13 +95,16 @@ fun Application.exchange() = walletRoute {
             response {
                 HttpStatusCode.OK to {
                     description = "Credentials that match the presentation definition"
-                    body<List<JsonObject>> {}
+                    body<List<JsonObject>>()
                 }
             }
         }) {
             val presentationDefinition = PresentationDefinition.fromJSON(call.receive<JsonObject>())
             val matchedCredentials =
-                WalletServiceManager.matchCredentialsForPresentationDefinition(call.getWalletId(), presentationDefinition)
+                WalletServiceManager.matchCredentialsForPresentationDefinition(
+                    call.getWalletId(),
+                    presentationDefinition
+                )
             call.respond(matchedCredentials)
         }
         post("unmatchedCredentialsForPresentationDefinition", {
@@ -113,7 +117,7 @@ fun Application.exchange() = walletRoute {
             response {
                 HttpStatusCode.OK to {
                     description = "Filters that failed to fulfill the presentation definition"
-                    body<List<FilterData>> {}
+                    body<List<FilterData>>()
                 }
             }
         }) {
@@ -232,7 +236,7 @@ fun Application.exchange() = walletRoute {
             response {
                 HttpStatusCode.OK to {
                     description = "Resolved credential offer"
-                    body<CredentialOffer> {}
+                    body<CredentialOffer>()
                 }
             }
         }) {
@@ -246,7 +250,8 @@ fun Application.exchange() = walletRoute {
             call.respondText(serializedOffer, ContentType.Application.Json)
         }
         get("resolveVctUrl", {
-            summary = "Receive an verifiable credential type (VCT) URL and return resolved vct object as described in IETF SD-JWT VC"
+            summary =
+                "Receive an verifiable credential type (VCT) URL and return resolved vct object as described in IETF SD-JWT VC"
             request {
                 queryParameter<String>("vct") {
                     description = "The value of the vct in URL format"
@@ -285,7 +290,8 @@ fun Application.exchange() = walletRoute {
             }
         }) {
             val issuer = call.request.queryParameters["issuer"] ?: throw BadRequestException("Issuer base url not set")
-            val serializedMetadata = Json.encodeToString(OpenIDProviderMetadataSerializer, OpenID4VCI.resolveCIProviderMetadata(issuer))
+            val serializedMetadata =
+                Json.encodeToString(OpenIDProviderMetadataSerializer, OpenID4VCI.resolveCIProviderMetadata(issuer))
             call.respondText(serializedMetadata, ContentType.Application.Json)
         }
     }
