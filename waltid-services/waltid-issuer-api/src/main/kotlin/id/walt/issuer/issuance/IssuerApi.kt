@@ -5,12 +5,17 @@ import id.walt.did.dids.DidService
 import id.walt.issuer.issuance.OidcApi.buildCredentialOfferUri
 import id.walt.issuer.issuance.OidcApi.buildOfferUri
 import id.walt.issuer.issuance.OidcApi.getFormatByCredentialConfigurationId
-import id.walt.issuer.issuance.openapi.MdocDocs
+import id.walt.issuer.issuance.openapi.issuerapi.JwtDocs.getJwtBatchDocs
+import id.walt.issuer.issuance.openapi.issuerapi.JwtDocs.getJwtDocs
+import id.walt.issuer.issuance.openapi.issuerapi.MdocDocs.getMdocsDocs
+import id.walt.issuer.issuance.openapi.issuerapi.SdJwtDocs.getSdJwtBatchDocs
+import id.walt.issuer.issuance.openapi.issuerapi.SdJwtDocs.getSdJwtDocs
+import id.walt.issuer.issuance.openapi.issuerapi.IssuanceRequestErrors
+import id.walt.issuer.issuance.openapi.issuerapi.RawJwtDocs
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.w3c.vc.vcs.W3CVC
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.github.smiley4.ktoropenapi.config.RequestConfig
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
@@ -38,10 +43,10 @@ fun createCredentialOfferUri(
     val overwrittenIssuanceRequests = issuanceRequests.map {
         it.copy(
             credentialFormat = credentialFormat,
-            vct = if (credentialFormat == CredentialFormat.sd_jwt_vc) OidcApi.metadata.getVctByCredentialConfigurationId(
-                it.credentialConfigurationId
-            )
-                ?: throw IllegalArgumentException("VCT not found") else null
+            vct = if (credentialFormat == CredentialFormat.sd_jwt_vc)
+                OidcApi.metadata.getVctByCredentialConfigurationId(
+                    it.credentialConfigurationId
+                ) ?: throw IllegalArgumentException("VCT not found") else null
         )
     }
 
@@ -57,30 +62,21 @@ fun createCredentialOfferUri(
     val offerRequest = CredentialOfferRequest(
         credentialOffer = null,
         credentialOfferUri = buildCredentialOfferUri(
-            overwrittenIssuanceRequests.first().standardVersion!!,
-            issuanceSession.id
+            standardVersion = overwrittenIssuanceRequests.first().standardVersion!!,
+            issuanceSessionId = issuanceSession.id
         )
     )
 
     logger.debug { "offerRequest: $offerRequest" }
 
-    val offerUri = buildOfferUri(overwrittenIssuanceRequests.first().standardVersion!!, offerRequest)
+    val offerUri = buildOfferUri(
+        standardVersion = overwrittenIssuanceRequests.first().standardVersion!!,
+        offerRequest = offerRequest
+    )
 
     logger.debug { "Offer URI: $offerUri" }
 
     return offerUri
-}
-
-private const val example_title = "Missing credentialData in the request body."
-
-fun RequestConfig.statusCallbackUriHeader() = headerParameter<String>("statusCallbackUri") {
-    description = "Callback to push state changes of the issuance process to"
-    required = false
-}
-
-fun RequestConfig.sessionTtlHeader() = headerParameter<Long>("sessionTtl") {
-    description = "Custom session time-to-live in seconds"
-    required = false
 }
 
 fun Application.issuerApi() {
@@ -88,15 +84,6 @@ fun Application.issuerApi() {
         route("", {
             tags = listOf("Credential Issuance")
         }) {
-//            fun RequestConfig.statusCallbackUriHeader() = headerParameter<String>("statusCallbackUri") {
-//                description = "Callback to push state changes of the issuance process to"
-//                required = false
-//            }
-//
-//            fun RequestConfig.sessionTtlHeader() = headerParameter<Long>("sessionTtl") {
-//                description = "Custom session time-to-live in seconds"
-//                required = false
-//            }
 
             fun RoutingContext.getCallbackUriHeader() = call.request.header("statusCallbackUri")
 
@@ -104,343 +91,118 @@ fun Application.issuerApi() {
 
             route("raw") {
                 route("jwt") {
-                    post("sign", {
-                        summary = "Signs credential without using an credential exchange mechanism."
-                        description =
-                            "This endpoint issues (signs) an Verifiable Credential, but does not utilize an credential exchange " + "mechanism flow like OIDC or DIDComm to adapt and send the signed credential to an user. This means, that the " + "caller will have to utilize such an credential exchange mechanism themselves."
-
-                        request {
-                            body<JsonObject> {
-                                description =
-                                    "Pass the unsigned credential that you intend to sign as the body of the request."
-                                example(
-                                    "UniversityDegreeCredential example",
-                                    IssuanceExamples.universityDegreeSignRequestCredentialExample
-                                )
-                                required = true
-                            }
-                        }
-
-                        response {
-                            "200" to {
-                                description = "Signed Credential (with the *proof* attribute added)"
-                                body<String> {
-                                    example(
-                                        "Signed UniversityDegreeCredential example",
-                                        IssuanceExamples.universityDegreeSignResponseCredentialExample
-                                    )
-                                }
-                            }
-                            "400" to {
-                                description = "The request could not be understood or was missing required parameters."
-                                body<String> {
-                                    example("Missing issuerKey in the request body") {
-                                        value = "Missing issuerKey in the request body."
-                                    }
-                                    example("Invalid issuerKey format.") {
-                                        value = "Invalid issuerKey format."
-                                    }
-                                    example("Missing subjectDid in the request body.") {
-                                        value = "Missing subjectDid in the request body."
-                                    }
-                                    example(example_title) {
-                                        value = example_title
-                                    }
-                                    example("Invalid credentialData format.") {
-                                        value = "Invalid credentialData format."
-                                    }
-                                }
-                            }
-                        }
-                    }) {
+                    post("sign", RawJwtDocs.getRawJwtDocs()) {
                         val body = call.receive<JsonObject>()
+
                         validateRawSignatureRequest(body)
+
                         val signedCredential = executeCredentialSigning(body)
-                        call.respond(HttpStatusCode.OK, signedCredential)
+
+                        call.respond(
+                            status = HttpStatusCode.OK,
+                            message = signedCredential
+                        )
                     }
                 }
             }
+
             route("openid4vc") {
-
                 route("jwt") {
-                    post("issue", {
-                        summary = "Signs credential with JWT and starts an OIDC credential exchange flow."
-                        description = "This endpoint issues a W3C Verifiable Credential, and returns an issuance URL "
-
-                        request {
-
-                            statusCallbackUriHeader()
-                            sessionTtlHeader()
-                            body<IssuanceRequest> {
-                                description =
-                                    "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example(
-                                    "OpenBadgeCredential example",
-                                    IssuanceExamples.openBadgeCredentialIssuanceExample
-                                )
-                                example(
-                                    "UniversityDegreeCredential example",
-                                    IssuanceExamples.universityDegreeIssuanceCredentialExample
-                                )
-                                example(
-                                    "OpenBadgeCredential example with Authorization Code Flow and Id Token",
-                                    IssuanceExamples.openBadgeCredentialIssuanceExampleWithIdToken
-                                )
-                                example(
-                                    "OpenBadgeCredential example with Authorization Code Flow and Vp Token",
-                                    IssuanceExamples.openBadgeCredentialIssuanceExampleWithVpToken
-                                )
-                                example(
-                                    "OpenBadgeCredential example with Authorization Code Flow and Username/Password Token",
-                                    IssuanceExamples.openBadgeCredentialIssuanceExampleWithUsernamePassword
-                                )
-                                example(
-                                    "EBSI-VECTOR interoperability test - InTimeIssuance Draft11",
-                                    IssuanceExamples.ebsiCTExampleAuthInTimeDraft11
-                                )
-                                example(
-                                    "EBSI-VECTOR interoperability test - DeferredIssuance Draft11",
-                                    IssuanceExamples.ebsiCTExampleAuthDeferredDraft11
-                                )
-                                example(
-                                    "EBSI-VECTOR interoperability test - PreAuthIssuance Draft11",
-                                    IssuanceExamples.ebsiCTExamplePreAuthDraft11
-                                )
-                                example(
-                                    "EBSI-VECTOR interoperability test - InTimeIssuance Draft13",
-                                    IssuanceExamples.ebsiCTExampleAuthInTimeDraft13
-                                )
-                                example(
-                                    "EBSI-VECTOR interoperability test - DeferredIssuance Draft13",
-                                    IssuanceExamples.ebsiCTExampleAuthDeferredDraft13
-                                )
-                                example(
-                                    "EBSI-VECTOR interoperability test - PreAuthIssuance Draft13",
-                                    IssuanceExamples.ebsiCTExamplePreAuthDraft13
-                                )
-                                required = true
-                            }
-                        }
-
-                        response {
-                            "200" to {
-                                description = "Credential signed (with the *proof* attribute added)"
-                                body<String> {
-                                    example("Issuance URL") {
-                                        value =
-                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
-                                    }
-                                }
-                            }
-                            "400" to {
-                                description =
-                                    "Bad request - The request could not be understood or was missing required parameters."
-                                body<String> {
-                                    example("Missing issuerKey in the request body.") {
-                                        value = "Missing issuerKey in the request body."
-                                    }
-                                    example("Invalid issuerKey format.") {
-                                        value = "Invalid issuerKey format."
-                                    }
-                                    example("Missing issuerDid in the request body.") {
-                                        value = "Missing issuerDid in the request body."
-                                    }
-                                    example("Missing credentialConfigurationId in the request body.") {
-                                        value = "Missing credentialConfigurationId in the request body."
-                                    }
-                                    example(example_title) {
-                                        value = example_title
-                                    }
-                                    example("Invalid credentialData format.") {
-                                        value = "Invalid credentialData format."
-                                    }
-                                }
-                            }
-                        }
-                    }) {
+                    post("issue", getJwtDocs()) {
                         val jwtIssuanceRequest = call.receive<IssuanceRequest>()
                         val offerUri = createCredentialOfferUri(
-                            listOf(jwtIssuanceRequest),
-                            getFormatByCredentialConfigurationId(jwtIssuanceRequest.credentialConfigurationId)
+                            issuanceRequests = listOf(jwtIssuanceRequest),
+                            credentialFormat = getFormatByCredentialConfigurationId(jwtIssuanceRequest.credentialConfigurationId)
                                 ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
-                            getCallbackUriHeader(),
+                            callbackUrl = getCallbackUriHeader(),
                             sessionTtl = getSessionTtl()
                         )
-                        call.respond(HttpStatusCode.OK, offerUri)
+                        call.respond(
+                            status = HttpStatusCode.OK,
+                            message = offerUri
+                        )
                     }
-                    post("issueBatch", {
-                        summary = "Signs a list of credentials and starts an OIDC credential exchange flow."
-                        description =
-                            "This endpoint issues a list of W3C Verifiable Credentials, and returns an issuance URL "
 
-                        request {
-                            statusCallbackUriHeader()
-                            sessionTtlHeader()
-                            body<List<IssuanceRequest>> {
-                                description =
-                                    "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("Batch example", IssuanceExamples.batchExampleJwt)
-                                required = true
-                            }
-                        }
-
-                        response {
-                            "200" to {
-                                description = "Credential signed (with the *proof* attribute added)"
-                                body<String> {
-                                    example("Issuance URL") {
-                                        value =
-                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
-                                    }
-                                }
-                            }
-                        }
-                    }) {
+                    post("issueBatch", getJwtBatchDocs()) {
                         val issuanceRequests = call.receive<List<IssuanceRequest>>()
                         val offerUri = createCredentialOfferUri(
-                            issuanceRequests,
-                            getFormatByCredentialConfigurationId(issuanceRequests.first().credentialConfigurationId)
+                            issuanceRequests = issuanceRequests,
+                            credentialFormat = getFormatByCredentialConfigurationId(issuanceRequests.first().credentialConfigurationId)
                                 ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
-                            getCallbackUriHeader(),
+                            callbackUrl = getCallbackUriHeader(),
                             sessionTtl = getSessionTtl()
                         )
                         logger.debug { "Offer URI: $offerUri" }
-                        call.respond(HttpStatusCode.OK, offerUri)
+                        call.respond(
+                            status = HttpStatusCode.OK,
+                            message = offerUri
+                        )
                     }
                 }
 
                 route("sdjwt") {
-                    post("issue", {
-                        summary = "Signs credential using SD-JWT and starts an OIDC credential exchange flow."
-                        description =
-                            "This endpoint issues a W3C or SD-JWT-VC Verifiable Credential, and returns an issuance URL "
-
-                        request {
-                            statusCallbackUriHeader()
-                            sessionTtlHeader()
-                            body<IssuanceRequest> {
-                                description =
-                                    "Pass the unsigned credential that you intend to issue in the body of the request."
-                                example("W3C SD-JWT example", IssuanceExamples.sdJwtW3CExample)
-                                example("W3C SD-JWT PDA1 example", IssuanceExamples.sdJwtW3CPDA1Example)
-                                example("SD-JWT-VC example", IssuanceExamples.sdJwtVCExample)
-                                example(
-                                    "SD-JWT-VC example featuring selectively disclosable sub and iat claims",
-                                    IssuanceExamples.sdJwtVCExampleWithSDSub
-                                )
-                                example(
-                                    "SD-JWT-VC example with issuer DID",
-                                    IssuanceExamples.sdJwtVCWithIssuerDidExample
-                                )
-                                required = true
-                            }
-                        }
-
-                        response {
-                            "200" to {
-                                description = "Credential signed (with the *proof* attribute added)"
-                                body<String> {
-                                    example("Issuance URL") {
-                                        value =
-                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
-                                    }
-                                }
-                            }
-                        }
-                    }) {
+                    post("issue", getSdJwtDocs()) {
                         val sdJwtIssuanceRequest = call.receive<IssuanceRequest>()
                         val offerUri = createCredentialOfferUri(
-                            listOf(sdJwtIssuanceRequest),
-                            getFormatByCredentialConfigurationId(sdJwtIssuanceRequest.credentialConfigurationId)
+                            issuanceRequests = listOf(sdJwtIssuanceRequest),
+                            credentialFormat = getFormatByCredentialConfigurationId(sdJwtIssuanceRequest.credentialConfigurationId)
                                 ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
-                            getCallbackUriHeader(),
+                            callbackUrl = getCallbackUriHeader(),
                             sessionTtl = getSessionTtl()
                         )
 
                         call.respond(
-                            HttpStatusCode.OK, offerUri
+                            status = HttpStatusCode.OK,
+                            message = offerUri
                         )
                     }
 
-                    post("issueBatch", {
-                        summary = "Signs a list of credentials with SD and starts an OIDC credential exchange flow."
-                        description =
-                            "This endpoint issues a list of W3C Verifiable Credentials, and returns an issuance URL "
-
-                        request {
-                            statusCallbackUriHeader()
-                            sessionTtlHeader()
-                            body<List<IssuanceRequest>> {
-                                description =
-                                    "Pass the unsigned credential that you intend to issue as the body of the request."
-                                example("Batch example", IssuanceExamples.batchExampleSdJwt)
-                                required = true
-                            }
-                        }
-
-                        response {
-                            "200" to {
-                                description = "Credential signed (with the *proof* attribute added)"
-                                body<String> {
-                                    example("Issuance URL") {
-                                        value =
-                                            "openid-credential-offer://localhost/?credential_offer=%7B%22credential_issuer%22%3A%22http%3A%2F%2Flocalhost%3A8000%22%2C%22credentials%22%3A%5B%22VerifiableId%22%5D%2C%22grants%22%3A%7B%22authorization_code%22%3A%7B%22issuer_state%22%3A%22501414a4-c461-43f0-84b2-c628730c7c02%22%7D%7D%7D"
-                                    }
-                                }
-                            }
-                        }
-                    }) {
+                    post("issueBatch", getSdJwtBatchDocs()) {
                         val sdJwtIssuanceRequests = call.receive<List<IssuanceRequest>>()
                         val offerUri =
                             createCredentialOfferUri(
-                                sdJwtIssuanceRequests,
-                                getFormatByCredentialConfigurationId(sdJwtIssuanceRequests.first().credentialConfigurationId)
+                                issuanceRequests = sdJwtIssuanceRequests,
+                                credentialFormat = getFormatByCredentialConfigurationId(sdJwtIssuanceRequests.first().credentialConfigurationId)
                                     ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
-                                getCallbackUriHeader(),
+                                callbackUrl = getCallbackUriHeader(),
                                 sessionTtl = getSessionTtl()
                             )
 
                         logger.debug { "Offer URI: $offerUri" }
 
                         call.respond(
-                            HttpStatusCode.OK, offerUri
+                            status = HttpStatusCode.OK,
+                            message = offerUri
                         )
                     }
                 }
 
                 route("mdoc") {
-                    post("issue", {
-                        summary = "Signs a credential based on the IEC/ISO18013-5 mdoc/mDL format."
-                        description = "This endpoint issues a mdoc and returns an issuance URL "
-
-                        request(MdocDocs.requestConfig())
-                    }) {
+                    post("issue", getMdocsDocs()) {
                         val mdocIssuanceRequest = call.receive<IssuanceRequest>()
                         val offerUri = createCredentialOfferUri(
-                            listOf(mdocIssuanceRequest),
-                            getFormatByCredentialConfigurationId(mdocIssuanceRequest.credentialConfigurationId)
+                            issuanceRequests = listOf(mdocIssuanceRequest),
+                            credentialFormat = getFormatByCredentialConfigurationId(mdocIssuanceRequest.credentialConfigurationId)
                                 ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
-                            getCallbackUriHeader(),
+                            callbackUrl = getCallbackUriHeader(),
                             sessionTtl = getSessionTtl()
                         )
-
                         call.respond(
-                            HttpStatusCode.OK, offerUri
+                            status = HttpStatusCode.OK,
+                            message = offerUri
                         )
                     }
                 }
-
             }
         }
     }
 }
 
-private fun validateRawSignatureRequest(body: JsonObject) {
-    requireNotNull(body["issuerKey"]?.jsonObject) { "Missing issuerKey in the request body." }
-    requireNotNull(body["subjectDid"]?.jsonPrimitive?.content) { "Missing subjectDid in the request body." }
-    requireNotNull(body["credentialData"]?.jsonObject) { example_title }
+fun validateRawSignatureRequest(body: JsonObject) {
+    requireNotNull(body["issuerKey"]?.jsonObject) { IssuanceRequestErrors.MISSING_ISSUER_KEY }
+    requireNotNull(body["subjectDid"]?.jsonPrimitive?.content) { IssuanceRequestErrors.MISSING_SUBJECT_DID }
+    requireNotNull(body["credentialData"]?.jsonObject) { IssuanceRequestErrors.MISSING_CREDENTIAL_DATA }
 }
-
 
 private suspend fun <T, k : Exception> executeWrapping(
     runner: suspend () -> T, exception: KClass<k>, message: (() -> String)? = null

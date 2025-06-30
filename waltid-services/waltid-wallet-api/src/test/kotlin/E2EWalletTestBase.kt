@@ -2,7 +2,7 @@
 
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
-import id.walt.issuer.issuance.IssuanceExamples
+import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
 import id.walt.issuer.issuance.IssuerOnboardingResponse
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.db.models.WalletDid

@@ -12,21 +12,21 @@ import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class InputDescriptorSchema(
-  val uri: String,
-  override val customParameters: Map<String, JsonElement> = mapOf()
-): JsonDataObject() {
-  override fun toJSON(): JsonObject {
-    TODO("Not yet implemented")
-  }
+    val uri: String,
+    override val customParameters: Map<String, JsonElement> = mapOf()
+) : JsonDataObject() {
+    override fun toJSON(): JsonObject {
+        TODO("Not yet implemented")
+    }
 }
 
 object InputDescriptorSchemaSerializer :
-  JsonDataObjectSerializer<InputDescriptorSchema>(InputDescriptorSchema.serializer())
+    JsonDataObjectSerializer<InputDescriptorSchema>(InputDescriptorSchema.serializer())
 
 object InputDescriptorSchemaListSerializer : KSerializer<List<InputDescriptorSchema>> {
-  private val internalSerializer = ListSerializer(InputDescriptorSchemaSerializer)
-  override val descriptor = internalSerializer.descriptor
-  override fun deserialize(decoder: Decoder) = internalSerializer.deserialize(decoder)
-  override fun serialize(encoder: Encoder, value: List<InputDescriptorSchema>) =
-    internalSerializer.serialize(encoder, value)
+    private val internalSerializer = ListSerializer(InputDescriptorSchemaSerializer)
+    override val descriptor = internalSerializer.descriptor
+    override fun deserialize(decoder: Decoder) = internalSerializer.deserialize(decoder)
+    override fun serialize(encoder: Encoder, value: List<InputDescriptorSchema>) =
+        internalSerializer.serialize(encoder, value)
 }

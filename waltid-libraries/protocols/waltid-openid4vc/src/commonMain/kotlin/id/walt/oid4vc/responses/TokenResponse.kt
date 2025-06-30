@@ -51,16 +51,29 @@ data class TokenResponse private constructor(
             accessToken: String, tokenType: String, expiresIn: Long? = null, refreshToken: String? = null,
             scope: String? = null, cNonce: String? = null, cNonceExpiresIn: Duration? = null,
             authorizationPending: Boolean? = null, interval: Long? = null, state: String? = null
-        ) = TokenResponse(accessToken, tokenType, expiresIn, refreshToken, scope = scope,
+        ) = TokenResponse(
+            accessToken, tokenType, expiresIn, refreshToken, scope = scope,
             cNonce = cNonce, cNonceExpiresIn = cNonceExpiresIn, authorizationPending = authorizationPending,
-            interval = interval, state = state)
+            interval = interval, state = state
+        )
 
         /**
          * Utility method to construct a success response for a verifiable presentation request
          * @param vpToken Utility object that aids the construction of the parameter value, according [OpenID Spec section 6.1](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-6.1), which defines this as a single string, single JSON object, or a JSON array of strings and/or objects, depending on the presentation format.
          */
-        fun success(vpToken: VpTokenParameter, presentationSubmission: PresentationSubmission?, idToken: String?, state: String?) =
-            TokenResponse(vpToken = vpToken.toJsonElement(), presentationSubmission = presentationSubmission, idToken = idToken, state = state)
+        fun success(
+            vpToken: VpTokenParameter,
+            presentationSubmission: PresentationSubmission?,
+            idToken: String?,
+            state: String?
+        ) =
+            TokenResponse(
+                vpToken = vpToken.toJsonElement(),
+                presentationSubmission = presentationSubmission,
+                idToken = idToken,
+                state = state
+            )
+
         fun error(error: TokenErrorCode, errorDescription: String? = null, errorUri: String? = null) =
             TokenResponse(error = error.name, errorDescription = errorDescription, errorUri = errorUri)
 
@@ -83,7 +96,7 @@ data class TokenResponse private constructor(
         )
 
         fun fromHttpParameters(parameters: Map<String, List<String>>): TokenResponse {
-            if(isDirectPostJWT(parameters)) throw IllegalArgumentException("The given POST parameters are in direct_post.jwt format, use fromDirectPostJwt instead")
+            if (isDirectPostJWT(parameters)) throw IllegalArgumentException("The given POST parameters are in direct_post.jwt format, use fromDirectPostJwt instead")
             return TokenResponse(
                 parameters["access_token"]?.firstOrNull(),
                 parameters["token_type"]?.firstOrNull(),
@@ -110,7 +123,7 @@ data class TokenResponse private constructor(
         fun isDirectPostJWT(parameters: Map<String, List<String>>) = parameters.containsKey("response")
 
         fun fromDirectPostJWT(parameters: Map<String, List<String>>, encKeyJwk: JsonObject): TokenResponse {
-            if(!isDirectPostJWT(parameters)) throw IllegalArgumentException("The given parameters are not in direct_post.jwt format, use fromHttpParameters instead")
+            if (!isDirectPostJWT(parameters)) throw IllegalArgumentException("The given parameters are not in direct_post.jwt format, use fromHttpParameters instead")
 
             val response = parameters["response"]!!.first()
             return JweUtils.parseJWE(response, encKeyJwk.toString()).let {
@@ -144,8 +157,10 @@ data class TokenResponse private constructor(
     /**
      * Converts the token response to a direct_post.jwt response, where currently only a JWE-only response is supported.
      */
-    fun toDirecPostJWTParameters(encKeyJwk: JsonObject, alg: String = "ECDH-ES", enc: String = "A256GCM",
-                                 headerParams: Map<String, JsonElement> = mapOf()): Map<String, List<String>> {
+    fun toDirecPostJWTParameters(
+        encKeyJwk: JsonObject, alg: String = "ECDH-ES", enc: String = "A256GCM",
+        headerParams: Map<String, JsonElement> = mapOf()
+    ): Map<String, List<String>> {
         return mapOf(
             "response" to listOf(JweUtils.toJWE(toJSON(), encKeyJwk.toString(), alg, enc, headerParams))
         )

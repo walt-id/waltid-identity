@@ -22,8 +22,10 @@ data class AuthorizationJSONRequest(
     override fun toJSON() = Json.encodeToJsonElement(AuthorizationJSONRequestSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<AuthorizationJSONRequest>() {
-        override fun fromJSON(jsonObject: JsonObject) = Json.decodeFromJsonElement(AuthorizationJSONRequestSerializer, jsonObject)
+        override fun fromJSON(jsonObject: JsonObject) =
+            Json.decodeFromJsonElement(AuthorizationJSONRequestSerializer, jsonObject)
     }
 }
 
-object AuthorizationJSONRequestSerializer : JsonDataObjectSerializer<AuthorizationJSONRequest>(AuthorizationJSONRequest.serializer())
+object AuthorizationJSONRequestSerializer :
+    JsonDataObjectSerializer<AuthorizationJSONRequest>(AuthorizationJSONRequest.serializer())

@@ -147,8 +147,14 @@ internal object DataElementSerializer : KSerializer<DataElement> {
                 encoder.encodeTag(TIME.toULong())
                 when (attribute.mode) {
                     DEDateTimeMode.time_int -> encoder.encodeLong(dateTime.value.epochSeconds)
-                    DEDateTimeMode.time_float -> encoder.encodeFloat(dateTime.value.toEpochMilliseconds().toFloat() / 1000f)
-                    DEDateTimeMode.time_double -> encoder.encodeDouble(dateTime.value.toEpochMilliseconds().toDouble() / 1000.0)
+                    DEDateTimeMode.time_float -> encoder.encodeFloat(
+                        dateTime.value.toEpochMilliseconds().toFloat() / 1000f
+                    )
+
+                    DEDateTimeMode.time_double -> encoder.encodeDouble(
+                        dateTime.value.toEpochMilliseconds().toDouble() / 1000.0
+                    )
+
                     else -> {} // not possible
                 }
             }
@@ -196,7 +202,11 @@ internal object DataElementSerializer : KSerializer<DataElement> {
     private fun deserializeFullDate(decoder: Decoder, tag: Long): FullDateElement {
         return when (tag) {
             FULL_DATE_STR -> FullDateElement(LocalDate.parse(decoder.decodeString()), DEFullDateMode.full_date_str)
-            FULL_DATE_INT -> FullDateElement(LocalDate.fromEpochDays(decoder.decodeLong().toInt()), DEFullDateMode.full_date_int)
+            FULL_DATE_INT -> FullDateElement(
+                LocalDate.fromEpochDays(decoder.decodeLong().toInt()),
+                DEFullDateMode.full_date_int
+            )
+
             else -> throw SerializationException("Unsupported tag number for full-date: #6.$tag, supported tags are #6.1004, #6.100")
         }
     }
@@ -216,7 +226,12 @@ abstract class DataElement(
     override fun equals(other: Any?): Boolean {
         val res = other is DataElement && other.type == type && when (type) {
             DEType.byteString, DEType.encodedCbor -> (internalValue as ByteArray).contentEquals(other.internalValue as ByteArray)
-            DEType.list -> (internalValue as List<DataElement>).all { (other.internalValue as List<DataElement>).contains(it) }
+            DEType.list -> (internalValue as List<DataElement>).all {
+                (other.internalValue as List<DataElement>).contains(
+                    it
+                )
+            }
+
             DEType.map -> (internalValue as Map<MapKey, DataElement>).all { (other.internalValue as Map<MapKey, DataElement>)[it.key] == it.value }
             else -> internalValue == other.internalValue
         }

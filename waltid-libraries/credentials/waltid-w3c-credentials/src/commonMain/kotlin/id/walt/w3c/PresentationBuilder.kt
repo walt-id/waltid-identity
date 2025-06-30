@@ -78,6 +78,7 @@ class PresentationBuilder {
 
     fun buildPresentationJson() = buildPresentationMap().toJsonElement()
     fun buildPresentationJsonString() = Json.encodeToString(buildPresentationJson())
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
