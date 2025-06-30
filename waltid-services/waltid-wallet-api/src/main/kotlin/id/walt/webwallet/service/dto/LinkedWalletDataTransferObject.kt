@@ -2,8 +2,8 @@
 
 package id.walt.webwallet.service.dto
 
-import id.walt.commons.temp.UuidSerializer
 import id.walt.webwallet.db.models.Web3Wallets
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.ResultRow
 import kotlin.uuid.ExperimentalUuidApi
@@ -11,7 +11,7 @@ import kotlin.uuid.Uuid
 
 @Serializable
 data class LinkedWalletDataTransferObject(
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    @Contextual
     val id: Uuid,
     val address: String,
     val ecosystem: String,

@@ -2,10 +2,10 @@
 
 package id.walt.webwallet.db.models
 
-import id.walt.commons.temp.UuidSerializer
 import id.walt.webwallet.db.kotlinxUuid
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import org.jetbrains.exposed.sql.ResultRow
@@ -16,6 +16,7 @@ import kotlin.uuid.Uuid
 
 object Accounts : Table("accounts") {
     val tenant = varchar("tenant", 128).default("")
+    @OptIn(ExperimentalUuidApi::class)
     val id = kotlinxUuid("id").uniqueIndex()
 
     val name = varchar("name", 128).nullable()
@@ -27,6 +28,7 @@ object Accounts : Table("accounts") {
 
     val createdOn = timestamp("createdOn")
 
+    @OptIn(ExperimentalUuidApi::class)
     override val primaryKey = PrimaryKey(tenant, id)
 
     /*
@@ -42,7 +44,7 @@ object Accounts : Table("accounts") {
 @Serializable
 data class Account(
     val tenant: String,
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    @Contextual
     val id: Uuid,
     val name: String? = null,
     val email: String? = null,
