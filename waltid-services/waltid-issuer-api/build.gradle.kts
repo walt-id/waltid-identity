@@ -12,7 +12,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
 
-    id("io.ktor.plugin") version "3.1.3" // Versions.KTOR_VERSION
+    id("io.ktor.plugin") version "3.2.0" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.2.0"
     id("com.github.jk1.dependency-license-report") version "2.9"
     id("com.github.ben-manes.versions")
