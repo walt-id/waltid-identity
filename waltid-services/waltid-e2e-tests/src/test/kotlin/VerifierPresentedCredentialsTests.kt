@@ -2,19 +2,36 @@
 
 import id.walt.commons.testing.E2ETest.test
 import id.walt.commons.testing.E2ETest.testHttpClient
+import id.walt.commons.testing.utils.ServiceTestUtils
 import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.did.dids.DidService
+import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.issuer.issuance.openapi.issuerapi.MdocDocs
+import id.walt.oid4vc.data.ResponseMode
+import id.walt.sdjwt.SDField
+import id.walt.sdjwt.SDMap
+import id.walt.verifier.oidc.PresentationSessionInfo
+import id.walt.verifier.openapi.VerifierApiExamples
+import id.walt.w3c.utils.VCFormat
 import id.walt.webwallet.db.models.AccountWalletListing
+import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.service.keys.SingleKeyResponse
+import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.*
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -36,12 +53,362 @@ class VerifierPresentedCredentialsTests {
 
     private val client = testHttpClient()
 
+    private val issuerKey = runBlocking {
+        KeyManager.createKey(
+            generationRequest = KeyGenerationRequest(
+                keyType = KeyType.secp256r1,
+            )
+        )
+    }
+
+    private val issuerKeyForRequest = buildJsonObject {
+        put("type", "jwk".toJsonElement())
+        put("jwk", runBlocking {
+            issuerKey.exportJWKObject()
+        })
+    }
+
+    private val issuerDid = runBlocking {
+        DidService.registerByKey(
+            method = "key",
+            key = issuerKey,
+        ).did
+    }
+
+    private val universityDegreeNoDisclosuresIssuanceRequest = Json.decodeFromString<IssuanceRequest>(
+        """
+        {
+          "issuerKey": {
+            "type": "jwk",
+            "jwk": {
+              "kty": "OKP",
+              "d": "JvJIpga2GD8LJeRu4Sv-mL4thE31DuFlr9PA04CIoZY",
+              "crv": "Ed25519",
+              "kid": "iJMS5bkZVIlncfq_Lf_SuxJ2JtQ5Hvaz7tWPnAjUUds",
+              "x": "FZdvwC8aGhRwqzWptej0NZgtwYAI1SyFg1mKDETOfqE"
+            }
+          },
+          "issuerDid": "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5Iiwia2lkIjoiaUpNUzVia1pWSWxuY2ZxX0xmX1N1eEoySnRRNUh2YXo3dFdQbkFqVVVkcyIsIngiOiJGWmR2d0M4YUdoUndxeldwdGVqME5aZ3R3WUFJMVN5RmcxbUtERVRPZnFFIn0",
+          "credentialConfigurationId": "UniversityDegree_jwt_vc_json",
+          "credentialData": {
+            "@context": [
+              "https://www.w3.org/2018/credentials/v1",
+              "https://www.w3.org/2018/credentials/examples/v1"
+            ],
+            "id": "http://example.gov/credentials/3732",
+            "type": [
+              "VerifiableCredential",
+              "UniversityDegree"
+            ],
+            "issuer": {
+              "id": "did:web:vc.transmute.world"
+            },
+            "issuanceDate": "2020-03-10T04:24:12.164Z",
+            "credentialSubject": {
+              "id": "did:example:ebfeb1f712ebc6f1c276e12ec21",
+              "degree": {
+                "type": "BachelorDegree",
+                "name": "Bachelor of Science and Arts"
+              }
+            }
+          },
+          "mapping": {
+            "id": "<uuid>",
+            "issuerDid": "<issuerDid>",
+            "issuer": {
+              "id": "<issuerDid>"
+            },
+            "credentialSubject": {
+              "id": "<subjectDid>"
+            },
+            "issuanceDate": "<timestamp>",
+            "expirationDate": "<timestamp-in:365d>"
+          },
+          "authenticationMethod": "PRE_AUTHORIZED",
+          "standardVersion": "DRAFT13"
+        }
+    """.trimIndent()
+    ).copy(
+        issuerKey = issuerKeyForRequest,
+        issuerDid = issuerDid,
+    )
+
+
+    private lateinit var universityDegreeNoDisclosuresWalletCredentialId: String
+    private val universityDegreeNoDisclosurePresentationRequest = buildJsonObject {
+        put("request_credentials", buildJsonArray {
+            addJsonObject {
+                put("format", VCFormat.jwt_vc_json.toJsonElement())
+                put("type", "UniversityDegreeCredential".toJsonElement())
+            }
+        })
+    }
+
+    private val openBadgeNoDisclosuresIssuanceRequest = Json.decodeFromString<IssuanceRequest>(
+        string = ServiceTestUtils.loadResource("issuance/openbadgecredential-issuance-request.json")
+    ).copy(
+        issuerKey = issuerKeyForRequest,
+        issuerDid = issuerDid,
+    )
+    private lateinit var openBadgeNoDisclosuresWalletCredentialId: String
+    private val openBadgeNoDisclosurePresentationRequest = buildJsonObject {
+        put("request_credentials", buildJsonArray {
+            addJsonObject {
+                put("format", VCFormat.jwt_vc_json.toJsonElement())
+                put("type", "OpenBadgeCredential".toJsonElement())
+            }
+        })
+    }
+
+    private val universityDegreeWithDisclosuresIssuanceRequest = universityDegreeNoDisclosuresIssuanceRequest.copy(
+        credentialData = universityDegreeNoDisclosuresIssuanceRequest.credentialData,
+        selectiveDisclosure = SDMap(
+            fields = mapOf(
+                "issuanceDate" to SDField(true),
+                "credentialSubject" to SDField(
+                    sd = false,
+                    children = SDMap(
+                        fields = mapOf(
+                            "degree" to SDField(
+                                sd = false,
+                                children = SDMap(
+                                    fields = mapOf(
+                                        "name" to SDField(true),
+                                    )
+                                ),
+                            ),
+                        )
+                    ),
+                ),
+            ),
+        ),
+    )
+    private lateinit var universityDegreeWithDisclosuresWalletCredentialId: String
+    private lateinit var universityDegreeDisclosures: List<String>
+    private val universityDegreeWithDisclosuresPresentationRequest = Json.decodeFromString<JsonObject>(
+        """
+        {
+            "vp_policies": [
+                "signature",
+                "expired",
+                "not-before",
+                "presentation-definition"
+            ],
+            "vc_policies": [
+                "signature",
+                "expired",
+                "not-before"
+            ],
+            "request_credentials": [
+                {
+                    "type": "OpenBadgeCredential",
+                    "input_descriptor": {
+                        "id": "some-id-id",
+                        "format": {
+                            "jwt_vc_json": {}
+                        },
+                        "constraints": {
+                            "fields": [
+                                {
+                                    "path": [
+                                        "${'$'}.vc.issuanceDate"
+                                    ],
+                                    "filter": {
+                                        "type": "string",
+                                        "pattern": ".*"
+                                    }
+                                },
+                                {
+                                    "path": [
+                                        "${'$'}.vc.credentialSubject.degree.name"
+                                    ],
+                                    "filter": {
+                                        "type": "string",
+                                        "pattern": ".*"
+                                    }
+                                }                                
+                            ],
+                            "limit_disclosure": "required"
+                        }
+                    }
+                }
+            ]
+        }
+    """.trimIndent()
+    )
+
+    private val openBadgeWithDisclosuresIssuanceRequest = openBadgeNoDisclosuresIssuanceRequest.copy(
+        credentialData = openBadgeNoDisclosuresIssuanceRequest.credentialData,
+        selectiveDisclosure = SDMap(
+            fields = mapOf(
+                "issuanceDate" to SDField(true),
+                "name" to SDField(true),
+            ),
+        ),
+    )
+    private lateinit var openBadgeWithDisclosuresWalletCredentialId: String
+    private lateinit var openBadgeDisclosures: List<String>
+    private val openBadgeWithDisclosuresPresentationRequest = Json.decodeFromString<JsonObject>(
+        """
+        {
+            "vp_policies": [
+                "signature",
+                "expired",
+                "not-before",
+                "presentation-definition"
+            ],
+            "vc_policies": [
+                "signature",
+                "expired",
+                "not-before"
+            ],
+            "request_credentials": [
+                {
+                    "type": "OpenBadgeCredential",
+                    "input_descriptor": {
+                        "id": "some-id-id",
+                        "format": {
+                            "jwt_vc_json": {}
+                        },
+                        "constraints": {
+                            "fields": [
+                                {
+                                    "path": [
+                                        "${'$'}.vc.issuanceDate"
+                                    ],
+                                    "filter": {
+                                        "type": "string",
+                                        "pattern": ".*"
+                                    }
+                                },
+                                {
+                                    "path": [
+                                        "${'$'}.vc.expirationDate"
+                                    ],
+                                    "filter": {
+                                        "type": "string",
+                                        "pattern": ".*"
+                                    }
+                                }                                
+                            ],
+                            "limit_disclosure": "required"
+                        }
+                    }
+                }
+            ]
+        }
+    """.trimIndent()
+    )
+
+    private val sdJwtVcIssuanceRequest = Json.decodeFromString<IssuanceRequest>(
+        """
+        {
+            "issuerKey": {
+                "type": "jwk",
+                "jwk": {
+                    "kty": "EC",
+                    "d": "KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ",
+                    "crv": "P-256",
+                    "x": "G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM",
+                    "y": "ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"
+                }
+            },
+            "credentialConfigurationId": "identity_credential_vc+sd-jwt",
+            "credentialData": {
+                "given_name": "John",
+                "family_name": "Doe",
+                "email": "johndoe@example.com",
+                "phone_number": "+1-202-555-0101",
+                "address": {
+                    "street_address": "123 Main St",
+                    "locality": "Anytown",
+                    "region": "Anystate",
+                    "country": "US"
+                },
+                "birthdate": "1940-01-01",
+                "is_over_18": true,
+                "is_over_21": true,
+                "is_over_65": true
+            },
+            "mapping": {
+                "id": "<uuid>",
+                "iat": "<timestamp-seconds>",
+                "nbf": "<timestamp-seconds>",
+                "exp": "<timestamp-in-seconds:365d>"
+            },
+            "selectiveDisclosure": {
+                "fields": {
+                    "birthdate": {
+                        "sd": true
+                    },
+                    "family_name": {
+                        "sd": true
+                    }
+                }
+            },
+            "x5Chain": [
+                "-----BEGIN CERTIFICATE-----\nMIIBeTCCAR8CFHrWgrGl5KdefSvRQhR+aoqdf48+MAoGCCqGSM49BAMCMBcxFTATBgNVBAMMDE1ET0MgUk9PVCBDQTAgFw0yNTA1MTQxNDA4MDlaGA8yMDc1MDUwMjE0MDgwOVowZTELMAkGA1UEBhMCQVQxDzANBgNVBAgMBlZpZW5uYTEPMA0GA1UEBwwGVmllbm5hMRAwDgYDVQQKDAd3YWx0LmlkMRAwDgYDVQQLDAd3YWx0LmlkMRAwDgYDVQQDDAd3YWx0LmlzMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG0RINBiF+oQUD3d5DGnegQuXenI29JDaMGoMvioKRBN53d4UazakS2unu8BnsEtxutS2kqRhYBPYk9RAriU3gTAKBggqhkjOPQQDAgNIADBFAiAOMwM7hH7q9Di+mT6qCi4LvB+kH8OxMheIrZ2eRPxtDQIhALHzTxwvN8Udt0Z2Cpo8JBihqacfeXkIxVAO8XkxmXhB\n-----END CERTIFICATE-----"
+            ]
+        }
+    """.trimIndent()
+    )
+    private lateinit var sdJwtVcWalletCredentialId: String
+    private lateinit var sdJwtVcDisclosures: List<String>
+    private val sdJwtVcPresentationRequest = Json.decodeFromString<JsonObject>(
+        """
+        {
+            "request_credentials": [
+                {
+                    "format": "vc+sd-jwt",
+                    "vct": "https://issuer.portal.walt-test.cloud/identity_credential",
+                    "input_descriptor": {
+                        "id": "some-id-id",
+                        "format": {
+                            "vc+sd-jwt": {}
+                        },
+                        "constraints": {
+                            "fields": [
+                                {
+                                    "path": [
+                                        "${'$'}.birthdate"
+                                    ],
+                                    "filter": {
+                                        "type": "string",
+                                        "pattern": ".*"
+                                    }
+                                }
+                            ],
+                            "limit_disclosure": "required"
+                        }
+                    }
+                }
+            ],
+            "vp_policies": [
+                "signature_sd-jwt-vc",
+                "presentation-definition"
+            ],
+            "vc_policies": [
+                "not-before",
+                "expired"
+            ]
+        }
+    """.trimIndent()
+    )
+
+    private lateinit var mDLWalletCredentialId: String
+
     private suspend fun setupTestSuite() {
         createWallet()
         deleteAllKeys()
         deleteAllDids()
         createSecp256r1Key()
         createDefaultDid()
+        issueUniDegreeNoDisclosures()
+        issueUniDegreeWithDisclosures()
+        issueOpenBadgeNoDisclosures()
+        issueSdJwtVc()
+        issueMdl()
+        issueOpenBadgeWithDisclosures()
     }
 
     private suspend fun createWallet() =
@@ -131,8 +498,309 @@ class VerifierPresentedCredentialsTests {
             }.expectSuccess()
         }
 
+    private suspend fun issueUniDegreeNoDisclosures() =
+        test(
+            name = "${TEST_SUITE}: Setup step #6: Issue university degree credential with no disclosures to wallet"
+        ) {
+            val offerUrl = client.post("/openid4vc/jwt/issue") {
+                setBody(universityDegreeNoDisclosuresIssuanceRequest)
+            }.expectSuccess().bodyAsText()
+
+            universityDegreeNoDisclosuresWalletCredentialId =
+                walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/useOfferRequest") {
+                    setBody(offerUrl)
+                }.expectSuccess().body<List<WalletCredential>>().first().id
+        }
+
+    private suspend fun issueUniDegreeWithDisclosures() =
+        test(
+            name = "${TEST_SUITE}: Setup step #7: Issue university degree credential with two dummy disclosures to wallet"
+        ) {
+            val offerUrl = client.post("/openid4vc/jwt/issue") {
+                setBody(universityDegreeWithDisclosuresIssuanceRequest)
+            }.expectSuccess().bodyAsText()
+
+            universityDegreeWithDisclosuresWalletCredentialId =
+                walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/useOfferRequest") {
+                    setBody(offerUrl)
+                }.expectSuccess().body<List<WalletCredential>>().first().let {
+                    assertNotNull(it.disclosures)
+                    assertNotEquals("", it.disclosures)
+                    universityDegreeDisclosures = listOf(it.disclosures!!)
+                    it.id
+                }
+        }
+
+    private suspend fun issueOpenBadgeNoDisclosures() =
+        test(
+            name = "${TEST_SUITE}: Setup step #8: Issue open badge credential with no disclosures to wallet"
+        ) {
+            val offerUrl = client.post("/openid4vc/jwt/issue") {
+                setBody(openBadgeNoDisclosuresIssuanceRequest)
+            }.expectSuccess().bodyAsText()
+
+            openBadgeNoDisclosuresWalletCredentialId =
+                walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/useOfferRequest") {
+                    setBody(offerUrl)
+                }.expectSuccess().body<List<WalletCredential>>().first().id
+        }
+
+    private suspend fun issueSdJwtVc() =
+        test(
+            name = "${TEST_SUITE}: Setup step #9: Issue sd jwt vc to wallet"
+        ) {
+            val offerUrl = client.post("/openid4vc/sdjwt/issue") {
+                setBody(sdJwtVcIssuanceRequest)
+            }.expectSuccess().bodyAsText()
+
+            sdJwtVcWalletCredentialId =
+                walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/useOfferRequest") {
+                    setBody(offerUrl)
+                }.expectSuccess().body<List<WalletCredential>>().first().let {
+                    assertNotNull(it.disclosures)
+                    assertNotEquals("", it.disclosures)
+                    sdJwtVcDisclosures = listOf(it.disclosures!!)
+                    it.id
+                }
+        }
+
+    private suspend fun issueMdl() =
+        test(
+            name = "${TEST_SUITE}: Setup step #10: Issue mdl to wallet"
+        ) {
+            val offerUrl = client.post("/openid4vc/mdoc/issue") {
+                setBody(MdocDocs.mdlBaseIssuanceExample)
+            }.expectSuccess().bodyAsText()
+
+            mDLWalletCredentialId =
+                walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/useOfferRequest") {
+                    setBody(offerUrl)
+                }.expectSuccess().body<List<WalletCredential>>().first().id
+        }
+
+    private suspend fun issueOpenBadgeWithDisclosures() =
+        test(
+            name = "${TEST_SUITE}: Setup step #11: Issue open badge credential with two dummy disclosures to wallet"
+        ) {
+            val offerUrl = client.post("/openid4vc/jwt/issue") {
+                setBody(openBadgeWithDisclosuresIssuanceRequest)
+            }.expectSuccess().bodyAsText()
+
+            openBadgeWithDisclosuresWalletCredentialId =
+                walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/useOfferRequest") {
+                    setBody(offerUrl)
+                }.expectSuccess().body<List<WalletCredential>>().first().let {
+                    assertNotNull(it.disclosures)
+                    assertNotEquals("", it.disclosures)
+                    openBadgeDisclosures = listOf(it.disclosures!!)
+                    it.id
+                }
+        }
+
+    private suspend fun presentUniDegreeNoDisclosures() =
+        test(
+            name = "${TEST_SUITE}: Presentation of university degree credential with no disclosures"
+        ) {
+            val sessionId = Uuid.random()
+            val presentationUrl = client.post("/openid4vc/verify") {
+                headers {
+                    append("stateId", sessionId.toString())
+                }
+                setBody(universityDegreeNoDisclosurePresentationRequest)
+            }.expectSuccess().bodyAsText()
+
+
+            walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/usePresentationRequest") {
+                setBody(
+                    UsePresentationRequest(
+                        presentationRequest = presentationUrl,
+                        selectedCredentials = listOf(universityDegreeNoDisclosuresWalletCredentialId),
+                    )
+                )
+            }.expectSuccess()
+
+            client.get("/openid4vc/session/${sessionId}")
+                .expectSuccess().body<PresentationSessionInfo>().let {
+                    assertTrue(it.verificationResult!!)
+                }
+
+            client.get("/openid4vc/session/${sessionId}/presented-credentials")
+                .expectSuccess()
+        }
+
+    private suspend fun presentOpenBadgeNoDisclosures() =
+        test(
+            name = "${TEST_SUITE}: Presentation of open badge credential with no disclosures"
+        ) {
+            val sessionId = Uuid.random()
+            val presentationUrl = client.post("/openid4vc/verify") {
+                headers {
+                    append("stateId", sessionId.toString())
+                }
+                setBody(openBadgeNoDisclosurePresentationRequest)
+            }.expectSuccess().bodyAsText()
+
+
+            walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/usePresentationRequest") {
+                setBody(
+                    UsePresentationRequest(
+                        presentationRequest = presentationUrl,
+                        selectedCredentials = listOf(openBadgeNoDisclosuresWalletCredentialId),
+                    )
+                )
+            }.expectSuccess()
+
+            client.get("/openid4vc/session/${sessionId}")
+                .expectSuccess().body<PresentationSessionInfo>().let {
+                    assertTrue(it.verificationResult!!)
+                }
+
+            client.get("/openid4vc/session/${sessionId}/presented-credentials")
+                .expectSuccess()
+        }
+
+    private suspend fun presentSdJwtVc() =
+        test(
+            name = "${TEST_SUITE}: Presentation of sd jwt vc"
+        ) {
+            val sessionId = Uuid.random()
+            val presentationUrl = client.post("/openid4vc/verify") {
+                headers {
+                    append("stateId", sessionId.toString())
+                }
+                setBody(sdJwtVcPresentationRequest)
+            }.expectSuccess().bodyAsText()
+
+
+            walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/usePresentationRequest") {
+                setBody(
+                    UsePresentationRequest(
+                        presentationRequest = presentationUrl,
+                        selectedCredentials = listOf(sdJwtVcWalletCredentialId),
+                        disclosures = mapOf(
+                            sdJwtVcWalletCredentialId to sdJwtVcDisclosures,
+                        )
+                    )
+                )
+            }.expectSuccess()
+
+            client.get("/openid4vc/session/${sessionId}")
+                .expectSuccess().body<PresentationSessionInfo>().let {
+                    assertTrue(it.verificationResult!!)
+                }
+
+            client.get("/openid4vc/session/${sessionId}/presented-credentials")
+                .expectSuccess()
+        }
+
+    private suspend fun presentMdl() =
+        test(
+            name = "${TEST_SUITE}: Presentation of mDL"
+        ) {
+            val sessionId = Uuid.random()
+            val presentationUrl = client.post("/openid4vc/verify") {
+                headers {
+                    append("stateId", sessionId.toString())
+                    append("responseMode", ResponseMode.direct_post_jwt.toString())
+                }
+                setBody(VerifierApiExamples.mDLRequiredFieldsExample)
+            }.expectSuccess().bodyAsText()
+
+
+            walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/usePresentationRequest") {
+                setBody(
+                    UsePresentationRequest(
+                        presentationRequest = presentationUrl,
+                        selectedCredentials = listOf(mDLWalletCredentialId),
+                    )
+                )
+            }.expectSuccess()
+
+            client.get("/openid4vc/session/${sessionId}")
+                .expectSuccess().body<PresentationSessionInfo>().let {
+                    assertTrue(it.verificationResult!!)
+                }
+
+            client.get("/openid4vc/session/${sessionId}/presented-credentials")
+                .expectSuccess()
+        }
+
+    private suspend fun presentOpenBadgeWithDisclosures() =
+        test(
+            name = "${TEST_SUITE}: Presentation of open badge credential with disclosures"
+        ) {
+            val sessionId = Uuid.random()
+            val presentationUrl = client.post("/openid4vc/verify") {
+                headers {
+                    append("stateId", sessionId.toString())
+                }
+                setBody(openBadgeWithDisclosuresPresentationRequest)
+            }.expectSuccess().bodyAsText()
+
+
+            walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/usePresentationRequest") {
+                setBody(
+                    UsePresentationRequest(
+                        presentationRequest = presentationUrl,
+                        selectedCredentials = listOf(openBadgeWithDisclosuresWalletCredentialId),
+                        disclosures = mapOf(
+                            openBadgeWithDisclosuresWalletCredentialId to openBadgeDisclosures
+                        )
+                    )
+                )
+            }.expectSuccess()
+
+            client.get("/openid4vc/session/${sessionId}")
+                .expectSuccess().body<PresentationSessionInfo>().let {
+                    assertTrue(it.verificationResult!!)
+                }
+
+            client.get("/openid4vc/session/${sessionId}/presented-credentials")
+                .expectSuccess()
+        }
+
+    private suspend fun presentUniversityDegreeWithDisclosures() =
+        test(
+            name = "${TEST_SUITE}: Presentation of university degree credential with disclosures"
+        ) {
+            val sessionId = Uuid.random()
+            val presentationUrl = client.post("/openid4vc/verify") {
+                headers {
+                    append("stateId", sessionId.toString())
+                }
+                setBody(universityDegreeWithDisclosuresPresentationRequest)
+            }.expectSuccess().bodyAsText()
+
+
+            walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/usePresentationRequest") {
+                setBody(
+                    UsePresentationRequest(
+                        presentationRequest = presentationUrl,
+                        selectedCredentials = listOf(universityDegreeWithDisclosuresWalletCredentialId),
+                        disclosures = mapOf(
+                            universityDegreeWithDisclosuresWalletCredentialId to universityDegreeDisclosures
+                        )
+                    )
+                )
+            }.expectSuccess()
+
+            client.get("/openid4vc/session/${sessionId}")
+                .expectSuccess().body<PresentationSessionInfo>().let {
+                    assertTrue(it.verificationResult!!)
+                }
+
+            client.get("/openid4vc/session/${sessionId}/presented-credentials")
+                .expectSuccess()
+        }
+
 
     suspend fun runTests() {
         setupTestSuite()
+        presentUniDegreeNoDisclosures()
+        presentOpenBadgeNoDisclosures()
+        presentSdJwtVc()
+        presentMdl()
+        presentOpenBadgeWithDisclosures()
+        presentUniversityDegreeWithDisclosures()
     }
 }
