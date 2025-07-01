@@ -14,7 +14,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 @SerialName("dcql")
 data class DcqlHolderPolicyCheck(
-    val dcql: DcqlQuery
+    @SerialName("dcql_query")
+    val dcqlQuery: DcqlQuery
 ) : HolderPolicyCheck {
     override suspend fun matchesCredentials(credentials: Flow<DigitalCredential>): Boolean {
         val dcqlCredentials = credentials.toList().mapIndexed { idx, credential ->
@@ -28,7 +29,7 @@ data class DcqlHolderPolicyCheck(
                 else null
             )
         }
-        val match = DcqlMatcher.match(dcql, dcqlCredentials)
+        val match = DcqlMatcher.match(dcqlQuery, dcqlCredentials)
         return match.isSuccess && match.getOrThrow().isNotEmpty()
     }
 

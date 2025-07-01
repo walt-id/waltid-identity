@@ -325,7 +325,7 @@ class HolderPolicyEngineTest {
                     priority = 1,
                     description = "Block if sharing address",
                     check = DcqlHolderPolicyCheck(
-                        dcql = Json.decodeFromString<DcqlQuery>(
+                        dcqlQuery = Json.decodeFromString<DcqlQuery>(
                             //language=JSON
                             """
                     {
@@ -364,7 +364,7 @@ class HolderPolicyEngineTest {
                     priority = 5,
                     description = "Allow if sharing birthdate",
                     check = DcqlHolderPolicyCheck(
-                        dcql = Json.decodeFromString<DcqlQuery>(
+                        dcqlQuery = Json.decodeFromString<DcqlQuery>(
                             //language=JSON
                             """
                     {
