@@ -2,12 +2,14 @@ package id.walt.policies.policies.status.validator
 
 import id.walt.policies.policies.status.bit.BigEndianRepresentation
 import id.walt.policies.policies.status.bit.BitRepresentationStrategy
+import id.walt.policies.policies.status.expansion.StatusListExpansionAlgorithm
 import id.walt.policies.policies.status.model.StatusVerificationError
 import id.walt.policies.policies.status.model.W3CEntry
 import id.walt.policies.policies.status.model.W3CStatusContent
 import id.walt.policies.policies.status.model.W3CStatusPolicyAttribute
 import io.mockk.coEvery
 import io.mockk.every
+import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -15,6 +17,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
+import kotlin.reflect.KClass
 
 @DisplayName("W3CStatusValidator Tests")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -33,6 +36,7 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CStatusPoli
         fetcher = mockFetcher,
         reader = mockStatusReader,
         bitValueReaderFactory = mockBitValueReaderFactory,
+        expansionAlgorithmFactory = mockStatusListExpansionAlgorithmFactory,
     )
 
     override fun createEntry(scenario: TestScenario, size: Int) = W3CEntry(
@@ -57,6 +61,18 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CStatusPoli
     )
 
     override fun getBitRepresentationStrategy(): BitRepresentationStrategy = BigEndianRepresentation()
+
+    override fun setupBitValueReader(statusSize: Int, scenario: TestScenario, bitValue: List<Char>) {
+        every {
+            mockBitValueReader.get(any(), index, statusSize, ofType(scenario.expansionAlgorithmType))
+        } returns bitValue
+    }
+
+    override fun verifyBitValueReaderInteraction(
+        statusSize: Int, expansionAlgorithmType: KClass<out StatusListExpansionAlgorithm>
+    ) {
+        verify { mockBitValueReader.get(any(), index, statusSize, ofType(expansionAlgorithmType)) }
+    }
 
     @Nested
     @DisplayName("W3C-specific validation error scenarios")
