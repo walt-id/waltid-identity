@@ -7,7 +7,6 @@ private const val MULTIBASE_BASE64_URL_PREFIX = 'u'
 class Base64UrlHandler {
     private val base64UrlRegex = Regex("^[A-Za-z0-9_-]*$")
     private val urlDecoder = Base64.getUrlDecoder()
-    private val urlEncoder = Base64.getUrlEncoder()
 
     /**
      * Decodes a base64-url string (regular or multibase) and returns detailed result
@@ -50,47 +49,6 @@ class Base64UrlHandler {
     private fun String.isValidBase64UrlContent(): Boolean = runCatching { decodeBase64UrlBytes() }.isSuccess
 
     private fun String.decodeBase64UrlBytes(): ByteArray = urlDecoder.decode(this)
-
-    /**
-     * Decodes a base64-url string and returns only the byte array
-     */
-    fun String.decodeBase64UrlToBytes(): ByteArray = decodeBase64Url(this).decodedData
-
-    /**
-     * Decodes a base64-url string and returns UTF-8 string
-     */
-    fun String.decodeBase64UrlToString(): String = decodeBase64Url(this).decodedData.toString(Charsets.UTF_8)
-
-    /**
-     * Encodes byte array to regular base64-url
-     */
-    fun ByteArray.encodeToBase64Url(): String = urlEncoder.withoutPadding().encodeToString(this)
-
-    /**
-     * Encodes byte array to multibase base64-url
-     */
-    fun ByteArray.encodeToMultibaseBase64Url(): String = MULTIBASE_BASE64_URL_PREFIX + encodeToBase64Url()
-
-    /**
-     * Encodes string to regular base64-url
-     */
-    fun String.encodeToBase64Url(): String = toByteArray(Charsets.UTF_8).encodeToBase64Url()
-
-    /**
-     * Encodes string to multibase base64-url
-     */
-    fun String.encodeToMultibaseBase64Url(): String = toByteArray(Charsets.UTF_8).encodeToMultibaseBase64Url()
-
-    /**
-     * Converts between regular and multibase formats
-     */
-    fun String.convertBase64UrlType(targetType: Base64UrlType): String =
-        decodeBase64Url(this).cleanEncodedString.let { cleanEncoded ->
-            when (targetType) {
-                Base64UrlType.Regular -> cleanEncoded
-                Base64UrlType.Multibase -> "$MULTIBASE_BASE64_URL_PREFIX$cleanEncoded"
-            }
-        }
 }
 
 sealed class Base64UrlType {
