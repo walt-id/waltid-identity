@@ -108,7 +108,7 @@ object MdocDocs {
     private const val MDL_VC_CONFIG_ID = "org.iso.18013.5.1.mDL"
     private const val ISO_IEC_NAMESPACE_ID = "org.iso.18013.5.1"
 
-    private val mdlBaseIssuanceExample = Json.decodeFromString<IssuanceRequest>(
+    val mdlBaseIssuanceExample = Json.decodeFromString<IssuanceRequest>(
         """
         {
             "issuerKey": {
