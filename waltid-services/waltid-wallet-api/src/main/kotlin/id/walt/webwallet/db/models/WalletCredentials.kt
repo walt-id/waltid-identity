@@ -46,11 +46,11 @@ data class WalletCredential @OptIn(ExperimentalUuidApi::class) constructor(
     val wallet: Uuid,
     val id: String,
     val document: String,
-    val disclosures: String?,
+    val disclosures: String? = null,
     val addedOn: Instant,
     @Transient
     val manifest: String? = null,
-    val deletedOn: Instant?,
+    val deletedOn: Instant? = null,
     val pending: Boolean = false,
     val format: CredentialFormat,
     val parsedDocument: JsonObject? = parseDocument(document, id, format),
