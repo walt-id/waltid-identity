@@ -14,7 +14,7 @@ plugins {
     kotlin("plugin.power-assert")
 }
 
-group = "id.walt.credentials"
+group = "id.walt.holderpolicies"
 
 repositories {
     mavenCentral()
@@ -30,8 +30,8 @@ suspendTransformPlugin {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_15
-    targetCompatibility = JavaVersion.VERSION_15
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 kotlin {
@@ -64,7 +64,7 @@ kotlin {
         }
     }
     js(IR) {
-        outputModuleName.set("digital-credentials")
+        outputModuleName.set("holder-policies")
         /*browser {
             commonWebpackConfig {
                 cssSupport {
@@ -83,45 +83,32 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    //val ktor_version = "3.1.2"
     sourceSets {
         val commonMain by getting {
             dependencies {
 //                // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.8.0")
-//                implementation("io.github.optimumcode:json-schema-validator:0.4.0")
-//
-//                // Ktor client
-//                implementation("io.ktor:ktor-client-core:$ktor_version")
-//                implementation("io.ktor:ktor-client-serialization:$ktor_version")
-//                implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
-//                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
-//                implementation("io.ktor:ktor-client-json:$ktor_version")
-//                implementation("io.ktor:ktor-client-logging:$ktor_version")
-//
+                implementation("io.github.optimumcode:json-schema-validator:0.4.0")
+                implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
+
 //                // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 //
 //                // Kotlinx
-//                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
 //                implementation("app.softwork:kotlinx-uuid-core:0.1.4")
 //
-//                // Loggin
-//                implementation("io.github.oshai:kotlin-logging:7.0.5")
+//                // Logging
+                implementation("io.github.oshai:kotlin-logging:7.0.5")
 //
 //                // walt.id
-                api(project(":waltid-libraries:crypto:waltid-crypto"))
-                api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
-                api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
+                //api(project(":waltid-libraries:crypto:waltid-crypto"))
+                api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
+                //api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
+                //api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
                 api(project(":waltid-libraries:credentials:waltid-dcql"))
-                api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
-                api(project(":waltid-libraries:waltid-did"))
-
-
-
-                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
-                implementation("org.kotlincrypto.hash:sha2")
+                //api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
+                //api(project(":waltid-libraries:waltid-did"))
 
                 // suspend-transform plugin annotations (required in the current version to avoid "compileOnly" warning)
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
@@ -211,8 +198,8 @@ publishing {
         create<MavenPublication>("maven") {
             from(components["kotlin"])
             pom {
-                name.set("walt.id Digital Credentials")
-                description.set("walt.id Kotlin/Java library for Digital Credentials")
+                name.set("walt.id Holder Policies")
+                description.set("walt.id Kotlin/Java library for Holder Policies")
                 url.set("https://walt.id")
 
                 licenses {

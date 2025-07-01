@@ -254,7 +254,7 @@ class DcqlMatcherTest {
             {
               "credentials": [
                 { "id": "q_jwt", "format": "jwt_vc_json" },
-                { "id": "q_nonexistent", "format": "nonexistent_format" }
+                { "id": "q_nonexistent", "format": "ac_vp" }
               ]
             }
             """.trimIndent()

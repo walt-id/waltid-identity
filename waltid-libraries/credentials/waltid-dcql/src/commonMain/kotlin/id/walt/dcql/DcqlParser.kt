@@ -22,7 +22,7 @@ object DcqlParser {
             Result.success(query)
         } catch (e: Exception) {
             log.error(e) { "Failed to parse DCQL JSON" }
-            Result.failure(e)
+            Result.failure(IllegalArgumentException("Error while parsing invalid DCQL query", e))
         }
     }
 
