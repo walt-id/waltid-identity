@@ -44,7 +44,13 @@ abstract class LoginControllerBase(
             }
         }
         response {
-            HttpStatusCode.OK to { description = "Login successful" }
+            HttpStatusCode.OK to {
+                description = "Login successful"
+                header<String>("set-cookie") {
+                    description = "A successful login will set a session cookie."
+                }
+                body<LoginResponseData>()
+            }
             HttpStatusCode.Unauthorized to { description = "Login failed" }
             HttpStatusCode.BadRequest to { description = "Login failed" }
         }
