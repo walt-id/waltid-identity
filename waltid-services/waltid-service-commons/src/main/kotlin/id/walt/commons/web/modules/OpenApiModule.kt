@@ -1,3 +1,5 @@
+@file:OptIn(SealedSerializationApi::class)
+
 package id.walt.commons.web.modules
 
 import com.sksamuel.hoplite.simpleName
@@ -11,19 +13,24 @@ import io.github.smiley4.ktoropenapi.openApi
 import io.github.smiley4.ktoropenapi.route
 import io.github.smiley4.ktorredoc.redoc
 import io.github.smiley4.ktorswaggerui.swaggerUI
-import io.github.smiley4.schemakenerator.core.data.InitialKTypeData
-import io.github.smiley4.schemakenerator.core.data.InitialTypeData
+import io.github.smiley4.schemakenerator.core.data.*
+import io.github.smiley4.schemakenerator.serialization.analyzer.SerializationTypeAnalyzerModule
 import io.github.smiley4.schemakenerator.serialization.data.InitialSerialDescriptorTypeData
+import io.github.smiley4.schemakenerator.swagger.generator.SwaggerSchemaGenerationModule
 import io.klogging.noCoLogger
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.swagger.v3.oas.models.media.Discriminator
 import io.swagger.v3.oas.models.media.Schema
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.serialization.SealedSerializationApi
+import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.json.Json
 import kotlin.reflect.typeOf
 import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.uuid.ExperimentalUuidApi
 
 object OpenApiModule {
 
@@ -36,13 +43,20 @@ object OpenApiModule {
     }
 
     // Module
+    @OptIn(ExperimentalUuidApi::class)
     fun Application.enable() {
         install(OpenApi) {
 
             schemas {
-                val kotlinxGenerator = SchemaGenerator.kotlinx()
+                val kotlinxGenerator = SchemaGenerator.kotlinx {
+                    customAnalyzer(ContextualSerializationTypeAnalyzerModule)
+                    customAnalyzer(FixSealedClassInheritanceGenerator)
+                    customGenerator(FixSealedClassInheritanceGenerator)
+                    overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
+                }
                 val reflectionGenerator = SchemaGenerator.reflection {
                     explicitNullTypes = false
+                    overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
                     overwrite(SchemaGenerator.TypeOverwrites.File())
                     overwrite(
                         SchemaOverwriteModule(
@@ -247,4 +261,124 @@ object OpenApiModule {
 private fun Instant.roundToSecond(): Instant =
     minus(nanosecondsOfSecond.nanoseconds)
 
+/**
+ * When schema is generated for a class which inherits from a sealed class, then an "anyOf" schema is generated
+ * for the sealed class. Kotlin Json adds implicitly a type parameter to the child classes. This is not reflected
+ * in the generated schema. This class should fix the problem.
+ */
+private object FixSealedClassInheritanceGenerator : SwaggerSchemaGenerationModule, SerializationTypeAnalyzerModule {
+    val gerneratorMarker = "FIX_INHERITANCE_MARKER"
+    val childElementNames = mutableSetOf<String>()
 
+    override fun applies(typeData: TypeData): Boolean {
+        if (childElementNames.contains(typeData.identifyingName.full)) {
+            return typeData.annotations.firstOrNull { a -> a.name.equals(gerneratorMarker) } == null
+        }
+        if (typeData.subtypes.isNotEmpty()
+            && typeData.identifyingName.full.startsWith("id.walt.")
+        ) {
+            return typeData.annotations.firstOrNull { a -> a.name.equals(gerneratorMarker) } == null
+        }
+        return false
+    }
+
+    override fun generate(context: SwaggerSchemaGenerationModule.Context): Schema<*> {
+        context.typeData.annotations.add(AnnotationData(gerneratorMarker, mutableMapOf()))
+        val stringType = context.knownTypeData.first { it.identifyingName.full.equals("kotlin.String") }
+        if (context.typeData.subtypes.isNotEmpty()) {
+            context.typeData.subtypes.forEach { subTypeId ->
+                val subType = context.knownTypeData.first { search -> search.id.id.equals(subTypeId.id) }
+                subType.members.add(
+                    MemberData(
+                        name = "type",
+                        type = stringType.id,
+                        nullable = false,
+                        optional = false,
+                        visibility = Visibility.PUBLIC,
+                        kind = MemberKind.PROPERTY,
+                        annotations = mutableListOf()
+                    )
+                )
+            }
+        }
+        val generated = context.generate(context.typeData)
+        if (generated.anyOf != null) {
+            generated.discriminator = Discriminator()
+                .propertyName("type")
+        } else if (childElementNames.contains(context.typeData.identifyingName.full)) {
+            Schema<String>().let {
+                it.`raw$ref`(stringType.id.id)
+                it.nullable = false
+                it.exampleSetFlag = false
+                generated.properties.put("type", it)
+            }
+        }
+        return generated
+    }
+
+    override fun applies(descriptor: SerialDescriptor): Boolean {
+        if (descriptor.kind == PolymorphicKind.SEALED) {
+            descriptor.elementDescriptors
+                .filter { it.kind == SerialKind.CONTEXTUAL }
+                .forEach {
+                    childElementNames.addAll(it.elementNames)
+                }
+        }
+        return false
+    }
+
+    override fun analyze(context: SerializationTypeAnalyzerModule.Context): WrappedTypeData {
+        TODO()
+    }
+}
+
+
+/**
+ * This analyzer is needed for attributes like:
+ * @Contextual val id: Uuid
+ */
+object ContextualSerializationTypeAnalyzerModule : SerializationTypeAnalyzerModule {
+
+    private val classToKindMap = mapOf("kotlin.uuid.Uuid" to PrimitiveKind.STRING)
+
+    override fun applies(descriptor: SerialDescriptor): Boolean {
+        return descriptor.kind == SerialKind.CONTEXTUAL
+                && descriptor.serialName.startsWith("kotlinx.serialization.ContextualSerializer")
+                && classToKindMap.keys.contains(referencedClassName(descriptor))
+    }
+
+    override fun analyze(context: SerializationTypeAnalyzerModule.Context): WrappedTypeData {
+        println(context.descriptor)
+        val internalClassName = referencedClassName(context.descriptor)
+        val result = context.analyze(object : SerialDescriptor {
+            override val serialName: String
+                get() = internalClassName
+            override val kind: SerialKind
+                get() = classToKindMap.get(internalClassName)!!
+            override val elementsCount: Int
+                get() = context.descriptor.elementsCount
+
+            override fun getElementName(index: Int): String =
+                context.descriptor.getElementName(index)
+
+            override fun getElementIndex(name: String): Int =
+                context.descriptor.getElementIndex(name)
+
+            override fun getElementAnnotations(index: Int): List<Annotation> =
+                context.descriptor.getElementAnnotations(index)
+
+            override fun getElementDescriptor(index: Int): SerialDescriptor =
+                context.descriptor.getElementDescriptor(index)
+
+            override fun isElementOptional(index: Int): Boolean =
+                context.descriptor.isElementOptional(index)
+        })
+        return result
+    }
+
+    private fun referencedClassName(descriptor: SerialDescriptor): String {
+        val descriptorString = descriptor.toString()
+        return "kClass:\\s+class\\s+([.a-z0-9]+)".toRegex(RegexOption.IGNORE_CASE)
+            .find(descriptorString)!!.groups[1]!!.value
+    }
+}
