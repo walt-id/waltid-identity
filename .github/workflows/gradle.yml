@@ -32,7 +32,7 @@ jobs:
       - name: Fully build the project (runs assemble + check)
         run: ./gradlew build --no-daemon
       - name: Run allTests task
-        run: ./gradlew allTests --no-daemon
+        run: ./gradlew cleanAllTests test allTests --no-daemon
       - name: Publish
         if: ${{ inputs.publish }}
         env:
