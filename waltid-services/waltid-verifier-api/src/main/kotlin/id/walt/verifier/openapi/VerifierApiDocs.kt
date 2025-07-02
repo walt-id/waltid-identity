@@ -116,7 +116,7 @@ object VerifierApiDocs {
         }
         response {
             HttpStatusCode.OK to {
-                description = "URL for the hodler wallet to continue verification"
+                description = "URL for the holder wallet to continue verification"
                 body<String> {
                     mediaTypes(ContentType.Text.Plain)
                 }

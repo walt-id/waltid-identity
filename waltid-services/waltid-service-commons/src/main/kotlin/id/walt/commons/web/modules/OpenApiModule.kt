@@ -1,4 +1,4 @@
-@file:OptIn(SealedSerializationApi::class)
+@file:OptIn(SealedSerializationApi::class, kotlinx.serialization.ExperimentalSerializationApi::class)
 
 package id.walt.commons.web.modules
 
@@ -51,8 +51,8 @@ object OpenApiModule {
                 val kotlinxGenerator = SchemaGenerator.kotlinx {
                     explicitNullTypes = false
                     customAnalyzer(ContextualSerializationTypeAnalyzerModule)
-                    customAnalyzer(FixSealedClassInheritanceGenerator)
-                    customGenerator(FixSealedClassInheritanceGenerator)
+                    customAnalyzer(FixSealedClassInheritanceModule)
+                    customGenerator(FixSealedClassInheritanceModule)
                     overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
                 }
                 val reflectionGenerator = SchemaGenerator.reflection {
@@ -267,7 +267,7 @@ private fun Instant.roundToSecond(): Instant =
  * for the sealed class. Kotlin Json adds implicitly a type parameter to the child classes. This is not reflected
  * in the generated schema. This class should fix the problem.
  */
-private object FixSealedClassInheritanceGenerator : SwaggerSchemaGenerationModule, SerializationTypeAnalyzerModule {
+private object FixSealedClassInheritanceModule : SwaggerSchemaGenerationModule, SerializationTypeAnalyzerModule {
     const val gerneratorMarker = "FIX_INHERITANCE_MARKER"
     val childElementNames = mutableSetOf<String>()
 
@@ -338,8 +338,9 @@ private object FixSealedClassInheritanceGenerator : SwaggerSchemaGenerationModul
  * This analyzer is needed for attributes like:
  * @Contextual val id: Uuid
  */
-object ContextualSerializationTypeAnalyzerModule : SerializationTypeAnalyzerModule {
+private object ContextualSerializationTypeAnalyzerModule : SerializationTypeAnalyzerModule {
 
+    // at the moment only UUID is supported
     private val classToKindMap = mapOf("kotlin.uuid.Uuid" to PrimitiveKind.STRING)
 
     override fun applies(descriptor: SerialDescriptor): Boolean {
