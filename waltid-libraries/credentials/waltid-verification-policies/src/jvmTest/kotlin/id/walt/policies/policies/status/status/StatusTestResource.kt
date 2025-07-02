@@ -20,6 +20,7 @@ data class TestStatusResource(
 sealed class StatusResourceData {
     abstract val holderCredential: JsonObject//no cwt, atm
     abstract val valid: Boolean
+    abstract val exception: String?
 
     abstract fun updateHolderCredential(vararg values: String): StatusResourceData
     abstract fun updateStatusCredential(vararg values: String): StatusResourceData
@@ -43,6 +44,7 @@ data class SingleStatusResourceData(
     @SerialName("holder-credential")
     override val holderCredential: JsonObject,
     override val valid: Boolean,
+    override val exception: String? = null,
     val attribute: StatusPolicyAttribute,
 ) : StatusResourceData() {
 
@@ -60,6 +62,7 @@ data class MultiStatusResourceData(
     @SerialName("holder-credential")
     override val holderCredential: JsonObject,
     override val valid: Boolean,
+    override val exception: String? = null,
     val attribute: List<StatusPolicyAttribute>,
 ) : StatusResourceData() {
 

@@ -1,8 +1,6 @@
 package id.walt.policies.policies.status.validator
 
 import id.walt.policies.policies.status.CredentialFetcher
-import id.walt.policies.policies.status.model.StatusContent
-import id.walt.policies.policies.status.model.StatusPolicyAttribute
 import id.walt.policies.policies.status.Values.BITSTRING_STATUS_LIST
 import id.walt.policies.policies.status.Values.BITSTRING_STATUS_LIST_ENTRY
 import id.walt.policies.policies.status.Values.REVOCATION_LIST_2020
@@ -13,10 +11,8 @@ import id.walt.policies.policies.status.Values.TOKEN_STATUS_LIST
 import id.walt.policies.policies.status.bit.BitRepresentationStrategy
 import id.walt.policies.policies.status.bit.BitValueReader
 import id.walt.policies.policies.status.bit.BitValueReaderFactory
-import id.walt.policies.policies.status.model.StatusEntry
-import id.walt.policies.policies.status.model.StatusRetrievalError
-import id.walt.policies.policies.status.model.StatusVerificationError
 import id.walt.policies.policies.status.expansion.*
+import id.walt.policies.policies.status.model.*
 import id.walt.policies.policies.status.reader.StatusValueReader
 import io.mockk.*
 import kotlinx.coroutines.test.runTest
@@ -48,11 +44,17 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
     protected abstract fun createAttribute(scenario: TestScenario, value: UInt): K
     protected abstract fun createStatusContent(scenario: TestScenario, size: Int): T
     protected abstract fun getBitRepresentationStrategy(): BitRepresentationStrategy
+    protected abstract fun setupBitValueReader(statusSize: Int, scenario: TestScenario, bitValue: List<Char>)
+    protected abstract fun verifyBitValueReaderInteraction(
+        statusSize: Int, expansionAlgorithmType: KClass<out StatusListExpansionAlgorithm>
+    )
 
     protected val mockFetcher: CredentialFetcher = mockk()
     protected val mockStatusReader: StatusValueReader<T> = mockk()
     protected val mockBitValueReaderFactory: BitValueReaderFactory = mockk()
     protected val mockBitValueReader: BitValueReader = mockk()
+    protected val mockStatusListExpansionAlgorithmFactory: StatusListExpansionAlgorithmFactory<T> = mockk()
+    protected val mockExpansionAlgorithm: StatusListExpansionAlgorithm = mockk()
 
     protected lateinit var sut: StatusValidator<M, K>
 
@@ -194,10 +196,8 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
             val attribute = createAttribute(scenario, 7u) // expecting 7 but getting 5
             val content = createStatusContent(scenario, size = 3)
 
-            setupSuccessfulFetchAndRead(content)
-            every {
-                mockBitValueReader.get(any(), index, 3, ofType(scenario.expansionAlgorithmType))
-            } returns listOf('1', '0', '1') // binary 101 = 5
+            setupSuccessfulFetchAndRead(content, scenario.expansionAlgorithmType)
+            setupBitValueReader(3, scenario, listOf('1', '0', '1')) // binary 101 = 5
 
             val exception = assertThrows<StatusVerificationError> { sut.validate(entry, attribute).getOrThrow() }
             assertEquals("Status validation failed: expected 7, but got 5", exception.message)
@@ -222,7 +222,12 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
         verifyAllInteractions(statusSize, scenario.expansionAlgorithmType)
     }
 
-    protected suspend fun testValidationError(scenario: TestScenario, bitValue: List<Char>, statusSize: Int, expectedMessage: String) {
+    protected suspend fun testValidationError(
+        scenario: TestScenario,
+        bitValue: List<Char>,
+        statusSize: Int,
+        expectedMessage: String
+    ) {
         val entry = createEntry(scenario, size = statusSize)
         val attribute = createAttribute(scenario, 5u)
         val content = createStatusContent(scenario, size = statusSize)
@@ -234,15 +239,14 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
     }
 
     protected fun setupValidationScenario(scenario: TestScenario, content: T, bitValue: List<Char>, statusSize: Int) {
-        setupSuccessfulFetchAndRead(content)
-        every {
-            mockBitValueReader.get(any(), index, statusSize, ofType(scenario.expansionAlgorithmType))
-        } returns bitValue
+        setupSuccessfulFetchAndRead(content, scenario.expansionAlgorithmType)
+        setupBitValueReader(statusSize, scenario, bitValue)
     }
 
-    protected fun setupSuccessfulFetchAndRead(content: T) {
+    protected fun setupSuccessfulFetchAndRead(content: T, expansionAlgorithmType: KClass<out StatusListExpansionAlgorithm>) {
         coEvery { mockFetcher.fetch(uri) } returns Result.success(statusListContent)
         every { mockStatusReader.read(statusListContent) } returns Result.success(content)
+        every { mockStatusListExpansionAlgorithmFactory.create(content) } returns mockkClass(expansionAlgorithmType)
     }
 
     protected fun verifyAllInteractions(
@@ -252,7 +256,7 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
         coVerify { mockFetcher.fetch(uri) }
         verify { mockStatusReader.read(statusListContent) }
         verify { mockBitValueReaderFactory.new(strategy = match { it::class == getBitRepresentationStrategy()::class }) }
-        verify { mockBitValueReader.get(any(), index, statusSize, ofType(expansionAlgorithmType)) }
+        verifyBitValueReaderInteraction(statusSize, expansionAlgorithmType)
     }
 
     data class TestScenario(
