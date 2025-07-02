@@ -89,7 +89,7 @@ fun DataElement.toJsonElement(): JsonElement = when (this) {
 
 fun DataElement.toUIJson(): JsonElement = when (this) {
     is MapElement -> buildJsonObject {
-        (this@toUIJson as MapElement).value.forEach { (key, value) ->
+        this@toUIJson.value.forEach { (key, value) ->
             when(key.type) {
                 MapKeyType.int -> put(key.int.toString(), value.toUIJson())
                 MapKeyType.string -> put(key.str, value.toUIJson())
