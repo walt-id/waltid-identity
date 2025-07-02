@@ -49,6 +49,7 @@ object OpenApiModule {
 
             schemas {
                 val kotlinxGenerator = SchemaGenerator.kotlinx {
+                    explicitNullTypes = false
                     customAnalyzer(ContextualSerializationTypeAnalyzerModule)
                     customAnalyzer(FixSealedClassInheritanceGenerator)
                     customGenerator(FixSealedClassInheritanceGenerator)
@@ -267,7 +268,7 @@ private fun Instant.roundToSecond(): Instant =
  * in the generated schema. This class should fix the problem.
  */
 private object FixSealedClassInheritanceGenerator : SwaggerSchemaGenerationModule, SerializationTypeAnalyzerModule {
-    val gerneratorMarker = "FIX_INHERITANCE_MARKER"
+    const val gerneratorMarker = "FIX_INHERITANCE_MARKER"
     val childElementNames = mutableSetOf<String>()
 
     override fun applies(typeData: TypeData): Boolean {
@@ -328,7 +329,7 @@ private object FixSealedClassInheritanceGenerator : SwaggerSchemaGenerationModul
     }
 
     override fun analyze(context: SerializationTypeAnalyzerModule.Context): WrappedTypeData {
-        TODO()
+        TODO("Should never be reached")
     }
 }
 
@@ -348,7 +349,6 @@ object ContextualSerializationTypeAnalyzerModule : SerializationTypeAnalyzerModu
     }
 
     override fun analyze(context: SerializationTypeAnalyzerModule.Context): WrappedTypeData {
-        println(context.descriptor)
         val internalClassName = referencedClassName(context.descriptor)
         val result = context.analyze(object : SerialDescriptor {
             override val serialName: String
