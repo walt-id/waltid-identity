@@ -15,7 +15,7 @@ data class AuthorizationDirectPostResponse(
     @SerialName("redirect_uri") val redirectUri: String? = null,
     val error: String?,
     @SerialName("error_description") val errorDescription: String?,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
 
     override fun toJSON() = Json.encodeToJsonElement(AuthorizationDirectPostResponseSerializer, this).jsonObject
