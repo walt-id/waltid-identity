@@ -18,7 +18,7 @@ import kotlinx.serialization.json.jsonObject
 data class VCFormatDefinition(
     val alg: Set<String>? = null,
     val proof_type: Set<String>? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
 
     override fun toJSON() = Json.encodeToJsonElement(VCFormatDefinitionSerializer, this).jsonObject

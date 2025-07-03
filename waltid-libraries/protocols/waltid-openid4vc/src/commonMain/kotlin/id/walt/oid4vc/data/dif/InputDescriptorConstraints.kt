@@ -14,7 +14,7 @@ import kotlinx.serialization.json.jsonObject
 data class InputDescriptorConstraints(
     @Serializable(InputDescriptorFieldListSerializer::class) val fields: List<InputDescriptorField>? = null,
     @SerialName("limit_disclosure") val limitDisclosure: DisclosureLimitation? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(InputDescriptorConstraintsSerializer, this).jsonObject
 
