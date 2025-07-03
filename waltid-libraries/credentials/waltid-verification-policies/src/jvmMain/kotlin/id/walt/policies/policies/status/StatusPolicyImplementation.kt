@@ -1,10 +1,13 @@
 package id.walt.policies.policies.status
 
+import id.walt.policies.policies.Base64UrlHandler
 import id.walt.policies.policies.status.bit.BitValueReaderFactory
 import id.walt.policies.policies.status.content.JsonElementParser
 import id.walt.policies.policies.status.content.JwtParser
 import id.walt.policies.policies.status.entry.IETFEntryExtractor
 import id.walt.policies.policies.status.entry.W3CEntryExtractor
+import id.walt.policies.policies.status.expansion.TokenStatusListExpansionAlgorithm
+import id.walt.policies.policies.status.expansion.W3cStatusListExpansionAlgorithmFactory
 import id.walt.policies.policies.status.model.*
 import id.walt.policies.policies.status.reader.IETFJwtStatusValueReader
 import id.walt.policies.policies.status.reader.W3CStatusValueReader
@@ -46,9 +49,19 @@ object StatusPolicyImplementation {
 
     private val bitValueReaderFactory = BitValueReaderFactory()
 
-    private val w3cStatusValidator = W3CStatusValidator(credentialFetcher, w3cStatusReader, bitValueReaderFactory)
+    private val base64UrlHandler = Base64UrlHandler()
 
-    private val ietfStatusValidator = IETFStatusValidator(credentialFetcher, ietfJwtStatusReader, bitValueReaderFactory)
+    private val statusListExpansionAlgorithmFactory = W3cStatusListExpansionAlgorithmFactory(base64UrlHandler)
+
+    private val w3cStatusValidator = W3CStatusValidator(
+        credentialFetcher, w3cStatusReader, bitValueReaderFactory, statusListExpansionAlgorithmFactory
+    )
+
+    private val tokenStatusListExpansionAlgorithm = TokenStatusListExpansionAlgorithm(base64UrlHandler)
+
+    private val ietfStatusValidator = IETFStatusValidator(
+        credentialFetcher, ietfJwtStatusReader, bitValueReaderFactory, tokenStatusListExpansionAlgorithm
+    )
 
     suspend fun verifyWithAttributes(data: JsonObject, attributes: StatusPolicyArgument): Result<Any> =
         getStatusEntryElementExtractor(attributes).extract(data)?.let { processStatusEntry(it, attributes) }
