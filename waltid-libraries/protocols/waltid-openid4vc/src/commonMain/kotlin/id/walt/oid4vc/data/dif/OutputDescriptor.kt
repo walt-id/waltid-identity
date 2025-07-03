@@ -14,7 +14,7 @@ data class OutputDescriptor(
     val id: String,
     val schema: String,
     val name: String? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(OutputDescriptorSerializer, this).jsonObject
 
