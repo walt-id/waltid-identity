@@ -17,7 +17,7 @@ data class AuthorizationJSONRequest(
     override val scope: Set<String> = setOf(),
     override val state: String? = null,
     override val nonce: String? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject(), IAuthorizationRequest {
     override fun toJSON() = Json.encodeToJsonElement(AuthorizationJSONRequestSerializer, this).jsonObject
 

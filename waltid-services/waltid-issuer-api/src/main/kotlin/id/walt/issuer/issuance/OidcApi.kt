@@ -306,7 +306,7 @@ object OidcApi : CIProvider() {
                     }
 
                     val redirectUri = when (authMethod) {
-                        AuthenticationMethod.VP_TOKEN, AuthenticationMethod.ID_TOKEN -> authReq.clientMetadata!!.customParameters["authorization_endpoint"]?.jsonPrimitive?.content
+                        AuthenticationMethod.VP_TOKEN, AuthenticationMethod.ID_TOKEN -> authReq.clientMetadata!!.customParameters!!["authorization_endpoint"]?.jsonPrimitive?.content
                             ?: "openid://"
 
                         else -> if (authReq.isReferenceToPAR) {

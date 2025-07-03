@@ -17,7 +17,7 @@ data class PushedAuthorizationResponse private constructor(
     @SerialName("expires_in") val expiresIn: Duration? = null,
     val error: String? = null,
     @SerialName("error_description") val errorDescription: String? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     val isSuccess get() = requestUri != null
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(PushedAuthorizationResponseSerializer, this).jsonObject

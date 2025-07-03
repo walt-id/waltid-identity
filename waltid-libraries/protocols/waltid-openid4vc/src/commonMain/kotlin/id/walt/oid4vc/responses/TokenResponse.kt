@@ -40,7 +40,7 @@ data class TokenResponse private constructor(
     @SerialName("error_description") val errorDescription: String? = null,
     @SerialName("error_uri") val errorUri: String? = null,
     @Transient val jwsParts: JwsUtils.JwsParts? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>?= mapOf()
 ) : JsonDataObject(), IHTTPDataObject {
     val isSuccess get() = accessToken != null || (vpToken != null && presentationSubmission != null)
     override fun toJSON() = Json.encodeToJsonElement(TokenResponseSerializer, this).jsonObject
@@ -150,7 +150,7 @@ data class TokenResponse private constructor(
             error?.let { put("error", listOf(it)) }
             errorDescription?.let { put("error_description", listOf(it)) }
             errorUri?.let { put("error_uri", listOf(it)) }
-            putAll(customParameters.mapValues { listOf(it.value.toString()) })
+            putAll(customParameters!!.mapValues { listOf(it.value.toString()) })
         }
     }
 

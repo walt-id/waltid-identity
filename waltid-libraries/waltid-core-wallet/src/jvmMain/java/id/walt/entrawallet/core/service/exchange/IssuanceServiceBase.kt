@@ -111,7 +111,7 @@ abstract class IssuanceServiceBase {
         credential: String,
     ): CredentialDataResult {
         val credentialEncoding =
-            processedOffer.credentialResponse.customParameters["credential_encoding"]?.jsonPrimitive?.content
+            processedOffer.credentialResponse.customParameters!!["credential_encoding"]?.jsonPrimitive?.content
                 ?: "issuer-signed"
         logger.debug { "Parsed credential encoding: $credentialEncoding" }
 
