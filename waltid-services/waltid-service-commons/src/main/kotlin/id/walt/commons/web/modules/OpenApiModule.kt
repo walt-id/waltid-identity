@@ -27,8 +27,6 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.SealedSerializationApi
 import kotlinx.serialization.descriptors.*
-import kotlinx.serialization.json.Json
-import kotlin.reflect.typeOf
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.uuid.ExperimentalUuidApi
 
@@ -54,54 +52,24 @@ object OpenApiModule {
                     customAnalyzer(FixSealedClassInheritanceModule)
                     customGenerator(FixSealedClassInheritanceModule)
                     overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
+                    overwrite(SchemaGenerator.TypeOverwrites.File())
+                    overwrite(SchemaGenerator.TypeOverwrites.Instant())
+                    overwrite(CustomTypeOverrides.KotlinxInstant())
+                    overwrite(CustomTypeOverrides.JsonArray())
+                    overwrite(CustomTypeOverrides.JsonObject())
+                    overwrite(CustomTypeOverrides.JsonElement())
+                    overwrite(CustomTypeOverrides.SdMap())
                 }
                 val reflectionGenerator = SchemaGenerator.reflection {
                     explicitNullTypes = false
                     overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
                     overwrite(SchemaGenerator.TypeOverwrites.File())
-                    overwrite(
-                        SchemaOverwriteModule(
-                            identifier = kotlinx.serialization.json.JsonElement::class.qualifiedName!!,
-                            schema = {
-                                Schema<Any>().also {
-                                    it.types = setOf("object")
-                                    it.additionalProperties = Schema<Any>()
-                                }
-                            },
-                        )
-                    )
-                    overwrite(
-                        SchemaOverwriteModule(
-                            identifier = kotlinx.serialization.json.JsonObject::class.qualifiedName!!,
-                            schema = {
-                                Schema<Any>().also {
-                                    it.types = setOf("object")
-                                    it.additionalProperties = Schema<Any>()
-                                }
-                            },
-                        )
-                    )
-                    overwrite(
-                        SchemaOverwriteModule(
-                            identifier = "id.walt.sdjwt.SDMap",
-                            schema = {
-                                Schema<Any>().also {
-                                    it.types = setOf("object")
-                                    it.additionalProperties = Schema<Any>()
-                                }
-                            },
-                        )
-                    )
-                    overwrite(
-                        SchemaOverwriteModule(
-                            identifier = kotlinx.serialization.json.JsonArray::class.qualifiedName!!,
-                            schema = {
-                                Schema<Any>().also {
-                                    it.types = setOf("array")
-                                }
-                            },
-                        )
-                    )
+                    overwrite(SchemaGenerator.TypeOverwrites.Instant())
+                    overwrite(CustomTypeOverrides.KotlinxInstant())
+                    overwrite(CustomTypeOverrides.JsonArray())
+                    overwrite(CustomTypeOverrides.JsonObject())
+                    overwrite(CustomTypeOverrides.JsonElement())
+                    overwrite(CustomTypeOverrides.SdMap())
                 }
 
                 fun InitialTypeData.schemaName() =
@@ -207,55 +175,6 @@ object OpenApiModule {
                 call.respondRedirect("swagger")
             }
         }
-
-//        install(SwaggerUI) {
-
-        /*examples {
-            example("Uuid") {
-                value = "12345678-abcd-9876-efgh-543210123456"
-            }
-
-            example("Instant") {
-                value = Clock.System.now().toString()
-            }
-
-            encoder { type, example ->
-                if (type is KTypeDescriptor) {
-                    encodeSwaggerExample(type, example)
-                } else {
-                    logger.trace { "No type descriptor for example, type is: $type" }
-                    example
-                }
-            }
-        }
-
-        schemas {
-            val kotlinxPrefixes = listOf("id.walt")
-
-            generator = { type ->
-
-                if (kotlinxPrefixes.any { type.toString().startsWith(it) }) {
-                    runCatching {
-                        // println("Trying kotlinx schema with: $type")
-                        type.processWithKotlinxSerializationGenerator()
-                    }.recover { ex ->
-                        logger.trace { "Falling back to reflection schema with: $type, due to $ex" }
-                        type.processWithReflectionGenerator()
-                    }.getOrElse { ex ->
-                        error("Could neither parse with kotlinx nor reflection: $type, due to $ex")
-                    }
-                } else type.processWithReflectionGenerator()
-            }
-        }*/
-
-
-    }
-
-    private val skippedTypes = listOf(typeOf<String>(), typeOf<Enum<*>>())
-
-    private val exampleJson = Json {
-        encodeDefaults = true
-        explicitNulls = false
     }
 }
 
@@ -382,4 +301,54 @@ private object ContextualSerializationTypeAnalyzerModule : SerializationTypeAnal
         return "kClass:\\s+class\\s+([.a-z0-9]+)".toRegex(RegexOption.IGNORE_CASE)
             .find(descriptorString)!!.groups[1]!!.value
     }
+}
+
+object CustomTypeOverrides {
+    class KotlinxInstant : SchemaOverwriteModule(
+        identifier = Instant::class.qualifiedName!!,
+        schema = {
+            Schema<Any>().also {
+                it.types = setOf("string")
+                it.format = "date-time"
+            }
+        }
+    )
+
+    class JsonElement : SchemaOverwriteModule(
+        identifier = kotlinx.serialization.json.JsonElement::class.qualifiedName!!,
+        schema = {
+            Schema<Any>().also {
+                it.types = setOf("object")
+            }
+        },
+    )
+
+    class JsonObject :
+        SchemaOverwriteModule(
+            identifier = kotlinx.serialization.json.JsonObject::class.qualifiedName!!,
+            schema = {
+                Schema<Any>().also {
+                    it.types = setOf("object")
+                }
+            },
+        )
+
+    class JsonArray : SchemaOverwriteModule(
+        identifier = kotlinx.serialization.json.JsonArray::class.qualifiedName!!,
+        schema = {
+            Schema<Any>().also {
+                it.types = setOf("array")
+            }
+        },
+    )
+
+    class SdMap : SchemaOverwriteModule(
+        identifier = "id.walt.sdjwt.SDMap",
+        schema = {
+            Schema<Any>().also {
+                it.types = setOf("object")
+            }
+        },
+    )
+
 }
