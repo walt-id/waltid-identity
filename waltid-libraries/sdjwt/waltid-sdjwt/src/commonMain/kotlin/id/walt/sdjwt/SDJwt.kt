@@ -86,6 +86,7 @@ open class SDJwt internal constructor(
             .plus((if (withKBJwt) keyBindingJwt else null)?.let { listOf(it) }
                 ?: (if (formatForPresentation) listOf("") else listOf()))
             .joinToString(SEPARATOR_STR)
+            .plus(SEPARATOR_STR)
     }
 
     /**
