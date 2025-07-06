@@ -109,6 +109,7 @@ kotlin {
                 implementation("io.ktor:ktor-server-test-host:$ktor_version")
                 implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-server-netty:$ktor_version")
+                implementation("io.mockk:mockk:1.14.2")
             }
         }
 

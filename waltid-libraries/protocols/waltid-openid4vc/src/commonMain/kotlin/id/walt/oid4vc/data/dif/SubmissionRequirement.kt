@@ -24,7 +24,7 @@ data class SubmissionRequirement(
     val count: Int? = null,
     val min: Int? = null,
     val max: Int? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf(),
+    override val customParameters: Map<String, JsonElement>?= mapOf(),
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(SubmissionRequirementSerializer, this).jsonObject
 

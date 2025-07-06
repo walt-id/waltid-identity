@@ -16,7 +16,7 @@ data class OnboardRequestDid(
 data class OnboardingRequest(
     val key: KeyGenerationRequest = KeyGenerationRequest(
         backend = "jwk",
-        keyType =  KeyType.Ed25519
+        keyType = KeyType.Ed25519
     ),
 
     val did: OnboardRequestDid = OnboardRequestDid(

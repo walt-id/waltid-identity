@@ -7,6 +7,7 @@ import id.walt.did.dids.resolver.local.LocalResolverMethod
 import io.ktor.client.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
@@ -17,8 +18,7 @@ class DidEbsiResolverTest : DidResolverTestBase() {
 
 
     // TODO: Include test in the scope of WAL-842
-    // FIXME: did:ebsi server not available
-    //@ParameterizedTest
+    @ParameterizedTest
     @MethodSource
     override fun `given a did String, when calling resolve, then the result is a valid did document`(
         did: String, key: JsonObject, assert: resolverAssertion<DidDocument>
@@ -28,8 +28,7 @@ class DidEbsiResolverTest : DidResolverTestBase() {
 
 
     // TODO: Include test in the scope of WAL-842
-    // FIXME: did:ebsi server not available
-    //@ParameterizedTest
+    @ParameterizedTest
     @MethodSource
     override fun `given a did String, when calling resolveToKey, then the result is valid key`(
         did: String,

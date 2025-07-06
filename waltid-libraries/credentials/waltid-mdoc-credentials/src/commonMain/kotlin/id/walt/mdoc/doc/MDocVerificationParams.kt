@@ -13,10 +13,10 @@ import id.walt.mdoc.mdocauth.DeviceAuthentication
  * @param mDocRequest MDoc request containing requested issuer signed items
  */
 data class MDocVerificationParams(
-  val verificationTypes: VerificationTypes,
-  val issuerKeyID: String? = null,
-  val deviceKeyID: String? = null,
-  val ephemeralMacKey: ByteArray? = null,
-  val deviceAuthentication: DeviceAuthentication? = null,
-  val mDocRequest: MDocRequest? = null
+    val verificationTypes: VerificationTypes,
+    val issuerKeyID: String? = null,
+    val deviceKeyID: String? = null,
+    val ephemeralMacKey: ByteArray? = null,
+    val deviceAuthentication: DeviceAuthentication? = null,
+    val mDocRequest: MDocRequest? = null
 )

@@ -11,13 +11,13 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Duration
 
-@Serializable
+@Serializable @ConsistentCopyVisibility
 data class PushedAuthorizationResponse private constructor(
     @SerialName("request_uri") val requestUri: String? = null,
     @SerialName("expires_in") val expiresIn: Duration? = null,
     val error: String? = null,
     @SerialName("error_description") val errorDescription: String? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     val isSuccess get() = requestUri != null
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(PushedAuthorizationResponseSerializer, this).jsonObject

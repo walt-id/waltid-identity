@@ -75,7 +75,7 @@ object IssuanceService : IssuanceServiceBase() {
         pinOrTxCode: String? = null,
     ): List<ProcessedCredentialOffer> {
 
-        logger.debug { "credentialOffer: $credentialOffer"}
+        logger.debug { "credentialOffer: $credentialOffer" }
 
         val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(credentialOffer)
 
@@ -92,11 +92,15 @@ object IssuanceService : IssuanceServiceBase() {
         val grant = credentialOffer.grants[GrantType.pre_authorized_code.value]!!
         val preAuthorizedCode = grant.preAuthorizedCode!!
         val tokenReq = when {
-            grant.userPinRequired != null && grant.userPinRequired != true -> TokenRequest.PreAuthorizedCode(preAuthorizedCode)
+            grant.userPinRequired != null && grant.userPinRequired != true -> TokenRequest.PreAuthorizedCode(
+                preAuthorizedCode
+            )
+
             providerMetadata is OpenIDProviderMetadata.Draft11 -> TokenRequest.PreAuthorizedCode(
                 preAuthorizedCode = preAuthorizedCode,
                 userPIN = pinOrTxCode
             )
+
             else -> TokenRequest.PreAuthorizedCode(
                 preAuthorizedCode = preAuthorizedCode,
                 txCode = pinOrTxCode
@@ -105,7 +109,7 @@ object IssuanceService : IssuanceServiceBase() {
 
         logger.debug { "token request : $tokenReq" }
 
-        val tokenResp =  OpenID4VCI.sendTokenRequest(
+        val tokenResp = OpenID4VCI.sendTokenRequest(
             providerMetadata = providerMetadata,
             tokenRequest = tokenReq
         )
@@ -133,18 +137,22 @@ object IssuanceService : IssuanceServiceBase() {
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
                 proof = ProofOfPossessionFactory.new(
-                    isKeyProofRequiredForOfferedCredential(offeredCredential),
-                    credentialWallet,
-                    offeredCredential,
-                    credentialOffer,
-                    nonce
+                    useKeyProof = isKeyProofRequiredForOfferedCredential(offeredCredential),
+                    credentialWallet = credentialWallet,
+                    offeredCredential = offeredCredential,
+                    credentialOffer = credentialOffer,
+                    nonce = nonce
                 )
             )
         }
         logger.debug { "credReqs: $credReqs" }
 
         require(credReqs.isNotEmpty()) { "No credentials offered" }
-        return CredentialOfferProcessor.process(credReqs, providerMetadata, accessToken)
+        return CredentialOfferProcessor.process(
+            credentialRequests = credReqs,
+            providerMetadata = providerMetadata,
+            accessToken = accessToken
+        )
     }
 
     private suspend fun processMSEntraIssuanceRequest(

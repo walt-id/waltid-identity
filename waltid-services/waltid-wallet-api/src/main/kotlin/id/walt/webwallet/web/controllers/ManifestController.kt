@@ -33,14 +33,12 @@ fun Application.manifest() = walletRoute {
                 }
                 response {
                     HttpStatusCode.OK to {
-                        body<JsonObject> {
-                            description = "The display info json object"
-                        }
+                        description = "The display info json object"
+                        body<JsonObject> {}
                     }
                     HttpStatusCode.NoContent to {
-                        body<JsonObject> {
-                            description = "The display info json object"
-                        }
+                        description = "The display info json object"
+                        body<JsonObject> {}
                     }
                 }
             }) {
@@ -63,9 +61,8 @@ fun Application.manifest() = walletRoute {
                 }
                 response {
                     HttpStatusCode.OK to {
-                        body<JsonObject> {
-                            description = "The display info json object"
-                        }
+                        description = "The display info json object"
+                        body<JsonObject> { }
                     }
                 }
             }) {
@@ -91,9 +88,8 @@ fun Application.manifest() = walletRoute {
                 }
                 response {
                     HttpStatusCode.OK to {
-                        body<JsonObject> {
-                            description = "The issuer info json object"
-                        }
+                        description = "The issuer info json object"
+                        body<JsonObject> {}
                     }
                 }
             }) {
@@ -121,19 +117,16 @@ fun Application.manifest() = walletRoute {
                 }
                 response {
                     HttpStatusCode.OK to {
-                        body<JsonObject> {
-                            description = "The manifest issuer info json object"
-                        }
+                        description = "The manifest issuer info json object"
+                        body<JsonObject> { }
                     }
                     HttpStatusCode.NoContent to {
-                        body<JsonObject> {
-                            description = "No/empty manifest"
-                        }
+                        description = "No/empty manifest"
+                        body<JsonObject> {}
                     }
                     HttpStatusCode.BadRequest to {
-                        body<String> {
-                            description = "Error message"
-                        }
+                        description = "Error message"
+                        body<String> {}
                     }
                 }
             }) {

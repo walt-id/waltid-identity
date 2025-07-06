@@ -80,7 +80,33 @@ data class CredentialTypeConfig(
         "LegalPerson" to vc("VerifiableCredential", "LegalPerson"),
         "LegalRegistrationNumber" to vc("VerifiableCredential", "LegalRegistrationNumber"),
         "GaiaXTermsAndConditions" to vc("VerifiableCredential", "GaiaXTermsAndConditions"),
+        "DataspaceParticipantCredential" to vc("VerifiableCredential", "DataspaceParticipantCredential"),
+        "KiwiAccessCredential_jwt_vc_json" to vc(
+            CredentialSupported(
+                format = CredentialFormat.jwt_vc_json,
+                cryptographicBindingMethodsSupported = setOf("did"),
+                credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
 
+                display = listOf(
+                    DisplayProperties(
+                        name = "Kiwi Access Card",
+                        locale = "en-US",
+                        description = "An official evidence of age and identity card for use across New Zealand.",
+                        logo = LogoProperties(
+                            url = "https://kiwiaccess.co.nz/wp-content/uploads/2018/10/Kiwi-Access-Logo-White.png",
+                            altText = "Logo"
+                        ),
+                        backgroundColor = "#FFFFFF",
+                        textColor = "#78350f",
+                        backgroundImage = LogoProperties(
+                            url = "https://e-com.demo.walt.id/img/credential-bg.png",
+                            altText = "Background"
+                        ),
+                    )
+                ),
+                credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableAttestation" , "KiwiAccessCredential"))
+            )
+        ),
         MDocTypes.ISO_MDL to vc(
             CredentialSupported(
                 format = CredentialFormat.mso_mdoc,
@@ -91,35 +117,6 @@ data class CredentialTypeConfig(
                 docType = MDocTypes.ISO_MDL
             )
         ),
-        /*       "testCredential+jwt-vc-json" to vc(
-                   CredentialSupported(
-                       format = CredentialFormat.jwt_vc_json,
-                       cryptographicBindingMethodsSupported = setOf("did"),
-                       credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
-                       credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "TestCredential")),
-                       display = listOf( // <-- Breaks EBSI draft11 compatibility. Instead, configure in credential-issuer-metadata.conf
-                           DisplayProperties(
-                               name = "Test Credential 2",
-                               locale = "en-US",
-                               description = "This is a test credential 2",
-                               logo = LogoProperties(
-                                   url = "https://example.com/logo.png",
-                                   altText = "Logo"
-                               ),
-                               backgroundColor = "#FFFFFF",
-                               textColor = "#000000",
-                               backgroundImage = LogoProperties(
-                                   url = "https://example.com/background.png",
-                                   altText = "Background"
-                               ),
-                               secondaryImage = LogoProperties(
-                                   url = "https://example.com/secondary.png",
-                                   altText = "Secondary"
-                               ),
-                           )
-                       ),
-                   )
-               ),*/
         "urn:eu.eur1opa.ec.eudi:pid:1" to vc(
             CredentialSupported(
                 format = CredentialFormat.sd_jwt_vc,

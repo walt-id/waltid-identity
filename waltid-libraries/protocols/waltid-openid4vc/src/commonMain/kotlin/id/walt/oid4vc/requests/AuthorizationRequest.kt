@@ -3,6 +3,7 @@ package id.walt.oid4vc.requests
 import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.sdjwt.JWTCryptoProvider
 import io.ktor.client.request.*
@@ -165,9 +166,9 @@ data class AuthorizationRequest(
     fun toRequestObject(cryptoProvider: JWTCryptoProvider, keyId: String): String {
         return cryptoProvider.sign(toJSON().addUpdateJsoObject(
             buildJsonObject {
-                put("iss", clientId)
-                put("aud", "")
-                put("exp", (Clock.System.now() + Duration.parse(1.days.toString())).epochSeconds)
+                put(JWTClaims.Payload.issuer, clientId)
+                put(JWTClaims.Payload.audience, "")
+                put(JWTClaims.Payload.expirationTime, (Clock.System.now() + Duration.parse(1.days.toString())).epochSeconds)
             }
         ), keyId)
     }
@@ -251,7 +252,10 @@ data class AuthorizationRequest(
 
         suspend fun fromHttpParametersAuto(parameters: Map<String, List<String>>): AuthorizationRequest {
             return when {
-                parameters.containsKey("response_type") && parameters.containsKey("client_id") -> fromHttpParameters(parameters)
+                parameters.containsKey("response_type") && parameters.containsKey("client_id") -> fromHttpParameters(
+                    parameters
+                )
+
                 parameters.containsKey("request_uri") -> fromRequestObjectByReference(parameters["request_uri"]!!.first())
                 parameters.containsKey("request") -> fromRequestObject(parameters["request"]!!.first())
                 else -> throw Exception("Could not find request parameters or object in given parameters")
@@ -295,5 +299,4 @@ data class AuthorizationRequest(
             )
         }
     }
-
 }

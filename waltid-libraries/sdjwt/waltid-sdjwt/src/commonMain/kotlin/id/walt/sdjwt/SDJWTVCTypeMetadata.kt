@@ -19,8 +19,8 @@ data class SDJWTVCTypeMetadata(
     @SerialName("extends#integrity") val extendsIntegrity: String? = null,
     @SerialName("schema#integrity") val schemaIntegrity: String? = null,
     @SerialName("schema_uri#integrity") val schemaUriIntegrity: String? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
-    ) : JsonDataObject() {
+    override val customParameters: Map<String, JsonElement>? = mapOf()
+) : JsonDataObject() {
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(SDJWTVCTypeMetadataSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<SDJWTVCTypeMetadata>() {

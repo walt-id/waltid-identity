@@ -15,7 +15,7 @@ data class PresentationSubmission(
     val id: String,
     @SerialName("definition_id") val definitionId: String,
     @SerialName("descriptor_map") @Serializable(DescriptorMappingListSerializer::class) val descriptorMap: List<DescriptorMapping>,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(PresentationSubmissionSerializer, this).jsonObject
 

@@ -23,7 +23,7 @@ data class InputDescriptor(
     @Serializable(InputDescriptorConstraintsSerializer::class) val constraints: InputDescriptorConstraints? = null,
     @Serializable(InputDescriptorSchemaListSerializer::class) val schema: List<InputDescriptorSchema>? = null,
     val group: Set<String>? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(InputDescriptorSerializer, this).jsonObject
 
