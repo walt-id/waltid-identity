@@ -27,12 +27,14 @@ data class IssuerSignedItem(
      * Convert to CBOR map element
      */
     fun toMapElement(): MapElement {
-        return MapElement(mapOf(
-            MapKey("digestID") to digestID,
-            MapKey("random") to random,
-            MapKey("elementIdentifier") to elementIdentifier,
-            MapKey("elementValue") to elementValue
-        ))
+        return MapElement(
+            mapOf(
+                MapKey("digestID") to digestID,
+                MapKey("random") to random,
+                MapKey("elementIdentifier") to elementIdentifier,
+                MapKey("elementValue") to elementValue
+            )
+        )
     }
 
     companion object {
@@ -51,14 +53,23 @@ data class IssuerSignedItem(
         /**
          * Create an issuer signed item, with random salt
          */
-        fun createWithRandomSalt(digestID: UInt, elementIdentifier: String, elementValue: AnyDataElement): IssuerSignedItem {
-            return IssuerSignedItem(digestID.toDataElement(),  SecureRandom.nextBytes(16).toDataElement(), elementIdentifier.toDataElement(), elementValue)
+        fun createWithRandomSalt(
+            digestID: UInt,
+            elementIdentifier: String,
+            elementValue: AnyDataElement
+        ): IssuerSignedItem {
+            return IssuerSignedItem(
+                digestID.toDataElement(),
+                SecureRandom.nextBytes(16).toDataElement(),
+                elementIdentifier.toDataElement(),
+                elementValue
+            )
         }
     }
 }
 
 @Serializer(forClass = IssuerSignedItem::class)
-internal object IssuerSignedItemSerializer: KSerializer<IssuerSignedItem> {
+internal object IssuerSignedItemSerializer : KSerializer<IssuerSignedItem> {
     override fun serialize(encoder: Encoder, value: IssuerSignedItem) {
         encoder.encodeSerializableValue(DataElementSerializer, value.toMapElement())
     }

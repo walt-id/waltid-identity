@@ -24,30 +24,31 @@ class ExplicitClaimStrategy(
         offer: String,
         pending: Boolean = true,
         pinOrTxCode: String? = null,
-    ): List<WalletCredential> = issuanceService.useOfferRequest(
-        offer = offer,
-        credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
-        pinOrTxCode = pinOrTxCode,
-    ).map { credentialDataResult ->
-        ClaimCommons.convertCredentialDataResultToWalletCredential(
-            credentialDataResult,
-            wallet,
-            pending,
-        ).also { credential ->
-            ClaimCommons.addReceiveCredentialToUseCaseLog(
-                tenant,
-                account,
+    ): List<WalletCredential> =
+        issuanceService.useOfferRequest(
+            offer = offer,
+            credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
+            pinOrTxCode = pinOrTxCode,
+        ).map { credentialDataResult ->
+            ClaimCommons.convertCredentialDataResultToWalletCredential(
+                credentialDataResult = credentialDataResult,
+                walletId = wallet,
+                pending = pending,
+            ).also { credential ->
+                ClaimCommons.addReceiveCredentialToUseCaseLog(
+                    tenant,
+                    account,
+                    wallet,
+                    credential,
+                    credentialDataResult.type,
+                    eventUseCase,
+                )
+            }
+        }.also {
+            ClaimCommons.storeWalletCredentials(
                 wallet,
-                credential,
-                credentialDataResult.type,
-                eventUseCase,
+                it,
+                credentialService,
             )
         }
-    }.also {
-        ClaimCommons.storeWalletCredentials(
-            wallet,
-            it,
-            credentialService,
-        )
-    }
 }

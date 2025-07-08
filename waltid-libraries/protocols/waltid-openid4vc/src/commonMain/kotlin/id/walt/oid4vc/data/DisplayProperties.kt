@@ -32,7 +32,7 @@ data class DisplayProperties(
     @SerialName("background_color") val backgroundColor: String? = null,
     @SerialName("background_image") @Serializable(LogoPropertiesSerializer::class) val backgroundImage: LogoProperties? = null,
     @SerialName("text_color") val textColor: String? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf(),
+    override val customParameters: Map<String, JsonElement>? = mapOf(),
 ) : JsonDataObject() {
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(DisplayPropertiesSerializer, this).jsonObject
 

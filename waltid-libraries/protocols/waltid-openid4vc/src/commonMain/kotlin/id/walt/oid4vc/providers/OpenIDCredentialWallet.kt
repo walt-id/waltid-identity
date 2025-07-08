@@ -215,7 +215,6 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
     }
 
     override fun generateTokenResponse(session: S, tokenRequest: TokenRequest): TokenResponse {
-        println("SIOPCredentialProvider generateTokenResponse")
         val presentationDefinition = session.authorizationRequest?.presentationDefinition ?: throw TokenError(
             tokenRequest,
             TokenErrorCode.invalid_request
@@ -353,9 +352,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         ).let { authReq ->
             if (authorizationServerMetadata.pushedAuthorizationRequestEndpoint != null) {
                 // execute pushed authorization request
-                println("// 1. send pushed authorization request with authorization details, containing info of credentials to be issued, receive session id")
-                println("pushedAuthReq: $authReq")
-
+                // 1. send pushed authorization request with authorization details, containing info of credentials to be issued, receive session id"
                 val pushedAuthResp = httpSubmitForm(
                     Url(authorizationServerMetadata.pushedAuthorizationRequestEndpoint),
                     formParameters = parametersOf(authReq.toHttpParameters())
@@ -364,9 +361,8 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
                     AuthorizationErrorCode.server_error,
                     "Pushed authorization request didn't succeed"
                 )
-                println("pushedAuthResp: $pushedAuthResp")
 
-                println("// 2. call authorize endpoint with request uri, receive HTTP redirect (302 Found) with Location header")
+                // 2. call authorize endpoint with request uri, receive HTTP redirect (302 Found) with Location header"
                 AuthorizationRequest(
                     responseType = setOf(ResponseType.Code),
                     clientId = client.clientID,
@@ -375,18 +371,17 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
             } else authReq
         }
 
-        println("authReq: $authReq")
         val authResp = httpGet(URLBuilder(Url(authorizationServerMetadata.authorizationEndpoint!!)).also {
             it.parameters.appendAll(parametersOf(authReq.toHttpParameters()))
         }.build())
-        println("authResp: $authResp")
+
         if (authResp.status != HttpStatusCode.Found) throw AuthorizationError(
             authReq,
             AuthorizationErrorCode.server_error,
             "Got unexpected status code ${authResp.status.value} from issuer"
         )
         var location = Url(authResp.headers[HttpHeaders.Location]!!)
-        println("location: $location")
+
         location =
             if (location.parameters.contains("response_type") && location.parameters["response_type"] == ResponseType.IdToken.name) {
                 executeIdTokenAuthorization(location, holderDid, client)

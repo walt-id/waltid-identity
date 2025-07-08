@@ -30,6 +30,7 @@ object JsonUtils {
             is Array<*> -> JsonArray(map { it.toJsonElement() })
             is Collection<*> -> JsonArray(map { it.toJsonElement() })
             is Enum<*> -> JsonPrimitive(this.toString())
+            is Unit -> JsonPrimitive("null")
             else -> throw IllegalArgumentException("Unknown type: ${this::class.simpleName}, was: $this")
         }
 

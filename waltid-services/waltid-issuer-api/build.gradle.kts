@@ -1,6 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import java.util.Properties
+import java.util.*
 
 object Versions {
     const val KTOR_VERSION = "3.1.2" // also change 1 plugin
@@ -105,6 +105,9 @@ dependencies {
     // crypto
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
     implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+    // Bouncy Castle
+    implementation("org.bouncycastle:bcprov-lts8on:2.73.7")
+    implementation("org.bouncycastle:bcpkix-lts8on:2.73.7")
 
     // Multiplatform / Hashes
     testImplementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))

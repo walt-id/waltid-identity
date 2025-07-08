@@ -30,7 +30,10 @@ object RequestSigningCryptoProvider : JWTCryptoProvider {
     val signingKey: ECKey = ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningKeyFile?.let {
         runBlocking {
             if (File(it).exists())
-                ECKey.Builder(Curve.P_256, (ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey().toECPublicKey()))
+                ECKey.Builder(
+                    Curve.P_256,
+                    (ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey().toECPublicKey())
+                )
                     .privateKey(ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey().toECPrivateKey())
                     .keyID(Uuid.random().toString())
                     .build()
@@ -48,13 +51,14 @@ object RequestSigningCryptoProvider : JWTCryptoProvider {
 
     override fun sign(payload: JsonObject, keyID: String?, typ: String, headers: Map<String, Any>): String {
         return SignedJWT(
-            JWSHeader.Builder(JWSAlgorithm.ES256).keyID(signingKey.keyID).type(JOSEObjectType.JWT).customParams(headers).also {
-                if (certificateChain != null) {
-                    it.x509CertChain(
-                        X509CertChainUtils.parse(certificateChain).map { Base64.encode(it.encoded) }
-                    )
-                }
-            }.build(),
+            JWSHeader.Builder(JWSAlgorithm.ES256).keyID(signingKey.keyID).type(JOSEObjectType.JWT).customParams(headers)
+                .also {
+                    if (certificateChain != null) {
+                        it.x509CertChain(
+                            X509CertChainUtils.parse(certificateChain).map { Base64.encode(it.encoded) }
+                        )
+                    }
+                }.build(),
             JWTClaimsSet.parse(payload.toString())
         ).also { it.sign(ECDSASigner(signingKey)) }.serialize()
     }
