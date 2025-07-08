@@ -45,7 +45,7 @@ object ServiceEndpointBaseSerializer : JsonContentPolymorphicSerializer<ServiceE
 data class ServiceEndpointURL(val url: String) : ServiceEndpoint() {
 
     init {
-        require( url.isNotBlank() ) { "Service endpoint URL cannot be blank." }
+        require(url.isNotBlank()) { "Service endpoint URL cannot be blank." }
     }
 }
 

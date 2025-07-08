@@ -26,11 +26,11 @@ data class AuthorizationCodeWithAuthorizationRequestResponse private constructor
             redirectUri?.let { put("redirect_uri", listOf(it)) }
             responseType?.let { put("response_type", listOf(it)) }
             responseMode?.let { put("response_mode", listOf(it.name)) }
-            scope.let { put("scope", it.toList())}
+            scope.let { put("scope", it.toList()) }
             nonce?.let { put("nonce", listOf(it)) }
             requestUri?.let { put("request_uri", listOf(it)) }
             request?.let { put("request", listOf(it)) }
-            presentationDefinition?.let {  put("presentation_definition", listOf(it)) }
+            presentationDefinition?.let { put("presentation_definition", listOf(it)) }
             putAll(customParameters)
         }
     }
@@ -53,7 +53,31 @@ data class AuthorizationCodeWithAuthorizationRequestResponse private constructor
             )
         }
 
-        fun success(state: String, clientId: String, redirectUri: String, responseType: String,  responseMode: ResponseMode, scope: Set<String>, nonce: String, requestUri: String?, request: String?,  presentationDefinition: String?, customParameters:Map<String, List<String>> = mapOf()) =
-            AuthorizationCodeWithAuthorizationRequestResponse(state, clientId, redirectUri, responseType,  responseMode, scope, nonce, requestUri, request,  presentationDefinition, customParameters)
+        fun success(
+            state: String,
+            clientId: String,
+            redirectUri: String,
+            responseType: String,
+            responseMode: ResponseMode,
+            scope: Set<String>,
+            nonce: String,
+            requestUri: String?,
+            request: String?,
+            presentationDefinition: String?,
+            customParameters: Map<String, List<String>> = mapOf()
+        ) =
+            AuthorizationCodeWithAuthorizationRequestResponse(
+                state,
+                clientId,
+                redirectUri,
+                responseType,
+                responseMode,
+                scope,
+                nonce,
+                requestUri,
+                request,
+                presentationDefinition,
+                customParameters
+            )
     }
 }

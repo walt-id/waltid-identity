@@ -55,7 +55,7 @@ data class PresentationSessionInfo(
     val tokenResponse: TokenResponse? = null,
     val verificationResult: Boolean? = null,
     val policyResults: JsonObject? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf(),
+    override val customParameters: Map<String, JsonElement>? = mapOf(),
 ) : JsonDataObject() {
     override fun toJSON() = buildJsonObject {
         put("id", JsonPrimitive(id))

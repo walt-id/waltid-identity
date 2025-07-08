@@ -51,6 +51,7 @@ class DeviceRequest(
          */
         @OptIn(ExperimentalSerializationApi::class)
         fun fromCBOR(cbor: ByteArray) = Cbor.decodeFromByteArray<DeviceRequest>(cbor)
+
         /**
          * Deserialize from CBOR hex string
          */

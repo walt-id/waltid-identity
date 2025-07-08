@@ -50,7 +50,8 @@ object PolicyManager {
             AllowedIssuerPolicy(),
             RevocationPolicy(),
             PresentationDefinitionPolicy(),
-            DynamicPolicy()
+            DynamicPolicy(),
+            StatusPolicy(),
         )
     }
 

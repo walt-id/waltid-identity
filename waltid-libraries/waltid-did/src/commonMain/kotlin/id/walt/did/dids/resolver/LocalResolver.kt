@@ -59,7 +59,7 @@ class LocalResolver : DidResolver {
     @JsExport.Ignore
     override suspend fun resolveToKey(did: String): Result<Key> =
         getResolverForDid(did).resolveToKey(did)
-        
+
     @JvmBlocking
     @JvmAsync
     @JsPromise

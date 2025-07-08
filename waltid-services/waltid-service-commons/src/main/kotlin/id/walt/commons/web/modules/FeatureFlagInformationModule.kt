@@ -33,9 +33,8 @@ object FeatureFlagInformationModule {
                     summary = "List registered features"
                     response {
                         HttpStatusCode.OK to {
-                            body<Map<String, String>> {
-                                description = "Registered features"
-                            }
+                            description = "Registered features"
+                            body<Map<String, String>> {}
                         }
                     }
                 }) {
@@ -45,6 +44,7 @@ object FeatureFlagInformationModule {
                     summary = "Show state of features"
                     response {
                         HttpStatusCode.OK to {
+                            description = "State of features"
                             body<FeatureFlagInformations>()
                         }
                     }

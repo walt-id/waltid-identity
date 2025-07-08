@@ -38,7 +38,7 @@ data class AuthorizationDetails @OptIn(ExperimentalSerializationApi::class) cons
     @Serializable(ClaimDescriptorNamespacedMapSerializer::class) val claims: Map<String, Map<String, ClaimDescriptor>>? = null,
     @SerialName("credential_definition") val credentialDefinition: CredentialDefinition? = null,
     val locations: List<String>? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = json.encodeToJsonElement(AuthorizationDetailsSerializer, this).jsonObject
 
@@ -46,12 +46,19 @@ data class AuthorizationDetails @OptIn(ExperimentalSerializationApi::class) cons
         override fun fromJSON(jsonObject: JsonObject): AuthorizationDetails =
             json.decodeFromJsonElement(AuthorizationDetailsSerializer, jsonObject)
 
-        fun fromOfferedCredential(offeredCredential: OfferedCredential, issuerLocation: String? = null) = AuthorizationDetails(
-            OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
-            offeredCredential.format, offeredCredential.vct, offeredCredential.types, null,
-            offeredCredential.docType, null,
-            offeredCredential.credentialDefinition, issuerLocation?.let { listOf(it) }, offeredCredential.customParameters
-        )
+        fun fromOfferedCredential(offeredCredential: OfferedCredential, issuerLocation: String? = null) =
+            AuthorizationDetails(
+                OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
+                offeredCredential.format,
+                offeredCredential.vct,
+                offeredCredential.types,
+                null,
+                offeredCredential.docType,
+                null,
+                offeredCredential.credentialDefinition,
+                issuerLocation?.let { listOf(it) },
+                offeredCredential.customParameters
+            )
     }
 }
 

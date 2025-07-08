@@ -10,12 +10,12 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 
 @Serializable(with = CredentialDefinitionSerializer::class)
-data class CredentialDefinition (
+data class CredentialDefinition(
     val credentialSubject: JsonObject? = null,
     val type: List<String>? = null,
 )
 
-object CredentialDefinitionSerializer: KSerializer<CredentialDefinition> {
+object CredentialDefinitionSerializer : KSerializer<CredentialDefinition> {
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("CredentialDefinition")
 
     override fun deserialize(decoder: Decoder): CredentialDefinition {
