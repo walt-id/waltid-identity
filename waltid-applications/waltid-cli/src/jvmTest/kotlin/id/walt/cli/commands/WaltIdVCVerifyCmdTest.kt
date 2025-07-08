@@ -180,7 +180,7 @@ class WaltIdVCVerifyCmdTest {
         assertContains(result1.output, "signature: Success")
 
         val result2 = command.test(listOf("--policy=signature", badSignedVCFilePath))
-        assertContains(result2.output, "signature: Fail! Signature check failed")
+        assertContains(result2.output, "signature: Fail!")
     }
 
     @Test

@@ -28,7 +28,7 @@ data class CredentialRequest(
     @SerialName("credential_definition") val credentialDefinition: CredentialDefinition? = null,
     @SerialName("types") val types: List<String>? = null,
     @SerialName("display") val display: List<DisplayProperties>? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = json.encodeToJsonElement(CredentialRequestSerializer, this).jsonObject
 
@@ -50,18 +50,18 @@ data class CredentialRequest(
                 authorizationDetails.customParameters
             )
 
-       fun forOfferedCredential(offeredCredential: OfferedCredential, proof: ProofOfPossession?) = CredentialRequest(
-           format = offeredCredential.format,
-           proof = proof,
-           vct = offeredCredential.vct,
-           credentialSubject = null,
-           docType = offeredCredential.docType,
-           claims = null,
-           credentialDefinition = offeredCredential.credentialDefinition,
-           types = offeredCredential.types,
-           display = offeredCredential.display,
-           customParameters = offeredCredential.customParameters
-       )
+        fun forOfferedCredential(offeredCredential: OfferedCredential, proof: ProofOfPossession?) = CredentialRequest(
+            format = offeredCredential.format,
+            proof = proof,
+            vct = offeredCredential.vct,
+            credentialSubject = null,
+            docType = offeredCredential.docType,
+            claims = null,
+            credentialDefinition = offeredCredential.credentialDefinition,
+            types = offeredCredential.types,
+            display = offeredCredential.display,
+            customParameters = offeredCredential.customParameters
+        )
     }
 }
 

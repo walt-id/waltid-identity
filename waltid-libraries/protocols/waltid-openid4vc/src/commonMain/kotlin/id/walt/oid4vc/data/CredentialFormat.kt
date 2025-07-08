@@ -22,7 +22,11 @@ enum class CredentialFormat(val value: String) {
 
     companion object {
         fun fromValue(value: String): CredentialFormat? {
-            return entries.find { it.value == value }
+            return when (value) {
+                // TODO: Workaround for Ktor's parseQueryString interpreting '+' as space
+                "vc+sd-jwt", "vc sd-jwt" -> sd_jwt_vc
+                else -> entries.find { it.value == value }
+            }
         }
     }
 }

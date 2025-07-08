@@ -19,9 +19,9 @@ data class ClaimDescriptor(
     val mandatory: Boolean? = null,
     @SerialName("value_type") val valueType: String? = null,
     @Serializable(DisplayPropertiesListSerializer::class) val display: List<DisplayProperties>? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
-    val nestedClaims: Map<String, ClaimDescriptor> = customParameters.filterValues { it is JsonObject }
+    val nestedClaims: Map<String, ClaimDescriptor> = customParameters!!.filterValues { it is JsonObject }
         .mapValues { fromJSON(it.value.jsonObject) }
 
     override fun toJSON() = Json.encodeToJsonElement(ClaimDescriptorSerializer, this).jsonObject

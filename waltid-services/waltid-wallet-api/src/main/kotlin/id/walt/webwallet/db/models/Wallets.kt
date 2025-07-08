@@ -2,9 +2,9 @@
 
 package id.walt.webwallet.db.models
 
-import id.walt.commons.temp.UuidSerializer
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.ResultRow
@@ -20,7 +20,7 @@ object Wallets : UUIDTable("wallets") {
 
 @Serializable
 data class Wallet(
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    @Contextual
     val id: Uuid,
     val name: String,
     val createdOn: Instant,

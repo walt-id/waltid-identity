@@ -21,7 +21,7 @@ data class InputDescriptorField(
     val filter: JsonObject? = null,
     val optional: Boolean? = null,
     @SerialName("intent_to_retain") val intentToRetain: Boolean? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     override fun toJSON(): JsonObject {
         TODO("Not yet implemented")

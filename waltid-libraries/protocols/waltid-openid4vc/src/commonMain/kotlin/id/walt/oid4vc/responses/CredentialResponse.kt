@@ -27,7 +27,7 @@ data class CredentialResponse private constructor(
     val error: String? = null,
     @SerialName("error_description") val errorDescription: String? = null,
     @SerialName("error_uri") val errorUri: String? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     val isSuccess get() = (format != null && credential != null) || isDeferred
     val isDeferred get() = acceptanceToken != null
@@ -43,7 +43,14 @@ data class CredentialResponse private constructor(
             cNonce: String? = null,
             cNonceExpiresIn: Duration? = null,
             customParameters: Map<String, JsonElement> = mapOf()
-        ) = CredentialResponse(format, JsonPrimitive(credentialString), null, cNonce, cNonceExpiresIn, customParameters = customParameters)
+        ) = CredentialResponse(
+            format,
+            JsonPrimitive(credentialString),
+            null,
+            cNonce,
+            cNonceExpiresIn,
+            customParameters = customParameters
+        )
 
         fun success(
             format: CredentialFormat,
@@ -59,7 +66,14 @@ data class CredentialResponse private constructor(
             cNonce: String? = null,
             cNonceExpiresIn: Duration? = null,
             customParameters: Map<String, JsonElement> = mapOf()
-        ) = CredentialResponse(format, null, acceptanceToken, cNonce, cNonceExpiresIn, customParameters = customParameters)
+        ) = CredentialResponse(
+            format,
+            null,
+            acceptanceToken,
+            cNonce,
+            cNonceExpiresIn,
+            customParameters = customParameters
+        )
 
         fun error(
             error: CredentialErrorCode,

@@ -30,7 +30,7 @@ sealed class TokenRequest() : HTTPDataObject() {
         override val grantType = GrantType.authorization_code
 
         override fun getSpecificParameters(): Map<String, List<String>> = buildMap {
-            redirectUri?.let {put("redirect_uri", listOf(redirectUri)) }
+            redirectUri?.let { put("redirect_uri", listOf(redirectUri)) }
             put("code", listOf(code))
             codeVerifier?.let { put("code_verifier", listOf(it)) }
         }
@@ -53,7 +53,6 @@ sealed class TokenRequest() : HTTPDataObject() {
     }
 
 
-
     companion object : HTTPDataObjectFactory<TokenRequest>() {
         private val knownKeys = setOf(
             "grant_type", "client_id", "redirect_uri", "code", "pre-authorized_code", "tx_code", "code_verifier"
@@ -63,17 +62,20 @@ sealed class TokenRequest() : HTTPDataObject() {
             val grantType = parameters["grant_type"]!!.first().let { GrantType.fromValue(it)!! }
             val customParams = parameters.filterKeys { !knownKeys.contains(it) }
 
-            return  when (grantType) {
+            return when (grantType) {
                 GrantType.authorization_code -> AuthorizationCode(
-                    clientId = parameters["client_id"]?.firstOrNull() ?: throw IllegalArgumentException("Missing 'client_id' for Authorization Code flow."),
-                    code = parameters["code"]?.firstOrNull() ?: throw IllegalArgumentException("Missing 'code' for Authorization Code flow."),
+                    clientId = parameters["client_id"]?.firstOrNull()
+                        ?: throw IllegalArgumentException("Missing 'client_id' for Authorization Code flow."),
+                    code = parameters["code"]?.firstOrNull()
+                        ?: throw IllegalArgumentException("Missing 'code' for Authorization Code flow."),
                     redirectUri = parameters["redirect_uri"]?.firstOrNull(),
                     codeVerifier = parameters["code_verifier"]?.firstOrNull(),
                     customParameters = customParams
                 )
 
                 GrantType.pre_authorized_code -> PreAuthorizedCode(
-                    preAuthorizedCode = parameters["pre-authorized_code"]?.firstOrNull() ?: throw IllegalArgumentException("Missing 'pre-authorized_code' for Pre-Authorized flow."),
+                    preAuthorizedCode = parameters["pre-authorized_code"]?.firstOrNull()
+                        ?: throw IllegalArgumentException("Missing 'pre-authorized_code' for Pre-Authorized flow."),
                     txCode = parameters["tx_code"]?.firstOrNull(),
                     userPIN = parameters["user_pin"]?.firstOrNull(),
                     clientId = parameters["client_id"]?.firstOrNull(),

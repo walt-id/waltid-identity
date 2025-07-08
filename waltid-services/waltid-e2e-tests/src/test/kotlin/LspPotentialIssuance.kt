@@ -201,8 +201,8 @@ class LspPotentialIssuance(val client: HttpClient) {
                 setBody(credReq.toJSON())
             }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
             assertTrue(credResp.isSuccess)
-            assertContains(credResp.customParameters.keys, "credential_encoding")
-            assertEquals("issuer-signed", credResp.customParameters["credential_encoding"]!!.jsonPrimitive.content)
+            assertContains(credResp.customParameters!!.keys, "credential_encoding")
+            assertEquals("issuer-signed", credResp.customParameters!!["credential_encoding"]!!.jsonPrimitive.content)
             assertNotNull(credResp.credential)
             val mdoc = MDoc(
                 credReq.docType!!.toDataElement(), IssuerSigned.fromMapElement(

@@ -2,13 +2,12 @@
 
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
-import id.walt.issuer.issuance.IssuanceExamples
+import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
 import id.walt.issuer.issuance.IssuerOnboardingResponse
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
-import id.walt.webwallet.web.model.loginRequestJson
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -116,7 +115,7 @@ abstract class E2EWalletTestBase {
         println("Running login...")
         walletClient.post("$walletUrl/wallet-api/auth/login") {
             setBody(
-                loginRequestJson.encodeToString(
+                Json.encodeToString(
                     EmailAccountRequest(
                         email = user.email, password = user.password
                     ) as AccountRequest
