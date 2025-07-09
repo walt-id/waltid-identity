@@ -76,15 +76,12 @@
         </div>
         <div v-if="disclosures">
           <div v-for="disclosure in disclosures">
-            <template
-              v-if="!(jwtJson.type[jwtJson.type.length - 1] === 'KiwiAccessCredential' && disclosure[1] === 'portrait')">
-              <div class="flex mt-2">
-                <div class="text-gray-500 w-sm">{{ disclosure[1] }}</div>
-                <div class="text-gray-500 font-bold overflow-scroll w-2xl">
-                  {{ disclosure[2] }}
-                </div>
+            <div class="flex mt-2">
+              <div class="text-gray-500 w-sm">{{ disclosure[1] }}</div>
+              <div class="text-gray-500 font-bold overflow-scroll w-2xl">
+                {{ disclosure[2] }}
               </div>
-            </template>
+            </div>
           </div>
         </div>
         <hr class="w-full border-gray-200 my-2" />
@@ -226,7 +223,7 @@ const credentialManifest = computedAsync(async () => {
 
 async function deleteCredential() {
   await $fetch(
-    `/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`,
+    `/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}?permanent=true`,
     {
       method: "DELETE",
     },
