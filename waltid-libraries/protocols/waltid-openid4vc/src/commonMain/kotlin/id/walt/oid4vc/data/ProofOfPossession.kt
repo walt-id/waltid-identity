@@ -21,7 +21,7 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
     val jwt: String? = null,
     val cwt: String? = null,
     val ldp_vp: JsonObject? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(ProofOfPossessionSerializer, this).jsonObject
 

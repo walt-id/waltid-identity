@@ -25,14 +25,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@f7b46c8ae1c27f1a0873a5ca8dfb0440c77381ec
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@a4a92e12ee9b7396ee9a22083ff21b3277c627d6
       - name: Set version
         run: |
           sed -i "s/1.0.0-SNAPSHOT/${{ inputs.version }}/g" build.gradle.kts
-      - name: Fully build the project (runs assemble + check)
-        run: ./gradlew build --no-daemon
-      - name: Run allTests task
-        run: ./gradlew allTests --no-daemon
+      - name: Clean and build with all tests
+        run: ./gradlew clean build cleanAllTests allTests --rerun-tasks --no-daemon --parallel --max-workers=3 --continue
       - name: Publish
         if: ${{ inputs.publish }}
         env:

@@ -13,7 +13,7 @@ class SDJwtVC(sdJwt: SDJwt) :
     val notBefore = undisclosedPayload["nbf"]?.jsonPrimitive?.long
     val expiration = undisclosedPayload["exp"]?.jsonPrimitive?.long
     val vct = undisclosedPayload["vct"]?.jsonPrimitive?.content
-    val status = undisclosedPayload["status"]?.jsonPrimitive?.content
+    val status = undisclosedPayload["status"]?.jsonObject
 
     private fun verifyHolderKeyBinding(
         jwtCryptoProvider: JWTCryptoProvider, requiresHolderKeyBinding: Boolean,
@@ -85,7 +85,7 @@ class SDJwtVC(sdJwt: SDJwt) :
             issuerDid: String,
             holderDid: String,
             issuerKeyId: String? = null,
-            vct: String, nbf: Long? = null, exp: Long? = null, status: String? = null,
+            vct: String, nbf: Long? = null, exp: Long? = null, status: JsonObject? = null,
             /** Set additional options in the JWT header */
             additionalJwtHeader: Map<String, Any> = emptyMap(),
             subject: String? = null
@@ -99,7 +99,7 @@ class SDJwtVC(sdJwt: SDJwt) :
             issuerDid: String,
             holderKeyJWK: JsonObject,
             issuerKeyId: String? = null,
-            vct: String, nbf: Long? = null, exp: Long? = null, status: String? = null,
+            vct: String, nbf: Long? = null, exp: Long? = null, status: JsonObject? = null,
             /** Set additional options in the JWT header */
             additionalJwtHeader: Map<String, Any> = emptyMap(),
             subject: String? = null
@@ -114,7 +114,7 @@ class SDJwtVC(sdJwt: SDJwt) :
             holderDid: String?,
             holderKeyJWK: JsonObject?,
             issuerKeyId: String? = null,
-            vct: String, nbf: Long? = null, exp: Long? = null, status: String? = null,
+            vct: String, nbf: Long? = null, exp: Long? = null, status: JsonObject? = null,
             /** Set additional options in the JWT header */
             additionalJwtHeader: Map<String, Any> = emptyMap()
         ): SDJwtVC = holderDid?.let {
@@ -129,7 +129,7 @@ class SDJwtVC(sdJwt: SDJwt) :
             issuerDid: String,
             cnf: JsonObject,
             issuerKeyId: String? = null,
-            vct: String, nbf: Long? = null, exp: Long? = null, status: String? = null,
+            vct: String, nbf: Long? = null, exp: Long? = null, status: JsonObject? = null,
             /** Set additional options in the JWT header */
             additionalJwtHeader: Map<String, Any> = emptyMap(),
             subject: String? = null
@@ -152,14 +152,14 @@ class SDJwtVC(sdJwt: SDJwt) :
 
         fun defaultPayloadProperties(
             issuerId: String, cnf: JsonObject, vct: String,
-            notBefore: Long? = null, expirationDate: Long? = null, status: String? = null, subject: String? = null
+            notBefore: Long? = null, expirationDate: Long? = null, status: JsonObject? = null, subject: String? = null
         ) = buildJsonObject {
             put("iss", JsonPrimitive(issuerId))
             put("cnf", cnf)
             put("vct", JsonPrimitive(vct))
             notBefore?.let { put("nbf", JsonPrimitive(it)) }
             expirationDate?.let { put("exp", JsonPrimitive(it)) }
-            status?.let { put("status", JsonPrimitive(it)) }
+            status?.let { put("status", it) }
             subject?.let { put("sub", JsonPrimitive(it)) }
         }
 

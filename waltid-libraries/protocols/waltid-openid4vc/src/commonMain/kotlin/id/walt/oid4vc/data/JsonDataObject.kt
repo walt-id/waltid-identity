@@ -8,7 +8,7 @@ import kotlinx.serialization.json.*
 
 @Serializable
 abstract class JsonDataObject {
-    abstract val customParameters: Map<String, JsonElement>
+    abstract val customParameters: Map<String, JsonElement>?
     abstract fun toJSON(): JsonObject
     fun toJSONString() = toJSON().toString()
 }

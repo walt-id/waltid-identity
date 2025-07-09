@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 data class InputDescriptorSchema(
     val uri: String,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>?= mapOf()
 ) : JsonDataObject() {
     override fun toJSON(): JsonObject {
         TODO("Not yet implemented")

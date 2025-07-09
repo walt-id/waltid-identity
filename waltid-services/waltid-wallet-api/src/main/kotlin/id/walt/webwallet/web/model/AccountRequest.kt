@@ -1,16 +1,18 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.webwallet.web.model
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
+import kotlinx.serialization.json.JsonIgnoreUnknownKeys
 
 @Serializable
-sealed class AccountRequest {
+sealed class AccountRequest() {
     abstract val name: String?
 }
 
+@JsonIgnoreUnknownKeys
 @Serializable
 @SerialName("email")
 data class EmailAccountRequest(
@@ -19,6 +21,7 @@ data class EmailAccountRequest(
     val password: String,
 ) : AccountRequest()
 
+@JsonIgnoreUnknownKeys
 @Serializable
 @SerialName("address")
 data class AddressAccountRequest(
@@ -27,11 +30,15 @@ data class AddressAccountRequest(
     val ecosystem: String,
 ) : AccountRequest()
 
+@JsonIgnoreUnknownKeys
 @Serializable
 @SerialName("oidc")
-data class OidcAccountRequest(override val name: String? = null, val token: String) :
-    AccountRequest()
+data class OidcAccountRequest(
+    override val name: String? = null,
+    val token: String
+) : AccountRequest()
 
+@JsonIgnoreUnknownKeys
 @Serializable
 @SerialName("keycloak")
 data class KeycloakAccountRequest(
@@ -43,32 +50,20 @@ data class KeycloakAccountRequest(
 ) : AccountRequest()
 
 @Serializable
-@SerialName("keycloak")
 data class KeycloakLogoutRequest(val keycloakUserId: String? = null, val token: String? = null)
 
+@JsonIgnoreUnknownKeys
 @Serializable
 @SerialName("oidc-unique-subject")
-data class OidcUniqueSubjectRequest(override val name: String? = null, val token: String) :
-    AccountRequest()
+data class OidcUniqueSubjectRequest(
+    override val name: String? = null,
+    val token: String
+) : AccountRequest()
 
+@JsonIgnoreUnknownKeys
 @Serializable
 @SerialName("x5c")
 data class X5CAccountRequest(
     override val name: String? = null,
     val token: String,
 ) : AccountRequest()
-
-val accountRequestSerializer = SerializersModule {
-    polymorphic(AccountRequest::class) {
-        EmailAccountRequest::class
-        AddressAccountRequest::class
-        OidcAccountRequest::class
-        KeycloakAccountRequest::class
-        X5CAccountRequest::class
-    }
-}
-
-val loginRequestJson = Json {
-    serializersModule = accountRequestSerializer
-    ignoreUnknownKeys = true
-}

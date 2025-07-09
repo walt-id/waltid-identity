@@ -13,7 +13,7 @@ import kotlinx.serialization.json.jsonObject
 @Serializable
 data class SupportedVPFormat(
     val alg_values_supported: Set<String>,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(SupportedVPFormatSerializer, this).jsonObject
 
