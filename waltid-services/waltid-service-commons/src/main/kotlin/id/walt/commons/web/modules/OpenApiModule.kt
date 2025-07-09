@@ -51,6 +51,7 @@ object OpenApiModule {
                     customAnalyzer(ContextualSerializationTypeAnalyzerModule)
                     customAnalyzer(FixSealedClassInheritanceModule)
                     customGenerator(FixSealedClassInheritanceModule)
+                    customGenerator(FixJsonCustomParameters)
                     overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
                     overwrite(SchemaGenerator.TypeOverwrites.File())
                     overwrite(SchemaGenerator.TypeOverwrites.Instant())
@@ -62,6 +63,7 @@ object OpenApiModule {
                 }
                 val reflectionGenerator = SchemaGenerator.reflection {
                     explicitNullTypes = false
+                    customGenerator(FixJsonCustomParameters)
                     overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
                     overwrite(SchemaGenerator.TypeOverwrites.File())
                     overwrite(SchemaGenerator.TypeOverwrites.Instant())
@@ -192,12 +194,12 @@ private object FixSealedClassInheritanceModule : SwaggerSchemaGenerationModule, 
 
     override fun applies(typeData: TypeData): Boolean {
         if (childElementNames.contains(typeData.identifyingName.full)) {
-            return typeData.annotations.firstOrNull { a -> a.name.equals(gerneratorMarker) } == null
+            return !typeData.annotations.any { a -> a.name.equals(gerneratorMarker) }
         }
         if (typeData.subtypes.isNotEmpty()
             && typeData.identifyingName.full.startsWith("id.walt.")
         ) {
-            return typeData.annotations.firstOrNull { a -> a.name.equals(gerneratorMarker) } == null
+            return !typeData.annotations.any { a -> a.name.equals(gerneratorMarker) }
         }
         return false
     }
@@ -249,6 +251,46 @@ private object FixSealedClassInheritanceModule : SwaggerSchemaGenerationModule, 
 
     override fun analyze(context: SerializationTypeAnalyzerModule.Context): WrappedTypeData {
         TODO("Should never be reached")
+    }
+}
+
+/*
+ * JsonCustomProperties are properties which can be added to the object, but are not
+ * part of the specification. All subclasses of id.walt.oid4vc.data.JsonDataObject
+ * might have additional properties.
+ *
+ * When the spec is generated the standard way, a property with the name
+ * "customParameters" is added. To fix this, this generator module
+ * removes the "customParameters" from the spec and sets the additional
+ * properties
+ */
+private object FixJsonCustomParameters : SwaggerSchemaGenerationModule {
+
+    /*
+     * The exceptions are needed (maybe more), because when serializing the response
+     * the customProperties are rendered as additional attribute. I have not found
+     * the reason, why it is doing that -> bug report: [WAL-1552]
+     *
+     * TODO: remove this when [WAL-1550] is fixed
+     */
+    val classNamesToIgnore = setOf(
+        "id.walt.verifier.oidc.SwaggerPresentationSessionInfo",
+        "id.walt.oid4vc.data.dif.PresentationDefinition",
+        "id.walt.verifier.oidc.SwaggerTokenResponse",
+        "id.walt.oid4vc.data.dif.DescriptorMapping")
+
+    override fun applies(typeData: TypeData): Boolean {
+        return !classNamesToIgnore.contains(typeData.identifyingName.full)
+                && typeData.members.any { it.name.equals("customParameters") }
+    }
+
+    override fun generate(context: SwaggerSchemaGenerationModule.Context): Schema<*> {
+        val typeData = context.typeData
+        typeData.members.removeIf { it.name.equals("customParameters") }
+        val generated = context.generate(typeData)
+        generated.additionalProperties = Schema<Any>()
+        generated.required?.removeIf { it.equals("customParameters") }
+        return generated
     }
 }
 
@@ -350,5 +392,4 @@ object CustomTypeOverrides {
             }
         },
     )
-
 }
