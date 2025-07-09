@@ -59,7 +59,7 @@ class UniResolverTest {
                     ).path.let { File(it).readText() }
                         .replace("[\\s\\n\\r]".toRegex(), ""),
                 ),
-                //disable flaky test
+// disable flaky test
 //                arguments(
 //                    "did:io:0x476c81C27036D05cB5ebfe30ae58C23351a61C4A",
 //                    URI(
@@ -88,7 +88,7 @@ class UniResolverTest {
                     ).path.let { File(it).readText() }
                         .replace("[\\s\\n\\r]".toRegex(), ""),
                 ),
-                //disable flaky test
+// disable flaky test
 //                arguments(
 //                    "did:io:0x476c81C27036D05cB5ebfe30ae58C23351a61C4A",
 //                    URI(

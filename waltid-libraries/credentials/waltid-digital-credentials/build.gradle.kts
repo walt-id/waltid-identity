@@ -1,10 +1,6 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
-import love.forte.plugin.suspendtrans.configuration.ClassInfo
-import love.forte.plugin.suspendtrans.configuration.SuspendTransformConfiguration
-import love.forte.plugin.suspendtrans.configuration.TargetPlatform
 import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
-import love.forte.plugin.suspendtrans.gradle.SuspendTransformPluginExtension
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -118,8 +114,10 @@ kotlin {
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
                 api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
                 api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
+                api(project(":waltid-libraries:credentials:waltid-dcql"))
                 api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
                 api(project(":waltid-libraries:waltid-did"))
+
 
 
                 implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))

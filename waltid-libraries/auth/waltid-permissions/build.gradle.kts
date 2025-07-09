@@ -37,7 +37,7 @@ kotlin {
             generateTypeScriptDefinitions()
         }
         browser {
-            generateTypeScriptDefinitions()
+            //generateTypeScriptDefinitions()
             /*testTask {
                 useKarma {
                     fun hasProgram(program: String) =
