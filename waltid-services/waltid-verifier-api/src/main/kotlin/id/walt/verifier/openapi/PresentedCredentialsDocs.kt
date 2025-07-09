@@ -9,12 +9,17 @@ object PresentedCredentialsDocs {
 
     fun getPresentedCredentialsDocs(): RouteConfig.() -> Unit = {
         tags = listOf("Credential Verification")
-        summary = ""
-        description = ""
+        summary = "Retrieve decoded credentials associated with a successfully verified presentation session"
+        description =
+                "Returns a structured, verbose representation of all credentials presented\n" +
+                "in a successfully verified presentation session. This endpoint is only available\n" +
+                "for sessions whose `vp_token` was verified with a positive result (`verificationResult == true`).\n" +
+                "\n" +
+                "Credentials are grouped by format and returned in both decoded and raw forms."
 
         request {
             pathParameter<String>("id") {
-                description = "Session ID"
+                description = "The identifier of the presentation session whose credentials should be retrieved."
                 required = true
             }
         }
@@ -23,6 +28,8 @@ object PresentedCredentialsDocs {
 
             HttpStatusCode.OK to {
                 body<PresentationSessionPresentedCredentials> {
+                    description = "Map of credential formats to lists of decoded presented credentials."
+                    required = true
 
                     example(
                         name = "OpenBadge W3C VC (no disclosures)"
