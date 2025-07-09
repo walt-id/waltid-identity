@@ -81,7 +81,7 @@ data class CredentialSupported(
     @Serializable(ClaimDescriptorNamespacedMapSerializer::class) val claims: Map<String, Map<String, ClaimDescriptor>>? = null,
     val order: List<String>? = null,
     @SerialName("sdJwtVcTypeMetadata") val sdJwtVcTypeMetadata: SDJWTVCTypeMetadata? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
 
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(CredentialSupportedSerializer, this).jsonObject

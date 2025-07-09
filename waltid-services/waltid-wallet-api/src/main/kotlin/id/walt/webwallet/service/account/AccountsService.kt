@@ -5,7 +5,6 @@ package id.walt.webwallet.service.account
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager.whenFeatureSuspend
-import id.walt.commons.temp.UuidSerializer
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.*
@@ -17,6 +16,7 @@ import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.web.model.*
 import kotlinx.datetime.toKotlinInstant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.exposed.sql.and
@@ -206,39 +206,38 @@ object AccountsService {
 
 @Serializable
 data class RegistrationResult(
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    @Contextual
     val id: Uuid,
 )
 
 @Serializable
 sealed class AuthenticatedUser {
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
     abstract val id: Uuid
 }
 
 @Serializable
 data class UsernameAuthenticatedUser(
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    @Contextual
     override val id: Uuid,
     val username: String,
 ) : AuthenticatedUser()
 
 @Serializable
 data class AddressAuthenticatedUser(
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    @Contextual
     override val id: Uuid,
     val address: String,
 ) : AuthenticatedUser()
 
 @Serializable
 data class KeycloakAuthenticatedUser(
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    @Contextual
     override val id: Uuid,
     val keycloakUserId: String,
 ) : AuthenticatedUser()
 
 @Serializable
 data class X5CAuthenticatedUser(
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    @Contextual
     override val id: Uuid,
 ) : AuthenticatedUser()

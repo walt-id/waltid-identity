@@ -71,7 +71,7 @@ sealed class CredentialOffer : JsonDataObject() {
 
         @SerialName("credential_configuration_ids") val credentialConfigurationIds: JsonArray,
 
-        override val customParameters: Map<String, JsonElement> = mapOf()
+        override val customParameters: Map<String, JsonElement>? = mapOf()
     ) : CredentialOffer() {
 
         class Builder(credentialIssuer: String) : CredentialOffer.Builder<Draft13>(credentialIssuer) {
@@ -95,7 +95,7 @@ sealed class CredentialOffer : JsonDataObject() {
 
         @SerialName("credentials") val credentials: JsonArray,
 
-        override val customParameters: Map<String, JsonElement> = mapOf()
+        override val customParameters: Map<String, JsonElement>? = mapOf()
     ) : CredentialOffer() {
 
         class Builder(

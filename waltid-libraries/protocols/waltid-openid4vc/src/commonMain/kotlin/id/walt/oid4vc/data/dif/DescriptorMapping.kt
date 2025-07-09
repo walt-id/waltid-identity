@@ -19,7 +19,7 @@ data class DescriptorMapping(
     val format: VCFormat? = null,
     val path: String,
     @SerialName("path_nested") val pathNested: DescriptorMapping? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
 
     override fun toJSON(): JsonObject {

@@ -186,7 +186,7 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
         @SerialName("credentials_supported") @Serializable(CredentialSupportedArraySerializer::class) val credentialSupported: Map<String, CredentialSupported>? = null,
         @SerialName("authorization_server") val authorizationServer: String? = null,
 
-        override val customParameters: Map<String, JsonElement> = mapOf()
+        override val customParameters: Map<String, JsonElement>? = mapOf()
 
     ) : OpenIDProviderMetadata() {
 
@@ -275,7 +275,7 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
         @SerialName("authorization_servers") val authorizationServers: Set<String>? = null,
         @SerialName("pre-authorized_grant_anonymous_access_supported") val preAuthorizedGrantAnonymousAccessSupport: Boolean? = null,
 
-        override val customParameters: Map<String, JsonElement> = mapOf()
+        override val customParameters: Map<String, JsonElement>? = mapOf()
 
     ) : OpenIDProviderMetadata() {
         fun getVctByCredentialConfigurationId(credentialConfigurationId: String) =
