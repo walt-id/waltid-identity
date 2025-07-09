@@ -13,6 +13,7 @@ import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerifierService
 import id.walt.verifier.oidc.VerifierService.FailedVerificationException
+import id.walt.verifier.openapi.PresentedCredentialsDocs
 import id.walt.verifier.openapi.VerifierApiDocs
 import id.walt.w3c.utils.VCFormat
 import io.github.smiley4.ktoropenapi.get
@@ -175,20 +176,23 @@ fun Application.verifierApi() {
 
             get(
                 path = "/session/{id}/presented-credentials",
-                builder = VerifierApiDocs.getPresentedCredentialsDocs()
+                builder = PresentedCredentialsDocs.getPresentedCredentialsDocs()
             ) {
                 val id = call.parameters.getOrFail("id")
-                VerifierService.getSessionPresentedCredentials(id).onSuccess {
-                    call.respond(
-                        status = HttpStatusCode.OK,
-                        message = it,
-                    )
-                }.onFailure {
-                    call.respond(
-                        status = HttpStatusCode.BadRequest,
-                        message = it,
-                    )
-                }
+                VerifierService
+                    .getSessionPresentedCredentials(id)
+                    .onSuccess {
+                        call.respond(
+                            status = HttpStatusCode.OK,
+                            message = it,
+                        )
+                    }
+                    .onFailure { ex ->
+                        call.respond(
+                            status = HttpStatusCode.BadRequest,
+                            message = ex.stackTraceToString(),
+                        )
+                    }
             }
 
             get("/pd/{id}", VerifierApiDocs.getPdDocs()) {

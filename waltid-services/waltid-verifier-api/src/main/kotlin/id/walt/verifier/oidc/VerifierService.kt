@@ -1,11 +1,11 @@
+@file:OptIn(ExperimentalEncodingApi::class)
+
 package id.walt.verifier.oidc
 
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.mdoc.dataretrieval.DeviceResponse
 import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
@@ -17,7 +17,7 @@ import id.walt.policies.models.PolicyRequest
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.policies.policies.SdJwtVCSignaturePolicy
-import id.walt.sdjwt.SDJwtVC
+import id.walt.verifier.oidc.models.PresentationSessionPresentedCredentials
 import id.walt.w3c.utils.VCFormat
 import io.klogging.logger
 import io.ktor.client.*
@@ -29,6 +29,7 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration
 
 object VerifierService {
@@ -263,7 +264,7 @@ object VerifierService {
 
     fun getSessionPresentedCredentials(
         sessionId: String,
-    ): Result<JsonObject> {
+    ) = runCatching {
         val session = OIDCVerifierService.getSession(sessionId)
 
         check(session.verificationResult == true) {
@@ -285,44 +286,19 @@ object VerifierService {
             "No presentation submission or presentation format found for session id: $sessionId"
         }
 
-        when (format) {
+        PresentationSessionPresentedCredentials.fromVpTokenStringsByFormat(
+            mapOf(
+                when(format) {
+                    VCFormat.jwt_vp_json, VCFormat.jwt_vp, VCFormat.jwt_vc_json -> {
+                        VCFormat.jwt_vc_json to listOf(vpTokenStringified)
+                    }
 
-            VCFormat.sd_jwt_vc -> {
-                val sdJwtVc = SDJwtVC.parse(vpTokenStringified)
-                buildJsonObject {
-                    put("header", sdJwtVc.header)
-                    put("payload", sdJwtVc.fullPayload)
-                    sdJwtVc.disclosureObjects.takeIf { it.isNotEmpty() }?.let {
-                        put("disclosures", it.toList().toJsonElement())
+                    else -> {
+                        format to listOf(vpTokenStringified)
                     }
                 }
-            }
-
-            VCFormat.mso_mdoc -> {
-                val deviceResponse = DeviceResponse.fromCBORBase64URL(vpTokenStringified)
-                buildJsonObject {
-                    put("version", deviceResponse.version.toString())
-                    put("status", deviceResponse.status.value.toString())
-                    put("documents", buildJsonArray {
-                        deviceResponse.documents.forEach { mDoc ->
-                            addJsonObject {
-                                put("docType", mDoc.docType.toString())
-                            }
-                        }
-                    })
-                }
-            }
-
-            else -> { //jwt_vc_json only here
-                val decodedJwtVp = vpTokenStringified.decodeJws()
-                buildJsonObject {
-                    put("header", decodedJwtVp.header)
-                    put("payload", decodedJwtVp.payload)
-                }
-            }
-        }.let {
-            return Result.success(it)
-        }
+            )
+        ).toJSONObject()
     }
 
 

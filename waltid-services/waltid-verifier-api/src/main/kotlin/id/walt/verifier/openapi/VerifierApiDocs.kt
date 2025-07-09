@@ -183,23 +183,6 @@ object VerifierApiDocs {
         }
     }
 
-    fun getPresentedCredentialsDocs(): RouteConfig.() -> Unit = {
-        tags = listOf("Credential Verification")
-        summary = ""
-        description = ""
-
-        request {
-            pathParameter<String>("id") {
-                description = "Session ID"
-                required = true
-            }
-        }
-
-        response {
-
-        }
-    }
-
     fun getPdDocs(): RouteConfig.() -> Unit = {
         tags = listOf("OIDC")
         summary = "Get presentation definition object by ID"
