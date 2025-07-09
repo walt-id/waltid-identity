@@ -2,6 +2,7 @@ package id.walt.verifier.oidc
 
 import id.walt.crypto.utils.JwsUtils
 import id.walt.oid4vc.data.JsonDataObject
+import id.walt.oid4vc.data.JsonDataObjectSerializer
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.data.dif.PresentationSubmissionSerializer
@@ -10,10 +11,10 @@ import id.walt.oid4vc.responses.TokenResponse
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 
 @Serializable
 data class SwaggerTokenResponse(
@@ -57,12 +58,7 @@ data class PresentationSessionInfo(
     val policyResults: JsonObject? = null,
     override val customParameters: Map<String, JsonElement>? = mapOf(),
 ) : JsonDataObject() {
-    override fun toJSON() = buildJsonObject {
-        put("id", JsonPrimitive(id))
-        put("presentation_definition", presentationDefinition.toJSON())
-        tokenResponse?.let { put("token_response", it.toJSON()) }
-        verificationResult?.let { put("verification_result", JsonPrimitive(it)) }
-    }
+    override fun toJSON() = Json.encodeToJsonElement(PresentationSessionInfoSerializer, this).jsonObject
 
     companion object {
         fun fromPresentationSession(session: PresentationSession, policyResults: JsonObject? = null) =
@@ -75,3 +71,7 @@ data class PresentationSessionInfo(
             )
     }
 }
+
+object PresentationSessionInfoSerializer :
+    JsonDataObjectSerializer<PresentationSessionInfo>(PresentationSessionInfo.serializer())
+
