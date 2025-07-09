@@ -6,11 +6,6 @@ import id.walt.verifier.DescriptorMappingFormParam
 import id.walt.verifier.PresentationSubmissionFormParam
 import id.walt.verifier.TokenResponseFormParam
 import id.walt.verifier.defaultAuthorizeBaseUrl
-import id.walt.oid4vc.data.dif.*
-import id.walt.verifier.DescriptorMappingFormParam
-import id.walt.verifier.PresentationSubmissionFormParam
-import id.walt.verifier.TokenResponseFormParam
-import id.walt.verifier.defaultAuthorizeBaseUrl
 import id.walt.verifier.oidc.SwaggerPresentationSessionInfo
 import id.walt.w3c.utils.VCFormat
 import io.github.smiley4.ktoropenapi.config.RouteConfig
