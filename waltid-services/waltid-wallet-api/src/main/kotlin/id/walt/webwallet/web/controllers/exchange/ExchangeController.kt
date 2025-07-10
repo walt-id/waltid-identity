@@ -1,7 +1,6 @@
 package id.walt.webwallet.web.controllers.exchange
 
 import id.walt.oid4vc.OpenID4VCI
-import id.walt.oid4vc.data.CredentialOfferSerializer
 import id.walt.oid4vc.data.OpenIDProviderMetadataSerializer
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.CredentialOfferRequest
@@ -184,7 +183,7 @@ fun Application.exchange() = walletRoute {
             val reqParams = Url(request).parameters.toMap()
             val parsedOffer = wallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams))
 
-            val serializedOffer = Json.encodeToString(CredentialOfferSerializer, parsedOffer)
+            val serializedOffer = parsedOffer.toJSONString()
 
             call.respondText(serializedOffer, ContentType.Application.Json)
         }

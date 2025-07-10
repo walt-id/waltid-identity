@@ -1,28 +1,28 @@
 package id.walt.cli.presexch
 
 import id.walt.cli.models.Credential
-import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
-import id.walt.oid4vc.data.dif.PresentationSubmissionSerializer
-import kotlinx.serialization.json.*
+import id.walt.w3c.utils.VCFormat
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class PresentationSubmissionBuilder(
     private val presentationDefinition: PresentationDefinition,
     private val qualifiedVcList: List<Credential>,
 ) {
-    fun buildToString() = Json.encodeToString(
-        PresentationSubmissionSerializer,
+    fun buildToString(): String =
         PresentationSubmission(
             id = presentationDefinition.id,
             definitionId = presentationDefinition.id,
             descriptorMap = qualifiedVcList.map { it.serializedCredential }.mapIndexed { index, vcJwsStr ->
                 buildDescriptorMapping(presentationDefinition, index, vcJwsStr)
             }
-        )
-    )
+        ).toJSONString()
 
     private fun buildDescriptorMapping(
         presentationDefinition: PresentationDefinition,
