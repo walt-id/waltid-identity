@@ -1,0 +1,130 @@
+{
+  "id": "n0tkgwV5wiSE",
+  "presentationDefinition": {
+    "id": "URvohwMjU0Qh",
+    "input_descriptors": [
+      {
+        "id": "VerifiableCredential",
+        "format": {
+          "jwt_vc_json": {
+            "alg": [
+              "EdDSA"
+            ]
+          }
+        },
+        "constraints": {
+          "fields": [
+            {
+              "path": [
+                "$.vc.type"
+              ],
+              "filter": {
+                "type": "string",
+                "pattern": "VerifiableCredential"
+              }
+            }
+          ]
+        },
+        "sequence-number": 1
+      }
+    ],
+    "should-present": true
+  },
+  "tokenResponse": {
+    "vp_token": "eyJraWQiOiJkaWQ6andrOmV5SnJkSGtpT2lKUFMxQWlMQ0pqY25ZaU9pSkZaREkxTlRFNUlpd2lhMmxrSWpvaWNtVktZMmswVERBME1VUTFla0ZOZDNNMVRtTkxlVzF2T0V0SlZIQk9YMnBLVlVGMU1sQklTVWRWVVNJc0luZ2lPaUp6WjNWT01uWndXbWR2UWpGUk5uZzBMVlY0T0UwMmNISTRNM2xQYm1obWNrVTFTVWRVTVdwZmFFMUpJbjAjMCIsInR5cCI6IkpXVCIsImFsZyI6IkVkRFNBIn0.eyJzdWIiOiJkaWQ6andrOmV5SnJkSGtpT2lKUFMxQWlMQ0pqY25ZaU9pSkZaREkxTlRFNUlpd2lhMmxrSWpvaWNtVktZMmswVERBME1VUTFla0ZOZDNNMVRtTkxlVzF2T0V0SlZIQk9YMnBLVlVGMU1sQklTVWRWVVNJc0luZ2lPaUp6WjNWT01uWndXbWR2UWpGUk5uZzBMVlY0T0UwMmNISTRNM2xQYm1obWNrVTFTVWRVTVdwZmFFMUpJbjAiLCJuYmYiOjE3NTIwNDg1NTAsImlhdCI6MTc1MjA0ODYxMCwianRpIjoiVVJ2b2h3TWpVMFFoIiwiaXNzIjoiZGlkOmp3azpleUpyZEhraU9pSlBTMUFpTENKamNuWWlPaUpGWkRJMU5URTVJaXdpYTJsa0lqb2ljbVZLWTJrMFREQTBNVVExZWtGTmQzTTFUbU5MZVcxdk9FdEpWSEJPWDJwS1ZVRjFNbEJJU1VkVlVTSXNJbmdpT2lKelozVk9Nblp3V21kdlFqRlJObmcwTFZWNE9FMDJjSEk0TTNsUGJtaG1ja1UxU1VkVU1XcGZhRTFKSW4wIiwibm9uY2UiOiI5ZTliMWUwMi00NmU4LTQwMDEtODBhMy0zMzY3NmMwYTVmM2QiLCJhdWQiOiJodHRwOi8vbG9jYWxob3N0OjcwMDMvb3BlbmlkNHZjL3ZlcmlmeSIsInZwIjp7IkBjb250ZXh0IjpbImh0dHBzOi8vd3d3LnczLm9yZy8yMDE4L2NyZWRlbnRpYWxzL3YxIl0sInR5cGUiOlsiVmVyaWZpYWJsZVByZXNlbnRhdGlvbiJdLCJpZCI6IlVSdm9od01qVTBRaCIsImhvbGRlciI6ImRpZDpqd2s6ZXlKcmRIa2lPaUpQUzFBaUxDSmpjbllpT2lKRlpESTFOVEU1SWl3aWEybGtJam9pY21WS1kyazBUREEwTVVRMWVrRk5kM00xVG1OTGVXMXZPRXRKVkhCT1gycEtWVUYxTWxCSVNVZFZVU0lzSW5naU9pSnpaM1ZPTW5ad1dtZHZRakZSTm5nMExWVjRPRTAyY0hJNE0zbFBibWhtY2tVMVNVZFVNV3BmYUUxSkluMCIsInZlcmlmaWFibGVDcmVkZW50aWFsIjpbImV5SnJhV1FpT2lKa2FXUTZhbmRyT21WNVNuSmtTR3RwVDJsS1JsRjVTWE5KYlU1NVpHbEpOa2x1VG14Wk0wRjVUbFJhY2sxVFNYTkpiWFJ3V2tOSk5rbHFSVE5oUkZJeldESldORkpVWkRCa2JUbFBXVlZHUjFaSGVGZE9WbVF4V0hwT2FscEZTbmxXYWxwbVYyeHdhRkV5YkdoU00xcG9ZVzVOYVV4RFNqUkphbTlwWkVkd2VHTlVTbGhTVmxaNldIcENUV1J0WkcxWFJrcHhWRmRrTms0eFVYaFNSemwxVDFjNVdGa3hTa3RrUm1SNFUwaE9VVlZzYkU5aWVVbHpTVzVyYVU5cFNsWlZSR2gyVldreGJVMUhPWGxaZWtFeFZESmtNVm95UmxaU01FcEVXVEJrZVZReWFFTmFXR1JzVTBkNGJsSldiREJWYTNoM1RUQnNha2x1TUNNeE4yZzBkMTlsZUVVM2RIWnZUbUZCUmxSc1ZqVlhkVjh6WTJSQ2NsWTJYMXBhWVVOcFlVZDJZV3B6SWl3aWRIbHdJam9pU2xkVUlpd2lZV3huSWpvaVJWTXlOVFpMSW4wLmV5SnBjM01pT2lKa2FXUTZhbmRyT21WNVNuSmtTR3RwVDJsS1JsRjVTWE5KYlU1NVpHbEpOa2x1VG14Wk0wRjVUbFJhY2sxVFNYTkpiWFJ3V2tOSk5rbHFSVE5oUkZJeldESldORkpVWkRCa2JUbFBXVlZHUjFaSGVGZE9WbVF4V0hwT2FscEZTbmxXYWxwbVYyeHdhRkV5YkdoU00xcG9ZVzVOYVV4RFNqUkphbTlwWkVkd2VHTlVTbGhTVmxaNldIcENUV1J0WkcxWFJrcHhWRmRrTms0eFVYaFNSemwxVDFjNVdGa3hTa3RrUm1SNFUwaE9VVlZzYkU5aWVVbHpTVzVyYVU5cFNsWlZSR2gyVldreGJVMUhPWGxaZWtFeFZESmtNVm95UmxaU01FcEVXVEJrZVZReWFFTmFXR1JzVTBkNGJsSldiREJWYTNoM1RUQnNha2x1TUNJc0luTjFZaUk2SW1ScFpEcHFkMnM2WlhsS2NtUklhMmxQYVVwUVV6RkJhVXhEU21wamJsbHBUMmxLUmxwRVNURk9WRVUxU1dsM2FXRXliR3RKYW05cFkyMVdTMWt5YXpCVVJFRXdUVlZSTVdWclJrNWtNMDB4VkcxT1RHVlhNWFpQUlhSS1ZraENUMWd5Y0V0V1ZVWXhUV3hDU1ZOVlpGWlZVMGx6U1c1bmFVOXBTbnBhTTFaUFRXNWFkMWR0WkhaUmFrWlNUbTVuTUV4V1ZqUlBSVEF5WTBoSk5FMHpiRkJpYldodFkydFZNVk5WWkZWTlYzQm1ZVVV4U2tsdU1DSXNJblpqSWpwN0lrQmpiMjUwWlhoMElqcGJJbWgwZEhCek9pOHZkM2QzTG5jekxtOXlaeTl1Y3k5amNtVmtaVzUwYVdGc2N5OTJNaUpkTENKMGVYQmxJanBiSWxabGNtbG1hV0ZpYkdWRGNtVmtaVzUwYVdGc0lsMHNJbWxrSWpvaWRYSnVPblYxYVdRNk9XTXpNelprWmpZdFpUTmxOQzAwTjJJeUxUaGpNelF0TnpNeE0yRXhZV1l3TnpFMklpd2libUZ0WlNJNkltVXlaU0JVWlhOMElFUmxabUYxYkhRZ1ZtVnlhV1pwWVdKc1pTQkRjbVZrWlc1MGFXRnNJaXdpYVhOemRXVnlJanA3SW1sa0lqb2laR2xrT21wM2F6cGxlVXB5WkVocmFVOXBTa1pSZVVselNXMU9lV1JwU1RaSmJrNXNXVE5CZVU1VVduSk5VMGx6U1cxMGNGcERTVFpKYWtVellVUlNNMWd5VmpSU1ZHUXdaRzA1VDFsVlJrZFdSM2hYVGxaa01WaDZUbXBhUlVwNVZtcGFabGRzY0doUk1teG9Vak5hYUdGdVRXbE1RMG8wU1dwdmFXUkhjSGhqVkVwWVVsWldlbGg2UWsxa2JXUnRWMFpLY1ZSWFpEWk9NVkY0VWtjNWRVOVhPVmhaTVVwTFpFWmtlRk5JVGxGVmJHeFBZbmxKYzBsdWEybFBhVXBXVlVSb2RsVnBNVzFOUnpsNVdYcEJNVlF5WkRGYU1rWldVakJLUkZrd1pIbFVNbWhEV2xoa2JGTkhlRzVTVm13d1ZXdDRkMDB3YkdwSmJqQWlmU3dpWTNKbFpHVnVkR2xoYkZOMVltcGxZM1FpT25zaWFXUWlPaUprYVdRNmFuZHJPbVY1U25Ka1NHdHBUMmxLVUZNeFFXbE1RMHBxWTI1WmFVOXBTa1phUkVreFRsUkZOVWxwZDJsaE1teHJTV3B2YVdOdFZrdFpNbXN3VkVSQk1FMVZVVEZsYTBaT1pETk5NVlJ0VGt4bFZ6RjJUMFYwU2xaSVFrOVlNbkJMVmxWR01VMXNRa2xUVldSV1ZWTkpjMGx1WjJsUGFVcDZXak5XVDAxdVduZFhiV1IyVVdwR1VrNXVaekJNVmxZMFQwVXdNbU5JU1RSTk0yeFFZbTFvYldOclZURlRWV1JWVFZkd1ptRkZNVXBKYmpBaWZTd2lhWE56ZFdGdVkyVkVZWFJsSWpvaU1qQXlOUzB3Tnkwd09WUXdPRG94TURveE1DNDNPVFV5TlRBMk1EUmFJaXdpWlhod2FYSmhkR2x2YmtSaGRHVWlPaUl5TURJMkxUQTNMVEE1VkRBNE9qRXdPakV3TGpjNU5UTTBNREE1TWxvaWZTd2lhblJwSWpvaWRYSnVPblYxYVdRNk9XTXpNelprWmpZdFpUTmxOQzAwTjJJeUxUaGpNelF0TnpNeE0yRXhZV1l3TnpFMklpd2laWGh3SWpveE56Z3pOVGcwTmpFd0xDSnBZWFFpT2pFM05USXdORGcyTVRBc0ltNWlaaUk2TVRjMU1qQTBPRFl4TUgwLmJ2X1NWQVZtb3NJZHlLX09TTVNjdkp1aXdWV0R2TVE1M2FUVmtSYXBxWEYxTVhNVmljWlJrcHY4aHYzblFqVUhoR2FSRUhuRWVLNVRxa3ktMnlPazFRIl19fQ.QCwpjHqgdQIYIyThRzZfSKAQ2mf91erMqXA2Jl2Eb666HJODzNbnjgQZWAygWC0tU1DnJfMecxPyVrz6xl52AQ",
+    "presentation_submission": {
+      "id": "URvohwMjU0Qh",
+      "definition_id": "URvohwMjU0Qh",
+      "descriptor_map": [
+        {
+          "id": "VerifiableCredential",
+          "format": "jwt_vp",
+          "path": "$",
+          "path_nested": {
+            "id": "VerifiableCredential",
+            "format": "jwt_vc",
+            "path": "$.vp.verifiableCredential[0]"
+          }
+        }
+      ]
+    },
+    "state": "n0tkgwV5wiSE",
+    "extra-param": "nice token"
+  },
+  "verificationResult": true,
+  "policyResults": {
+    "results": [
+      {
+        "credential": "VerifiablePresentation",
+        "policyResults": [
+          {
+            "policy": "signature",
+            "description": "Checks a JWT credential by verifying its cryptographic signature using the key referenced by the DID in `iss`.",
+            "is_success": true,
+            "result": {
+              "sub": "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5Iiwia2lkIjoicmVKY2k0TDA0MUQ1ekFNd3M1TmNLeW1vOEtJVHBOX2pKVUF1MlBISUdVUSIsIngiOiJzZ3VOMnZwWmdvQjFRNng0LVV4OE02cHI4M3lPbmhmckU1SUdUMWpfaE1JIn0",
+              "nbf": 1752048550,
+              "iat": 1752048610,
+              "jti": "URvohwMjU0Qh",
+              "iss": "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5Iiwia2lkIjoicmVKY2k0TDA0MUQ1ekFNd3M1TmNLeW1vOEtJVHBOX2pKVUF1MlBISUdVUSIsIngiOiJzZ3VOMnZwWmdvQjFRNng0LVV4OE02cHI4M3lPbmhmckU1SUdUMWpfaE1JIn0",
+              "nonce": "9e9b1e02-46e8-4001-80a3-33676c0a5f3d",
+              "aud": "http://localhost:7003/openid4vc/verify",
+              "vp": {
+                "@context": [
+                  "https://www.w3.org/2018/credentials/v1"
+                ],
+                "type": [
+                  "VerifiablePresentation"
+                ],
+                "id": "URvohwMjU0Qh",
+                "holder": "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5Iiwia2lkIjoicmVKY2k0TDA0MUQ1ekFNd3M1TmNLeW1vOEtJVHBOX2pKVUF1MlBISUdVUSIsIngiOiJzZ3VOMnZwWmdvQjFRNng0LVV4OE02cHI4M3lPbmhmckU1SUdUMWpfaE1JIn0",
+                "verifiableCredential": [
+                  "eyJraWQiOiJkaWQ6andrOmV5SnJkSGtpT2lKRlF5SXNJbU55ZGlJNkluTmxZM0F5TlRack1TSXNJbXRwWkNJNklqRTNhRFIzWDJWNFJUZDBkbTlPWVVGR1ZHeFdOVmQxWHpOalpFSnlWalpmV2xwaFEybGhSM1poYW5NaUxDSjRJam9pZEdweGNUSlhSVlZ6WHpCTWRtZG1XRkpxVFdkNk4xUXhSRzl1T1c5WFkxSktkRmR4U0hOUVVsbE9ieUlzSW5raU9pSlZVRGh2VWkxbU1HOXlZekExVDJkMVoyRlZSMEpEWTBkeVQyaENaWGRsU0d4blJWbDBVa3h3TTBsakluMCMxN2g0d19leEU3dHZvTmFBRlRsVjVXdV8zY2RCclY2X1paYUNpYUd2YWpzIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTZLIn0.eyJpc3MiOiJkaWQ6andrOmV5SnJkSGtpT2lKRlF5SXNJbU55ZGlJNkluTmxZM0F5TlRack1TSXNJbXRwWkNJNklqRTNhRFIzWDJWNFJUZDBkbTlPWVVGR1ZHeFdOVmQxWHpOalpFSnlWalpmV2xwaFEybGhSM1poYW5NaUxDSjRJam9pZEdweGNUSlhSVlZ6WHpCTWRtZG1XRkpxVFdkNk4xUXhSRzl1T1c5WFkxSktkRmR4U0hOUVVsbE9ieUlzSW5raU9pSlZVRGh2VWkxbU1HOXlZekExVDJkMVoyRlZSMEpEWTBkeVQyaENaWGRsU0d4blJWbDBVa3h3TTBsakluMCIsInN1YiI6ImRpZDpqd2s6ZXlKcmRIa2lPaUpQUzFBaUxDSmpjbllpT2lKRlpESTFOVEU1SWl3aWEybGtJam9pY21WS1kyazBUREEwTVVRMWVrRk5kM00xVG1OTGVXMXZPRXRKVkhCT1gycEtWVUYxTWxCSVNVZFZVU0lzSW5naU9pSnpaM1ZPTW5ad1dtZHZRakZSTm5nMExWVjRPRTAyY0hJNE0zbFBibWhtY2tVMVNVZFVNV3BmYUUxSkluMCIsInZjIjp7IkBjb250ZXh0IjpbImh0dHBzOi8vd3d3LnczLm9yZy9ucy9jcmVkZW50aWFscy92MiJdLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIl0sImlkIjoidXJuOnV1aWQ6OWMzMzZkZjYtZTNlNC00N2IyLThjMzQtNzMxM2ExYWYwNzE2IiwibmFtZSI6ImUyZSBUZXN0IERlZmF1bHQgVmVyaWZpYWJsZSBDcmVkZW50aWFsIiwiaXNzdWVyIjp7ImlkIjoiZGlkOmp3azpleUpyZEhraU9pSkZReUlzSW1OeWRpSTZJbk5sWTNBeU5UWnJNU0lzSW10cFpDSTZJakUzYURSM1gyVjRSVGQwZG05T1lVRkdWR3hXTlZkMVh6TmpaRUp5VmpaZldscGhRMmxoUjNaaGFuTWlMQ0o0SWpvaWRHcHhjVEpYUlZWelh6Qk1kbWRtV0ZKcVRXZDZOMVF4Ukc5dU9XOVhZMUpLZEZkeFNITlFVbGxPYnlJc0lua2lPaUpWVURodlVpMW1NRzl5WXpBMVQyZDFaMkZWUjBKRFkwZHlUMmhDWlhkbFNHeG5SVmwwVWt4d00wbGpJbjAifSwiY3JlZGVudGlhbFN1YmplY3QiOnsiaWQiOiJkaWQ6andrOmV5SnJkSGtpT2lKUFMxQWlMQ0pqY25ZaU9pSkZaREkxTlRFNUlpd2lhMmxrSWpvaWNtVktZMmswVERBME1VUTFla0ZOZDNNMVRtTkxlVzF2T0V0SlZIQk9YMnBLVlVGMU1sQklTVWRWVVNJc0luZ2lPaUp6WjNWT01uWndXbWR2UWpGUk5uZzBMVlY0T0UwMmNISTRNM2xQYm1obWNrVTFTVWRVTVdwZmFFMUpJbjAifSwiaXNzdWFuY2VEYXRlIjoiMjAyNS0wNy0wOVQwODoxMDoxMC43OTUyNTA2MDRaIiwiZXhwaXJhdGlvbkRhdGUiOiIyMDI2LTA3LTA5VDA4OjEwOjEwLjc5NTM0MDA5MloifSwianRpIjoidXJuOnV1aWQ6OWMzMzZkZjYtZTNlNC00N2IyLThjMzQtNzMxM2ExYWYwNzE2IiwiZXhwIjoxNzgzNTg0NjEwLCJpYXQiOjE3NTIwNDg2MTAsIm5iZiI6MTc1MjA0ODYxMH0.bv_SVAVmosIdyK_OSMScvJuiwVWDvMQ53aTVkRapqXF1MXMVicZRkpv8hv3nQjUHhGaREHnEeK5Tqky-2yOk1Q"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "credential": "VerifiableCredential",
+        "policyResults": [
+          {
+            "policy": "signature",
+            "description": "Checks a JWT credential by verifying its cryptographic signature using the key referenced by the DID in `iss`.",
+            "is_success": true,
+            "result": {
+              "iss": "did:jwk:eyJrdHkiOiJFQyIsImNydiI6InNlY3AyNTZrMSIsImtpZCI6IjE3aDR3X2V4RTd0dm9OYUFGVGxWNVd1XzNjZEJyVjZfWlphQ2lhR3ZhanMiLCJ4IjoidGpxcTJXRVVzXzBMdmdmWFJqTWd6N1QxRG9uOW9XY1JKdFdxSHNQUllObyIsInkiOiJVUDhvUi1mMG9yYzA1T2d1Z2FVR0JDY0dyT2hCZXdlSGxnRVl0UkxwM0ljIn0",
+              "sub": "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5Iiwia2lkIjoicmVKY2k0TDA0MUQ1ekFNd3M1TmNLeW1vOEtJVHBOX2pKVUF1MlBISUdVUSIsIngiOiJzZ3VOMnZwWmdvQjFRNng0LVV4OE02cHI4M3lPbmhmckU1SUdUMWpfaE1JIn0",
+              "vc": {
+                "@context": [
+                  "https://www.w3.org/ns/credentials/v2"
+                ],
+                "type": [
+                  "VerifiableCredential"
+                ],
+                "id": "urn:uuid:9c336df6-e3e4-47b2-8c34-7313a1af0716",
+                "name": "e2e Test Default Verifiable Credential",
+                "issuer": {
+                  "id": "did:jwk:eyJrdHkiOiJFQyIsImNydiI6InNlY3AyNTZrMSIsImtpZCI6IjE3aDR3X2V4RTd0dm9OYUFGVGxWNVd1XzNjZEJyVjZfWlphQ2lhR3ZhanMiLCJ4IjoidGpxcTJXRVVzXzBMdmdmWFJqTWd6N1QxRG9uOW9XY1JKdFdxSHNQUllObyIsInkiOiJVUDhvUi1mMG9yYzA1T2d1Z2FVR0JDY0dyT2hCZXdlSGxnRVl0UkxwM0ljIn0"
+                },
+                "credentialSubject": {
+                  "id": "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5Iiwia2lkIjoicmVKY2k0TDA0MUQ1ekFNd3M1TmNLeW1vOEtJVHBOX2pKVUF1MlBISUdVUSIsIngiOiJzZ3VOMnZwWmdvQjFRNng0LVV4OE02cHI4M3lPbmhmckU1SUdUMWpfaE1JIn0"
+                },
+                "issuanceDate": "2025-07-09T08:10:10.795250604Z",
+                "expirationDate": "2026-07-09T08:10:10.795340092Z"
+              },
+              "jti": "urn:uuid:9c336df6-e3e4-47b2-8c34-7313a1af0716",
+              "exp": 1783584610,
+              "iat": 1752048610,
+              "nbf": 1752048610
+            }
+          }
+        ]
+      }
+    ],
+    "time": "PT0.361272697S",
+    "policiesRun": 2
+  },
+  "customParmaA": "a session info custom param"
+}

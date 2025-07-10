@@ -1,16 +1,15 @@
 package id.walt.verifier.oidc
 
-import id.walt.crypto.utils.JwsUtils
 import id.walt.oid4vc.data.JsonDataObject
 import id.walt.oid4vc.data.JsonDataObjectSerializer
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.data.dif.PresentationSubmission
-import id.walt.oid4vc.data.dif.PresentationSubmissionSerializer
 import id.walt.oid4vc.providers.PresentationSession
 import id.walt.oid4vc.responses.TokenResponse
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KeepGeneratedSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -29,13 +28,11 @@ data class SwaggerTokenResponse(
     @SerialName("c_nonce_expires_in") val cNonceExpiresIn: Long? = null,
     @SerialName("authorization_pending") val authorizationPending: Boolean? = null,
     val interval: Long? = null,
-    @Serializable(PresentationSubmissionSerializer::class)
     @SerialName("presentation_submission") val presentationSubmission: PresentationSubmission? = null,
     val state: String? = null,
     val error: String? = null,
     @SerialName("error_description") val errorDescription: String? = null,
     @SerialName("error_uri") val errorUri: String? = null,
-    @Transient val jwsParts: JwsUtils.JwsParts? = null,
     val customParameters: Map<String, JsonElement> = mapOf(),
 )
 
@@ -49,7 +46,9 @@ data class SwaggerPresentationSessionInfo(
     val customParameters: Map<String, JsonElement> = mapOf(),
 )
 
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = PresentationSessionInfoSerializer::class)
 data class PresentationSessionInfo(
     val id: String,
     val presentationDefinition: PresentationDefinition,
@@ -72,6 +71,6 @@ data class PresentationSessionInfo(
     }
 }
 
-object PresentationSessionInfoSerializer :
-    JsonDataObjectSerializer<PresentationSessionInfo>(PresentationSessionInfo.serializer())
+internal object PresentationSessionInfoSerializer :
+    JsonDataObjectSerializer<PresentationSessionInfo>(PresentationSessionInfo.generatedSerializer())
 

@@ -266,22 +266,8 @@ private object FixSealedClassInheritanceModule : SwaggerSchemaGenerationModule, 
  */
 private object FixJsonCustomParameters : SwaggerSchemaGenerationModule {
 
-    /*
-     * The exceptions are needed (maybe more), because when serializing the response
-     * the customProperties are rendered as additional attribute. I have not found
-     * the reason, why it is doing that -> bug report: [WAL-1552]
-     *
-     * TODO: remove this when [WAL-1550] is fixed
-     */
-    val classNamesToIgnore = setOf(
-        "id.walt.verifier.oidc.SwaggerPresentationSessionInfo",
-        "id.walt.oid4vc.data.dif.PresentationDefinition",
-        "id.walt.verifier.oidc.SwaggerTokenResponse",
-        "id.walt.oid4vc.data.dif.DescriptorMapping")
-
     override fun applies(typeData: TypeData): Boolean {
-        return !classNamesToIgnore.contains(typeData.identifyingName.full)
-                && typeData.members.any { it.name.equals("customParameters") }
+        return typeData.members.any { it.name.equals("customParameters") }
     }
 
     override fun generate(context: SwaggerSchemaGenerationModule.Context): Schema<*> {
