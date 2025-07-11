@@ -1,5 +1,7 @@
 package id.walt.oid4vc.data
 
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KeepGeneratedSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -7,7 +9,9 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = OfferedCredentialSerializer::class)
 data class OfferedCredential(
     val format: CredentialFormat,
     val types: List<String>? = null, // for draft 11
@@ -22,7 +26,7 @@ data class OfferedCredential(
     override fun toJSON() = Json.encodeToJsonElement(OfferedCredentialSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<OfferedCredential>() {
-        override fun fromJSON(jsonObject: JsonObject) =
+        override fun fromJSON(jsonObject: JsonObject): OfferedCredential =
             Json.decodeFromJsonElement(OfferedCredentialSerializer, jsonObject)
 
         fun fromProviderMetadata(credential: CredentialSupported) = OfferedCredential(
@@ -39,4 +43,5 @@ data class OfferedCredential(
     }
 }
 
-object OfferedCredentialSerializer : JsonDataObjectSerializer<OfferedCredential>(OfferedCredential.serializer())
+internal object OfferedCredentialSerializer :
+    JsonDataObjectSerializer<OfferedCredential>(OfferedCredential.generatedSerializer())
