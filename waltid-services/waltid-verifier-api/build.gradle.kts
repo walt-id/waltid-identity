@@ -95,6 +95,7 @@ dependencies {
     // Test
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
+    testImplementation(project(":waltid-services:waltid-service-commons-test"))
 
     // OIDC
     api(project(":waltid-libraries:protocols:waltid-openid4vc"))

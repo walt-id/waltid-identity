@@ -3,6 +3,8 @@ package id.walt.oid4vc.responses
 import id.walt.oid4vc.data.JsonDataObject
 import id.walt.oid4vc.data.JsonDataObjectFactory
 import id.walt.oid4vc.data.JsonDataObjectSerializer
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KeepGeneratedSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -11,7 +13,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Duration
 
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = BatchCredentialResponseSerializer::class)
 data class BatchCredentialResponse private constructor(
     @SerialName("credential_responses") @Serializable(CredentialResponseListSerializer::class) val credentialResponses: List<CredentialResponse>?,
     @SerialName("c_nonce") val cNonce: String? = null,
@@ -25,7 +29,7 @@ data class BatchCredentialResponse private constructor(
     override fun toJSON() = Json.encodeToJsonElement(BatchCredentialResponseSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<BatchCredentialResponse>() {
-        override fun fromJSON(jsonObject: JsonObject) =
+        override fun fromJSON(jsonObject: JsonObject): BatchCredentialResponse =
             Json.decodeFromJsonElement(BatchCredentialResponseSerializer, jsonObject)
 
         fun success(
@@ -52,5 +56,5 @@ data class BatchCredentialResponse private constructor(
     }
 }
 
-object BatchCredentialResponseSerializer :
-    JsonDataObjectSerializer<BatchCredentialResponse>(BatchCredentialResponse.serializer())
+internal object BatchCredentialResponseSerializer :
+    JsonDataObjectSerializer<BatchCredentialResponse>(BatchCredentialResponse.generatedSerializer())
