@@ -1,6 +1,4 @@
-@file:OptIn(ExperimentalSerializationApi::class)
-
-package id.walt.verifier.oidc.models
+package id.walt.verifier.oidc.models.presentedcredentials
 
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
@@ -14,7 +12,6 @@ import id.walt.mdoc.dataretrieval.DeviceResponse
 import id.walt.sdjwt.SDJwtVC
 import id.walt.w3c.utils.VCFormat
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import org.cose.java.OneKey
@@ -28,7 +25,7 @@ data class PresentationSessionPresentedCredentials private constructor(
     val credentialsByFormat: Map<VCFormat, JsonArray>,
 ) {
 
-    fun toJSON() = Json.encodeToJsonElement(this)
+    fun toJSON() = Json.Default.encodeToJsonElement(this)
 
     fun toJSONObject() = this.toJSON().jsonObject
 
@@ -39,7 +36,7 @@ data class PresentationSessionPresentedCredentials private constructor(
         ) = buildJsonObject {
             put("raw", rawCredential.toJsonElement())
             put("decoded", buildJsonObject {
-                val sdJwtVc = SDJwtVC.parse(rawCredential)
+                val sdJwtVc = SDJwtVC.Companion.parse(rawCredential)
                 put("header", sdJwtVc.header)
                 put("payload", sdJwtVc.fullPayload)
                 sdJwtVc.sdPayload.digestedDisclosures.takeIf { it.isNotEmpty() }
@@ -64,7 +61,7 @@ data class PresentationSessionPresentedCredentials private constructor(
             put("raw", base64UrlEncodedDeviceResponse.toJsonElement())
             put("decoded", buildJsonObject {
                 val deviceResponse =
-                    DeviceResponse.fromCBORBase64URL(base64UrlEncodedDeviceResponse)
+                    DeviceResponse.Companion.fromCBORBase64URL(base64UrlEncodedDeviceResponse)
                 put("version", deviceResponse.version.value.toJsonElement())
                 put("status", deviceResponse.status.value.toJsonElement())
                 put("documents", buildJsonArray {
@@ -84,12 +81,13 @@ data class PresentationSessionPresentedCredentials private constructor(
                                     })
                                 }
                                 put("issuerAuth", buildJsonObject {
-                                    put("x5c", CertificateFactory
-                                        .getInstance("X509")
-                                        .generateCertificates(ByteArrayInputStream(mDoc.issuerSigned.issuerAuth!!.x5Chain))
-                                        .map {
-                                            X509CertUtils.toPEMString((it as X509Certificate))
-                                        }.toJsonElement()
+                                    put(
+                                        "x5c", CertificateFactory
+                                            .getInstance("X509")
+                                            .generateCertificates(ByteArrayInputStream(mDoc.issuerSigned.issuerAuth!!.x5Chain))
+                                            .map {
+                                                X509CertUtils.toPEMString((it as X509Certificate))
+                                            }.toJsonElement()
                                     )
                                     put("mso", mDoc.MSO!!.let { mso ->
                                         buildJsonObject {
@@ -102,7 +100,7 @@ data class PresentationSessionPresentedCredentials private constructor(
                                                 val deviceOneKey =
                                                     OneKey(CBORObject.DecodeFromBytes(mso.deviceKeyInfo.deviceKey.toCBOR()))
                                                 val deviceKeyJson = runBlocking {
-                                                    JWKKey.importRawPublicKey(
+                                                    JWKKey.Companion.importRawPublicKey(
                                                         type = KeyType.secp256r1,
                                                         rawPublicKey = deviceOneKey.AsPublicKey().encoded,
                                                     ).exportJWKObject()
@@ -147,7 +145,7 @@ data class PresentationSessionPresentedCredentials private constructor(
                 val decodedJwtVp = rawCredential.decodeJws()
                 val parsedCredentialsArray =
                     (((decodedJwtVp.payload["vp"] as JsonObject)["verifiableCredential"] as JsonArray).map { credential ->
-                        val vc = SDJwtVC.parse(credential.jsonPrimitive.content)
+                        val vc = SDJwtVC.Companion.parse(credential.jsonPrimitive.content)
                         buildJsonObject {
                             put("raw", credential)
                             put("decoded", buildJsonObject {
