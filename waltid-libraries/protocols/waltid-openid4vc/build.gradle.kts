@@ -7,11 +7,13 @@ plugins {
     id("dev.petuska.npm.publish") version "3.5.2"
     id("maven-publish")
     id("com.github.ben-manes.versions")
+    `maven-publish`
 }
 
 group = "id.walt.openid4vc"
 
 repositories {
+    mavenLocal()
     mavenCentral()
     maven("https://maven.waltid.dev/releases") {
         content {
@@ -19,7 +21,6 @@ repositories {
         }
     }
     maven("https://maven.waltid.dev/snapshots")
-    mavenLocal()
 }
 
 val targetVersion = JavaVersion.VERSION_1_8
@@ -258,5 +259,7 @@ publishing {
                 password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let { if (it.isFile) it.readLines().first() else "" }
             }
         }
+        // ./gradlew :waltid-libraries:protocols:waltid-openid4vc:publishToMavenLocal
+        mavenLocal()
     }
 }

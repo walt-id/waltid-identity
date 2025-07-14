@@ -124,7 +124,7 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
     @OptIn(ExperimentalSerializationApi::class)
     @KeepGeneratedSerializer
     @Serializable(with = Draft11OpenIDProviderMetadataSerializer::class)
-    data class Draft11 private constructor(
+    data class Draft11(
         @SerialName("issuer") override val issuer: String? = null,
         @SerialName("authorization_endpoint") override val authorizationEndpoint: String? = null,
         @SerialName("pushed_authorization_request_endpoint") override val pushedAuthorizationRequestEndpoint: String? = null,
