@@ -14,10 +14,7 @@ import id.walt.oid4vc.data.ResponseMode
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDMap
 import id.walt.verifier.oidc.PresentationSessionInfo
-import id.walt.verifier.oidc.models.presentedcredentials.PresentationSessionPresentedCredentials
-import id.walt.verifier.oidc.models.presentedcredentials.PresentedCredentialsViewMode
-import id.walt.verifier.oidc.models.presentedcredentials.PresentedJwtVcJsonSimpleViewMode
-import id.walt.verifier.oidc.models.presentedcredentials.PresentedJwtVcJsonVerboseViewMode
+import id.walt.verifier.oidc.models.presentedcredentials.*
 import id.walt.verifier.openapi.VerifierApiExamples
 import id.walt.w3c.utils.VCFormat
 import id.walt.webwallet.db.models.AccountWalletListing
@@ -839,8 +836,91 @@ class VerifierPresentedCredentialsTests {
                     assertTrue(it.verificationResult!!)
                 }
 
-            client.get("/openid4vc/session/${sessionId}/presented-credentials")
+            val simpleViewByDefaultResponse = client.get("/openid4vc/session/${sessionId}/presented-credentials")
                 .expectSuccess().body<PresentationSessionPresentedCredentials>()
+
+            assertEquals(
+                actual = simpleViewByDefaultResponse.viewMode,
+                expected = PresentedCredentialsViewMode.simple,
+            )
+
+            assertEquals(
+                actual = simpleViewByDefaultResponse.credentialsByFormat.keys,
+                expected = setOf(VCFormat.sd_jwt_vc),
+            )
+
+            var credentials =
+                assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.sd_jwt_vc])
+
+            assert(credentials.size == 1)
+
+            val sdJwtVcPresentationSimpleView = assertDoesNotThrow {
+                credentials.first() as PresentedSdJwtVcSimpleViewMode
+            }
+
+            assertNotNull(sdJwtVcPresentationSimpleView.keyBinding)
+
+            val simpleViewResponse =
+                client.get("/openid4vc/session/${sessionId}/presented-credentials") {
+                    url {
+                        parameters.append("viewMode", PresentedCredentialsViewMode.simple.name)
+                    }
+                }.expectSuccess().body<PresentationSessionPresentedCredentials>()
+
+            assertEquals(
+                expected = simpleViewByDefaultResponse,
+                actual = simpleViewResponse,
+            )
+
+            val verboseViewResponse =
+                client.get("/openid4vc/session/${sessionId}/presented-credentials") {
+                    url {
+                        parameters.append("viewMode", PresentedCredentialsViewMode.verbose.name)
+                    }
+                }.expectSuccess().body<PresentationSessionPresentedCredentials>()
+
+            assertNotEquals(
+                illegal = simpleViewResponse,
+                actual = verboseViewResponse,
+            )
+
+            assertEquals(
+                actual = verboseViewResponse.viewMode,
+                expected = PresentedCredentialsViewMode.verbose,
+            )
+
+            assertEquals(
+                actual = verboseViewResponse.credentialsByFormat.keys,
+                expected = setOf(VCFormat.sd_jwt_vc),
+            )
+
+            credentials =
+                assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.sd_jwt_vc])
+
+            assert(credentials.size == 1)
+
+            val sdJwtVcPresentationVerboseView = assertDoesNotThrow {
+                credentials.first() as PresentedSdJwtVcVerboseViewMode
+            }
+
+            assert(sdJwtVcPresentationVerboseView.raw.isNotBlank())
+            assertNotNull(sdJwtVcPresentationVerboseView.keyBinding)
+
+            assert(sdJwtVcPresentationVerboseView.vc.fullPayload != sdJwtVcPresentationVerboseView.vc.undisclosedPayload)
+
+            assert(sdJwtVcPresentationVerboseView.vc.undisclosedPayload.containsKey("_sd"))
+
+            sdJwtVcIssuanceRequest.selectiveDisclosure!!.fields.keys.forEach {
+                assertContains(
+                    sdJwtVcPresentationVerboseView.vc.fullPayload,
+                    it,
+                )
+            }
+
+            val disclosures = assertNotNull(sdJwtVcPresentationVerboseView.vc.disclosures)
+
+            assert(disclosures.size == 2)
+
         }
 
     private suspend fun presentMdl() =
