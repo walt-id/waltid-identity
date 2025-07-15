@@ -14,6 +14,7 @@ import id.walt.oid4vc.data.ResponseMode
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDMap
 import id.walt.verifier.oidc.PresentationSessionInfo
+import id.walt.verifier.oidc.models.presentedcredentials.PresentationSessionPresentedCredentials
 import id.walt.verifier.openapi.VerifierApiExamples
 import id.walt.w3c.utils.VCFormat
 import id.walt.webwallet.db.models.AccountWalletListing
@@ -624,12 +625,7 @@ class VerifierPresentedCredentialsTests {
                 }
 
             client.get("/openid4vc/session/${sessionId}/presented-credentials")
-                .expectSuccess()
-//                .body<JsonObject>().let {
-//                    jwtVcJsonAssertions(
-//                        response = it,
-//                    )
-//                }
+                .expectSuccess().body<PresentationSessionPresentedCredentials>()
         }
 
     private suspend fun presentOpenBadgeNoDisclosures() =
@@ -660,12 +656,7 @@ class VerifierPresentedCredentialsTests {
                 }
 
             client.get("/openid4vc/session/${sessionId}/presented-credentials")
-                .expectSuccess()
-//                .body<JsonObject>().let {
-//                    jwtVcJsonAssertions(
-//                        response = it,
-//                    )
-//                }
+                .expectSuccess().body<PresentationSessionPresentedCredentials>()
         }
 
     private suspend fun presentSdJwtVc() =
@@ -699,13 +690,7 @@ class VerifierPresentedCredentialsTests {
                 }
 
             client.get("/openid4vc/session/${sessionId}/presented-credentials")
-                .expectSuccess()
-//                .body<JsonObject>().let {
-//                    sdJwtVcAssertions(
-//                        response = it,
-//                        expectedDisclosureNo = 2,
-//                    )
-//                }
+                .expectSuccess().body<PresentationSessionPresentedCredentials>()
         }
 
     private suspend fun presentMdl() =
@@ -737,10 +722,7 @@ class VerifierPresentedCredentialsTests {
                 }
 
             client.get("/openid4vc/session/${sessionId}/presented-credentials")
-                .expectSuccess()
-//                .body<JsonObject>().let {
-//                    mDLAssertions(it)
-//                }
+                .expectSuccess().body<PresentationSessionPresentedCredentials>()
         }
 
     private suspend fun presentOpenBadgeWithDisclosures() =
@@ -774,12 +756,7 @@ class VerifierPresentedCredentialsTests {
                 }
 
             client.get("/openid4vc/session/${sessionId}/presented-credentials")
-                .expectSuccess()
-//                .body<JsonObject>().let {
-//                    jwtVcJsonAssertions(
-//                        response = it,
-//                    )
-//                }
+                .expectSuccess().body<PresentationSessionPresentedCredentials>()
         }
 
     private suspend fun presentUniversityDegreeWithDisclosures() =
@@ -813,12 +790,7 @@ class VerifierPresentedCredentialsTests {
                 }
 
             client.get("/openid4vc/session/${sessionId}/presented-credentials")
-                .expectSuccess()
-//                .body<JsonObject>().let {
-//                    jwtVcJsonAssertions(
-//                        response = it,
-//                    )
-//                }
+                .expectSuccess().body<PresentationSessionPresentedCredentials>()
         }
 
     private fun jwtVcJsonAssertions(
