@@ -709,10 +709,10 @@ class VerifierPresentedCredentialsTests {
         test(
             name = "${TEST_SUITE}: Presentation of open badge credential with no disclosures"
         ) {
-            val sessionId = Uuid.random()
+            val sessionId = Uuid.random().toString()
             val presentationUrl = client.post("/openid4vc/verify") {
                 headers {
-                    append("stateId", sessionId.toString())
+                    append("stateId", sessionId)
                 }
                 setBody(openBadgeNoDisclosurePresentationRequest)
             }.expectSuccess().bodyAsText()
@@ -740,10 +740,10 @@ class VerifierPresentedCredentialsTests {
         test(
             name = "${TEST_SUITE}: Presentation of sd jwt vc"
         ) {
-            val sessionId = Uuid.random()
+            val sessionId = Uuid.random().toString()
             val presentationUrl = client.post("/openid4vc/verify") {
                 headers {
-                    append("stateId", sessionId.toString())
+                    append("stateId", sessionId)
                 }
                 setBody(sdJwtVcPresentationRequest)
             }.expectSuccess().bodyAsText()
@@ -774,10 +774,10 @@ class VerifierPresentedCredentialsTests {
         test(
             name = "${TEST_SUITE}: Presentation of mDL"
         ) {
-            val sessionId = Uuid.random()
+            val sessionId = Uuid.random().toString()
             val presentationUrl = client.post("/openid4vc/verify") {
                 headers {
-                    append("stateId", sessionId.toString())
+                    append("stateId", sessionId)
                     append("responseMode", ResponseMode.direct_post_jwt.toString())
                 }
                 setBody(VerifierApiExamples.mDLRequiredFieldsExample)
@@ -806,10 +806,10 @@ class VerifierPresentedCredentialsTests {
         test(
             name = "${TEST_SUITE}: Presentation of open badge credential with disclosures"
         ) {
-            val sessionId = Uuid.random()
+            val sessionId = Uuid.random().toString()
             val presentationUrl = client.post("/openid4vc/verify") {
                 headers {
-                    append("stateId", sessionId.toString())
+                    append("stateId", sessionId)
                 }
                 setBody(openBadgeWithDisclosuresPresentationRequest)
             }.expectSuccess().bodyAsText()
@@ -840,10 +840,10 @@ class VerifierPresentedCredentialsTests {
         test(
             name = "${TEST_SUITE}: Presentation of university degree credential with disclosures"
         ) {
-            val sessionId = Uuid.random()
+            val sessionId = Uuid.random().toString()
             val presentationUrl = client.post("/openid4vc/verify") {
                 headers {
-                    append("stateId", sessionId.toString())
+                    append("stateId", sessionId)
                 }
                 setBody(universityDegreeWithDisclosuresPresentationRequest)
             }.expectSuccess().bodyAsText()
