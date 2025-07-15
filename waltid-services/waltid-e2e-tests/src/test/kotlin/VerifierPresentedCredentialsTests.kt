@@ -905,8 +905,98 @@ class VerifierPresentedCredentialsTests {
                     assertTrue(it.verificationResult!!)
                 }
 
-            client.get("/openid4vc/session/${sessionId}/presented-credentials")
+            val simpleViewByDefaultResponse = client.get("/openid4vc/session/${sessionId}/presented-credentials")
                 .expectSuccess().body<PresentationSessionPresentedCredentials>()
+
+            assertEquals(
+                actual = simpleViewByDefaultResponse.viewMode,
+                expected = PresentedCredentialsViewMode.simple,
+            )
+
+            assertEquals(
+                actual = simpleViewByDefaultResponse.credentialsByFormat.keys,
+                expected = setOf(VCFormat.jwt_vc_json),
+            )
+
+            var credentials =
+                assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.jwt_vc_json])
+
+            assert(credentials.size == 1)
+
+            val jwtVcJsonPresentationSimpleView = assertDoesNotThrow {
+                credentials.first() as PresentedJwtVcJsonSimpleViewMode
+            }
+
+            val holder = assertNotNull(jwtVcJsonPresentationSimpleView.holder)
+
+            assertEquals(
+                expected = did,
+                actual = holder.jsonPrimitive.content,
+            )
+
+            assert(jwtVcJsonPresentationSimpleView.verifiableCredentials.size == 1)
+
+            val simpleViewResponse =
+                client.get("/openid4vc/session/${sessionId}/presented-credentials") {
+                    url {
+                        parameters.append("viewMode", PresentedCredentialsViewMode.simple.name)
+                    }
+                }.expectSuccess().body<PresentationSessionPresentedCredentials>()
+
+            assertEquals(
+                expected = simpleViewByDefaultResponse,
+                actual = simpleViewResponse,
+            )
+
+            val verboseViewResponse =
+                client.get("/openid4vc/session/${sessionId}/presented-credentials") {
+                    url {
+                        parameters.append("viewMode", PresentedCredentialsViewMode.verbose.name)
+                    }
+                }.expectSuccess().body<PresentationSessionPresentedCredentials>()
+
+            assertNotEquals(
+                illegal = simpleViewResponse,
+                actual = verboseViewResponse,
+            )
+
+            assertEquals(
+                actual = verboseViewResponse.viewMode,
+                expected = PresentedCredentialsViewMode.verbose,
+            )
+
+            assertEquals(
+                actual = verboseViewResponse.credentialsByFormat.keys,
+                expected = setOf(VCFormat.jwt_vc_json),
+            )
+
+            credentials =
+                assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.jwt_vc_json])
+
+            assert(credentials.size == 1)
+
+            val jwtVcJsonPresentationVerboseView = assertDoesNotThrow {
+                credentials.first() as PresentedJwtVcJsonVerboseViewMode
+            }
+
+            assert(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 1)
+
+            val verboseCredential = jwtVcJsonPresentationVerboseView.verifiableCredentials.first()
+
+            assert(verboseCredential.fullPayload != verboseCredential.undisclosedPayload)
+
+            assert((verboseCredential.undisclosedPayload["vc"] as JsonObject).containsKey("_sd"))
+
+            openBadgeWithDisclosuresIssuanceRequest.selectiveDisclosure!!.fields.keys.forEach {
+                assertContains(
+                    verboseCredential.fullPayload["vc"] as JsonObject,
+                    it,
+                )
+            }
+
+            val disclosures = assertNotNull(verboseCredential.disclosures)
+
+            assert(disclosures.size == 2)
         }
 
     private suspend fun presentUniversityDegreeWithDisclosures() =
@@ -1015,21 +1105,20 @@ class VerifierPresentedCredentialsTests {
 
             assert(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 1)
 
-            val verboseUniDegree = jwtVcJsonPresentationVerboseView.verifiableCredentials.first()
+            val verboseCredential = jwtVcJsonPresentationVerboseView.verifiableCredentials.first()
 
-            assert(verboseUniDegree.fullPayload != verboseUniDegree.undisclosedPayload)
+            assert(verboseCredential.fullPayload != verboseCredential.undisclosedPayload)
 
-            assert((verboseUniDegree.undisclosedPayload["vc"] as JsonObject).containsKey("_sd"))
+            assert((verboseCredential.undisclosedPayload["vc"] as JsonObject).containsKey("_sd"))
 
             universityDegreeWithDisclosuresIssuanceRequest.selectiveDisclosure!!.fields.keys.forEach {
                 assertContains(
-                    verboseUniDegree.fullPayload["vc"] as JsonObject,
+                    verboseCredential.fullPayload["vc"] as JsonObject,
                     it,
                 )
             }
 
-
-            val disclosures = assertNotNull(verboseUniDegree.disclosures)
+            val disclosures = assertNotNull(verboseCredential.disclosures)
 
             assert(disclosures.size == 2)
 
