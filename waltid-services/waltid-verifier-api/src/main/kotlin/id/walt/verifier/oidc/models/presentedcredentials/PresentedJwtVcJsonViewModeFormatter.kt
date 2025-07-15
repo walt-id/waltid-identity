@@ -15,7 +15,7 @@ object PresentedJwtVcJsonViewModeFormatter {
         vpStr: String,
     ) = vpStr.decodeJws().let { vp ->
         PresentedJwtVcJsonSimpleViewMode(
-            holder = vp.payload["holder"],
+            holder = (vp.payload["vp"] as JsonObject)["holder"],
             verifiableCredentials = ((vp.payload["vp"] as JsonObject)["verifiableCredential"] as JsonArray).map {
                 SDJwtVC.parse(it.jsonPrimitive.content).let { sdJwtVc ->
                     ParsedJwt(
