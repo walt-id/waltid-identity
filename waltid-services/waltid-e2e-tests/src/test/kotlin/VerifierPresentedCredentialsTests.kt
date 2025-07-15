@@ -30,8 +30,9 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import org.junit.jupiter.api.assertDoesNotThrow
-import kotlin.test.*
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -792,153 +793,6 @@ class VerifierPresentedCredentialsTests {
             client.get("/openid4vc/session/${sessionId}/presented-credentials")
                 .expectSuccess().body<PresentationSessionPresentedCredentials>()
         }
-
-    private fun jwtVcJsonAssertions(
-        response: JsonObject,
-        expectedVpArrayEntries: Int = 1,
-    ) {
-        assertContains(response, "credentialsByFormat")
-        val credentialsByFormatJson = assertDoesNotThrow {
-            response["credentialsByFormat"] as JsonObject
-        }
-        assertContains(credentialsByFormatJson, VCFormat.jwt_vc_json.value)
-        val presentedJwtVPsJson = assertDoesNotThrow {
-            credentialsByFormatJson[VCFormat.jwt_vc_json.value] as JsonArray
-        }
-        assert(presentedJwtVPsJson.size == 1)
-        presentedJwtVPsJson.forEach { presentedJwtVpJsonArrayEntry ->
-            val presentedJwtVpJson = assertDoesNotThrow {
-                presentedJwtVpJsonArrayEntry as JsonObject
-            }
-            assertContains(presentedJwtVpJson, "raw")
-            assertNotNull(presentedJwtVpJson["raw"])
-            assert(presentedJwtVpJson["raw"]!!.jsonPrimitive.content.isNotBlank())
-            assertContains(presentedJwtVpJson, "decoded")
-            assertNotNull(presentedJwtVpJson["decoded"])
-
-            val presentedDecodedJwtVpJson = assertDoesNotThrow {
-                presentedJwtVpJson["decoded"] as JsonObject
-            }
-
-            assertContains(presentedDecodedJwtVpJson, "header")
-            assertContains(presentedDecodedJwtVpJson, "payload")
-
-            val presentedVpPayloadJson = assertDoesNotThrow {
-                presentedDecodedJwtVpJson["payload"] as JsonObject
-            }
-
-            assertContains(presentedVpPayloadJson, "vp")
-
-            val vpJson = assertDoesNotThrow {
-                presentedVpPayloadJson["vp"] as JsonObject
-            }
-
-            assertContains(vpJson, "@context")
-            assertContains(vpJson, "type")
-            assertContains(vpJson, "verifiableCredential")
-
-            val vpVCsJsonArray = assertDoesNotThrow {
-                vpJson["verifiableCredential"] as JsonArray
-            }
-
-            assert(vpVCsJsonArray.size == expectedVpArrayEntries)
-
-            vpVCsJsonArray.forEach { vpVcArrayEntry ->
-                val presentedJwtVcJson = assertDoesNotThrow {
-                    vpVcArrayEntry as JsonObject
-                }
-                assertContains(presentedJwtVcJson, "raw")
-                assertNotNull(presentedJwtVcJson["raw"])
-                assert(presentedJwtVcJson["raw"]!!.jsonPrimitive.content.isNotBlank())
-                assertContains(presentedJwtVcJson, "decoded")
-                assertNotNull(presentedJwtVcJson["decoded"])
-
-                val presentedDecodedJwtVcJson = assertDoesNotThrow {
-                    presentedJwtVcJson["decoded"] as JsonObject
-                }
-
-                assertContains(presentedDecodedJwtVcJson, "header")
-                assertContains(presentedDecodedJwtVcJson, "payload")
-
-                val presentedVcPayloadJson = assertDoesNotThrow {
-                    presentedDecodedJwtVcJson["payload"] as JsonObject
-                }
-
-                assertContains(presentedVcPayloadJson, "vc")
-            }
-        }
-    }
-
-    private fun sdJwtVcAssertions(
-        response: JsonObject,
-        expectedDisclosureNo: Int = 0,
-    ) {
-        assertContains(response, "credentialsByFormat")
-        val credentialsByFormatJson = assertDoesNotThrow {
-            response["credentialsByFormat"] as JsonObject
-        }
-        assertContains(credentialsByFormatJson, VCFormat.sd_jwt_vc.value)
-        val presentedSdJwtVCsJson = assertDoesNotThrow {
-            credentialsByFormatJson[VCFormat.sd_jwt_vc.value] as JsonArray
-        }
-        assert(presentedSdJwtVCsJson.size == 1)
-        presentedSdJwtVCsJson.forEach { presentedSdJwtVcArrayEntry ->
-            val presentedSdJwtVc = assertDoesNotThrow {
-                presentedSdJwtVcArrayEntry as JsonObject
-            }
-            assertContains(presentedSdJwtVc, "raw")
-            assertNotNull(presentedSdJwtVc["raw"])
-            assert(presentedSdJwtVc["raw"]!!.jsonPrimitive.content.isNotBlank())
-            assertContains(presentedSdJwtVc, "decoded")
-            assertNotNull(presentedSdJwtVc["decoded"])
-            val presentedDecodedSdJwtVc = assertDoesNotThrow {
-                presentedSdJwtVc["decoded"] as JsonObject
-            }
-            assertContains(presentedDecodedSdJwtVc, "header")
-            assertContains(presentedDecodedSdJwtVc, "payload")
-            if (expectedDisclosureNo > 0) {
-                assertContains(presentedDecodedSdJwtVc, "disclosures")
-                val disclosuresJson = assertDoesNotThrow {
-                    presentedDecodedSdJwtVc["disclosures"] as JsonObject
-                }
-                assertEquals(
-                    expected = expectedDisclosureNo,
-                    actual = disclosuresJson.keys.size,
-                )
-            }
-        }
-    }
-
-    private fun mDLAssertions(
-        response: JsonObject,
-    ) {
-        assertContains(response, "credentialsByFormat")
-        val credentialsByFormatJson = assertDoesNotThrow {
-            response["credentialsByFormat"] as JsonObject
-        }
-        assertContains(credentialsByFormatJson, VCFormat.mso_mdoc.value)
-        val presentedMdocsJson = assertDoesNotThrow {
-            credentialsByFormatJson[VCFormat.mso_mdoc.value] as JsonArray
-        }
-        assert(presentedMdocsJson.size == 1)
-        presentedMdocsJson.forEach { presentedMdocArrayEntry ->
-            val presentedMdoc = assertDoesNotThrow {
-                presentedMdocArrayEntry as JsonObject
-            }
-            assertContains(presentedMdoc, "raw")
-            assertNotNull(presentedMdoc["raw"])
-            assert(presentedMdoc["raw"]!!.jsonPrimitive.content.isNotBlank())
-            assertContains(presentedMdoc, "decoded")
-            assertNotNull(presentedMdoc["decoded"])
-            val presentedDecodedMdoc = assertDoesNotThrow {
-                presentedMdoc["decoded"] as JsonObject
-            }
-            assertContains(presentedDecodedMdoc, "version")
-            assertContains(presentedDecodedMdoc, "status")
-            assertContains(presentedDecodedMdoc, "documents")
-        }
-    }
-
 
     suspend fun runTests() {
         setupTestSuite()
