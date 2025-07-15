@@ -15,6 +15,9 @@ import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDMap
 import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.verifier.oidc.models.presentedcredentials.PresentationSessionPresentedCredentials
+import id.walt.verifier.oidc.models.presentedcredentials.PresentedCredentialsViewMode
+import id.walt.verifier.oidc.models.presentedcredentials.PresentedJwtVcJsonSimpleViewMode
+import id.walt.verifier.oidc.models.presentedcredentials.PresentedJwtVcJsonVerboseViewMode
 import id.walt.verifier.openapi.VerifierApiExamples
 import id.walt.w3c.utils.VCFormat
 import id.walt.webwallet.db.models.AccountWalletListing
@@ -30,6 +33,8 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
+import org.junit.jupiter.api.assertDoesNotThrow
+import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -625,8 +630,82 @@ class VerifierPresentedCredentialsTests {
                     assertTrue(it.verificationResult!!)
                 }
 
-            client.get("/openid4vc/session/${sessionId}/presented-credentials")
+            val simpleViewByDefaultResponse = client.get("/openid4vc/session/${sessionId}/presented-credentials")
                 .expectSuccess().body<PresentationSessionPresentedCredentials>()
+
+            assertEquals(
+                actual = simpleViewByDefaultResponse.viewMode,
+                expected = PresentedCredentialsViewMode.simple,
+            )
+
+            assertEquals(
+                actual = simpleViewByDefaultResponse.credentialsByFormat.keys,
+                expected = setOf(VCFormat.jwt_vc_json),
+            )
+
+            var credentials =
+                assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.jwt_vc_json])
+
+            assert(credentials.size == 1)
+
+            val jwtVcJsonPresentationSimpleView = assertDoesNotThrow {
+                credentials.first() as PresentedJwtVcJsonSimpleViewMode
+            }
+
+            val holder = assertNotNull(jwtVcJsonPresentationSimpleView.holder)
+
+            assertEquals(
+                expected = did,
+                actual = holder.jsonPrimitive.content,
+            )
+
+            assert(jwtVcJsonPresentationSimpleView.verifiableCredentials.size == 1)
+
+            val simpleViewResponse =
+                client.get("/openid4vc/session/${sessionId}/presented-credentials") {
+                    url {
+                        parameters.append("viewMode", PresentedCredentialsViewMode.simple.name)
+                    }
+                }.expectSuccess().body<PresentationSessionPresentedCredentials>()
+
+            assertEquals(
+                expected = simpleViewByDefaultResponse,
+                actual = simpleViewResponse,
+            )
+
+            val verboseViewResponse =
+                client.get("/openid4vc/session/${sessionId}/presented-credentials") {
+                    url {
+                        parameters.append("viewMode", PresentedCredentialsViewMode.verbose.name)
+                    }
+                }.expectSuccess().body<PresentationSessionPresentedCredentials>()
+
+            assertNotEquals(
+                illegal = simpleViewResponse,
+                actual = verboseViewResponse,
+            )
+
+            assertEquals(
+                actual = verboseViewResponse.viewMode,
+                expected = PresentedCredentialsViewMode.verbose,
+            )
+
+            assertEquals(
+                actual = verboseViewResponse.credentialsByFormat.keys,
+                expected = setOf(VCFormat.jwt_vc_json),
+            )
+
+            credentials =
+                assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.jwt_vc_json])
+
+            assert(credentials.size == 1)
+
+            val jwtVcJsonPresentationVerboseView = assertDoesNotThrow {
+                credentials.first() as PresentedJwtVcJsonVerboseViewMode
+            }
+
+            assert(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 1)
+
         }
 
     private suspend fun presentOpenBadgeNoDisclosures() =
