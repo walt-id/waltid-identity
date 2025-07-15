@@ -16,7 +16,7 @@ object PresentedJwtVcJsonViewModeFormatter {
     ) = vpStr.decodeJws().let { vp ->
         PresentedJwtVcJsonSimpleViewMode(
             holder = vp.payload["holder"],
-            verifiableCredentials = (vp.payload["verifiableCredential"] as JsonArray).map {
+            verifiableCredentials = ((vp.payload["vp"] as JsonObject)["verifiableCredential"] as JsonArray).map {
                 SDJwtVC.parse(it.jsonPrimitive.content).let { sdJwtVc ->
                     ParsedJwt(
                         header = sdJwtVc.header,
@@ -36,7 +36,7 @@ object PresentedJwtVcJsonViewModeFormatter {
                 header = vp.header,
                 payload = vp.payload,
             ),
-            verifiableCredentials = (vp.payload["verifiableCredential"] as JsonArray).map { vcStr ->
+            verifiableCredentials = ((vp.payload["vp"] as JsonObject)["verifiableCredential"] as JsonArray).map { vcStr ->
                 SDJwtVC.parse(vcStr.jsonPrimitive.content).let { sdJwtVc ->
                     ParsedJwtVcJsonVerbose(
                         raw = vcStr.jsonPrimitive.content,
