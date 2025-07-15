@@ -17,7 +17,8 @@ import id.walt.policies.models.PolicyRequest
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.policies.policies.SdJwtVCSignaturePolicy
-import id.walt.verifier.oidc.models.PresentationSessionPresentedCredentials
+import id.walt.verifier.oidc.models.presentedcredentials.PresentationSessionPresentedCredentials
+import id.walt.verifier.oidc.models.presentedcredentials.PresentedCredentialsViewMode
 import id.walt.w3c.utils.VCFormat
 import io.klogging.logger
 import io.ktor.client.*
@@ -264,6 +265,7 @@ object VerifierService {
 
     fun getSessionPresentedCredentials(
         sessionId: String,
+        viewMode: PresentedCredentialsViewMode,
     ) = runCatching {
         val session = OIDCVerifierService.getSession(sessionId)
 
@@ -287,8 +289,8 @@ object VerifierService {
         }
 
         PresentationSessionPresentedCredentials.fromVpTokenStringsByFormat(
-            mapOf(
-                when(format) {
+            vpTokenStringsByFormat = mapOf(
+                when (format) {
                     VCFormat.jwt_vp_json, VCFormat.jwt_vp, VCFormat.jwt_vc_json -> {
                         VCFormat.jwt_vc_json to listOf(vpTokenStringified)
                     }
@@ -297,8 +299,9 @@ object VerifierService {
                         format to listOf(vpTokenStringified)
                     }
                 }
-            )
-        ).toJSONObject()
+            ),
+            viewMode = viewMode,
+        )
     }
 
 

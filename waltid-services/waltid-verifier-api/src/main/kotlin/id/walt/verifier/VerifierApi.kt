@@ -13,6 +13,7 @@ import id.walt.verifier.config.OIDCVerifierServiceConfig
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerifierService
 import id.walt.verifier.oidc.VerifierService.FailedVerificationException
+import id.walt.verifier.oidc.models.presentedcredentials.PresentedCredentialsViewMode
 import id.walt.verifier.openapi.PresentedCredentialsDocs
 import id.walt.verifier.openapi.VerifierApiDocs
 import id.walt.w3c.utils.VCFormat
@@ -179,8 +180,14 @@ fun Application.verifierApi() {
                 builder = PresentedCredentialsDocs.getPresentedCredentialsDocs()
             ) {
                 val id = call.parameters.getOrFail("id")
+                val viewMode = call.queryParameters["viewMode"]?.let {
+                    PresentedCredentialsViewMode.valueOf(it)
+                } ?: PresentedCredentialsViewMode.simple
                 VerifierService
-                    .getSessionPresentedCredentials(id)
+                    .getSessionPresentedCredentials(
+                        sessionId = id,
+                        viewMode = viewMode,
+                    )
                     .onSuccess {
                         call.respond(
                             status = HttpStatusCode.OK,
