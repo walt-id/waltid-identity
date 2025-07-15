@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 @ConsistentCopyVisibility
 data class PresentationSessionPresentedCredentials private constructor(
     val credentialsByFormat: Map<VCFormat, List<PresentedCredentialView>>,
+    val viewMode: PresentedCredentialsViewMode,
 ) {
 
     companion object {
@@ -48,7 +49,8 @@ data class PresentationSessionPresentedCredentials private constructor(
                         throw IllegalArgumentException("VC format ${entry.key} not supported")
                     }
                 }
-            }
+            },
+            viewMode = viewMode,
         )
     }
 }
