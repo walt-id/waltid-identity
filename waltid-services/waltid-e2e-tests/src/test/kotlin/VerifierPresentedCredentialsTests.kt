@@ -27,7 +27,9 @@ import id.walt.webwallet.web.model.EmailAccountRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
+import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.assertDoesNotThrow
@@ -1310,6 +1312,96 @@ class VerifierPresentedCredentialsTests {
 
         }
 
+    private suspend fun queryPresentedCredentialsBeforeVpTokenSubmission() =
+        test(
+            name = "${TEST_SUITE}: Attempt to query presented credentials for session before submission of vp_token"
+        ) {
+
+            val sessionId = Uuid.random().toString()
+            client.post("/openid4vc/verify") {
+                headers {
+                    append("stateId", sessionId)
+                }
+                setBody(universityDegreeWithDisclosuresPresentationRequest)
+            }.expectSuccess().bodyAsText()
+
+            client.get("/openid4vc/session/${sessionId}/presented-credentials")
+                .expectFailure()
+
+            client.get("/openid4vc/session/${sessionId}/presented-credentials") {
+                url {
+                    parameters.append("viewMode", PresentedCredentialsViewMode.simple.name)
+                }
+            }.expectFailure()
+
+            client.get("/openid4vc/session/${sessionId}/presented-credentials") {
+                url {
+                    parameters.append("viewMode", PresentedCredentialsViewMode.verbose.name)
+                }
+            }.expectFailure()
+
+        }
+
+    private suspend fun queryPresentedCredentialsAfterInvalidVpTokenSubmission() =
+        test(
+            name = "${TEST_SUITE}: Attempt to query presented credentials for session with invalid vp_token submitted"
+        ) {
+
+            val sessionId = Uuid.random().toString()
+            client.post("/openid4vc/verify") {
+                headers {
+                    append("stateId", sessionId)
+                }
+                setBody(universityDegreeWithDisclosuresPresentationRequest)
+            }.expectSuccess().bodyAsText()
+
+            val dummyEcKey = KeyManager.createKey(
+                generationRequest = KeyGenerationRequest(
+                    backend = "jwk",
+                    keyType = KeyType.secp256r1,
+                )
+            )
+
+            val dummyPresentationSubmissionString =
+                """{"id":"X0zlmZ3BuJNS","definition_id":"X0zlmZ3BuJNS","descriptor_map":[{"id":"UniversityDegreeCredential","format":"jwt_vp","path":"${'$'}","path_nested":{"format":"jwt_vc","path":"${'$'}.vp.verifiableCredential[0]"}}]}"""
+
+            val dummyVpToken = dummyEcKey.signJws(
+                plaintext = Json.encodeToString(buildJsonObject {
+                    put("kati", "allo".toJsonElement())
+                }).toByteArray(),
+            )
+
+            client.submitForm(
+                url = "/openid4vc/verify/${sessionId}",
+                formParameters = Parameters.build {
+                    append("vp_token", dummyVpToken)
+                    append("presentation_submission", dummyPresentationSubmissionString)
+                    append("state", sessionId)
+                }
+            ).expectFailure()
+
+            client.get("/openid4vc/session/${sessionId}")
+                .expectSuccess().body<PresentationSessionInfo>().let {
+                    assertFalse(it.verificationResult!!)
+                }
+
+            client.get("/openid4vc/session/${sessionId}/presented-credentials")
+                .expectFailure()
+
+            client.get("/openid4vc/session/${sessionId}/presented-credentials") {
+                url {
+                    parameters.append("viewMode", PresentedCredentialsViewMode.simple.name)
+                }
+            }.expectFailure()
+
+            client.get("/openid4vc/session/${sessionId}/presented-credentials") {
+                url {
+                    parameters.append("viewMode", PresentedCredentialsViewMode.verbose.name)
+                }
+            }.expectFailure()
+
+        }
+
     suspend fun runTests() {
         setupTestSuite()
         presentUniDegreeNoDisclosures()
@@ -1318,5 +1410,7 @@ class VerifierPresentedCredentialsTests {
         presentMdl()
         presentOpenBadgeWithDisclosures()
         presentUniversityDegreeWithDisclosures()
+        queryPresentedCredentialsBeforeVpTokenSubmission()
+        queryPresentedCredentialsAfterInvalidVpTokenSubmission()
     }
 }
