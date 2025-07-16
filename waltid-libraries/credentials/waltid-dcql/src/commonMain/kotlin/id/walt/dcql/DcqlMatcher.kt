@@ -44,7 +44,7 @@ object DcqlMatcher {
         for (credQuery in query.credentials) {
             log.trace { "Processing CredentialQuery: ${credQuery.id} (format: ${credQuery.format})" }
             val potentialMatchesByFormat = availableCredentials.filter { it.format in credQuery.format.id }
-            log.trace { "Potential matches for ${credQuery.id} based on format: ${potentialMatchesByFormat.map { it.id }}" }
+            log.trace { "Potential matches for ${credQuery.id} based on format: ${potentialMatchesByFormat.map { it.id + "(${it.format})" }}" }
 
             val successfullyMatchedCredentialsForThisQuery = mutableListOf<DcqlMatchResult>()
 
