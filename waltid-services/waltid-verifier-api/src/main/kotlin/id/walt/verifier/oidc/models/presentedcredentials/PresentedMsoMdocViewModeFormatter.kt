@@ -52,9 +52,9 @@ object PresentedMsoMdocViewModeFormatter {
         validityInfo: ValidityInfo,
     ) = mapOf(
         *listOfNotNull(
-            "signed" to validityInfo.signed.toString().toJsonElement(),
-            "validFrom" to validityInfo.validFrom.toString().toJsonElement(),
-            "validUntil" to validityInfo.validUntil.toString().toJsonElement(),
+            "signed" to validityInfo.signed.value.toString().toJsonElement(),
+            "validFrom" to validityInfo.validFrom.value.toString().toJsonElement(),
+            "validUntil" to validityInfo.validUntil.value.toString().toJsonElement(),
             validityInfo.expectedUpdate?.let {
                 "expected_update" to it.value.toString().toJsonElement()
             }
