@@ -1,6 +1,7 @@
 package id.walt.webwallet.db.models
 
 import id.walt.crypto.utils.JsonUtils.toJsonObject
+import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.webwallet.db.kotlinxUuid
 import id.walt.webwallet.service.WalletService
 import kotlinx.datetime.Clock
@@ -38,7 +39,7 @@ object WalletOperationHistories : UUIDTable("wallet_operation_histories") {
 data class WalletOperationHistory(
     val tenant: String,
     @Contextual
-    val id: Uuid? = Uuid.random(),
+    val id: Uuid? = randomUUID(),
     @Contextual
     val account: Uuid,
     @Contextual

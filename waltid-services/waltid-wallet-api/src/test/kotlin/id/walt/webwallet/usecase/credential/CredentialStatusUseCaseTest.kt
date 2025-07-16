@@ -2,6 +2,7 @@
 
 package id.walt.webwallet.usecase.credential
 
+import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialStatusServiceFactory
@@ -17,14 +18,14 @@ import kotlinx.datetime.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 class CredentialStatusUseCaseTest {
 
     private val credentialServiceMock = mockk<CredentialsService>()
     private val statusFactoryMock = mockk<CredentialStatusServiceFactory>()
     private val sut = CredentialStatusUseCase(credentialServiceMock, statusFactoryMock)
-    private val wallet = Uuid.random()
+    private val wallet = randomUUID()
     private val credentialId = "credential-id"
     private val credentialSingleStatus = WalletCredential(
         wallet = wallet,
@@ -50,6 +51,7 @@ class CredentialStatusUseCaseTest {
         deletedOn = null,
         format = CredentialFormat.ldp_vc
     )
+    @OptIn(ExperimentalUuidApi::class)
     private val credentialMultiStatus = WalletCredential(
         wallet = wallet,
         id = credentialId,

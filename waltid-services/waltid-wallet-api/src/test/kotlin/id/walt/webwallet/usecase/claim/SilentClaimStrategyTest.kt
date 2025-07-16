@@ -4,6 +4,7 @@ package id.walt.webwallet.usecase.claim
 
 
 import TestUtils
+import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.webwallet.seeker.Seeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -89,7 +90,7 @@ class SilentClaimStrategyTest {
             "keyType",
         )
         every { eventUseCase.log(any()) } just Runs
-        every { notificationUseCase.add(any()) } returns listOf(Uuid.random())
+        every { notificationUseCase.add(any()) } returns listOf(randomUUID())
         coEvery { notificationDispatchUseCaseMock.send(any()) } just Runs
         coEvery { issuerNameResolutionUseCase.resolve(any()) } returns "test"
     }

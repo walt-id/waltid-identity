@@ -6,6 +6,7 @@ import id.walt.w3c.issuance.Issuer.baseIssue
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -19,7 +20,6 @@ import id.walt.oid4vc.responses.AuthorizationCodeResponse
 import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.JwtUtils
-import id.walt.oid4vc.util.randomUUID
 import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.sdjwt.SDJwt
 import io.ktor.client.*
@@ -691,7 +691,7 @@ class OpenID4VCI_Test {
         // Authentication Method is PRE_AUTHORIZED
         // ----------------------------------
         println("// --Authentication method is PRE_AUTHORIZED--")
-        val preAuthCode = randomUUID()
+        val preAuthCode = randomUUIDString()
         credOffer = CredentialOffer.Draft13.Builder(ISSUER_BASE_URL)
             .addOfferedCredentialByReference(issuedCredentialId)
             .addPreAuthorizedCodeGrant(preAuthCode)
