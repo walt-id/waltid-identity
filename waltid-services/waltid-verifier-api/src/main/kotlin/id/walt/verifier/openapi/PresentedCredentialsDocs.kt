@@ -26,10 +26,7 @@ object PresentedCredentialsDocs {
 
             queryParameter<PresentedCredentialsViewMode>("viewMode") {
                 description =
-                    "Optional format verbosity mode for the decoded credential data returned. Controls how detailed the response is.\n" +
-                            "      Defaults to `simple`. Allowed values are:\n" +
-                            "        - `simple`: Returns a simplified view of presented credentials (suitable for most use cases).\n" +
-                            "        - `verbose`: Returns a very detailed view with additional fields and raw structures."
+                    "Optional parameter controlling how detailed the response will be (defaults to `simple`)."
                 required = false
             }
         }
