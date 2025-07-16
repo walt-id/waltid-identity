@@ -31,6 +31,7 @@ import io.ktor.client.statement.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.assertDoesNotThrow
+import org.junit.jupiter.api.assertNull
 import kotlin.test.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -1039,6 +1040,22 @@ class VerifierPresentedCredentialsTests {
             )
 
             assert(msoMdocPresentationVerboseView.documents.size == 1)
+
+            val mDoc = msoMdocPresentationVerboseView.documents[0]
+
+            assertEquals(
+                expected = "org.iso.18013.5.1.mDL",
+                actual = mDoc.docType
+            )
+
+            assertNull(mDoc.errors)
+
+            assert(mDoc.issuerSigned.nameSpaces.size == 1)
+
+            assertEquals(
+                actual = mDoc.issuerSigned.nameSpaces.keys,
+                expected = setOf("org.iso.18013.5.1"),
+            )
         }
 
     private suspend fun presentOpenBadgeWithDisclosures() =
