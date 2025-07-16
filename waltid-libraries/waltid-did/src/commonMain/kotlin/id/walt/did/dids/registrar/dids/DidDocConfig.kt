@@ -2,6 +2,7 @@ package id.walt.did.dids.registrar.dids
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.document.models.service.Service
@@ -14,7 +15,6 @@ import id.walt.did.dids.document.models.verification.relationship.VerificationRe
 import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.did.dids.registrar.dids.DidDocConfig.Companion.buildFromPublicKeySet
 import id.walt.did.dids.registrar.dids.DidDocConfig.Companion.buildFromPublicKeySetVerificationConfiguration
-import id.walt.did.utils.randomUUID
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -228,7 +228,7 @@ data class DidDocConfig(
     private fun createService(did: String) = serviceConfigurationSet
         .map {
             ServiceMap(
-                id = "$did#${randomUUID()}",
+                id = "$did#${randomUUIDString()}",
                 type = setOf(it.type),
                 serviceEndpoint = it.serviceEndpoint,
                 customProperties = it.customProperties,

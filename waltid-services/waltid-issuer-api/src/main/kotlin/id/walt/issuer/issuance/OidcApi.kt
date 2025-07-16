@@ -19,11 +19,11 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.responses.PushedAuthorizationResponse
-import id.walt.oid4vc.util.randomUUID
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.sdjwt.JWTVCIssuerMetadata
 import id.walt.sdjwt.SDJWTVCTypeMetadata
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
@@ -191,7 +191,7 @@ object OidcApi : CIProvider() {
                                 }
 
                                 AuthenticationMethod.ID_TOKEN -> {
-                                    val authServerState = randomUUID()
+                                    val authServerState = randomUUIDString()
 
                                     initializeIssuanceSession(
                                         authorizationRequest = authReq,
@@ -210,7 +210,7 @@ object OidcApi : CIProvider() {
                                 }
 
                                 AuthenticationMethod.VP_TOKEN -> {
-                                    val authServerState = randomUUID()
+                                    val authServerState = randomUUIDString()
 
                                     initializeIssuanceSession(
                                         authorizationRequest = authReq,
