@@ -1,8 +1,6 @@
 package id.walt.oid4vc.data
 
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -22,7 +20,9 @@ import kotlinx.serialization.json.jsonObject
  * @param textColor String value of a text color of the Credential represented as numerical color values defined in CSS Color Module Level 37 [CSS-Color].
  * @param backgroundImage OPTIONAL. Object with information about the background image of the Credential.
  */
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = DisplayPropertiesSerializer::class)
 data class DisplayProperties(
     val name: String,
     val locale: String? = null,
@@ -32,7 +32,7 @@ data class DisplayProperties(
     @SerialName("background_color") val backgroundColor: String? = null,
     @SerialName("background_image") @Serializable(LogoPropertiesSerializer::class) val backgroundImage: LogoProperties? = null,
     @SerialName("text_color") val textColor: String? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf(),
+    override val customParameters: Map<String, JsonElement>? = mapOf(),
 ) : JsonDataObject() {
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(DisplayPropertiesSerializer, this).jsonObject
 
@@ -42,7 +42,8 @@ data class DisplayProperties(
     }
 }
 
-object DisplayPropertiesSerializer : JsonDataObjectSerializer<DisplayProperties>(DisplayProperties.serializer())
+object DisplayPropertiesSerializer :
+    JsonDataObjectSerializer<DisplayProperties>(DisplayProperties.generatedSerializer())
 
 object DisplayPropertiesListSerializer : KSerializer<List<DisplayProperties>> {
     private val internalSerializer = ListSerializer(DisplayPropertiesSerializer)

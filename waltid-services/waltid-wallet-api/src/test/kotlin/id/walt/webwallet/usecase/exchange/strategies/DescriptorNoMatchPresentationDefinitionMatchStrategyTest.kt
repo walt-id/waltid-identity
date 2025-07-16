@@ -3,6 +3,7 @@
 package id.walt.webwallet.usecase.exchange.strategies
 
 import TestUtils
+import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
@@ -14,8 +15,8 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 class DescriptorNoMatchPresentationDefinitionMatchStrategyTest {
 
     private val sut = DescriptorNoMatchPresentationDefinitionMatchStrategy()
@@ -23,7 +24,7 @@ class DescriptorNoMatchPresentationDefinitionMatchStrategyTest {
         PresentationDefinition.fromJSON(Json.decodeFromString(TestUtils.loadResource("presentation-definition/definition.json")))
     private val credentials = listOf(
         WalletCredential(
-            wallet = Uuid.random(),
+            wallet = randomUUID(),
             id = "array-type",
             document = """
                 {

@@ -1,6 +1,7 @@
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
@@ -13,10 +14,7 @@ import id.walt.oid4vc.util.ShortIdUtils
 import kotlinx.datetime.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
     ISessionCache<PresentationSession> {
 
@@ -111,7 +109,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
             },
             state = session.id,
             clientIdScheme = clientIdScheme,
-            nonce = Uuid.random().toString()
+            nonce = randomUUIDString()
         )
         return session.copy(authorizationRequest = authReq).also {
             putSession(session.id, it, sessionTtl ?: expiresIn)

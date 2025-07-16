@@ -146,7 +146,7 @@ class Draft11(private val client: HttpClient)  {
 
         val signingKey = JWKKey.importJWK(matchingKey.toString()).getOrThrow()
 
-        assertTrue {signingKey.verifyJws(authJarTokenRequest.request!!).isSuccess}
+        assertTrue (signingKey.verifyJws(authJarTokenRequest.request!!).isSuccess)
 
         val jarPayload = requestJwt.payload
         assertNotNull(jarPayload)

@@ -3,16 +3,18 @@ package id.walt.oid4vc.data.dif
 import id.walt.mdoc.docrequest.MDocRequestBuilder
 import id.walt.oid4vc.data.JsonDataObject
 import id.walt.oid4vc.data.JsonDataObjectSerializer
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = InputDescriptorFieldSerializer::class)
 data class InputDescriptorField(
     val path: List<String>,
     val id: String? = null,
@@ -21,11 +23,9 @@ data class InputDescriptorField(
     val filter: JsonObject? = null,
     val optional: Boolean? = null,
     @SerialName("intent_to_retain") val intentToRetain: Boolean? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
-    override fun toJSON(): JsonObject {
-        TODO("Not yet implemented")
-    }
+    override fun toJSON() = Json.encodeToJsonElement(InputDescriptorFieldSerializer, this).jsonObject
 
     fun addToMdocRequest(mDocRequestBuilder: MDocRequestBuilder, intentToRetain: Boolean = false): MDocRequestBuilder {
         path.firstOrNull()?.trimStart('$')?.replace("['", "")?.replace("']", ".")?.trimEnd('.')
@@ -37,10 +37,10 @@ data class InputDescriptorField(
     }
 }
 
-object InputDescriptorFieldSerializer :
-    JsonDataObjectSerializer<InputDescriptorField>(InputDescriptorField.serializer())
+internal object InputDescriptorFieldSerializer :
+    JsonDataObjectSerializer<InputDescriptorField>(InputDescriptorField.generatedSerializer())
 
-object InputDescriptorFieldListSerializer : KSerializer<List<InputDescriptorField>> {
+internal object InputDescriptorFieldListSerializer : KSerializer<List<InputDescriptorField>> {
     private val internalSerializer = ListSerializer(InputDescriptorFieldSerializer)
     override val descriptor = internalSerializer.descriptor
     override fun deserialize(decoder: Decoder) = internalSerializer.deserialize(decoder)

@@ -120,6 +120,8 @@ jobs:
           else
             build_arg="--build"
           fi
+          # required by wallet-api for extra-host to avoid 502 bad gateway
+          sed -i 's/localhost/host.docker.internal/g' .env
           docker compose --profile services --profile tse up -d $build_arg
       - name: Ping services
         timeout-minutes: 5

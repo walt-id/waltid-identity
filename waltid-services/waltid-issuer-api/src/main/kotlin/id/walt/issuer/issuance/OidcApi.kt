@@ -19,13 +19,14 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.responses.PushedAuthorizationResponse
-import id.walt.oid4vc.util.randomUUID
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.sdjwt.JWTVCIssuerMetadata
 import id.walt.sdjwt.SDJWTVCTypeMetadata
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -124,7 +125,11 @@ object OidcApi : CIProvider() {
             tags = listOf("oidc")
         }) {
 
-            post("{standardVersion}/par") {
+            post("{standardVersion}/par", {
+                request {
+                    standardVersionPathParameter()
+                }
+            }) {
                 val authReq = AuthorizationRequest.fromHttpParameters(call.receiveParameters().toMap())
                 try {
                     val session = initializeIssuanceSession(
@@ -155,7 +160,11 @@ object OidcApi : CIProvider() {
                 )
             }
 
-            get("{standardVersion}/authorize") {
+            get("{standardVersion}/authorize", {
+                request {
+                    standardVersionPathParameter()
+                }
+            }) {
                 val standardVersion = call.parameters["standardVersion"]
                     ?: throw IllegalArgumentException("standardVersion parameter is required")
                 val authReq = runBlocking { AuthorizationRequest.fromHttpParametersAuto(call.parameters.toMap()) }
@@ -182,7 +191,7 @@ object OidcApi : CIProvider() {
                                 }
 
                                 AuthenticationMethod.ID_TOKEN -> {
-                                    val authServerState = randomUUID()
+                                    val authServerState = randomUUIDString()
 
                                     initializeIssuanceSession(
                                         authorizationRequest = authReq,
@@ -201,7 +210,7 @@ object OidcApi : CIProvider() {
                                 }
 
                                 AuthenticationMethod.VP_TOKEN -> {
-                                    val authServerState = randomUUID()
+                                    val authServerState = randomUUIDString()
 
                                     initializeIssuanceSession(
                                         authorizationRequest = authReq,
@@ -297,7 +306,7 @@ object OidcApi : CIProvider() {
                     }
 
                     val redirectUri = when (authMethod) {
-                        AuthenticationMethod.VP_TOKEN, AuthenticationMethod.ID_TOKEN -> authReq.clientMetadata!!.customParameters["authorization_endpoint"]?.jsonPrimitive?.content
+                        AuthenticationMethod.VP_TOKEN, AuthenticationMethod.ID_TOKEN -> authReq.clientMetadata!!.customParameters!!["authorization_endpoint"]?.jsonPrimitive?.content
                             ?: "openid://"
 
                         else -> if (authReq.isReferenceToPAR) {
@@ -353,7 +362,12 @@ object OidcApi : CIProvider() {
                 }
             }
 
-            post("{standardVersion}/direct_post") {
+            post("{standardVersion}/direct_post", {
+                request {
+                    standardVersionPathParameter()
+                }
+            }) {
+
                 val params = call.receiveParameters().toMap()
                 logger.info { "/direct_post params: $params" }
 
@@ -428,7 +442,11 @@ object OidcApi : CIProvider() {
                 }
             }
 
-            post("{standardVersion}/token") {
+            post("{standardVersion}/token", {
+                request {
+                    standardVersionPathParameter()
+                }
+            }) {
                 val params = call.receiveParameters().toMap()
 
                 logger.info { "/token params: $params" }
@@ -468,7 +486,11 @@ object OidcApi : CIProvider() {
                 call.respond(credentialOffer.toJSON())
             }
 
-            post("{standardVersion}/credential") {
+            post("{standardVersion}/credential", {
+                request {
+                    standardVersionPathParameter()
+                }
+            }) {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ") ?: call.respond(
                     HttpStatusCode.Unauthorized
                 )
@@ -506,7 +528,11 @@ object OidcApi : CIProvider() {
 
             }
 
-            post("{standardVersion}/credential_deferred") {
+            post("{standardVersion}/credential_deferred", {
+                request {
+                    standardVersionPathParameter()
+                }
+            }) {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
                 if (accessToken.isNullOrEmpty() || !OpenID4VC.verifyTokenSignature(
                         target = TokenTarget.DEFERRED_CREDENTIAL,
@@ -527,7 +553,11 @@ object OidcApi : CIProvider() {
                 }
             }
 
-            post("{standardVersion}/batch_credential") {
+            post("{standardVersion}/batch_credential", {
+                request {
+                    standardVersionPathParameter()
+                }
+            }) {
                 val accessToken = call.request.header(HttpHeaders.Authorization)?.substringAfter(" ")
                 val parsedToken = accessToken?.let {
                     OpenID4VC.verifyAndParseToken(
@@ -588,7 +618,11 @@ object OidcApi : CIProvider() {
 
                 }
 
-                get("/external_login/{internalAuthReq}") {
+                get("/external_login/{internalAuthReq}", {
+                    request {
+                        pathParameter<String>("internalAuthReq") { required = true }
+                    }
+                }) {
                     // Redirects to 'authorizeUrl' automatically
                 }
 

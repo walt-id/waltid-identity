@@ -16,6 +16,7 @@ import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class StatusPolicyTest {
@@ -44,6 +45,7 @@ class StatusPolicyTest {
         val result = sut.verify(json, jsonAttribute, emptyMap())
         assertEquals(context.valid, result.isSuccess)
         assertEquals(!context.valid, result.isFailure)
+        context.exception?.run { assertTrue(result.exceptionOrNull()!!.localizedMessage.contains(this)) }
     }
 
     companion object {

@@ -1,6 +1,7 @@
 package id.walt.verifier.entra
 
 import id.walt.commons.config.ConfigManager
+import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.policies.Verifier.runPolicyRequest
 import id.walt.policies.models.PolicyRequest
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
@@ -132,7 +133,7 @@ object EntraVerifierApi {
     private val configuredCallbackUrl = config.callbackUrl
 
     private fun createCallbackMapping(data: MappedData): Uuid {
-        val uuid = Uuid.random()
+        val uuid = randomUUID()
         callbackMapping[uuid] = data
 
         return uuid
@@ -207,7 +208,12 @@ fun Application.entraVerifierApi() {
             post("verify", {
                 tags = listOf("Entra Credential Verification")
                 request { body<EntraVerifyRequest>() }
-                response { HttpStatusCode.OK to { body<EntraVerifyResponse>() } }
+                response {
+                    HttpStatusCode.OK to {
+                        description = "EntraVerifyResponse"
+                        body<EntraVerifyResponse>()
+                    }
+                }
             }) {
                 val verifyRequest = call.receive<EntraVerifyRequest>()
                 val res =
@@ -253,7 +259,12 @@ fun Application.entraVerifierApi() {
             get("status/{nonce}", {
                 tags = listOf("Entra Credential Verification")
                 request { pathParameter<String>("nonce") }
-                response { HttpStatusCode.OK to { body<JsonArray>() } }
+                response {
+                    HttpStatusCode.OK to {
+                        description = "Status/nonce"
+                        body<JsonArray>()
+                    }
+                }
             }) {
                 val nonce = call.parameters["nonce"]?.let { Uuid.parse(it) }
 

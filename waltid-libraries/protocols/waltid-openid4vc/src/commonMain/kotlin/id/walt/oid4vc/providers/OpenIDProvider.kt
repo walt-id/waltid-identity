@@ -1,10 +1,10 @@
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.OpenID4VCIVersion
-import id.walt.oid4vc.data.GrantType
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
@@ -18,7 +18,6 @@ import id.walt.oid4vc.interfaces.ITokenProvider
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.*
-import id.walt.oid4vc.util.randomUUID
 import io.ktor.http.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.JsonObject
@@ -27,10 +26,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 abstract class OpenIDProvider<S : AuthorizationSession>(
     val baseUrl: String,
 ) : ISessionCache<S>, ITokenProvider {
@@ -166,7 +162,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         val code = generateAuthorizationCodeFor(authorizationSession)
         return AuthorizationCodeResponse.success(
             code,
-            mapOf("state" to listOf(authorizationRequest.state ?: randomUUID()))
+            mapOf("state" to listOf(authorizationRequest.state ?: randomUUIDString()))
         )
     }
 
@@ -206,8 +202,8 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             )
 
         // Bind authentication request with state
-        val authorizationRequestServerState = Uuid.random().toString()
-        val authorizationRequestServerNonce = Uuid.random().toString()
+        val authorizationRequestServerState = randomUUIDString()
+        val authorizationRequestServerNonce = randomUUIDString()
         val authorizationResponseServerMode = ResponseMode.direct_post
 
         val clientId = this.metadata.issuer!!
