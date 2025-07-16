@@ -69,15 +69,14 @@ class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
         }
         
         // Try to verify with each key
-        val results = issuerKeys.map { issuerKey ->
-          runCatching { issuerKey.verifyJws(credential) }
-        }
-        
-        // Return the first successful result or the last error
-        val successResult = results.firstOrNull { it.isSuccess }
-        successResult?.getOrNull()
-          ?: throw results.last().exceptionOrNull() 
-            ?: VerificationException("Verification failed with all keys from the DID document")
+          // Return the first successful result or the last error
+          issuerKeys.firstSuccessOrThrow(
+              { failures ->
+                  VerificationException(
+                      message = "Verification failed with all keys from the DID document",
+                      cause = failures.lastOrNull()
+                  )
+              }) { it.verifyJws(credential) }
         
       } else {
         // For presentations, get all possible issuer keys
@@ -110,5 +109,16 @@ class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
       }
     }
   }
-
+    private inline fun <T, R> Collection<T>.firstSuccessOrThrow(
+        exceptionProvider: (List<Throwable>) -> Exception,
+        block: (T) -> R
+    ): R {
+        val failures = mutableListOf<Throwable>()
+        return firstNotNullOfOrNull { item ->
+            runCatching { block(item) }.fold(
+                onSuccess = { it },
+                onFailure = { failures.add(it); null }
+            )
+        } ?: throw exceptionProvider(failures)
+    }
 }
