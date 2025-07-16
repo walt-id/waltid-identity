@@ -56,7 +56,7 @@ object PresentedMsoMdocViewModeFormatter {
             "validFrom" to validityInfo.validFrom.value.toString().toJsonElement(),
             "validUntil" to validityInfo.validUntil.value.toString().toJsonElement(),
             validityInfo.expectedUpdate?.let {
-                "expected_update" to it.value.toString().toJsonElement()
+                "expectedUpdate" to it.value.toString().toJsonElement()
             }
         ).toTypedArray()
     )
