@@ -1,6 +1,5 @@
 package id.walt.policies.policies
 
-import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.exceptions.VerificationException
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
@@ -10,6 +9,7 @@ import id.walt.did.dids.DidUtils
 import id.walt.policies.JwtVerificationPolicy
 import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.SDJwtVC
+import id.walt.w3c.utils.VCFormat
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import love.forte.plugin.suspendtrans.annotation.JsPromise
@@ -38,7 +38,7 @@ class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
         JWKKey.importPEM(x5c.jsonPrimitive.content).getOrThrow().let { JWKKey(it.exportJWK(), kid) }
     }
   }
-  
+
   private suspend fun resolveIssuerKeysFromSdJwt(sdJwt: SDJwtVC): Set<Key> {
     val kid = sdJwt.issuer ?: randomUUIDString()
     return if(DidUtils.isDidUrl(kid)) {
@@ -59,15 +59,15 @@ class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
   override suspend fun verify(credential: String, args: Any?, context: Map<String, Any>): Result<Any> {
     return runCatching {
       val sdJwtVC = SDJwtVC.parse(credential)
-      
+
       if(!sdJwtVC.isPresentation) {
         // Get all possible issuer keys from the DID document
         val issuerKeys = resolveIssuerKeysFromSdJwt(sdJwtVC)
-        
+
         if (issuerKeys.isEmpty()) {
           throw VerificationException("No issuer keys found in the DID document")
         }
-        
+
         // Try to verify with each key
           // Return the first successful result or the last error
           issuerKeys.firstSuccessOrThrow(
@@ -77,15 +77,15 @@ class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
                       cause = failures.lastOrNull()
                   )
               }) { it.verifyJws(credential) }
-        
+
       } else {
         // For presentations, get all possible issuer keys
         val issuerKeys = resolveIssuerKeysFromSdJwt(sdJwtVC)
-        val issuerKey = issuerKeys.firstOrNull() 
+        val issuerKey = issuerKeys.firstOrNull()
           ?: throw VerificationException("No issuer keys found in the DID document")
-        
+
         val holderKey = JWKKey.importJWK(sdJwtVC.holderKeyJWK.toString()).getOrThrow()
-        
+
         // Create a map of all possible issuer keys by their key IDs
         val keyMap = issuerKeys.associateBy { it.getKeyId() }.toMutableMap()
 
@@ -93,18 +93,18 @@ class SdJwtVCSignaturePolicy(): JwtVerificationPolicy() {
         keyMap[sdJwtVC.keyID ?: issuerKey.getKeyId()] = issuerKey
         // Add the holder key
         keyMap[holderKey.getKeyId()] = holderKey
-        
+
         val verificationResult = sdJwtVC.verifyVC(
           JWTCryptoProviderManager.getDefaultJWTCryptoProvider(keyMap),
           requiresHolderKeyBinding = true,
           context["clientId"]?.toString(),
           context["challenge"]?.toString()
         )
-        
+
         if (!verificationResult.verified) {
           throw VerificationException("SD-JWT verification failed")
         }
-        
+
         sdJwtVC.undisclosedPayload
       }
     }
