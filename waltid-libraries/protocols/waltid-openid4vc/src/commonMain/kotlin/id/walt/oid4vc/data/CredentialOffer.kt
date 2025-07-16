@@ -1,22 +1,25 @@
 package id.walt.oid4vc.data
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
+import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
 
-@Serializable
+@Serializable(with = CredentialOfferSerializer::class)
 sealed class CredentialOffer : JsonDataObject() {
     abstract val grants: Map<String, GrantDetails>
     abstract val credentialIssuer: String
+
+    @Transient
+    val draft11: Draft11?
+        inline get() = this as? Draft11
+
+    @Transient
+    val draft13: Draft13?
+        inline get() = this as? Draft13
 
     abstract class Builder<T : CredentialOffer>(
         protected val credentialIssuer: String
@@ -57,22 +60,20 @@ sealed class CredentialOffer : JsonDataObject() {
         fun build(): T = buildInternal()
     }
 
-    override fun toJSON() = Json.encodeToJsonElement(CredentialOfferSerializer, this).jsonObject
 
-    companion object : JsonDataObjectFactory<CredentialOffer>() {
-        override fun fromJSON(jsonObject: JsonObject) =
-            Json.decodeFromJsonElement(CredentialOfferSerializer, jsonObject)
-    }
-
-    @Serializable
+    @OptIn(ExperimentalSerializationApi::class)
+    @KeepGeneratedSerializer
+    @Serializable(with = Draft13CredentialOfferSerializer::class)
     data class Draft13(
         @SerialName("credential_issuer") override val credentialIssuer: String,
         @SerialName("grants") override val grants: Map<String, GrantDetails> = mapOf(),
 
         @SerialName("credential_configuration_ids") val credentialConfigurationIds: JsonArray,
 
-        override val customParameters: Map<String, JsonElement> = mapOf()
+        override val customParameters: Map<String, JsonElement>? = mapOf()
     ) : CredentialOffer() {
+
+        override fun toJSON(): JsonObject = Json.encodeToJsonElement(Draft13CredentialOfferSerializer, this).jsonObject
 
         class Builder(credentialIssuer: String) : CredentialOffer.Builder<Draft13>(credentialIssuer) {
 
@@ -88,15 +89,19 @@ sealed class CredentialOffer : JsonDataObject() {
 
     }
 
-    @Serializable
+    @OptIn(ExperimentalSerializationApi::class)
+    @KeepGeneratedSerializer
+    @Serializable(with = Draft11CredentialOfferSerializer::class)
     data class Draft11(
         @SerialName("credential_issuer") override val credentialIssuer: String,
         @SerialName("grants") override val grants: Map<String, GrantDetails> = mapOf(),
 
         @SerialName("credentials") val credentials: JsonArray,
 
-        override val customParameters: Map<String, JsonElement> = mapOf()
+        override val customParameters: Map<String, JsonElement>? = mapOf()
     ) : CredentialOffer() {
+
+        override fun toJSON(): JsonObject = Json.encodeToJsonElement(Draft11CredentialOfferSerializer, this).jsonObject
 
         class Builder(
             credentialIssuer: String,
@@ -111,36 +116,26 @@ sealed class CredentialOffer : JsonDataObject() {
             )
 
         }
-
     }
 
-}
-
-object CredentialOfferJsonSerializer : JsonDataObjectSerializer<CredentialOffer>(CredentialOfferSerializer) {
-    public override fun transformSerialize(element: JsonElement) =
-        JsonObject(super.transformSerialize(element).jsonObject)
-
-    public override fun transformDeserialize(element: JsonElement) =
-        JsonObject(super.transformDeserialize(element).jsonObject)
-}
-
-object CredentialOfferSerializer : KSerializer<CredentialOffer> {
-
-    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("CredentialOffer") {
-        val seenElements = mutableSetOf<String>()
-
-        val subclassDescriptors = listOf(
-            CredentialOffer.Draft11.serializer().descriptor,
-            CredentialOffer.Draft13.serializer().descriptor
+    companion object : JsonDataObjectFactory<CredentialOffer>() {
+        override fun fromJSON(jsonObject: JsonObject): CredentialOffer = Json.decodeFromJsonElement(
+            CredentialOfferSerializer, jsonObject
         )
+    }
+}
 
-        for (subDescriptor in subclassDescriptors) {
-            for (index in 0 until subDescriptor.elementsCount) {
-                val name = subDescriptor.getElementName(index)
-                if (seenElements.add(name)) {
-                    element(name, subDescriptor.getElementDescriptor(index))
-                }
-            }
+
+
+internal object CredentialOfferSerializer : KSerializer<CredentialOffer> {
+
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("id.walt.oid4vc.data.CredentialOffer") {
+    }
+
+    override fun serialize(encoder: Encoder, value: CredentialOffer) {
+        when (value) {
+            is CredentialOffer.Draft11 -> Draft11CredentialOfferSerializer.serialize(encoder, value)
+            is CredentialOffer.Draft13 -> Draft13CredentialOfferSerializer.serialize(encoder, value)
         }
     }
 
@@ -148,40 +143,24 @@ object CredentialOfferSerializer : KSerializer<CredentialOffer> {
         val jsonDecoder = decoder as? JsonDecoder ?: throw SerializationException("Invalid Decoder")
 
         val rawJsonElement = jsonDecoder.decodeJsonElement()
-
-        val transformedElement = CredentialOfferJsonSerializer.transformDeserialize(rawJsonElement)
-
         return when {
-            "credential_configuration_ids" in transformedElement.jsonObject -> Json.decodeFromJsonElement(
+            "credential_configuration_ids" in rawJsonElement.jsonObject -> Json.decodeFromJsonElement(
                 CredentialOffer.Draft13.serializer(),
-                transformedElement,
+                rawJsonElement,
             )
 
-            "credentials" in transformedElement.jsonObject -> Json.decodeFromJsonElement(
+            "credentials" in rawJsonElement.jsonObject -> Json.decodeFromJsonElement(
                 CredentialOffer.Draft11.serializer(),
-                transformedElement,
+                rawJsonElement,
             )
 
             else -> throw IllegalArgumentException("Unknown CredentialOffer type: missing expected fields")
         }
     }
-
-    private val CredentialOfferSerializersModule = SerializersModule {
-        polymorphic(CredentialOffer::class) {
-            subclass(CredentialOffer.Draft11::class, CredentialOffer.Draft11.serializer())
-            subclass(CredentialOffer.Draft13::class, CredentialOffer.Draft13.serializer())
-        }
-    }
-
-    override fun serialize(encoder: Encoder, value: CredentialOffer) {
-        val json by lazy {
-            Json {
-                serializersModule = CredentialOfferSerializersModule; classDiscriminatorMode =
-                ClassDiscriminatorMode.NONE
-            }
-        }
-        val jsonElement = json.encodeToJsonElement(CredentialOffer.serializer(), value)
-        encoder as? JsonEncoder ?: throw IllegalStateException("Invalid Encoder")
-        encoder.encodeJsonElement(jsonElement)
-    }
 }
+
+internal object Draft11CredentialOfferSerializer :
+    JsonDataObjectSerializer<CredentialOffer.Draft11>(CredentialOffer.Draft11.generatedSerializer())
+
+internal object Draft13CredentialOfferSerializer :
+    JsonDataObjectSerializer<CredentialOffer.Draft13>(CredentialOffer.Draft13.generatedSerializer())

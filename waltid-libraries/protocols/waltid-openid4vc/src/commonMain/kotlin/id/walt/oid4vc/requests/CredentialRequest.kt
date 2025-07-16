@@ -1,9 +1,7 @@
 package id.walt.oid4vc.requests
 
 import id.walt.oid4vc.data.*
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -17,7 +15,9 @@ private val json = Json {
     ignoreUnknownKeys = true
 }
 
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = CredentialRequestSerializer::class)
 data class CredentialRequest(
     val format: CredentialFormat,
     val proof: ProofOfPossession? = null,
@@ -28,12 +28,12 @@ data class CredentialRequest(
     @SerialName("credential_definition") val credentialDefinition: CredentialDefinition? = null,
     @SerialName("types") val types: List<String>? = null,
     @SerialName("display") val display: List<DisplayProperties>? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = json.encodeToJsonElement(CredentialRequestSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<CredentialRequest>() {
-        override fun fromJSON(jsonObject: JsonObject) =
+        override fun fromJSON(jsonObject: JsonObject): CredentialRequest =
             json.decodeFromJsonElement(CredentialRequestSerializer, jsonObject)
 
         fun forAuthorizationDetails(authorizationDetails: AuthorizationDetails, proof: ProofOfPossession?) =
@@ -65,9 +65,10 @@ data class CredentialRequest(
     }
 }
 
-object CredentialRequestSerializer : JsonDataObjectSerializer<CredentialRequest>(CredentialRequest.serializer())
+internal object CredentialRequestSerializer :
+    JsonDataObjectSerializer<CredentialRequest>(CredentialRequest.generatedSerializer())
 
-object CredentialRequestListSerializer : KSerializer<List<CredentialRequest>> {
+internal object CredentialRequestListSerializer : KSerializer<List<CredentialRequest>> {
     private val internalSerializer = ListSerializer(CredentialRequestSerializer)
     override val descriptor: SerialDescriptor = internalSerializer.descriptor
     override fun deserialize(decoder: Decoder): List<CredentialRequest> = internalSerializer.deserialize(decoder)

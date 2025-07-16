@@ -66,7 +66,12 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
     ) {
         post("emailpass", {
             request { body<EmailPassCredentials>() }
-            response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
+            response {
+                HttpStatusCode.OK to {
+                    description = "Successful authentication"
+                    body<AuthSessionInformation>()
+                }
+            }
         }) {
             val session = call.getAuthSession(authContext)
 

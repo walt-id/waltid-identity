@@ -3,7 +3,10 @@ package id.walt.verifier.openapi
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.dif.*
-import id.walt.verifier.*
+import id.walt.verifier.DescriptorMappingFormParam
+import id.walt.verifier.PresentationSubmissionFormParam
+import id.walt.verifier.TokenResponseFormParam
+import id.walt.verifier.defaultAuthorizeBaseUrl
 import id.walt.verifier.oidc.SwaggerPresentationSessionInfo
 import id.walt.w3c.utils.VCFormat
 import io.github.smiley4.ktoropenapi.config.RouteConfig
@@ -111,6 +114,14 @@ object VerifierApiDocs {
                 addCredentialStatusExamples()
             }
         }
+        response {
+            HttpStatusCode.OK to {
+                description = "URL for the holder wallet to continue verification"
+                body<String> {
+                    mediaTypes(ContentType.Text.Plain)
+                }
+            }
+        }
 
     }
 
@@ -165,13 +176,12 @@ object VerifierApiDocs {
         response {
             HttpStatusCode.OK to {
                 // body<PresentationSessionInfo> { // cannot encode duration
-                body<SwaggerPresentationSessionInfo> {
-                    description = "Session info"
-                }
+                description = "Session info"
+                body<SwaggerPresentationSessionInfo>()
             }
             HttpStatusCode.NotFound to {
+                description = "Session not found or invalid"
                 body<String> {
-                    description = "Session not found or invalid"
                     example("Session not found") {
                         value = "Invalid id provided (expired?): 123"
                     }
@@ -192,15 +202,26 @@ object VerifierApiDocs {
             }
         }
         response {
-            HttpStatusCode.OK to { body<JsonObject>() }
-            HttpStatusCode.NotFound to { body<String>() }
+            HttpStatusCode.OK to {
+                description = "Presentation definition"
+                body<JsonObject>()
+            }
+            HttpStatusCode.NotFound to {
+                description = "Presentation definition not found"
+                body<String>()
+            }
         }
     }
 
     fun getPolicyListDocs(): RouteConfig.() -> Unit = {
         tags = listOf("Credential Verification")
         summary = "List registered policies"
-        response { HttpStatusCode.OK to { body<Map<String, String?>>() } }
+        response {
+            HttpStatusCode.OK to {
+                description = "List of registered policies"
+                body<Map<String, String?>>()
+            }
+        }
     }
 
     fun getRequestDocs(): RouteConfig.() -> Unit = {

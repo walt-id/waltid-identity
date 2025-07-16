@@ -5,9 +5,7 @@ import id.walt.crypto.utils.JwsUtils
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.oid4vc.data.dif.PresentationSubmissionSerializer
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
+import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -19,7 +17,9 @@ import kotlin.time.Duration.Companion.seconds
  * @param vpToken a JsonElement, according to the [OpenID Spec section 6.1](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-6.1), which defines this as a single string, single JSON object, or a JSON array of strings and/or objects, depending on the presentation format.
  * The conversion to and from this value is aided by the [VpTokenParameter] utility class.
  */
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = TokenResponseSerializer::class)
 data class TokenResponse private constructor(
     @SerialName("access_token") val accessToken: String? = null,
     @SerialName("token_type") val tokenType: String? = null,
@@ -40,13 +40,16 @@ data class TokenResponse private constructor(
     @SerialName("error_description") val errorDescription: String? = null,
     @SerialName("error_uri") val errorUri: String? = null,
     @Transient val jwsParts: JwsUtils.JwsParts? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject(), IHTTPDataObject {
     val isSuccess get() = accessToken != null || (vpToken != null && presentationSubmission != null)
     override fun toJSON() = Json.encodeToJsonElement(TokenResponseSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<TokenResponse>() {
-        override fun fromJSON(jsonObject: JsonObject) = Json.decodeFromJsonElement(TokenResponseSerializer, jsonObject)
+
+        override fun fromJSON(jsonObject: JsonObject): TokenResponse =
+            Json.decodeFromJsonElement(TokenResponseSerializer, jsonObject)
+
         fun success(
             accessToken: String, tokenType: String, expiresIn: Long? = null, refreshToken: String? = null,
             scope: String? = null, cNonce: String? = null, cNonceExpiresIn: Duration? = null,
@@ -150,7 +153,7 @@ data class TokenResponse private constructor(
             error?.let { put("error", listOf(it)) }
             errorDescription?.let { put("error_description", listOf(it)) }
             errorUri?.let { put("error_uri", listOf(it)) }
-            putAll(customParameters.mapValues { listOf(it.value.toString()) })
+            putAll(customParameters!!.mapValues { listOf(it.value.toString()) })
         }
     }
 
@@ -167,7 +170,7 @@ data class TokenResponse private constructor(
     }
 }
 
-object TokenResponseSerializer : JsonDataObjectSerializer<TokenResponse>(TokenResponse.serializer())
+internal object TokenResponseSerializer : JsonDataObjectSerializer<TokenResponse>(TokenResponse.generatedSerializer())
 
 enum class TokenErrorCode {
     invalid_request,
