@@ -28,23 +28,12 @@ class SdJwtVCSignaturePolicy() : JwtVerificationPolicy() {
         "Checks a SD-JWT-VC credential by verifying its cryptographic signature using the key referenced by the DID in `iss`."
     override val supportedVCFormats = setOf(VCFormat.sd_jwt_vc)
 
-    private suspend fun resolveIssuerKeyFromSdJwt(sdJwt: SDJwtVC): Key {
-        val kid = sdJwt.issuer ?: randomUUIDString()
-        return if (DidUtils.isDidUrl(kid)) {
-            DidService.resolveToKey(kid).getOrThrow()
-        } else {
-            val x5c = sdJwt.header.get("x5c")?.jsonArray?.lastOrNull()
-                ?: throw IllegalArgumentException("x5c header parameter is missing or empty.")
-            JWKKey.importPEM(x5c.jsonPrimitive.content).getOrThrow().let { JWKKey(it.exportJWK(), kid) }
-        }
-    }
-
     private suspend fun resolveIssuerKeysFromSdJwt(sdJwt: SDJwtVC): Set<Key> {
         val kid = sdJwt.issuer ?: randomUUIDString()
         return if (DidUtils.isDidUrl(kid)) {
             DidService.resolveToKeys(kid).getOrThrow()
         } else {
-            val x5c = sdJwt.header.get("x5c")?.jsonArray?.lastOrNull()
+            val x5c = sdJwt.header["x5c"]?.jsonArray?.lastOrNull()
                 ?: throw IllegalArgumentException("x5c header parameter is missing or empty.")
             val key = JWKKey.importPEM(x5c.jsonPrimitive.content).getOrThrow().let { JWKKey(it.exportJWK(), kid) }
             setOf(key)
