@@ -27,8 +27,10 @@ private val json = Json {
  * @param claims OPTIONAL (ISO mso_mdoc credential format). A JSON object containing a list of key value pairs, where the key is a certain namespace as defined in [ISO.18013-5] (or any profile of it), and the value is a JSON object. This object also contains a list of key value pairs, where the key is a claim that is defined in the respective namespace and is offered in the Credential. The value is a JSON object detailing the specifics of the claim.
  * @param credentialDefinition REQUIRED (W3C ldp_vc, jwt_vc_json-ld credential formats). JSON object containing (and isolating) the detailed description of the credential type. This object MUST be processed using full JSON-LD processing.
  */
-@Serializable
-data class AuthorizationDetails @OptIn(ExperimentalSerializationApi::class) constructor(
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = AuthorizationDetailsSerializer::class)
+data class AuthorizationDetails(
     @EncodeDefault val type: String = OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
     val format: CredentialFormat? = null,
     val vct: String? = null,
@@ -38,7 +40,7 @@ data class AuthorizationDetails @OptIn(ExperimentalSerializationApi::class) cons
     @Serializable(ClaimDescriptorNamespacedMapSerializer::class) val claims: Map<String, Map<String, ClaimDescriptor>>? = null,
     @SerialName("credential_definition") val credentialDefinition: CredentialDefinition? = null,
     val locations: List<String>? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = json.encodeToJsonElement(AuthorizationDetailsSerializer, this).jsonObject
 
@@ -62,10 +64,10 @@ data class AuthorizationDetails @OptIn(ExperimentalSerializationApi::class) cons
     }
 }
 
-object AuthorizationDetailsSerializer :
-    JsonDataObjectSerializer<AuthorizationDetails>(AuthorizationDetails.serializer())
+internal object AuthorizationDetailsSerializer :
+    JsonDataObjectSerializer<AuthorizationDetails>(AuthorizationDetails.generatedSerializer())
 
-object AuthorizationDetailsListSerializer : KSerializer<List<AuthorizationDetails>> {
+internal object AuthorizationDetailsListSerializer : KSerializer<List<AuthorizationDetails>> {
     private val internalSerializer = ListSerializer(AuthorizationDetailsSerializer)
     override val descriptor: SerialDescriptor = internalSerializer.descriptor
     override fun deserialize(decoder: Decoder): List<AuthorizationDetails> = internalSerializer.deserialize(decoder)

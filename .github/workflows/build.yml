@@ -13,7 +13,7 @@ jobs:
   version:
     uses: walt-id/waltid-identity/.github/workflows/version.yml@266f5c09359450c39019a6da38f2b331e7122918
   gradle-build:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@68e281d1e9ac71b31c5a03ac9dc72b8b9e93a266
+    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@02e2ecf03928acb9ed2e6024fdab3dc9f75c4a2d
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
@@ -36,7 +36,7 @@ jobs:
       artifact: issuer-api
       tag: "waltid/issuer-api:${{ needs.version.outputs.release_version }}"
   compose-test:
-    uses: walt-id/waltid-identity/.github/workflows/docker-compose-testing.yml@a99af313ae1f930dbf03c1bd41f006ac74f77e43
+    uses: walt-id/waltid-identity/.github/workflows/docker-compose-testing.yml@30f3806290f5652dd371a682cf17961250607e71
     needs: [ version, docker ]
     secrets: inherit
     with:

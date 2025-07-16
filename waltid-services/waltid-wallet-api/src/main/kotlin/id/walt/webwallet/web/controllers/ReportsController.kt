@@ -30,9 +30,8 @@ fun Application.reports() = walletRoute {
                 summary = "Credentials"
                 response {
                     HttpStatusCode.OK to {
-                        body<List<WalletCredential>> {
-                            description = "The list of the most frequently used credentials"
-                        }
+                        description = "The list of the most frequently used credentials"
+                        body<List<WalletCredential>> {}
                     }
                 }
             }) {

@@ -55,8 +55,7 @@ import kotlinx.serialization.json.*
  * @param opPolicyUri OPTIONAL. URL that the OpenID Provider provides to the person registering the Client to read about the OP's requirements on how the Relying Party can use the data provided by the OP. The registration process SHOULD display this URL to the person registering the Client if it is given.
  * @param opTosUri OPTIONAL. URL that the OpenID Provider provides to the person registering the Client to read about OpenID Provider's terms of service. The registration process SHOULD display this URL to the person registering the Client if it is given.
  */
-@Serializable
-
+@Serializable(with = OpenIDProviderMetadataSerializer::class)
 sealed class OpenIDProviderMetadata() : JsonDataObject() {
     abstract val issuer: String?
     abstract val authorizationEndpoint: String?
@@ -114,12 +113,18 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
     abstract val requirePushedAuthorizationRequests: Boolean?
     abstract val dpopSigningAlgValuesSupported: Set<String>?
 
-    inline fun <reified T : OpenIDProviderMetadata> castOrNull(): T? {
-        return this as? T
-    }
+    @Transient
+    val draft11: Draft11?
+        inline get() = this as? Draft11
 
-    @Serializable
-    data class Draft11(
+    @Transient
+    val draft13: Draft13?
+        inline get() = this as? Draft13
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @KeepGeneratedSerializer
+    @Serializable(with = Draft11OpenIDProviderMetadataSerializer::class)
+    data class Draft11 private constructor(
         @SerialName("issuer") override val issuer: String? = null,
         @SerialName("authorization_endpoint") override val authorizationEndpoint: String? = null,
         @SerialName("pushed_authorization_request_endpoint") override val pushedAuthorizationRequestEndpoint: String? = null,
@@ -186,27 +191,163 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
         @SerialName("credentials_supported") @Serializable(CredentialSupportedArraySerializer::class) val credentialSupported: Map<String, CredentialSupported>? = null,
         @SerialName("authorization_server") val authorizationServer: String? = null,
 
-        override val customParameters: Map<String, JsonElement> = mapOf()
+        override val customParameters: Map<String, JsonElement>? = mapOf()
 
     ) : OpenIDProviderMetadata() {
 
-        override fun toJSON(): JsonObject {
-            val originalJson = super.toJSON().toMutableMap()
+        override fun toJSON(): JsonObject =
+            Json.encodeToJsonElement(Draft11OpenIDProviderMetadataSerializer, this).jsonObject
 
-            credentialSupported?.let { credentials ->
-                val jsonArray = credentials.map { (id, credential) ->
-                    val jsonObject = credential.toJSON().toMutableMap()
-                    jsonObject["id"] = JsonPrimitive(id)
-                    JsonObject(jsonObject)
-                }
-                originalJson["credentials_supported"] = JsonArray(jsonArray)
+        companion object {
+
+            /**
+             * Factory method is needed, because a transformation of credentialSupported (set id in credential)
+             * needs to be done.
+             */
+            fun create(
+                issuer: String? = null,
+                authorizationEndpoint: String? = null,
+                pushedAuthorizationRequestEndpoint: String? = null,
+                tokenEndpoint: String? = null,
+                userinfoEndpoint: String? = null,
+                jwksUri: String? = null,
+                registrationEndpoint: String? = null,
+                scopesSupported: Set<String> = setOf("openid"),
+                responseTypesSupported: Set<String>? = null,
+                responseModesSupported: Set<ResponseMode> = setOf(
+                    ResponseMode.query,
+                    ResponseMode.fragment
+                ),
+                grantTypesSupported: Set<GrantType> = setOf(
+                    GrantType.authorization_code,
+                    GrantType.pre_authorized_code
+                ),
+                acrValuesSupported: Set<String>? = null,
+                subjectTypesSupported: Set<SubjectType>? = null,
+                idTokenSigningAlgValuesSupported: Set<String>? = null,
+                idTokenEncryptionAlgValuesSupported: Set<String>? = null,
+                idTokenEncryptionEncValuesSupported: Set<String>? = null,
+                userinfoSigningAlgValuesSupported: Set<String>? = null,
+                userinfoEncryptionAlgValuesSupported: Set<String>? = null,
+                userinfoEncryptionEncValuesSupported: Set<String>? = null,
+                requestObjectSigningAlgValuesSupported: Set<String>? = null,
+                requestObjectEncryptionAlgValuesSupported: Set<String>? = null,
+                requestObjectEncryptionEncValuesSupported: Set<String>? = null,
+                tokenEndpointAuthMethodsSupported: Set<String>? = null,
+                tokenEndpointAuthSigningAlgValuesSupported: Set<String>? = null,
+                displayValuesSupported: Set<String>? = null,
+                claimTypesSupported: Set<String>? = null,
+                claimsSupported: Set<String>? = null,
+                serviceDocumentation: String? = null,
+                claimsLocalesSupported: Set<String>? = null,
+                uiLocalesSupported: Set<String>? = null,
+                claimsParameterSupported: Boolean = false,
+                requestParameterSupported: Boolean = false,
+                requestUriParameterSupported: Boolean = true,
+                requireRequestUriRegistration: Boolean = false,
+                opPolicyUri: String? = null,
+                opTosUri: String? = null,
+                codeChallengeMethodsSupported: List<String>? = null,
+                revocationEndpoint: String? = null,
+                revocationEndpointAuthMethodsSupported: Set<String>? = null,
+                revocationEndpointAuthSigningAlgValuesSupported: Set<String>? = null,
+                introspectionEndpoint: String? = null,
+                introspectionEndpointAuthMethodsSupported: Set<String>? = null,
+                introspectionEndpointAuthSigningAlgValuesSupported: Set<String>? = null,
+
+                // OID4VCI properties
+                credentialIssuer: String? = null,
+                credentialEndpoint: String? = null,
+                batchCredentialEndpoint: String? = null,
+                deferredCredentialEndpoint: String? = null,
+                display: List<DisplayProperties>? = null,
+                presentationDefinitionUriSupported: Boolean? = null,
+                clientIdSchemesSupported: List<String>? = null,
+                requirePushedAuthorizationRequests: Boolean? = null,
+                dpopSigningAlgValuesSupported: Set<String>? = null,
+
+                // OID4VCI 11
+                credentialSupported: Map<String, CredentialSupported>? = null,
+                authorizationServer: String? = null,
+
+                customParameters: Map<String, JsonElement>? = mapOf()
+
+
+            ): Draft11 {
+                return Draft11(
+                    issuer,
+                    authorizationEndpoint,
+                    pushedAuthorizationRequestEndpoint,
+                    tokenEndpoint,
+                    userinfoEndpoint,
+                    jwksUri,
+                    registrationEndpoint,
+                    scopesSupported,
+                    responseTypesSupported,
+                    responseModesSupported,
+                    grantTypesSupported,
+                    acrValuesSupported,
+                    subjectTypesSupported,
+                    idTokenSigningAlgValuesSupported,
+                    idTokenEncryptionAlgValuesSupported,
+                    idTokenEncryptionEncValuesSupported,
+                    userinfoSigningAlgValuesSupported,
+                    userinfoEncryptionAlgValuesSupported,
+                    userinfoEncryptionEncValuesSupported,
+                    requestObjectSigningAlgValuesSupported,
+                    requestObjectEncryptionAlgValuesSupported,
+                    requestObjectEncryptionEncValuesSupported,
+                    tokenEndpointAuthMethodsSupported,
+                    tokenEndpointAuthSigningAlgValuesSupported,
+                    displayValuesSupported,
+                    claimTypesSupported,
+                    claimsSupported,
+                    serviceDocumentation,
+                    claimsLocalesSupported,
+                    uiLocalesSupported,
+                    claimsParameterSupported,
+                    requestParameterSupported,
+                    requestUriParameterSupported,
+                    requireRequestUriRegistration,
+                    opPolicyUri,
+                    opTosUri,
+                    codeChallengeMethodsSupported,
+                    revocationEndpoint,
+                    revocationEndpointAuthMethodsSupported,
+                    revocationEndpointAuthSigningAlgValuesSupported,
+                    introspectionEndpoint,
+                    introspectionEndpointAuthMethodsSupported,
+                    introspectionEndpointAuthSigningAlgValuesSupported,
+
+                    // OID4VCI properties
+                    credentialIssuer,
+                    credentialEndpoint,
+                    batchCredentialEndpoint,
+                    deferredCredentialEndpoint,
+                    display,
+                    presentationDefinitionUriSupported,
+                    clientIdSchemesSupported,
+                    requirePushedAuthorizationRequests,
+                    dpopSigningAlgValuesSupported,
+
+                    // OID4VCI 11
+                    credentialSupported?.map { (id, cs) ->
+                        id to when (cs.id.isNullOrEmpty()) {
+                            true -> CredentialSupported.withId(id, cs)
+                            else -> cs
+                        }
+                    }?.toMap(),
+                    authorizationServer,
+
+                    customParameters
+                )
             }
-
-            return JsonObject(originalJson)
         }
     }
 
-    @Serializable
+    @OptIn(ExperimentalSerializationApi::class)
+    @KeepGeneratedSerializer
+    @Serializable(with = Draft13OpenIDProviderMetadataSerializer::class)
     data class Draft13(
         @SerialName("issuer") override val issuer: String? = null,
         @SerialName("authorization_endpoint") override val authorizationEndpoint: String? = null,
@@ -275,7 +416,7 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
         @SerialName("authorization_servers") val authorizationServers: Set<String>? = null,
         @SerialName("pre-authorized_grant_anonymous_access_supported") val preAuthorizedGrantAnonymousAccessSupport: Boolean? = null,
 
-        override val customParameters: Map<String, JsonElement> = mapOf()
+        override val customParameters: Map<String, JsonElement>? = mapOf()
 
     ) : OpenIDProviderMetadata() {
         fun getVctByCredentialConfigurationId(credentialConfigurationId: String) =
@@ -295,9 +436,11 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
 
             throw IllegalArgumentException("Invalid type value: $credType. The $credType type is not supported")
         }
-    }
 
-    override fun toJSON(): JsonObject = Json.encodeToJsonElement(OpenIDProviderMetadataSerializer, this).jsonObject
+        override fun toJSON(): JsonObject {
+            return Json.encodeToJsonElement(Draft13OpenIDProviderMetadataSerializer, this).jsonObject
+        }
+    }
 
     companion object : JsonDataObjectFactory<OpenIDProviderMetadata>() {
         override fun fromJSON(jsonObject: JsonObject): OpenIDProviderMetadata =
@@ -307,25 +450,14 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
 
 object OpenIDProviderMetadataSerializer : KSerializer<OpenIDProviderMetadata> {
 
-    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("OpenIDProviderMetadata")
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("id.walt.oid4vc.data.OpenIDProviderMetadata") {}
 
     override fun serialize(encoder: Encoder, value: OpenIDProviderMetadata) {
-        val jsonEncoder = encoder as? JsonEncoder
-            ?: throw IllegalStateException("This serializer can only be used with a JSON encoder")
-
-        val jsonElement = when (value) {
-            is OpenIDProviderMetadata.Draft11 -> Json.encodeToJsonElement(
-                OpenIDProviderMetadataDraft11Serializer,
-                value
-            )
-
-            is OpenIDProviderMetadata.Draft13 -> Json.encodeToJsonElement(
-                OpenIDProviderMetadataDraft13Serializer,
-                value
-            )
+        when (value) {
+            is OpenIDProviderMetadata.Draft11 -> Draft11OpenIDProviderMetadataSerializer.serialize(encoder, value)
+            is OpenIDProviderMetadata.Draft13 -> Draft13OpenIDProviderMetadataSerializer.serialize(encoder, value)
         }
-
-        jsonEncoder.encodeJsonElement(jsonElement)
     }
 
     override fun deserialize(decoder: Decoder): OpenIDProviderMetadata {
@@ -336,12 +468,12 @@ object OpenIDProviderMetadataSerializer : KSerializer<OpenIDProviderMetadata> {
 
         return when {
             "credential_configurations_supported" in rawJsonElement.jsonObject -> Json.decodeFromJsonElement(
-                OpenIDProviderMetadataDraft13Serializer,
+                Draft13OpenIDProviderMetadataSerializer,
                 rawJsonElement
             )
 
             "credentials_supported" in rawJsonElement.jsonObject -> Json.decodeFromJsonElement(
-                OpenIDProviderMetadataDraft11Serializer,
+                Draft11OpenIDProviderMetadataSerializer,
                 rawJsonElement
             )
 
@@ -362,8 +494,8 @@ fun OpenIDProviderMetadata.getSupportedProofTypes(): List<ProofType>? {
     }
 }
 
-object OpenIDProviderMetadataDraft11Serializer :
-    JsonDataObjectSerializer<OpenIDProviderMetadata.Draft11>(OpenIDProviderMetadata.Draft11.serializer())
+private object Draft11OpenIDProviderMetadataSerializer :
+    JsonDataObjectSerializer<OpenIDProviderMetadata.Draft11>(OpenIDProviderMetadata.Draft11.generatedSerializer())
 
-object OpenIDProviderMetadataDraft13Serializer :
-    JsonDataObjectSerializer<OpenIDProviderMetadata.Draft13>(OpenIDProviderMetadata.Draft13.serializer())
+private object Draft13OpenIDProviderMetadataSerializer :
+    JsonDataObjectSerializer<OpenIDProviderMetadata.Draft13>(OpenIDProviderMetadata.Draft13.generatedSerializer())

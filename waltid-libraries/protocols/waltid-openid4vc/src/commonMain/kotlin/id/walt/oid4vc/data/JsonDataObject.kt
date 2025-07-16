@@ -2,13 +2,14 @@ package id.walt.oid4vc.data
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.json.*
 
-@Serializable
+const private val customParametersName = "customParameters"
+
 abstract class JsonDataObject {
-    abstract val customParameters: Map<String, JsonElement>
+    abstract val customParameters: Map<String, JsonElement>?
     abstract fun toJSON(): JsonObject
     fun toJSONString() = toJSON().toString()
 }
@@ -21,7 +22,7 @@ abstract class JsonDataObjectFactory<T : JsonDataObject> {
 abstract class JsonDataObjectSerializer<T : JsonDataObject>(serializer: KSerializer<T>) :
     JsonTransformingSerializer<T>(serializer) {
 
-    private val customParametersName = "customParameters"
+    override val descriptor: SerialDescriptor = serializer.descriptor
 
     @OptIn(ExperimentalSerializationApi::class)
     private val knownElementNames get() = descriptor.elementNames.filter { it != customParametersName }.toSet()

@@ -15,6 +15,7 @@ import id.walt.commons.web.UnauthorizedException
 import id.walt.commons.web.WebException
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.entrawallet.core.utils.UuidSerializer
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.webwallet.FeatureCatalog
@@ -22,7 +23,7 @@ import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.service.WalletServiceManager
-import id.walt.webwallet.service.account.AccountsService
+import id.walt.webwallet.service.account.*
 import id.walt.webwallet.web.InsufficientPermissionsException
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
@@ -39,7 +40,9 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -62,6 +65,46 @@ data class LoginTokenSession(val token: String)
 
 @Serializable
 data class OidcTokenSession(val token: String)
+
+/*
+Use this data class for login response data, so schema generator can generate
+openapi schema from it.
+ */
+@Serializable
+data class LoginResponseData(
+    @Serializable(with = UuidSerializer::class) val id: Uuid,
+    val token: String,
+    val username: String? = null,
+    val address: String? = null,
+    val keycloakUserId: String? = null,
+) {
+
+    companion object {
+        fun of(authenticatedUser: AuthenticatedUser, token: String): LoginResponseData {
+            return when (authenticatedUser) {
+                is UsernameAuthenticatedUser -> LoginResponseData(
+                    id = authenticatedUser.id,
+                    token = token,
+                    username = authenticatedUser.username
+                )
+
+                is AddressAuthenticatedUser -> LoginResponseData(
+                    id = authenticatedUser.id,
+                    token = token,
+                    address = authenticatedUser.address
+                )
+
+                is KeycloakAuthenticatedUser -> LoginResponseData(
+                    id = authenticatedUser.id,
+                    token = token,
+                    keycloakUserId = authenticatedUser.keycloakUserId
+                )
+
+                is X5CAuthenticatedUser -> LoginResponseData(authenticatedUser.id, token)
+            }
+        }
+    }
+}
 
 object AuthKeys {
     private val config = ConfigManager.getConfig<AuthConfig>()
@@ -116,20 +159,8 @@ data class LoginRequestError(override val message: String) : WebException(
     )
 }
 
-suspend fun ApplicationCall.getLoginRequest() = runCatching {
-    val jsonObject = receive<JsonObject>()
-    val accountType = jsonObject["type"]?.jsonPrimitive?.contentOrNull
-    if (accountType.isNullOrEmpty()) {
-        throw BadRequestException(
-            if (jsonObject.containsKey("type")) {
-                "Account type '${jsonObject["type"]}' is not recognized"
-            } else {
-                "No account type provided"
-            }
-        )
-    }
-    val json = Json { ignoreUnknownKeys = true }
-    json.decodeFromJsonElement<AccountRequest>(jsonObject)
+suspend fun ApplicationCall.getLoginRequest(): AccountRequest = runCatching {
+    receive<AccountRequest>()
 }.getOrElse { throw LoginRequestError(it) }
 
 
@@ -155,9 +186,7 @@ suspend fun RoutingContext.doLogin() {
     } ?: createHS256Token(tokenPayload)
     call.sessions.set(LoginTokenSession(token))
     call.response.status(HttpStatusCode.OK)
-    call.respond(
-        Json.encodeToJsonElement(authenticatedUser).jsonObject.minus("type").plus(Pair("token", token.toJsonElement()))
-    )
+    call.respond(LoginResponseData.of(authenticatedUser, token))
 }
 
 fun ApplicationCall.getUserId() =

@@ -1,10 +1,7 @@
 package id.walt.oid4vc.data
 
 import id.walt.sdjwt.SDJWTVCTypeMetadata
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -62,7 +59,9 @@ order: [...]
  * @param claims OPTIONAL (ISO mDL/mdocs): A JSON object containing a list of key value pairs, where the key is a certain namespace as defined in [ISO.18013-5] (or any profile of it), and the value is a JSON object. This object also contains a list of key value pairs, where the key is a claim that is defined in the respective namespace and is offered in the Credential. The value is a JSON object detailing the specifics of the claim
  * @param order OPTIONAL. An array of claims.display.name values that lists them in the order they should be displayed by the Wallet.
  */
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = CredentialSupportedSerializer::class)
 data class CredentialSupported(
     val format: CredentialFormat,
     val scope: String? = null,
@@ -81,28 +80,44 @@ data class CredentialSupported(
     @Serializable(ClaimDescriptorNamespacedMapSerializer::class) val claims: Map<String, Map<String, ClaimDescriptor>>? = null,
     val order: List<String>? = null,
     @SerialName("sdJwtVcTypeMetadata") val sdJwtVcTypeMetadata: SDJWTVCTypeMetadata? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
 
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(CredentialSupportedSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<CredentialSupported>() {
+        fun withId(id: String, cs: CredentialSupported): CredentialSupported {
+            return CredentialSupported(
+                cs.format,
+                cs.scope,
+                cs.vct,
+                cs.cryptographicBindingMethodsSupported,
+                id,
+                cs.cryptographicSuitesSupported,
+                cs.types,
+                cs.credentialSigningAlgValuesSupported,
+                cs.proofTypesSupported,
+                cs.display,
+                cs.context,
+                cs.credentialDefinition,
+                cs.docType,
+                cs.credentialSubject,
+                cs.claims,
+                cs.order,
+                cs.sdJwtVcTypeMetadata,
+                cs.customParameters
+            )
+        }
+
         override fun fromJSON(jsonObject: JsonObject): CredentialSupported =
             Json.decodeFromJsonElement(CredentialSupportedSerializer, jsonObject)
     }
 }
 
-object CredentialSupportedSerializer : JsonDataObjectSerializer<CredentialSupported>(CredentialSupported.serializer())
+internal object CredentialSupportedSerializer :
+    JsonDataObjectSerializer<CredentialSupported>(CredentialSupported.generatedSerializer())
 
-object CredentialSupportedListSerializer : KSerializer<List<CredentialSupported>> {
-    private val internalSerializer = ListSerializer(CredentialSupportedSerializer)
-    override val descriptor: SerialDescriptor = internalSerializer.descriptor
-    override fun deserialize(decoder: Decoder) = internalSerializer.deserialize(decoder)
-    override fun serialize(encoder: Encoder, value: List<CredentialSupported>) =
-        internalSerializer.serialize(encoder, value)
-}
-
-object CredentialSupportedMapSerializer : KSerializer<Map<String, CredentialSupported>> {
+internal object CredentialSupportedMapSerializer : KSerializer<Map<String, CredentialSupported>> {
 
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("Map<String, CredentialSupported>")
 
@@ -144,7 +159,7 @@ object CredentialSupportedMapSerializer : KSerializer<Map<String, CredentialSupp
  * However, the expected structure for a `Map<String, CredentialSupported>` is a JsonObject
  */
 
-object CredentialSupportedArraySerializer : KSerializer<Map<String, CredentialSupported>> {
+internal object CredentialSupportedArraySerializer : KSerializer<Map<String, CredentialSupported>> {
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("Map<String, CredentialSupported>")
 
     override fun deserialize(decoder: Decoder): Map<String, CredentialSupported> {

@@ -52,13 +52,7 @@ abstract class RegisterControllerBase(
     }
 
     override suspend fun RoutingContext.execute() {
-//        val jsonObject = call.receive<JsonObject>()
-//        val type = jsonObject["type"]?.jsonPrimitive?.contentOrNull
-//        if (type.isNullOrEmpty()) {
-//            throw BadRequestException("No account type provided")
-//        }
-//        val accountRequest = loginRequestJson.decodeFromJsonElement<AccountRequest>(jsonObject)
-        val req = loginRequestJson.decodeFromString<AccountRequest>(call.receive())
+        val req = call.receive<AccountRequest>()
         logger.debug { "Creating ${req.javaClass.simpleName} user" }
         AccountsService.register("", req)
             .onSuccess {

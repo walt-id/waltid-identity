@@ -90,10 +90,8 @@ fun Application.credentials() = walletRoute {
                 summary = "View a credential"
                 response {
                     HttpStatusCode.OK to {
-                        body<WalletCredential> {
-                            description =
-                                "WalletCredential in JWT (String starting with 'ey' or JSON_LD (JSON with proof) format"
-                        }
+                        description = "WalletCredential in JWT (String starting with 'ey' or JSON_LD (JSON with proof) format"
+                        body<WalletCredential> {}
                     }
                 }
             }) {
@@ -126,10 +124,8 @@ fun Application.credentials() = walletRoute {
                 summary = "Attempt to restore a soft delete credential"
                 response {
                     HttpStatusCode.OK to {
-                        body<WalletCredential> {
-                            description =
-                                "WalletCredential in JWT (String starting with 'ey' or JSON_LD (JSON with proof) format"
-                        }
+                        description = "WalletCredential in JWT (String starting with 'ey' or JSON_LD (JSON with proof) format"
+                        body<WalletCredential> {}
                     }
                     HttpStatusCode.BadRequest to { description = "WalletCredential could not be restored" }
                 }

@@ -1,17 +1,17 @@
 package id.walt.oid4vc.data.dif
 
-import id.walt.w3c.utils.VCFormat
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.JsonDataObject
 import id.walt.oid4vc.data.JsonDataObjectFactory
 import id.walt.oid4vc.data.JsonDataObjectSerializer
 import id.walt.oid4vc.util.ShortIdUtils
-import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import id.walt.w3c.utils.VCFormat
+import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = PresentationDefinitionSerializer::class)
 data class PresentationDefinition(
     @EncodeDefault val id: String = ShortIdUtils.randomSessionId(),
     @SerialName("input_descriptors") @Serializable(InputDescriptorListSerializer::class) val inputDescriptors: List<InputDescriptor>,
@@ -19,7 +19,7 @@ data class PresentationDefinition(
     val purpose: String? = null,
     @Serializable(VCFormatMapSerializer::class) val format: Map<VCFormat, VCFormatDefinition>? = null,
     @SerialName("submission_requirements") @Serializable(SubmissionRequirementListSerializer::class) val submissionRequirements: List<SubmissionRequirement>? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(PresentationDefinitionSerializer, this).jsonObject
 
@@ -38,7 +38,7 @@ data class PresentationDefinition(
     }
 
     companion object : JsonDataObjectFactory<PresentationDefinition>() {
-        override fun fromJSON(jsonObject: JsonObject) =
+        override fun fromJSON(jsonObject: JsonObject): PresentationDefinition =
             Json.decodeFromJsonElement(PresentationDefinitionSerializer, jsonObject)
 
         fun defaultGenerationFromVcTypesForCredentialFormat(
@@ -123,8 +123,8 @@ data class PresentationDefinition(
     }
 }
 
-object PresentationDefinitionSerializer :
-    JsonDataObjectSerializer<PresentationDefinition>(PresentationDefinition.serializer())
+internal object PresentationDefinitionSerializer :
+    JsonDataObjectSerializer<PresentationDefinition>(PresentationDefinition.generatedSerializer())
 
 fun main() {
     //language=json

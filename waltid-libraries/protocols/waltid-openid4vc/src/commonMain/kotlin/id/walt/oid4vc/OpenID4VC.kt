@@ -20,7 +20,10 @@ import id.walt.oid4vc.errors.TokenVerificationError
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
-import id.walt.oid4vc.responses.*
+import id.walt.oid4vc.responses.AuthorizationCodeResponse
+import id.walt.oid4vc.responses.AuthorizationCodeWithAuthorizationRequestResponse
+import id.walt.oid4vc.responses.AuthorizationErrorCode
+import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.COSESign1Utils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.utils.io.core.*
@@ -166,8 +169,8 @@ object OpenID4VC {
         presentationDefinition: PresentationDefinition? = null,
     ): AuthorizationCodeWithAuthorizationRequestResponse {
 
-        providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
-            ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
+        providerMetadata.draft11
+            ?: providerMetadata.draft13
             ?: error("Unknown metadata type: $providerMetadata")
 
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
@@ -236,8 +239,8 @@ object OpenID4VC {
                 message = "Invalid response type ${authorizationRequest.responseType}, for authorization code flow."
             )
 
-        providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
-            ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
+        providerMetadata.draft11
+            ?: providerMetadata.draft13
             ?: error("Unknown metadata type: $providerMetadata")
 
         val issuer = providerMetadata.issuer ?: throw AuthorizationError(
@@ -264,8 +267,8 @@ object OpenID4VC {
         providerMetadata: OpenIDProviderMetadata,
         tokenKey: Key
     ): TokenResponse {
-        providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
-            ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
+        providerMetadata.draft11
+            ?: providerMetadata.draft13
             ?: error("Unknown metadata type: $providerMetadata")
 
         log.debug { "> processImplicitFlowAuthorization for $authorizationRequest" }
@@ -306,8 +309,8 @@ object OpenID4VC {
         providerMetadata: OpenIDProviderMetadata,
         tokenKey: Key
     ): AuthorizationCodeResponse {
-        providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
-            ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
+        providerMetadata.draft11
+            ?: providerMetadata.draft13
             ?: error("Unknown metadata type: $providerMetadata")
 
         // Verify nonce - need to add id token nonce session

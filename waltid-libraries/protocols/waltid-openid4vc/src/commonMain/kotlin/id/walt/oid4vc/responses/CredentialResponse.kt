@@ -4,9 +4,7 @@ import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.JsonDataObject
 import id.walt.oid4vc.data.JsonDataObjectFactory
 import id.walt.oid4vc.data.JsonDataObjectSerializer
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -17,7 +15,9 @@ import kotlinx.serialization.json.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = CredentialResponseSerializer::class)
 data class CredentialResponse private constructor(
     val format: CredentialFormat? = null,
     val credential: JsonElement? = null,
@@ -27,14 +27,14 @@ data class CredentialResponse private constructor(
     val error: String? = null,
     @SerialName("error_description") val errorDescription: String? = null,
     @SerialName("error_uri") val errorUri: String? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     val isSuccess get() = (format != null && credential != null) || isDeferred
     val isDeferred get() = acceptanceToken != null
     override fun toJSON() = Json.encodeToJsonElement(CredentialResponseSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<CredentialResponse>() {
-        override fun fromJSON(jsonObject: JsonObject) =
+        override fun fromJSON(jsonObject: JsonObject): CredentialResponse =
             Json.decodeFromJsonElement(CredentialResponseSerializer, jsonObject)
 
         fun success(
@@ -93,7 +93,8 @@ data class CredentialResponse private constructor(
     }
 }
 
-object CredentialResponseSerializer : JsonDataObjectSerializer<CredentialResponse>(CredentialResponse.serializer())
+internal object CredentialResponseSerializer :
+    JsonDataObjectSerializer<CredentialResponse>(CredentialResponse.generatedSerializer())
 
 enum class CredentialErrorCode {
     invalid_request,
@@ -105,7 +106,7 @@ enum class CredentialErrorCode {
     server_error
 }
 
-object CredentialResponseListSerializer : KSerializer<List<CredentialResponse>> {
+internal object CredentialResponseListSerializer : KSerializer<List<CredentialResponse>> {
     private val internalSerializer = ListSerializer(CredentialResponseSerializer)
     override val descriptor: SerialDescriptor = internalSerializer.descriptor
     override fun deserialize(decoder: Decoder): List<CredentialResponse> = internalSerializer.deserialize(decoder)
@@ -113,7 +114,7 @@ object CredentialResponseListSerializer : KSerializer<List<CredentialResponse>> 
         internalSerializer.serialize(encoder, value)
 }
 
-object DurationAsSecondsSerializer : KSerializer<Duration> {
+internal object DurationAsSecondsSerializer : KSerializer<Duration> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("DurationAsSeconds", PrimitiveKind.INT)
 
     override fun serialize(encoder: Encoder, value: Duration) {
