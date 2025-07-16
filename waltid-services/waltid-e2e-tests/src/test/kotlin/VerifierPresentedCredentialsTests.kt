@@ -805,6 +805,7 @@ class VerifierPresentedCredentialsTests {
             }
 
             assert(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 1)
+
         }
 
     private suspend fun presentSdJwtVc() =
@@ -1056,6 +1057,7 @@ class VerifierPresentedCredentialsTests {
                 actual = mDoc.issuerSigned.nameSpaces.keys,
                 expected = setOf("org.iso.18013.5.1"),
             )
+
         }
 
     private suspend fun presentOpenBadgeWithDisclosures() =
@@ -1180,6 +1182,7 @@ class VerifierPresentedCredentialsTests {
             val disclosures = assertNotNull(verboseCredential.disclosures)
 
             assert(disclosures.size == 2)
+
         }
 
     private suspend fun presentUniversityDegreeWithDisclosures() =
