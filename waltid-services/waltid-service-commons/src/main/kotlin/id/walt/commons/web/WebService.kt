@@ -14,6 +14,7 @@ import io.klogging.logger
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
+import java.net.BindException
 
 data class WebService(
     val module: Application.() -> Unit,
@@ -34,13 +35,43 @@ data class WebService(
 
     suspend fun run(): suspend () -> Unit = suspend {
         val webConfig = ConfigManager.getConfig<WebConfig>()
-        log.info { "Starting web server (binding to ${webConfig.webHost}, listening on port ${webConfig.webPort})..." }
-        embeddedServer(
+        val host = webConfig.webHost
+        val port = webConfig.webPort
+
+        log.info { "Starting web server (binding to $host, listening on port $port)..." }
+
+        val server = embeddedServer(
             CIO,
-            port = webConfig.webPort,
-            host = webConfig.webHost,
+            host = host,
+            port = port,
             module = webServiceModule
-        ).start(wait = true)
+        )
+
+        runCatching { server.start(wait = true) }.getOrElse { ex ->
+
+            when {
+                ex is BindException || ex.cause is BindException -> {
+                    val bindEx = ex as? BindException ?: ex.cause as BindException
+
+                    log.fatal(ex) {
+                        """
+                        |
+                        |-------
+                        |Failed to start web server for service: "${bindEx.localizedMessage}"
+                        |Could not bind web server to port $port on host "$host".
+                        |
+                        |Please check if permissions to bind are correct and the port is not already being used by another program.
+                        |-------
+                        |
+                        """.trimMargin()
+                    }
+                }
+
+                else -> throw ex
+            }
+
+
+        }
     }
 
 }
