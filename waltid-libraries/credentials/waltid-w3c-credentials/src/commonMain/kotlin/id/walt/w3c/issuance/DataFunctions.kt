@@ -1,5 +1,6 @@
 package id.walt.w3c.issuance
 
+import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.w3c.utils.CredentialDataMergeUtils
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -11,8 +12,6 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Duration
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
-
 
 @OptIn(ExperimentalJsExport::class, ExperimentalUuidApi::class)
 @JsExport
@@ -84,7 +83,7 @@ val dataFunctions = mapOf<String, suspend (call: CredentialDataMergeUtils.Functi
     "timestamp-before" to { JsonPrimitive((Clock.System.now() - Duration.parse(it.args!!)).toString()) },
     "timestamp-before-seconds" to { JsonPrimitive((Clock.System.now() - Duration.parse(it.args!!)).epochSeconds) },
 
-    "uuid" to { JsonPrimitive("urn:uuid:${Uuid.random()}") },
+    "uuid" to { JsonPrimitive("urn:uuid:${randomUUID()}") },
     "webhook" to { JsonPrimitive(HttpClient().get(it.args!!).bodyAsText()) },
     "webhook-json" to { Json.parseToJsonElement(HttpClient().get(it.args!!).bodyAsText()) },
 

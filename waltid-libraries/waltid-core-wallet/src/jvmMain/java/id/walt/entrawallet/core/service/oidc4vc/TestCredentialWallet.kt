@@ -1,7 +1,4 @@
-@file:OptIn(ExperimentalUuidApi::class)
-
 package id.walt.entrawallet.core.service.oidc4vc
-
 
 import org.cose.java.AlgorithmID
 import com.nimbusds.jose.jwk.ECKey
@@ -12,6 +9,7 @@ import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
@@ -57,8 +55,6 @@ import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:$WALLET_PORT"
@@ -271,7 +267,7 @@ class TestCredentialWallet(
         }
         println("mdocsPresented: $mdocsPresented")
 
-        val presentationId = (session.presentationDefinition?.id ?: "urn:uuid:${Uuid.random().toString().lowercase()}")
+        val presentationId = (session.presentationDefinition?.id ?: "urn:uuid:${randomUUIDString().lowercase()}")
 
         val vp = if (jwtsPresented.isNotEmpty()) getVpJson(
             credentialsPresented = jwtsPresented,

@@ -1,5 +1,7 @@
 package id.walt.sdjwt
 
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KeepGeneratedSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -7,7 +9,9 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = SDJWTVCTypeMetadataSerializer::class)
 data class SDJWTVCTypeMetadata(
     @SerialName("name") val name: String? = null,
     @SerialName("description") val description: String? = null,
@@ -29,6 +33,6 @@ data class SDJWTVCTypeMetadata(
     }
 }
 
-object SDJWTVCTypeMetadataSerializer :
-    JsonDataObjectSerializer<SDJWTVCTypeMetadata>(SDJWTVCTypeMetadata.serializer())
+internal object SDJWTVCTypeMetadataSerializer :
+    JsonDataObjectSerializer<SDJWTVCTypeMetadata>(SDJWTVCTypeMetadata.generatedSerializer())
 

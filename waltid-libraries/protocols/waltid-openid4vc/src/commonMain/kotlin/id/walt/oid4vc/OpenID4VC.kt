@@ -5,6 +5,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.mdoc.dataelement.MapElement
@@ -19,9 +20,11 @@ import id.walt.oid4vc.errors.TokenVerificationError
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
-import id.walt.oid4vc.responses.*
+import id.walt.oid4vc.responses.AuthorizationCodeResponse
+import id.walt.oid4vc.responses.AuthorizationCodeWithAuthorizationRequestResponse
+import id.walt.oid4vc.responses.AuthorizationErrorCode
+import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.COSESign1Utils
-import id.walt.oid4vc.util.randomUUID
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
@@ -166,8 +169,8 @@ object OpenID4VC {
         presentationDefinition: PresentationDefinition? = null,
     ): AuthorizationCodeWithAuthorizationRequestResponse {
 
-        providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
-            ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
+        providerMetadata.draft11
+            ?: providerMetadata.draft13
             ?: error("Unknown metadata type: $providerMetadata")
 
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
@@ -177,7 +180,7 @@ object OpenID4VC {
                 message = "Invalid response type ${authorizationRequest.responseType}, for authorization code flow."
             )
 
-        val authorizationRequestServerNonce = randomUUID()
+        val authorizationRequestServerNonce = randomUUIDString()
         val authorizationResponseServerMode = ResponseMode.direct_post
 
         val clientId = providerMetadata.issuer!!
@@ -236,8 +239,8 @@ object OpenID4VC {
                 message = "Invalid response type ${authorizationRequest.responseType}, for authorization code flow."
             )
 
-        providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
-            ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
+        providerMetadata.draft11
+            ?: providerMetadata.draft13
             ?: error("Unknown metadata type: $providerMetadata")
 
         val issuer = providerMetadata.issuer ?: throw AuthorizationError(
@@ -254,7 +257,7 @@ object OpenID4VC {
 
         return AuthorizationCodeResponse.success(
             code = code,
-            customParameters = mapOf("state" to listOf(authorizationRequest.state ?: randomUUID()))
+            customParameters = mapOf("state" to listOf(authorizationRequest.state ?: randomUUIDString()))
         )
     }
 
@@ -264,8 +267,8 @@ object OpenID4VC {
         providerMetadata: OpenIDProviderMetadata,
         tokenKey: Key
     ): TokenResponse {
-        providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
-            ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
+        providerMetadata.draft11
+            ?: providerMetadata.draft13
             ?: error("Unknown metadata type: $providerMetadata")
 
         log.debug { "> processImplicitFlowAuthorization for $authorizationRequest" }
@@ -306,8 +309,8 @@ object OpenID4VC {
         providerMetadata: OpenIDProviderMetadata,
         tokenKey: Key
     ): AuthorizationCodeResponse {
-        providerMetadata.castOrNull<OpenIDProviderMetadata.Draft11>()
-            ?: providerMetadata.castOrNull<OpenIDProviderMetadata.Draft13>()
+        providerMetadata.draft11
+            ?: providerMetadata.draft13
             ?: error("Unknown metadata type: $providerMetadata")
 
         // Verify nonce - need to add id token nonce session
