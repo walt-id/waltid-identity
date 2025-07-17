@@ -13,6 +13,7 @@ object SdJwtDocs {
             statusCallbackUriHeader()
             sessionTtlHeader()
             body<IssuanceRequest> {
+                required = true
                 description =
                     "Pass the unsigned credential that you intend to issue in the body of the request."
                 example("W3C SD-JWT example", IssuanceExamples.sdJwtW3CExample)
@@ -52,6 +53,7 @@ object SdJwtDocs {
             statusCallbackUriHeader()
             sessionTtlHeader()
             body<List<IssuanceRequest>> {
+                required = true
                 description =
                     "Pass the unsigned credential that you intend to issue as the body of the request."
                 example("Batch example", IssuanceExamples.batchExampleSdJwt)

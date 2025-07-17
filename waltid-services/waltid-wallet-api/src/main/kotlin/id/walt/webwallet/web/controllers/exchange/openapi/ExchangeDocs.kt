@@ -21,6 +21,7 @@ object ExchangeDocs {
                     "The `pin` (Draft11), or `tx_code` (Draft13 and onwards), value that may be required as part of a pre-authorized code (credential issuance) flow"
             }
             body<String> {
+                required = true
                 description = "The offer request to use"
             }
         }
@@ -32,7 +33,10 @@ object ExchangeDocs {
         summary = "Returns the credentials stored in the wallet that match the passed presentation definition"
 
         request {
-            body<PresentationDefinition> { description = "Presentation definition to match credentials against" }
+            body<PresentationDefinition> {
+                required = true
+                description = "Presentation definition to match credentials against"
+            }
         }
         response {
             HttpStatusCode.OK to {
@@ -47,7 +51,10 @@ object ExchangeDocs {
             "Returns the credentials that are required by the presentation definition but not found in the wallet"
 
         request {
-            body<PresentationDefinition> { description = "Presentation definition" }
+            body<PresentationDefinition> {
+                required = true
+                description = "Presentation definition"
+            }
         }
         response {
             HttpStatusCode.OK to {
@@ -60,9 +67,7 @@ object ExchangeDocs {
     fun getUsePresentationRequestDocs(): RouteConfig.() -> Unit = {
         summary = "Present credential(s) to a Relying Party"
 
-        request {
-            body<UsePresentationRequest>()
-        }
+        request { body<UsePresentationRequest> { required = true } }
         response(ExchangeOpenApiCommons.usePresentationRequestResponse())
     }
 
@@ -71,7 +76,10 @@ object ExchangeDocs {
             summary = "Return resolved / parsed presentation request"
 
             request {
-                body<String> { description = "PresentationRequest to resolve/parse" }
+                body<String> {
+                    required = true
+                    description = "PresentationRequest to resolve/parse"
+                }
             }
             response {
                 HttpStatusCode.OK to {
@@ -85,7 +93,10 @@ object ExchangeDocs {
         summary = "Return resolved / parsed credential offer"
 
         request {
-            body<String> { description = "Credential offer request to resolve/parse" }
+            body<String> {
+                required = true
+                description = "Credential offer request to resolve/parse"
+            }
         }
         response {
             HttpStatusCode.OK to {

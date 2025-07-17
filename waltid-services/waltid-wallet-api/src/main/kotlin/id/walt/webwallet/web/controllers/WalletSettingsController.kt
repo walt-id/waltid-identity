@@ -38,7 +38,10 @@ fun Application.settings() = walletRoute {
         post({
             summary = "Update wallet settings"
             request {
-                body<JsonObject> { description = "Wallet setting object" }
+                body<JsonObject> {
+                    required = true
+                    description = "Wallet setting object"
+                }
             }
             response {
                 HttpStatusCode.Created to { description = "Wallet settings updated successfully" }

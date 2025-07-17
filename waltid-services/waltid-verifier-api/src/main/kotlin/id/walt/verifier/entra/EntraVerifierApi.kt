@@ -207,7 +207,7 @@ fun Application.entraVerifierApi() {
         }) {
             post("verify", {
                 tags = listOf("Entra Credential Verification")
-                request { body<EntraVerifyRequest>() }
+                request { body<EntraVerifyRequest> { required = true } }
                 response {
                     HttpStatusCode.OK to {
                         description = "EntraVerifyResponse"

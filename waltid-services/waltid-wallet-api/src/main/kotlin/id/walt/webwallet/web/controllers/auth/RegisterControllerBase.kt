@@ -27,6 +27,7 @@ abstract class RegisterControllerBase(
         summary = "Register with [email + password] or [wallet address + ecosystem]"
         request {
             body<AccountRequest> {
+                required = true
                 example("E-mail + password") {
                     value = EmailAccountRequest(
                         name = "Max Mustermann",

@@ -74,6 +74,7 @@ object VerifierApiDocs {
                 required = false
             }
             body<JsonObject> {
+                required = true
                 description =
                     "Presentation definition, describing the presentation requirement for this verification session. ID of the presentation definition is automatically assigned randomly."
                 //example("Verifiable ID example", verifiableIdPresentationDefinitionExample)
@@ -137,6 +138,7 @@ object VerifierApiDocs {
                 required = true
             }
             body<TokenResponseFormParam> {
+                required = true
                 mediaTypes = listOf(ContentType.Application.FormUrlEncoded)
                 example("simple vp_token response") {
                     value = TokenResponseFormParam(

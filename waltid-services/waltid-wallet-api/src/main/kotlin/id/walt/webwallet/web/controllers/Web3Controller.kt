@@ -38,7 +38,10 @@ fun Application.web3accounts() = walletRoute {
         post("link", {
             summary = "Add a web3 wallet"
             request {
-                body<WalletDataTransferObject> { description = "Wallet address and ecosystem" }
+                body<WalletDataTransferObject> {
+                    required = true
+                    description = "Wallet address and ecosystem"
+                }
             }
             response {
                 HttpStatusCode.OK to {
@@ -57,7 +60,9 @@ fun Application.web3accounts() = walletRoute {
         post("unlink", {
             summary = "Remove a web3 wallet"
             request {
-                body<String> { description = "Wallet id" }
+                body<String> {
+                    required = true
+                    description = "Wallet id" }
             }
             response {
                 HttpStatusCode.OK to { description = "Wallet unlinked" }
@@ -71,7 +76,10 @@ fun Application.web3accounts() = walletRoute {
         post("connect", {
             summary = "Connect a web3 wallet"
             request {
-                body<WalletDataTransferObject> { description = "Wallet address and ecosystem" }
+                body<WalletDataTransferObject> {
+                    required = true
+                    description = "Wallet address and ecosystem"
+                }
             }
             response {
                 HttpStatusCode.OK to {
@@ -90,7 +98,10 @@ fun Application.web3accounts() = walletRoute {
         post("disconnect", {
             summary = "Disconnect a web3 wallet"
             request {
-                body<String> { description = "Wallet id" }
+                body<String> {
+                    required = true
+                    description = "Wallet id"
+                }
             }
             response {
                 HttpStatusCode.OK to { description = "Wallet disconnected" }
