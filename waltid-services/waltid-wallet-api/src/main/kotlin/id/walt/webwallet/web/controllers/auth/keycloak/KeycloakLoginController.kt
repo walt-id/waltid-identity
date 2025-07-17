@@ -13,6 +13,7 @@ class KeycloakLoginController : LoginControllerBase(keycloakAuthPath, keycloakAu
         description = "Login of a user managed by Keycloak."
         request {
             body<AccountRequest> {
+                required = true
                 example("Keycloak username + password") {
                     value = KeycloakAccountRequest(
                         username = "Max_Mustermann",

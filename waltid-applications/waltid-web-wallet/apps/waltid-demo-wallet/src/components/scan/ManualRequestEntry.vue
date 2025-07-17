@@ -8,7 +8,7 @@
                         class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
                         name="comment" />
                     <textarea v-else id="comment" v-model="text" autofocus="autofocus" rows="3" cols="50" wrap="soft"
-                        spellcheck="true" maxlength="1000" placeholder="Your offer URL"
+                        spellcheck="true" placeholder="Your offer URL"
                         class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
                         name="comment"></textarea>
                 </div>

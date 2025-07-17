@@ -123,10 +123,7 @@ export default function Success() {
         if (!containsVP) {
           const vct = parsedToken['vct'];
           const vctUrl = new URL(vct);
-          const baseUrl = `${vctUrl.origin}`;
-          const pathParts = vctUrl.pathname.split('/');
-          const identifier = pathParts[pathParts.length - 1]; // BankId
-          const vctResolutionUrl = `${baseUrl}/.well-known/vct/${identifier}`;
+          const vctResolutionUrl = `${vctUrl.origin}/.well-known/vct${vctUrl.pathname}`;
           fetchVctName(vctResolutionUrl).then((name) => setVctName(name));
         }
       });

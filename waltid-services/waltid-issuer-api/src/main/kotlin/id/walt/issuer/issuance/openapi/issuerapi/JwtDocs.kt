@@ -12,6 +12,7 @@ object JwtDocs {
             statusCallbackUriHeader()
             sessionTtlHeader()
             body<IssuanceRequest> {
+                required = true
                 description =
                     "Pass the unsigned credential that you intend to issue as the body of the request."
                 example(
@@ -106,6 +107,7 @@ object JwtDocs {
             statusCallbackUriHeader()
             sessionTtlHeader()
             body<List<IssuanceRequest>> {
+                required = true
                 description =
                     "Pass the unsigned credential that you intend to issue as the body of the request."
                 example("Batch example", IssuanceExamples.batchExampleJwt)
