@@ -111,6 +111,7 @@ fun Application.lspPotentialVerificationTestApi() {
                 hidden = false
                 request {
                     body<LSPPotentialIssueFormDataParam> {
+                        required = true
                         mediaTypes = listOf(ContentType.Application.FormUrlEncoded)
                         example("jwk") {
                             value = LSPPotentialIssueFormDataParam(
@@ -152,6 +153,7 @@ fun Application.lspPotentialVerificationTestApi() {
                 hidden = false
                 request {
                     body<LSPPotentialIssueFormDataParam> {
+                        required = true
                         mediaTypes = listOf(ContentType.Application.FormUrlEncoded)
                         example("jwk") {
                             value = LSPPotentialIssueFormDataParam(

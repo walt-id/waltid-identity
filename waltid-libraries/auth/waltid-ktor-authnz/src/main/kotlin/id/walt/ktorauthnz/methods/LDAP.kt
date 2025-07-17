@@ -48,7 +48,7 @@ object LDAP : UserPassBasedAuthMethod("ldap") {
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
     ) {
         post("ldap", {
-            request { body<UserPassCredentials>() }
+            request { body<UserPassCredentials> { required = true } }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
         }) {
             val session = call.getAuthSession(authContext)

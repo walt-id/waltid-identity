@@ -33,7 +33,7 @@ object JWT : AuthenticationMethod("jwt") {
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
     ) {
         post("jwt", {
-            request { body<String>() }
+            request { body<String> { required = true } }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
         }) {
             val session = call.getAuthSession(authContext)

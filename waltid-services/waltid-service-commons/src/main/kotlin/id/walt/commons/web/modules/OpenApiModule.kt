@@ -14,6 +14,8 @@ import io.github.smiley4.ktoropenapi.route
 import io.github.smiley4.ktorredoc.redoc
 import io.github.smiley4.ktorswaggerui.swaggerUI
 import io.github.smiley4.schemakenerator.core.data.*
+import io.github.smiley4.schemakenerator.reflection.analyzer.MinimalTypeData
+import io.github.smiley4.schemakenerator.reflection.analyzer.ReflectionTypeAnalyzerModule
 import io.github.smiley4.schemakenerator.serialization.analyzer.SerializationTypeAnalyzerModule
 import io.github.smiley4.schemakenerator.serialization.data.InitialSerialDescriptorTypeData
 import io.github.smiley4.schemakenerator.swagger.generator.SwaggerSchemaGenerationModule
@@ -60,6 +62,7 @@ object OpenApiModule {
                     overwrite(CustomTypeOverrides.JsonObject())
                     overwrite(CustomTypeOverrides.JsonElement())
                     overwrite(CustomTypeOverrides.SdMap())
+                    overwrite(CustomTypeOverrides.QuickFixPolymorphic())
                 }
                 val reflectionGenerator = SchemaGenerator.reflection {
                     explicitNullTypes = false
@@ -378,4 +381,35 @@ object CustomTypeOverrides {
             }
         },
     )
+
+    // TODO: real implementation which analyzes inheritance and generates schema
+    class QuickFixPolymorphic : SchemaOverwriteModule(
+        identifier = kotlinx.serialization.Polymorphic::class.qualifiedName!!,
+        schema = {
+            Schema<Any>().also {
+                it.types = setOf("object")
+            }
+        },
+    ) {
+        override fun applies(descriptor: SerialDescriptor): Boolean {
+            return descriptor.serialName.startsWith("kotlinx.serialization.Polymorphic")
+        }
+
+        override fun analyze(context: SerializationTypeAnalyzerModule.Context): WrappedTypeData {
+            val original = super.analyze(context)
+            return original.copy(
+                typeData = original.typeData.copy(
+                    identifyingName = TypeName("kotlinx.serialization.Polymorphic", "Polymorphic"),
+                    descriptiveName = TypeName("kotlinx.serialization.Polymorphic", short = "Polymorphic"),
+                ),
+            )
+        }
+
+        override fun analyze(
+            context: ReflectionTypeAnalyzerModule.Context,
+            minimalTypeData: MinimalTypeData
+        ): WrappedTypeData {
+            TODO("Seems not to be needed")
+        }
+    }
 }

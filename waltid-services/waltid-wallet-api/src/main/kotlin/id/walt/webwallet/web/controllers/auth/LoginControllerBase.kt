@@ -30,6 +30,7 @@ abstract class LoginControllerBase(
         summary = "Login with [email + password] or [wallet address + ecosystem] or [oidc session]"
         request {
             body<AccountRequest> {
+                required = true
                 example("E-mail + password") {
                     value = EmailAccountRequest(
                         email = "user@email.com", password = "password"

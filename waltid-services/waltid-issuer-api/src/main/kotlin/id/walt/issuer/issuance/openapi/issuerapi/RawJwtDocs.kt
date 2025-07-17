@@ -11,6 +11,7 @@ object RawJwtDocs {
 
         request {
             body<JsonObject> {
+                required = true
                 description =
                     "Pass the unsigned credential that you intend to sign as the body of the request."
                 example(

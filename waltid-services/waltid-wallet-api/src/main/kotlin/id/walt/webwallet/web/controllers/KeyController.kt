@@ -39,6 +39,7 @@ fun Application.keys() = walletRoute {
             summary = "Generate new key"
             request {
                 body<KeyGenerationRequest> {
+                    required = true
                     description = "Key configuration (JSON)"
 
                     example("JWK key generation request") {
@@ -162,7 +163,10 @@ fun Application.keys() = walletRoute {
         post("import", {
             summary = "Import an existing key"
             request {
-                body<String> { description = "Key in JWK or PEM format" }
+                body<String> {
+                    required = true
+                    description = "Key in JWK or PEM format"
+                }
             }
         }) {
             val body = call.receiveText()
@@ -198,6 +202,7 @@ fun Application.keys() = walletRoute {
                     }
                 }
                 body<String> {
+                    required = true
                     description = "The signature to verify"
                 }
             }
@@ -307,7 +312,10 @@ fun Application.keys() = walletRoute {
             post("sign", {
                 summary = "Sign a message with a specific key"
                 request {
-                    body<JsonElement> { description = "The message to sign" }
+                    body<JsonElement> {
+                        required = true
+                        description = "The message to sign"
+                    }
                 }
                 response {
                     HttpStatusCode.OK to {
