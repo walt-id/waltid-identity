@@ -123,7 +123,7 @@ export default function Success() {
         if (!containsVP) {
           const vct = parsedToken['vct'];
           const vctUrl = new URL(vct);
-          const vctResolutionUrl = `${vctUrl.origin}/.well-known/vct/${vctUrl.pathname}`;
+          const vctResolutionUrl = `${vctUrl.origin}/.well-known/vct${vctUrl.pathname}`;
           fetchVctName(vctResolutionUrl).then((name) => setVctName(name));
         }
       });
