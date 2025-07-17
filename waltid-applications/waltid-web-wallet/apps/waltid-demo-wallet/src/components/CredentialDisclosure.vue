@@ -90,7 +90,7 @@ const props = defineProps<{
 
 const type = computed(() => {
     const parsed = props.credential.parsedDocument ?? parseJwt(props.credential.document).vc ?? parseJwt(props.credential.document);
-    return parsed?.type?.at(-1) ?? "Unknown";
+    return parsed?.type?.at(-1) ?? parsed.vct.split('/').pop() ?? "Unknown";
 });
 const displayType = computed(() => type.value.replace(/([a-z0-9])([A-Z])/g, "$1 $2"));
 const disclosureList = computed(() => parseDisclosures(props.credential.disclosures || ""));
