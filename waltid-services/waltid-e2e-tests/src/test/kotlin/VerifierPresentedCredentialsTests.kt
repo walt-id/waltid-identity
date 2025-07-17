@@ -1524,6 +1524,7 @@ class VerifierPresentedCredentialsTests {
             }
 
             assert(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 2)
+            
         }
 
     suspend fun runTests() {
