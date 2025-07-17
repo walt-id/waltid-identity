@@ -205,10 +205,10 @@ object VerifierService {
 
         val presentationSession = maybePresentationSessionResult.getOrThrow()
 
-        if (presentationSession.verificationResult == true) {
+        return if (presentationSession.verificationResult == true) {
             val redirectUri = sessionVerificationInfo.successRedirectUri?.replace("\$id", session.id) ?: ""
             logger.debug { "Presentation is successful, redirecting to: $redirectUri" }
-            return Result.success(redirectUri)
+            Result.success(redirectUri)
         } else {
             val policyResults = OIDCVerifierService.policyResults[session.id]
             val redirectUri = sessionVerificationInfo.errorRedirectUri?.replace("\$id", session.id)
@@ -216,7 +216,7 @@ object VerifierService {
             logger.debug { "Presentation failed, redirecting to: $redirectUri" }
 
 
-            return if (policyResults == null) {
+            if (policyResults == null) {
                 Result.failure(
                     FailedVerificationException(
                         redirectUri,
@@ -331,7 +331,9 @@ object VerifierService {
         val credentialFormat =
             requestedCredentials.map { it.format ?: it.inputDescriptor?.format?.keys?.first() }.distinct()
                 .singleOrNull()
-        if (credentialFormat == null) throw IllegalArgumentException("Credentials formats must be distinct for a presentation request")
+        requireNotNull(credentialFormat) {
+            "Credentials formats must be distinct for a presentation request"
+        }
         return when (credentialFormat) {
             VCFormat.mso_mdoc -> VCFormat.mso_mdoc
             VCFormat.sd_jwt_vc -> VCFormat.sd_jwt_vc
