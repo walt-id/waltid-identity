@@ -204,7 +204,7 @@ class VerifierPresentedCredentialsTests {
             ],
             "request_credentials": [
                 {
-                    "type": "OpenBadgeCredential",
+                    "type": "UniversityDegreeCredential",
                     "input_descriptor": {
                         "id": "some-id-id",
                         "format": {
@@ -399,6 +399,19 @@ class VerifierPresentedCredentialsTests {
     )
 
     private lateinit var mDLWalletCredentialId: String
+
+    val uniDegreeOpenBadgePresentationRequest  = buildJsonObject {
+        put("request_credentials", buildJsonArray {
+            addJsonObject {
+                put("format", VCFormat.jwt_vc_json.toJsonElement())
+                put("type", "OpenBadgeCredential".toJsonElement())
+            }
+            addJsonObject {
+                put("format", VCFormat.jwt_vc_json.toJsonElement())
+                put("type", "OpenBadgeCredential".toJsonElement())
+            }
+        })
+    }
 
     private suspend fun setupTestSuite() {
         createWallet()
@@ -1402,6 +1415,117 @@ class VerifierPresentedCredentialsTests {
 
         }
 
+    private suspend fun presentUniDegreeOpenBadgeWithDisclosures() =
+        test(
+            name = "${TEST_SUITE}: Presentation of university degree  and open badge credentials, both with disclosures"
+        ) {
+            val sessionId = Uuid.random().toString()
+            val presentationUrl = client.post("/openid4vc/verify") {
+                headers {
+                    append("stateId", sessionId)
+                }
+                setBody(uniDegreeOpenBadgePresentationRequest)
+            }.expectSuccess().bodyAsText()
+
+
+            walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/usePresentationRequest") {
+                setBody(
+                    UsePresentationRequest(
+                        presentationRequest = presentationUrl,
+                        selectedCredentials = listOf(
+                            openBadgeWithDisclosuresWalletCredentialId,
+                            universityDegreeWithDisclosuresWalletCredentialId,
+                        ),
+                        disclosures = mapOf(
+                            openBadgeWithDisclosuresWalletCredentialId to openBadgeDisclosures,
+                            universityDegreeWithDisclosuresWalletCredentialId to universityDegreeDisclosures,
+                        )
+                    )
+                )
+            }.expectSuccess()
+
+            client.get("/openid4vc/session/${sessionId}")
+                .expectSuccess().body<PresentationSessionInfo>().let {
+                    assertTrue(it.verificationResult!!)
+                }
+
+            val simpleViewByDefaultResponse = client.get("/openid4vc/session/${sessionId}/presented-credentials")
+                .expectSuccess().body<PresentationSessionPresentedCredentials>()
+
+            assertEquals(
+                actual = simpleViewByDefaultResponse.viewMode,
+                expected = PresentedCredentialsViewMode.simple,
+            )
+
+            assertEquals(
+                actual = simpleViewByDefaultResponse.credentialsByFormat.keys,
+                expected = setOf(VCFormat.jwt_vc_json),
+            )
+
+            var credentials =
+                assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.jwt_vc_json])
+
+            assert(credentials.size == 1)
+
+            val jwtVcJsonPresentationSimpleView = assertDoesNotThrow {
+                credentials.first() as PresentedJwtVcJsonSimpleViewMode
+            }
+
+            val holder = assertNotNull(jwtVcJsonPresentationSimpleView.holder)
+
+            assertEquals(
+                expected = did,
+                actual = holder.jsonPrimitive.content,
+            )
+
+            assert(jwtVcJsonPresentationSimpleView.verifiableCredentials.size == 2)
+
+            val simpleViewResponse =
+                client.get("/openid4vc/session/${sessionId}/presented-credentials") {
+                    url {
+                        parameters.append("viewMode", PresentedCredentialsViewMode.simple.name)
+                    }
+                }.expectSuccess().body<PresentationSessionPresentedCredentials>()
+
+            assertEquals(
+                expected = simpleViewByDefaultResponse,
+                actual = simpleViewResponse,
+            )
+
+            val verboseViewResponse =
+                client.get("/openid4vc/session/${sessionId}/presented-credentials") {
+                    url {
+                        parameters.append("viewMode", PresentedCredentialsViewMode.verbose.name)
+                    }
+                }.expectSuccess().body<PresentationSessionPresentedCredentials>()
+
+            assertNotEquals(
+                illegal = simpleViewResponse,
+                actual = verboseViewResponse,
+            )
+
+            assertEquals(
+                actual = verboseViewResponse.viewMode,
+                expected = PresentedCredentialsViewMode.verbose,
+            )
+
+            assertEquals(
+                actual = verboseViewResponse.credentialsByFormat.keys,
+                expected = setOf(VCFormat.jwt_vc_json),
+            )
+
+            credentials =
+                assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.jwt_vc_json])
+
+            assert(credentials.size == 1)
+
+            val jwtVcJsonPresentationVerboseView = assertDoesNotThrow {
+                credentials.first() as PresentedJwtVcJsonVerboseViewMode
+            }
+
+            assert(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 2)
+        }
+
     suspend fun runTests() {
         setupTestSuite()
         presentUniDegreeNoDisclosures()
@@ -1412,5 +1536,6 @@ class VerifierPresentedCredentialsTests {
         presentUniversityDegreeWithDisclosures()
         queryPresentedCredentialsBeforeVpTokenSubmission()
         queryPresentedCredentialsAfterInvalidVpTokenSubmission()
+        presentUniDegreeOpenBadgeWithDisclosures()
     }
 }
