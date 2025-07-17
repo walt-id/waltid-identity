@@ -42,7 +42,7 @@ class DidEbsiResolverTest : DidResolverTestBase() {
 
         @JvmStatic
         fun `given a did String, when calling resolve, then the result is a valid did document`(): Stream<Arguments> =
-            katiList.stream().flatMap {
+            (conformanceEnvDidList + pilotEnvDidList).stream().flatMap {
                 val curDid = it.did
                 it.expectedDocValidAssertionList.map { innerIt ->
                     arguments(curDid, innerIt.first, innerIt.second)
@@ -51,7 +51,7 @@ class DidEbsiResolverTest : DidResolverTestBase() {
 
         @JvmStatic
         fun `given a did String, when calling resolveToKey, then the result is valid key`(): Stream<Arguments> =
-            katiList.stream()
+            (conformanceEnvDidList + pilotEnvDidList).stream()
                 .map { arguments(it.did, it.expectedKeyValidAssertion.first, it.expectedKeyValidAssertion.second) }
 
         data class TestEntry(
@@ -62,7 +62,330 @@ class DidEbsiResolverTest : DidResolverTestBase() {
         )
 
 
-        private val katiList: List<TestEntry> = listOf(
+        private val pilotEnvDidList: List<TestEntry> = listOf(
+            TestEntry(
+                did = "did:ebsi:zfkNjYrzvx3bQn2SRyDZDMC",
+                expectedDidDoc = Json.decodeFromString<JsonObject>(
+                    """
+                                {
+                                    "@context": [
+                                        "https://www.w3.org/ns/did/v1",
+                                        "https://w3id.org/security/suites/jws-2020/v1"
+                                    ],
+                                    "controller": [
+                                        "did:ebsi:zfkNjYrzvx3bQn2SRyDZDMC"
+                                    ],
+                                    "id": "did:ebsi:zfkNjYrzvx3bQn2SRyDZDMC",
+                                    "verificationMethod": [
+                                        {
+                                            "controller": "did:ebsi:zfkNjYrzvx3bQn2SRyDZDMC",
+                                            "id": "did:ebsi:zfkNjYrzvx3bQn2SRyDZDMC#_1EonbYXjUuhLeCBZAqfdwGpHlfsKXSC63FCt4SBZGU",
+                                            "publicKeyJwk": {
+                                                "crv": "secp256k1",
+                                                "kty": "EC",
+                                                "x": "0CZIbkz6Z1f4r0rB1vRe1bhh6_cZM5hjvcOnsLo3k5w",
+                                                "y": "t67sxzXan_wQE--9dQB83kdA3Q-BGOH35_KkHkm2LlQ"
+                                            },
+                                            "type": "JsonWebKey2020"
+                                        }
+                                    ],
+                                    "authentication": [
+                                        "did:ebsi:zfkNjYrzvx3bQn2SRyDZDMC#_1EonbYXjUuhLeCBZAqfdwGpHlfsKXSC63FCt4SBZGU"
+                                    ],
+                                    "capabilityInvocation": [
+                                        "did:ebsi:zfkNjYrzvx3bQn2SRyDZDMC#_1EonbYXjUuhLeCBZAqfdwGpHlfsKXSC63FCt4SBZGU"
+                                    ]
+                                }
+                                """
+                ),
+                expectedDocValidAssertionList = listOf(
+                    Pair(
+                        Json.decodeFromString<JsonObject>(
+                            """
+                                        {
+                                            "kty": "EC",
+                                            "crv": "secp256k1",
+                                            "x": "0CZIbkz6Z1f4r0rB1vRe1bhh6_cZM5hjvcOnsLo3k5w",
+                                            "y": "t67sxzXan_wQE--9dQB83kdA3Q-BGOH35_KkHkm2LlQ"
+                                        }
+                                    """
+                        ),
+                        secp256DidAssertions
+                    )
+                ),
+                expectedKeyValidAssertion = Pair(
+                    Json.decodeFromString<JsonObject>(
+                        """
+                                        {
+                                            "kty": "EC",
+                                            "crv": "secp256k1",
+                                            "x": "0CZIbkz6Z1f4r0rB1vRe1bhh6_cZM5hjvcOnsLo3k5w",
+                                            "y": "t67sxzXan_wQE--9dQB83kdA3Q-BGOH35_KkHkm2LlQ"
+                                        }
+                                    """
+                    ),
+                    secp256KeyAssertions
+                )
+            ),
+            TestEntry(
+                did = "did:ebsi:zbgTSaAUD6YY1jLXAuU8rsV",
+                expectedDidDoc = Json.decodeFromString<JsonObject>(
+                    """
+                                {
+                                    "@context": [
+                                        "https://www.w3.org/ns/did/v1",
+                                        "https://w3id.org/security/suites/jws-2020/v1"
+                                    ],
+                                    "controller": [
+                                        "did:ebsi:zbgTSaAUD6YY1jLXAuU8rsV"
+                                    ],
+                                    "id": "did:ebsi:zbgTSaAUD6YY1jLXAuU8rsV",
+                                    "verificationMethod": [
+                                        {
+                                            "controller": "did:ebsi:zbgTSaAUD6YY1jLXAuU8rsV",
+                                            "id": "did:ebsi:zbgTSaAUD6YY1jLXAuU8rsV#rctPc88bcxyb0_dAQwn3GNPhKOdPyoVugqglMu-g2cw",
+                                            "publicKeyJwk": {
+                                                "crv": "secp256k1",
+                                                "kty": "EC",
+                                                "x": "cReVHVGbQAe-HwY7lmCWAge4nXMKU2uPMv8GH6kYqks",
+                                                "y": "OMsUq84wMOlV5T_bHZTJ59spiPwWFdtj9BRAq7umNb8"
+                                            },
+                                            "type": "JsonWebKey2020"
+                                        }
+                                    ],
+                                    "authentication": [
+                                        "did:ebsi:zbgTSaAUD6YY1jLXAuU8rsV#rctPc88bcxyb0_dAQwn3GNPhKOdPyoVugqglMu-g2cw"
+                                    ],
+                                    "capabilityInvocation": [
+                                        "did:ebsi:zbgTSaAUD6YY1jLXAuU8rsV#rctPc88bcxyb0_dAQwn3GNPhKOdPyoVugqglMu-g2cw"
+                                    ]
+                                }
+                            """
+                ),
+                expectedDocValidAssertionList = listOf(
+                    Pair(
+                        Json.decodeFromString<JsonObject>(
+                            """
+                                        {
+                                            "kty": "EC",
+                                            "crv": "secp256k1",
+                                            "x": "cReVHVGbQAe-HwY7lmCWAge4nXMKU2uPMv8GH6kYqks",
+                                            "y": "OMsUq84wMOlV5T_bHZTJ59spiPwWFdtj9BRAq7umNb8"
+                                        }
+                                    """
+                        ),
+                        secp256DidAssertions
+                    )
+                ),
+                expectedKeyValidAssertion = Pair(
+                    Json.decodeFromString<JsonObject>(
+                        """
+                                    {
+                                        "kty": "EC",
+                                        "crv": "secp256k1",
+                                        "x": "cReVHVGbQAe-HwY7lmCWAge4nXMKU2uPMv8GH6kYqks",
+                                        "y": "OMsUq84wMOlV5T_bHZTJ59spiPwWFdtj9BRAq7umNb8"
+                                    }
+                                """
+                    ),
+                    secp256KeyAssertions
+                )
+            ),
+            TestEntry(
+                did = "did:ebsi:zxJUDi1QZP2pCEScZn8Rbpe",
+                expectedDidDoc = Json.decodeFromString<JsonObject>(
+                    """
+                                {
+                                    "@context": [
+                                        "https://www.w3.org/ns/did/v1",
+                                        "https://w3id.org/security/suites/jws-2020/v1"
+                                    ],
+                                    "controller": [
+                                        "did:ebsi:zxJUDi1QZP2pCEScZn8Rbpe"
+                                    ],
+                                    "id": "did:ebsi:zxJUDi1QZP2pCEScZn8Rbpe",
+                                    "verificationMethod": [
+                                        {
+                                            "controller": "did:ebsi:zxJUDi1QZP2pCEScZn8Rbpe",
+                                            "id": "did:ebsi:zxJUDi1QZP2pCEScZn8Rbpe#Px_5vvTQ0jDqYn_uGcBQ3sigq6tCSjaFJTRSFSKRikI",
+                                            "publicKeyJwk": {
+                                                "crv": "secp256k1",
+                                                "kty": "EC",
+                                                "x": "feQMOw29vsMKNaFRf_ZsAHe8-k2o_wqL_38m_h0FqVQ",
+                                                "y": "hLc735ZPGKc_WlgqT8r7iAbk-8dekL5pU6fHuhZjFOA"
+                                            },
+                                            "type": "JsonWebKey2020"
+                                        }
+                                    ],
+                                    "authentication": [
+                                        "did:ebsi:zxJUDi1QZP2pCEScZn8Rbpe#Px_5vvTQ0jDqYn_uGcBQ3sigq6tCSjaFJTRSFSKRikI"
+                                    ],
+                                    "capabilityInvocation": [
+                                        "did:ebsi:zxJUDi1QZP2pCEScZn8Rbpe#Px_5vvTQ0jDqYn_uGcBQ3sigq6tCSjaFJTRSFSKRikI"
+                                    ]
+                                }
+                            """
+                ),
+                expectedDocValidAssertionList = listOf(
+                    Pair(
+                        Json.decodeFromString<JsonObject>(
+                            """
+                                        {
+                                            "kty": "EC",
+                                            "crv": "secp256k1",
+                                            "x": "feQMOw29vsMKNaFRf_ZsAHe8-k2o_wqL_38m_h0FqVQ",
+                                            "y": "hLc735ZPGKc_WlgqT8r7iAbk-8dekL5pU6fHuhZjFOA"
+                                        }
+                                     """
+                        ),
+                        secp256DidAssertions
+                    )
+                ),
+                expectedKeyValidAssertion = Pair(
+                    Json.decodeFromString<JsonObject>(
+                        """
+                                    {
+                                        "kty": "EC",
+                                        "crv": "secp256k1",
+                                        "x": "feQMOw29vsMKNaFRf_ZsAHe8-k2o_wqL_38m_h0FqVQ",
+                                        "y": "hLc735ZPGKc_WlgqT8r7iAbk-8dekL5pU6fHuhZjFOA"
+                                    }
+                                 """
+                    ),
+                    secp256KeyAssertions
+                )
+            ),
+            TestEntry(
+                did= "did:ebsi:zreDnmXLU5HoQc7HWjkmNkw",
+                expectedDidDoc = Json.decodeFromString<JsonObject>(
+                    """
+                                {
+                                    "@context": [
+                                        "https://www.w3.org/ns/did/v1",
+                                        "https://w3id.org/security/suites/jws-2020/v1"
+                                    ],
+                                    "controller": [
+                                        "did:ebsi:zreDnmXLU5HoQc7HWjkmNkw"
+                                    ],
+                                    "id": "did:ebsi:zreDnmXLU5HoQc7HWjkmNkw",
+                                    "verificationMethod": [
+                                        {
+                                            "controller": "did:ebsi:zreDnmXLU5HoQc7HWjkmNkw",
+                                            "id": "did:ebsi:zreDnmXLU5HoQc7HWjkmNkw#_uHNt0NoqJPtLKWhsLCN4ySHGH2V2VDcdJZmwgTmvJY",
+                                            "publicKeyJwk": {
+                                                "crv": "secp256k1",
+                                                "kty": "EC",
+                                                "x": "Itfz9Io7G0CglQFQnupi4CyFnF0rPfRtGLhUJkIrMkY",
+                                                "y": "c7dEXQtdgvcxSv_O6sqWplznkNE5C4SjCyiVrlaA_xM"
+                                            },
+                                            "type": "JsonWebKey2020"
+                                        }
+                                    ],
+                                    "authentication": [
+                                        "did:ebsi:zreDnmXLU5HoQc7HWjkmNkw#_uHNt0NoqJPtLKWhsLCN4ySHGH2V2VDcdJZmwgTmvJY"
+                                    ],
+                                    "capabilityInvocation": [
+                                        "did:ebsi:zreDnmXLU5HoQc7HWjkmNkw#_uHNt0NoqJPtLKWhsLCN4ySHGH2V2VDcdJZmwgTmvJY"
+                                    ]
+                                }
+                            """
+                ),
+                expectedDocValidAssertionList = listOf(
+                    Pair(
+                        Json.decodeFromString<JsonObject>(
+                            """
+                                        {
+                                            "kty": "EC",
+                                            "crv": "secp256k1",
+                                            "x": "Itfz9Io7G0CglQFQnupi4CyFnF0rPfRtGLhUJkIrMkY",
+                                            "y": "c7dEXQtdgvcxSv_O6sqWplznkNE5C4SjCyiVrlaA_xM"
+                                        }
+                                      """
+                        ),
+                        secp256DidAssertions
+                    )
+                ),
+                expectedKeyValidAssertion = Pair(
+                    Json.decodeFromString<JsonObject>(
+                        """
+                                    {
+                                        "kty": "EC",
+                                        "crv": "secp256k1",
+                                        "x": "Itfz9Io7G0CglQFQnupi4CyFnF0rPfRtGLhUJkIrMkY",
+                                        "y": "c7dEXQtdgvcxSv_O6sqWplznkNE5C4SjCyiVrlaA_xM"
+                                    }
+                                 """
+                    ),
+                    secp256KeyAssertions
+                )
+            ),
+            TestEntry(
+                did =  "did:ebsi:zjysjDAy9ejkpZ2HdkwNw4k",
+                expectedDidDoc = Json.decodeFromString<JsonObject>(
+                    """
+                                {
+                                    "@context": [
+                                        "https://www.w3.org/ns/did/v1",
+                                        "https://w3id.org/security/suites/jws-2020/v1"
+                                    ],
+                                    "controller": [
+                                        "did:ebsi:zjysjDAy9ejkpZ2HdkwNw4k"
+                                    ],
+                                    "id": "did:ebsi:zjysjDAy9ejkpZ2HdkwNw4k",
+                                    "verificationMethod": [
+                                        {
+                                            "controller": "did:ebsi:zjysjDAy9ejkpZ2HdkwNw4k",
+                                            "id": "did:ebsi:zjysjDAy9ejkpZ2HdkwNw4k#Mh3r9LWuVCYDiJ20VEH6aVwaEv1uSi5NXVCJ6IbhfEE",
+                                            "publicKeyJwk": {
+                                                "crv": "secp256k1",
+                                                "kty": "EC",
+                                                "x": "BSj1V7lwxljxkj91hvLrGYj5_GY116tt3zbG8u1vhac",
+                                                "y": "ZcFLzFzjRFbJz6sUniBfzWjx0k4vL012xIPISYCZGJA"
+                                            },
+                                            "type": "JsonWebKey2020"
+                                        }
+                                    ],
+                                    "authentication": [
+                                        "did:ebsi:zjysjDAy9ejkpZ2HdkwNw4k#Mh3r9LWuVCYDiJ20VEH6aVwaEv1uSi5NXVCJ6IbhfEE"
+                                    ],
+                                    "capabilityInvocation": [
+                                        "did:ebsi:zjysjDAy9ejkpZ2HdkwNw4k#Mh3r9LWuVCYDiJ20VEH6aVwaEv1uSi5NXVCJ6IbhfEE"
+                                    ]
+                                }
+                               """
+                ),
+                expectedDocValidAssertionList = listOf(
+                    Pair(
+                        Json.decodeFromString<JsonObject>(
+                            """
+                                        {
+                                            "kty": "EC",
+                                            "crv": "secp256k1",
+                                            "x": "BSj1V7lwxljxkj91hvLrGYj5_GY116tt3zbG8u1vhac",
+                                            "y": "ZcFLzFzjRFbJz6sUniBfzWjx0k4vL012xIPISYCZGJA"
+                                        }
+                                     """
+                        ),
+                        secp256DidAssertions
+                    )
+                ),
+                expectedKeyValidAssertion = Pair(
+                    Json.decodeFromString<JsonObject>(
+                        """
+                                    {
+                                        "kty": "EC",
+                                        "crv": "secp256k1",
+                                        "x": "BSj1V7lwxljxkj91hvLrGYj5_GY116tt3zbG8u1vhac",
+                                        "y": "ZcFLzFzjRFbJz6sUniBfzWjx0k4vL012xIPISYCZGJA"
+                                    }
+                                """
+                    ),
+                    secp256KeyAssertions
+                )
+            )
+        )
+
+        private val conformanceEnvDidList: List<TestEntry> = listOf(
             TestEntry(
                 "did:ebsi:z21Bs13TqhZV7RY727hX22XF",
                 Json.decodeFromString<JsonObject>(

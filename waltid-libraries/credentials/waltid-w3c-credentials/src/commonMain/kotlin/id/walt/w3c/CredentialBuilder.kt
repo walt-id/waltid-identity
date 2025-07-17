@@ -1,5 +1,6 @@
 package id.walt.w3c
 
+import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.w3c.CredentialBuilderType.W3CV11CredentialBuilder
 import id.walt.w3c.CredentialBuilderType.W3CV2CredentialBuilder
 import id.walt.w3c.vc.vcs.W3CBaseDataModels
@@ -16,7 +17,6 @@ import kotlin.js.JsExport
 import kotlin.js.JsName
 import kotlin.time.Duration
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -51,9 +51,9 @@ class CredentialBuilder(
         context = context.toMutableList().apply { add(addContext) }
     }
 
-    var credentialId: String? = "urn:uuid:${Uuid.random()}"
+    var credentialId: String? = "urn:uuid:${randomUUID()}"
     fun randomCredentialSubjectUUID() {
-        credentialId = "urn:uuid:${Uuid.random()}"
+        credentialId = "urn:uuid:${randomUUID()}"
     }
 
     var issuerDid: String? = null
