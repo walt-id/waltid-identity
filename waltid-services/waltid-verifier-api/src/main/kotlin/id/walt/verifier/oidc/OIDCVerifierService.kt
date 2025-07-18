@@ -7,10 +7,6 @@ import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.UuidUtils.randomUUIDString
-import id.walt.did.dids.DidService
-import id.walt.did.dids.DidUtils
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.EncodedCBORElement
@@ -37,8 +33,6 @@ import id.walt.policies.policies.vp.HolderBindingPolicy
 import id.walt.policies.policies.vp.MaximumCredentialsPolicy
 import id.walt.policies.policies.vp.MinimumCredentialsPolicy
 import id.walt.policies.policies.vp.PresentationDefinitionPolicy
-import id.walt.sdjwt.SDJwtVC
-import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.plugins.*
@@ -262,60 +256,6 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
                 )
             )
         )
-    }
-
-    private suspend fun resolveIssuerKeyFromSdJwt(sdJwt: SDJwtVC): Key {
-        val kid = sdJwt.keyID ?: randomUUIDString()
-        return if (!sdJwt.issuer.isNullOrEmpty() && DidUtils.isDidUrl(sdJwt.issuer!!)) {
-            DidService.resolveToKey(sdJwt.issuer!!).getOrThrow()
-        } else {
-            sdJwt.header["x5c"]?.jsonArray?.last()?.let {
-                return JWKKey.importPEM(it.jsonPrimitive.content).getOrThrow().let { JWKKey(it.jwk, kid) }
-            }
-                ?: throw UnsupportedOperationException("Resolving issuer key from SD-JWT is only supported for issuer did in kid header and PEM cert in x5c header parameter")
-        }
-    }
-
-    private suspend fun resolveIssuerKeysFromSdJwt(sdJwt: SDJwtVC): Set<Key> {
-        val kid = sdJwt.keyID ?: randomUUIDString()
-
-        return if (!sdJwt.issuer.isNullOrEmpty() && DidUtils.isDidUrl(sdJwt.issuer!!)) {
-            DidService.resolveToKeys(sdJwt.issuer!!).getOrThrow()
-        } else {
-            sdJwt.header["x5c"]?.jsonArray?.last()?.let {
-                val key = JWKKey.importPEM(it.jsonPrimitive.content).getOrThrow().let { JWKKey(it.jwk, kid) }
-                setOf(key)
-            }
-                ?: throw UnsupportedOperationException("Resolving issuer key from SD-JWT is only supported for issuer did in kid header and PEM cert in x5c header parameter")
-        }
-    }
-
-    private suspend fun verifySdJwtVC(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
-        val sdJwtVC = SDJwtVC.parse(tokenResponse.vpToken!!.jsonPrimitive.content)
-        require(sdJwtVC.isPresentation && sdJwtVC.keyBindingJwt != null) { "SD-JWT is not a presentation and/or doesn't contain a holder key binding JWT" }
-        val holderKey = JWKKey.importJWK(sdJwtVC.holderKeyJWK.toString()).getOrThrow()
-
-        // Get all possible issuer keys
-        val issuerKeys = resolveIssuerKeysFromSdJwt(sdJwtVC)
-
-        val issuerKey =
-            issuerKeys.firstOrNull() ?: throw IllegalStateException("No issuer keys found in the DID document")
-
-        // Create a map of all possible issuer keys by their key IDs
-        val keyMap = issuerKeys.associateBy { it.getKeyId() }.toMutableMap()
-
-        // Add the default key ID mapping
-        keyMap[sdJwtVC.keyID ?: issuerKey.getKeyId()] = issuerKey
-        // Add the holder key
-        keyMap[holderKey.getKeyId()] = holderKey
-
-        val verificationResult = sdJwtVC.verifyVC(
-            jwtCryptoProvider = WaltIdJWTCryptoProvider(keyMap),
-            requiresHolderKeyBinding = true,
-            audience = session.authorizationRequest!!.clientId,
-            nonce = session.authorizationRequest!!.nonce!!
-        )
-        return verificationResult.verified
     }
 
     override fun initializeAuthorization(
