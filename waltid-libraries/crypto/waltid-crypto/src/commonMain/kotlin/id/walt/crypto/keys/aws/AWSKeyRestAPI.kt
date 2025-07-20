@@ -120,11 +120,16 @@ class AWSKeyRestAPI(
     @JsExport.Ignore
     @OptIn(ExperimentalStdlibApi::class)
     override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+        if (!awsSigningAlgorithm.endsWith("_SHA_256")){
+            throw SigningException("failed to sign - unsupported hashing algorithm: $awsSigningAlgorithm")
+        }
+        val digestedMessage = AWSKeyRestAPI.sha256(plaintext)
+
         val body = """
 {
 "KeyId":"$id",
-"Message":"${plaintext.encodeToBase64Url()}",
-"MessageType":"RAW",
+"Message":"${digestedMessage.encodeBase64()}",
+"MessageType":"DIGEST",
 "SigningAlgorithm":"$awsSigningAlgorithm"
 }
 """.trimIndent().trimMargin()
@@ -188,11 +193,16 @@ class AWSKeyRestAPI(
         signed: ByteArray,
         detachedPlaintext: ByteArray?
     ): Result<ByteArray> {
+        val messageToVerify = detachedPlaintext ?: return Result.failure(IllegalArgumentException("Detached plaintext is required for verification"))
+
+        // Calculate SHA-256 hash to handle payloads larger than 4KB
+        val digestedMessage = AWSKeyRestAPI.sha256(messageToVerify)
+
         val body = """
 {
 "KeyId":"$id",
-"Message":"${detachedPlaintext?.encodeBase64()}",
-"MessageType":"RAW",
+"Message":"${digestedMessage.encodeBase64()}",
+"MessageType":"DIGEST",
 "Signature":"${signed.encodeBase64()}",
 "SigningAlgorithm":"$awsSigningAlgorithm"
 }
@@ -349,6 +359,9 @@ class AWSKeyRestAPI(
         // Utility to perform HMAC-SHA256
         fun hmacSHA256(key: ByteArray, data: String): ByteArray =
             HmacSHA256(key).doFinal(data.toByteArray(Charsets.UTF_8))
+
+        // Utility to perform SHA-256 digest on binary data
+        fun sha256(data: ByteArray): ByteArray = SHA256().digest(data)
 
         // Generate Signature Key
         fun getSignatureKey(config: AWSKeyMetadata, dateStamp: String): ByteArray {

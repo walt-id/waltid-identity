@@ -14,6 +14,8 @@ import io.github.smiley4.ktoropenapi.route
 import io.github.smiley4.ktorredoc.redoc
 import io.github.smiley4.ktorswaggerui.swaggerUI
 import io.github.smiley4.schemakenerator.core.data.*
+import io.github.smiley4.schemakenerator.reflection.analyzer.MinimalTypeData
+import io.github.smiley4.schemakenerator.reflection.analyzer.ReflectionTypeAnalyzerModule
 import io.github.smiley4.schemakenerator.serialization.analyzer.SerializationTypeAnalyzerModule
 import io.github.smiley4.schemakenerator.serialization.data.InitialSerialDescriptorTypeData
 import io.github.smiley4.schemakenerator.swagger.generator.SwaggerSchemaGenerationModule
@@ -51,6 +53,7 @@ object OpenApiModule {
                     customAnalyzer(ContextualSerializationTypeAnalyzerModule)
                     customAnalyzer(FixSealedClassInheritanceModule)
                     customGenerator(FixSealedClassInheritanceModule)
+                    customGenerator(FixJsonCustomParameters)
                     overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
                     overwrite(SchemaGenerator.TypeOverwrites.File())
                     overwrite(SchemaGenerator.TypeOverwrites.Instant())
@@ -59,9 +62,11 @@ object OpenApiModule {
                     overwrite(CustomTypeOverrides.JsonObject())
                     overwrite(CustomTypeOverrides.JsonElement())
                     overwrite(CustomTypeOverrides.SdMap())
+                    overwrite(CustomTypeOverrides.QuickFixPolymorphic())
                 }
                 val reflectionGenerator = SchemaGenerator.reflection {
                     explicitNullTypes = false
+                    customGenerator(FixJsonCustomParameters)
                     overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
                     overwrite(SchemaGenerator.TypeOverwrites.File())
                     overwrite(SchemaGenerator.TypeOverwrites.Instant())
@@ -192,12 +197,12 @@ private object FixSealedClassInheritanceModule : SwaggerSchemaGenerationModule, 
 
     override fun applies(typeData: TypeData): Boolean {
         if (childElementNames.contains(typeData.identifyingName.full)) {
-            return typeData.annotations.firstOrNull { a -> a.name.equals(gerneratorMarker) } == null
+            return !typeData.annotations.any { a -> a.name.equals(gerneratorMarker) }
         }
         if (typeData.subtypes.isNotEmpty()
             && typeData.identifyingName.full.startsWith("id.walt.")
         ) {
-            return typeData.annotations.firstOrNull { a -> a.name.equals(gerneratorMarker) } == null
+            return !typeData.annotations.any { a -> a.name.equals(gerneratorMarker) }
         }
         return false
     }
@@ -249,6 +254,32 @@ private object FixSealedClassInheritanceModule : SwaggerSchemaGenerationModule, 
 
     override fun analyze(context: SerializationTypeAnalyzerModule.Context): WrappedTypeData {
         TODO("Should never be reached")
+    }
+}
+
+/*
+ * JsonCustomProperties are properties which can be added to the object, but are not
+ * part of the specification. All subclasses of id.walt.oid4vc.data.JsonDataObject
+ * might have additional properties.
+ *
+ * When the spec is generated the standard way, a property with the name
+ * "customParameters" is added. To fix this, this generator module
+ * removes the "customParameters" from the spec and sets the additional
+ * properties
+ */
+private object FixJsonCustomParameters : SwaggerSchemaGenerationModule {
+
+    override fun applies(typeData: TypeData): Boolean {
+        return typeData.members.any { it.name.equals("customParameters") }
+    }
+
+    override fun generate(context: SwaggerSchemaGenerationModule.Context): Schema<*> {
+        val typeData = context.typeData
+        typeData.members.removeIf { it.name.equals("customParameters") }
+        val generated = context.generate(typeData)
+        generated.additionalProperties = Schema<Any>()
+        generated.required?.removeIf { it.equals("customParameters") }
+        return generated
     }
 }
 
@@ -351,4 +382,34 @@ object CustomTypeOverrides {
         },
     )
 
+    // TODO: real implementation which analyzes inheritance and generates schema
+    class QuickFixPolymorphic : SchemaOverwriteModule(
+        identifier = kotlinx.serialization.Polymorphic::class.qualifiedName!!,
+        schema = {
+            Schema<Any>().also {
+                it.types = setOf("object")
+            }
+        },
+    ) {
+        override fun applies(descriptor: SerialDescriptor): Boolean {
+            return descriptor.serialName.startsWith("kotlinx.serialization.Polymorphic")
+        }
+
+        override fun analyze(context: SerializationTypeAnalyzerModule.Context): WrappedTypeData {
+            val original = super.analyze(context)
+            return original.copy(
+                typeData = original.typeData.copy(
+                    identifyingName = TypeName("kotlinx.serialization.Polymorphic", "Polymorphic"),
+                    descriptiveName = TypeName("kotlinx.serialization.Polymorphic", short = "Polymorphic"),
+                ),
+            )
+        }
+
+        override fun analyze(
+            context: ReflectionTypeAnalyzerModule.Context,
+            minimalTypeData: MinimalTypeData
+        ): WrappedTypeData {
+            TODO("Seems not to be needed")
+        }
+    }
 }

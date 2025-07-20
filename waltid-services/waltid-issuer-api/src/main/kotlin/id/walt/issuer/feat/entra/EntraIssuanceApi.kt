@@ -81,9 +81,7 @@ fun Application.entraIssuance() {
             tags = listOf("entra")
         }) {
             post("issue", {
-                request {
-                    body<EntraIssuanceRequest>()
-                }
+                request { body<EntraIssuanceRequest> { required = true } }
             }) {
                 val req = call.receive<EntraIssuanceRequest>()
 

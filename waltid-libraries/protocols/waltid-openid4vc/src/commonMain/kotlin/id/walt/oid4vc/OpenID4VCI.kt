@@ -528,7 +528,7 @@ object OpenID4VCI {
                 customParameters = customParameters!!
             )
 
-            OpenID4VCIVersion.DRAFT11 -> OpenIDProviderMetadata.Draft11(
+            OpenID4VCIVersion.DRAFT11 -> OpenIDProviderMetadata.Draft11.create(
                 issuer = baseUrl,
                 authorizationServer = baseUrl,
                 authorizationEndpoint = "$baseUrl/authorize",

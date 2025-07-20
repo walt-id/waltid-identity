@@ -12,6 +12,7 @@ class KeycloakRegisterController : RegisterControllerBase(keycloakAuthPath, keyc
         description = "Creates a user in the configured Keycloak instance."
         request {
             body<AccountRequest> {
+                required = true
                 example("username + email + password") {
                     value = KeycloakAccountRequest(
                         username = "Max_Mustermann",

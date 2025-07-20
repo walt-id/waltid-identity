@@ -15,8 +15,10 @@ import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import kotlin.uuid.ExperimentalUuidApi
 
-@Serializable
-data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private constructor(
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = ProofOfPossessionSerializer::class)
+data class ProofOfPossession private constructor(
     @EncodeDefault @SerialName("proof_type") val proofType: ProofType,
     val jwt: String? = null,
     val cwt: String? = null,
@@ -158,7 +160,7 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
     companion object : JsonDataObjectFactory<ProofOfPossession>() {
         const val JWT_HEADER_TYPE = "openid4vci-proof+jwt"
         const val CWT_HEADER_TYPE = "openid4vci-proof+cwt"
-        override fun fromJSON(jsonObject: JsonObject) =
+        override fun fromJSON(jsonObject: JsonObject): ProofOfPossession =
             Json.decodeFromJsonElement(ProofOfPossessionSerializer, jsonObject)
     }
 
@@ -167,7 +169,8 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
     val isJwtProofType get() = proofType == ProofType.jwt && !jwt.isNullOrEmpty()
 }
 
-object ProofOfPossessionSerializer : JsonDataObjectSerializer<ProofOfPossession>(ProofOfPossession.serializer())
+internal object ProofOfPossessionSerializer :
+    JsonDataObjectSerializer<ProofOfPossession>(ProofOfPossession.generatedSerializer())
 
 enum class ProofType {
     jwt, cwt, ldp_vp

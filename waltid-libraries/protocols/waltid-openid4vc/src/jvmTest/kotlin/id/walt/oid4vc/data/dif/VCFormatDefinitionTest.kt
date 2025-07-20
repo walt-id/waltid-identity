@@ -3,7 +3,9 @@ package id.walt.oid4vc.data.dif
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -41,8 +43,8 @@ class VCFormatDefinitionTest {
             proof_type = setOf("RS256", "RS384", "RS512"),
             customParameters = mapOf()
         ).toJSON()
-        assertNull(json["customParameters"])
         assertNotNull(json)
+        assertNull(json["customParameters"])
     }
 
     @Test
@@ -52,7 +54,8 @@ class VCFormatDefinitionTest {
             proof_type = setOf("RS256", "RS384", "RS512"),
             customParameters = mapOf("param1" to JsonPrimitive("value 1"))
         ).toJSON()
-        assertNull(json["customParameters"])
         assertNotNull(json)
+        assertNull(json["customParameters"])
+        assertEquals("value 1", json["param1"]!!.jsonPrimitive.content)
     }
 }

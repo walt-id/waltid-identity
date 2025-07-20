@@ -111,6 +111,7 @@ fun Application.onboardingApi() {
 
                 request {
                     body<OnboardingRequest> {
+                        required = true
                         description = "Issuer onboarding request (key & DID) config."
                         example(
                             "did:jwk + JWK key (Ed25519)",

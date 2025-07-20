@@ -58,7 +58,7 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
     ) {
         post("radius", {
-            request { body<UserPassCredentials>() }
+            request { body<UserPassCredentials> { required = true } }
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
         }) {
             val session = call.getAuthSession(authContext)
