@@ -15,6 +15,7 @@ plugins {
     id("io.ktor.plugin") version "3.1.2" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.2.0"
     id("com.github.jk1.dependency-license-report") version "2.9"
+    id("maven-publish")
     id("com.github.ben-manes.versions")
     application
 }
@@ -165,7 +166,36 @@ application {
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
 }
 
-/*licenseReport {
-    renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("xyzkit-licenses-report.html", "XYZ Kit"))
-    filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
-}*/
+// Define publication to allow publishing to local maven repo with the command:  ./gradlew publishToMavenLocal
+// This should not be published to https://maven.waltid.dev/ to save storage
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["kotlin"])
+            pom {
+                name.set("walt.id Issuer API REST service")
+                description.set(
+                    """
+                    Kotlin/Java REST service for issuing digital credentials
+                    """.trimIndent()
+                )
+                url.set("https://walt.id")
+
+                licenses {
+                    license {
+                        name.set("Apache License 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                    }
+                }
+
+                developers {
+                    developer {
+                        id.set("walt.id")
+                        name.set("walt.id")
+                        email.set("office@walt.id")
+                    }
+                }
+            }
+        }
+    }
+}
