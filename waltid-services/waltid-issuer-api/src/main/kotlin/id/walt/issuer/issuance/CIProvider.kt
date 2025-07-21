@@ -183,7 +183,6 @@ open class CIProvider(
         log.debug { "CREDENTIAL REQUEST JSON -------:" }
         log.debug { Json.encodeToString(credentialRequest) }
 
-
         if (session.issuanceRequests.firstOrNull()?.issuanceType != null && session.issuanceRequests.firstOrNull()!!.issuanceType == "DEFERRED") {
             return CredentialResult(
                 format = credentialRequest.format,
@@ -200,17 +199,19 @@ open class CIProvider(
         }
     }
 
-    private fun getDeferredCredential(credentialID: String, session: IssuanceSession): CredentialResult {
+    private fun getDeferredCredential(
+        credentialID: String,
+        session: IssuanceSession
+    ): CredentialResult {
         return deferredCredentialRequests[credentialID]?.let {
             when (it.format) {
                 CredentialFormat.mso_mdoc -> runBlocking { doGenerateMDoc(it, session) }
                 else -> doGenerateCredential(it, session)
             }
-        }
-            ?: throw DeferredCredentialError(
-                errorCode = CredentialErrorCode.invalid_request,
-                message = "Invalid credential ID given"
-            )
+        } ?: throw DeferredCredentialError(
+            errorCode = CredentialErrorCode.invalid_request,
+            message = "Invalid credential ID given"
+        )
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -223,11 +224,12 @@ open class CIProvider(
             errorCode = CredentialErrorCode.unsupported_credential_format
         )
 
-        val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) } ?: throw CredentialError(
-            credentialRequest = credentialRequest,
-            errorCode = CredentialErrorCode.invalid_or_missing_proof,
-            message = "Proof must be JWT proof"
-        )
+        val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }
+            ?: throw CredentialError(
+                credentialRequest = credentialRequest,
+                errorCode = CredentialErrorCode.invalid_or_missing_proof,
+                message = "Proof must be JWT proof"
+            )
 
         val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content
         val holderKey = proofHeader[JWTClaims.Header.jwk]?.jsonObject
@@ -239,66 +241,69 @@ open class CIProvider(
         )
 
         log.debug { "RETRIEVING ISSUANCE REQUEST FOR CREDENTIAL REQUEST" }
+
         val request = findMatchingIssuanceRequest(
             credentialRequest = credentialRequest,
             issuanceRequests = issuanceSession.issuanceRequests
         )
             ?: throw IllegalArgumentException("No matching issuance request found for this session: ${issuanceSession.id}!")
 
+        val credential = JsonPrimitive(runBlocking {
+            val vc = request.credentialData
+                ?: throw MissingFieldException(listOf("credentialData"), "credentialData")
+
+            val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
+
+            request.run {
+                when (credentialFormat) {
+                    CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(
+                        credentialRequest = credentialRequest,
+                        credentialData = vc,
+                        issuerId = issuerDid ?: baseUrl,
+                        issuerKey = resolvedIssuerKey,
+                        selectiveDisclosure = request.selectiveDisclosure,
+                        dataMapping = request.mapping,
+                        display = credentialRequest.display ?: vc["display"]?.jsonArray?.map {
+                            DisplayProperties.fromJSON(it.jsonObject)
+                        },
+                        x5Chain = request.x5Chain
+                    ).also {
+                        if (!issuanceSession.callbackUrl.isNullOrEmpty())
+                            sendCallback(
+                                sessionId = issuanceSession.id,
+                                type = "sdjwt_issue",
+                                data = buildJsonObject { put("sdjwt", it) },
+                                callbackUrl = issuanceSession.callbackUrl
+                            )
+                    }
+
+                    else -> OpenID4VCI.generateW3CJwtVC(
+                        credentialRequest = credentialRequest,
+                        credentialData = vc,
+                        issuerKey = resolvedIssuerKey,
+                        issuerId = issuerDid
+                            ?: throw BadRequestException("Issuer API currently supports only issuer DID for issuer ID property in W3C credentials. Issuer DID was not given in issuance request."),
+                        selectiveDisclosure = request.selectiveDisclosure,
+                        dataMapping = request.mapping,
+                        x5Chain = request.x5Chain,
+                        display = credentialRequest.display
+
+                    ).also {
+                        if (!issuanceSession.callbackUrl.isNullOrEmpty())
+                            sendCallback(
+                                sessionId = issuanceSession.id,
+                                type = "jwt_issue",
+                                data = buildJsonObject { put("jwt", it) },
+                                callbackUrl = issuanceSession.callbackUrl
+                            )
+                    }
+                }
+            }.also { log.debug { "Respond VC: $it" } }
+        })
+
         return CredentialResult(
             format = credentialRequest.format,
-            credential = JsonPrimitive(runBlocking {
-                val vc = request.credentialData
-                    ?: throw MissingFieldException(listOf("credentialData"), "credentialData")
-
-                val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
-
-                request.run {
-                    when (credentialFormat) {
-                        CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(
-                            credentialRequest = credentialRequest,
-                            credentialData = vc,
-                            issuerId = issuerDid ?: baseUrl,
-                            issuerKey = resolvedIssuerKey,
-                            selectiveDisclosure = request.selectiveDisclosure,
-                            dataMapping = request.mapping,
-                            display = credentialRequest.display ?: vc["display"]?.jsonArray?.map {
-                                DisplayProperties.fromJSON(it.jsonObject)
-                            },
-                            x5Chain = request.x5Chain
-                        ).also {
-                            if (!issuanceSession.callbackUrl.isNullOrEmpty())
-                                sendCallback(
-                                    sessionId = issuanceSession.id,
-                                    type = "sdjwt_issue",
-                                    data = buildJsonObject { put("sdjwt", it) },
-                                    callbackUrl = issuanceSession.callbackUrl
-                                )
-                        }
-
-                        else -> OpenID4VCI.generateW3CJwtVC(
-                            credentialRequest = credentialRequest,
-                            credentialData = vc,
-                            issuerKey = resolvedIssuerKey,
-                            issuerId = issuerDid
-                                ?: throw BadRequestException("Issuer API currently supports only issuer DID for issuer ID property in W3C credentials. Issuer DID was not given in issuance request."),
-                            selectiveDisclosure = request.selectiveDisclosure,
-                            dataMapping = request.mapping,
-                            x5Chain = request.x5Chain,
-                            display = credentialRequest.display
-
-                        ).also {
-                            if (!issuanceSession.callbackUrl.isNullOrEmpty())
-                                sendCallback(
-                                    sessionId = issuanceSession.id,
-                                    type = "jwt_issue",
-                                    data = buildJsonObject { put("jwt", it) },
-                                    callbackUrl = issuanceSession.callbackUrl
-                                )
-                        }
-                    }
-                }.also { log.debug { "Respond VC: $it" } }
-            })
+            credential = credential
         )
     }
 
@@ -348,7 +353,7 @@ open class CIProvider(
             message = "No nonce found on proof"
         )
 
-        log.debug {"RETRIEVING ISSUANCE REQUEST FOR CREDENTIAL REQUEST: $nonce"}
+        log.debug { "RETRIEVING ISSUANCE REQUEST FOR CREDENTIAL REQUEST: $nonce" }
 
         val request = findMatchingIssuanceRequest(
             credentialRequest = credentialRequest,
@@ -449,7 +454,12 @@ open class CIProvider(
         require(keyIdsDistinct.size < 2) { "More than one key id requested" }
 
         return BatchCredentialResponse.success(
-            batchCredentialRequest.credentialRequests.map { generateCredentialResponse(it, session) }
+            credentialResponses = batchCredentialRequest.credentialRequests.map {
+                generateCredentialResponse(
+                    credentialRequest = it,
+                    session = session
+                )
+            }
         )
     }
 
@@ -515,7 +525,8 @@ open class CIProvider(
                 when (credentialRequest.format) {
                     CredentialFormat.jwt_vc_json, CredentialFormat.jwt_vc -> {
                         val types = getTypesByCredentialConfigurationId(credentialConfigurationId)
-                        types?.containsAll(credentialRequest.credentialDefinition?.type ?: emptyList()) ?: false
+                        // same order, same elements
+                        (types == credentialRequest.credentialDefinition?.type) || (types == credentialRequest.types)
                     }
 
                     CredentialFormat.sd_jwt_vc -> {
@@ -578,8 +589,9 @@ open class CIProvider(
         return if (authorizationRequest.issuerState.isNullOrEmpty()) {
             if (!validateAuthorizationRequest(authorizationRequest)) {
                 throw AuthorizationError(
-                    authorizationRequest, AuthorizationErrorCode.invalid_request,
-                    "No valid authorization details for credential issuance found on authorization request"
+                    authorizationRequest = authorizationRequest,
+                    errorCode = AuthorizationErrorCode.invalid_request,
+                    message = "No valid authorization details for credential issuance found on authorization request"
                 )
             }
             IssuanceSession(
@@ -624,8 +636,10 @@ open class CIProvider(
     ): IssuanceSession = runBlocking {
         val sessionId = randomUUIDString()
 
-        val credentialOfferBuilder =
-            OidcIssuance.issuanceRequestsToCredentialOfferBuilder(issuanceRequests, standardVersion)
+        val credentialOfferBuilder = OidcIssuance.issuanceRequestsToCredentialOfferBuilder(
+            issuanceRequests = issuanceRequests,
+            standardVersion = standardVersion
+        )
 
         when (issuanceRequests[0].authenticationMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> {
@@ -680,7 +694,10 @@ open class CIProvider(
         }
     }
 
-    fun generateCredentialResponse(credentialRequest: CredentialRequest, session: IssuanceSession): CredentialResponse =
+    fun generateCredentialResponse(
+        credentialRequest: CredentialRequest,
+        session: IssuanceSession
+    ): CredentialResponse =
         runBlocking {
             // access_token should be validated on API level and issuance session extracted
             // Validate credential request (proof of possession, etc.)
@@ -704,9 +721,15 @@ open class CIProvider(
             )
 
             // create credential result
-            val credentialResult = generateCredential(credentialRequest, session)
+            val credentialResult = generateCredential(
+                credentialRequest = credentialRequest,
+                session = session
+            )
 
-            return@runBlocking createCredentialResponseFor(credentialResult, session)
+            return@runBlocking createCredentialResponseFor(
+                credentialResult = credentialResult,
+                session = session
+            )
         }
 
     fun generateDeferredCredentialResponse(acceptanceToken: String): CredentialResponse = runBlocking {
@@ -725,6 +748,7 @@ open class CIProvider(
                 errorCode = CredentialErrorCode.invalid_token,
                 errorUri = "Session not found for given access token, or session expired."
             )
+
         // issue credential for credential request
         return@runBlocking createCredentialResponseFor(
             credentialResult = getDeferredCredential(

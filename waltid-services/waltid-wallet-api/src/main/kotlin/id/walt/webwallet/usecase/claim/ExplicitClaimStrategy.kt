@@ -36,19 +36,19 @@ class ExplicitClaimStrategy(
                 pending = pending,
             ).also { credential ->
                 ClaimCommons.addReceiveCredentialToUseCaseLog(
-                    tenant,
-                    account,
-                    wallet,
-                    credential,
-                    credentialDataResult.type,
-                    eventUseCase,
+                    tenant = tenant,
+                    account = account,
+                    wallet = wallet,
+                    credential = credential,
+                    credentialType = credentialDataResult.type,
+                    eventUseCase = eventUseCase,
                 )
             }
         }.also {
             ClaimCommons.storeWalletCredentials(
-                wallet,
-                it,
-                credentialService,
+                wallet = wallet,
+                credentials = it,
+                credentialService = credentialService,
             )
         }
 }

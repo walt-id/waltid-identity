@@ -410,6 +410,12 @@ class WaltidServicesE2ETests {
         IssuerIsoMdlOnboardingServiceTests().runTests()
         //endregion -ISO mDL Onboarding Service (Issuer)-
 
+        val batchIssuance = BatchIssuance(
+            client = client,
+            wallet = wallet
+        )
+        batchIssuance.runTests()
+
     }
 
 //    @Test

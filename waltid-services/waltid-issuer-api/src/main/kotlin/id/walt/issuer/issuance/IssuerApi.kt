@@ -52,6 +52,7 @@ fun createCredentialOfferUri(
 
     overwrittenIssuanceRequests.first().standardVersion
         ?: throw IllegalArgumentException("Attribute [standardVersion] is null")
+
     val issuanceSession = OidcApi.initializeCredentialOffer(
         issuanceRequests = overwrittenIssuanceRequests,
         expiresIn = sessionTtl ?: expiresIn,
