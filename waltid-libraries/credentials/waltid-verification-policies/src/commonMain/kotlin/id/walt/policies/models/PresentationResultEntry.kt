@@ -11,8 +11,15 @@ data class PresentationResultEntry(val credential: String, val policyResults: Ar
 
 @Serializable
 data class PresentationResultEntrySurrogate(val credential: String, val policyResults: List<PolicyResultSurrogate>) {
-    constructor(original: PresentationResultEntry) : this(
-        credential = original.credential,
-        policyResults = original.policyResults.map { PolicyResultSurrogate(it) }
-    )
+
+    companion object {
+        fun buildOffPresentationResultEntry(original: PresentationResultEntry) =
+            runCatching {
+                PresentationResultEntrySurrogate(
+                    credential = original.credential,
+                    policyResults = original.policyResults.map {
+                        PolicyResultSurrogate(it)
+                    })
+            }.getOrElse { ex -> throw IllegalStateException("Could not build PresentationResultEntrySurrogate off PresentationResultEntry: $original", ex) }
+    }
 }

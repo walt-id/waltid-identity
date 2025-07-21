@@ -10,6 +10,7 @@ import id.walt.policies.JwtVerificationPolicy
 import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.SDJwtVC
 import id.walt.w3c.utils.VCFormat
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import love.forte.plugin.suspendtrans.annotation.JsPromise
@@ -45,7 +46,7 @@ class SdJwtVCSignaturePolicy() : JwtVerificationPolicy() {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun verify(credential: String, args: Any?, context: Map<String, Any>): Result<Any> {
+    override suspend fun verify(credential: String, args: Any?, context: Map<String, Any>): Result<JsonElement> {
         return runCatching {
             val sdJwtVC = SDJwtVC.parse(credential)
 
@@ -65,7 +66,7 @@ class SdJwtVCSignaturePolicy() : JwtVerificationPolicy() {
                             message = "Verification failed with all keys from the DID document",
                             cause = failures.lastOrNull()
                         )
-                    }) { it.verifyJws(credential) }
+                    }) { it.verifyJws(credential) }.getOrThrow()
 
             } else {
                 // For presentations, get all possible issuer keys
