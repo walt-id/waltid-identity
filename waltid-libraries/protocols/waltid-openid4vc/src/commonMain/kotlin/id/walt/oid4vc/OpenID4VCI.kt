@@ -255,6 +255,7 @@ object OpenID4VCI {
 
         return response.body<JsonObject>().let { TokenResponse.fromJSON(it) }
     }
+
     private suspend fun resolveOAuthServersTokenEndpoint(
         authServerUrl: List<String>,
     ): String {
@@ -321,7 +322,10 @@ object OpenID4VCI {
         return response.body<JsonObject>().let { BatchCredentialResponse.fromJSON(it) }
     }
 
-    fun validateTokenRequestRaw(tokenRequestRaw: Map<String, List<String>>, authorizationCode: String): TokenRequest {
+    fun validateTokenRequestRaw(
+        tokenRequestRaw: Map<String, List<String>>,
+        authorizationCode: String
+    ): TokenRequest {
         val tokenRequest = parseTokenRequest(tokenRequestRaw)
 
         validateAuthorizationCode(
@@ -342,7 +346,10 @@ object OpenID4VCI {
         return TokenRequest.fromHttpParameters(tokenRequestRaw)
     }
 
-    private fun validateAuthorizationCode(tokenRequest: TokenRequest, authorizationCode: String): Boolean {
+    private fun validateAuthorizationCode(
+        tokenRequest: TokenRequest,
+        authorizationCode: String
+    ): Boolean {
         val code = when (tokenRequest) {
             is TokenRequest.AuthorizationCode -> tokenRequest.code
             is TokenRequest.PreAuthorizedCode -> tokenRequest.preAuthorizedCode
@@ -351,7 +358,11 @@ object OpenID4VCI {
         return code == authorizationCode
     }
 
-    suspend fun signToken(privateKey: Key, payload: JsonObject, headers: Map<String, JsonElement>? = null): String {
+    suspend fun signToken(
+        privateKey: Key,
+        payload: JsonObject,
+        headers: Map<String, JsonElement>? = null
+    ): String {
         return privateKey.signJws(
             plaintext = payload.toString().toByteArray(),
             headers = headers ?: emptyMap()
