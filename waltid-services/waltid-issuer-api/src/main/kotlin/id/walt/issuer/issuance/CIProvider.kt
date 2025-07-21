@@ -526,7 +526,7 @@ open class CIProvider(
                     CredentialFormat.jwt_vc_json, CredentialFormat.jwt_vc -> {
                         val types = getTypesByCredentialConfigurationId(credentialConfigurationId)
                         // same order, same elements
-                        types == credentialRequest.credentialDefinition?.type
+                        (types == credentialRequest.credentialDefinition?.type) || (types == credentialRequest.types)
                     }
 
                     CredentialFormat.sd_jwt_vc -> {
