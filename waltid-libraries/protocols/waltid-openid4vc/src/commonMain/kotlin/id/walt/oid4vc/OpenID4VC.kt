@@ -81,7 +81,10 @@ object OpenID4VC {
         return if (isValid) payload else throw IllegalStateException("Invalid token")
     }
 
-    suspend fun verifyAndParseIdToken(token: String, tokenKey: Key? = null): JsonObject {
+    suspend fun verifyAndParseIdToken(
+        token: String,
+        tokenKey: Key? = null
+    ): JsonObject {
         // 1. Validate Header
         val header = parseTokenHeader(token)
         if (!header.keys.containsAll(
@@ -130,7 +133,11 @@ object OpenID4VC {
     }
 
 
-    suspend fun generateAuthorizationCodeFor(sessionId: String, issuer: String, tokenKey: Key): String {
+    suspend fun generateAuthorizationCodeFor(
+        sessionId: String,
+        issuer: String,
+        tokenKey: Key
+    ): String {
         return generateToken(
             sub = sessionId,
             issuer = issuer,
@@ -414,7 +421,10 @@ object OpenID4VC {
         return key.verifyJws(token).also { log.debug { "VERIFICATION IS: $it" } }.isSuccess
     }
 
-    fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean {
+    fun verifyCOSESign1Signature(
+        target: TokenTarget,
+        token: String
+    ): Boolean {
         // May not be required anymore (removed from https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#cwt-proof-type)
         log.debug { "Verifying JWS: $token" }
         log.debug { "JWS Verification: target: $target" }
