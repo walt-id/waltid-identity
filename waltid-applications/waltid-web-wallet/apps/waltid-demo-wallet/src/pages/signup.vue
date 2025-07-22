@@ -404,7 +404,7 @@
         <h1
           class="bg-gradient-to-r from-[#03449E] to-[#002159] inline-block text-transparent bg-clip-text mt-5 text-2xl"
         >
-          Trusted by +10.000 dev & organizations
+          Trusted by +20.000 dev & organizations
         </h1>
       </div>
     </div>
