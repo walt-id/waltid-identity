@@ -1,5 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
+import id.walt.commons.testing.E2ETest.test
 import id.walt.commons.testing.E2ETest.testHttpClient
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
@@ -8,20 +9,16 @@ import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.delete
-import io.ktor.client.request.get
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.collections.forEach
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-class MDocPreparedWallet {
+class MDocPreparedWallet private constructor() {
 
     private val email = "${Uuid.random()}@walt.id"
 
@@ -105,5 +102,54 @@ class MDocPreparedWallet {
                 parameters.append("did", did)
             }
         }.expectSuccess()
+    }
+
+    companion object {
+
+        private val TEST_SUITE = "MDoc Prepared/Ready Wallet Setup"
+
+        suspend fun testWalletSetup() {
+            val wallet = MDocPreparedWallet()
+
+            test(
+                name = "${TEST_SUITE} - Create New Wallet"
+            ) {
+                wallet.createNewWallet()
+            }
+
+            test(
+                name = "${TEST_SUITE} - Clear All Keys"
+            ) {
+                wallet.clearAllKeys()
+            }
+
+            test(
+                name = "${TEST_SUITE} - Clear All Dids"
+            ) {
+                wallet.clearAllDids()
+            }
+
+            test(
+                name = "${TEST_SUITE} - Generate Secp256r1 Key"
+            ) {
+                wallet.generateSecp256r1Key()
+            }
+
+            test(
+                name = "${TEST_SUITE} - Generate did:jwk Backed By Sepc256r1 Key "
+            ) {
+                wallet.generateDidBackedBySecp256r1Key()
+            }
+        }
+
+        suspend fun createSetupWallet(): MDocPreparedWallet {
+            val wallet = MDocPreparedWallet()
+            wallet.createNewWallet()
+            wallet.clearAllKeys()
+            wallet.clearAllDids()
+            wallet.generateSecp256r1Key()
+            wallet.generateDidBackedBySecp256r1Key()
+            return wallet
+        }
     }
 }
