@@ -1,7 +1,7 @@
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
-    id("dev.petuska.npm.publish") version "3.5.2"
+    id("dev.petuska.npm.publish") version "3.5.3"
     `maven-publish`
     id("com.github.ben-manes.versions")
 }
