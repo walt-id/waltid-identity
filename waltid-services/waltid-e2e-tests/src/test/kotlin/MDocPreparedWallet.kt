@@ -112,31 +112,31 @@ class MDocPreparedWallet private constructor() {
             val wallet = MDocPreparedWallet()
 
             test(
-                name = "${TEST_SUITE} - Create New Wallet"
+                name = "$TEST_SUITE - Create New Wallet"
             ) {
                 wallet.createNewWallet()
             }
 
             test(
-                name = "${TEST_SUITE} - Clear All Keys"
+                name = "$TEST_SUITE - Clear All Keys"
             ) {
                 wallet.clearAllKeys()
             }
 
             test(
-                name = "${TEST_SUITE} - Clear All Dids"
+                name = "$TEST_SUITE - Clear All Dids"
             ) {
                 wallet.clearAllDids()
             }
 
             test(
-                name = "${TEST_SUITE} - Generate Secp256r1 Key"
+                name = "$TEST_SUITE - Generate Secp256r1 Key"
             ) {
                 wallet.generateSecp256r1Key()
             }
 
             test(
-                name = "${TEST_SUITE} - Generate did:jwk Backed By Sepc256r1 Key "
+                name = "$TEST_SUITE - Generate did:jwk Backed By Sepc256r1 Key "
             ) {
                 wallet.generateDidBackedBySecp256r1Key()
             }
