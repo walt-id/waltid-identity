@@ -410,6 +410,10 @@ class WaltidServicesE2ETests {
         IssuerIsoMdlOnboardingServiceTests().runTests()
         //endregion -ISO mDL Onboarding Service (Issuer)-
 
+        //region -MDoc Prepared/Ready Wallet Test Utility (Wallet)
+        MDocPreparedWallet.testWalletSetup()
+        //endregion -MDoc Prepared/Ready Wallet Test Utility (Wallet)
+
         //region -Presented Credentials Feature (Verifier)-
         VerifierPresentedCredentialsTests().runTests()
         //endregion -Presented Credentials Feature (Verifier)-
