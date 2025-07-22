@@ -28,9 +28,9 @@ class MDocPreparedWallet private constructor() {
 
     lateinit var walletId: String
 
-    private lateinit var keyId: String
+    lateinit var keyId: String
 
-    private lateinit var did: String
+    lateinit var did: String
 
     private suspend fun createNewWallet() {
         val tempClient = testHttpClient()
