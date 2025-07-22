@@ -106,7 +106,7 @@ class MDocPreparedWallet private constructor() {
 
     companion object {
 
-        private val TEST_SUITE = "MDoc Prepared/Ready Wallet Setup"
+        private const val TEST_SUITE = "MDoc Prepared/Ready Wallet Setup"
 
         suspend fun testWalletSetup() {
             val wallet = MDocPreparedWallet()
