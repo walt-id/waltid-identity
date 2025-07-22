@@ -167,17 +167,21 @@ object OpenID4VP {
      * @param authorizationRequest OpenID4VP presentation request
      * @param mdocNonce MDoc generated random nonce
      */
-    fun generateMDocOID4VPHandover(authorizationRequest: AuthorizationRequest, mdocNonce: String): ListElement {
+    fun generateMDocOID4VPHandover(
+        authorizationRequest: AuthorizationRequest,
+        mdocNonce: String
+    ): ListElement {
         val clientIdToHash = ListElement(listOf(StringElement(authorizationRequest.clientId), StringElement(mdocNonce)))
+
         val responseUriToHash = ListElement(
             listOf(
                 StringElement(
                     authorizationRequest.responseUri
                         ?: throw AuthorizationError(
-                        authorizationRequest = authorizationRequest,
-                        errorCode = AuthorizationErrorCode.invalid_request,
-                        message = "Authorization request has no response_uri, which is required for generating MDoc-OID4VPHandover"
-                    )
+                            authorizationRequest = authorizationRequest,
+                            errorCode = AuthorizationErrorCode.invalid_request,
+                            message = "Authorization request has no response_uri, which is required for generating MDoc-OID4VPHandover"
+                        )
                 ),
                 StringElement(mdocNonce)
             )
@@ -190,10 +194,10 @@ object OpenID4VP {
                 StringElement(
                     authorizationRequest.nonce
                         ?: throw AuthorizationError(
-                        authorizationRequest = authorizationRequest,
-                        errorCode = AuthorizationErrorCode.invalid_request,
-                        message = "Authorization request has no nonce, which is required for generating MDoc-OID4VPHandover"
-                    )
+                            authorizationRequest = authorizationRequest,
+                            errorCode = AuthorizationErrorCode.invalid_request,
+                            message = "Authorization request has no nonce, which is required for generating MDoc-OID4VPHandover"
+                        )
                 )
             )
         )

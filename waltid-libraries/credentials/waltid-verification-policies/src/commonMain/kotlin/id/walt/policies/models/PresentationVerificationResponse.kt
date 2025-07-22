@@ -14,7 +14,7 @@ data class PresentationVerificationResponseSurrogate(
     val policiesFailed: Int = results.sumOf { it.policyResults.count { !it.isSuccess } },
 ) {
     constructor(original: PresentationVerificationResponse) : this(
-        results = original.results.map { PresentationResultEntrySurrogate(it) },
+        results = original.results.map { PresentationResultEntrySurrogate.buildOffPresentationResultEntry(it) },
         time = original.time,
         policiesRun = original.policiesRun
     )
