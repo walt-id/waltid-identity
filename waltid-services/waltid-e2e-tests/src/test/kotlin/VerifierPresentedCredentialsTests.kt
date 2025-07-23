@@ -17,14 +17,8 @@ import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.verifier.oidc.models.presentedcredentials.*
 import id.walt.verifier.openapi.VerifierApiExamples
 import id.walt.w3c.utils.VCFormat
-import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.db.models.WalletDid
-import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
-import id.walt.webwallet.web.model.AccountRequest
-import id.walt.webwallet.web.model.EmailAccountRequest
-import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -42,17 +36,7 @@ class VerifierPresentedCredentialsTests {
 
     private val TEST_SUITE = "Verifier Presented Credentials Test Suite"
 
-    private val email = "${Uuid.random()}@walt.id"
-
-    private val password = Uuid.random().toString()
-
-    private lateinit var walletUuid: Uuid
-
-    private lateinit var keyId: String
-
-    private lateinit var did: String
-
-    private lateinit var walletClient: HttpClient
+    private lateinit var mDocWallet: MDocPreparedWallet
 
     private val client = testHttpClient()
 
@@ -400,7 +384,7 @@ class VerifierPresentedCredentialsTests {
 
     private lateinit var mDLWalletCredentialId: String
 
-    val uniDegreeOpenBadgePresentationRequest  = buildJsonObject {
+    val uniDegreeOpenBadgePresentationRequest = buildJsonObject {
         put("request_credentials", buildJsonArray {
             addJsonObject {
                 put("format", VCFormat.jwt_vc_json.toJsonElement())
@@ -414,11 +398,7 @@ class VerifierPresentedCredentialsTests {
     }
 
     private suspend fun setupTestSuite() {
-        createWallet()
-        deleteAllKeys()
-        deleteAllDids()
-        createSecp256r1Key()
-        createDefaultDid()
+        mDocWallet = MDocPreparedWallet.createSetupWallet()
         issueUniDegreeNoDisclosures()
         issueUniDegreeWithDisclosures()
         issueOpenBadgeNoDisclosures()
@@ -426,93 +406,6 @@ class VerifierPresentedCredentialsTests {
         issueMdl()
         issueOpenBadgeWithDisclosures()
     }
-
-    private suspend fun createWallet() =
-        test(
-            name = "${TEST_SUITE}: Setup step #1: Create a wallet"
-        ) {
-
-            client.post("/wallet-api/auth/register") {
-                setBody(
-                    EmailAccountRequest(
-                        email = email,
-                        password = password,
-                    ) as AccountRequest
-                )
-            }.expectSuccess()
-
-            client.post("/wallet-api/auth/login") {
-                setBody(
-                    EmailAccountRequest(
-                        email = email,
-                        password = password,
-                    ) as AccountRequest
-                )
-            }.expectSuccess().body<JsonObject>().let {
-                walletClient = testHttpClient(it["token"]!!.jsonPrimitive.content)
-            }
-
-            walletClient.get("/wallet-api/wallet/accounts/wallets")
-                .expectSuccess().body<AccountWalletListing>().let {
-                    walletUuid = it.wallets.first().id
-                }
-        }
-
-    private suspend fun deleteAllKeys() =
-        test(
-            name = "${TEST_SUITE}: Setup step #2: Delete default generated key (Ed25519 while we need sepc256r1)"
-        ) {
-            val walletKeys = walletClient.get("/wallet-api/wallet/${walletUuid}/keys")
-                .expectSuccess().body<List<SingleKeyResponse>>()
-
-            walletKeys.forEach { walletKey ->
-                walletClient.delete("/wallet-api/wallet/${walletUuid}/keys/${walletKey.keyId.id}")
-                    .expectSuccess()
-            }
-        }
-
-    private suspend fun deleteAllDids() =
-        test(
-            name = "${TEST_SUITE}: Setup step #3: Delete default generated did (backed by a non-appropriate key)"
-        ) {
-            val walletDids = walletClient.get("/wallet-api/wallet/${walletUuid}/dids")
-                .expectSuccess().body<List<WalletDid>>()
-
-            walletDids.forEach { walletDid ->
-                walletClient.delete("/wallet-api/wallet/${walletUuid}/dids/${walletDid.did}")
-                    .expectSuccess()
-            }
-        }
-
-    private suspend fun createSecp256r1Key() =
-        test(
-            name = "${TEST_SUITE}: Setup step #4: Create secp256r1 key"
-        ) {
-            keyId = walletClient.post("/wallet-api/wallet/${walletUuid}/keys/generate") {
-                setBody(
-                    KeyGenerationRequest(
-                        keyType = KeyType.secp256r1,
-                    )
-                )
-            }.expectSuccess().bodyAsText()
-        }
-
-    private suspend fun createDefaultDid() =
-        test(
-            name = "${TEST_SUITE}: Setup step #5: Create new did:jwk and mark it as default"
-        ) {
-            did = walletClient.post("/wallet-api/wallet/${walletUuid}/dids/create/jwk") {
-                url {
-                    parameters.append("keyId", keyId)
-                }
-            }.expectSuccess().bodyAsText()
-
-            walletClient.post("/wallet-api/wallet/${walletUuid}/dids/default") {
-                url {
-                    parameters.append("did", did)
-                }
-            }.expectSuccess()
-        }
 
     private suspend fun issueUniDegreeNoDisclosures() =
         test(
@@ -523,7 +416,7 @@ class VerifierPresentedCredentialsTests {
             }.expectSuccess().bodyAsText()
 
             universityDegreeNoDisclosuresWalletCredentialId =
-                walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/useOfferRequest") {
+                mDocWallet.walletClient.post("/wallet-api/wallet/${mDocWallet.walletId}/exchange/useOfferRequest") {
                     setBody(offerUrl)
                 }.expectSuccess().body<List<WalletCredential>>().first().id
         }
@@ -537,7 +430,7 @@ class VerifierPresentedCredentialsTests {
             }.expectSuccess().bodyAsText()
 
             universityDegreeWithDisclosuresWalletCredentialId =
-                walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/useOfferRequest") {
+                mDocWallet.walletClient.post("/wallet-api/wallet/${mDocWallet.walletId}/exchange/useOfferRequest") {
                     setBody(offerUrl)
                 }.expectSuccess().body<List<WalletCredential>>().first().let {
                     assertNotNull(it.disclosures)
@@ -556,7 +449,7 @@ class VerifierPresentedCredentialsTests {
             }.expectSuccess().bodyAsText()
 
             openBadgeNoDisclosuresWalletCredentialId =
-                walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/useOfferRequest") {
+                mDocWallet.walletClient.post("/wallet-api/wallet/${mDocWallet.walletId}/exchange/useOfferRequest") {
                     setBody(offerUrl)
                 }.expectSuccess().body<List<WalletCredential>>().first().id
         }
@@ -570,7 +463,7 @@ class VerifierPresentedCredentialsTests {
             }.expectSuccess().bodyAsText()
 
             sdJwtVcWalletCredentialId =
-                walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/useOfferRequest") {
+                mDocWallet.walletClient.post("/wallet-api/wallet/${mDocWallet.walletId}/exchange/useOfferRequest") {
                     setBody(offerUrl)
                 }.expectSuccess().body<List<WalletCredential>>().first().let {
                     assertNotNull(it.disclosures)
@@ -589,7 +482,7 @@ class VerifierPresentedCredentialsTests {
             }.expectSuccess().bodyAsText()
 
             mDLWalletCredentialId =
-                walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/useOfferRequest") {
+                mDocWallet.walletClient.post("/wallet-api/wallet/${mDocWallet.walletId}/exchange/useOfferRequest") {
                     setBody(offerUrl)
                 }.expectSuccess().body<List<WalletCredential>>().first().id
         }
@@ -603,7 +496,7 @@ class VerifierPresentedCredentialsTests {
             }.expectSuccess().bodyAsText()
 
             openBadgeWithDisclosuresWalletCredentialId =
-                walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/useOfferRequest") {
+                mDocWallet.walletClient.post("/wallet-api/wallet/${mDocWallet.walletId}/exchange/useOfferRequest") {
                     setBody(offerUrl)
                 }.expectSuccess().body<List<WalletCredential>>().first().let {
                     assertNotNull(it.disclosures)
@@ -626,7 +519,7 @@ class VerifierPresentedCredentialsTests {
             }.expectSuccess().bodyAsText()
 
 
-            walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/usePresentationRequest") {
+            mDocWallet.walletClient.post("/wallet-api/wallet/${mDocWallet.walletId}/exchange/usePresentationRequest") {
                 setBody(
                     UsePresentationRequest(
                         presentationRequest = presentationUrl,
@@ -665,7 +558,7 @@ class VerifierPresentedCredentialsTests {
             val holder = assertNotNull(jwtVcJsonPresentationSimpleView.holder)
 
             assertEquals(
-                expected = did,
+                expected = mDocWallet.did,
                 actual = holder.jsonPrimitive.content,
             )
 
@@ -731,7 +624,7 @@ class VerifierPresentedCredentialsTests {
             }.expectSuccess().bodyAsText()
 
 
-            walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/usePresentationRequest") {
+            mDocWallet.walletClient.post("/wallet-api/wallet/${mDocWallet.walletId}/exchange/usePresentationRequest") {
                 setBody(
                     UsePresentationRequest(
                         presentationRequest = presentationUrl,
@@ -770,7 +663,7 @@ class VerifierPresentedCredentialsTests {
             val holder = assertNotNull(jwtVcJsonPresentationSimpleView.holder)
 
             assertEquals(
-                expected = did,
+                expected = mDocWallet.did,
                 actual = holder.jsonPrimitive.content,
             )
 
@@ -836,7 +729,7 @@ class VerifierPresentedCredentialsTests {
             }.expectSuccess().bodyAsText()
 
 
-            walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/usePresentationRequest") {
+            mDocWallet.walletClient.post("/wallet-api/wallet/${mDocWallet.walletId}/exchange/usePresentationRequest") {
                 setBody(
                     UsePresentationRequest(
                         presentationRequest = presentationUrl,
@@ -954,7 +847,7 @@ class VerifierPresentedCredentialsTests {
             }.expectSuccess().bodyAsText()
 
 
-            walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/usePresentationRequest") {
+            mDocWallet.walletClient.post("/wallet-api/wallet/${mDocWallet.walletId}/exchange/usePresentationRequest") {
                 setBody(
                     UsePresentationRequest(
                         presentationRequest = presentationUrl,
@@ -1088,7 +981,7 @@ class VerifierPresentedCredentialsTests {
             }.expectSuccess().bodyAsText()
 
 
-            walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/usePresentationRequest") {
+            mDocWallet.walletClient.post("/wallet-api/wallet/${mDocWallet.walletId}/exchange/usePresentationRequest") {
                 setBody(
                     UsePresentationRequest(
                         presentationRequest = presentationUrl,
@@ -1130,7 +1023,7 @@ class VerifierPresentedCredentialsTests {
             val holder = assertNotNull(jwtVcJsonPresentationSimpleView.holder)
 
             assertEquals(
-                expected = did,
+                expected = mDocWallet.did,
                 actual = holder.jsonPrimitive.content,
             )
 
@@ -1213,7 +1106,7 @@ class VerifierPresentedCredentialsTests {
             }.expectSuccess().bodyAsText()
 
 
-            walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/usePresentationRequest") {
+            mDocWallet.walletClient.post("/wallet-api/wallet/${mDocWallet.walletId}/exchange/usePresentationRequest") {
                 setBody(
                     UsePresentationRequest(
                         presentationRequest = presentationUrl,
@@ -1255,7 +1148,7 @@ class VerifierPresentedCredentialsTests {
             val holder = assertNotNull(jwtVcJsonPresentationSimpleView.holder)
 
             assertEquals(
-                expected = did,
+                expected = mDocWallet.did,
                 actual = holder.jsonPrimitive.content,
             )
 
@@ -1428,7 +1321,7 @@ class VerifierPresentedCredentialsTests {
             }.expectSuccess().bodyAsText()
 
 
-            walletClient.post("/wallet-api/wallet/${walletUuid}/exchange/usePresentationRequest") {
+            mDocWallet.walletClient.post("/wallet-api/wallet/${mDocWallet.walletId}/exchange/usePresentationRequest") {
                 setBody(
                     UsePresentationRequest(
                         presentationRequest = presentationUrl,
@@ -1474,7 +1367,7 @@ class VerifierPresentedCredentialsTests {
             val holder = assertNotNull(jwtVcJsonPresentationSimpleView.holder)
 
             assertEquals(
-                expected = did,
+                expected = mDocWallet.did,
                 actual = holder.jsonPrimitive.content,
             )
 
@@ -1524,7 +1417,7 @@ class VerifierPresentedCredentialsTests {
             }
 
             assert(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 2)
-            
+
         }
 
     suspend fun runTests() {
