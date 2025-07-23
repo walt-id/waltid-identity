@@ -43,6 +43,9 @@ data:
         }
     }
   registration-defaults.conf: |
+    defaultKeyConfig: {
+      keyType: secp256r1
+    }
     defaultIssuerConfig: {
       did = "did:web:walt.id",
       description = "walt.id issuer portal",
