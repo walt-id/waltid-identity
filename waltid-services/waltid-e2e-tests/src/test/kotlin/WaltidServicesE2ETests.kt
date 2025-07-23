@@ -607,25 +607,6 @@ class WaltidServicesE2ETests {
         inputDescTest.e2e(wallet, did)
     }
 
-    //@Test
-    fun issuerCredentialsListTest() = runBlocking {
-        var client = testHttpClient()
-        assertFalse(
-            IssuerUseCaseImpl(
-                IssuersService,
-                client
-            ).fetchCredentials("https://issuer.portal.walt-test.cloud/draft11/.well-known/openid-credential-issuer")
-                .isEmpty()
-        )
-        assertFalse(
-            IssuerUseCaseImpl(
-                IssuersService,
-                client
-            ).fetchCredentials("https://issuer.portal.walt-test.cloud/draft13/.well-known/openid-credential-issuer")
-                .isEmpty()
-        )
-    }
-
     suspend fun setupTestWallet(): LspPotentialWallet {
         var client = testHttpClient()
         client.post("/wallet-api/auth/login") {
