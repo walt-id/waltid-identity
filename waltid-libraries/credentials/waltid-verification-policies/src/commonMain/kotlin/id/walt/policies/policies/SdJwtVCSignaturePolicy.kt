@@ -92,7 +92,7 @@ class SdJwtVCSignaturePolicy() : JwtVerificationPolicy() {
                 )
 
                 if (!verificationResult.verified) {
-                    throw VerificationException("SD-JWT verification failed")
+                    throw VerificationException("SD-JWT verification failed: ${verificationResult.message}")
                 }
 
                 sdJwtVC.undisclosedPayload
