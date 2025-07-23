@@ -4,7 +4,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
-    id("dev.petuska.npm.publish") version "3.5.2"
+    id("dev.petuska.npm.publish") version "3.5.3"
     id("maven-publish")
     id("com.github.ben-manes.versions")
 }

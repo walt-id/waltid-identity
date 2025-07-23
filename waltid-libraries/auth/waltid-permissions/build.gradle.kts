@@ -8,7 +8,7 @@ plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
-    id("dev.petuska.npm.publish") version "3.5.2"
+    id("dev.petuska.npm.publish") version "3.5.3"
     id("com.github.ben-manes.versions")
     id("love.forte.plugin.suspend-transform")
 }
