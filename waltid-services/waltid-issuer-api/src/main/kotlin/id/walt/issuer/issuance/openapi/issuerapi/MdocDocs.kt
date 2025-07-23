@@ -11,8 +11,8 @@ import kotlinx.serialization.json.buildJsonArray
 
 object MdocDocs {
     fun getMdocsDocs(): RouteConfig.() -> Unit = {
-        summary = "Signs a credential based on the IEC/ISO18013-5 mdoc/mDL format."
-        description = "This endpoint issues a mdoc and returns an issuance URL "
+        summary = "Signs a credential based on the ISO/IEC 18013-5 mDoc format and starts an OIDC credential exchange flow."
+        description = "This endpoint issues an mDoc, and returns an issuance URL"
 
         request(requestConfig())
     }
@@ -39,8 +39,8 @@ object MdocDocs {
             ) {
                 value = mdlBaseIssuanceExample.copy(
                     mdocData = mdlBaseIssuanceExample.mdocData!!.toMutableMap().apply {
-                        this[ISO_IEC_NAMESPACE_ID] = JsonObject(
-                            (this[ISO_IEC_NAMESPACE_ID] as JsonObject).toMutableMap().apply {
+                        this[ISO_IEC_MDL_NAMESPACE_ID] = JsonObject(
+                            (this[ISO_IEC_MDL_NAMESPACE_ID] as JsonObject).toMutableMap().apply {
                                 put("age_over_18", true.toJsonElement())
                             }
                         )
@@ -53,8 +53,8 @@ object MdocDocs {
             ) {
                 value = mdlBaseIssuanceExample.copy(
                     mdocData = mdlBaseIssuanceExample.mdocData!!.toMutableMap().apply {
-                        this[ISO_IEC_NAMESPACE_ID] = JsonObject(
-                            (this[ISO_IEC_NAMESPACE_ID] as JsonObject).toMutableMap().apply {
+                        this[ISO_IEC_MDL_NAMESPACE_ID] = JsonObject(
+                            (this[ISO_IEC_MDL_NAMESPACE_ID] as JsonObject).toMutableMap().apply {
                                 put("age_over_18", true.toJsonElement())
                                 put("age_over_24", true.toJsonElement())
                                 put("age_over_60", false.toJsonElement())
@@ -69,8 +69,8 @@ object MdocDocs {
             ) {
                 value = mdlBaseIssuanceExample.copy(
                     mdocData = mdlBaseIssuanceExample.mdocData!!.toMutableMap().apply {
-                        this[ISO_IEC_NAMESPACE_ID] = JsonObject(
-                            (this[ISO_IEC_NAMESPACE_ID] as JsonObject).toMutableMap().apply {
+                        this[ISO_IEC_MDL_NAMESPACE_ID] = JsonObject(
+                            (this[ISO_IEC_MDL_NAMESPACE_ID] as JsonObject).toMutableMap().apply {
                                 put("age_over_18", true.toJsonElement())
                                 put("age_over_24", true.toJsonElement())
                                 put("age_over_60", false.toJsonElement())
@@ -106,9 +106,9 @@ object MdocDocs {
     }
 
     private const val MDL_VC_CONFIG_ID = "org.iso.18013.5.1.mDL"
-    private const val ISO_IEC_NAMESPACE_ID = "org.iso.18013.5.1"
+    private const val ISO_IEC_MDL_NAMESPACE_ID = "org.iso.18013.5.1"
 
-    private val mdlBaseIssuanceExample = Json.decodeFromString<IssuanceRequest>(
+    val mdlBaseIssuanceExample = Json.decodeFromString<IssuanceRequest>(
         """
         {
             "issuerKey": {
@@ -124,7 +124,7 @@ object MdocDocs {
             },
             "credentialConfigurationId": "$MDL_VC_CONFIG_ID",
             "mdocData": {
-                "$ISO_IEC_NAMESPACE_ID": {
+                "$ISO_IEC_MDL_NAMESPACE_ID": {
                     "family_name": "Doe",
                     "given_name": "John",
                     "birth_date": "1986-03-22",
