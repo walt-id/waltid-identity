@@ -418,11 +418,13 @@ class WaltidServicesE2ETests {
         VerifierPresentedCredentialsTests().runTests()
         //endregion -Presented Credentials Feature (Verifier)-
 
+        //region -Batch Issuance Test Suite-
         val batchIssuance = BatchIssuance(
             client = client,
             wallet = wallet
         )
         batchIssuance.runTests()
+        //endregion -Batch Issuance Test Suite-
 
     }
 
