@@ -11,8 +11,8 @@ import kotlinx.serialization.json.buildJsonArray
 
 object MdocDocs {
     fun getMdocsDocs(): RouteConfig.() -> Unit = {
-        summary = "Signs a credential based on the IEC/ISO18013-5 mdoc/mDL format."
-        description = "This endpoint issues a mdoc and returns an issuance URL "
+        summary = "Signs a credential based on the ISO/IEC 18013-5 mDoc format and starts an OIDC credential exchange flow."
+        description = "This endpoint issues an mDoc, and returns an issuance URL"
 
         request(requestConfig())
     }
