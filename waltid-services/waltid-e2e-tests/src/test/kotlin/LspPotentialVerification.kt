@@ -7,7 +7,7 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64URL
 import id.walt.commons.interop.LspPotentialInterop
-import id.walt.commons.testing.E2ETest.test
+import id.walt.commons.testing.E2ETest
 import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
@@ -47,9 +47,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class LspPotentialVerification(private val client: HttpClient) {
+class LspPotentialVerification(private val e2e: E2ETest, private val client: HttpClient) {
 
-    suspend fun testPotentialInteropTrack3() = test("test track 3") {
+    suspend fun testPotentialInteropTrack3() = e2e.test("test track 3") {
         println("Starting test")
 
         runBlocking {
@@ -176,7 +176,7 @@ class LspPotentialVerification(private val client: HttpClient) {
         }
     }
 
-    suspend fun testPotentialInteropTrack4() = test("test track 4") {
+    suspend fun testPotentialInteropTrack4() = e2e.test("test track 4") {
         runBlocking {
             // 1. holder key
             val holderKey = KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1))

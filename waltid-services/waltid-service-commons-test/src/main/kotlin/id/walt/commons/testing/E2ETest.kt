@@ -22,17 +22,19 @@ import kotlinx.coroutines.test.runTest
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
-object E2ETest {
-
-    var HOST = "localhost"
-    var PORT = 22222
-    var failEarly = false
-
+class E2ETest(
+    val host: String = "localhost",
+    val port: Int = 22222,
+    val failEarly: Boolean = false,
+) {
     data class TestStats(
         val overall: Int,
         val success: Int,
         val failed: Int,
     )
+
+    private val e2eHost = this.host
+    private val e2ePort = this.port
 
     fun testHttpClient(bearerToken: String? = null, doFollowRedirects: Boolean = true, block: HttpClientConfig<*>.() -> Unit = {}) = HttpClient(CIO) {
         install(ContentNegotiation) {
@@ -40,8 +42,8 @@ object E2ETest {
         }
         install(DefaultRequest) {
             contentType(ContentType.Application.Json)
-            host = HOST
-            port = PORT
+            host = e2eHost
+            port = e2ePort
 
             if (bearerToken != null) bearerAuth(bearerToken)
         }
@@ -57,7 +59,7 @@ object E2ETest {
     val testNames = HashMap<Int, String>()
     val t = Terminal(ansiLevel = AnsiLevel.TRUECOLOR)
 
-    fun getBaseURL() = "http://$HOST:$PORT"
+    fun getBaseURL() = "http://$host:$port"
 
     fun getTestStats(): TestStats {
         val succeeded = testResults.count { it.isSuccess }
@@ -72,28 +74,24 @@ object E2ETest {
         init: suspend () -> Unit,
         module: Application.() -> Unit,
         host: String = "localhost",
-        port: Int = PORT,
+        port: Int = this.port,
         timeout: Duration = 5.minutes,
-        block: suspend () -> Unit,
-    ) =
-        testBlock(
-            service = ServiceMain(
-                config = config,
-                init = ServiceInitialization(
-                    features = features,
-                    featureAmendments = featureAmendments,
-                    init = init,
-                    run = E2ETestWebService(module).runService(block, host, port)
-                )
-            ),
-            timeout = timeout, host = host, port = port
-        )
+        block: suspend E2ETest.() -> Unit,
+    ) = testBlock(
+        service = ServiceMain(
+            config = config,
+            init = ServiceInitialization(
+                features = features,
+                featureAmendments = featureAmendments,
+                init = init,
+                run = E2ETestWebService(module).runService(suspend { block.invoke(this) }, host, port)
+            )
+        ),
+        timeout = timeout
+    )
 
 
-    fun testBlock(service: ServiceMain, timeout: Duration, host: String, port: Int) = runTest(timeout = timeout) {
-        HOST = host
-        PORT = port
-
+    fun testBlock(service: ServiceMain, timeout: Duration) = runTest(timeout = timeout) {
         /*ServiceMain(
             ServiceConfiguration("e2e-test"), ServiceInitialization(
                 features = listOf(id.walt.issuer.FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),

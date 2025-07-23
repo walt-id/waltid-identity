@@ -1,10 +1,10 @@
-import id.walt.commons.testing.E2ETest.test
+import id.walt.commons.testing.E2ETest
 import id.walt.issuer.issuance.IssuanceRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 
-class IssuerApi(private val client: HttpClient, private val cbUrl: String? = null) {
+class IssuerApi(private val e2e: E2ETest, private val client: HttpClient, private val cbUrl: String? = null) {
     suspend fun jwt(request: IssuanceRequest, output: ((String) -> Unit)? = null) = issue(
         name = "/openid4vc/jwt/issue - issue jwt credential",
         url = "/openid4vc/jwt/issue",
@@ -27,7 +27,7 @@ class IssuerApi(private val client: HttpClient, private val cbUrl: String? = nul
     )
 
     suspend fun issueJwtBatch(requests: List<IssuanceRequest>, output: ((String) -> Unit)? = null) =
-        test("/openid4vc/jwt/issueBatch - issue jwt credential batch") {
+        e2e.test("/openid4vc/jwt/issueBatch - issue jwt credential batch") {
             client.post("/openid4vc/jwt/issueBatch") {
                 setBody(requests)
             }.expectSuccess().apply {
@@ -36,7 +36,7 @@ class IssuerApi(private val client: HttpClient, private val cbUrl: String? = nul
         }
 
     suspend fun issueSdJwtBatch(requests: List<IssuanceRequest>, output: ((String) -> Unit)? = null) =
-        test("/openid4vc/sdjwt/issueBatch - issue sd-jwt credential batch") {
+        e2e.test("/openid4vc/sdjwt/issueBatch - issue sd-jwt credential batch") {
             client.post("/openid4vc/sdjwt/issueBatch") {
                 setBody(requests)
             }.expectSuccess().apply {
@@ -45,7 +45,7 @@ class IssuerApi(private val client: HttpClient, private val cbUrl: String? = nul
         }
 
     private suspend fun issue(name: String, url: String, request: IssuanceRequest, output: ((String) -> Unit)? = null) =
-        test(name) {
+        e2e.test(name) {
             client.post(url) {
                 if(!cbUrl.isNullOrEmpty()) {
                     header("statusCallbackUri", cbUrl)

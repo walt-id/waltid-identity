@@ -1,24 +1,21 @@
+import id.walt.commons.testing.E2ETest
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.OpenID4VCI.resolveCIProviderMetadata
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.webwallet.db.models.WalletCredential
-import io.ktor.client.HttpClient
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonArray
+import io.ktor.client.*
+import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
-class BatchIssuance(val client: HttpClient, val wallet: Uuid) {
-    private val issuerApi = IssuerApi(client)
-    private val exchangeApi = ExchangeApi(client)
+class BatchIssuance(private val e2e: E2ETest, val client: HttpClient, val wallet: Uuid) {
+    private val issuerApi = IssuerApi(e2e, client)
+    private val exchangeApi = ExchangeApi(e2e, client)
 
     private val expectedMortgageAndVerifiableIdCredentialConfigurationIds = buildJsonArray {
         add("MortgageEligibility_jwt_vc_json")
@@ -110,7 +107,10 @@ class BatchIssuance(val client: HttpClient, val wallet: Uuid) {
             assertTrue(matched, "Unexpected types found in credential: $actual")
         }
 
-        assertTrue(expectedCredentialDefinitionTypeSets.isEmpty(), "Not all expected types were matched: expectedCredentialDefinitionTypeSets")
+        assertTrue(
+            expectedCredentialDefinitionTypeSets.isEmpty(),
+            "Not all expected types were matched: expectedCredentialDefinitionTypeSets"
+        )
     }
 
     private suspend fun runWithMortgageAndIdAndPassportCredential() {
@@ -161,9 +161,11 @@ class BatchIssuance(val client: HttpClient, val wallet: Uuid) {
             assertTrue(matched, "Unexpected types found in credential: $actual")
         }
 
-        assertTrue(expectedCredentialDefinitionTypeSets.isEmpty(), "Not all expected types were matched: $expectedCredentialDefinitionTypeSets")
+        assertTrue(
+            expectedCredentialDefinitionTypeSets.isEmpty(),
+            "Not all expected types were matched: $expectedCredentialDefinitionTypeSets"
+        )
     }
-
 
 
 }

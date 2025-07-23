@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-import id.walt.commons.testing.E2ETest.test
+import id.walt.commons.testing.E2ETest
 import id.walt.webwallet.db.models.WalletDid
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -12,7 +12,7 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
-class DidsApi(private val client: HttpClient) {
+class DidsApi(private val e2e: E2ETest, private val client: HttpClient) {
     private val didRegexPattern = "^^did:%s:\\S+\$"
     suspend fun list(
         wallet: Uuid,
@@ -20,7 +20,7 @@ class DidsApi(private val client: HttpClient) {
         size: Int? = null,
         output: ((List<WalletDid>) -> Unit)? = null,
     ) =
-        test("/wallet-api/wallet/{wallet}/dids - list DIDs") {
+        e2e.test("/wallet-api/wallet/{wallet}/dids - list DIDs") {
             client.get("/wallet-api/wallet/$wallet/dids").expectSuccess().apply {
                 val dids = body<List<WalletDid>>()
                 assert(dids.isNotEmpty()) { "Wallet has no DIDs!" }
@@ -32,7 +32,7 @@ class DidsApi(private val client: HttpClient) {
             }
         }
 
-    suspend fun get(wallet: Uuid, did: String) = test("/wallet-api/wallet/{wallet}/dids/{did} - show specific DID") {
+    suspend fun get(wallet: Uuid, did: String) = e2e.test("/wallet-api/wallet/{wallet}/dids/{did} - show specific DID") {
         client.get("/wallet-api/wallet/$wallet/dids/$did").expectSuccess().apply {
             val response = body<JsonObject>()
             assert(response["id"]?.jsonPrimitive?.content == did)
@@ -40,17 +40,17 @@ class DidsApi(private val client: HttpClient) {
         }
     }
 
-    suspend fun delete(wallet: Uuid, did: String) = test("/wallet-api/wallet/{wallet}/dids/{did} - delete did") {
+    suspend fun delete(wallet: Uuid, did: String) = e2e.test("/wallet-api/wallet/{wallet}/dids/{did} - delete did") {
         client.delete("/wallet-api/wallet/$wallet/dids/$did").expectSuccess()
     }
 
     suspend fun default(wallet: Uuid, did: String) =
-        test("/wallet-api/wallet/{wallet}/dids/default - set default did") {
+        e2e.test("/wallet-api/wallet/{wallet}/dids/default - set default did") {
             client.post("/wallet-api/wallet/$wallet/dids/default?did=$did").expectSuccess()
         }
 
     suspend fun create(wallet: Uuid, payload: DidCreateRequest, output: ((String) -> Unit)? = null) =
-        test("/wallet-api/wallet/{wallet}/dids/create/${payload.method} - create did:${payload.method}") {
+        e2e.test("/wallet-api/wallet/{wallet}/dids/create/${payload.method} - create did:${payload.method}") {
             client.post("/wallet-api/wallet/$wallet/dids/create/${payload.method}") {
                 url {
                     payload.toMap().onEach {

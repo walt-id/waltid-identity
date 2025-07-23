@@ -1,5 +1,5 @@
 import WaltidServicesE2ETests.Companion.testHttpClient
-import id.walt.commons.testing.E2ETest.test
+import id.walt.commons.testing.E2ETest
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.issuer.services.onboarding.models.*
 import io.ktor.client.call.*
@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 
-class IssuerIsoMdlOnboardingServiceTests {
+class IssuerIsoMdlOnboardingServiceTests(private val e2e: E2ETest) {
 
     private val client = testHttpClient()
 
@@ -47,7 +47,7 @@ class IssuerIsoMdlOnboardingServiceTests {
             .generateCertificate(ByteArrayInputStream(derBytes)) as X509Certificate
     }
 
-    suspend fun testOnboardIACARootGeneratesValidCertificate() = test(
+    suspend fun testOnboardIACARootGeneratesValidCertificate() = e2e.test(
         name = "onboard IACA root generates valid certificate",
     ) {
         val response = client.post("/onboard/iso-mdl/iacas") {
@@ -101,7 +101,7 @@ class IssuerIsoMdlOnboardingServiceTests {
         )
     }
 
-    suspend fun testOnboardDocumentSignerGeneratesValidCertificate() = test(
+    suspend fun testOnboardDocumentSignerGeneratesValidCertificate() = e2e.test(
         name = "onboard Document Signer generates valid certificate",
     ) {
 
@@ -175,7 +175,7 @@ class IssuerIsoMdlOnboardingServiceTests {
         )
     }
 
-    private suspend fun testDSValidityPeriodWithinIACAValidityPeriod() = test(
+    private suspend fun testDSValidityPeriodWithinIACAValidityPeriod() = e2e.test(
         name = "Document Signer validity period must be within IACA validity period",
     ) {
 
@@ -259,7 +259,7 @@ class IssuerIsoMdlOnboardingServiceTests {
 
     }
 
-    private suspend fun testDSValidityPeriodLargerThan457Days() = test(
+    private suspend fun testDSValidityPeriodLargerThan457Days() = e2e.test(
         name = "Document signer certificate validity period cannot be larger than 457 days"
     ) {
 
