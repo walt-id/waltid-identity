@@ -8,11 +8,7 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 import redis.clients.jedis.exceptions.JedisException
 import kotlin.reflect.jvm.jvmName
 
@@ -49,13 +45,14 @@ private fun statusCodeForException(cause: Throwable): HttpStatusCode = when (cau
 fun exceptionMap(cause: Throwable, status: HttpStatusCode): JsonObject = if (cause is SerializableWebException) {
     Json.encodeToJsonElement(cause).jsonObject
 } else {
-    JsonObject(mutableMapOf(
-        "exception" to JsonPrimitive(true),
-        "id" to JsonPrimitive(cause::class.simpleName ?: cause::class.jvmName),
-        "status" to JsonPrimitive(status.description),
-        "code" to JsonPrimitive(status.value.toString()),
-        "message" to JsonPrimitive(cause.message)
-    ).apply {
+    JsonObject(
+        mutableMapOf(
+            "exception" to JsonPrimitive(true),
+            "id" to JsonPrimitive(cause::class.simpleName ?: cause::class.jvmName),
+            "status" to JsonPrimitive(status.description),
+            "code" to JsonPrimitive(status.value.toString()),
+            "message" to JsonPrimitive(cause.message)
+        ).apply {
             var underlyingCause = cause.cause
             var errorCounter = 1
 
@@ -67,6 +64,5 @@ fun exceptionMap(cause: Throwable, status: HttpStatusCode): JsonObject = if (cau
                 underlyingCause = underlyingCause.cause
                 errorCounter++
             }
-        }
-    })
+        })
 }
