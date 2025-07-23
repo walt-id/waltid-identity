@@ -56,6 +56,17 @@ fun exceptionMap(cause: Throwable, status: HttpStatusCode): JsonObject = if (cau
         "code" to JsonPrimitive(status.value.toString()),
         "message" to JsonPrimitive(cause.message)
     ).apply {
-        if (cause.cause != null && logger.isTraceEnabled()) put("cause", JsonPrimitive(cause.cause!!.message))
+            var underlyingCause = cause.cause
+            var errorCounter = 1
+
+            while (underlyingCause != null) {
+                put("cause${errorCounter}_exception", JsonPrimitive(underlyingCause::class.simpleName ?: underlyingCause::class.jvmName))
+                if (cause.cause != null && logger.isTraceEnabled()) {
+                    put("cause${errorCounter}_message", JsonPrimitive(underlyingCause.message))
+                }
+                underlyingCause = underlyingCause.cause
+                errorCounter++
+            }
+        }
     })
 }
