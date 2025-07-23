@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-import id.walt.commons.testing.E2ETest.test
+import id.walt.commons.testing.E2ETest
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.webwallet.db.models.Account
@@ -29,41 +29,40 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 
-class AuthApi(private val client: HttpClient) {
+class AuthApi(private val e2e: E2ETest, private val client: HttpClient) {
     suspend fun userInfo(expectedStatus: HttpStatusCode, output: ((Account) -> Unit)? = null) =
-        test("/wallet-api/auth/user-info - wallet-api user-info") {
+        e2e.test("/wallet-api/auth/user-info - wallet-api user-info") {
             client.get("/wallet-api/auth/user-info").apply {
                 assert(status == expectedStatus) { "Expected status: $expectedStatus, but had $status" }
                 output?.invoke(body<Account>())
             }
         }
 
-    suspend fun register(request: AccountRequest) = register(
+    suspend fun register(request: AccountRequest) = baseRegister(
+        e2e = e2e,
         client = client,
         name = "/wallet-api/auth/register - wallet-api register",
         url = "/wallet-api/auth/register",
         request = request
     )
 
-    suspend fun login(request: AccountRequest, output: ((JsonObject) -> Unit)? = null) = login(
+    suspend fun login(request: AccountRequest) = baseLogin(
         client = client,
-        name = "/wallet-api/auth/login - wallet-api login",
         url = "/wallet-api/auth/login",
-        request = request,
-        output = output
+        request = request
     )
 
-    suspend fun logout() = test("/wallet-api/auth/logout - wallet-api logout") {
+    suspend fun logout() = e2e.test("/wallet-api/auth/logout - wallet-api logout") {
         client.post("/wallet-api/auth/logout").expectSuccess()
     }
 
-    suspend fun userSession() = test("/wallet-api/auth/session - logged in after login") {
+    suspend fun userSession() = e2e.test("/wallet-api/auth/session - logged in after login") {
         client.get("/wallet-api/auth/session").expectSuccess()
     }
 
     @OptIn(ExperimentalUuidApi::class)
     suspend fun userWallets(expectedAccountId: Uuid, output: ((AccountWalletListing) -> Unit)? = null) =
-        test("/wallet-api/wallet/accounts/wallets - get wallets") {
+        e2e.test("/wallet-api/wallet/accounts/wallets - get wallets") {
             client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().apply {
                 val listing = body<AccountWalletListing>()
                 assert(expectedAccountId == listing.account) { "Wallet listing is for wrong account!" }
@@ -72,52 +71,52 @@ class AuthApi(private val client: HttpClient) {
             }
         }
 
-    class Oidc(private val client: HttpClient) {
-        suspend fun oidcToken() = test("/wallet-api/auth/oidc-token - wallet-api oidc token") {
+    class Oidc(private val e2e: E2ETest, private val client: HttpClient) {
+        suspend fun oidcToken() = e2e.test("/wallet-api/auth/oidc-token - wallet-api oidc token") {
             client.get("/wallet-api/auth/oidc-token").expectSuccess()
         }
 
-        suspend fun oidcLogin() = test("/wallet-api/auth/oidc-login - wallet-api oidc login") {
+        suspend fun oidcLogin() = e2e.test("/wallet-api/auth/oidc-login - wallet-api oidc login") {
             client.get("/wallet-api/auth/oidc-login").expectSuccess()
         }
 
-        suspend fun oidcLogout() = test("/wallet-api/auth/logout-oidc - wallet-api oidc logout") {
+        suspend fun oidcLogout() = e2e.test("/wallet-api/auth/logout-oidc - wallet-api oidc logout") {
             client.get("/wallet-api/auth/oidc-logout").expectSuccess()
         }
     }
 
-    class Keycloak(private val client: HttpClient) {
+    class Keycloak(private val e2e: E2ETest, private val client: HttpClient) {
         suspend fun token(output: ((String) -> Unit)? = null) =
-            test("/wallet-api/auth/keycloak/token - wallet-api keycloak token") {
+            e2e.test("/wallet-api/auth/keycloak/token - wallet-api keycloak token") {
                 client.get("/wallet-api/auth/keycloak/token").expectSuccess().apply {
                     output?.invoke(bodyAsText())
                 }
             }
 
-        suspend fun create(request: AccountRequest) = register(
+        suspend fun create(request: AccountRequest) = baseRegister(
+            e2e = e2e,
             client = client,
             name = "/wallet-api/auth/keycloak/create - wallet-api keycloak create",
             url = "/wallet-api/auth/keycloak/create",
             request = request
         )
 
-        suspend fun login(request: AccountRequest, output: ((JsonObject) -> Unit)? = null) = login(
+        suspend fun login(request: AccountRequest) = baseLogin(
             client = client,
-            name = "/wallet-api/auth/keycloak/login - wallet-api keycloak login",
             url = "/wallet-api/auth/keycloak/login",
-            request = request,
-            output = output
+            request = request
+            //name = "/wallet-api/auth/keycloak/login - wallet-api keycloak login",
         )
 
         suspend fun logout(request: KeycloakLogoutRequest) =
-            test("/wallet-api/auth/keycloak/logout - wallet-api keycloak logout") {
+            e2e.test("/wallet-api/auth/keycloak/logout - wallet-api keycloak logout") {
                 client.post("/wallet-api/auth/keycloak/logout") {
                     setBody(request)
                 }.expectSuccess()
             }
     }
 
-    class X5c(private val client: HttpClient) {
+    class X5c(private val e2e: E2ETest, private val client: HttpClient) {
 
         private val rootCAPrivateKey = PKIXUtils.pemDecodeJavaPrivateKey(
             """
@@ -212,7 +211,7 @@ class AuthApi(private val client: HttpClient) {
             )
         }
 
-        private suspend fun checkX5CLoginCreatesWallet() = test(
+        private suspend fun checkX5CLoginCreatesWallet() = e2e.test(
             name = "/wallet-api/auth/x5c/login - validate wallet api x5c login with trustworthy subject certificate also creates wallet"
         ) {
             var tempClient = WaltidServicesE2ETests.testHttpClient()
@@ -227,13 +226,14 @@ class AuthApi(private val client: HttpClient) {
                 dn,
             )
             val jwkPrivateKey = PKIXUtils.javaPrivateKeyToJWKKey(keyPair.private)
-            Companion.login(
-                client = tempClient,
-                name = "/wallet-api/auth/x5c/login - wallet api x5c login with trustworthy subject certificate",
-                url = "/wallet-api/auth/x5c/login",
-                request = createX5CAccountRequest(jwkPrivateKey, cert)
-            ) {
-                tempClient = WaltidServicesE2ETests.testHttpClient(token = it["token"]!!.jsonPrimitive.content)
+            e2e.test("/wallet-api/auth/x5c/login - wallet api x5c login with trustworthy subject certificate") {
+                val loginResult = baseLogin(
+                    client = tempClient,
+                    url = "/wallet-api/auth/x5c/login",
+                    request = createX5CAccountRequest(jwkPrivateKey, cert)
+                )
+
+                tempClient = WaltidServicesE2ETests.testHttpClient(token = loginResult["token"]!!.jsonPrimitive.content)
             }
             val response = tempClient.get("/wallet-api/wallet/accounts/wallets").expectSuccess()
             val accWalletListing = response.body<AccountWalletListing>()
@@ -242,19 +242,21 @@ class AuthApi(private val client: HttpClient) {
 
         suspend fun executeTestCases() {
             //register with a subject certificate that is signed by the trusted root CA
-            Companion.register(
+            baseRegister(
+                e2e = e2e,
                 client = client,
                 name = "/wallet-api/auth/x5c/register - wallet api x5c registration with trustworthy subject certificate",
                 url = "/wallet-api/auth/x5c/register",
                 request = createX5CAccountRequest(subjectJWKPrivateKey, subjectCert)
             )
             //login with a subject certificate that is signed by the trusted root CA
-            Companion.login(
-                client = client,
-                name = "/wallet-api/auth/x5c/login - wallet api x5c login with trustworthy subject certificate",
-                url = "/wallet-api/auth/x5c/login",
-                request = createX5CAccountRequest(subjectJWKPrivateKey, subjectCert)
-            )
+            e2e.test("/wallet-api/auth/x5c/login - wallet api x5c login with trustworthy subject certificate") {
+                baseLogin(
+                    client = client,
+                    url = "/wallet-api/auth/x5c/login",
+                    request = createX5CAccountRequest(subjectJWKPrivateKey, subjectCert)
+                )
+            }
             //register with a subject certificate that is not signed by the trusted root CA
             val nonTrustworthyCAKeyPair = keyPairGenerator.generateKeyPair()
             val nonTrustworthySubjectCert = PKIXUtils.generateSubjectCertificate(
@@ -265,13 +267,13 @@ class AuthApi(private val client: HttpClient) {
                 rootCADistinguishedName,
                 subjectDistinguishedName,
             )
-            test("/wallet-api/auth/x5c/register - wallet api x5c auth registration with non trustworthy subject certificate") {
+            e2e.test("/wallet-api/auth/x5c/register - wallet api x5c auth registration with non trustworthy subject certificate") {
                 client.post("/wallet-api/auth/x5c/register") {
                     setBody(createX5CAccountRequest(subjectJWKPrivateKey, nonTrustworthySubjectCert))
                 }.expectFailure()
             }
             //login with a subject certificate that is not signed by the trusted root CA
-            test("/wallet-api/auth/x5c/login - wallet api x5c auth login with non trustworthy subject certificate") {
+            e2e.test("/wallet-api/auth/x5c/login - wallet api x5c auth login with non trustworthy subject certificate") {
                 client.post("/wallet-api/auth/x5c/login") {
                     setBody(createX5CAccountRequest(subjectJWKPrivateKey, nonTrustworthySubjectCert))
                 }.expectFailure()
@@ -281,33 +283,30 @@ class AuthApi(private val client: HttpClient) {
     }
 
     private companion object {
-        suspend fun register(
+        suspend fun baseRegister(
+            e2e: E2ETest,
             client: HttpClient,
             name: String,
             url: String,
             request: AccountRequest,
-        ) = test(name) {
+        ) = e2e.test(name) {
             client.post(url) {
                 setBody(request)
             }.expectSuccess()
         }
 
-        suspend fun login(
+        suspend fun baseLogin(
             client: HttpClient,
-            name: String,
             url: String,
             request: AccountRequest,
-            output: ((JsonObject) -> Unit)? = null,
-        ) = test(name) {
+        ): JsonObject =
             client.post(url) {
                 setBody(request)
-            }.expectSuccess().apply {
-                body<JsonObject>().let { result ->
+            }.expectSuccess()
+                .body<JsonObject>().let { result ->
                     assertNotNull(result["token"])
                     result["token"]!!.jsonPrimitive.content.expectLooksLikeJwt()
-                    output?.invoke(result)
+                    result
                 }
-            }
-        }
     }
 }

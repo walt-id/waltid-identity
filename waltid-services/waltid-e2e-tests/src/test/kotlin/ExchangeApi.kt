@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-import id.walt.commons.testing.E2ETest.test
+import id.walt.commons.testing.E2ETest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
@@ -13,10 +13,10 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 
-class ExchangeApi(private val client: HttpClient) {
+class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
     @OptIn(ExperimentalUuidApi::class)
     suspend fun resolveCredentialOffer(wallet: Uuid, offerUrl: String, output: ((String) -> Unit)? = null) =
-        test("/wallet-api/wallet/{wallet}/exchange/resolveCredentialOffer - resolve credential offer") {
+        e2e.test("/wallet-api/wallet/{wallet}/exchange/resolveCredentialOffer - resolve credential offer") {
             client.post("/wallet-api/wallet/$wallet/exchange/resolveCredentialOffer") {
                 setBody(offerUrl)
             }.expectSuccess().apply {
@@ -31,7 +31,7 @@ class ExchangeApi(private val client: HttpClient) {
         numberOfExpected: Int,
         requireUserInput: Boolean = false,
         output: ((List<WalletCredential>) -> Unit)? = null,
-    ) = test("/wallet-api/wallet/{wallet}/exchange/useOfferRequest - claim credential from issuer") {
+    ) = e2e.test("/wallet-api/wallet/{wallet}/exchange/useOfferRequest - claim credential from issuer") {
         client.post("/wallet-api/wallet/$wallet/exchange/useOfferRequest") {
             setBody(offerUrl)
         }.expectSuccess().apply {
@@ -46,7 +46,7 @@ class ExchangeApi(private val client: HttpClient) {
         wallet: Uuid,
         presentationRequestUrl: String,
         output: ((String) -> Unit)? = null,
-    ) = test("/wallet-api/wallet/{wallet}/exchange/resolvePresentationRequest - get presentation definition") {
+    ) = e2e.test("/wallet-api/wallet/{wallet}/exchange/resolvePresentationRequest - get presentation definition") {
         client.post("/wallet-api/wallet/$wallet/exchange/resolvePresentationRequest") {
             contentType(ContentType.Text.Plain)
             setBody(presentationRequestUrl)
@@ -64,7 +64,7 @@ class ExchangeApi(private val client: HttpClient) {
         expectedCredentialIds: List<String> = emptyList(),
         output: ((List<WalletCredential>) -> Unit)? = null,
     ) =
-        test("/wallet-api/wallet/{wallet}/exchange/matchCredentialsForPresentationDefinition - should match OpenBadgeCredential in wallet") {
+        e2e.test("/wallet-api/wallet/{wallet}/exchange/matchCredentialsForPresentationDefinition - should match OpenBadgeCredential in wallet") {
             client.post("/wallet-api/wallet/$wallet/exchange/matchCredentialsForPresentationDefinition") {
                 setBody(presentationDefinition)
             }.expectSuccess().apply {
@@ -83,7 +83,7 @@ class ExchangeApi(private val client: HttpClient) {
         expectedData: List<FilterData> = emptyList(),
         output: ((List<FilterData>) -> Unit)? = null,
     ) =
-        test("/wallet-api/wallet/{wallet}/exchange/unmatchedCredentialsForPresentationDefinition - none should be missing") {
+        e2e.test("/wallet-api/wallet/{wallet}/exchange/unmatchedCredentialsForPresentationDefinition - none should be missing") {
             client.post("/wallet-api/wallet/$wallet/exchange/unmatchedCredentialsForPresentationDefinition") {
                 setBody(presentationDefinition)
             }.expectSuccess().apply {
@@ -98,7 +98,7 @@ class ExchangeApi(private val client: HttpClient) {
         wallet: Uuid,
         request: UsePresentationRequest,
         expectStatus: suspend HttpResponse.() -> HttpResponse = expectSuccess,
-    ) = test("/wallet-api/wallet/{wallet}/exchange/usePresentationRequest - present credentials") {
+    ) = e2e.test("/wallet-api/wallet/{wallet}/exchange/usePresentationRequest - present credentials") {
         client.post("/wallet-api/wallet/$wallet/exchange/usePresentationRequest") {
             setBody(request)
         }.also { println("usePresentationRequest result: ${it.bodyAsText()}") }.expectStatus()

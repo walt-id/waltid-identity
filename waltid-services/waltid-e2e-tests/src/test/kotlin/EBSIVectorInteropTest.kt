@@ -1,7 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-import id.walt.commons.testing.E2ETest.test
-import id.walt.commons.testing.E2ETest.testHttpClient
+import id.walt.commons.testing.E2ETest
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -20,11 +19,12 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class EBSIVectorInteropTest(
+    private val e2e: E2ETest,
     private val httpClient: HttpClient,
     private val wallet: Uuid,
 ) {
 
-    private val keysApi: KeysApi = KeysApi(httpClient)
+    private val keysApi: KeysApi = KeysApi(e2e, httpClient)
     private lateinit var keyId: String
     private var did: String
 
@@ -46,7 +46,7 @@ class EBSIVectorInteropTest(
         }
     }
 
-    private suspend fun claimAndPresentCredentialIzertis() = test(
+    private suspend fun claimAndPresentCredentialIzertis() = e2e.test(
         name = "EBSI Vector credential claim and present test case: Our wallet API with the credential issuer and verifier of Izertis",
     ) {
 
@@ -80,7 +80,7 @@ class EBSIVectorInteropTest(
         pin: String? = null,
         walletDid: String = did,
         output: ((List<WalletCredential>) -> Unit)? = null
-    ) = test(
+    ) = e2e.test(
         name = "EBSI Vector credential claim test case: Our wallet API with the credential issuer of $issuerName",
     ) {
         httpClient.post("/wallet-api/wallet/$wallet/exchange/useOfferRequest") {
@@ -102,7 +102,7 @@ class EBSIVectorInteropTest(
         credentialId: String,
         verifierName: String = "",
         walletDid: String = did,
-    ) = test(
+    ) = e2e.test(
         name = "EBSI Vector present credential test case: Our wallet API with the verifier of $verifierName",
     ) {
         lateinit var resolvedPresentationOfferString: String
@@ -277,7 +277,7 @@ class EBSIVectorInteropTest(
         val issuerBaseUrl =
             "https://certify.dev.gataca.io/api/v3/tenants/gataca/oidc-issuance/testbed_PreAuthInTime/preauthorized"
 
-        val tempClient = testHttpClient()
+        val tempClient = e2e.testHttpClient()
 
         val accessToken = tempClient.post("https://nucleus.dev.gataca.io/admin/v1/api_keys/login") {
             headers {
@@ -357,7 +357,7 @@ class EBSIVectorInteropTest(
 
         val pin = "1234"
 
-        val tempClient = testHttpClient()
+        val tempClient = e2e.testHttpClient()
 
         val offerUri = tempClient.submitForm(
             url = issuerBaseUrl,
@@ -379,7 +379,7 @@ class EBSIVectorInteropTest(
         val issuerBaseUrl =
             "https://bclabum.informatika.uni-mb.si/interop-testing-frontend/api/credential-offer"
 
-        val tempClient = testHttpClient()
+        val tempClient = e2e.testHttpClient()
 
         val offerUri = tempClient.post(issuerBaseUrl) {
             setBody(
@@ -410,7 +410,7 @@ class EBSIVectorInteropTest(
         lateinit var pin: String
         lateinit var offerUri: String
 
-        val tempClient = testHttpClient()
+        val tempClient = e2e.testHttpClient()
 
         tempClient.post(issuerBaseUrl) {
             setBody(

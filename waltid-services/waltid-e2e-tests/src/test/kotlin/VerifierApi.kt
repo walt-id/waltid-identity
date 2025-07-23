@@ -1,4 +1,4 @@
-import id.walt.commons.testing.E2ETest.test
+import id.walt.commons.testing.E2ETest
 import id.walt.verifier.oidc.PresentationSessionInfo
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -8,17 +8,17 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
 object Verifier {
-    class SessionApi(private val client: HttpClient) {
+    class SessionApi(private val e2e: E2ETest, private val client: HttpClient) {
         suspend fun get(verificationId: String, output: ((PresentationSessionInfo) -> Unit)? = null) =
-            test("/openid4vc/session/{id} - check if presentation definitions match") {
+            e2e.test("/openid4vc/session/{id} - check if presentation definitions match") {
                 client.get("/openid4vc/session/$verificationId").expectSuccess().apply {
                     output?.invoke(body<PresentationSessionInfo>())
                 }
             }
     }
 
-    class VerificationApi(private val client: HttpClient) {
-        suspend fun verify(payload: String, output: ((String) -> Unit)? = null) = test("/openid4vc/verify") {
+    class VerificationApi(private val e2e: E2ETest, private val client: HttpClient) {
+        suspend fun verify(payload: String, output: ((String) -> Unit)? = null) = e2e.test("/openid4vc/verify") {
             client.post("/openid4vc/verify") {
                 setBody(Json.decodeFromString<JsonObject>(payload))
             }.expectSuccess().apply {
