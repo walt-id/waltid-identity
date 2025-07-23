@@ -2,17 +2,11 @@
 
 package id.walt.verifier.oidc
 
-import org.cose.java.AlgorithmID
-import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.crypto.ECDSASigner
-import com.nimbusds.jose.crypto.ECDSAVerifier
-import com.nimbusds.jose.jwk.ECKey
-import id.walt.w3c.utils.VCFormat
+import id.walt.crypto.exceptions.CryptoArgumentException
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.oid4vc.data.ClientIdScheme
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ResponseMode
@@ -25,27 +19,40 @@ import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.policies.policies.SdJwtVCSignaturePolicy
 import id.walt.sdjwt.JWTCryptoProvider
-import id.walt.sdjwt.SimpleJWTCryptoProvider
+import id.walt.verifier.oidc.models.presentedcredentials.PresentationSessionPresentedCredentials
+import id.walt.verifier.oidc.models.presentedcredentials.PresentedCredentialsViewMode
+import id.walt.w3c.utils.VCFormat
 import io.klogging.logger
 import io.ktor.client.*
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.logging.SIMPLE
 import io.ktor.client.request.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
+import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import java.security.KeyFactory
-import java.security.cert.CertificateFactory
-import java.security.cert.X509Certificate
-import java.security.spec.PKCS8EncodedKeySpec
-import java.security.spec.X509EncodedKeySpec
-import java.util.*
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration
 
-class VerificationUseCase(
-    val http: HttpClient, cryptoProvider: JWTCryptoProvider,
-) {
+
+object VerifierService {
     private val logger = logger("Verification")
+
+    private val http = HttpClient {
+
+        install(ContentNegotiation) {
+            json()
+        }
+
+        install(Logging) {
+            logger = Logger.SIMPLE
+            level = LogLevel.ALL
+        }
+    }
 
     suspend fun createSession(
         vpPoliciesJson: JsonElement?,

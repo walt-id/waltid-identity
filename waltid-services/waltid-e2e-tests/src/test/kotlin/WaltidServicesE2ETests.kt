@@ -21,6 +21,8 @@ import id.walt.verifier.verifierModule
 import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.AccountWalletListing
+import id.walt.webwallet.service.issuers.IssuersService
+import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
@@ -416,11 +418,11 @@ class WaltidServicesE2ETests {
         //endregion -ISO mDL Onboarding Service (Issuer)-
 
         //region -MDoc Prepared/Ready Wallet Test Utility (Wallet)
-        MDocPreparedWallet.testWalletSetup()
+        MDocPreparedWallet(e2e).testWalletSetup()
         //endregion -MDoc Prepared/Ready Wallet Test Utility (Wallet)
 
         //region -Presented Credentials Feature (Verifier)-
-        VerifierPresentedCredentialsTests().runTests()
+        VerifierPresentedCredentialsTests(e2e).runTests()
         //endregion -Presented Credentials Feature (Verifier)-
 
         //region -Batch Issuance Test Suite-
@@ -564,7 +566,7 @@ class WaltidServicesE2ETests {
     }
 
     //@Test
-    fun issuerCredentialsListTest() = runBlocking {
+    suspend fun issuerCredentialsListTest() {
         var client = testHttpClient()
         assertFalse(
             IssuerUseCaseImpl(
