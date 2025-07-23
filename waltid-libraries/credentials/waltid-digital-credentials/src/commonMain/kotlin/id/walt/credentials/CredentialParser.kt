@@ -141,7 +141,7 @@ object CredentialParser {
 //                println("$idx: ${it.location} -> $it")
 //            }
 
-            check(availableDisclosures.size == mappedDisclosures.size) { "Invalid disclosures: Different size after mapping disclosures (${availableDisclosures!!.size}) to mappable disclosable (${mappedDisclosures.size}), for credential: $credential" }
+            check(availableDisclosures.size == mappedDisclosures.size) { "Invalid disclosures: Different size after mapping disclosures (${availableDisclosures.size}) to mappable disclosable (${mappedDisclosures.size}), for credential: $credential" }
             availableDisclosures = mappedDisclosures
         }
 
@@ -214,7 +214,7 @@ object CredentialParser {
                         subject = getCredentialDataSubject(payload)
                     )
 
-            payload.contains("vc") -> parseSdJwt(credential, payload["vc"]!!.jsonObject, header, signature)
+            payload.contains("vc") -> parseSdJwt(credential, header, payload["vc"]!!.jsonObject, signature)
 
             else -> throw NotImplementedError("Unknown SD-JWT-signed credential: $credential")
         }
