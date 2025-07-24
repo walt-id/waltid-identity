@@ -1,9 +1,7 @@
 name: Pre-release on push to main
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   version:

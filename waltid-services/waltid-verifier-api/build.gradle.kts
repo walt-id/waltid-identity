@@ -12,7 +12,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
 
-    id("io.ktor.plugin") version "3.1.2" // Versions.KTOR_VERSION
+    id("io.ktor.plugin") version "3.2.0" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.2.0"
     id("com.github.jk1.dependency-license-report") version "2.9"
     id("maven-publish")
@@ -84,8 +84,8 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.5")
     implementation("org.slf4j:jul-to-slf4j:2.0.16")
-    implementation("io.klogging:klogging-jvm:0.9.1")
-    implementation("io.klogging:slf4j-klogging:0.9.1")
+    implementation("io.klogging:klogging-jvm:0.9.4")
+    implementation("io.klogging:slf4j-klogging:0.9.4")
 
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 

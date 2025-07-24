@@ -4,8 +4,8 @@ import java.util.*
 
 plugins {
     kotlin("jvm")
+    id("io.ktor.plugin") version "3.2.0"
     kotlin("plugin.serialization")
-    id("io.ktor.plugin") version "3.1.2"
     id("maven-publish")
     id("com.github.ben-manes.versions")
 }
@@ -182,8 +182,8 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.5")
     implementation("org.slf4j:jul-to-slf4j:2.0.16")
-    implementation("io.klogging:klogging-jvm:0.9.1")
-    implementation("io.klogging:slf4j-klogging:0.9.1")
+    implementation("io.klogging:klogging-jvm:0.9.4")
+    implementation("io.klogging:slf4j-klogging:0.9.4")
 
     // Test
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
@@ -192,7 +192,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
     testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
     testImplementation("io.mockk:mockk:1.13.16")
-    testImplementation("io.klogging:klogging-jvm:0.9.1")
+    testImplementation("io.klogging:klogging-jvm:0.9.4")
 }
 
 // Define publication to allow publishing to local maven repo with the command:  ./gradlew publishToMavenLocal

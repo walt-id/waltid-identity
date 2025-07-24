@@ -1,7 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-import id.walt.commons.testing.E2ETest.test
-import id.walt.commons.testing.E2ETest.testHttpClient
+import id.walt.commons.testing.E2ETest
 import id.walt.commons.testing.utils.ServiceTestUtils
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
@@ -32,13 +31,13 @@ import kotlin.test.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-class VerifierPresentedCredentialsTests {
+class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
 
     private val TEST_SUITE = "Verifier Presented Credentials Test Suite"
 
     private lateinit var mDocWallet: MDocPreparedWallet
 
-    private val client = testHttpClient()
+    private val client = e2e.testHttpClient()
 
     private val issuerKey = runBlocking {
         KeyManager.createKey(
@@ -398,7 +397,7 @@ class VerifierPresentedCredentialsTests {
     }
 
     private suspend fun setupTestSuite() {
-        mDocWallet = MDocPreparedWallet.createSetupWallet()
+        mDocWallet = MDocPreparedWallet(e2e).createSetupWallet()
         issueUniDegreeNoDisclosures()
         issueUniDegreeWithDisclosures()
         issueOpenBadgeNoDisclosures()
@@ -408,7 +407,7 @@ class VerifierPresentedCredentialsTests {
     }
 
     private suspend fun issueUniDegreeNoDisclosures() =
-        test(
+        e2e.test(
             name = "${TEST_SUITE}: Setup step #6: Issue university degree credential with no disclosures to wallet"
         ) {
             val offerUrl = client.post("/openid4vc/jwt/issue") {
@@ -422,7 +421,7 @@ class VerifierPresentedCredentialsTests {
         }
 
     private suspend fun issueUniDegreeWithDisclosures() =
-        test(
+        e2e.test(
             name = "${TEST_SUITE}: Setup step #7: Issue university degree credential with two dummy disclosures to wallet"
         ) {
             val offerUrl = client.post("/openid4vc/jwt/issue") {
@@ -441,7 +440,7 @@ class VerifierPresentedCredentialsTests {
         }
 
     private suspend fun issueOpenBadgeNoDisclosures() =
-        test(
+        e2e.test(
             name = "${TEST_SUITE}: Setup step #8: Issue open badge credential with no disclosures to wallet"
         ) {
             val offerUrl = client.post("/openid4vc/jwt/issue") {
@@ -455,7 +454,7 @@ class VerifierPresentedCredentialsTests {
         }
 
     private suspend fun issueSdJwtVc() =
-        test(
+        e2e.test(
             name = "${TEST_SUITE}: Setup step #9: Issue sd jwt vc to wallet"
         ) {
             val offerUrl = client.post("/openid4vc/sdjwt/issue") {
@@ -474,7 +473,7 @@ class VerifierPresentedCredentialsTests {
         }
 
     private suspend fun issueMdl() =
-        test(
+        e2e.test(
             name = "${TEST_SUITE}: Setup step #10: Issue mdl to wallet"
         ) {
             val offerUrl = client.post("/openid4vc/mdoc/issue") {
@@ -488,7 +487,7 @@ class VerifierPresentedCredentialsTests {
         }
 
     private suspend fun issueOpenBadgeWithDisclosures() =
-        test(
+        e2e.test(
             name = "${TEST_SUITE}: Setup step #11: Issue open badge credential with two dummy disclosures to wallet"
         ) {
             val offerUrl = client.post("/openid4vc/jwt/issue") {
@@ -507,7 +506,7 @@ class VerifierPresentedCredentialsTests {
         }
 
     private suspend fun presentUniDegreeNoDisclosures() =
-        test(
+        e2e.test(
             name = "${TEST_SUITE}: Presentation of university degree credential with no disclosures"
         ) {
             val sessionId = Uuid.random()
@@ -612,7 +611,7 @@ class VerifierPresentedCredentialsTests {
         }
 
     private suspend fun presentOpenBadgeNoDisclosures() =
-        test(
+        e2e.test(
             name = "${TEST_SUITE}: Presentation of open badge credential with no disclosures"
         ) {
             val sessionId = Uuid.random().toString()
@@ -717,7 +716,7 @@ class VerifierPresentedCredentialsTests {
         }
 
     private suspend fun presentSdJwtVc() =
-        test(
+        e2e.test(
             name = "${TEST_SUITE}: Presentation of sd jwt vc"
         ) {
             val sessionId = Uuid.random().toString()
@@ -834,7 +833,7 @@ class VerifierPresentedCredentialsTests {
         }
 
     private suspend fun presentMdl() =
-        test(
+        e2e.test(
             name = "${TEST_SUITE}: Presentation of mDL"
         ) {
             val sessionId = Uuid.random().toString()
@@ -969,7 +968,7 @@ class VerifierPresentedCredentialsTests {
         }
 
     private suspend fun presentOpenBadgeWithDisclosures() =
-        test(
+        e2e.test(
             name = "${TEST_SUITE}: Presentation of open badge credential with disclosures"
         ) {
             val sessionId = Uuid.random().toString()
@@ -1094,7 +1093,7 @@ class VerifierPresentedCredentialsTests {
         }
 
     private suspend fun presentUniversityDegreeWithDisclosures() =
-        test(
+        e2e.test(
             name = "${TEST_SUITE}: Presentation of university degree credential with disclosures"
         ) {
             val sessionId = Uuid.random().toString()
@@ -1219,7 +1218,7 @@ class VerifierPresentedCredentialsTests {
         }
 
     private suspend fun queryPresentedCredentialsBeforeVpTokenSubmission() =
-        test(
+        e2e.test(
             name = "${TEST_SUITE}: Attempt to query presented credentials for session before submission of vp_token"
         ) {
 
@@ -1249,7 +1248,7 @@ class VerifierPresentedCredentialsTests {
         }
 
     private suspend fun queryPresentedCredentialsAfterInvalidVpTokenSubmission() =
-        test(
+        e2e.test(
             name = "${TEST_SUITE}: Attempt to query presented credentials for session with invalid vp_token submitted"
         ) {
 
@@ -1309,7 +1308,7 @@ class VerifierPresentedCredentialsTests {
         }
 
     private suspend fun presentUniDegreeOpenBadgeWithDisclosures() =
-        test(
+        e2e.test(
             name = "${TEST_SUITE}: Presentation of university degree  and open badge credentials, both with disclosures"
         ) {
             val sessionId = Uuid.random().toString()

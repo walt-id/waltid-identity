@@ -1,9 +1,7 @@
 name: Build on every push except main branch
 
 on:
-  push:
-    branches-ignore:
-      - main
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

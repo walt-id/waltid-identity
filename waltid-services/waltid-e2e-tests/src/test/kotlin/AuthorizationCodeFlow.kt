@@ -1,3 +1,4 @@
+import id.walt.commons.testing.E2ETest
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.issuer.issuance.IssuanceRequest
@@ -17,12 +18,12 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.assertEquals
 
 
-class AuthorizationCodeFlow(private val client: HttpClient) {
+class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpClient) {
 
     fun testIssuerAPI() = runBlocking {
         lateinit var offerUrl: String
         lateinit var issuerState: String
-        val issuerApi = IssuerApi(client)
+        val issuerApi = IssuerApi(e2e, client)
         val authorizeEndpoint = "draft13/authorize"
 
         //

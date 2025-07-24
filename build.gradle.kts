@@ -13,7 +13,7 @@ allprojects {
 }
 
 plugins {
-    val kotlinVersion = "2.1.20"
+    val kotlinVersion = "2.2.0"
     kotlin("multiplatform") version kotlinVersion apply false
     kotlin("jvm") version kotlinVersion
     kotlin("plugin.power-assert") version kotlinVersion apply false
@@ -22,10 +22,10 @@ plugins {
 
     kotlin("plugin.serialization") version kotlinVersion apply false
 
-    id("love.forte.plugin.suspend-transform") version "2.1.20-0.12.0" apply false
+    id("love.forte.plugin.suspend-transform") version "2.2.0-0.13.1" apply false
 
-    id("com.android.library") version "8.9.2" apply false
-    id("com.android.application") version "8.9.2" apply false
+    id("com.android.library") version "8.11.1" apply false
+    id("com.android.application") version "8.11.1" apply false
 
     id("com.github.ben-manes.versions") version "0.52.0" apply false
 }
@@ -46,3 +46,5 @@ allprojects {
         }
     }
 }
+
+// test

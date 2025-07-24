@@ -3,8 +3,7 @@
 import cbor.Cbor
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.commons.interop.LspPotentialInterop
-import id.walt.commons.testing.E2ETest.getBaseURL
-import id.walt.commons.testing.E2ETest.test
+import id.walt.commons.testing.E2ETest
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -12,9 +11,9 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
-import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
-import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.feat.lspPotential.LspPotentialIssuanceInterop
+import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.MapElement
@@ -60,7 +59,7 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
-class ExchangeExternalSignatures {
+class ExchangeExternalSignatures(private val e2e: E2ETest) {
 
     private var client: HttpClient
     private var authApi: AuthApi
@@ -162,12 +161,13 @@ class ExchangeExternalSignatures {
 
     private suspend fun registerAccountAndLogin() {
         authApi.register(accountRequest)
-        authApi.login(
-            accountRequest,
-        ) {
-            client = WaltidServicesE2ETests.testHttpClient(token = it["token"]!!.jsonPrimitive.content)
-            authApi = AuthApi(client)
+
+        e2e.test("/wallet-api/auth/login - wallet-api login") {
+            val loginResult = authApi.login(accountRequest)
+            client = WaltidServicesE2ETests.testHttpClient(token = loginResult["token"]!!.jsonPrimitive.content)
+            authApi = AuthApi(e2e, client)
         }
+
         authApi.userInfo(HttpStatusCode.OK) {
             accountId = it.id
         }
@@ -179,11 +179,11 @@ class ExchangeExternalSignatures {
     }
 
     private fun prepareApis() {
-        keysApi = KeysApi(client)
-        didsApi = DidsApi(client)
-        issuerApi = IssuerApi(client)
-        exchangeApi = ExchangeApi(client)
-        credentialsApi = CredentialsApi(client)
+        keysApi = KeysApi(e2e, client)
+        didsApi = DidsApi(e2e, client)
+        issuerApi = IssuerApi(e2e, client)
+        exchangeApi = ExchangeApi(e2e, client)
+        credentialsApi = CredentialsApi(e2e, client)
     }
 
     private suspend fun cleanWallet() {
@@ -236,9 +236,9 @@ class ExchangeExternalSignatures {
 
     init {
         client = WaltidServicesE2ETests.testHttpClient()
-        verifierSessionApi = Verifier.SessionApi(client)
-        verifierVerificationApi = Verifier.VerificationApi(client)
-        authApi = AuthApi(client)
+        verifierSessionApi = Verifier.SessionApi(e2e, client)
+        verifierVerificationApi = Verifier.VerificationApi(e2e, client)
+        authApi = AuthApi(e2e, client)
 
         runBlocking {
             registerAccountAndLogin()
@@ -282,7 +282,7 @@ class ExchangeExternalSignatures {
     }
 
     private suspend fun regularJwtVcJsonTestCases() {
-        test("External signatures - regularJwtVcJsonTestCases") {
+        e2e.test("External signatures - regularJwtVcJsonTestCases") {
             testPreAuthorizedOID4VCI(
                 issuanceRequests = listOf(openBadgeIssuanceRequest),
             )
@@ -316,7 +316,7 @@ class ExchangeExternalSignatures {
     }
 
     private suspend fun mDocTestCases() {
-        test("External signatures - mDocTestCases") {
+        e2e.test("External signatures - mDocTestCases") {
             testPreAuthorizedOID4VCI(
                 useOptionalParameters = false,
                 issuanceRequests = listOf(mDocIssuanceRequest),
@@ -326,7 +326,7 @@ class ExchangeExternalSignatures {
     }
 
     private suspend fun w3cSdJwtVcTestCases() {
-        test("External signatures - w3cSdJwtVcTestCases - noOptionalParameters") {
+        e2e.test("External signatures - w3cSdJwtVcTestCases - noOptionalParameters") {
             testPreAuthorizedOID4VCI(
                 useOptionalParameters = false,
                 issuanceRequests = listOf(
@@ -334,20 +334,20 @@ class ExchangeExternalSignatures {
                 ),
             )
         }
-        test("External signatures - w3cSdJwtVcTestCases - Default") {
+        e2e.test("External signatures - w3cSdJwtVcTestCases - Default") {
             testOID4VP(openbadgeSdJwtPresentationRequest)
         }
-        test("External signatures - w3cSdJwtVcTestCases - addDisclosures") {
+        e2e.test("External signatures - w3cSdJwtVcTestCases - addDisclosures") {
             testOID4VP(openbadgeSdJwtPresentationRequest, addDisclosures = true)
         }
-        test("External signatures - w3cSdJwtVcTestCases - addDisclosures & forgeDisclosures") {
+        e2e.test("External signatures - w3cSdJwtVcTestCases - addDisclosures & forgeDisclosures") {
             testOID4VP(openbadgeSdJwtPresentationRequest, addDisclosures = true, forgeDisclosures = true)
         }
         clearWalletCredentials()
     }
 
     private suspend fun ietfSdJwtVcTestCases() {
-        test("External signatures - ietfSdJwtVcTestCases") {
+        e2e.test("External signatures - ietfSdJwtVcTestCases") {
             testPreAuthorizedOID4VCI(
                 useOptionalParameters = false,
                 issuanceRequests = listOf(
@@ -620,7 +620,7 @@ class ExchangeExternalSignatures {
                         listOf(
                             RequestedCredential(
                                 format = VCFormat.sd_jwt_vc,
-                                vct = "${getBaseURL()}/identity_credential",
+                                vct = "${e2e.getBaseURL()}/identity_credential",
                             ).let {
                                 Json.encodeToJsonElement(it)
                             })
@@ -724,7 +724,7 @@ class ExchangeExternalSignatures {
                         listOf(
                             RequestedCredential(
                                 format = VCFormat.sd_jwt_vc,
-                                vct = "${getBaseURL()}/identity_credential",
+                                vct = "${e2e.getBaseURL()}/identity_credential",
                             ).let {
                                 Json.encodeToJsonElement(it)
                             },

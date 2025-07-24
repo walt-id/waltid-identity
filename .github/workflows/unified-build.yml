@@ -1,0 +1,41 @@
+name: Unified Build
+
+on:
+  push:
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout unified-build
+        uses: actions/checkout@v4
+        with:
+          repository: walt-id/waltid-unified-build
+          ref: ${{ github.ref_name }}
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          path: .
+
+      - name: Checkout waltid-identity
+        uses: actions/checkout@v4
+        with:
+          repository: walt-id/waltid-identity
+          ref: ${{ github.ref_name }}
+          path: ./waltid-identity
+
+      - name: Checkout waltid-identity-enterprise
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          path: ./waltid-identity-enterprise
+
+      - name: Configure gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@a4a92e12ee9b7396ee9a22083ff21b3277c627d6
+
+      - name: Clean and build with all tests
+        run: ./gradlew clean build cleanAllTests allTests --rerun-tasks --no-daemon --parallel
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}

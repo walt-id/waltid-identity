@@ -1,4 +1,5 @@
 import com.nimbusds.jose.JWSAlgorithm
+import id.walt.commons.testing.E2ETest
 import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.jwk.JWKKey
@@ -24,14 +25,14 @@ import kotlin.test.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-class Draft11(private val client: HttpClient)  {
+class Draft11(private val e2e: E2ETest, private val client: HttpClient)  {
 
     fun testIssuerAPIDraft11AuthFlowWithJar(issuanceReq: IssuanceRequest) = runBlocking {
         lateinit var offerUrl: String
         lateinit var issuerState: String
         lateinit var authJarTokenRequest: AuthorizationRequest
 
-        val issuerApi = IssuerApi(client)
+        val issuerApi = IssuerApi(e2e, client)
 
         issuerApi.jwt(issuanceReq) {
             offerUrl = it
@@ -193,7 +194,7 @@ class Draft11(private val client: HttpClient)  {
     fun testIssuanceDraft11PreAuthFlow(issuanceReq: IssuanceRequest, wallet: Uuid) = runBlocking {
         lateinit var offerUrl: String
 
-        val issuerApi = IssuerApi(client)
+        val issuerApi = IssuerApi(e2e, client)
 
         issuerApi.jwt(issuanceReq) {
             offerUrl = it
@@ -253,7 +254,7 @@ class Draft11(private val client: HttpClient)  {
             matchingCredential.format
         )
 
-        val exchangeApi = ExchangeApi(client)
+        val exchangeApi = ExchangeApi(e2e, client)
         lateinit var newCredentialId: String
         exchangeApi.resolveCredentialOffer(wallet, offerUrl)
         exchangeApi.useOfferRequest(wallet, offerUrl, 1) {

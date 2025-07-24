@@ -30,11 +30,14 @@ val modules = listOfNotNull(
         "waltid-digital-credentials",
         "waltid-mdoc-credentials",
         "waltid-dif-definitions-parser",
-        "waltid-verification-policies"
+        "waltid-dcql",
+        "waltid-verification-policies",
+        "waltid-holder-policies"
     ),
 
     * "$libraries:protocols".group(
-        "waltid-openid4vc"
+        "waltid-openid4vc",
+        "waltid-openid4vp",
     ),
 
     * "$libraries:sdjwt".group(
@@ -92,7 +95,7 @@ pluginManagement {
 }
 
 plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.10.0"
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 rootProject.name = "waltid-identity"

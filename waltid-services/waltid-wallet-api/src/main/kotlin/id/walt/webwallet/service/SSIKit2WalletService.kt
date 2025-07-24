@@ -577,7 +577,7 @@ class SSIKit2WalletService(
         val operationSucceeded = canDeleteFromStorage && KeysService.delete(walletId, alias)
 
         if (isTotalDelete && !operationSucceeded) throw WebException(
-            HttpStatusCode.BadRequest,
+            HttpStatusCode.BadRequest.value,
             "Failed to delete remote key : $alias"
         )
         Pair(operationSucceeded, key)
@@ -598,12 +598,12 @@ class SSIKit2WalletService(
             )
         } else {
             logger.warn { "Key delete operation not performed for alias: $alias" }
-            throw WebException(HttpStatusCode.BadRequest, "Failed to delete key: $alias")
+            throw WebException(HttpStatusCode.BadRequest.value, "Failed to delete key: $alias")
         }
     }.onFailure {
         val errorMessage = "Failed to delete key: ${it.message}"
         logger.error(it) { errorMessage }
-        throw WebException(HttpStatusCode.BadRequest, errorMessage)
+        throw WebException(HttpStatusCode.BadRequest.value, errorMessage)
     }
 
     override suspend fun sign(alias: String, data: JsonElement): String {

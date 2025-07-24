@@ -1,8 +1,7 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
 import id.walt.commons.interop.LspPotentialInterop
-import id.walt.commons.testing.E2ETest.getBaseURL
-import id.walt.commons.testing.E2ETest.test
+import id.walt.commons.testing.E2ETest
 import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeySerialization
@@ -32,7 +31,7 @@ import kotlin.test.assertNotNull
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-class LspPotentialWallet(val client: HttpClient, val walletId: String) {
+class LspPotentialWallet(val e2e: E2ETest, val client: HttpClient, val walletId: String) {
     private var issuedMdocId: String = ""
     private var issuedSDJwtVCId: String = ""
     private lateinit var generatedKeyId: String
@@ -40,19 +39,19 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
 
     init {
         // === create EC256 key and DID:JWK (did is not necessarily required, but currently needed for wallet initialization) ===
-        val keysApi = KeysApi(client)
+        val keysApi = KeysApi(e2e, client)
 
         runBlocking {
             keysApi.generate(Uuid.parse(walletId), KeyGenerationRequest(keyType = KeyType.secp256r1)) {
                 generatedKeyId = it
             }
-            DidsApi(client).create(Uuid.parse(walletId), DidsApi.DidCreateRequest("jwk", keyId = generatedKeyId)) {
+            DidsApi(e2e, client).create(Uuid.parse(walletId), DidsApi.DidCreateRequest("jwk", keyId = generatedKeyId)) {
                 generatedDid = it
             }
         }
     }
 
-    suspend fun testMDocIssuance(issuanceRequestData: String, useForPresentation: Boolean) = test("test mdoc issuance") {
+    suspend fun testMDocIssuance(issuanceRequestData: String, useForPresentation: Boolean) = e2e.test("test mdoc issuance") {
         // === get credential offer from test issuer API ===
         val issuanceReq = Json.decodeFromString<IssuanceRequest>(issuanceRequestData).copy(
             authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED
@@ -103,7 +102,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
             runBlocking { issuedMdocId = fetchedCredential.id }
     }
 
-    suspend fun testMdocPresentation() = test("test mdoc presentation") {
+    suspend fun testMdocPresentation() = e2e.test("test mdoc presentation") {
         val createReqResponse = client.post("/openid4vc/verify") {
             header("authorizeBaseUrl", "mdoc-openid4vp://")
             header("responseMode", "direct_post_jwt")
@@ -209,7 +208,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
         )
     )
 
-    suspend fun testSDJwtVCIssuance(issuanceReq: IssuanceRequest) = test("test sd-jwt-vc issuance") {
+    suspend fun testSDJwtVCIssuance(issuanceReq: IssuanceRequest) = e2e.test("test sd-jwt-vc issuance") {
         // === get credential offer from test issuer API ===
         val offerResp = client.post("/openid4vc/sdjwt/issue") {
             contentType(ContentType.Application.Json)
@@ -262,7 +261,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
     }
 
     suspend fun testSDJwtPresentation(openIdProfile: OpenId4VPProfile = OpenId4VPProfile.HAIP) =
-        test("test sd-jwt-vc presentation") {
+        e2e.test("test sd-jwt-vc presentation") {
             val createReqResponse = client.post("/openid4vc/verify") {
                 header("authorizeBaseUrl", "openid4vp://")
                 header("openId4VPProfile", openIdProfile.name)
@@ -276,7 +275,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
                                 listOf(
                                     RequestedCredential(
                                         format = VCFormat.sd_jwt_vc,
-                                        vct = "${getBaseURL()}/identity_credential",
+                                        vct = "${e2e.getBaseURL()}/identity_credential",
                                     ).let {
                                         Json.encodeToJsonElement(it)
                                     })
@@ -308,7 +307,7 @@ class LspPotentialWallet(val client: HttpClient, val walletId: String) {
             }.expectSuccess()
         }
 
-    suspend fun testPresentationDefinitionCredentialMatching() = test("test presentation definition matching") {
+    suspend fun testPresentationDefinitionCredentialMatching() = e2e.test("test presentation definition matching") {
 //        val presentationDefinition: String = """
 //    {"id":"tovqUq4ddXYC","input_descriptors":[{"id":"IdIsRequired","constraints":{"fields":[{"path":["${'$'}.type"],"filter":{"type":"string","pattern":"BankId"}},{"path":["${'$'}.credentialSubject.type"],"filter":{"type":"string","pattern":".*"}}],"limit_disclosure":"required"}}]}
 //        """.trimIndent()

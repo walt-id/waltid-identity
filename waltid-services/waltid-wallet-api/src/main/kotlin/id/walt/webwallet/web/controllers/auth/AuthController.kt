@@ -147,7 +147,7 @@ suspend fun verifyToken(token: String): Result<String> {
 
 data class LoginRequestError(override val message: String) : WebException(
     message = message,
-    status = HttpStatusCode.BadRequest
+    status = HttpStatusCode.BadRequest.value
 ) {
     constructor(throwable: Throwable) : this(
         when (throwable) {
