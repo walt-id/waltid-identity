@@ -1,22 +1,22 @@
 [
   {
-    "folder": "./waltid-identity/waltid-services/waltid-issuer-api",
+    "folder": "waltid-identity/waltid-services/waltid-issuer-api",
     "image": "issuer-api"
   },
   {
-    "folder": "./waltid-identity/waltid-services/waltid-verifier-api",
+    "folder": "waltid-identity/waltid-services/waltid-verifier-api",
     "image": "verifier-api"
   },
   {
-    "folder": "./waltid-identity/waltid-services/waltid-wallet-api",
+    "folder": "waltid-identity/waltid-services/waltid-wallet-api",
     "image": "wallet-api"
   },
   {
-    "folder": "./waltid-identity/waltid-applications/waltid-web-wallet/apps/waltid-demo-wallet",
+    "folder": "waltid-identity/waltid-applications/waltid-web-wallet/apps/waltid-demo-wallet",
     "image": "waltid-demo-wallet"
   },
   {
-    "folder": "./waltid-identity/waltid-applications/waltid-web-wallet/apps/waltid-dev-wallet",
+    "folder": "waltid-identity/waltid-applications/waltid-web-wallet/apps/waltid-dev-wallet",
     "image": "waltid-dev-wallet"
   },
   {
