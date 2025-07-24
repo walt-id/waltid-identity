@@ -2,6 +2,7 @@
 
 package id.walt.verifier.oidc
 
+import id.walt.crypto.exceptions.CryptoArgumentException
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -17,35 +18,41 @@ import id.walt.policies.models.PolicyRequest
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.policies.policies.SdJwtVCSignaturePolicy
+import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.verifier.oidc.models.presentedcredentials.PresentationSessionPresentedCredentials
 import id.walt.verifier.oidc.models.presentedcredentials.PresentedCredentialsViewMode
 import id.walt.w3c.utils.VCFormat
 import io.klogging.logger
 import io.ktor.client.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.logging.SIMPLE
 import io.ktor.client.request.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
+import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration
 
+
 object VerifierService {
+    private val logger = logger("Verification")
 
     private val http = HttpClient {
+
         install(ContentNegotiation) {
             json()
         }
+
         install(Logging) {
             logger = Logger.SIMPLE
             level = LogLevel.ALL
         }
     }
-
-    private val logger = logger("Verification")
 
     suspend fun createSession(
         vpPoliciesJson: JsonElement?,
@@ -196,7 +203,7 @@ object VerifierService {
 
         if (maybePresentationSessionResult.isFailure) {
             return Result.failure(
-                IllegalStateException(
+                CryptoArgumentException(
                     "Verification failed (VerificationUseCase): ${maybePresentationSessionResult.exceptionOrNull()!!.message}",
                     maybePresentationSessionResult.exceptionOrNull()
                 )
@@ -216,7 +223,7 @@ object VerifierService {
             logger.debug { "Presentation failed, redirecting to: $redirectUri" }
 
 
-            if (policyResults == null) {
+            return if (policyResults == null) {
                 Result.failure(
                     FailedVerificationException(
                         redirectUri,

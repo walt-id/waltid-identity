@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-import id.walt.commons.testing.E2ETest.test
+import id.walt.commons.testing.E2ETest
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.UuidUtils.randomUUID
@@ -26,7 +26,7 @@ import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
 
-class PresentationDefinitionPolicyTests {
+class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
 
     private val email = "${randomUUID()}@mail.com"
     private val password = randomUUIDString()
@@ -531,7 +531,7 @@ class PresentationDefinitionPolicyTests {
         cleanup: suspend () -> Unit,
     ) {
         setup()
-        test(
+        e2e.test(
             name = description,
         ) {
             evaluate()

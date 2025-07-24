@@ -1,6 +1,6 @@
 plugins {
     kotlin("jvm")
-    id("io.ktor.plugin") version "3.1.2"
+    id("io.ktor.plugin") version "3.2.0"
     kotlin("plugin.serialization")
     id("maven-publish")
 
@@ -52,8 +52,8 @@ dependencies {
 
 
     // Logging
-    implementation("io.klogging:klogging-jvm:0.9.1")
-    implementation("io.klogging:slf4j-klogging:0.9.1")
+    implementation("io.klogging:klogging-jvm:0.9.4")
+    implementation("io.klogging:slf4j-klogging:0.9.4")
 
     testImplementation("io.ktor:ktor-server-test-host-jvm")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")

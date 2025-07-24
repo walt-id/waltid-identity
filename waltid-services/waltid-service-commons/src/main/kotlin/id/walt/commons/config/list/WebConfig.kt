@@ -1,5 +1,8 @@
 package id.walt.commons.config.list
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class WebConfig(
     /**
      * What host should the server listen on, mostly either

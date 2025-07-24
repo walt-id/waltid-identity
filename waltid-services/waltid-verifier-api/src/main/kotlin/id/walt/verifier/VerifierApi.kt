@@ -10,9 +10,8 @@ import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.policies.PolicyManager
 import id.walt.verifier.config.OIDCVerifierServiceConfig
-import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.VerifierService
-import id.walt.verifier.oidc.VerifierService.FailedVerificationException
+import id.walt.verifier.oidc.RequestSigningCryptoProvider
 import id.walt.verifier.oidc.models.presentedcredentials.PresentedCredentialsViewMode
 import id.walt.verifier.openapi.PresentedCredentialsDocs
 import id.walt.verifier.openapi.VerifierApiDocs
@@ -157,7 +156,7 @@ fun Application.verifierApi() {
                             )
                         }
 
-                        it is FailedVerificationException && it.redirectUrl != null -> {
+                        it is VerifierService.FailedVerificationException && it.redirectUrl != null -> {
                             call.respond(HttpStatusCode.BadRequest, it.redirectUrl)
                         }
 

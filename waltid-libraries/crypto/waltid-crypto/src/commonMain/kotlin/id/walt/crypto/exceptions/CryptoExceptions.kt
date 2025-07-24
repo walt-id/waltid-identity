@@ -23,8 +23,8 @@ class SigningException(message: String, cause: Throwable? = null) :
     CryptoStateException("An error occurred during the signing process: $message")
 
 class VerificationException(message: String, cause: Throwable? = null) :
-    CryptoStateException("An error occurred during verification: $message")
+    CryptoArgumentException("An error occurred during verification: $message")
 
 class MissingSignatureException(message: String, cause: Throwable? = null) :
-    CryptoStateException("The signature is missing or invalid: $message")
+    CryptoArgumentException("The signature is missing or invalid: $message")
 

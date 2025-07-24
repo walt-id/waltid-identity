@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-import id.walt.commons.testing.E2ETest.test
+import id.walt.commons.testing.E2ETest
 import id.walt.webwallet.db.models.WalletOperationHistory
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -9,9 +9,9 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 
-class HistoryApi(private val client: HttpClient) {
+class HistoryApi(private val e2e: E2ETest, private val client: HttpClient) {
     suspend fun list(wallet: Uuid, output: ((List<WalletOperationHistory>) -> Unit)? = null) =
-        test("/wallet-api/wallet/{wallet}/history - get operation history") {
+        e2e.test("/wallet-api/wallet/{wallet}/history - get operation history") {
             client.get("/wallet-api/wallet/$wallet/history").expectSuccess().apply {
                 output?.invoke(body<List<WalletOperationHistory>>())
             }
