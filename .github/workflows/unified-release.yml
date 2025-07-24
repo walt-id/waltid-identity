@@ -1,4 +1,4 @@
-name: Release on manual push
+name: Unified release on manual push
 
 on:
   workflow_dispatch:
