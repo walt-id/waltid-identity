@@ -1,11 +1,12 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import java.util.Properties
+import java.util.*
 
 plugins {
     kotlin("jvm")
-    id("io.ktor.plugin") version "3.1.2"
     kotlin("plugin.serialization")
+    id("io.ktor.plugin") version "3.1.2"
+    id("maven-publish")
     id("com.github.ben-manes.versions")
 }
 
@@ -192,4 +193,38 @@ dependencies {
     testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
     testImplementation("io.mockk:mockk:1.13.16")
     testImplementation("io.klogging:klogging-jvm:0.9.1")
+}
+
+// Define publication to allow publishing to local maven repo with the command:  ./gradlew publishToMavenLocal
+// This should not be published to https://maven.waltid.dev/ to save storage
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["kotlin"])
+            pom {
+                name.set("walt.id wallet API REST service")
+                description.set(
+                    """
+                    Kotlin/Java REST service for storing digital credentials
+                    """.trimIndent()
+                )
+                url.set("https://walt.id")
+
+                licenses {
+                    license {
+                        name.set("Apache License 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                    }
+                }
+
+                developers {
+                    developer {
+                        id.set("walt.id")
+                        name.set("walt.id")
+                        email.set("office@walt.id")
+                    }
+                }
+            }
+        }
+    }
 }

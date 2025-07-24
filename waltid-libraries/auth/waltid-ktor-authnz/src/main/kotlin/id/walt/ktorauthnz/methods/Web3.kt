@@ -128,7 +128,7 @@ object Web3 : AuthenticationMethod("web3") {
             }
 
             post<SiweRequest>("signed", {
-                request { body<SiweRequest>() }
+                request { body<SiweRequest> { required = true } }
             }) { req ->
                 val session = call.getAuthSession(authContext)
                 val address = verifySiweLogin(req)

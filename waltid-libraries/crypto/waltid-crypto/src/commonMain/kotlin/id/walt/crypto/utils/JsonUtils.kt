@@ -30,7 +30,8 @@ object JsonUtils {
             is Array<*> -> JsonArray(map { it.toJsonElement() })
             is Collection<*> -> JsonArray(map { it.toJsonElement() })
             is Enum<*> -> JsonPrimitive(this.toString())
-            else -> throw IllegalArgumentException("Unknown type: ${this::class.simpleName}, was: $this")
+            is Unit -> JsonPrimitive("null")
+            else -> throw IllegalArgumentException("Cannot convert to JsonElement - Unknown type: ${this::class.simpleName}, was: $this")
         }
 
     fun javaToJsonElement(any: Any?) = any.toJsonElement()

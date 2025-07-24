@@ -2,7 +2,7 @@ package id.walt.oid4vc
 
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.did.utils.randomUUID
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.requests.AuthorizationRequest
@@ -86,7 +86,7 @@ class EBSIIssueToHolderConformanceTest {
         // Create Authorization Request
         //
         val clientId = ISSUER_MOCK_DID
-        val codeVerifier = randomUUID() + randomUUID()
+        val codeVerifier = randomUUIDString() + randomUUIDString()
         val codeChallenge =
             codeVerifier.let { Base64.UrlSafe.encode(SHA256().digest(it.toByteArray(Charsets.UTF_8))).trimEnd('=') }
 
@@ -187,7 +187,7 @@ class EBSIIssueToHolderConformanceTest {
         httpResp = ktorClient.submitForm(
             url = idTokenReqMap["redirect_uri"]!!.first(),
             formParameters = parameters {
-                append("id_token", idToken)
+                append(ResponseType.IdToken.value, idToken)
                 append("state", idTokenReqMap["state"]!!.first())
             }
         )

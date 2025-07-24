@@ -3,7 +3,9 @@ package id.walt.sdjwt
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+
 private val log = KotlinLogging.logger { }
+
 /**
  * Selective disclosure map, that describes for each payload field recursively, whether it should be selectively disclosable / selected for disclosure.
  * @param fields  map of field keys to SD field descriptors
@@ -74,7 +76,15 @@ class SDMap(
                 if (!undisclosedPayload.containsKey(entry.key))
                     SDField(true)
                 else if (entry.value is JsonObject && undisclosedPayload[entry.key] is JsonObject) {
-                    SDField(false, generateSDMap(entry.value.jsonObject, undisclosedPayload[entry.key]!!.jsonObject, decoyMode, decoys))
+                    SDField(
+                        false,
+                        generateSDMap(
+                            entry.value.jsonObject,
+                            undisclosedPayload[entry.key]!!.jsonObject,
+                            decoyMode,
+                            decoys
+                        )
+                    )
                 } else {
                     SDField(false)
                 }
@@ -98,7 +108,8 @@ class SDMap(
             parent: String,
         ): SDMap {
             val pathMap = jsonPaths.map { path -> Pair(path.substringBefore("."), path.substringAfter(".", "")) }
-                .groupBy({ p -> p.first }, { p -> p.second }).mapValues { entry -> entry.value.filterNot { it.isEmpty() } }
+                .groupBy({ p -> p.first }, { p -> p.second })
+                .mapValues { entry -> entry.value.filterNot { it.isEmpty() } }
             return pathMap.mapValues {
                 val currentPath = listOf(parent, it.key).filter { it.isNotEmpty() }.joinToString(".")
                 SDField(
@@ -109,7 +120,11 @@ class SDMap(
             }.toSDMap(decoyMode, decoys)
         }
 
-        private fun regenerateSDField(sd: Boolean, value: JsonElement, digestedDisclosure: Map<String, SDisclosure>): SDField {
+        private fun regenerateSDField(
+            sd: Boolean,
+            value: JsonElement,
+            digestedDisclosure: Map<String, SDisclosure>
+        ): SDField {
             return SDField(
                 sd, if (value is JsonObject) {
                     regenerateSDMap(value.jsonObject, digestedDisclosure)
@@ -122,7 +137,10 @@ class SDMap(
          * @param undisclosedPayload  Undisclosed payload as contained in the JWT body of the SD-JWT token.
          * @param digestedDisclosures Map of digests to disclosures appended to the JWT in the SD-JWT token
          */
-        internal fun regenerateSDMap(undisclosedPayload: JsonObject, digestedDisclosures: Map<String, SDisclosure>): SDMap {
+        internal fun regenerateSDMap(
+            undisclosedPayload: JsonObject,
+            digestedDisclosures: Map<String, SDisclosure>
+        ): SDMap {
             return (undisclosedPayload[SDJwt.DIGESTS_KEY]?.jsonArray?.filter { digestedDisclosures.containsKey(it.jsonPrimitive.content) }
                 ?.map { sdEntry ->
                     digestedDisclosures[sdEntry.jsonPrimitive.content]!!

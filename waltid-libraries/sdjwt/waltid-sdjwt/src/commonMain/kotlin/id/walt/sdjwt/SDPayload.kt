@@ -40,16 +40,28 @@ data class SDPayload internal constructor(
     val sdMap
         get() = SDMap.regenerateSDMap(undisclosedPayload, digestedDisclosures)
 
-    private fun disclosePayloadRecursively(payload: JsonObject, verificationDisclosureMap: MutableMap<String, SDisclosure>?): JsonObject {
+    private fun disclosePayloadRecursively(
+        payload: JsonObject,
+        verificationDisclosureMap: MutableMap<String, SDisclosure>?
+    ): JsonObject {
         return buildJsonObject {
             payload.forEach { entry ->
                 if (entry.key == SDJwt.DIGESTS_KEY) {
                     if (entry.value !is JsonArray) throw Exception("SD-JWT contains invalid ${SDJwt.DIGESTS_KEY} element")
                     entry.value.jsonArray.forEach {
-                        unveilDisclosureIfPresent(it.jsonPrimitive.content, this, verificationDisclosureMap)
+                        unveilDisclosureIfPresent(
+                            digest = it.jsonPrimitive.content,
+                            objectBuilder = this,
+                            verificationDisclosureMap = verificationDisclosureMap
+                        )
                     }
                 } else if (entry.value is JsonObject) {
-                    put(entry.key, disclosePayloadRecursively(entry.value.jsonObject, verificationDisclosureMap))
+                    put(
+                        entry.key, disclosePayloadRecursively(
+                            payload = entry.value.jsonObject,
+                            verificationDisclosureMap = verificationDisclosureMap
+                        )
+                    )
                 } else {
                     put(entry.key, entry.value)
                 }
@@ -67,7 +79,10 @@ data class SDPayload internal constructor(
             objectBuilder.put(
                 sDisclosure.key,
                 if (sDisclosure.value is JsonObject) {
-                    disclosePayloadRecursively(sDisclosure.value.jsonObject, verificationDisclosureMap)
+                    disclosePayloadRecursively(
+                        payload = sDisclosure.value.jsonObject,
+                        verificationDisclosureMap = verificationDisclosureMap
+                    )
                 } else sDisclosure.value
             )
         }
@@ -105,7 +120,10 @@ data class SDPayload internal constructor(
      */
     fun withSelectiveDisclosures(sdMap: Map<String, SDField>): SDPayload {
         val selectedDisclosures = filterDisclosures(undisclosedPayload, sdMap)
-        return SDPayload(undisclosedPayload, digestedDisclosures.filterValues { selectedDisclosures.contains(it.disclosure) })
+        return SDPayload(
+            undisclosedPayload = undisclosedPayload,
+            digestedDisclosures = digestedDisclosures.filterValues { selectedDisclosures.contains(it.disclosure) }
+        )
     }
 
     /**
@@ -145,11 +163,20 @@ data class SDPayload internal constructor(
                 add(key)
                 add(value)
             }.toString().encodeToByteArray()).let { disclosure ->
-                SDisclosure(disclosure, salt, key, value)
+                SDisclosure(
+                    disclosure = disclosure,
+                    salt = salt,
+                    key = key,
+                    value = value
+                )
             }
         }
 
-        private fun digestSDClaim(key: String, value: JsonElement, digests2disclosures: MutableMap<String, SDisclosure>): String {
+        private fun digestSDClaim(
+            key: String,
+            value: JsonElement,
+            digests2disclosures: MutableMap<String, SDisclosure>
+        ): String {
             val disclosure = generateDisclosure(key, value)
             return digest(disclosure.disclosure).also {
                 digests2disclosures[it] = disclosure
@@ -166,7 +193,11 @@ data class SDPayload internal constructor(
             })
         }
 
-        private fun generateSDPayload(payload: JsonObject, sdMap: SDMap, digests2disclosures: MutableMap<String, SDisclosure>): JsonObject {
+        private fun generateSDPayload(
+            payload: JsonObject,
+            sdMap: SDMap,
+            digests2disclosures: MutableMap<String, SDisclosure>
+        ): JsonObject {
             val sdPayload = removeSDFields(payload, sdMap).toMutableMap()
             val digests = payload.filterKeys { key ->
                 // iterate over all fields that are selectively disclosable AND/OR have nested fields that might be:
@@ -174,15 +205,28 @@ data class SDPayload internal constructor(
             }.map { entry ->
                 if (entry.value !is JsonObject || sdMap[entry.key]?.children.isNullOrEmpty()) {
                     // this field has no nested elements and/or is selectively disclosable only as a whole:
-                    digestSDClaim(entry.key, entry.value, digests2disclosures)
+                    digestSDClaim(
+                        key = entry.key,
+                        value = entry.value,
+                        digests2disclosures = digests2disclosures
+                    )
                 } else {
                     // the nested properties could be selectively disclosable individually
                     // recursively generate SD payload for nested object:
-                    val nestedSDPayload = generateSDPayload(entry.value.jsonObject, sdMap[entry.key]!!.children!!, digests2disclosures)
+                    val nestedSDPayload = generateSDPayload(
+                        payload = entry.value.jsonObject,
+                        sdMap = sdMap[entry.key]!!.children!!,
+                        digests2disclosures = digests2disclosures
+                    )
+
                     if (sdMap[entry.key]?.sd == true) {
                         // this nested object is also selectively disclosable as a whole
                         // so let's compute the digest and disclosure for the nested SD payload:
-                        digestSDClaim(entry.key, nestedSDPayload, digests2disclosures)
+                        digestSDClaim(
+                            key = entry.key,
+                            value = nestedSDPayload,
+                            digests2disclosures = digests2disclosures
+                        )
                     } else {
                         // this nested object is not selectively disclosable as a whole, add the nested SD payload as it is:
                         sdPayload[entry.key] = nestedSDPayload
@@ -221,7 +265,11 @@ data class SDPayload internal constructor(
         fun createSDPayload(fullPayload: JsonObject, disclosureMap: SDMap): SDPayload {
             val digestedDisclosures = mutableMapOf<String, SDisclosure>()
             return SDPayload(
-                undisclosedPayload = generateSDPayload(fullPayload, disclosureMap, digestedDisclosures),
+                undisclosedPayload = generateSDPayload(
+                    payload = fullPayload,
+                    sdMap = disclosureMap,
+                    digests2disclosures = digestedDisclosures
+                ),
                 digestedDisclosures = digestedDisclosures
             )
         }
@@ -234,7 +282,10 @@ data class SDPayload internal constructor(
          */
         @JsExport.Ignore
         fun createSDPayload(jwtClaimsSet: JWTClaimsSet, disclosureMap: SDMap) =
-            createSDPayload(Json.parseToJsonElement(jwtClaimsSet.toString()).jsonObject, disclosureMap)
+            createSDPayload(
+                fullPayload = Json.parseToJsonElement(jwtClaimsSet.toString()).jsonObject,
+                disclosureMap = disclosureMap
+            )
 
         /**
          * Create SD payload based on full payload and undisclosed payload.
@@ -250,7 +301,15 @@ data class SDPayload internal constructor(
             undisclosedPayload: JsonObject,
             decoyMode: DecoyMode = DecoyMode.NONE,
             decoys: Int = 0
-        ) = createSDPayload(fullPayload, SDMap.generateSDMap(fullPayload, undisclosedPayload, decoyMode, decoys))
+        ) = createSDPayload(
+            fullPayload = fullPayload,
+            disclosureMap = SDMap.generateSDMap(
+                fullPayload = fullPayload,
+                undisclosedPayload = undisclosedPayload,
+                decoyMode = decoyMode,
+                decoys = decoys
+            )
+        )
 
         /**
          * Create SD payload based on full payload as JWT claims set and undisclosed payload.
@@ -267,9 +326,10 @@ data class SDPayload internal constructor(
             decoyMode: DecoyMode = DecoyMode.NONE,
             decoys: Int = 0
         ) = createSDPayload(
-            Json.parseToJsonElement(fullJWTClaimsSet.toString()).jsonObject,
-            Json.parseToJsonElement(undisclosedJWTClaimsSet.toString()).jsonObject,
-            decoyMode, decoys
+            fullPayload = Json.parseToJsonElement(fullJWTClaimsSet.toString()).jsonObject,
+            undisclosedPayload = Json.parseToJsonElement(undisclosedJWTClaimsSet.toString()).jsonObject,
+            decoyMode = decoyMode,
+            decoys = decoys
         )
 
         /**
@@ -279,8 +339,8 @@ data class SDPayload internal constructor(
          */
         fun parse(jwtBody: String, disclosures: Set<String>): SDPayload {
             return SDPayload(
-                Json.parseToJsonElement(jwtBody.decodeFromBase64Url().decodeToString()).jsonObject,
-                disclosures.associate { Pair(digest(it), SDisclosure.parse(it)) })
+                undisclosedPayload = Json.parseToJsonElement(jwtBody.decodeFromBase64Url().decodeToString()).jsonObject,
+                digestedDisclosures = disclosures.associate { Pair(digest(it), SDisclosure.parse(it)) })
         }
     }
 }

@@ -4,7 +4,7 @@ import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.util.getResourcePath
-import id.walt.did.utils.randomUUID
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -100,8 +100,8 @@ class WaltIdVPCreateCmdTest {
         runTest {
             val presDefPath = getResourcePath(this, "presexch/openbadge_presdef_vc_type.json")
             val expectedPresSubPath = getResourcePath(this, "presexch/openbadge_pressub_vc_type.json")
-            val outputPresSubPath = "${randomUUID()}_temp_pressub.json"
-            val outputVpPath = "${randomUUID()}_temp_vp.json"
+            val outputPresSubPath = "${randomUUIDString()}_temp_pressub.json"
+            val outputVpPath = "${randomUUIDString()}_temp_vp.json"
             File(outputPresSubPath).deleteOnExit()
             File(outputVpPath).deleteOnExit()
             val result = command.test(
@@ -135,8 +135,8 @@ class WaltIdVPCreateCmdTest {
         runTest {
             val presDefPath = getResourcePath(this, "presexch/openbadge_presdef_issuer_did.json")
             val expectedPresSubPath = getResourcePath(this, "presexch/openbadge_pressub_vc_type.json")
-            val outputPresSubPath = "${randomUUID()}_temp_pressub.json"
-            val outputVpPath = "${randomUUID()}_temp_vp.json"
+            val outputPresSubPath = "${randomUUIDString()}_temp_pressub.json"
+            val outputVpPath = "${randomUUIDString()}_temp_vp.json"
             File(outputPresSubPath).deleteOnExit()
             File(outputVpPath).deleteOnExit()
             val result = command.test(
@@ -170,8 +170,8 @@ class WaltIdVPCreateCmdTest {
         runTest {
             val presDefPath = getResourcePath(this, "presexch/openbadge_presdef_vc_type_and_issuer_did.json")
             val expectedPresSubPath = getResourcePath(this, "presexch/openbadge_pressub_vc_type.json")
-            val outputPresSubPath = "${randomUUID()}_temp_pressub.json"
-            val outputVpPath = "${randomUUID()}_temp_vp.json"
+            val outputPresSubPath = "${randomUUIDString()}_temp_pressub.json"
+            val outputVpPath = "${randomUUIDString()}_temp_vp.json"
             File(outputPresSubPath).deleteOnExit()
             File(outputVpPath).deleteOnExit()
             val result = command.test(
@@ -204,8 +204,8 @@ class WaltIdVPCreateCmdTest {
         runTest {
             val presDefPath = getResourcePath(this, "presexch/openbadge_verifiable_educational_id_presdef.json")
             val expectedPresSubPath = getResourcePath(this, "presexch/openbadge_verifiable_educational_id_pressub.json")
-            val outputPresSubPath = "${randomUUID()}_temp_pressub.json"
-            val outputVpPath = "${randomUUID()}_temp_vp.json"
+            val outputPresSubPath = "${randomUUIDString()}_temp_pressub.json"
+            val outputVpPath = "${randomUUIDString()}_temp_vp.json"
             File(outputPresSubPath).deleteOnExit()
             File(outputVpPath).deleteOnExit()
             val result = command.test(

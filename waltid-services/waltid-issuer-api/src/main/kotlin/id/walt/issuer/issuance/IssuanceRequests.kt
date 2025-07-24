@@ -79,7 +79,7 @@ data class NewIssuanceRequest(
 data class IssuanceRequest(
     val issuerKey: JsonObject,
     val credentialConfigurationId: String,
-    val credentialData: JsonObject?,
+    val credentialData: JsonObject? = null,
     val vct: String? = null,
     val mdocData: Map<String, JsonObject>? = null,
     val mapping: JsonObject? = null,

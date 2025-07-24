@@ -65,8 +65,13 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
     ) {
         post("emailpass", {
-            request { body<EmailPassCredentials>() }
-            response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
+            request { body<EmailPassCredentials> { required = true } }
+            response {
+                HttpStatusCode.OK to {
+                    description = "Successful authentication"
+                    body<AuthSessionInformation>()
+                }
+            }
         }) {
             val session = call.getAuthSession(authContext)
 

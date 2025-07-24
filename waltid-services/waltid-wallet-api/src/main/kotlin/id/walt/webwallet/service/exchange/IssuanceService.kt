@@ -37,17 +37,13 @@ object IssuanceService : IssuanceServiceBase() {
         logger.debug { "// -------- WALLET ----------" }
         logger.debug { "// as WALLET: receive credential offer, either being called via deeplink or by scanning QR code" }
         logger.debug { "// parse credential URI" }
-        val reqParams = parseOfferParams(offer)
 
         // entra or openid4vc credential offer
         val isEntra = EntraIssuanceRequest.isEntraIssuanceRequestUri(offer)
+
         val processedCredentialOffers = if (isEntra) {
             processMSEntraIssuanceRequest(
-                entraIssuanceRequest = EntraIssuanceRequest.fromAuthorizationRequest(
-                    AuthorizationRequest.fromHttpParametersAuto(
-                        reqParams
-                    )
-                ),
+                credentialOffer = offer,
                 credentialWallet = credentialWallet
             )
         } else {
@@ -57,6 +53,7 @@ object IssuanceService : IssuanceServiceBase() {
                 pinOrTxCode = pinOrTxCode,
             )
         }
+
         // === original ===
         logger.debug { "// parse and verify credential(s)" }
         check(processedCredentialOffers.any { it.credentialResponse.credential != null }) { "No credential was returned from credentialEndpoint: $processedCredentialOffers" }
@@ -64,8 +61,12 @@ object IssuanceService : IssuanceServiceBase() {
         // ??multiple credentials manifests
         val manifest =
             isEntra.takeIf { it }?.let { EntraManifestExtractor().extract(offer) }
+
         processedCredentialOffers.map {
-            getCredentialData(it, manifest)
+            getCredentialData(
+                processedOffer = it,
+                manifest = manifest
+            )
         }
     }
 
@@ -75,14 +76,17 @@ object IssuanceService : IssuanceServiceBase() {
         pinOrTxCode: String? = null,
     ): List<ProcessedCredentialOffer> {
 
-        logger.debug { "credentialOffer: $credentialOffer"}
+        logger.debug { "credentialOffer: $credentialOffer" }
 
         val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(credentialOffer)
 
         logger.debug { "providerMetadata: $providerMetadata" }
 
         logger.debug { "// resolve offered credentials" }
-        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credentialOffer, providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(
+            credentialOffer = credentialOffer,
+            providerMetadata = providerMetadata
+        )
         logger.debug { "offeredCredentials: $offeredCredentials" }
 
         require(offeredCredentials.isNotEmpty()) { "Resolved an empty list of offered credentials" }
@@ -92,11 +96,15 @@ object IssuanceService : IssuanceServiceBase() {
         val grant = credentialOffer.grants[GrantType.pre_authorized_code.value]!!
         val preAuthorizedCode = grant.preAuthorizedCode!!
         val tokenReq = when {
-            grant.userPinRequired != null && grant.userPinRequired != true -> TokenRequest.PreAuthorizedCode(preAuthorizedCode)
+            grant.userPinRequired != null && grant.userPinRequired != true -> TokenRequest.PreAuthorizedCode(
+                preAuthorizedCode
+            )
+
             providerMetadata is OpenIDProviderMetadata.Draft11 -> TokenRequest.PreAuthorizedCode(
                 preAuthorizedCode = preAuthorizedCode,
                 userPIN = pinOrTxCode
             )
+
             else -> TokenRequest.PreAuthorizedCode(
                 preAuthorizedCode = preAuthorizedCode,
                 txCode = pinOrTxCode
@@ -105,7 +113,7 @@ object IssuanceService : IssuanceServiceBase() {
 
         logger.debug { "token request : $tokenReq" }
 
-        val tokenResp =  OpenID4VCI.sendTokenRequest(
+        val tokenResp = OpenID4VCI.sendTokenRequest(
             providerMetadata = providerMetadata,
             tokenRequest = tokenReq
         )
@@ -133,27 +141,40 @@ object IssuanceService : IssuanceServiceBase() {
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
                 proof = ProofOfPossessionFactory.new(
-                    isKeyProofRequiredForOfferedCredential(offeredCredential),
-                    credentialWallet,
-                    offeredCredential,
-                    credentialOffer,
-                    nonce
+                    useKeyProof = isKeyProofRequiredForOfferedCredential(offeredCredential),
+                    credentialWallet = credentialWallet,
+                    offeredCredential = offeredCredential,
+                    credentialOffer = credentialOffer,
+                    nonce = nonce
                 )
             )
         }
         logger.debug { "credReqs: $credReqs" }
 
         require(credReqs.isNotEmpty()) { "No credentials offered" }
-        return CredentialOfferProcessor.process(credReqs, providerMetadata, accessToken)
+        return CredentialOfferProcessor.process(
+            credentialRequests = credReqs,
+            providerMetadata = providerMetadata,
+            accessToken = accessToken
+        )
     }
 
     private suspend fun processMSEntraIssuanceRequest(
-        entraIssuanceRequest: EntraIssuanceRequest,
+        credentialOffer: String,
         credentialWallet: TestCredentialWallet,
         pin: String? = null,
     ): List<ProcessedCredentialOffer> {
+
+        val reqParams = parseOfferParams(credentialOffer)
+
+        val entraIssuanceRequest = EntraIssuanceRequest.fromAuthorizationRequest(
+            AuthorizationRequest.fromHttpParametersAuto(
+                reqParams
+            )
+        )
+
         // *) Load key:
-//        val walletKey = getKeyByDid(credentialWallet.did)
+        // val walletKey = getKeyByDid(credentialWallet.did)
         val walletKey = DidService.resolveToKey(credentialWallet.did).getOrThrow()
 
         // *) Create response JWT token, signed by key for holder DID

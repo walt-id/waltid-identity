@@ -3,12 +3,12 @@ package id.walt.webwallet.service.exchange
 import cbor.Cbor
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.JwsUtils.decodeJwsOrSdjwt
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.OfferedCredential
-import id.walt.oid4vc.util.randomUUID
 import id.walt.sdjwt.SDJWTVCTypeMetadata
 import id.walt.webwallet.utils.WalletHttpClients
 import io.klogging.Klogger
@@ -63,7 +63,7 @@ abstract class IssuanceServiceBase {
         credential: String,
     ): CredentialDataResult {
         val credentialEncoding =
-            processedOffer.credentialResponse.customParameters["credential_encoding"]?.jsonPrimitive?.content
+            processedOffer.credentialResponse.customParameters!!["credential_encoding"]?.jsonPrimitive?.content
                 ?: "issuer-signed"
         logger.debug { "Parsed credential encoding: $credentialEncoding" }
 
@@ -83,7 +83,7 @@ abstract class IssuanceServiceBase {
         }
         // TODO: review ID generation for mdoc
         return CredentialDataResult(
-            id = randomUUID(),
+            id = randomUUIDString(),
             document = mDoc.toCBORHex(),
             type = docType,
             format = CredentialFormat.mso_mdoc,
@@ -108,7 +108,7 @@ abstract class IssuanceServiceBase {
         val vc = credentialParts.jwsParts.payload["vc"]?.jsonObject ?: credentialParts.jwsParts.payload
         logger.debug { "Parsed JWT-based vc payload: $vc" }
 
-        val credentialId = vc["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUID()
+        val credentialId = vc["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUIDString()
 
         val disclosures = credentialParts.sdJwtDisclosures
         logger.debug { "Parsed disclosures (size = ${disclosures.size}): $disclosures" }

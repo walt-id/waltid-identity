@@ -13,32 +13,31 @@ import com.nimbusds.jose.util.X509CertChainUtils
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import id.walt.commons.config.ConfigManager
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.JwtVerificationResult
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
-
-
 import java.io.File
 import java.io.FileReader
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 object RequestSigningCryptoProvider : JWTCryptoProvider {
     val signingKey: ECKey = ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningKeyFile?.let {
         runBlocking {
             if (File(it).exists())
-                ECKey.Builder(Curve.P_256, (ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey().toECPublicKey()))
+                ECKey.Builder(
+                    Curve.P_256,
+                    (ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey().toECPublicKey())
+                )
                     .privateKey(ECKey.parseFromPEMEncodedObjects(FileReader(it).readText()).toECKey().toECPrivateKey())
-                    .keyID(Uuid.random().toString())
+                    .keyID(randomUUIDString())
                     .build()
             else
                 null
         }
     }
-        ?: ECKeyGenerator(Curve.P_256).keyUse(KeyUse.SIGNATURE).keyID(Uuid.random().toString()).generate()
+        ?: ECKeyGenerator(Curve.P_256).keyUse(KeyUse.SIGNATURE).keyID(randomUUIDString()).generate()
 
     val certificateChain: String? = ConfigManager.getConfig<OIDCVerifierServiceConfig>().requestSigningCertFile?.let {
         runBlocking {
@@ -48,13 +47,14 @@ object RequestSigningCryptoProvider : JWTCryptoProvider {
 
     override fun sign(payload: JsonObject, keyID: String?, typ: String, headers: Map<String, Any>): String {
         return SignedJWT(
-            JWSHeader.Builder(JWSAlgorithm.ES256).keyID(signingKey.keyID).type(JOSEObjectType.JWT).customParams(headers).also {
-                if (certificateChain != null) {
-                    it.x509CertChain(
-                        X509CertChainUtils.parse(certificateChain).map { Base64.encode(it.encoded) }
-                    )
-                }
-            }.build(),
+            JWSHeader.Builder(JWSAlgorithm.ES256).keyID(signingKey.keyID).type(JOSEObjectType.JWT).customParams(headers)
+                .also {
+                    if (certificateChain != null) {
+                        it.x509CertChain(
+                            X509CertChainUtils.parse(certificateChain).map { Base64.encode(it.encoded) }
+                        )
+                    }
+                }.build(),
             JWTClaimsSet.parse(payload.toString())
         ).also { it.sign(ECDSASigner(signingKey)) }.serialize()
     }

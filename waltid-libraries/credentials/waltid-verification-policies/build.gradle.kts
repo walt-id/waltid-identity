@@ -10,7 +10,7 @@ plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
     id("maven-publish")
-    id("dev.petuska.npm.publish") version "3.5.2"
+    id("dev.petuska.npm.publish") version "3.5.3"
     id("love.forte.plugin.suspend-transform")
     id("com.github.ben-manes.versions")
 }
@@ -109,6 +109,7 @@ kotlin {
                 implementation("io.ktor:ktor-server-test-host:$ktor_version")
                 implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-server-netty:$ktor_version")
+                implementation("io.mockk:mockk:1.14.2")
             }
         }
 

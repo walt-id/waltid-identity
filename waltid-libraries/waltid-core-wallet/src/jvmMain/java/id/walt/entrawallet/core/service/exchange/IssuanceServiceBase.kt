@@ -11,7 +11,7 @@ import id.walt.oid4vc.data.OfferedCredential
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.oid4vc.util.randomUUID
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.sdjwt.SDJWTVCTypeMetadata
 import id.walt.entrawallet.core.service.oidc4vc.TestCredentialWallet
 import id.walt.webwallet.utils.WalletHttpClients
@@ -106,12 +106,12 @@ abstract class IssuanceServiceBase {
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    private suspend fun getMdocCredentialDataResult(
+    private fun getMdocCredentialDataResult(
         processedOffer: ProcessedCredentialOffer,
         credential: String,
     ): CredentialDataResult {
         val credentialEncoding =
-            processedOffer.credentialResponse.customParameters["credential_encoding"]?.jsonPrimitive?.content
+            processedOffer.credentialResponse.customParameters!!["credential_encoding"]?.jsonPrimitive?.content
                 ?: "issuer-signed"
         logger.debug { "Parsed credential encoding: $credentialEncoding" }
 
@@ -131,14 +131,14 @@ abstract class IssuanceServiceBase {
         }
         // TODO: review ID generation for mdoc
         return CredentialDataResult(
-            id = randomUUID(),
+            id = randomUUIDString(),
             document = mDoc.toCBORHex(),
             type = docType,
             format = CredentialFormat.mso_mdoc,
         )
     }
 
-    private suspend fun getDefaultCredentialDataResult(
+    private fun getDefaultCredentialDataResult(
         credential: String,
         manifest: JsonObject?,
         credentialFormat: CredentialFormat,
@@ -156,7 +156,7 @@ abstract class IssuanceServiceBase {
         val vc = credentialParts.jwsParts.payload["vc"]?.jsonObject ?: credentialParts.jwsParts.payload
         logger.debug { "Parsed JWT-based vc payload: $vc" }
 
-        val credentialId = vc["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUID()
+        val credentialId = vc["id"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: randomUUIDString()
 
         val disclosures = credentialParts.sdJwtDisclosures
         logger.debug { "Parsed disclosures (size = ${disclosures.size}): $disclosures" }

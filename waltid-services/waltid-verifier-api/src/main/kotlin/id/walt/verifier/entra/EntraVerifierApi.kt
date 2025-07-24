@@ -1,6 +1,7 @@
 package id.walt.verifier.entra
 
 import id.walt.commons.config.ConfigManager
+import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.policies.Verifier.runPolicyRequest
 import id.walt.policies.models.PolicyRequest
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
@@ -129,16 +130,19 @@ object EntraVerifierApi {
 
     val config = ConfigManager.getConfig<EntraConfig>()
 
-    val configuredCallbackUrl = config.callbackUrl
+    private val configuredCallbackUrl = config.callbackUrl
 
-    fun createCallbackMapping(data: MappedData): Uuid {
-        val uuid = Uuid.random()
+    private fun createCallbackMapping(data: MappedData): Uuid {
+        val uuid = randomUUID()
         callbackMapping[uuid] = data
 
         return uuid
     }
 
-    suspend fun createPresentationRequest(req: EntraVerificationRequest, data: VerifierData): Result<EntraVerifyResponse> {
+    suspend fun createPresentationRequest(
+        req: EntraVerificationRequest,
+        data: VerifierData
+    ): Result<EntraVerifyResponse> {
         val accessToken = req.authorization.getAccessToken()
 
 
@@ -150,13 +154,15 @@ object EntraVerifierApi {
             headers = JsonObject(mapOf("api-key" to JsonPrimitive("1234")))
         )
 
-        val createPresentationRequestBody = EntraCreatePresentationRequest.fromEntraVerificationRequest(req = req, callback = callback)
+        val createPresentationRequestBody =
+            EntraCreatePresentationRequest.fromEntraVerificationRequest(req = req, callback = callback)
 
-        val response = http.post("https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createPresentationRequest") {
-            header(HttpHeaders.Authorization, accessToken)
-            contentType(ContentType.Application.Json)
-            setBody(createPresentationRequestBody)
-        }
+        val response =
+            http.post("https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createPresentationRequest") {
+                header(HttpHeaders.Authorization, accessToken)
+                contentType(ContentType.Application.Json)
+                setBody(createPresentationRequestBody)
+            }
 
         return runCatching {
             check(response.status == HttpStatusCode.Created) { "Entra did not respond with CREATED" }
@@ -201,11 +207,17 @@ fun Application.entraVerifierApi() {
         }) {
             post("verify", {
                 tags = listOf("Entra Credential Verification")
-                request { body<EntraVerifyRequest>() }
-                response { HttpStatusCode.OK to { body<EntraVerifyResponse>() } }
+                request { body<EntraVerifyRequest> { required = true } }
+                response {
+                    HttpStatusCode.OK to {
+                        description = "EntraVerifyResponse"
+                        body<EntraVerifyResponse>()
+                    }
+                }
             }) {
                 val verifyRequest = call.receive<EntraVerifyRequest>()
-                val res = EntraVerifierApi.createPresentationRequest(verifyRequest.entraVerification, verifyRequest.data)
+                val res =
+                    EntraVerifierApi.createPresentationRequest(verifyRequest.entraVerification, verifyRequest.data)
 
                 call.respond(res.getOrThrow())
             }
@@ -247,7 +259,12 @@ fun Application.entraVerifierApi() {
             get("status/{nonce}", {
                 tags = listOf("Entra Credential Verification")
                 request { pathParameter<String>("nonce") }
-                response { HttpStatusCode.OK to { body<JsonArray>() } }
+                response {
+                    HttpStatusCode.OK to {
+                        description = "Status/nonce"
+                        body<JsonArray>()
+                    }
+                }
             }) {
                 val nonce = call.parameters["nonce"]?.let { Uuid.parse(it) }
 

@@ -1,12 +1,13 @@
 package id.walt.webwallet.db.models
 
-import id.walt.commons.temp.UuidSerializer
 import id.walt.crypto.utils.JsonUtils.toJsonObject
+import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.webwallet.db.kotlinxUuid
 import id.walt.webwallet.service.WalletService
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toKotlinInstant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -37,11 +38,11 @@ object WalletOperationHistories : UUIDTable("wallet_operation_histories") {
 @Serializable
 data class WalletOperationHistory(
     val tenant: String,
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
-    val id: Uuid? = Uuid.random(),
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    @Contextual
+    val id: Uuid? = randomUUID(),
+    @Contextual
     val account: Uuid,
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    @Contextual
     val wallet: Uuid,
     val timestamp: Instant,
     val operation: String,

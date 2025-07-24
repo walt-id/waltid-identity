@@ -1,5 +1,7 @@
 package id.walt.oid4vc.data
 
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KeepGeneratedSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -13,11 +15,13 @@ import kotlinx.serialization.json.jsonObject
  *  @param altText OPTIONAL. String value of an alternative text of a logo image.
  *  @param customParameters Other (custom) logo properties
  */
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = LogoPropertiesSerializer::class)
 data class LogoProperties(
     val url: String? = null,
     @SerialName("alt_text") val altText: String? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     override fun toJSON(): JsonObject = Json.encodeToJsonElement(LogoPropertiesSerializer, this).jsonObject
 
@@ -27,5 +31,5 @@ data class LogoProperties(
     }
 }
 
-object LogoPropertiesSerializer : JsonDataObjectSerializer<LogoProperties>(LogoProperties.serializer())
+object LogoPropertiesSerializer : JsonDataObjectSerializer<LogoProperties>(LogoProperties.generatedSerializer())
 

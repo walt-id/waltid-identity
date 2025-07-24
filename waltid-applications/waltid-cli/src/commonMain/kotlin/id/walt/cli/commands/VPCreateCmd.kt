@@ -17,8 +17,8 @@ import id.walt.cli.util.WaltIdCmdHelpOptionMessage
 import id.walt.w3c.PresentationBuilder
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
-import id.walt.did.utils.randomUUID
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -96,7 +96,7 @@ class VPCreateCmd : CliktCommand(
 
     private val nonce: String by option("-n", "--nonce")
         .help("Unique value used in the context of the OID4VP protocol to mitigate replay attacks. Random value will be generated if not specified.")
-        .default(randomUUID())
+        .default(randomUUIDString())
 
     private val inputVcFileList: List<File> by option("-vc", "--vc-file")
         .file(true, true, false, mustBeReadable = true, canBeSymlink = false)

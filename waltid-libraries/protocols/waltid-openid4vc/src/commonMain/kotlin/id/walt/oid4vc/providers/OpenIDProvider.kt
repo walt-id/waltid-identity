@@ -1,10 +1,10 @@
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.OpenID4VCIVersion
-import id.walt.oid4vc.data.GrantType
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
@@ -18,7 +18,6 @@ import id.walt.oid4vc.interfaces.ITokenProvider
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.*
-import id.walt.oid4vc.util.randomUUID
 import io.ktor.http.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.JsonObject
@@ -27,17 +26,15 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 abstract class OpenIDProvider<S : AuthorizationSession>(
     val baseUrl: String,
 ) : ISessionCache<S>, ITokenProvider {
     abstract val metadata: OpenIDProviderMetadata.Draft13
     abstract val config: OpenIDProviderConfig
 
-    protected open fun createDefaultProviderMetadata() = OpenID4VCI.createDefaultProviderMetadata(baseUrl, emptyMap(), OpenID4VCIVersion.DRAFT13)
+    protected open fun createDefaultProviderMetadata() =
+        OpenID4VCI.createDefaultProviderMetadata(baseUrl, emptyMap(), OpenID4VCIVersion.DRAFT13)
 
     fun getCommonProviderMetadataUrl(): String {
         return URLBuilder(baseUrl).apply {
@@ -118,7 +115,6 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         val did = kid.substringBefore("#")
 
         if (iss != sub || iss != did || sub != did) {
-            println("$sub $iss $did")
             throw IllegalArgumentException("Invalid payload in token. sub != iss != did")
         }
 
@@ -149,7 +145,11 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
 
     abstract fun validateAuthorizationRequest(authorizationRequest: AuthorizationRequest): Boolean
 
-    abstract fun initializeAuthorization(authorizationRequest: AuthorizationRequest, expiresIn: Duration, authServerState: String?): S
+    abstract fun initializeAuthorization(
+        authorizationRequest: AuthorizationRequest,
+        expiresIn: Duration,
+        authServerState: String?
+    ): S
 
     open fun processCodeFlowAuthorization(authorizationRequest: AuthorizationRequest): AuthorizationCodeResponse {
         if (!authorizationRequest.responseType.contains(ResponseType.Code))
@@ -160,7 +160,10 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             )
         val authorizationSession = getOrInitAuthorizationSession(authorizationRequest)
         val code = generateAuthorizationCodeFor(authorizationSession)
-        return AuthorizationCodeResponse.success(code, mapOf("state" to listOf(authorizationRequest.state ?: randomUUID())))
+        return AuthorizationCodeResponse.success(
+            code,
+            mapOf("state" to listOf(authorizationRequest.state ?: randomUUIDString()))
+        )
     }
 
     open fun processDirectPost(state: String, tokenPayload: JsonObject): AuthorizationCodeResponse {
@@ -199,8 +202,8 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
             )
 
         // Bind authentication request with state
-        val authorizationRequestServerState = Uuid.random().toString()
-        val authorizationRequestServerNonce = Uuid.random().toString()
+        val authorizationRequestServerState = randomUUIDString()
+        val authorizationRequestServerNonce = randomUUIDString()
         val authorizationResponseServerMode = ResponseMode.direct_post
 
         val clientId = this.metadata.issuer!!
@@ -256,8 +259,9 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     }
 
     open fun processImplicitFlowAuthorization(authorizationRequest: AuthorizationRequest): TokenResponse {
-        println("> processImplicitFlowAuthorization for $authorizationRequest")
-        if (!authorizationRequest.responseType.contains(ResponseType.Token) && !authorizationRequest.responseType.contains(ResponseType.VpToken)
+        if (!authorizationRequest.responseType.contains(ResponseType.Token) && !authorizationRequest.responseType.contains(
+                ResponseType.VpToken
+            )
             && !authorizationRequest.responseType.contains(ResponseType.IdToken)
         )
             throw AuthorizationError(
@@ -265,9 +269,9 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                 AuthorizationErrorCode.invalid_request,
                 message = "Invalid response type ${authorizationRequest.responseType}, for implicit authorization flow."
             )
-        println("> processImplicitFlowAuthorization: Generating authorizationSession (getOrInitAuthorizationSession)...")
+
         val authorizationSession = getOrInitAuthorizationSession(authorizationRequest)
-        println("> processImplicitFlowAuthorization: generateTokenResponse...")
+
         return generateTokenResponse(
             authorizationSession,
             TokenRequest.AuthorizationCode(
@@ -326,7 +330,10 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         expiresIn = authorizationSession.expirationTimestamp - Clock.System.now()
     )
 
-    protected open fun getOrInitAuthorizationSession(authorizationRequest: AuthorizationRequest, authServerState: String? = null): S {
+    protected open fun getOrInitAuthorizationSession(
+        authorizationRequest: AuthorizationRequest,
+        authServerState: String? = null
+    ): S {
         return when (authorizationRequest.isReferenceToPAR) {
             true -> getPushedAuthorizationSession(authorizationRequest)
             false -> initializeAuthorization(authorizationRequest, 5.minutes, authServerState)

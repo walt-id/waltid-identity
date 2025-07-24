@@ -2,8 +2,8 @@
 
 package id.walt.webwallet.service.issuers
 
-import id.walt.commons.temp.UuidSerializer
 import id.walt.webwallet.db.models.WalletIssuers
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.ResultRow
 import kotlin.uuid.ExperimentalUuidApi
@@ -12,7 +12,7 @@ import kotlin.uuid.toKotlinUuid
 
 @Serializable
 data class IssuerDataTransferObject(
-    @Serializable(with = UuidSerializer::class) // required to serialize Uuid, until kotlinx.serialization uses Kotlin 2.1.0
+    @Contextual
     val wallet: Uuid,
     val did: String,
     val description: String? = "no description",

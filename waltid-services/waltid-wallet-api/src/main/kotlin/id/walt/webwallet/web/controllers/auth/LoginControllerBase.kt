@@ -30,6 +30,7 @@ abstract class LoginControllerBase(
         summary = "Login with [email + password] or [wallet address + ecosystem] or [oidc session]"
         request {
             body<AccountRequest> {
+                required = true
                 example("E-mail + password") {
                     value = EmailAccountRequest(
                         email = "user@email.com", password = "password"
@@ -44,7 +45,13 @@ abstract class LoginControllerBase(
             }
         }
         response {
-            HttpStatusCode.OK to { description = "Login successful" }
+            HttpStatusCode.OK to {
+                description = "Login successful"
+                header<String>("set-cookie") {
+                    description = "A successful login will set a session cookie."
+                }
+                body<LoginResponseData>()
+            }
             HttpStatusCode.Unauthorized to { description = "Login failed" }
             HttpStatusCode.BadRequest to { description = "Login failed" }
         }

@@ -4,40 +4,48 @@ package id.walt.oid4vc.data
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.mdoc.cose.COSECryptoProvider
 import id.walt.mdoc.dataelement.*
+import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.util.JwtUtils
 import io.ktor.utils.io.core.*
 import kotlinx.datetime.Clock
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
-@Serializable
-data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private constructor(
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = ProofOfPossessionSerializer::class)
+data class ProofOfPossession private constructor(
     @EncodeDefault @SerialName("proof_type") val proofType: ProofType,
     val jwt: String? = null,
     val cwt: String? = null,
     val ldp_vp: JsonObject? = null,
-    override val customParameters: Map<String, JsonElement> = mapOf()
+    override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
     override fun toJSON() = Json.encodeToJsonElement(ProofOfPossessionSerializer, this).jsonObject
 
     suspend fun validateJwtProof(
         key: Key,
-        issuerUrl: String, clientId: String?, nonce: String?, keyId: String?
+        issuerUrl: String,
+        clientId: String?,
+        nonce: String?,
+        keyId: String?
     ): Boolean {
         return proofType == ProofType.jwt && jwt != null &&
                 key.verifyJws(jwt).isSuccess &&
                 JwtUtils.parseJWTHeader(jwt).let { header ->
-                    header.containsKey("typ") && header["typ"]?.jsonPrimitive?.content?.equals(JWT_HEADER_TYPE) ?: false &&
-                            (keyId.isNullOrEmpty() || header.containsKey("kid") && header["kid"]!!.jsonPrimitive.content == keyId)
+                    header.containsKey(JWTClaims.Header.type) && header[JWTClaims.Header.type]?.jsonPrimitive?.content?.equals(
+                        JWT_HEADER_TYPE
+                    ) ?: false &&
+                            (keyId.isNullOrEmpty() || header.containsKey(JWTClaims.Header.keyID) && header[JWTClaims.Header.keyID]!!.jsonPrimitive.content == keyId)
                 } &&
                 JwtUtils.parseJWTPayload(jwt).let { payload ->
-                    (issuerUrl.isNotEmpty() && payload.containsKey("aud") && payload["aud"]!!.jsonPrimitive.content == issuerUrl) &&
-                            (clientId.isNullOrEmpty() || payload.containsKey("iss") && payload["iss"]!!.jsonPrimitive.content == clientId) &&
-                            (nonce.isNullOrEmpty() || payload.containsKey("nonce") && payload["nonce"]!!.jsonPrimitive.content == nonce)
+                    (issuerUrl.isNotEmpty() && payload.containsKey(JWTClaims.Payload.audience) && payload[JWTClaims.Payload.audience]!!.jsonPrimitive.content == issuerUrl) &&
+                            (clientId.isNullOrEmpty() || payload.containsKey(JWTClaims.Payload.issuer) && payload[JWTClaims.Payload.issuer]!!.jsonPrimitive.content == clientId) &&
+                            (nonce.isNullOrEmpty() || payload.containsKey(JWTClaims.Payload.nonce) && payload[JWTClaims.Payload.nonce]!!.jsonPrimitive.content == nonce)
                 }
     }
 
@@ -56,31 +64,45 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
         private val audience: String? = null,
     ) : ProofBuilder() {
         val headers = buildJsonObject {
-            put("typ", JWT_HEADER_TYPE)
-            keyId?.let { put("kid", it) }
-            keyJwk?.let { put("jwk", it) }
-            x5c?.let { put("x5c", it) }
+            put(JWTClaims.Header.type, JWT_HEADER_TYPE)
+            keyId?.let { put(JWTClaims.Header.keyID, it) }
+            keyJwk?.let { put(JWTClaims.Header.jwk, it) }
+            x5c?.let { put(JWTClaims.Header.x5c, it) }
             trustChain?.let { put("trust_chain", it) }
         }
+
+        @OptIn(ExperimentalUuidApi::class)
         val payload = buildJsonObject {
             clientId?.let {
-                put("iss", it)
-                put("sub", it)
+                put(JWTClaims.Payload.issuer, it)
+                put(JWTClaims.Payload.subject, it)
             }
-            put("jti", Uuid.random().toString())
+            put(JWTClaims.Payload.jwtID, randomUUIDString())
             audience?.let {
-                put("aud", it)
-            } ?: put("aud", issuerUrl)
-            put("iat", Clock.System.now().epochSeconds)
-            put("exp", Clock.System.now().epochSeconds + 300)
-            nonce?.let { put("nonce", it) }
+                put(JWTClaims.Payload.audience, it)
+            } ?: put(JWTClaims.Payload.audience, issuerUrl)
+            put(JWTClaims.Payload.issuedAtTime, Clock.System.now().epochSeconds)
+            put(JWTClaims.Payload.expirationTime, Clock.System.now().epochSeconds + 300)
+            nonce?.let { put(JWTClaims.Payload.nonce, it) }
         }
 
         override suspend fun build(key: Key) =
-            ProofOfPossession(ProofType.jwt, key.signJws(payload.toString().toByteArray(), headers), null, null)
+            ProofOfPossession(
+                proofType = ProofType.jwt,
+                jwt = key.signJws(
+                    plaintext = payload.toString().toByteArray(),
+                    headers = headers
+                ),
+                cwt = null,
+                ldp_vp = null
+            )
 
-        fun build(signedJwt: String) = ProofOfPossession(ProofType.jwt, signedJwt, null, null)
-
+        fun build(signedJwt: String) = ProofOfPossession(
+            proofType = ProofType.jwt,
+            jwt = signedJwt,
+            cwt = null,
+            ldp_vp = null
+        )
     }
 
     /**
@@ -138,18 +160,17 @@ data class ProofOfPossession @OptIn(ExperimentalSerializationApi::class) private
     companion object : JsonDataObjectFactory<ProofOfPossession>() {
         const val JWT_HEADER_TYPE = "openid4vci-proof+jwt"
         const val CWT_HEADER_TYPE = "openid4vci-proof+cwt"
-        override fun fromJSON(jsonObject: JsonObject) =
+        override fun fromJSON(jsonObject: JsonObject): ProofOfPossession =
             Json.decodeFromJsonElement(ProofOfPossessionSerializer, jsonObject)
     }
 
-    @Transient
     val isCwtProofType get() = proofType == ProofType.cwt && !cwt.isNullOrEmpty()
 
-    @Transient
     val isJwtProofType get() = proofType == ProofType.jwt && !jwt.isNullOrEmpty()
 }
 
-object ProofOfPossessionSerializer : JsonDataObjectSerializer<ProofOfPossession>(ProofOfPossession.serializer())
+internal object ProofOfPossessionSerializer :
+    JsonDataObjectSerializer<ProofOfPossession>(ProofOfPossession.generatedSerializer())
 
 enum class ProofType {
     jwt, cwt, ldp_vp

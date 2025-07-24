@@ -17,6 +17,7 @@ class KeycloakLogoutController : LogoutControllerBase(keycloakAuthPath, keycloak
             "Terminates Keycloak and wallet session by the user identified by the Keycloak user ID."
         request {
             body<KeycloakLogoutRequest> {
+                required = true
                 example("keycloakUserId + token") {
                     value = KeycloakLogoutRequest(
                         keycloakUserId = "3d09 ...",
