@@ -1,11 +1,15 @@
 name: Unified release on manual push
 
+#on:
+#  workflow_dispatch:
+#    inputs:
+#      release_version:
+#        description: 'Release version'
+#        required: true
 on:
-  workflow_dispatch:
-    inputs:
-      release_version:
-        description: 'Release version'
-        required: true
+  push:
+    branches:
+      - release-ci-cd
 
 jobs:
   version:
