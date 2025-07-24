@@ -12,16 +12,16 @@ on:
         required: false
         type: string
         default: "dev"
-      namespace:
+      oss:
         description: "deployment namespace (defaults to test-identity-main)"
         required: false
         type: string
         default: "test-identity-main"
-      portals:
-        description: "deployment namespace for portal related services (defaults to test-identity-main)"
+      enterprise:
+        description: "deployment namespace (defaults to test-enterprise-main)"
         required: false
         type: string
-        default: "test-identity-main"
+        default: "test-enterprise-main"
       kubeconfig_secret:
         description: "The name of the kubeconfig secret to use (defaults to 'AKS_KUBE_CONFIG')"
         required: false
@@ -37,25 +37,46 @@ jobs:
     strategy:
       matrix:
         services:
-          - k8s: waltid-services/waltid-issuer-api/k8s
+          - k8s: waltid-identity/waltid-services/waltid-issuer-api/k8s
             name: issuer
-            namespace: ${{ inputs.portals }}
-          - k8s: waltid-services/waltid-verifier-api/k8s
+            namespace: ${{ inputs.oss }}
+          - k8s: waltid-identity/waltid-services/waltid-verifier-api/k8s
             name: verifier
-            namespace: ${{ inputs.portals }}
-          - k8s: waltid-services/waltid-wallet-api/k8s
+            namespace: ${{ inputs.oss }}
+          - k8s: waltid-identity/waltid-services/waltid-wallet-api/k8s
             name: web-wallet
-            namespace: ${{ inputs.namespace }}
+            namespace: ${{ inputs.oss }}
             keycloak: true
-          - k8s: waltid-applications/waltid-web-portal/k8s
+          - k8s: waltid-identity/waltid-applications/waltid-web-portal/k8s
             name: portal
-            namespace: ${{ inputs.portals }}
-          - k8s: waltid-services/waltid-verifier-api/k8s/opa
+            namespace: ${{ inputs.oss }}
+          - k8s: waltid-identity/waltid-services/waltid-verifier-api/k8s/opa
             name: opa
-            namespace: ${{ inputs.namespace }}
+            namespace: ${{ inputs.oss }}
+          - k8s: waltid-identity-enterprise/k8s
+            name: waltid-enterprise
+            namespace: ${{ inputs.enterprise }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout unified-build
+        uses: actions/checkout@v4
+        with:
+          repository: walt-id/waltid-unified-build
+          ref: 'dcql'
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          path: .
+      - name: Checkout waltid-identity
+        uses: actions/checkout@v4
+        with:
+          repository: walt-id/waltid-identity
+          ref: 'dcql'
+          path: ./waltid-identity
+      - name: Checkout waltid-identity-enterprise
+        uses: actions/checkout@v4
+        with:
+          ref: 'dcql'
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          path: ./waltid-identity-enterprise
       - name: Prepare CD - ${{ matrix.services.name }}
         run: |
           modified_deployment=$(sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" ${{ matrix.services.k8s }}/deployment-${{ inputs.deployment }}.yaml | \

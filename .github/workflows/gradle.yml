@@ -22,8 +22,27 @@ jobs:
         with:
           tool-cache: false
           docker-images: false
-      - name: Checkout code
+
+      - name: Checkout unified-build
         uses: actions/checkout@v4
+        with:
+          repository: walt-id/waltid-unified-build
+          ref: 'dcql'
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          path: .
+      - name: Checkout waltid-identity
+        uses: actions/checkout@v4
+        with:
+          repository: walt-id/waltid-identity
+          ref: 'dcql'
+          path: ./waltid-identity
+      - name: Checkout waltid-identity-enterprise
+        uses: actions/checkout@v4
+        with:
+          ref: 'dcql'
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          path: ./waltid-identity-enterprise
+
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@a4a92e12ee9b7396ee9a22083ff21b3277c627d6
       - name: Set version
