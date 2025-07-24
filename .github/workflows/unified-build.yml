@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: walt-id/waltid-unified-build
-          ref: ${{ github.ref_name }}"
+          ref: ${{ github.ref_name }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           path: .
 
@@ -21,13 +21,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: walt-id/waltid-identity
-          ref: ${{ github.ref_name }}"
+          ref: ${{ github.ref_name }}
           path: ./waltid-identity
 
       - name: Checkout waltid-identity-enterprise
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}"
+          ref: ${{ github.ref_name }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           path: ./waltid-identity-enterprise
 
