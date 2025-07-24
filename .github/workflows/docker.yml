@@ -69,6 +69,7 @@ jobs:
         with:
           push: ${{ inputs.publish }}
           file: ${{ github.workspace }}/${{ matrix.folder }}/Dockerfile
+          context: ${{ matrix.context }}
           tags: waltid/${{ matrix.image }}:${{ inputs.tag }}, waltid/${{ matrix.image }}:${{ inputs.version }}
           load: true
           build-args: |
