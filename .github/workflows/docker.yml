@@ -52,6 +52,7 @@ jobs:
       - name: Checkout waltid-identity-enterprise
         uses: actions/checkout@v4
         with:
+          repository: walt-id/waltid-identity-enterprise
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           path: ./waltid-identity-enterprise
 
@@ -63,7 +64,6 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - run: ls "${{ github.workspace }}/waltid-identity-enterprise"
       - name: Build and push Docker images (${{ matrix.image }})
         uses: docker/build-push-action@v6
         with:
