@@ -37,7 +37,7 @@ jobs:
       tag: latest
 #      publish: true
   deploy:
-    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@c1d783bf8ef5c8f01617e8ad4a73b892d2a61cd5
+    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@b7dffbd3a0159cd2e5a6aebd54f1e092d5455606
     secrets: inherit
     needs: [ version,
 #             gradle, docker
