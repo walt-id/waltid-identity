@@ -233,9 +233,9 @@ fun Application.verifierApi() {
                 put("issuer", SERVER_URL)
                 put("jwks_uri", "$SERVER_URL/jwks")
                 put("response_types_supported", buildJsonArray {
-                    add(ResponseType.Code.name)
-                    add(ResponseType.IdToken.name)
-                    add(ResponseType.VpToken.name)
+                    add(ResponseType.Code.value)
+                    add(ResponseType.IdToken.value)
+                    add(ResponseType.VpToken.value)
                 })
                 put("subject_types_supported", buildJsonArray { add("public") })
                 put("id_token_signing_alg_values_supported", buildJsonArray { add("ES256") })
