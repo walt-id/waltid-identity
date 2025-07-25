@@ -50,7 +50,7 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 
       - name: Set version
-        if: ${{ inputs.version }}
+        if: ${{ inputs.version != '' }}
         run: |
           sed -i "s/1.0.0-SNAPSHOT/${{ inputs.version }}/g" build.gradle.kts
       - name: Publish
