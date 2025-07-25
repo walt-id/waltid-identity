@@ -63,31 +63,30 @@ jobs:
         with:
           repository: walt-id/waltid-unified-build
           token: ${{ secrets.GH_ACCESS_TOKEN }}
-          path: .
+          path: ${{ github.workspace }}
       - name: Checkout waltid-identity
         uses: actions/checkout@v4
         with:
           repository: walt-id/waltid-identity
-          path: ./waltid-identity
+          path: ${{ github.workspace }}/waltid-identity
       - name: Checkout waltid-identity-enterprise
         uses: actions/checkout@v4
         with:
           repository: walt-id/waltid-identity-enterprise
           token: ${{ secrets.GH_ACCESS_TOKEN }}
-          path: ./waltid-identity-enterprise
+          path: ${{ github.workspace }}/waltid-identity-enterprise
       - name: Prepare CD - ${{ matrix.services.name }}
         run: |
-          modified_deployment=$(sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" ${{ github.workspace }}/${{ matrix.services.k8s }}/deployment-${{ inputs.deployment }}.yaml | \
+          modified_deployment=$(sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" ${{ matrix.services.k8s }}/deployment-${{ inputs.deployment }}.yaml | \
                                 sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g")
           if [ "${{ matrix.services.keycloak }}" == true ]; then
-            echo "$modified_deployment" | sed "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/$KEYCLOAK/g" > ${{ github.workspace }}/${{ matrix.services.k8s }}/deployment_mod.yaml
+            echo "$modified_deployment" | sed "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/$KEYCLOAK/g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
           else
-            echo "$modified_deployment" > ${{ github.workspace }}/${{ matrix.services.k8s }}/deployment_mod.yaml
+            echo "$modified_deployment" > ${{ matrix.services.k8s }}/deployment_mod.yaml
           fi
-      - run: ls ${{ github.workspace }}/${{ matrix.services.k8s }}
       - name: Continuous deployment - ${{ matrix.services.name }}
         uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets[inputs.kubeconfig_secret] }}
         with:
-          args: apply -n ${{ matrix.services.namespace }} -f ${{ github.workspace }}/${{ matrix.services.k8s }}/deployment_mod.yaml
+          args: apply -n ${{ matrix.services.namespace }} -f ${{ matrix.services.k8s }}/deployment_mod.yaml
