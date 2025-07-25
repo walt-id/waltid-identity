@@ -37,9 +37,11 @@ jobs:
       tag: latest
 #      publish: true
   deploy:
-    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@51e7fbbffc8a6c77ed41b958d95c0e3bd6187e02
+    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@c1d783bf8ef5c8f01617e8ad4a73b892d2a61cd5
     secrets: inherit
-    needs: [ version, gradle, docker ]
+    needs: [ version, gradle,
+#             docker
+    ]
     with:
       version: ${{ needs.version.outputs.release_version }}
       deployment: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'dev' || 'prod' }}
