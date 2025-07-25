@@ -43,18 +43,18 @@ jobs:
         with:
           repository: walt-id/waltid-unified-build
           token: ${{ secrets.GH_ACCESS_TOKEN }}
-          path: .
+          path: ${{ github.workspace }}
       - name: Checkout waltid-identity
         uses: actions/checkout@v4
         with:
           repository: walt-id/waltid-identity
-          path: ./waltid-identity
+          path: ${{ github.workspace }}/waltid-identity
       - name: Checkout waltid-identity-enterprise
         uses: actions/checkout@v4
         with:
           repository: walt-id/waltid-identity-enterprise
           token: ${{ secrets.GH_ACCESS_TOKEN }}
-          path: ./waltid-identity-enterprise
+          path: ${{ github.workspace }}/waltid-identity-enterprise
 
       - name: Login to Docker Hub
         if: ${{ inputs.publish }}
@@ -68,7 +68,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: ${{ inputs.publish }}
-          file: ${{ github.workspace }}/${{ matrix.folder }}/Dockerfile
+          file: ${{ matrix.folder }}/Dockerfile
           context: ${{ matrix.context }}
           tags: waltid/${{ matrix.image }}:${{ inputs.tag }}, waltid/${{ matrix.image }}:${{ inputs.version }}
           load: true

@@ -22,7 +22,7 @@ jobs:
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
-#      publish: true
+      publish: true
   docker-matrix:
     uses: walt-id/waltid-identity/.github/workflows/load-json.yml@51e7fbbffc8a6c77ed41b958d95c0e3bd6187e02
     with:
@@ -35,13 +35,11 @@ jobs:
       images: ${{ needs.docker-matrix.outputs.json }}
       version: ${{ needs.version.outputs.release_version }}
       tag: latest
-#      publish: true
+      publish: true
   deploy:
     uses: walt-id/waltid-identity/.github/workflows/deployment.yml@b7dffbd3a0159cd2e5a6aebd54f1e092d5455606
     secrets: inherit
-    needs: [ version,
-#             gradle, docker
-    ]
+    needs: [ version, gradle, docker]
     with:
       version: ${{ needs.version.outputs.release_version }}
       deployment: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'dev' || 'prod' }}
