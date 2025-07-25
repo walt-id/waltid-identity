@@ -84,6 +84,7 @@ jobs:
           else
             echo "$modified_deployment" > ${{ github.workspace }}/${{ matrix.services.k8s }}/deployment_mod.yaml
           fi
+      - run: ls ${{ github.workspace }}/${{ matrix.services.k8s }}
       - name: Continuous deployment - ${{ matrix.services.name }}
         uses: actions-hub/kubectl@master
         env:
