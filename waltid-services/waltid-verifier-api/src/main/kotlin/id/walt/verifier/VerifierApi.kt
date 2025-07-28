@@ -10,8 +10,8 @@ import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.data.ResponseType
 import id.walt.policies.PolicyManager
 import id.walt.verifier.config.OIDCVerifierServiceConfig
-import id.walt.verifier.oidc.VerifierService
 import id.walt.verifier.oidc.RequestSigningCryptoProvider
+import id.walt.verifier.oidc.VerifierService
 import id.walt.verifier.oidc.models.presentedcredentials.PresentedCredentialsViewMode
 import id.walt.verifier.openapi.PresentedCredentialsDocs
 import id.walt.verifier.openapi.VerifierApiDocs
@@ -137,7 +137,14 @@ fun Application.verifierApi() {
                         val code = Uuid.random().toString()
                         call.respondRedirect("openid://?code=$code&state=$state")
                     } else {
-                        call.respond(HttpStatusCode.OK, it)
+                        if(it.isNotBlank()) {
+                            call.respond(
+                                status = HttpStatusCode.OK,
+                                message = mapOf("redirect_uri" to it),
+                            )
+                        } else {
+                            call.respond(HttpStatusCode.OK)
+                        }
                     }
                 }.onFailure {
                     logger.debug(it) { "Verification failed ($it)" }
@@ -157,7 +164,10 @@ fun Application.verifierApi() {
                         }
 
                         it is VerifierService.FailedVerificationException && it.redirectUrl != null -> {
-                            call.respond(HttpStatusCode.BadRequest, it.redirectUrl)
+                            call.respond(
+                                status = HttpStatusCode.BadRequest,
+                                message = mapOf("error_uri" to it.redirectUrl),
+                            )
                         }
 
                         else -> {
