@@ -15,7 +15,6 @@ import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
-import id.walt.test.integration.environment.api.wallet.AuthApi
 import id.walt.test.integration.expectLooksLikeJwt
 import id.walt.test.integration.expectSuccess
 import id.walt.test.integration.tests.AbstractIntegrationTest
@@ -33,12 +32,13 @@ import id.walt.webwallet.webWalletModule
 import io.klogging.Klogging
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.util.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
+import org.junit.jupiter.api.BeforeEach
 import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
@@ -48,10 +48,6 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
 
     companion object {
         val defaultTestTimeout = 5.minutes
-        val defaultEmailAccount = EmailAccountRequest(
-            email = "user@email.com",
-            password = "password"
-        )
         val issuerKey = loadResource("issuance/key.json")
         val issuerDid = loadResource("issuance/did.txt")
         val openBadgeCredentialData = loadResource("issuance/openbadgecredential.json")
@@ -83,45 +79,24 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         lspPotentialVerificationTestApi()
     }
 
+    @BeforeEach
+    fun before() = runBlocking {
+        logger.info { "Before Each" }
+    }
+
+
     @OptIn(ExperimentalUuidApi::class)
     @Test
     fun e2e() = runTest {
         logger.error { "*************************** RUNNING TESTS **************************************" }
         val e2e = environment.e2e
-        var client = environment.testHttpClient()
-        lateinit var accountId: Uuid
-        lateinit var wallet: Uuid
-        var authApi = AuthApi(e2e, client)
+        val walletApi = environment.getWalletApi().loginWithDefaultUser()
+        var client = walletApi.httpClient
+        val wallets = walletApi.listAccountWallets()
+        val wallet = wallets.wallets.first()
+
 
         // the e2e http request tests here
-
-        //region -Auth-
-        authApi.apply {
-            userInfo(HttpStatusCode.Unauthorized)
-            e2e.test("/wallet-api/auth/login - wallet-api login") {
-                val loginResult = login(defaultEmailAccount)
-                client = environment.testHttpClient(token = loginResult["token"]!!.jsonPrimitive.content)
-                authApi = AuthApi(e2e, client)
-            }
-        }
-
-        authApi.apply {
-            userInfo(HttpStatusCode.OK) {
-                accountId = it.id
-            }
-            userSession()
-            userWallets(accountId) {
-                wallet = it.wallets.first().id
-                println("Selected wallet: $wallet")
-            }
-        }
-
-
-        //region -Auth X5c-
-        AuthApi.X5c(e2e, client).executeTestCases()
-        //endregion -Auth X5c-
-        //endregion -Auth-
-
         //region -Keys-
         val keysApi = KeysApi(e2e, client)
         val defaultKeyConfig = ConfigManager.getConfig<RegistrationDefaultsConfig>().defaultKeyConfig
@@ -129,74 +104,74 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         val keyGenRequest = KeyGenerationRequest("jwk", KeyType.Ed25519)
         lateinit var generatedKeyId: String
         val rsaJwkImport = loadResource("keys/rsa.json")
-        keysApi.list(wallet, defaultKeyConfig)
-        keysApi.generate(wallet, keyGenRequest) { generatedKeyId = it }
-        keysApi.load(wallet, generatedKeyId, keyGenRequest)
-        keysApi.meta(wallet, generatedKeyId, keyGenRequest)
-        keysApi.export(wallet, generatedKeyId, "JWK", true, keyGenRequest)
-        keysApi.delete(wallet, generatedKeyId)
-        keysApi.import(wallet, rsaJwkImport)
+        keysApi.list(wallet.id, defaultKeyConfig)
+        keysApi.generate(wallet.id, keyGenRequest) { generatedKeyId = it }
+        keysApi.load(wallet.id, generatedKeyId, keyGenRequest)
+        keysApi.meta(wallet.id, generatedKeyId, keyGenRequest)
+        keysApi.export(wallet.id, generatedKeyId, "JWK", true, keyGenRequest)
+        keysApi.delete(wallet.id, generatedKeyId)
+        keysApi.import(wallet.id, rsaJwkImport)
         //endregion -Keys-
 
         //region -Dids-
         val didsApi = DidsApi(e2e, client)
         lateinit var did: String
         val createdDids = mutableListOf<String>()
-        didsApi.list(wallet, DidsApi.DefaultDidOption.Any, 1) {
+        didsApi.list(wallet.id, DidsApi.DefaultDidOption.Any, 1) {
             assert(it.first().default)
             did = it.first().did
         }
         //todo: test for optional registration defaults
-        didsApi.create(wallet, DidsApi.DidCreateRequest(method = "key", options = mapOf("useJwkJcsPub" to false))) {
+        didsApi.create(wallet.id, DidsApi.DidCreateRequest(method = "key", options = mapOf("useJwkJcsPub" to false))) {
             createdDids.add(it)
         }
-        didsApi.create(wallet, DidsApi.DidCreateRequest(method = "jwk")) {
+        didsApi.create(wallet.id, DidsApi.DidCreateRequest(method = "jwk")) {
             createdDids.add(it)
         }
         didsApi.create(
-            wallet,
+            wallet.id,
             DidsApi.DidCreateRequest(method = "web", options = mapOf("domain" to "domain", "path" to "path"))
         ) {
             createdDids.add(it)
         }
         /* Flaky test - sometimes works fine, sometimes responds with 400:
     didsApi.create(
-        wallet, DidsApi.DidCreateRequest(method = "cheqd", options = mapOf("network" to "testnet"))
+        wallet.id, DidsApi.DidCreateRequest(method = "cheqd", options = mapOf("network" to "testnet"))
     ) {
         createdDids.add(it)
     }*/
 
         //TODO: error(400) DID method not supported for auto-configuration: ebsi
-//            didsApi.create(wallet, DidsApi.DidCreateRequest(method = "ebsi", options = mapOf("version" to 2, "bearerToken" to "token"))){
+//            didsApi.create(wallet.id, DidsApi.DidCreateRequest(method = "ebsi", options = mapOf("version" to 2, "bearerToken" to "token"))){
 //                createdDids.add(it)
 //            }
 
-        //TODO: didsApi.create(wallet, DidsApi.DidCreateRequest(method = "iota")){ createdDids.add(it) }
-        didsApi.default(wallet, createdDids[0])
-        didsApi.list(wallet, DidsApi.DefaultDidOption.Some(createdDids[0]), createdDids.size + 1)
+        //TODO: didsApi.create(wallet.id, DidsApi.DidCreateRequest(method = "iota")){ createdDids.add(it) }
+        didsApi.default(wallet.id, createdDids[0])
+        didsApi.list(wallet.id, DidsApi.DefaultDidOption.Some(createdDids[0]), createdDids.size + 1)
         for (d in createdDids) {
-            didsApi.delete(wallet, d)
+            didsApi.delete(wallet.id, d)
         }
-        didsApi.list(wallet, DidsApi.DefaultDidOption.None, 1)
-        didsApi.get(wallet, did)
-        didsApi.default(wallet, did)
-        didsApi.list(wallet, DidsApi.DefaultDidOption.Some(did), 1)
+        didsApi.list(wallet.id, DidsApi.DefaultDidOption.None, 1)
+        didsApi.get(wallet.id, did)
+        didsApi.default(wallet.id, did)
+        didsApi.list(wallet.id, DidsApi.DefaultDidOption.Some(did), 1)
         //endregion -Dids-
 
         //region -Categories-
         val categoryApi = CategoryApi(e2e, client)
         val categoryName = "name#1"
         val categoryNewName = "name#2"
-        categoryApi.list(wallet, 0)
-        categoryApi.add(wallet, categoryName)
-        categoryApi.list(wallet, 1) {
+        categoryApi.list(wallet.id, 0)
+        categoryApi.add(wallet.id, categoryName)
+        categoryApi.list(wallet.id, 1) {
             assertNotNull(it.single { it["name"]?.jsonPrimitive?.content == categoryName })
         }
-        categoryApi.rename(wallet, categoryName, categoryNewName)
-        categoryApi.list(wallet, 1) {
+        categoryApi.rename(wallet.id, categoryName, categoryNewName)
+        categoryApi.list(wallet.id, 1) {
             assertNotNull(it.single { it["name"]?.jsonPrimitive?.content == categoryNewName })
         }
-        categoryApi.delete(wallet, categoryNewName)
+        categoryApi.delete(wallet.id, categoryNewName)
         //endregion -Categories
 
         //region -Issuer / offer url-
@@ -221,8 +196,8 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         //region -Exchange / claim-
         val exchangeApi = ExchangeApi(e2e, client)
         lateinit var newCredentialId: String
-        exchangeApi.resolveCredentialOffer(wallet, offerUrl)
-        exchangeApi.useOfferRequest(wallet, offerUrl, 1) {
+        exchangeApi.resolveCredentialOffer(wallet.id, offerUrl)
+        exchangeApi.useOfferRequest(wallet.id, offerUrl, 1) {
             val cred = it.first()
             assertContains(JwtUtils.parseJWTPayload(cred.document).keys, JwsSignatureScheme.JwsOption.VC)
             newCredentialId = cred.id
@@ -231,18 +206,18 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
 
         //region -Credentials-
         val credentialsApi = CredentialsApi(e2e, client)
-        credentialsApi.list(wallet, expectedSize = 1, expectedCredential = arrayOf(newCredentialId))
-        credentialsApi.get(wallet, newCredentialId)
-        credentialsApi.accept(wallet, newCredentialId)
-        credentialsApi.delete(wallet, newCredentialId)
-        credentialsApi.restore(wallet, newCredentialId)
-        credentialsApi.status(wallet, newCredentialId)
-        categoryApi.add(wallet, categoryName)
-        categoryApi.add(wallet, categoryNewName)
-        credentialsApi.attachCategory(wallet, newCredentialId, categoryName, categoryNewName)
-        credentialsApi.detachCategory(wallet, newCredentialId, categoryName, categoryNewName)
-//            credentialsApi.reject(wallet, newCredentialId)
-//            credentialsApi.delete(wallet, newCredentialId, true)
+        credentialsApi.list(wallet.id, expectedSize = 1, expectedCredential = arrayOf(newCredentialId))
+        credentialsApi.get(wallet.id, newCredentialId)
+        credentialsApi.accept(wallet.id, newCredentialId)
+        credentialsApi.delete(wallet.id, newCredentialId)
+        credentialsApi.restore(wallet.id, newCredentialId)
+        credentialsApi.status(wallet.id, newCredentialId)
+        categoryApi.add(wallet.id, categoryName)
+        categoryApi.add(wallet.id, categoryNewName)
+        credentialsApi.attachCategory(wallet.id, newCredentialId, categoryName, categoryNewName)
+        credentialsApi.detachCategory(wallet.id, newCredentialId, categoryName, categoryNewName)
+//            credentialsApi.reject(wallet.id, newCredentialId)
+//            credentialsApi.delete(wallet.id, newCredentialId, true)
         //endregion -Credentials-
 
         //region -Verifier / request url-
@@ -259,7 +234,7 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         //region -Exchange / presentation-
         lateinit var resolvedPresentationOfferString: String
         lateinit var presentationDefinition: String
-        exchangeApi.resolvePresentationRequest(wallet, verificationUrl) {
+        exchangeApi.resolvePresentationRequest(wallet.id, verificationUrl) {
             resolvedPresentationOfferString = it
             presentationDefinition = Url(it).parameters.getOrFail("presentation_definition")
         }
@@ -269,11 +244,11 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         }
 
         exchangeApi.matchCredentialsForPresentationDefinition(
-            wallet, presentationDefinition, listOf(newCredentialId)
+            wallet.id, presentationDefinition, listOf(newCredentialId)
         )
-        exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet, presentationDefinition)
+        exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet.id, presentationDefinition)
         exchangeApi.usePresentationRequest(
-            wallet, UsePresentationRequest(did, resolvedPresentationOfferString, listOf(newCredentialId))
+            wallet.id, UsePresentationRequest(did, resolvedPresentationOfferString, listOf(newCredentialId))
         )
 
         sessionApi.get(verificationId) {
@@ -308,15 +283,15 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
 
         //region -History-
         val historyApi = HistoryApi(e2e, client)
-        historyApi.list(wallet) {
+        historyApi.list(wallet.id) {
             assert(it.size >= 2) { "missing history items" }
             assert(it.any { it.operation == "useOfferRequest" } && it.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
         }
         //endregion -History-
         val sdJwtTest = E2ESdJwtTest(issuerApi, exchangeApi, sessionApi, verificationApi)
         //cleanup credentials
-        credentialsApi.delete(wallet, newCredentialId)
-        sdJwtTest.e2e(wallet, did)
+        credentialsApi.delete(wallet.id, newCredentialId)
+        sdJwtTest.e2e(wallet.id, did)
 
         // Test Authorization Code flow with available authentication methods in Issuer API
         val authorizationCodeFlow = AuthorizationCodeFlow(e2e, environment.testHttpClient(doFollowRedirects = false))
@@ -353,14 +328,14 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
                     standardVersion = OpenID4VCIVersion.DRAFT11,
                 )
 
-        draft11.testIssuanceDraft11PreAuthFlow(preAuthFlowIssuanceReq, wallet)
+        draft11.testIssuanceDraft11PreAuthFlow(preAuthFlowIssuanceReq, wallet.id)
 
         val preAuthFlowIssuanceReqOfferedCredByValue = preAuthFlowIssuanceReq.copy(
             standardVersion = OpenID4VCIVersion.DRAFT11,
             draft11EncodeOfferedCredentialsByReference = false,
         )
 
-        draft11.testIssuanceDraft11PreAuthFlow(preAuthFlowIssuanceReqOfferedCredByValue, wallet)
+        draft11.testIssuanceDraft11PreAuthFlow(preAuthFlowIssuanceReqOfferedCredByValue, wallet.id)
 
 
         // Test External Signature API Endpoints
@@ -374,8 +349,8 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         //region -Input Descriptor Matching (Wallet)-
         val inputDescTest = InputDescriptorMatchingTest(issuerApi, exchangeApi, sessionApi, verificationApi)
         //cleanup credentials
-        credentialsApi.delete(wallet, newCredentialId)
-        inputDescTest.e2e(wallet, did)
+        credentialsApi.delete(wallet.id, newCredentialId)
+        inputDescTest.e2e(wallet.id, did)
         //endregion -Input Descriptor Matching (Wallet)-
 
         //region -Presentation Definition Policy (Verifier)-
@@ -398,7 +373,7 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         val batchIssuance = BatchIssuance(
             e2e = e2e,
             client = client,
-            wallet = wallet
+            wallet = wallet.id
         )
         batchIssuance.runTests()
         //endregion -Batch Issuance Test Suite-
@@ -492,31 +467,13 @@ fun lspVerifierTests() = testBlock(timeout = defaultTestTimeout) {
         var client = testHttpClient()
         lateinit var accountId: Uuid
         lateinit var wallet: Uuid
-        var authApi = AuthApi(this, client)
+        var authApi = environment.getWalletApi().loginWithDefaultUser()
 
         // the e2e http request tests here
 
         //region -Auth-
         TODO("Implement Junit Test")
         val e2e = E2ETest()
-        authApi.apply {
-            test("1. Auth - Login") {
-                userInfo(HttpStatusCode.Unauthorized)
-                val loginResult = login(defaultEmailAccount)
-                client = environment.testHttpClient(token = loginResult["token"]!!.jsonPrimitive.content)
-                authApi = AuthApi(e2e, client)
-            }
-        }
-        authApi.apply {
-            userInfo(HttpStatusCode.OK) {
-                accountId = it.id
-            }
-            userSession()
-            userWallets(accountId) {
-                wallet = it.wallets.first().id
-                println("Selected wallet: $wallet")
-            }
-        }
         //region -Dids-
         val didsApi = DidsApi(e2e, client)
         lateinit var did: String

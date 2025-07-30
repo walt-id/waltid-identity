@@ -169,7 +169,7 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         authApi.register(accountRequest)
 
         e2e.test("/wallet-api/auth/login - wallet-api login") {
-            val loginResult = authApi.login(accountRequest)
+            val loginResult = authApi.loginEmailAccountUser(accountRequest)
             client = environment.testHttpClient(token = loginResult["token"]!!.jsonPrimitive.content)
             authApi = AuthApi(e2e, client)
         }

@@ -1,27 +1,17 @@
 package id.walt.test.integration.tests
 
 import id.walt.test.integration.environment.InMemoryCommunityStackEnvironment
-import kotlinx.coroutines.runBlocking
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.BeforeAll
 
 abstract class AbstractIntegrationTest {
 
     companion object {
-        lateinit var environment: InMemoryCommunityStackEnvironment
+        val environment = InMemoryCommunityStackEnvironment()
 
-        @JvmStatic
-        @BeforeAll
-        fun initEnvironment() = runBlocking {
-            environment = InMemoryCommunityStackEnvironment()
-            environment.start()
-        }
+        // start of environment is done by the
+        // id.walt.test.integration.IntegrationTestRunListener
 
-        @JvmStatic
-        @AfterAll
-        fun shutdownEnvironment() = runBlocking {
-            environment.shutdown()
-        }
-
+        // shutdown is done by the
+        // id.walt.test.integration.IntegrationTestRunListener
+        // only the listener does know, when the last test is executed
     }
 }

@@ -6,8 +6,10 @@ import id.walt.commons.testing.E2ETest
 import id.walt.commons.web.plugins.httpJson
 import id.walt.issuer.feat.lspPotential.lspPotentialIssuanceTestApi
 import id.walt.issuer.issuerModule
+import id.walt.test.integration.environment.api.wallet.WalletApi
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
+import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.webWalletModule
 import io.klogging.Klogging
 import io.ktor.client.*
@@ -28,6 +30,7 @@ import kotlin.time.Duration.Companion.minutes
 
 val defaultTestTimeout = 5.minutes
 
+
 @OptIn(InternalAPI::class)
 class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : Klogging {
     private val startupCompleted = CompletableDeferred<Unit>()
@@ -47,8 +50,13 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
         port: Int = 22222,
     ) : this(E2ETest(host, port))
 
+    val defaultEmailAccount = EmailAccountRequest(
+        name = "Max Mustermann",
+        email = "user@email.com",
+        password = "password"
+    )
+
     suspend fun start() {
-        logger.error("============== ASYNC BEFORE ===============")
         scope.launch {
             e2e.testBlock(
                 config = ServiceConfiguration("e2e-test"),
@@ -83,7 +91,7 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
     }
 
     suspend fun shutdown() {
-        logger.error("Shutting down InMemoryCommunityStackEnvironment")
+        logger.info("Shutting down InMemoryCommunityStackEnvironment")
         shutdownInitialized.complete(Unit)
     }
 
@@ -102,6 +110,20 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
             level = LogLevel.ALL
         }
         followRedirects = doFollowRedirects
+    }
+
+    fun getWalletApi(token: String? = null): WalletApi {
+        return WalletApi(
+            defaultEmailAccount,
+            clientFactory = { token: String? ->
+                testHttpClient(
+                    token,
+                    true
+                )
+            },
+            e2e,
+            token
+        )
     }
 
 }

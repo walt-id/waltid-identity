@@ -40,6 +40,12 @@ dependencies {
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
     implementation("org.bouncycastle:bcpkix-lts8on:2.73.7")
 
+    implementation("org.junit.jupiter:junit-jupiter-engine:5.12.2")
+    implementation("org.junit.jupiter:junit-jupiter-params:5.12.2")
+    implementation("org.junit.platform:junit-platform-launcher:1.12.2")
+    implementation("org.junit.platform:junit-platform-console:1.12.2")
+
+
     // Multiplatform / Hashes
     implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
     implementation("org.kotlincrypto.hash:sha2")
