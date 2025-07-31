@@ -13,6 +13,7 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.SDMap
+import id.walt.test.integration.environment.api.wallet.KeysApi
 import id.walt.verifier.oidc.RequestedCredential
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
@@ -44,65 +45,67 @@ class LspPotentialWallet(val e2e: E2ETest, val client: HttpClient, val walletId:
         val keysApi = KeysApi(e2e, client)
 
         runBlocking {
-            keysApi.generate(Uuid.parse(walletId), KeyGenerationRequest(keyType = KeyType.secp256r1)) {
-                generatedKeyId = it
-            }
+            generatedKeyId = keysApi.generate(Uuid.parse(walletId), KeyGenerationRequest(keyType = KeyType.secp256r1))
             DidsApi(e2e, client).create(Uuid.parse(walletId), DidsApi.DidCreateRequest("jwk", keyId = generatedKeyId)) {
                 generatedDid = it
             }
         }
     }
 
-    suspend fun testMDocIssuance(issuanceRequestData: String, useForPresentation: Boolean) = e2e.test("test mdoc issuance") {
-        // === get credential offer from test issuer API ===
-        val issuanceReq = Json.decodeFromString<IssuanceRequest>(issuanceRequestData).copy(
-            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED
-        )
-        val offerResp = client.post("/openid4vc/mdoc/issue") {
-            contentType(ContentType.Application.Json)
-            setBody(Json.encodeToJsonElement(issuanceReq).toString())
+    suspend fun testMDocIssuance(issuanceRequestData: String, useForPresentation: Boolean) =
+        e2e.test("test mdoc issuance") {
+            // === get credential offer from test issuer API ===
+            val issuanceReq = Json.decodeFromString<IssuanceRequest>(issuanceRequestData).copy(
+                authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED
+            )
+            val offerResp = client.post("/openid4vc/mdoc/issue") {
+                contentType(ContentType.Application.Json)
+                setBody(Json.encodeToJsonElement(issuanceReq).toString())
+            }
+            assert(offerResp.status == HttpStatusCode.OK)
+            val offerUri = offerResp.bodyAsText()
+
+            // === resolve credential offer ===
+            val resolvedOffer11 = client.post("/wallet-api/wallet/$walletId/exchange/resolveCredentialOffer") {
+                setBody(offerUri)
+            }.expectSuccess().body<JsonObject>()
+
+            println(resolvedOffer11)
+
+            val resolvedOffer = client.post("/wallet-api/wallet/$walletId/exchange/resolveCredentialOffer") {
+                setBody(offerUri)
+            }.expectSuccess().body<CredentialOffer.Draft13>()
+
+            assertEquals(1, resolvedOffer.credentialConfigurationIds.size)
+            assertEquals(
+                issuanceReq.credentialConfigurationId,
+                resolvedOffer.credentialConfigurationIds.first().jsonPrimitive.content
+            )
+
+            // === resolve issuer metadata ===
+            val issuerMetadata =
+                client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess()
+                    .body<OpenIDProviderMetadata.Draft13>()
+            assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
+            assertContains(
+                issuerMetadata.credentialConfigurationsSupported!!.keys,
+                resolvedOffer.credentialConfigurationIds.first().jsonPrimitive.content,
+            )
+
+            // === use credential offer request ===
+            val issuedCred = client.post("/wallet-api/wallet/$walletId/exchange/useOfferRequest?did=$generatedDid") {
+                setBody(offerUri)
+            }.expectSuccess().body<List<WalletCredential>>().first()
+
+            assertEquals(CredentialFormat.mso_mdoc, issuedCred.format)
+
+            // === get issued credential from wallet-api
+            val fetchedCredential = client.get("/wallet-api/wallet/$walletId/credentials/${issuedCred.id}")
+                .expectSuccess().body<WalletCredential>()
+            assertEquals(issuedCred.format, fetchedCredential.format)
+            if (useForPresentation)
+                runBlocking { issuedMdocId = fetchedCredential.id }
         }
-        assert(offerResp.status == HttpStatusCode.OK)
-        val offerUri = offerResp.bodyAsText()
-
-        // === resolve credential offer ===
-        val resolvedOffer11 = client.post("/wallet-api/wallet/$walletId/exchange/resolveCredentialOffer") {
-            setBody(offerUri)
-        }.expectSuccess().body<JsonObject>()
-
-        println(resolvedOffer11)
-
-        val resolvedOffer = client.post("/wallet-api/wallet/$walletId/exchange/resolveCredentialOffer") {
-            setBody(offerUri)
-        }.expectSuccess().body<CredentialOffer.Draft13>()
-
-        assertEquals(1, resolvedOffer.credentialConfigurationIds.size)
-        assertEquals(issuanceReq.credentialConfigurationId, resolvedOffer.credentialConfigurationIds.first().jsonPrimitive.content)
-
-        // === resolve issuer metadata ===
-        val issuerMetadata =
-            client.get("${resolvedOffer.credentialIssuer}/.well-known/openid-credential-issuer").expectSuccess()
-                .body<OpenIDProviderMetadata.Draft13>()
-        assertEquals(issuerMetadata.issuer, resolvedOffer.credentialIssuer)
-        assertContains(
-            issuerMetadata.credentialConfigurationsSupported!!.keys,
-            resolvedOffer.credentialConfigurationIds.first().jsonPrimitive.content,
-        )
-
-        // === use credential offer request ===
-        val issuedCred = client.post("/wallet-api/wallet/$walletId/exchange/useOfferRequest?did=$generatedDid") {
-            setBody(offerUri)
-        }.expectSuccess().body<List<WalletCredential>>().first()
-
-        assertEquals(CredentialFormat.mso_mdoc, issuedCred.format)
-
-        // === get issued credential from wallet-api
-        val fetchedCredential = client.get("/wallet-api/wallet/$walletId/credentials/${issuedCred.id}")
-            .expectSuccess().body<WalletCredential>()
-        assertEquals(issuedCred.format, fetchedCredential.format)
-        if(useForPresentation)
-            runBlocking { issuedMdocId = fetchedCredential.id }
-    }
 
     suspend fun testMdocPresentation() = e2e.test("test mdoc presentation") {
         val createReqResponse = client.post("/openid4vc/verify") {
@@ -224,7 +227,10 @@ class LspPotentialWallet(val e2e: E2ETest, val client: HttpClient, val walletId:
             setBody(offerUri)
         }.expectSuccess().body<CredentialOffer.Draft13>()
         assertEquals(1, resolvedOffer.credentialConfigurationIds.size)
-        assertEquals("identity_credential_vc+sd-jwt", resolvedOffer.credentialConfigurationIds.first().jsonPrimitive.content)
+        assertEquals(
+            "identity_credential_vc+sd-jwt",
+            resolvedOffer.credentialConfigurationIds.first().jsonPrimitive.content
+        )
 
         // === resolve issuer metadata ===
         val issuerMetadata =

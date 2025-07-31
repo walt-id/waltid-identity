@@ -2,6 +2,11 @@ package id.walt.test.integration
 
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 fun String.expectLooksLikeJwt(): String =
     also { assert(startsWith("ey") && count { it == '.' } == 2) { "Does not look like JWT" } }
@@ -24,4 +29,23 @@ fun randomString(length: Int) : String {
         .map { allowedChars.random() }
         .joinToString("")
 }
+
+
+fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {
+    var element: JsonElement? = this
+    for (i in it) {
+        element = when (element) {
+            is JsonObject -> element[i]
+            is JsonArray -> element.firstOrNull {
+                it.jsonObject.containsKey(i)
+            }?.let {
+                it.jsonObject[i]
+            }
+
+            else -> element?.jsonPrimitive
+        }
+    }
+    element
+}
+
 

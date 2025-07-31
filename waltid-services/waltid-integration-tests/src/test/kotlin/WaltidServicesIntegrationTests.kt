@@ -1,12 +1,9 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
 import id.walt.commons.ServiceConfiguration
-import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.testing.E2ETest
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
-import id.walt.crypto.keys.KeyGenerationRequest
-import id.walt.crypto.keys.KeyType
 import id.walt.issuer.feat.lspPotential.lspPotentialIssuanceTestApi
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
@@ -21,7 +18,6 @@ import id.walt.test.integration.tests.AbstractIntegrationTest
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
 import id.walt.w3c.schemes.JwsSignatureScheme
-import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
@@ -97,21 +93,6 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
 
 
         // the e2e http request tests here
-        //region -Keys-
-        val keysApi = KeysApi(e2e, client)
-        val defaultKeyConfig = ConfigManager.getConfig<RegistrationDefaultsConfig>().defaultKeyConfig
-        // requires registration-defaults to not be disabled in _features.confval defaultKeyConfig = ConfigManager.getConfig<RegistrationDefaultsConfig>().defaultKeyConfig
-        val keyGenRequest = KeyGenerationRequest("jwk", KeyType.Ed25519)
-        lateinit var generatedKeyId: String
-        val rsaJwkImport = loadResource("keys/rsa.json")
-        keysApi.list(wallet.id, defaultKeyConfig)
-        keysApi.generate(wallet.id, keyGenRequest) { generatedKeyId = it }
-        keysApi.load(wallet.id, generatedKeyId, keyGenRequest)
-        keysApi.meta(wallet.id, generatedKeyId, keyGenRequest)
-        keysApi.export(wallet.id, generatedKeyId, "JWK", true, keyGenRequest)
-        keysApi.delete(wallet.id, generatedKeyId)
-        keysApi.import(wallet.id, rsaJwkImport)
-        //endregion -Keys-
 
         //region -Dids-
         val didsApi = DidsApi(e2e, client)
@@ -134,12 +115,12 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         ) {
             createdDids.add(it)
         }
-        /* Flaky test - sometimes works fine, sometimes responds with 400:
-    didsApi.create(
-        wallet.id, DidsApi.DidCreateRequest(method = "cheqd", options = mapOf("network" to "testnet"))
-    ) {
-        createdDids.add(it)
-    }*/
+        // Flaky test - sometimes works fine, sometimes responds with 400:
+        //didsApi.create(
+        //    wallet.id, DidsApi.DidCreateRequest(method = "cheqd", options = mapOf("network" to "testnet"))
+        //) {
+        //    createdDids.add(it)
+      // }
 
         //TODO: error(400) DID method not supported for auto-configuration: ebsi
 //            didsApi.create(wallet.id, DidsApi.DidCreateRequest(method = "ebsi", options = mapOf("version" to 2, "bearerToken" to "token"))){
@@ -566,21 +547,3 @@ fun testSdJwtVCIssuanceWithIssuerDid() = testBlock(timeout = defaultTestTimeout)
     lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
     lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
 }*/
-
-
-fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {
-    var element: JsonElement? = this
-    for (i in it) {
-        element = when (element) {
-            is JsonObject -> element[i]
-            is JsonArray -> element.firstOrNull {
-                it.jsonObject.containsKey(i)
-            }?.let {
-                it.jsonObject[i]
-            }
-
-            else -> element?.jsonPrimitive
-        }
-    }
-    element
-}

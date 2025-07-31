@@ -4,6 +4,7 @@ import id.walt.commons.testing.E2ETest
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.test.integration.environment.api.wallet.KeysApi
 import id.walt.test.integration.expectSuccess
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
@@ -32,15 +33,13 @@ class EBSIVectorInteropTest(
     init {
 
         runBlocking {
-            keysApi.generate(
-                wallet = wallet,
-                request = KeyGenerationRequest(
+            keyId = keysApi.generate(
+                wallet,
+                KeyGenerationRequest(
                     backend = "jwk",
-                    keyType = KeyType.secp256r1,
-                ),
-            ) {
-                keyId = it
-            }
+                    keyType = KeyType.secp256r1
+                )
+            )
 
             did = httpClient.post("/wallet-api/wallet/$wallet/dids/create/key?useJwkJcsPub=true&keyId=$keyId")
                 .expectSuccess().bodyAsText()
@@ -234,7 +233,7 @@ class EBSIVectorInteropTest(
             {"kty":"EC","d":"zKsPggT-dWrymXgvZTg19khBKo0Mj9rF7eDjCPuJOrk","crv":"P-256","kid":"vKpe0rC5k3EkFRIS4pDQWO56oK20KfLDpwU3Zd0C0Bg","x":"lVrg3EKCD2AFPeNz_RjEl12KZ4CweiPqpU7lBgfGN2Q","y":"roQpMQs_915oxyRZt2JlFYa-OP24cPCPUGkGNichi8k"}
         """.trimIndent()
 
-        keysApi.import(
+        keysApi.importKey(
             wallet = wallet,
             privateKey
         )

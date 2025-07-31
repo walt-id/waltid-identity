@@ -48,7 +48,7 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
     constructor(
         host: String = "localhost",
         port: Int = 22222,
-    ) : this(E2ETest(host, port))
+    ) : this(E2ETest(host, port, true))
 
     val defaultEmailAccount = EmailAccountRequest(
         name = "Max Mustermann",
@@ -112,8 +112,8 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
         followRedirects = doFollowRedirects
     }
 
-    fun getWalletApi(token: String? = null): WalletApi {
-        return WalletApi(
+    fun getWalletApi(token: String? = null): WalletApi =
+        WalletApi(
             defaultEmailAccount,
             clientFactory = { token: String? ->
                 testHttpClient(
@@ -124,6 +124,8 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
             e2e,
             token
         )
-    }
+
+    suspend fun getDefaultAccountWalletApi(): WalletApi =
+        getWalletApi().loginWithDefaultUser()
 
 }

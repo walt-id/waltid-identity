@@ -191,17 +191,16 @@ class AuthApi(
                     result
                 }
     }
+
+    private suspend fun checkSuccessfulLogin(response: HttpResponse): JsonObject {
+        response.expectSuccess()
+        return response.body<JsonObject>()
+            .also {
+                assertNotNull(it["token"]?.jsonPrimitive?.content)
+                    .also { token ->
+                        token.expectLooksLikeJwt()
+                    }
+            }
+
+    }
 }
-
-private suspend fun checkSuccessfulLogin(response: HttpResponse): JsonObject {
-    response.expectSuccess()
-    return response.body<JsonObject>()
-        .also {
-            assertNotNull(it["token"]?.jsonPrimitive?.content)
-                .also { token ->
-                    token.expectLooksLikeJwt()
-                }
-        }
-
-}
-

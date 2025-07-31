@@ -26,6 +26,7 @@ import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDisclosure
 import id.walt.sdjwt.utils.Base64Utils.encodeToBase64Url
 import id.walt.test.integration.environment.api.wallet.AuthApi
+import id.walt.test.integration.environment.api.wallet.KeysApi
 import id.walt.test.integration.expectFailure
 import id.walt.test.integration.expectLooksLikeJwt
 import id.walt.test.integration.expectSuccess
@@ -196,7 +197,7 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         var response = client.get("/wallet-api/wallet/$walletId/keys").expectSuccess()
         val keyList = response.body<List<SingleKeyResponse>>()
         for (key in keyList) {
-            keysApi.delete(walletId, key.keyId.id)
+            keysApi.deleteKey(walletId, key.keyId.id)
         }
         response = client.get("/wallet-api/wallet/$walletId/dids").expectSuccess()
         val didList = response.body<List<WalletDid>>()
@@ -219,7 +220,7 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
 
     private suspend fun initializeWallet() {
         //import the holder's public key to the wallet API
-        keysApi.import(walletId, holderKey.getPublicKey().exportJWK())
+        keysApi.importKey(walletId, holderKey.getPublicKey().exportJWK())
         //check that it's the only key in the wallet
         var response = client.get("/wallet-api/wallet/$walletId/keys").expectSuccess()
         val keyList = response.body<List<SingleKeyResponse>>()

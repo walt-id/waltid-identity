@@ -1,12 +1,17 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.test.integration.environment.api.wallet
 
 import id.walt.commons.testing.E2ETest
+import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.webwallet.db.models.Account
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.web.model.X5CAccountRequest
 import io.ktor.client.*
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class WalletApi(
     val defaultEmailAccount: EmailAccountRequest,
@@ -16,6 +21,7 @@ class WalletApi(
 ) {
     val httpClient = clientFactory(token)
     val authApi = AuthApi(e2e, httpClient)
+    val keysApi = KeysApi(e2e, httpClient)
 
     fun withToken(token: String): WalletApi = WalletApi(defaultEmailAccount, clientFactory, e2e, token)
 
@@ -49,4 +55,17 @@ class WalletApi(
 
     suspend fun listAccountWallets() = authApi.listAccountWallets()
 
+    //=========================================================================
+    // Keys API
+    //=========================================================================
+    suspend fun listKeys(walletId: Uuid) = keysApi.list(walletId)
+    suspend fun generateKey(walletId: Uuid, request: KeyGenerationRequest) = keysApi.generate(walletId, request)
+    suspend fun loadKey(walletId: Uuid, keyId: String) = keysApi.load(walletId, keyId)
+    suspend fun loadKeyMeta(walletId: Uuid, keyId: String) = keysApi.loadMeta(walletId, keyId)
+    suspend fun exportKey(walletId: Uuid, keyId: String, format: String, isPrivate: Boolean) =
+        keysApi.exportKey(walletId, keyId, format, isPrivate)
+
+    suspend fun deleteKeyRaw(walletId: Uuid, keyId: String) = keysApi.deleteKeyRaw(walletId, keyId)
+    suspend fun deleteKey(walletId: Uuid, keyId: String) = keysApi.deleteKey(walletId, keyId)
+    suspend fun importKey(walletId: Uuid, keyId: String): String = keysApi.importKey(walletId, keyId)
 }

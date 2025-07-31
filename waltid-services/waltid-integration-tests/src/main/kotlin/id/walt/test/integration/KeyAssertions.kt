@@ -1,4 +1,5 @@
-import id.walt.crypto.keys.KeyGenerationRequest
+package id.walt.test.integration
+
 import id.walt.crypto.keys.KeyType
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import kotlinx.serialization.json.JsonElement
@@ -11,8 +12,16 @@ fun assertKeyComponents(document: JsonElement, keyId: String, type: KeyType, isP
     assertNotNull(document.tryGetData("kty")?.jsonPrimitive?.content) { "Missing _kty_ component!" }
     when (type) {
         KeyType.Ed25519 -> assertEd25519KeyComponents(document, isPrivate)
-        KeyType.secp256k1 -> assertSecp256k1KeyComponents(document, isPrivate)
-        KeyType.secp256r1 -> assertSecp256r1KeyComponents(document, isPrivate)
+        KeyType.secp256k1 -> assertSecp256k1KeyComponents(
+            document,
+            isPrivate
+        )
+
+        KeyType.secp256r1 -> assertSecp256r1KeyComponents(
+            document,
+            isPrivate
+        )
+
         KeyType.RSA -> assertRSAKeyComponents(document, isPrivate)
     }
 }
@@ -56,10 +65,6 @@ fun assertRSAKeyComponents(document: JsonElement, isPrivate: Boolean) {
     }
 }
 
-fun assertDefaultKey(listing: List<SingleKeyResponse>, default: KeyGenerationRequest) {
-    assert(listing.isNotEmpty()) { "No default key was created!" }
-    assert(KeyType.valueOf(listing[0].algorithm) == default.keyType) { "Default key type not ${default.keyType}" }
-}
 
 fun assertNoDefaultKey(listing: List<SingleKeyResponse>) {
     assert(listing.isEmpty()) { "Expected no default key!" }
