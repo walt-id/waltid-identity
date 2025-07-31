@@ -107,8 +107,8 @@ kotlin {
 //                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
 //                implementation("app.softwork:kotlinx-uuid-core:0.1.4")
 //
-//                // Loggin
-//                implementation("io.github.oshai:kotlin-logging:7.0.5")
+                // Logging
+                implementation("io.github.oshai:kotlin-logging:7.0.7")
 //
 //                // walt.id
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -235,10 +235,18 @@ publishing {
 
     repositories {
         maven {
-            url = uri(if (version.toString().endsWith("SNAPSHOT")) uri("https://maven.waltid.dev/snapshots") else uri("https://maven.waltid.dev/releases"))
+            url = uri(
+                if (version.toString()
+                        .endsWith("SNAPSHOT")
+                ) uri("https://maven.waltid.dev/snapshots") else uri("https://maven.waltid.dev/releases")
+            )
             credentials {
-                username = System.getenv("MAVEN_USERNAME") ?: File("$rootDir/secret_maven_username.txt").let { if (it.isFile) it.readLines().first() else "" }
-                password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let { if (it.isFile) it.readLines().first() else "" }
+                username = System.getenv("MAVEN_USERNAME") ?: File("$rootDir/secret_maven_username.txt").let {
+                    if (it.isFile) it.readLines().first() else ""
+                }
+                password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let {
+                    if (it.isFile) it.readLines().first() else ""
+                }
             }
         }
     }
