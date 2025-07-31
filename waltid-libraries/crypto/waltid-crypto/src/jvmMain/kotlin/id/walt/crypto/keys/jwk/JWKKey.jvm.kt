@@ -267,7 +267,9 @@ actual class JWKKey actual constructor(
         signature.initVerify(getInternalPublicKey())
         signature.update(detachedPlaintext)
 
-        return runCatching { signature.verify(signed) }.map { detachedPlaintext }
+        return runCatching {
+            require(signature.verify(signed)) { "Signature verification failed" }
+        }.map { detachedPlaintext }
     }
 
 
