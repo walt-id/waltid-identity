@@ -29,6 +29,13 @@ jobs:
       images: ${{ needs.docker-matrix.outputs.json }}s
       version: ${{ needs.version.outputs.release_version }}
       publish: true
+  enterprise-api-docker:
+    uses: walt-id/waltid-identity/.github/workflows/enterprise-api-docker.yml@cf46ed618f9b296fd9b63c7207ca288855bb5343
+    secrets: inherit
+    needs: [ version, docker-matrix ]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      publish: true
   deploy:
     uses: walt-id/waltid-identity/.github/workflows/deployment.yml@cf46ed618f9b296fd9b63c7207ca288855bb5343
     secrets: inherit

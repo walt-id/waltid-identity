@@ -1,4 +1,4 @@
-name: Build on every push except main branch
+name: Build on every push
 
 on:
   push:
@@ -28,6 +28,12 @@ jobs:
       images: ${{ needs.docker-matrix.outputs.json }}
       version: ${{ needs.version.outputs.release_version }}
       artifact: true
+  enterprise-api-docker:
+    uses: walt-id/waltid-identity/.github/workflows/enterprise-api-docker.yml@cf46ed618f9b296fd9b63c7207ca288855bb5343
+    secrets: inherit
+    needs: [ version, docker-matrix ]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
   ebsi-ct-v3:
     uses: walt-id/waltid-identity/.github/workflows/ebsictv3.yml@3f56b05ff315770abd06e7a931b5a73942296cc4
     needs: [ version, docker ]
