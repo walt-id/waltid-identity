@@ -1,0 +1,32 @@
+name: Create enterprise tag (reusable workflow)
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "release version"
+        required: true
+        type: string
+    outputs:
+      tag:
+        description: "The tag"
+        value: ${{ jobs.tag.outputs.result }}
+
+jobs:
+  tag:
+    name: Git tag
+    runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: walt-id/waltid-identity-enterprise
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+      - name: Create and push the git tag
+        id: tag
+        run: |
+          tag=v${{ inputs.version }}
+          git tag $tag
+          git push --tags
+          echo "tag=${tag}" >> $GITHUB_OUTPUT

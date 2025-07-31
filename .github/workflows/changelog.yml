@@ -33,4 +33,5 @@ jobs:
           tag_name: ${{ inputs.tag }}
 #          body: |
 #            ${{ steps.changelog.outputs.changelog }}
-          prerelease: ${{ steps.changelog.outputs.prerelease }}
+#          prerelease: ${{ steps.changelog.outputs.prerelease }}
+          prerelease: ${{ contains(inputs.tag, 'PRE-RELEASE') }}
