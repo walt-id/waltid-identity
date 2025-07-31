@@ -76,8 +76,8 @@ jobs:
       - name: Prepare CD
         if: matrix.services.name == 'waltid-enterprise'
         run: |
-          sed "s/_DEFAULT_DEPLOYMENT_/${GITHUB_SHA}/g" k8s/deployment-dev.yaml | 
-          sed "s!mongodb://root:password@localhost:27017/!${{ secrets.MONGODB_URL }}!g" > k8s/deployment_mod.yaml
+          sed "s/_DEFAULT_DEPLOYMENT_/${GITHUB_SHA}/g" ${{ matrix.services.k8s }}/deployment-${{ inputs.deployment }}.yaml | 
+          sed "s!mongodb://root:password@localhost:27017/!${{ secrets.MONGODB_URL }}!g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
 
       - name: Continuous deployment - ${{ matrix.services.name }}
         uses: actions-hub/kubectl@master
