@@ -13,6 +13,7 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.SDMap
+import id.walt.test.integration.environment.api.wallet.DidsApi
 import id.walt.test.integration.environment.api.wallet.KeysApi
 import id.walt.verifier.oidc.RequestedCredential
 import id.walt.webwallet.db.models.WalletCredential

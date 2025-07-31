@@ -12,6 +12,7 @@ import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
+import id.walt.test.integration.environment.api.wallet.DidsApi
 import id.walt.test.integration.expectLooksLikeJwt
 import id.walt.test.integration.expectSuccess
 import id.walt.test.integration.tests.AbstractIntegrationTest
@@ -94,50 +95,6 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
 
         // the e2e http request tests here
 
-        //region -Dids-
-        val didsApi = DidsApi(e2e, client)
-        lateinit var did: String
-        val createdDids = mutableListOf<String>()
-        didsApi.list(wallet.id, DidsApi.DefaultDidOption.Any, 1) {
-            assert(it.first().default)
-            did = it.first().did
-        }
-        //todo: test for optional registration defaults
-        didsApi.create(wallet.id, DidsApi.DidCreateRequest(method = "key", options = mapOf("useJwkJcsPub" to false))) {
-            createdDids.add(it)
-        }
-        didsApi.create(wallet.id, DidsApi.DidCreateRequest(method = "jwk")) {
-            createdDids.add(it)
-        }
-        didsApi.create(
-            wallet.id,
-            DidsApi.DidCreateRequest(method = "web", options = mapOf("domain" to "domain", "path" to "path"))
-        ) {
-            createdDids.add(it)
-        }
-        // Flaky test - sometimes works fine, sometimes responds with 400:
-        //didsApi.create(
-        //    wallet.id, DidsApi.DidCreateRequest(method = "cheqd", options = mapOf("network" to "testnet"))
-        //) {
-        //    createdDids.add(it)
-      // }
-
-        //TODO: error(400) DID method not supported for auto-configuration: ebsi
-//            didsApi.create(wallet.id, DidsApi.DidCreateRequest(method = "ebsi", options = mapOf("version" to 2, "bearerToken" to "token"))){
-//                createdDids.add(it)
-//            }
-
-        //TODO: didsApi.create(wallet.id, DidsApi.DidCreateRequest(method = "iota")){ createdDids.add(it) }
-        didsApi.default(wallet.id, createdDids[0])
-        didsApi.list(wallet.id, DidsApi.DefaultDidOption.Some(createdDids[0]), createdDids.size + 1)
-        for (d in createdDids) {
-            didsApi.delete(wallet.id, d)
-        }
-        didsApi.list(wallet.id, DidsApi.DefaultDidOption.None, 1)
-        didsApi.get(wallet.id, did)
-        didsApi.default(wallet.id, did)
-        didsApi.list(wallet.id, DidsApi.DefaultDidOption.Some(did), 1)
-        //endregion -Dids-
 
         //region -Categories-
         val categoryApi = CategoryApi(e2e, client)
@@ -221,25 +178,33 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         }
 
         sessionApi.get(verificationId) {
-            assert(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
+            assertTrue(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
         }
 
         exchangeApi.matchCredentialsForPresentationDefinition(
             wallet.id, presentationDefinition, listOf(newCredentialId)
         )
+        val defaultDid = walletApi.getDefaultDid(wallet.id)
+        val did = defaultDid.did
         exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet.id, presentationDefinition)
         exchangeApi.usePresentationRequest(
             wallet.id, UsePresentationRequest(did, resolvedPresentationOfferString, listOf(newCredentialId))
         )
 
         sessionApi.get(verificationId) {
-            assert(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-            assert(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+            assertTrue(
+                it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null,
+                "Received no valid token response!"
+            )
+            assertTrue(
+                it.tokenResponse?.presentationSubmission != null,
+                "should have a presentation submission after submission"
+            )
 
-            assert(it.verificationResult == true) { "overall verification should be valid" }
+            assertTrue(it.verificationResult == true, "overall verification should be valid")
             it.policyResults.let {
                 require(it != null) { "policyResults should be available after running policies" }
-                assert(it.size > 1) { "no policies have run" }
+                assertTrue(it.size > 1, "no policies have run")
             }
         }
         val lspPotentialIssuance = LspPotentialIssuance(e2e, environment.testHttpClient(doFollowRedirects = false))
@@ -265,8 +230,11 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         //region -History-
         val historyApi = HistoryApi(e2e, client)
         historyApi.list(wallet.id) {
-            assert(it.size >= 2) { "missing history items" }
-            assert(it.any { it.operation == "useOfferRequest" } && it.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
+            assertTrue(it.size >= 2, "missing history items")
+            assertTrue(
+                it.any { it.operation == "useOfferRequest" } && it.any { it.operation == "usePresentationRequest" },
+                "incorrect history items"
+            )
         }
         //endregion -History-
         val sdJwtTest = E2ESdJwtTest(issuerApi, exchangeApi, sessionApi, verificationApi)
@@ -459,7 +427,7 @@ fun lspVerifierTests() = testBlock(timeout = defaultTestTimeout) {
         val didsApi = DidsApi(e2e, client)
         lateinit var did: String
         didsApi.list(wallet, DidsApi.DefaultDidOption.Any, 1) {
-            assert(it.first().default)
+            assertTrue(it.first().default)
             did = it.first().did
         }
 
