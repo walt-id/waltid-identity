@@ -5,6 +5,7 @@ import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
+import id.walt.test.integration.environment.api.issuer.IssuerApi
 import id.walt.test.integration.expectRedirect
 import io.ktor.client.*
 import io.ktor.client.call.*

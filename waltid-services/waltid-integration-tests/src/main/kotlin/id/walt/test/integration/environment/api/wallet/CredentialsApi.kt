@@ -1,5 +1,7 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
+package id.walt.test.integration.environment.api.wallet
+
 import id.walt.commons.testing.E2ETest
 import id.walt.test.integration.expectSuccess
 import id.walt.webwallet.db.models.WalletCredential
@@ -11,38 +13,75 @@ import io.ktor.client.request.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
-import kotlin.test.assertNotNull
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class CredentialsApi(private val e2e: E2ETest, private val client: HttpClient) {
-    suspend fun list(
+
+    suspend fun getCredentialRaw(walletId: Uuid, credentialId: String) =
+        client.get("/wallet-api/wallet/$walletId/credentials/$credentialId")
+
+    suspend fun getCredential(walletId: Uuid, credentialId: String) =
+        getCredentialRaw(walletId, credentialId).let {
+            it.expectSuccess()
+            it.body<WalletCredential>()
+        }
+
+    suspend fun getCredentialStatusRaw(walletId: Uuid, credentialId: String) =
+        client.get("/wallet-api/wallet/$walletId/credentials/$credentialId/status")
+
+    suspend fun getCredentialStatus(walletId: Uuid, credentialId: String): List<CredentialStatusResult> =
+        getCredentialStatusRaw(walletId, credentialId).let {
+            it.expectSuccess()
+            it.body<List<CredentialStatusResult>>()
+        }
+
+    suspend fun listCredentialsRaw(
         wallet: Uuid,
-        filter: CredentialFilterObject = CredentialFilterObject.default,
-        expectedSize: Int = 0,
-        vararg expectedCredential: String,
-    ) = e2e.test("/wallet-api/wallet/{wallet}/credentials - list credentials") {
-        client.get("/wallet-api/wallet/$wallet/credentials") {
-            url {
-                filter.toMap().onEach {
-                    parameters.append(it.key, it.value.toString())
-                }
+        filter: CredentialFilterObject = CredentialFilterObject.Companion.default
+    ) = client.get("/wallet-api/wallet/$wallet/credentials") {
+        url {
+            filter.toMap().onEach {
+                parameters.append(it.key, it.value.toString())
             }
-        }.expectSuccess().apply {
-            val credentials = body<List<WalletCredential>>()
-            assert(credentials.size == expectedSize) { "should have $expectedSize credentials, but has ${credentials.size}" }
-            expectedCredential.onEach { cid -> assertNotNull(credentials.single { it.id == cid }) { "credential not found for id: $cid" } }
         }
     }
 
-    suspend fun get(wallet: Uuid, credential: String, output: ((WalletCredential) -> Unit)? = null) =
-        e2e.test("/wallet-api/wallet/{wallet}/credentials/{credentialId} - get credential") {
-            client.get("/wallet-api/wallet/$wallet/credentials/$credential").expectSuccess().apply {
-                val credential = body<WalletCredential>()
-                output?.invoke(credential)
+    suspend fun listCredentials(
+        wallet: Uuid,
+        filter: CredentialFilterObject = CredentialFilterObject.Companion.default
+    ) = listCredentialsRaw(wallet, filter).let { response ->
+        response.expectSuccess()
+        response.body<List<WalletCredential>>()
+    }
+
+    suspend fun acceptCredentialRaw(walletId: Uuid, credentialId: String) =
+        client.post("/wallet-api/wallet/$walletId/credentials/$credentialId/accept")
+
+    suspend fun acceptCredential(walletId: Uuid, credentialId: String) {
+        acceptCredentialRaw(walletId, credentialId).expectSuccess()
+    }
+
+    suspend fun deleteCredentialRaw(walletId: Uuid, credentialId: String, permanent: Boolean = false) =
+        client.delete("/wallet-api/wallet/$walletId/credentials/$credentialId") {
+            url {
+                parameters.append("permanent", "$permanent")
             }
         }
 
+    suspend fun deleteCredential(walletId: Uuid, credentialId: String, permanent: Boolean = false) {
+        deleteCredentialRaw(walletId, credentialId, permanent).expectSuccess()
+    }
+
+    suspend fun restoreCredentialRaw(walletId: Uuid, credentialId: String) =
+        client.post("/wallet-api/wallet/$walletId/credentials/$credentialId/restore")
+
+    suspend fun restoreCredential(walletId: Uuid, credentialId: String) {
+        restoreCredentialRaw(walletId, credentialId).expectSuccess()
+    }
+
+
+    @Deprecated("Old API")
     suspend fun delete(wallet: Uuid, credential: String, permanent: Boolean = false) =
         e2e.test("/wallet-api/wallet/{wallet}/credentials/{credentialId} - delete credential") {
             client.delete("/wallet-api/wallet/$wallet/credentials/$credential") {
@@ -59,10 +98,6 @@ class CredentialsApi(private val e2e: E2ETest, private val client: HttpClient) {
             }
         }
 
-    suspend fun accept(wallet: Uuid, credential: String) =
-        e2e.test("/wallet-api/wallet/{wallet}/credentials/{credentialId}/accept - accept credential") {
-            client.post("/wallet-api/wallet/$wallet/credentials/$credential/accept").expectSuccess()
-        }
 
     suspend fun reject(wallet: Uuid, credential: String, note: String? = null) =
         e2e.test("/wallet-api/wallet/{wallet}/credentials/{credentialId}/reject - reject credential") {
@@ -98,5 +133,5 @@ class CredentialsApi(private val e2e: E2ETest, private val client: HttpClient) {
             TODO("Not implemented")
         }
 
-    private fun CredentialFilterObject.toMap() = Json.encodeToJsonElement(this).jsonObject.toMap()
+    private fun CredentialFilterObject.toMap() = Json.Default.encodeToJsonElement(this).jsonObject.toMap()
 }

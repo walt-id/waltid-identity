@@ -4,6 +4,8 @@ import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.OpenID4VCI.resolveCIProviderMetadata
 import id.walt.oid4vc.data.CredentialOffer
+import id.walt.test.integration.environment.api.issuer.IssuerApi
+import id.walt.test.integration.environment.api.wallet.ExchangeApi
 import id.walt.webwallet.db.models.WalletCredential
 import io.ktor.client.*
 import kotlinx.serialization.json.*

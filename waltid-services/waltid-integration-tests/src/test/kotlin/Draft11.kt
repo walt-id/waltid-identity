@@ -13,6 +13,8 @@ import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.util.JwtUtils
+import id.walt.test.integration.environment.api.issuer.IssuerApi
+import id.walt.test.integration.environment.api.wallet.ExchangeApi
 import id.walt.test.integration.expectRedirect
 import io.ktor.client.*
 import io.ktor.client.call.*

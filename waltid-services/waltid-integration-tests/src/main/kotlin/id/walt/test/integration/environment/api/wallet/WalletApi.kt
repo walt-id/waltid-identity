@@ -6,6 +6,7 @@ import id.walt.commons.testing.E2ETest
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.webwallet.db.models.Account
 import id.walt.webwallet.db.models.WalletDid
+import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.web.model.X5CAccountRequest
@@ -26,6 +27,8 @@ class WalletApi(
     val keysApi = KeysApi(e2e, httpClient)
     val didsApi = DidsApi(e2e, httpClient)
     val categoryApi = CategoryApi(e2e, httpClient)
+    val exchangeApi = ExchangeApi(e2e, httpClient)
+    val credentialApi = CredentialsApi(e2e, httpClient)
 
     fun withToken(token: String): WalletApi = WalletApi(defaultEmailAccount, clientFactory, e2e, token)
 
@@ -121,5 +124,37 @@ class WalletApi(
 
     suspend fun listCategories(walletId: Uuid) =
         categoryApi.listCategories(walletId)
+
+    //=========================================================================
+    // Credential Exchange
+    //=========================================================================
+    suspend fun resolveCredentialOffer(walletId: Uuid, offerUrl: String) =
+        exchangeApi.resolveCredentialOffer(walletId, offerUrl)
+
+    suspend fun claimCredential(walletId: Uuid, offerUrl: String) =
+        exchangeApi.claimCredential(walletId, offerUrl)
+
+    //=========================================================================
+    // Credential Store
+    //=========================================================================
+    suspend fun getCredential(walletId: Uuid, credentialId: String) =
+        credentialApi.getCredential(walletId, credentialId)
+
+    suspend fun getCredentialStatus(walletId: Uuid, credentialId: String) =
+        credentialApi.getCredentialStatus(walletId, credentialId)
+
+
+    suspend fun listCredentials(walletId: Uuid, filter: CredentialFilterObject = CredentialFilterObject.default) =
+        credentialApi.listCredentials(walletId, filter)
+
+    suspend fun acceptCredential(walletId: Uuid, credentialId: String) =
+        credentialApi.acceptCredential(walletId, credentialId)
+
+    suspend fun deleteCredential(walletId: Uuid, credentialId: String, permanent: Boolean = false) =
+        credentialApi.deleteCredential(walletId, credentialId, permanent)
+
+    suspend fun restoreCredential(walletId: Uuid, credentialId: String) =
+        credentialApi.restoreCredential(walletId, credentialId)
+
 
 }

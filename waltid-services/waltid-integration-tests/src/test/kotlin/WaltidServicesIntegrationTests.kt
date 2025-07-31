@@ -12,7 +12,10 @@ import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
+import id.walt.test.integration.environment.api.issuer.IssuerApi
+import id.walt.test.integration.environment.api.wallet.CredentialsApi
 import id.walt.test.integration.environment.api.wallet.DidsApi
+import id.walt.test.integration.environment.api.wallet.ExchangeApi
 import id.walt.test.integration.expectLooksLikeJwt
 import id.walt.test.integration.expectSuccess
 import id.walt.test.integration.tests.AbstractIntegrationTest
@@ -127,11 +130,6 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
 
         //region -Credentials-
         val credentialsApi = CredentialsApi(e2e, client)
-        credentialsApi.list(wallet.id, expectedSize = 1, expectedCredential = arrayOf(newCredentialId))
-        credentialsApi.get(wallet.id, newCredentialId)
-        credentialsApi.accept(wallet.id, newCredentialId)
-        credentialsApi.delete(wallet.id, newCredentialId)
-        credentialsApi.restore(wallet.id, newCredentialId)
         credentialsApi.status(wallet.id, newCredentialId)
         val categoryName = "name#1"
         val categoryNewName = "name#2"

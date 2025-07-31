@@ -4,6 +4,8 @@ import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
+import id.walt.test.integration.environment.api.issuer.IssuerApi
+import id.walt.test.integration.environment.api.wallet.ExchangeApi
 import id.walt.test.integration.expectLooksLikeJwt
 import id.walt.test.integration.expectSuccess
 import id.walt.test.integration.expectFailure

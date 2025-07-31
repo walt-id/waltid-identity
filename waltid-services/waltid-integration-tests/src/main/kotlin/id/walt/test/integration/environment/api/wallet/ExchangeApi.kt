@@ -1,5 +1,7 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
+package id.walt.test.integration.environment.api.wallet
+
 import id.walt.commons.testing.E2ETest
 import id.walt.test.integration.expectSuccess
 import id.walt.webwallet.db.models.WalletCredential
@@ -10,20 +12,33 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.serialization.json.JsonObject
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-
 class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
-    @OptIn(ExperimentalUuidApi::class)
-    suspend fun resolveCredentialOffer(wallet: Uuid, offerUrl: String, output: ((String) -> Unit)? = null) =
-        e2e.test("/wallet-api/wallet/{wallet}/exchange/resolveCredentialOffer - resolve credential offer") {
-            client.post("/wallet-api/wallet/$wallet/exchange/resolveCredentialOffer") {
-                setBody(offerUrl)
-            }.expectSuccess().apply {
-                output?.invoke(bodyAsText())
-            }
+
+    suspend fun resolveCredentialOfferRaw(walletId: Uuid, offerUrl: String) =
+        client.post("/wallet-api/wallet/$walletId/exchange/resolveCredentialOffer") {
+            setBody(offerUrl)
         }
+
+    suspend fun resolveCredentialOffer(walletId: Uuid, offerUrl: String): JsonObject {
+        return resolveCredentialOfferRaw(walletId, offerUrl)
+            .expectSuccess()
+            .body<JsonObject>()
+    }
+
+    suspend fun claimCredentialRaw(walletId: Uuid, offerUrl: String) =
+        client.post("/wallet-api/wallet/$walletId/exchange/useOfferRequest") {
+            setBody(offerUrl)
+        }
+
+    suspend fun claimCredential(walletId: Uuid, offerUrl: String): List<WalletCredential> {
+        return claimCredentialRaw(walletId, offerUrl)
+            .expectSuccess()
+            .body<List<WalletCredential>>()
+    }
 
     @OptIn(ExperimentalUuidApi::class)
     suspend fun useOfferRequest(
