@@ -25,6 +25,7 @@ class WalletApi(
     val authApi = AuthApi(e2e, httpClient)
     val keysApi = KeysApi(e2e, httpClient)
     val didsApi = DidsApi(e2e, httpClient)
+    val categoryApi = CategoryApi(e2e, httpClient)
 
     fun withToken(token: String): WalletApi = WalletApi(defaultEmailAccount, clientFactory, e2e, token)
 
@@ -105,4 +106,20 @@ class WalletApi(
 
     suspend fun deleteDid(walletId: Uuid, didString: String) =
         didsApi.deleteDid(walletId, didString)
+
+    //=========================================================================
+    // Category API
+    //=========================================================================
+    suspend fun createCategory(walletId: Uuid, categoryName: String) =
+        categoryApi.createCategory(walletId, categoryName)
+
+    suspend fun deleteCategory(walletId: Uuid, categoryName: String) =
+        categoryApi.deleteCategory(walletId, categoryName)
+
+    suspend fun renameCategory(walletId: Uuid, from: String, to: String) =
+        categoryApi.renameCategory(walletId, from, to)
+
+    suspend fun listCategories(walletId: Uuid) =
+        categoryApi.listCategories(walletId)
+
 }

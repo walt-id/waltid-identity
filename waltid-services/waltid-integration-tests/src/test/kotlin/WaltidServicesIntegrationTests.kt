@@ -95,23 +95,6 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
 
         // the e2e http request tests here
 
-
-        //region -Categories-
-        val categoryApi = CategoryApi(e2e, client)
-        val categoryName = "name#1"
-        val categoryNewName = "name#2"
-        categoryApi.list(wallet.id, 0)
-        categoryApi.add(wallet.id, categoryName)
-        categoryApi.list(wallet.id, 1) {
-            assertNotNull(it.single { it["name"]?.jsonPrimitive?.content == categoryName })
-        }
-        categoryApi.rename(wallet.id, categoryName, categoryNewName)
-        categoryApi.list(wallet.id, 1) {
-            assertNotNull(it.single { it["name"]?.jsonPrimitive?.content == categoryNewName })
-        }
-        categoryApi.delete(wallet.id, categoryNewName)
-        //endregion -Categories
-
         //region -Issuer / offer url-
         lateinit var offerUrl: String
         val issuerApi = IssuerApi(
@@ -150,8 +133,10 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         credentialsApi.delete(wallet.id, newCredentialId)
         credentialsApi.restore(wallet.id, newCredentialId)
         credentialsApi.status(wallet.id, newCredentialId)
-        categoryApi.add(wallet.id, categoryName)
-        categoryApi.add(wallet.id, categoryNewName)
+        val categoryName = "name#1"
+        val categoryNewName = "name#2"
+        walletApi.createCategory(wallet.id, categoryName)
+        walletApi.createCategory(wallet.id, categoryNewName)
         credentialsApi.attachCategory(wallet.id, newCredentialId, categoryName, categoryNewName)
         credentialsApi.detachCategory(wallet.id, newCredentialId, categoryName, categoryNewName)
 //            credentialsApi.reject(wallet.id, newCredentialId)
