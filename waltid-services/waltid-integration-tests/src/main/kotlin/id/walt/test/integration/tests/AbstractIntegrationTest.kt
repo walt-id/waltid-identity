@@ -17,6 +17,7 @@ abstract class AbstractIntegrationTest {
         // id.walt.test.integration.junit.IntegrationTestRunListener
         // only the listener does know, when the last test is executed
 
+        fun getVerifierApi() = environment.getVerifierApi()
         fun getIssuerApi() = environment.getIssuerApi()
         suspend fun getDefaultAccountWalletApi() = environment.getDefaultAccountWalletApi()
 

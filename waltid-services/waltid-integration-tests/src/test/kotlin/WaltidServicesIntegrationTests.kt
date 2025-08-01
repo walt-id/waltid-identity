@@ -10,9 +10,8 @@ import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
 import id.walt.issuer.issuerModule
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.OpenId4VPProfile
-import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.oid4vc.util.JwtUtils
 import id.walt.test.integration.environment.api.issuer.IssuerApi
+import id.walt.test.integration.environment.api.verifier.Verifier
 import id.walt.test.integration.environment.api.wallet.CredentialsApi
 import id.walt.test.integration.environment.api.wallet.DidsApi
 import id.walt.test.integration.environment.api.wallet.ExchangeApi
@@ -21,25 +20,24 @@ import id.walt.test.integration.expectSuccess
 import id.walt.test.integration.tests.AbstractIntegrationTest
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
-import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
-import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.webWalletModule
 import io.klogging.Klogging
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.BeforeEach
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -94,102 +92,14 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         var client = walletApi.httpClient
         val wallets = walletApi.listAccountWallets()
         val wallet = wallets.wallets.first()
-
-
-        // the e2e http request tests here
-
-        //region -Issuer / offer url-
-        lateinit var offerUrl: String
-        val issuerApi = IssuerApi(
-            e2e, client,
-            // uncomment the following line, to test status callbacks, update webhook id as required.
-            //    "https://webhook.site/d879094b-2275-4ae7-b1c5-ebfb9f08dfdb"
-        )
-        val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(jwtCredential)
-        println("issuance-request:")
-        println(issuanceRequest)
-        issuerApi.jwt(issuanceRequest) {
-            offerUrl = it
-            println("offer: $offerUrl")
-        }
-        assertTrue(offerUrl.contains("draft13"))
-        assertFalse(offerUrl.contains("draft11"))
-
-        //endregion -Issuer / offer url-
-
-        //region -Exchange / claim-
-        val exchangeApi = ExchangeApi(e2e, client)
-        lateinit var newCredentialId: String
-        exchangeApi.resolveCredentialOffer(wallet.id, offerUrl)
-        exchangeApi.useOfferRequest(wallet.id, offerUrl, 1) {
-            val cred = it.first()
-            assertContains(JwtUtils.parseJWTPayload(cred.document).keys, JwsSignatureScheme.JwsOption.VC)
-            newCredentialId = cred.id
-        }
-        //endregion -Exchange / claim-
-
-        //region -Credentials-
-        val credentialsApi = CredentialsApi(e2e, client)
-        credentialsApi.status(wallet.id, newCredentialId)
-        val categoryName = "name#1"
-        val categoryNewName = "name#2"
-        walletApi.createCategory(wallet.id, categoryName)
-        walletApi.createCategory(wallet.id, categoryNewName)
-        credentialsApi.attachCategory(wallet.id, newCredentialId, categoryName, categoryNewName)
-        credentialsApi.detachCategory(wallet.id, newCredentialId, categoryName, categoryNewName)
-//            credentialsApi.reject(wallet.id, newCredentialId)
-//            credentialsApi.delete(wallet.id, newCredentialId, true)
-        //endregion -Credentials-
-
-        //region -Verifier / request url-
-        lateinit var verificationUrl: String
-        lateinit var verificationId: String
+        val issuerApi = environment.getIssuerApi()
+        val exchangeApi = walletApi.exchangeApi
         val sessionApi = Verifier.SessionApi(e2e, client)
         val verificationApi = Verifier.VerificationApi(e2e, client)
-        verificationApi.verify(simplePresentationRequestPayload) {
-            verificationUrl = it
-            verificationId = Url(verificationUrl).parameters.getOrFail("state")
-        }
-        //endregion -Verifier / request url-
 
-        //region -Exchange / presentation-
-        lateinit var resolvedPresentationOfferString: String
-        lateinit var presentationDefinition: String
-        exchangeApi.resolvePresentationRequest(wallet.id, verificationUrl) {
-            resolvedPresentationOfferString = it
-            presentationDefinition = Url(it).parameters.getOrFail("presentation_definition")
-        }
-
-        sessionApi.get(verificationId) {
-            assertTrue(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
-        }
-
-        exchangeApi.matchCredentialsForPresentationDefinition(
-            wallet.id, presentationDefinition, listOf(newCredentialId)
-        )
+        // ---------------------------------------------------------------
         val defaultDid = walletApi.getDefaultDid(wallet.id)
         val did = defaultDid.did
-        exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet.id, presentationDefinition)
-        exchangeApi.usePresentationRequest(
-            wallet.id, UsePresentationRequest(did, resolvedPresentationOfferString, listOf(newCredentialId))
-        )
-
-        sessionApi.get(verificationId) {
-            assertTrue(
-                it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null,
-                "Received no valid token response!"
-            )
-            assertTrue(
-                it.tokenResponse?.presentationSubmission != null,
-                "should have a presentation submission after submission"
-            )
-
-            assertTrue(it.verificationResult == true, "overall verification should be valid")
-            it.policyResults.let {
-                require(it != null) { "policyResults should be available after running policies" }
-                assertTrue(it.size > 1, "no policies have run")
-            }
-        }
         val lspPotentialIssuance = LspPotentialIssuance(e2e, environment.testHttpClient(doFollowRedirects = false))
         lspPotentialIssuance.testTrack1()
         lspPotentialIssuance.testTrack2()
@@ -221,8 +131,6 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         }
         //endregion -History-
         val sdJwtTest = E2ESdJwtTest(issuerApi, exchangeApi, sessionApi, verificationApi)
-        //cleanup credentials
-        credentialsApi.delete(wallet.id, newCredentialId)
         sdJwtTest.e2e(wallet.id, did)
 
         // Test Authorization Code flow with available authentication methods in Issuer API
@@ -280,14 +188,12 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
 
         //region -Input Descriptor Matching (Wallet)-
         val inputDescTest = InputDescriptorMatchingTest(issuerApi, exchangeApi, sessionApi, verificationApi)
-        //cleanup credentials
-        credentialsApi.delete(wallet.id, newCredentialId)
         inputDescTest.e2e(wallet.id, did)
         //endregion -Input Descriptor Matching (Wallet)-
 
-        //region -Presentation Definition Policy (Verifier)-
+        //region -Presentation Definition Policy (id.walt.test.integration.environment.api.verifier.Verifier)-
         PresentationDefinitionPolicyTests(e2e).runTests()
-        //endregion -Presentation Definition Policy (Verifier)-
+        //endregion -Presentation Definition Policy (id.walt.test.integration.environment.api.verifier.Verifier)-
 
         //region -ISO mDL Onboarding Service (Issuer)-
         IssuerIsoMdlOnboardingServiceTests(e2e).runTests()

@@ -80,6 +80,23 @@ class CredentialsApi(private val e2e: E2ETest, private val client: HttpClient) {
         restoreCredentialRaw(walletId, credentialId).expectSuccess()
     }
 
+    suspend fun attachCategoriesToCredentialRaw(walletId: Uuid, credentialId: String, vararg categories: String) =
+        client.put("/wallet-api/wallet/$walletId/credentials/$credentialId/category") {
+            setBody(categories.toList())
+        }
+
+    suspend fun attachCategoriesToCredential(walletId: Uuid, credentialId: String, vararg categories: String): Unit {
+        attachCategoriesToCredentialRaw(walletId, credentialId, *categories).expectSuccess()
+    }
+
+    suspend fun detachCategoriesFromCredentialRaw(wallet: Uuid, credential: String, vararg categories: String) =
+        client.delete("/wallet-api/wallet/$wallet/credentials/$credential/category") {
+            setBody(categories.toList())
+        }
+
+    suspend fun detachCategoriesFromCredential(wallet: Uuid, credential: String, vararg categories: String) {
+        detachCategoriesFromCredentialRaw(wallet, credential, *categories).expectSuccess()
+    }
 
     @Deprecated("Old API")
     suspend fun delete(wallet: Uuid, credential: String, permanent: Boolean = false) =
@@ -114,19 +131,6 @@ class CredentialsApi(private val e2e: E2ETest, private val client: HttpClient) {
             }
         }
 
-    suspend fun attachCategory(wallet: Uuid, credential: String, vararg categories: String) =
-        e2e.test("/wallet-api/wallet/{wallet}/credentials/{credentialId}/category - attach category") {
-            client.put("/wallet-api/wallet/$wallet/credentials/$credential/category") {
-                setBody(categories.toList())
-            }.expectSuccess()
-        }
-
-    suspend fun detachCategory(wallet: Uuid, credential: String, vararg categories: String) =
-        e2e.test("/wallet-api/wallet/{wallet}/credentials/{credentialId}/category - detach category") {
-            client.delete("/wallet-api/wallet/$wallet/credentials/$credential/category") {
-                setBody(categories.toList())
-            }.expectSuccess()
-        }
 
     suspend fun store(wallet: Uuid, credential: String) =
         e2e.test("/wallet-api/wallet/{wallet}/credentials - store credential") {

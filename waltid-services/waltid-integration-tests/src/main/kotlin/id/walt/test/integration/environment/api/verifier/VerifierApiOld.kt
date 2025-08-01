@@ -1,3 +1,5 @@
+package id.walt.test.integration.environment.api.verifier
+
 import id.walt.commons.testing.E2ETest
 import id.walt.test.integration.expectSuccess
 import id.walt.verifier.oidc.PresentationSessionInfo
@@ -8,6 +10,7 @@ import io.ktor.client.statement.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
+@Deprecated("Old API", ReplaceWith("id.walt.test.integration.environment.api.verifier.VerifierApi"))
 object Verifier {
     class SessionApi(private val e2e: E2ETest, private val client: HttpClient) {
         suspend fun get(verificationId: String, output: ((PresentationSessionInfo) -> Unit)? = null) =

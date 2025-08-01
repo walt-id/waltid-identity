@@ -40,6 +40,70 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
             .body<List<WalletCredential>>()
     }
 
+    suspend fun resolvePresentationRequestRaw(
+        wallet: Uuid,
+        presentationRequestUrl: String
+    ) = client.post("/wallet-api/wallet/$wallet/exchange/resolvePresentationRequest") {
+        contentType(ContentType.Text.Plain)
+        setBody(presentationRequestUrl)
+    }
+
+    suspend fun resolvePresentationRequest(
+        wallet: Uuid,
+        presentationRequestUrl: String,
+    ) = resolvePresentationRequestRaw(wallet, presentationRequestUrl).let {
+        it.expectSuccess()
+        val resolvedPresentationOfferString = it.body<String>()
+        assert(resolvedPresentationOfferString.contains("presentation_definition="))
+        resolvedPresentationOfferString
+    }
+
+    suspend fun matchCredentialsForPresentationDefinitionRaw(
+        wallet: Uuid,
+        presentationDefinition: String
+    ) =
+        client.post("/wallet-api/wallet/$wallet/exchange/matchCredentialsForPresentationDefinition") {
+            setBody(presentationDefinition)
+        }
+
+    suspend fun matchCredentialsForPresentationDefinition(
+        walletId: Uuid,
+        presentationDefinition: String,
+    ) = matchCredentialsForPresentationDefinitionRaw(walletId, presentationDefinition).let {
+        it.expectSuccess()
+        it.body<List<WalletCredential>>()
+    }
+
+    suspend fun unmatchedCredentialsForPresentationDefinitionRaw(
+        walletId: Uuid,
+        presentationDefinition: String
+    ) =
+        client.post("/wallet-api/wallet/$walletId/exchange/unmatchedCredentialsForPresentationDefinition") {
+            setBody(presentationDefinition)
+        }
+
+    suspend fun unmatchedCredentialsForPresentationDefinition(
+        walletId: Uuid,
+        presentationDefinition: String
+    ) = unmatchedCredentialsForPresentationDefinitionRaw(walletId, presentationDefinition).let {
+        it.expectSuccess()
+        it.body<List<FilterData>>()
+    }
+
+    suspend fun usePresentationRequestRaw(
+        walletId: Uuid,
+        request: UsePresentationRequest,
+    ) = client.post("/wallet-api/wallet/$walletId/exchange/usePresentationRequest") {
+        setBody(request)
+    }
+
+    suspend fun usePresentationRequest(
+        walletId: Uuid,
+        request: UsePresentationRequest
+    ) {
+        usePresentationRequestRaw(walletId, request).expectSuccess()
+    }
+
     @OptIn(ExperimentalUuidApi::class)
     suspend fun useOfferRequest(
         wallet: Uuid,
@@ -57,6 +121,7 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
         }
     }
 
+    @Deprecated("Old API")
     @OptIn(ExperimentalUuidApi::class)
     suspend fun resolvePresentationRequest(
         wallet: Uuid,
@@ -73,6 +138,7 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
         }
     }
 
+    @Deprecated("Old API")
     @OptIn(ExperimentalUuidApi::class)
     suspend fun matchCredentialsForPresentationDefinition(
         wallet: Uuid,
@@ -92,6 +158,7 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
             }
         }
 
+    @Deprecated("Old API")
     @OptIn(ExperimentalUuidApi::class)
     suspend fun unmatchedCredentialsForPresentationDefinition(
         wallet: Uuid,

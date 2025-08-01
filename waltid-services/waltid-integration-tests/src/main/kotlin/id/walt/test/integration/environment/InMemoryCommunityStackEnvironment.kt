@@ -7,6 +7,7 @@ import id.walt.commons.web.plugins.httpJson
 import id.walt.issuer.feat.lspPotential.lspPotentialIssuanceTestApi
 import id.walt.issuer.issuerModule
 import id.walt.test.integration.environment.api.issuer.IssuerApi
+import id.walt.test.integration.environment.api.verifier.VerifierApi
 import id.walt.test.integration.environment.api.wallet.WalletApi
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
@@ -112,6 +113,9 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
         }
         followRedirects = doFollowRedirects
     }
+
+    fun getVerifierApi() =
+        VerifierApi(e2e, testHttpClient())
 
     fun getIssuerApi() =
         IssuerApi(e2e, testHttpClient())

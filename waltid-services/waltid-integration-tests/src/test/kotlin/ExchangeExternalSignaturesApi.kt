@@ -26,6 +26,7 @@ import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDisclosure
 import id.walt.sdjwt.utils.Base64Utils.encodeToBase64Url
 import id.walt.test.integration.environment.api.issuer.IssuerApi
+import id.walt.test.integration.environment.api.verifier.Verifier
 import id.walt.test.integration.environment.api.wallet.AuthApi
 import id.walt.test.integration.environment.api.wallet.CredentialsApi
 import id.walt.test.integration.environment.api.wallet.DidsApi

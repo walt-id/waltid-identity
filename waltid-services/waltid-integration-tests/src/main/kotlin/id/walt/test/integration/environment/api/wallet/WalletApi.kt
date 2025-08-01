@@ -7,6 +7,7 @@ import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.webwallet.db.models.Account
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.service.credentials.CredentialFilterObject
+import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.web.model.X5CAccountRequest
@@ -134,6 +135,18 @@ class WalletApi(
     suspend fun claimCredential(walletId: Uuid, offerUrl: String) =
         exchangeApi.claimCredential(walletId, offerUrl)
 
+    suspend fun resolvePresentationRequest(walletId: Uuid, verificationUrl: String) =
+        exchangeApi.resolvePresentationRequest(walletId, verificationUrl)
+
+    suspend fun matchCredentialsForPresentationDefinition(walletId: Uuid, presentationDefinition: String) =
+        exchangeApi.matchCredentialsForPresentationDefinition(walletId, presentationDefinition)
+
+    suspend fun unmatchedCredentialsForPresentationDefinition(walletId: Uuid, presentationDefinition: String) =
+        exchangeApi.unmatchedCredentialsForPresentationDefinition(walletId, presentationDefinition)
+
+    suspend fun usePresentationRequest(walletId: Uuid, request: UsePresentationRequest) =
+        exchangeApi.usePresentationRequest(walletId, request)
+
     //=========================================================================
     // Credential Store
     //=========================================================================
@@ -142,7 +155,6 @@ class WalletApi(
 
     suspend fun getCredentialStatus(walletId: Uuid, credentialId: String) =
         credentialApi.getCredentialStatus(walletId, credentialId)
-
 
     suspend fun listCredentials(walletId: Uuid, filter: CredentialFilterObject = CredentialFilterObject.default) =
         credentialApi.listCredentials(walletId, filter)
@@ -156,5 +168,10 @@ class WalletApi(
     suspend fun restoreCredential(walletId: Uuid, credentialId: String) =
         credentialApi.restoreCredential(walletId, credentialId)
 
+    suspend fun attachCategoriesToCredential(walletId: Uuid, credentialId: String, vararg categories: String) =
+        credentialApi.attachCategoriesToCredential(walletId, credentialId, *categories)
+
+    suspend fun detachCategoriesFromCredential(walletId: Uuid, credentialId: String, vararg categories: String) =
+        credentialApi.detachCategoriesFromCredential(walletId, credentialId, *categories)
 
 }
