@@ -4,32 +4,16 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
-import kotlin.test.Ignore
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class JWKKeyAndDidManagementTest {
-
-    private val keyTypeMap = mapOf(
-        KeyType.Ed25519 to "OKP",
-        KeyType.secp256k1 to "EC",
-        KeyType.secp256r1 to "EC",
-        KeyType.RSA to "RSA"
-    )
-
-    private fun getKeyTypeMap(kt: KeyType): String? {
-        return keyTypeMap[kt]
-    }
 
     private val testObj = JsonObject(mapOf("value1" to JsonPrimitive("123456789")))
 
     @Test
-    @Ignore
     //TODO: This tests does not work - timeout error
     fun jwkKeyGenerationTest() = runTest {
-        KeyType.values().forEach {
+        KeyType.entries.forEach {
             println("Generate key for key type $it")
             val generatedKey = JWKKey.generate(it)
 
@@ -55,7 +39,7 @@ class JWKKeyAndDidManagementTest {
             val x = jwk["x"].toString().removeSurrounding("\"")
 
             println("Checking kty, d, crv, kid, x...")
-            assertEquals(kty, getKeyTypeMap(it))
+            assertEquals(kty, it.jwkKty)
             assertNotNull(d)
             assertNotNull(crv)
             assertNotNull(kid)

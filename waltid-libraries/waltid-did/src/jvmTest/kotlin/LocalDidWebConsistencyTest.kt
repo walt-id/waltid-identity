@@ -71,13 +71,18 @@ class LocalDidWebConsistencyTest {
     @Test
     fun testDidWebCreateAndResolveConsistency() = runTest {
         for (entry in didWebTestEntryList) {
+            println("Checking consistency for: $entry")
             val resolvedKey = localResolver.resolveToKey(entry.did).getOrThrow()
+            println("Entry:    ${entry.key.exportJWK()}")
+            println("Resolved: ${resolvedKey.exportJWK()}")
             assertEquals(entry.key.getThumbprint(), resolvedKey.getThumbprint())
+            println()
         }
     }
 
     private fun populateTestData(): List<TestEntry> = runBlocking {
-        val keyList: List<JWKKey> = KeyType.entries.map { JWKKey.generate(it) }
+        println("-- Populating test data --")
+        val keyList: List<JWKKey> = KeyType.entries.map { keyType -> JWKKey.generate(keyType).also { println("Created JWKKey for $keyType: $it") } }
         val domain = "localhost:3021"
         keyList.map {
             val path = it.keyType.toString().lowercase()
@@ -86,16 +91,17 @@ class LocalDidWebConsistencyTest {
                 DidWebCreateOptions(
                     domain = domain,
                     path = path,
-                    it.keyType
+                    keyType = it.keyType
                 )
             )
             didWebPathToDocMap[path] = didResult.didDocument
+
             TestEntry(
-                didResult.did,
-                it,
-                didResult.didDocument,
-                domain,
-                path,
+                did = didResult.did,
+                key = it,
+                doc = didResult.didDocument,
+                domain = domain,
+                path = path,
             )
         }
     }
