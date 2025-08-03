@@ -7,6 +7,7 @@ import id.walt.crypto.exceptions.VerificationException
 import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyTypes
 import id.walt.crypto.keys.OciKeyMeta
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
@@ -14,8 +15,6 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.crypto.utils.JwsUtils.jwsAlg
-import id.walt.crypto.utils.jwsSigningAlgorithm
 import id.walt.crypto.utils.sha256WithRsa
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -121,12 +120,17 @@ class OCIKeyRestApi(
     override suspend fun exportPEM(): String = throw NotImplementedError("PEM export is not available for remote keys.")
 
 
+    // See: https://docs.oracle.com/en-us/iaas/api/#/en/key/release/datatypes/SignDataDetails
     @Transient
     private val ociSigningAlgorithm by lazy {
         when (keyType) {
             KeyType.secp256r1 -> "ECDSA_SHA_256"
-            KeyType.RSA -> "SHA_256_RSA_PKCS_PSS"
-            else -> throw KeyTypeNotSupportedException(keyType.name)
+            KeyType.secp384r1 -> "ECDSA_SHA_384"
+            KeyType.secp521r1 -> "ECDSA_SHA_512"
+            KeyType.RSA -> "SHA_256_RSA_PKCS1_V1_5"
+            KeyType.RSA3072 -> "SHA_384_RSA_PKCS1_V1_5"
+            KeyType.RSA4096 -> "SHA_512_RSA_PKCS1_V1_5"
+            KeyType.secp256k1, KeyType.Ed25519 -> throw KeyTypeNotSupportedException(keyType.name)
         }
     }
 
@@ -171,7 +175,7 @@ class OCIKeyRestApi(
     @JsExport.Ignore
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         val appendedHeader = HashMap(headers).apply {
-            put("alg", jwsSigningAlgorithm(keyType).toJsonElement())
+            put("alg", keyType.jwsAlg.toJsonElement())
         }
 
         val header = Json.encodeToString(appendedHeader).encodeToByteArray().encodeToBase64Url()
@@ -179,7 +183,7 @@ class OCIKeyRestApi(
 
         var rawSignature = signRaw("$header.$payload".encodeToByteArray())
 
-        if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) {
+        if (keyType in KeyTypes.EC_KEYS) {
             log.trace { "Converted DER to IEEE P1363 signature." }
             rawSignature = EccUtils.convertDERtoIEEEP1363(rawSignature)
         } else {
@@ -236,8 +240,8 @@ class OCIKeyRestApi(
         val headers: Map<String, JsonElement> = header.toMap()
         headers["alg"]?.let {
             val algValue = it.jsonPrimitive.content
-            check(algValue == keyType.jwsAlg()) {
-                "Invalid key algorithm for JWS: JWS has $algValue, key is ${keyType.jwsAlg()}!"
+            check(algValue == keyType.jwsAlg) {
+                "Invalid key algorithm for JWS: JWS has $algValue, key is ${keyType.jwsAlg}!"
             }
         }
 
@@ -286,17 +290,18 @@ class OCIKeyRestApi(
     companion object {
 
         private fun keyTypeToOciKeyMapping(type: KeyType) = when (type) {
-            KeyType.secp256r1 -> "ECDSA"
-            KeyType.RSA -> "RSA"
-            else -> throw KeyTypeNotSupportedException(type.name)
+            KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> "ECDSA"
+            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> "RSA"
+            KeyType.Ed25519, KeyType.secp256k1 -> throw KeyTypeNotSupportedException(type.name)
         }
 
         private fun ociKeyToKeyTypeMapping(type: String) = when (type) {
-            "ECDSA" -> KeyType.secp256r1
+            "ECDSA" -> KeyType.secp256r1 // TODO: other secp types
             "RSA" -> KeyType.RSA
             else -> throw KeyTypeNotSupportedException(type)
         }
 
+        // See: https://docs.oracle.com/en-us/iaas/api/#/en/key/release/datatypes/KeyShape
         @JvmBlocking
         @JvmAsync
         @JsPromise
@@ -308,8 +313,12 @@ class OCIKeyRestApi(
                 val host = config.managementEndpoint
                 val length = when (type) {
                     KeyType.secp256r1 -> 32
+                    KeyType.secp384r1 -> 48
+                    KeyType.secp521r1 -> 66
                     KeyType.RSA -> 256
-                    else -> throw KeyTypeNotSupportedException(type.name)
+                    KeyType.RSA3072 -> 384
+                    KeyType.RSA4096 -> 512
+                    KeyType.Ed25519, KeyType.secp256k1 -> throw KeyTypeNotSupportedException(type.name)
                 }
                 val requestBody = JsonObject(
                     mapOf(
@@ -321,6 +330,8 @@ class OCIKeyRestApi(
                                 "length" to JsonPrimitive(length),
                                 when (type) {
                                     KeyType.secp256r1 -> "curveId" to JsonPrimitive("NIST_P256")
+                                    KeyType.secp384r1 -> "curveId" to JsonPrimitive("NIST_P384")
+                                    KeyType.secp521r1 -> "curveId" to JsonPrimitive("NIST_P521")
                                     else -> "curveId" to JsonNull
                                 },
                             )

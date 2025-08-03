@@ -8,11 +8,11 @@ import id.walt.crypto.keys.AwsKeyMeta
 import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyTypes
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.crypto.utils.jwsSigningAlgorithm
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -106,11 +106,16 @@ class AWSKeyRestAPI(
     @JsExport.Ignore
     override suspend fun exportPEM(): String = throw NotImplementedError("PEM export is not available for remote keys.")
 
+    // See: https://docs.aws.amazon.com/kms/latest/APIReference/API_Sign.html
     private val awsSigningAlgorithm by lazy {
         when (keyType) {
             KeyType.secp256r1, KeyType.secp256k1 -> "ECDSA_SHA_256"
+            KeyType.secp384r1 -> "ECDSA_SHA_384"
+            KeyType.secp521r1 -> "ECDSA_SHA_512"
             KeyType.RSA -> "RSASSA_PKCS1_V1_5_SHA_256"
-            else -> throw KeyTypeNotSupportedException(keyType.name)
+            KeyType.RSA3072 -> "RSASSA_PKCS1_V1_5_SHA_384"
+            KeyType.RSA4096 -> "RSASSA_PKCS1_V1_5_SHA_512"
+            KeyType.Ed25519 -> throw KeyTypeNotSupportedException(keyType.name)
         }
     }
 
@@ -167,7 +172,7 @@ class AWSKeyRestAPI(
         headers: Map<String, JsonElement>
     ): String {
         val appendedHeader = HashMap(headers).apply {
-            put("alg", jwsSigningAlgorithm(keyType).toJsonElement())
+            put("alg", keyType.jwsAlg.toJsonElement())
         }
 
         val header = Json.encodeToString(appendedHeader).encodeToByteArray().encodeToBase64Url()
@@ -175,7 +180,7 @@ class AWSKeyRestAPI(
 
         var rawSignature = signRaw("$header.$payload".encodeToByteArray())
 
-        if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) { // TODO: Add RSA support
+        if (keyType in KeyTypes.EC_KEYS) { // TODO: Add RSA support
             rawSignature = EccUtils.convertDERtoIEEEP1363(rawSignature)
         }
 
@@ -598,17 +603,26 @@ $public
             }
         }
 
+        // See: https://docs.aws.amazon.com/kms/latest/developerguide/symm-asymm-choose-key-spec.html
         private fun keyTypeToAwsKeyMapping(type: KeyType) = when (type) {
             KeyType.secp256r1 -> "ECC_NIST_P256"
+            KeyType.secp384r1 -> "ECC_NIST_P384"
+            KeyType.secp521r1 -> "ECC_NIST_P521"
             KeyType.secp256k1 -> "ECC_SECG_P256K1"
             KeyType.RSA -> "RSA_2048"
-            else -> throw KeyTypeNotSupportedException(type.name)
+            KeyType.RSA3072 -> "RSA_3072"
+            KeyType.RSA4096 -> "RSA_4096"
+            KeyType.Ed25519 -> throw KeyTypeNotSupportedException(type.name)
         }
 
         private fun awsKeyToKeyTypeMapping(type: String) = when (type) {
             "ECC_NIST_P256" -> KeyType.secp256r1
+            "ECC_NIST_P384" -> KeyType.secp384r1
+            "ECC_NIST_P521" -> KeyType.secp521r1
             "ECC_SECG_P256K1" -> KeyType.secp256k1
             "RSA_2048" -> KeyType.RSA
+            "RSA_3072" -> KeyType.RSA3072
+            "RSA_4096" -> KeyType.RSA4096
             else -> throw KeyTypeNotSupportedException(type)
         }
 

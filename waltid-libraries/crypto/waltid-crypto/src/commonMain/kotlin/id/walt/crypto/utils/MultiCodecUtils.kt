@@ -23,14 +23,18 @@ object MultiCodecUtils {
         KeyType.Ed25519 -> 0xEDu
         KeyType.secp256k1 -> 0xE7u
         KeyType.secp256r1 -> 0x1200u
-        KeyType.RSA -> 0x1205u
+        KeyType.secp384r1 -> 0x1201u
+        KeyType.secp521r1 -> 0x1202u
+        KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> 0x1205u
     }
 
     fun getKeyTypeFromKeyCode(code: UInt): KeyType = when (code) {
         0xEDu -> KeyType.Ed25519
         0xE7u -> KeyType.secp256k1
-        0x1205u -> KeyType.RSA
+        0x1205u -> KeyType.RSA // TODO: other RSA sizes
         0x1200u -> KeyType.secp256r1
+        0x1201u -> KeyType.secp384r1
+        0x1202u -> KeyType.secp521r1
         else -> throw IllegalArgumentException("No multicodec algorithm for code: $code")
     }
 

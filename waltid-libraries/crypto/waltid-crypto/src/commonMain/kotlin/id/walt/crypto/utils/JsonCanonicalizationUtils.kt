@@ -26,8 +26,8 @@ object JsonCanonicalizationUtils {
     suspend fun convertToRequiredMembersJsonString(key: Key): String = key.exportJWKObject().let {
         when (key.keyType) {
             KeyType.Ed25519 -> okpPublicKeyRequiredMembers(it)
-            KeyType.secp256k1, KeyType.secp256r1 -> ecPublicKeyRequiredMembers(it)
-            KeyType.RSA -> rsaPublicKeyRequiredMembers(it)
+            KeyType.secp256k1, KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> ecPublicKeyRequiredMembers(it)
+            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> rsaPublicKeyRequiredMembers(it)
         }
     }.toString()
 
