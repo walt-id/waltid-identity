@@ -27,6 +27,9 @@ import org.junit.jupiter.api.TestMethodOrder
 import kotlin.test.*
 import kotlin.uuid.ExperimentalUuidApi
 
+private const val testOrderOfferUrlErrorMessage = "The offer URL should be set - test order?"
+private const val testOrderCredentialIdErrorMessage = "Credential ID should be set - test order?"
+
 private val jwtCredential = IssuanceRequest(
     issuerKey = loadJsonResource("issuance/key.json"),
     issuerDid = loadResource("issuance/did.txt"),
@@ -61,7 +64,7 @@ class IssueJwtCredentialIntegrationTest : AbstractIntegrationTest(), Klogging {
     @Order(1)
     @Test
     fun shouldResolveCredentialOffer() = runTest {
-        assertNotNull(offerUrl, "The offer URL should be set - test order?")
+        assertNotNull(offerUrl, testOrderOfferUrlErrorMessage)
         val result = defaultWalletApi.resolveCredentialOffer(defaultWallet.id, offerUrl!!)
         assertNotNull(result).also {
             assertNotNull(
@@ -78,11 +81,11 @@ class IssueJwtCredentialIntegrationTest : AbstractIntegrationTest(), Klogging {
     @Order(2)
     @Test
     fun shouldClaimCredential() = runTest {
-        assertNotNull(offerUrl, "The offer URL should be set - test order?")
+        assertNotNull(offerUrl, testOrderOfferUrlErrorMessage)
         val claimedCredentials = defaultWalletApi.claimCredential(defaultWallet.id, offerUrl!!)
         assertNotNull(claimedCredentials).also {
             assertEquals(1, it.size)
-            assertNotNull(it.get(0)).also { credential ->
+            assertNotNull(it[0]).also { credential ->
                 credentialId = credential.id
                 val document = JwtUtils.parseJWTPayload(credential.document)
                 assertContains(document.keys, JwsSignatureScheme.JwsOption.VC)
@@ -93,7 +96,7 @@ class IssueJwtCredentialIntegrationTest : AbstractIntegrationTest(), Klogging {
     @Order(3)
     @Test
     fun shouldListCredential() = runTest {
-        assertNotNull(credentialId, "Credential ID should be set - test order?")
+        assertNotNull(credentialId, testOrderCredentialIdErrorMessage)
         val credentials = defaultWalletApi.listCredentials(defaultWallet.id)
         assertTrue(credentials.any { it.id == credentialId }, "Could not list credential with id $credentialId")
     }
@@ -101,7 +104,7 @@ class IssueJwtCredentialIntegrationTest : AbstractIntegrationTest(), Klogging {
     @Order(4)
     @Test
     fun shouldGetCredential() = runTest {
-        assertNotNull(credentialId, "Credential ID should be set - test order?")
+        assertNotNull(credentialId, testOrderCredentialIdErrorMessage)
         val credential = defaultWalletApi.getCredential(defaultWallet.id, credentialId!!)
         assertNotNull(credential).also {
             assertEquals(credentialId, credential.id)
@@ -111,7 +114,7 @@ class IssueJwtCredentialIntegrationTest : AbstractIntegrationTest(), Klogging {
     @Order(5)
     @Test
     fun shouldAcceptCredential() = runTest {
-        assertNotNull(credentialId, "Credential ID should be set - test order?")
+        assertNotNull(credentialId, testOrderCredentialIdErrorMessage)
         defaultWalletApi.acceptCredential(defaultWallet.id, credentialId!!)
         logger.info("Credential '$credentialId' accepted")
         val credential = defaultWalletApi.getCredential(defaultWallet.id, credentialId!!)
@@ -124,7 +127,7 @@ class IssueJwtCredentialIntegrationTest : AbstractIntegrationTest(), Klogging {
     @Order(6)
     @Test
     fun shouldDeleteCredential() = runTest {
-        assertNotNull(credentialId, "Credential ID should be set - test order?")
+        assertNotNull(credentialId, testOrderCredentialIdErrorMessage)
         defaultWalletApi.deleteCredential(defaultWallet.id, credentialId!!)
         logger.info("Credential '$credentialId' deleted")
         val credential = defaultWalletApi.getCredential(defaultWallet.id, credentialId!!)
@@ -134,7 +137,7 @@ class IssueJwtCredentialIntegrationTest : AbstractIntegrationTest(), Klogging {
     @Order(7)
     @Test
     fun shouldRestoreCredential() = runTest {
-        assertNotNull(credentialId, "Credential ID should be set - test order?")
+        assertNotNull(credentialId, testOrderCredentialIdErrorMessage)
         defaultWalletApi.restoreCredential(defaultWallet.id, credentialId!!)
         logger.info("Credential '$credentialId' restored")
         val credential = defaultWalletApi.getCredential(defaultWallet.id, credentialId!!)
@@ -144,7 +147,7 @@ class IssueJwtCredentialIntegrationTest : AbstractIntegrationTest(), Klogging {
     @Order(8)
     @Test
     fun shouldAttachCategoryToCredential() = runTest {
-        assertNotNull(credentialId, "Credential ID should be set - test order?")
+        assertNotNull(credentialId, testOrderCredentialIdErrorMessage)
         // TODO: space not supported in category, needs to be fixed
         categoryNames.forEach { category ->
             defaultWalletApi.createCategory(defaultWallet.id, category)
@@ -165,7 +168,7 @@ class IssueJwtCredentialIntegrationTest : AbstractIntegrationTest(), Klogging {
     @Order(9)
     @Test
     fun shouldDetachCategoryFromCredential() = runTest {
-        assertNotNull(credentialId, "Credential ID should be set - test order?")
+        assertNotNull(credentialId, testOrderCredentialIdErrorMessage)
         defaultWalletApi.detachCategoriesFromCredential(defaultWallet.id, credentialId!!, *categoryNames.toTypedArray())
         assertEquals(
             0,
@@ -179,7 +182,7 @@ class IssueJwtCredentialIntegrationTest : AbstractIntegrationTest(), Klogging {
     @Order(10)
     @Test
     fun shouldVerify() = runTest {
-        assertNotNull(credentialId, "Credential ID should be set - test order?")
+        assertNotNull(credentialId, testOrderCredentialIdErrorMessage)
         val verificationUrl = verifierApi.verify(simplePresentationRequestPayload)
         val verificationId = Url(verificationUrl).parameters.getOrFail("state")
 

@@ -103,7 +103,7 @@ class WalletApi(
     suspend fun getDefaultDid(walletId: Uuid): WalletDid {
         val possibleDefaultDids = listDids(walletId).filter { it.default }
         assertEquals(1, possibleDefaultDids.size, "Expected wallet '${walletId}' to have exact one default did.")
-        return possibleDefaultDids.get(0)
+        return possibleDefaultDids[0]
     }
 
     suspend fun deleteDidRaw(walletId: Uuid, didString: String) =

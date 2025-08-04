@@ -42,7 +42,7 @@ class X5cUserWalletIntegrationTest : AbstractIntegrationTest() {
         //we don't care about the bit size of the key, it's a test case (as long as it's bigger than 512)
         private val keyPairGenerator = KeyPairGenerator
             .getInstance("RSA").apply {
-                initialize(1024)
+                initialize(2048)
             }
 
         private val subjectKeyPair = keyPairGenerator.generateKeyPair()
