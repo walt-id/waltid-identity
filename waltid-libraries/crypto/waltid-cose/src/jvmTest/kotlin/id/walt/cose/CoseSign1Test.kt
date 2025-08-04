@@ -4,11 +4,9 @@ import id.walt.crypto.keys.KeyManager
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
-import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.encodeToHexString
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -38,8 +36,8 @@ class CoseSign1Test {
         println("-- Start: 1 - CoseHeaders serializer should enforce canonical order --")
         // Build headers in a non-canonical order
         val headers = CoseHeaders(
-            alg = Cose.Algorithm.ES256, // label 1
-            contentType = "application/json", // label 3
+            algorithm = Cose.Algorithm.ES256, // label 1
+            contentType = CoseContentType.AsString("application/json"), // label 3
             kid = "test-key-01".encodeToByteArray() // label 4
         )
         println("Headers: $headers")
@@ -62,7 +60,7 @@ class CoseSign1Test {
     @Test
     fun `2 - Should create and verify a signature successfully`() = runTest {
         println("-- Start: 2 - Should create and verify a signature successfully --")
-        val protectedHeaders = CoseHeaders(alg = Cose.Algorithm.ES256)
+        val protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES256)
         val payload = "This is a test payload.".encodeToByteArray()
 
         val coseSign1 = CoseSign1.createAndSign(
@@ -83,7 +81,7 @@ class CoseSign1Test {
     @Test
     fun `3 - Should fail verification if payload is tampered`() = runTest {
         println("-- Start: 3 - Should fail verification if payload is tampered --")
-        val protectedHeaders = CoseHeaders(alg = Cose.Algorithm.ES256)
+        val protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES256)
         val payload = "Original payload.".encodeToByteArray()
 
         val coseSign1 = CoseSign1.createAndSign(
@@ -107,7 +105,7 @@ class CoseSign1Test {
     @Test
     fun `4 - Should fail verification if protected headers are tampered`() = runTest {
         println("-- Start: 4 - Should fail verification if protected headers are tampered --")
-        val originalHeaders = CoseHeaders(alg = Cose.Algorithm.ES256)
+        val originalHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES256)
         val payload = "Payload.".encodeToByteArray()
 
         val coseSign1 = CoseSign1.createAndSign(
@@ -118,7 +116,7 @@ class CoseSign1Test {
         println("Created CoseSign1: $coseSign1")
 
         println("Create tampered headers and re-encode them")
-        val tamperedHeaders = CoseHeaders(alg = Cose.Algorithm.ES384)
+        val tamperedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES384)
         val tamperedProtectedBytes = coseCbor.encodeToByteArray(tamperedHeaders)
 
         println("Tamper with the protected header bytes")
@@ -133,13 +131,13 @@ class CoseSign1Test {
     }
 
     @Test
-    fun `5 - Should successfully roundtrip (serialize and deserialize)`() = runTest {
-        println("-- Start: 5 - Should successfully roundtrip (serialize and deserialize) --")
+    fun `5_1 - Should successfully roundtrip (serialize and deserialize) int contentType`() = runTest {
+        println("-- Start: 5.1 - Should successfully roundtrip (serialize and deserialize) for int content type --")
         val protectedHeaders = CoseHeaders(
-            alg = Cose.Algorithm.ES256,
+            algorithm = Cose.Algorithm.ES256,
             kid = "test-key-01".encodeToByteArray()
         )
-        val unprotectedHeaders = CoseHeaders(contentType = "text/plain")
+        val unprotectedHeaders = CoseHeaders(contentType = CoseContentType.AsInt(11))
         val payload = "Roundtrip test.".encodeToByteArray()
 
         val originalCose = CoseSign1.createAndSign(
@@ -150,22 +148,50 @@ class CoseSign1Test {
         )
         println("Original CoseSign1: $originalCose")
 
-        val cborBytes = coseCbor.encodeToByteArray(originalCose)
-        val decodedCose = coseCbor.decodeFromByteArray<CoseSign1>(cborBytes)
+        val cborBytes = originalCose.toTagged()
+        val decodedCose = CoseSign1.fromTagged(cborBytes)
         println("Decoded CoseSign1: $decodedCose")
 
         // Check if the decoded object is valid
         assertTrue(decodedCose.verify(testVerifierKey().toCoseVerifier()), "Decoded object should be verifiable.")
-        assertContentEquals(originalCose.payload, decodedCose.payload)
-        assertContentEquals(originalCose.signature, decodedCose.signature)
+        assertEquals(originalCose, decodedCose)
 
-        println("-- End: 5 - Should successfully roundtrip (serialize and deserialize) --")
+        println("-- End: 5.1 - Should successfully roundtrip (serialize and deserialize) for int content type --")
+    }
+
+    @Test
+    fun `5_2 - Should successfully roundtrip (serialize and deserialize) string contentType`() = runTest {
+        println("-- Start: 5 - Should successfully roundtrip (serialize and deserialize) for string content type --")
+        val protectedHeaders = CoseHeaders(
+            algorithm = Cose.Algorithm.ES256,
+            kid = "test-key-01".encodeToByteArray()
+        )
+        val unprotectedHeaders = CoseHeaders(contentType = CoseContentType.AsString("text/plain"))
+        val payload = "Roundtrip test.".encodeToByteArray()
+
+        val originalCose = CoseSign1.createAndSign(
+            protectedHeaders = protectedHeaders,
+            unprotectedHeaders = unprotectedHeaders,
+            payload = payload,
+            signer = testSignerKey.toCoseSigner()
+        )
+        println("Original CoseSign1: $originalCose")
+
+        val cborBytes = originalCose.toTagged()
+        val decodedCose = CoseSign1.fromTagged(cborBytes)
+        println("Decoded CoseSign1: $decodedCose")
+
+        // Check if the decoded object is valid
+        assertTrue(decodedCose.verify(testVerifierKey().toCoseVerifier()), "Decoded object should be verifiable.")
+        assertEquals(originalCose, decodedCose)
+
+        println("-- End: 5 - Should successfully roundtrip (serialize and deserialize) for string content type --")
     }
 
     @Test
     fun `6 - Should handle null payload correctly`() = runTest {
         println("-- Start: 6 - Should handle null payload --")
-        val protectedHeaders = CoseHeaders(alg = Cose.Algorithm.ES256)
+        val protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES256)
 
         val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
@@ -185,7 +211,7 @@ class CoseSign1Test {
     @Test
     fun `7 - Should handle external authenticated data (AAD) correctly`() = runTest {
         println("-- Start: 7 - Should handle external authenticated data (AAD) correctly --")
-        val protectedHeaders = CoseHeaders(alg = Cose.Algorithm.ES256)
+        val protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES256)
         val payload = "Payload.".encodeToByteArray()
         val externalAad = "External Authenticated Data".encodeToByteArray()
 
