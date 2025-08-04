@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.cose
 
 import cbor.Cbor
@@ -38,6 +40,25 @@ abstract class COSESimpleBase<T : COSESimpleBase<T>> {
                 is ListElement -> {
                     val byteArrays = headerParameter.value.map { (it as? ByteStringElement)?.value ?: ByteArray(0) }
                     byteArrays.reduceOrNull { acc, bytes -> acc + bytes }
+                }
+
+                else -> null
+            }
+        }
+
+    val x5ChainSafe: COSEX5Chain?
+        get() {
+            if (data.size != 4) throw SerializationException("Invalid COSE_Sign1/COSE_Mac0 array")
+            val unprotectedHeader =
+                data[1] as? MapElement ?: throw SerializationException("Missing COSE_Sign1 unprotected header")
+            return when (val headerParameter = unprotectedHeader.value[MapKey(X5_CHAIN)]) {
+                is ByteStringElement -> COSEX5Chain.SingleElement(headerParameter.value)
+                is ListElement -> {
+                    COSEX5Chain.ListElement(
+                        data = headerParameter.value.map {
+                            (it as ByteStringElement).value
+                        }
+                    )
                 }
 
                 else -> null
@@ -109,3 +130,30 @@ abstract class COSESimpleBase<T : COSESimpleBase<T>> {
     fun decodeProtectedHeader() = Cbor.decodeFromByteArray<MapElement>(protectedHeader)
     fun decodePayload() = payload?.let { Cbor.decodeFromByteArray<MapElement>(it) }
 }
+
+sealed class COSEX5Chain {
+
+    data class SingleElement(
+        val data: ByteArray,
+    ) : COSEX5Chain() {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other == null || this::class != other::class) return false
+
+            other as SingleElement
+
+            return data.contentEquals(other.data)
+        }
+
+        override fun hashCode(): Int {
+            return data.contentHashCode()
+        }
+    }
+
+    data class ListElement(
+        val data: List<ByteArray>,
+    ) : COSEX5Chain()
+}
+
+
+
