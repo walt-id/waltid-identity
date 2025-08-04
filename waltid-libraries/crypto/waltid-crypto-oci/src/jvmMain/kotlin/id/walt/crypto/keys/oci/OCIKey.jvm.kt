@@ -106,7 +106,7 @@ actual class OCIKey actual constructor(
 
 
     @OptIn(ExperimentalEncodingApi::class)
-    actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    actual override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         val encodedMessage: String = Base64.encode(SHA256().digest(plaintext))
 
         val signDataDetails =
@@ -157,7 +157,11 @@ actual class OCIKey actual constructor(
 
     }
 
-    actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
+    actual override suspend fun verifyRaw(
+        signed: ByteArray,
+        detachedPlaintext: ByteArray?,
+        customSignatureAlgorithm: String?
+    ): Result<ByteArray> {
 
         val verifyDataDetails =
             VerifyDataDetails.builder().keyId(id).message(detachedPlaintext?.encodeToBase64Url())

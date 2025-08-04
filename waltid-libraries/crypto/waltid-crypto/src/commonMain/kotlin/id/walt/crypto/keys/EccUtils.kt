@@ -1,7 +1,5 @@
 package id.walt.crypto.keys
 
-import kotlin.experimental.and
-
 object EccUtils {
 
 

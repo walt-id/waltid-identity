@@ -168,7 +168,7 @@ class AzureKey(
     @JsPromise
     @JsExport.Ignore
     @OptIn(ExperimentalStdlibApi::class)
-    override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         return signRawAzure(plaintext, ieeeP1363Signature = false)
     }
 
@@ -193,10 +193,7 @@ class AzureKey(
     @JsPromise
     @JsExport.Ignore
     @OptIn(ExperimentalEncodingApi::class)
-    override suspend fun verifyRaw(
-        signed: ByteArray,
-        detachedPlaintext: ByteArray?
-    ): Result<ByteArray> {
+    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> {
 
         val publicKey = getPublicKey()
         val verification = publicKey.verifyRaw(signed, detachedPlaintext)

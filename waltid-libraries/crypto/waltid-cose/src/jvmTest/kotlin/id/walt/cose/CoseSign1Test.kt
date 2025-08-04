@@ -2,13 +2,19 @@ package id.walt.cose
 
 import id.walt.crypto.keys.KeyManager
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.encodeToHexString
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
-@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class)
 class CoseSign1Test {
 
     private val key = KeyManager.resolveSerializedKeyBlocking(
@@ -28,7 +34,7 @@ class CoseSign1Test {
     suspend fun testVerifierKey() = key.getPublicKey()
 
     @Test
-    fun `1 - CoseHeaders serializer should enforce canonical order`() = runTest {
+    fun `1 - CoseHeaders serializer should enforce canonical order`() {
         println("-- Start: 1 - CoseHeaders serializer should enforce canonical order --")
         // Build headers in a non-canonical order
         val headers = CoseHeaders(
@@ -59,7 +65,7 @@ class CoseSign1Test {
         val protectedHeaders = CoseHeaders(alg = Cose.Algorithm.ES256)
         val payload = "This is a test payload.".encodeToByteArray()
 
-        val coseSign1 = CoseSign1.create(
+        val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
             payload = payload,
             signer = testSignerKey.toCoseSigner()
@@ -80,7 +86,7 @@ class CoseSign1Test {
         val protectedHeaders = CoseHeaders(alg = Cose.Algorithm.ES256)
         val payload = "Original payload.".encodeToByteArray()
 
-        val coseSign1 = CoseSign1.create(
+        val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
             payload = payload,
             signer = testSignerKey.toCoseSigner()
@@ -104,7 +110,7 @@ class CoseSign1Test {
         val originalHeaders = CoseHeaders(alg = Cose.Algorithm.ES256)
         val payload = "Payload.".encodeToByteArray()
 
-        val coseSign1 = CoseSign1.create(
+        val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = originalHeaders,
             payload = payload,
             signer = testSignerKey.toCoseSigner()
@@ -136,7 +142,7 @@ class CoseSign1Test {
         val unprotectedHeaders = CoseHeaders(contentType = "text/plain")
         val payload = "Roundtrip test.".encodeToByteArray()
 
-        val originalCose = CoseSign1.create(
+        val originalCose = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
             unprotectedHeaders = unprotectedHeaders,
             payload = payload,
@@ -161,7 +167,7 @@ class CoseSign1Test {
         println("-- Start: 6 - Should handle null payload --")
         val protectedHeaders = CoseHeaders(alg = Cose.Algorithm.ES256)
 
-        val coseSign1 = CoseSign1.create(
+        val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
             payload = null, // Null payload
             signer = testSignerKey.toCoseSigner()
@@ -183,7 +189,7 @@ class CoseSign1Test {
         val payload = "Payload.".encodeToByteArray()
         val externalAad = "External Authenticated Data".encodeToByteArray()
 
-        val coseSign1 = CoseSign1.create(
+        val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
             payload = payload,
             signer = testSignerKey.toCoseSigner(),

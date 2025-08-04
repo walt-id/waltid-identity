@@ -183,10 +183,10 @@ actual class JWKKey actual constructor(
         }
     }
 
-    actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    actual override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
-        val signature = getSignatureAlgorithm()
+        val signature = getSignatureAlgorithm(customSignatureAlgorithm)
         signature.initSign(getPrivateKey())
         signature.update(plaintext)
         val sig = signature.sign()
@@ -258,7 +258,11 @@ actual class JWKKey actual constructor(
         return customJws
     }
 
-    actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
+    actual override suspend fun verifyRaw(
+        signed: ByteArray,
+        detachedPlaintext: ByteArray?,
+        customSignatureAlgorithm: String?
+    ): Result<ByteArray> {
         check(detachedPlaintext != null) { "Detached plaintext is required." }
 
         if (keyType == KeyType.Ed25519) {
@@ -269,7 +273,7 @@ actual class JWKKey actual constructor(
             return runCatching { tinkVerifier.verify(signed, detachedPlaintext) }.map { detachedPlaintext }
         }*/
 
-        val signature = getSignatureAlgorithm()
+        val signature = getSignatureAlgorithm(customSignatureAlgorithm)
         signature.initVerify(getInternalPublicKey())
         signature.update(detachedPlaintext)
 
@@ -387,16 +391,18 @@ actual class JWKKey actual constructor(
         else -> TODO("Not yet supported: $keyType")
     }
 
-    private fun getSignatureAlgorithm(): Signature = when (keyType) {
-        KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC")
-        KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
-        KeyType.secp384r1 -> Signature.getInstance("SHA384withECDSA")
-        KeyType.secp521r1 -> Signature.getInstance("SHA512withECDSA")
-        KeyType.Ed25519 -> Signature.getInstance("Ed25519")
-        KeyType.RSA -> Signature.getInstance("SHA256withRSA")
-        KeyType.RSA3072 -> Signature.getInstance("SHA384withRSA")
-        KeyType.RSA4096 -> Signature.getInstance("SHA512withRSA")
-    }
+    private fun getSignatureAlgorithm(customSignatureAlgorithm: String? = null): Signature =
+        if (customSignatureAlgorithm != null) Signature.getInstance(customSignatureAlgorithm)
+        else when (keyType) {
+            KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC")
+            KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
+            KeyType.secp384r1 -> Signature.getInstance("SHA384withECDSA")
+            KeyType.secp521r1 -> Signature.getInstance("SHA512withECDSA")
+            KeyType.Ed25519 -> Signature.getInstance("Ed25519")
+            KeyType.RSA -> Signature.getInstance("SHA256withRSA") // RSASSA-PKCS1-v1_5
+            KeyType.RSA3072 -> Signature.getInstance("SHA384withRSA") // RSASSA-PKCS1-v1_5
+            KeyType.RSA4096 -> Signature.getInstance("SHA512withRSA") // RSASSA-PKCS1-v1_5
+        }
 
     private fun decodeEd25519RawPrivateKey(base64: String): PrivateKey {
         val keyFactory = KeyFactory.getInstance("EdDSA")

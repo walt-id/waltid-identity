@@ -161,7 +161,7 @@ class TSEKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun signRaw(plaintext: ByteArray): Any {
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         val body = mapOf("input" to plaintext.encodeBase64())
         val signatureBase64 = httpRequest(HttpMethod.Post, "sign/$id", body)
             .tseJsonDataBody().jsonObject["signature"]?.jsonPrimitive?.content?.removePrefix("vault:v1:")
@@ -198,7 +198,7 @@ class TSEKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
+    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> {
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
         val body = mapOf(

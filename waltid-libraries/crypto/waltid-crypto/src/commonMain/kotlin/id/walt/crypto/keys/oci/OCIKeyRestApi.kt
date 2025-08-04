@@ -4,11 +4,7 @@ import id.walt.crypto.exceptions.KeyNotFoundException
 import id.walt.crypto.exceptions.KeyTypeNotSupportedException
 import id.walt.crypto.exceptions.SigningException
 import id.walt.crypto.exceptions.VerificationException
-import id.walt.crypto.keys.EccUtils
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.KeyTypes
-import id.walt.crypto.keys.OciKeyMeta
+import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
@@ -138,7 +134,7 @@ class OCIKeyRestApi(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         return retry {
             val encodedMessage: String = SHA256().digest(plaintext).encodeBase64()
 
@@ -200,9 +196,7 @@ class OCIKeyRestApi(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun verifyRaw(
-        signed: ByteArray, detachedPlaintext: ByteArray?
-    ): Result<ByteArray> {
+    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> {
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
         val requestBody = JsonObject(

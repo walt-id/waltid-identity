@@ -126,7 +126,7 @@ actual class JWKKey actual constructor(
         @JsPromise() @Api4Js() actual fun signRawAsync(plaintext: ByteArray): Promise<out ByteArray>
      */
     @JsExport.Ignore
-    actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    actual override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         check(hasPrivateKey) { "No private key is attached to this key!" }
         return crypto.sign(
             when (keyType) {
@@ -160,7 +160,11 @@ actual class JWKKey actual constructor(
 
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
+    actual override suspend fun verifyRaw(
+        signed: ByteArray,
+        detachedPlaintext: ByteArray?,
+        customSignatureAlgorithm: String?
+    ): Result<ByteArray> {
         return runCatching {
             val verified = crypto.verify(
                 when (keyType) {

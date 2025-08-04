@@ -5,7 +5,6 @@ package id.walt.cose
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
-import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborLabel
 import kotlinx.serialization.decodeFromByteArray
@@ -40,14 +39,14 @@ data class CoseSign1(
     }
 
     /**
-     * Encodes this CoseSign1 object into its tagged CBOR representation as per RFC 8152.
+     * Encodes this CoseSign1 object into its tagged CBOR representation as per RFC 9052.
+     * A COSE_Sign1 object is tagged with CBOR tag 18.
      */
-    @OptIn(ExperimentalSerializationApi::class)
     fun toTagged(): ByteArray {
         val messageBytes = coseCbor.encodeToByteArray(this)
-        // The CBOR tag for COSE_Sign1 is 18.
-        val taggedList = listOf(Cose.MessageTag.SIGN1, Cbor.decodeFromByteArray<Any>(messageBytes))
-        return Cbor.encodeToByteArray(taggedList)
+        // CBOR tag 18 (major type 6, value 18) is encoded as the single byte 0xd2
+        val tag = 0xD2.toByte()
+        return byteArrayOf(tag) + messageBytes
     }
 
     companion object {
@@ -55,25 +54,30 @@ data class CoseSign1(
          * Decodes a CoseSign1 object from its tagged CBOR representation.
          * The CBOR tag for a COSE Single Signer Data Object is 18.
          */
-        @OptIn(ExperimentalSerializationApi::class)
         fun fromTagged(cborBytes: ByteArray): CoseSign1 {
-            val decoded = Cbor.decodeFromByteArray<List<Any>>(cborBytes)
-            if (decoded.size != 2 || (decoded[0] as Long) != Cose.MessageTag.SIGN1) {
-                throw IllegalArgumentException("Data is not a valid tagged COSE_Sign1 message.")
+            // CBOR tag 18 (major type 6, value 18) is encoded as the single byte 0xd2
+            val expectedTag = 0xD2.toByte()
+            if (cborBytes.isEmpty() || cborBytes[0] != expectedTag) {
+                throw IllegalArgumentException("Data is not a valid tagged COSE_Sign1 message (Tag 18 not found).")
             }
-            return coseCbor.decodeFromByteArray(Cbor.encodeToByteArray(decoded[1]))
+            // Decode the byte array starting *after* the tag byte
+            val messageBytes = cborBytes.copyOfRange(1, cborBytes.size)
+            return coseCbor.decodeFromByteArray(messageBytes)
         }
 
-        /**
-         * Creates and signs a CoseSign1 object.
-         */
-        suspend fun create(
+        fun fromTagged(cborHex: String) = fromTagged(cborHex.hexToByteArray())
+
+        /** Internal To Be Signed data*/
+        internal data class TBS(
+            val protectedBytes: ByteArray,
+            val dataToSign: ByteArray
+        )
+
+        internal fun makeToBeSigned(
             protectedHeaders: CoseHeaders,
-            unprotectedHeaders: CoseHeaders = CoseHeaders(),
             payload: ByteArray?,
-            signer: CoseSigner,
             externalAad: ByteArray = byteArrayOf()
-        ): CoseSign1 {
+        ): TBS {
             /* RFC 9052, Section 3: an empty protected header map should be encoded as a zero-length byte string */
             val protectedBytes = if (protectedHeaders == CoseHeaders()) {
                 // Encode an empty map as an empty byte string
@@ -83,6 +87,21 @@ data class CoseSign1(
             }
 
             val dataToSign = buildSignatureStructure(protectedBytes, payload, externalAad)
+
+            return TBS(protectedBytes, dataToSign)
+        }
+
+        /**
+         * Creates and signs a CoseSign1 object.
+         */
+        suspend fun createAndSign(
+            protectedHeaders: CoseHeaders,
+            unprotectedHeaders: CoseHeaders = CoseHeaders(),
+            payload: ByteArray?,
+            signer: CoseSigner,
+            externalAad: ByteArray = byteArrayOf()
+        ): CoseSign1 {
+            val (protectedBytes, dataToSign) = makeToBeSigned(protectedHeaders, payload, externalAad)
             val signature = signer.sign(dataToSign)
 
             return CoseSign1(
@@ -109,10 +128,21 @@ data class CoseHeaders(
     @CborLabel(1) val alg: Int? = null,
     @CborLabel(2) val crit: List<Int>? = null,
     @CborLabel(3) val contentType: String? = null,
+//    /** contentType can either be an int or a string */
+//    @CborLabel(3) val contentTypeInt: Int? = null,
+//    /** contentType can either be an int or a string */
+//    @CborLabel(3) val contentTypeString: String? = null,
     @CborLabel(4) @ByteString val kid: ByteArray? = null,
     @CborLabel(5) @ByteString val iv: ByteArray? = null,
     @CborLabel(33) @ByteString val x5chain: ByteArray? = null,
-)
+) {
+//    /**
+//     * Convenience property to get the content type, regardless of whether it was
+//     * encoded as an Int or a String.
+//     */
+//    @Transient
+//    val contentType = contentTypeString ?: contentTypeInt
+}
 
 
 /** Represents a COSE Key object. Aligned with RFC 8152, Section 7. */
@@ -165,6 +195,10 @@ object Cose {
 
     /** COSE Algorithm Identifiers.*/
     object Algorithm {
+
+        /** ECDSA using secp256k1 curve and SHA-256 */
+        const val ES256K = -47
+
         /** ECDSA w/ SHA-256 */
         const val ES256 = -7
 
@@ -179,6 +213,21 @@ object Cose {
 
         /** RSASSA-PSS w/ SHA-256 */
         const val PS256 = -37
+
+        /** RSASSA-PSS w/ SHA-384 */
+        const val PS384 = -38
+
+        /** RSASSA-PSS w/ SHA-512 */
+        const val PS512 = -39
+
+        /** RSASSA-PKCS1-v1_5 using SHA-256 */
+        const val RS256 = -257
+
+        /** RSASSA-PKCS1-v1_5 using SHA-384 */
+        const val RS384 = -258
+
+        /** RSASSA-PKCS1-v1_5 using SHA-512 */
+        const val RS512 = -259
     }
 }
 
@@ -204,6 +253,7 @@ object HeaderLabel {
 
     /** Counter signature */
     const val COUNTER_SIGNATURE = 7
+
     /** An ordered chain of X.509 certificates */
     const val X5_CHAIN = 33
 }

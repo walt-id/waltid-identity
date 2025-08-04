@@ -102,7 +102,7 @@ abstract class Key {
     @JsPromise
     @JsExport.Ignore
     @Throws(Exception::class)
-    abstract suspend fun signRaw(plaintext: ByteArray): Any
+    abstract suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String? = null): Any
 
     /**
      * signs a message using this private key (with the algorithm this key is based on)
@@ -127,7 +127,7 @@ abstract class Key {
     @JsPromise
     @JsExport.Ignore
     @Throws(Exception::class)
-    abstract suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray? = null): Result<ByteArray>
+    abstract suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray? = null, customSignatureAlgorithm: String? = null): Result<ByteArray>
 
     @JvmBlocking
     @JvmAsync

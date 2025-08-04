@@ -72,7 +72,7 @@ class AWSKey(
         }
     }
 
-    override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         if (!awsSigningAlgorithm.endsWith("_SHA_256")){
             throw SigningException("failed to sign - unsupported hashing algorithm: $awsSigningAlgorithm")
         }
@@ -114,10 +114,7 @@ class AWSKey(
         return jws
     }
 
-    override suspend fun verifyRaw(
-        signed: ByteArray,
-        detachedPlaintext: ByteArray?
-    ): Result<ByteArray> {
+    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> {
         if (!awsSigningAlgorithm.endsWith("_SHA_256")){
             throw SigningException("failed to verofy - unsupported hashing algorithm: $awsSigningAlgorithm")
         }

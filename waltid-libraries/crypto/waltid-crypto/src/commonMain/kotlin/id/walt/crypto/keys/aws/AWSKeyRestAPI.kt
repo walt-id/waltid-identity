@@ -124,7 +124,7 @@ class AWSKeyRestAPI(
     @JsPromise
     @JsExport.Ignore
     @OptIn(ExperimentalStdlibApi::class)
-    override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         if (!awsSigningAlgorithm.endsWith("_SHA_256")){
             throw SigningException("failed to sign - unsupported hashing algorithm: $awsSigningAlgorithm")
         }
@@ -194,10 +194,7 @@ class AWSKeyRestAPI(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun verifyRaw(
-        signed: ByteArray,
-        detachedPlaintext: ByteArray?
-    ): Result<ByteArray> {
+    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> {
         val messageToVerify = detachedPlaintext ?: return Result.failure(IllegalArgumentException("Detached plaintext is required for verification"))
 
         // Calculate SHA-256 hash to handle payloads larger than 4KB

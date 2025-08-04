@@ -65,6 +65,7 @@ enum class KeyType(val jwsAlg: String, val jwkKty: String, val jwkCurve: String?
 
 object KeyTypes {
     val EC_KEYS = KeyType.entries.filter { it.jwkKty == "EC" }
+    val RSA_KEYS = KeyType.entries.filter { it.jwkKty == "RSA" }
 
     /** kty -> crv mapping */
     val JWK_MAPPING = KeyType.entries.associateBy { it.jwkKty to it.jwkCurve }
