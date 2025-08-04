@@ -69,6 +69,7 @@ import kotlin.test.assertNotNull
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+//TODO: needs to be ported to JUnit test
 @OptIn(ExperimentalUuidApi::class)
 class ExchangeExternalSignatures(private val e2e: E2ETest) {
 
@@ -443,21 +444,11 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
                 }
 
                 CredentialFormat.sd_jwt_vc -> {
-                    issuerApi.sdjwt(
-                        firstIssuanceRequest,
-                    ) {
-                        offerURL = it
-                        println("offer: $it")
-                    }
+                    offerURL = issuerApi.issueSdJwtCredential(firstIssuanceRequest)
                 }
 
                 else -> {
-                    issuerApi.jwt(
-                        firstIssuanceRequest,
-                    ) {
-                        offerURL = it
-                        println("offer: $it")
-                    }
+                    offerURL = issuerApi.issueJwtCredential(firstIssuanceRequest)
                 }
             }
         } else {

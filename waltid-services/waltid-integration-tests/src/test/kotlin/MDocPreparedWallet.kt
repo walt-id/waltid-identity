@@ -18,6 +18,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+//TODO: needs to be ported to JUnit test
 class MDocPreparedWallet(val e2e: E2ETest) {
 
     private val email = "${Uuid.random()}@walt.id"

@@ -1,7 +1,5 @@
 import com.nimbusds.jose.JWSAlgorithm
 import id.walt.commons.testing.E2ETest
-import id.walt.w3c.schemes.JwsSignatureScheme
-import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -16,6 +14,8 @@ import id.walt.oid4vc.util.JwtUtils
 import id.walt.test.integration.environment.api.issuer.IssuerApi
 import id.walt.test.integration.environment.api.wallet.ExchangeApi
 import id.walt.test.integration.expectRedirect
+import id.walt.w3c.schemes.JwsSignatureScheme
+import id.walt.w3c.utils.VCFormat
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -28,6 +28,7 @@ import kotlin.test.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+//TODO: needs to be ported to JUnit test
 class Draft11(private val e2e: E2ETest, private val client: HttpClient) {
 
     fun testIssuerAPIDraft11AuthFlowWithJar(issuanceReq: IssuanceRequest) = runBlocking {
@@ -37,9 +38,7 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient) {
 
         val issuerApi = IssuerApi(e2e, client)
 
-        issuerApi.jwt(issuanceReq) {
-            offerUrl = it
-        }
+        offerUrl = issuerApi.issueJwtCredential(issuanceReq)
 
         val offerUrlParams = Url(offerUrl).parameters.toMap()
         val offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)
@@ -216,9 +215,7 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient) {
 
         val issuerApi = IssuerApi(e2e, client)
 
-        issuerApi.jwt(issuanceReq) {
-            offerUrl = it
-        }
+        offerUrl = issuerApi.issueJwtCredential(issuanceReq)
 
         val offerUrlParams = Url(offerUrl).parameters.toMap()
         val offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)

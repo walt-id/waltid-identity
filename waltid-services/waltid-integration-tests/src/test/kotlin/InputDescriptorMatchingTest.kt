@@ -17,6 +17,7 @@ import kotlin.uuid.Uuid
 import id.walt.test.integration.expectSuccess
 import id.walt.test.integration.expectFailure
 
+//TODO: needs to be ported to JUnit test
 class InputDescriptorMatchingTest(
     private val issuerApi: IssuerApi,
     private val exchangeApi: ExchangeApi,
@@ -85,15 +86,9 @@ class InputDescriptorMatchingTest(
     ): WalletCredential {
         lateinit var offerUrl: String
         if (sdJwt) {
-            issuerApi.sdjwt(issuanceRequest) {
-                offerUrl = it
-                println("offer: $offerUrl")
-            }
+            offerUrl = issuerApi.issueSdJwtCredential(issuanceRequest)
         } else {
-            issuerApi.jwt(issuanceRequest) {
-                offerUrl = it
-                println("offer: $offerUrl")
-            }
+            offerUrl = issuerApi.issueJwtCredential(issuanceRequest)
         }
         //region -Exchange / claim-
         lateinit var newCredential: WalletCredential

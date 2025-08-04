@@ -42,6 +42,8 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+@Deprecated("Old Testcase Style: lock at id.walt.test.integration.tests.IssueSdJwtCredentialIntegrationTest to" +
+        "see how integration tests should be written")
 class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
 
     companion object {
@@ -59,11 +61,6 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
             put("mapping", Json.decodeFromString<JsonElement>(credentialMapping))
             put("selectiveDisclosure", Json.decodeFromString<JsonElement>(credentialDisclosure))
         }
-        val jwtCredential = JsonObject(sdjwtCredential.minus("selectiveDisclosure"))
-        val simplePresentationRequestPayload =
-            loadResource("presentation/openbadgecredential-presentation-request.json")
-        val nameFieldSchemaPresentationRequestPayload =
-            loadResource("presentation/openbadgecredential-name-field-presentation-request.json")
 
         fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) =
             environment.testHttpClient(token, doFollowRedirects)
@@ -86,6 +83,8 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
     @OptIn(ExperimentalUuidApi::class)
     @Test
     fun e2e() = runTest {
+        //TODO:
+        // All tests here should be ported to JUnit tests. Example: id.walt.test.integration.tests.IssueSdJwtCredentialIntegrationTest
         logger.error { "*************************** RUNNING TESTS **************************************" }
         val e2e = environment.e2e
         val walletApi = environment.getWalletApi().loginWithDefaultUser()
@@ -130,8 +129,6 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
             )
         }
         //endregion -History-
-        val sdJwtTest = E2ESdJwtTest(issuerApi, exchangeApi, sessionApi, verificationApi)
-        sdJwtTest.e2e(wallet.id, did)
 
         // Test Authorization Code flow with available authentication methods in Issuer API
         val authorizationCodeFlow = AuthorizationCodeFlow(e2e, environment.testHttpClient(doFollowRedirects = false))

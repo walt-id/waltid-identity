@@ -5,6 +5,7 @@ package id.walt.test.integration.environment.api.wallet
 import id.walt.commons.testing.E2ETest
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.webwallet.db.models.Account
+import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
@@ -132,8 +133,14 @@ class WalletApi(
     suspend fun resolveCredentialOffer(walletId: Uuid, offerUrl: String) =
         exchangeApi.resolveCredentialOffer(walletId, offerUrl)
 
-    suspend fun claimCredential(walletId: Uuid, offerUrl: String) =
-        exchangeApi.claimCredential(walletId, offerUrl)
+    suspend fun claimCredential(
+        walletId: Uuid,
+        offerUrl: String,
+        didString: String? = null,
+        requireUserInput: Boolean? = null,
+        pinOrTxCode: String? = null
+    ) =
+        exchangeApi.claimCredential(walletId, offerUrl, didString, requireUserInput, pinOrTxCode)
 
     suspend fun resolvePresentationRequest(walletId: Uuid, verificationUrl: String) =
         exchangeApi.resolvePresentationRequest(walletId, verificationUrl)
@@ -147,6 +154,10 @@ class WalletApi(
     suspend fun usePresentationRequest(walletId: Uuid, request: UsePresentationRequest) =
         exchangeApi.usePresentationRequest(walletId, request)
 
+    suspend fun usePresentationRequestExpectError(walletId: Uuid, request: UsePresentationRequest) =
+        exchangeApi.usePresentationRequestExpectError(walletId, request)
+
+
     //=========================================================================
     // Credential Store
     //=========================================================================
@@ -156,7 +167,7 @@ class WalletApi(
     suspend fun getCredentialStatus(walletId: Uuid, credentialId: String) =
         credentialApi.getCredentialStatus(walletId, credentialId)
 
-    suspend fun listCredentials(walletId: Uuid, filter: CredentialFilterObject = CredentialFilterObject.default) =
+    suspend fun listCredentials(walletId: Uuid, filter: CredentialFilterObject = CredentialFilterObject.default) : List<WalletCredential> =
         credentialApi.listCredentials(walletId, filter)
 
     suspend fun acceptCredential(walletId: Uuid, credentialId: String) =

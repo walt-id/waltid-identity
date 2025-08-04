@@ -9,7 +9,7 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import id.walt.test.integration.expectSuccess
 
-
+//TODO: needs to be ported
 class HistoryApi(private val e2e: E2ETest, private val client: HttpClient) {
     suspend fun list(wallet: Uuid, output: ((List<WalletOperationHistory>) -> Unit)? = null) =
         e2e.test("/wallet-api/wallet/{wallet}/history - get operation history") {

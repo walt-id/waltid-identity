@@ -24,15 +24,14 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.utils.io.*
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kotlin.time.Duration.Companion.minutes
 
 val defaultTestTimeout = 5.minutes
 
-
+/*
+In the future, also a RemoteCommunityStackEnvironment might be implemented
+ */
 @OptIn(InternalAPI::class)
 class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : Klogging {
     private val startupCompleted = CompletableDeferred<Unit>()
@@ -88,8 +87,9 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
         }
         logger.error("============== ASYNC STARTED ===============")
         logger.error("============== Waiting til startup complete ================")
-        startupCompleted.await()
-
+        withTimeout(30_000) {
+            startupCompleted.await()
+        }
     }
 
     suspend fun shutdown() {

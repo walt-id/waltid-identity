@@ -1,8 +1,19 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.test.integration.tests
 
 import id.walt.test.integration.environment.InMemoryCommunityStackEnvironment
+import id.walt.test.integration.environment.api.issuer.IssuerApi
+import id.walt.test.integration.environment.api.verifier.VerifierApi
+import id.walt.test.integration.environment.api.wallet.WalletApi
 import id.walt.test.integration.junit.LogTestStartExtension
+import id.walt.webwallet.db.models.AccountWalletListing.WalletListing
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.extension.ExtendWith
+import kotlin.uuid.ExperimentalUuidApi
 
 @ExtendWith(LogTestStartExtension::class)
 abstract class AbstractIntegrationTest {
@@ -17,10 +28,34 @@ abstract class AbstractIntegrationTest {
         // id.walt.test.integration.junit.IntegrationTestRunListener
         // only the listener does know, when the last test is executed
 
-        fun getVerifierApi() = environment.getVerifierApi()
-        fun getIssuerApi() = environment.getIssuerApi()
-        suspend fun getDefaultAccountWalletApi() = environment.getDefaultAccountWalletApi()
+        lateinit var issuerApi: IssuerApi
+        lateinit var verifierApi: VerifierApi
+        lateinit var defaultWalletApi: WalletApi
+        lateinit var defaultWallet: WalletListing
 
+        @JvmStatic
+        @BeforeAll
+        fun loadWalletAndDefaultDid(): Unit = runBlocking {
+            defaultWalletApi = environment.getDefaultAccountWalletApi()
+            issuerApi = environment.getIssuerApi()
+            verifierApi = environment.getVerifierApi()
+            defaultWallet = defaultWalletApi.listAccountWallets().wallets.first()
+            deleteAllCategoriesAndCredentialOfDefaultWallet()
+        }
+
+        @JvmStatic
+        @AfterAll
+        fun deleteAllCategoriesAndCredentialOfDefaultWallet(): Unit = runBlocking {
+            defaultWalletApi.listCategories(defaultWallet.id).map {
+                it["name"]?.jsonPrimitive?.content
+            }.forEach {
+                defaultWalletApi.deleteCategory(defaultWallet.id, it!!)
+            }
+            // The test expects an empty wallet in the beginning, so delete all
+            // credentials first, before test start
+            defaultWalletApi.listCredentials(defaultWallet.id).forEach {
+                defaultWalletApi.deleteCredential(defaultWallet.id, it.id)
+            }
+        }
     }
-
 }

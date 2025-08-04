@@ -14,6 +14,7 @@ import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+//TODO: needs to be ported to JUnit test
 @OptIn(ExperimentalUuidApi::class)
 class BatchIssuance(private val e2e: E2ETest, val client: HttpClient, val wallet: Uuid) {
     private val issuerApi = IssuerApi(e2e, client)

@@ -63,6 +63,12 @@ powerAssert {
     )
 }
 
+sourceSets {
+    test {
+        kotlin.setSrcDirs(listOf("src/main/kotlin/", "src/test/kotlin"))
+    }
+}
+
 tasks.test {
     useJUnitPlatform()
 }

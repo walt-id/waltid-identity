@@ -1,0 +1,173 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
+package id.walt.test.integration.tests
+
+import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
+import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.util.JwtUtils
+import id.walt.test.integration.expectLooksLikeJwt
+import id.walt.test.integration.loadJsonResource
+import id.walt.test.integration.toSdMap
+import id.walt.w3c.schemes.JwsSignatureScheme
+import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
+import io.ktor.http.*
+import io.ktor.server.util.*
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.MethodOrderer.OrderAnnotation
+import org.junit.jupiter.api.Order
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestMethodOrder
+import org.junit.jupiter.api.assertNotNull
+import kotlin.test.assertContains
+import kotlin.test.assertEquals
+import kotlin.uuid.ExperimentalUuidApi
+
+private val sdjwtCredential = IssuanceRequest(
+    issuerKey = loadJsonResource("issuance/key.json"),
+    issuerDid = loadResource("issuance/did.txt"),
+    credentialConfigurationId = "OpenBadgeCredential_jwt_vc_json",
+    credentialData = loadJsonResource("issuance/openbadgecredential.json"),
+    mapping = loadJsonResource("issuance/mapping.json"),
+    selectiveDisclosure = loadJsonResource("issuance/disclosure.json").toSdMap()
+)
+
+@TestMethodOrder(OrderAnnotation::class)
+class IssueSdJwtCredentialIntegrationTest : AbstractIntegrationTest() {
+
+    companion object {
+        var newCredential: WalletCredential? = null
+    }
+
+    @Order(0)
+    @Test
+    fun shouldIssueCredential() = runTest {
+        val offerUrl = issuerApi.issueSdJwtCredential(sdjwtCredential)
+
+        defaultWalletApi.resolveCredentialOffer(defaultWallet.id, offerUrl)
+        newCredential = defaultWalletApi.claimCredential(defaultWallet.id, offerUrl).let {
+            assertEquals(1, it.size)
+            it.first()
+        }
+        assertContains(JwtUtils.parseJWTPayload(newCredential!!.document).keys, JwsSignatureScheme.JwsOption.VC)
+    }
+
+    @Order(1)
+    @Test
+    fun shouldVerifyCredentialSuccessfully() = runTest {
+        assertNotNull(newCredential, "Credential ID should not be null - Test Order ??")
+        val verificationUrl =
+            verifierApi.verify(loadResource("presentation/openbadge-credential-name-field-is-string-schema-validation-policy-presentation-request.json.json"))
+
+        val verificationId = Url(verificationUrl).parameters.getOrFail("state")
+
+        val resolvedPresentationOfferString =
+            defaultWalletApi.resolvePresentationRequest(defaultWallet.id, verificationUrl)
+        val presentationDefinition =
+            Url(resolvedPresentationOfferString).parameters.getOrFail("presentation_definition")
+
+        verifierApi.getSession(verificationId).also {
+            assertEquals(
+                PresentationDefinition.Companion.fromJSONString(presentationDefinition),
+                it.presentationDefinition
+            )
+        }
+
+        defaultWalletApi.matchCredentialsForPresentationDefinition(defaultWallet.id, presentationDefinition).also {
+            assertEquals(1, it.size)
+            assertEquals(newCredential!!.id, it.first().id)
+        }
+
+        defaultWalletApi.unmatchedCredentialsForPresentationDefinition(defaultWallet.id, presentationDefinition).also {
+            assertTrue(it.isEmpty())
+        }
+        defaultWalletApi.usePresentationRequest(
+            walletId = defaultWallet.id,
+            request = UsePresentationRequest(
+                did = defaultWalletApi.getDefaultDid(defaultWallet.id).did,
+                presentationRequest = resolvedPresentationOfferString,
+                selectedCredentials = listOf(newCredential!!.id),
+                disclosures = newCredential!!.disclosures?.let { mapOf(newCredential!!.id to listOf(it)) }
+            )
+        )
+
+        verifierApi.getSession(verificationId).also {
+            assertNotNull(
+                it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt(),
+                "Received no valid token response!"
+            )
+            assertNotNull(
+                it.tokenResponse?.presentationSubmission,
+                "should have a presentation submission after submission"
+            )
+            assertEquals(true, it.verificationResult, "overall verification should be valid")
+            it.policyResults.let {
+                assertNotNull(it, "policyResults should be available after running policies")
+                assertTrue(it.size > 1, "no policies have run")
+            }
+        }
+    }
+
+    @Order(1)
+    @Test
+    fun shouldVerifyCredentialWithErrorBecauseShemaPolicyFails() = runTest {
+        assertNotNull(newCredential, "Credential ID should not be null - Test Order ??")
+        val verificationUrl =
+            verifierApi.verify(loadResource("presentation/openbadge-credential-name-field-is-object-schema-validation-policy-presentation-request.json"))
+
+        val verificationId = Url(verificationUrl).parameters.getOrFail("state")
+
+        val resolvedPresentationOfferString =
+            defaultWalletApi.resolvePresentationRequest(defaultWallet.id, verificationUrl)
+        val presentationDefinition =
+            Url(resolvedPresentationOfferString).parameters.getOrFail("presentation_definition")
+
+        verifierApi.getSession(verificationId).also {
+            assertEquals(
+                PresentationDefinition.Companion.fromJSONString(presentationDefinition),
+                it.presentationDefinition
+            )
+        }
+
+        defaultWalletApi.matchCredentialsForPresentationDefinition(defaultWallet.id, presentationDefinition).also {
+            assertEquals(1, it.size)
+            assertEquals(newCredential!!.id, it.first().id)
+        }
+
+        defaultWalletApi.unmatchedCredentialsForPresentationDefinition(defaultWallet.id, presentationDefinition).also {
+            assertTrue(it.isEmpty())
+        }
+        val error = defaultWalletApi.usePresentationRequestExpectError(
+            walletId = defaultWallet.id,
+            request = UsePresentationRequest(
+                did = defaultWalletApi.getDefaultDid(defaultWallet.id).did,
+                presentationRequest = resolvedPresentationOfferString,
+                selectedCredentials = listOf(newCredential!!.id),
+                disclosures = newCredential!!.disclosures?.let { mapOf(newCredential!!.id to listOf(it)) }
+            )
+        )
+        // Why is this a bad request?
+        assertEquals(HttpStatusCode.BadRequest, error.httpStatusCode)
+        assertEquals(true, error.errorMessage?.startsWith("Verification policies did not succeed"))
+
+        verifierApi.getSession(verificationId).also {
+            assertNotNull(
+                it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt(),
+                "Received no valid token response!"
+            )
+            assertNotNull(
+                it.tokenResponse?.presentationSubmission,
+                "should have a presentation submission after submission"
+            )
+            assertEquals(false, it.verificationResult, "overall verification should be not valid")
+            it.policyResults.let {
+                assertNotNull(it, "policyResults should be available after running policies")
+                assertTrue(it.size > 1, "no policies have run")
+            }
+        }
+    }
+}

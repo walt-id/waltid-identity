@@ -12,6 +12,8 @@ import id.walt.issuer.issuance.openapi.issuerapi.MdocDocs
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDMap
+import id.walt.test.integration.expectFailure
+import id.walt.test.integration.expectSuccess
 import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.verifier.oidc.models.presentedcredentials.*
 import id.walt.verifier.openapi.VerifierApiExamples
@@ -30,9 +32,8 @@ import org.junit.jupiter.api.assertNull
 import kotlin.test.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
-import id.walt.test.integration.expectSuccess
-import id.walt.test.integration.expectFailure
 
+//TODO: needs to be ported to JUnit test
 class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
 
     private val TEST_SUITE = "Verifier Presented Credentials Test Suite"

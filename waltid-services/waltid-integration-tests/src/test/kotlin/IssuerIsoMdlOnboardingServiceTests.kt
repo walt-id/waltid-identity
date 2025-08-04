@@ -25,7 +25,7 @@ import id.walt.test.integration.expectSuccess
 import id.walt.test.integration.expectFailure
 
 
-
+//TODO: needs to be ported to JUnit test
 class IssuerIsoMdlOnboardingServiceTests(private val e2e: E2ETest) {
 
     private val client = testHttpClient()

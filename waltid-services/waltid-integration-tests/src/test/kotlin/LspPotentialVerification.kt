@@ -47,6 +47,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+//TODO: needs to be ported to JUnit test
 class LspPotentialVerification(private val e2e: E2ETest, private val client: HttpClient) {
 
     suspend fun testPotentialInteropTrack3() = e2e.test("test track 3") {

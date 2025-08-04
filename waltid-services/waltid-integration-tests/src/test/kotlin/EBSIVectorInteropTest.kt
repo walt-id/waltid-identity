@@ -20,6 +20,7 @@ import kotlinx.serialization.json.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+//TODO: needs to be ported to JUnit test
 class EBSIVectorInteropTest(
     private val e2e: E2ETest,
     private val httpClient: HttpClient,

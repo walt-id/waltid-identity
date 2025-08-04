@@ -52,6 +52,7 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.*
 
+//TODO: needs to be ported to JUnit test
 class LspPotentialIssuance(private val e2e: E2ETest, val client: HttpClient) {
 
     @OptIn(ExperimentalEncodingApi::class, ExperimentalSerializationApi::class)

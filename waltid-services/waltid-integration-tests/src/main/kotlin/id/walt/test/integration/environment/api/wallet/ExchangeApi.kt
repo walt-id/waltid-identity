@@ -3,7 +3,9 @@
 package id.walt.test.integration.environment.api.wallet
 
 import id.walt.commons.testing.E2ETest
+import id.walt.test.integration.environment.api.ResponseError
 import id.walt.test.integration.expectSuccess
+import id.walt.test.integration.expectError
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
@@ -29,13 +31,30 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
             .body<JsonObject>()
     }
 
-    suspend fun claimCredentialRaw(walletId: Uuid, offerUrl: String) =
+    suspend fun claimCredentialRaw(
+        walletId: Uuid,
+        offerUrl: String,
+        didString: String? = null,
+        requireUserInput: Boolean? = null,
+        pinOrTxCode: String? = null
+    ) =
         client.post("/wallet-api/wallet/$walletId/exchange/useOfferRequest") {
+            url {
+                didString?.also { parameter("did", it) }
+                requireUserInput?.also { parameter("requireUserInput", it.toString()) }
+                pinOrTxCode?.also { parameter("pinOrTxCode", it) }
+            }
             setBody(offerUrl)
         }
 
-    suspend fun claimCredential(walletId: Uuid, offerUrl: String): List<WalletCredential> {
-        return claimCredentialRaw(walletId, offerUrl)
+    suspend fun claimCredential(
+        walletId: Uuid,
+        offerUrl: String,
+        didString: String? = null,
+        requireUserInput: Boolean? = null,
+        pinOrTxCode: String? = null
+    ): List<WalletCredential> {
+        return claimCredentialRaw(walletId, offerUrl, didString, requireUserInput, pinOrTxCode)
             .expectSuccess()
             .body<List<WalletCredential>>()
     }
@@ -90,6 +109,7 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
         it.body<List<FilterData>>()
     }
 
+    // TODO: It returns error 400 bad request when policy validation fails, although everything is ok with the request
     suspend fun usePresentationRequestRaw(
         walletId: Uuid,
         request: UsePresentationRequest,
@@ -102,6 +122,13 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
         request: UsePresentationRequest
     ) {
         usePresentationRequestRaw(walletId, request).expectSuccess()
+    }
+
+    suspend fun usePresentationRequestExpectError(
+        walletId: Uuid,
+        request: UsePresentationRequest
+    ): ResponseError {
+        return ResponseError.of(usePresentationRequestRaw(walletId, request).expectError())
     }
 
     @OptIn(ExperimentalUuidApi::class)

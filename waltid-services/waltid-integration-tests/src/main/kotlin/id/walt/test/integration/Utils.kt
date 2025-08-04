@@ -1,12 +1,11 @@
 package id.walt.test.integration
 
+import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
+import id.walt.sdjwt.SDMap
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 fun String.expectLooksLikeJwt(): String =
@@ -19,6 +18,15 @@ val expectSuccess: suspend HttpResponse.() -> HttpResponse = {
     )
     this
 }
+
+val expectError: suspend HttpResponse.() -> HttpResponse = {
+    assertFalse(
+        this.status.isSuccess(),
+        "HTTP status is successful but expected error - response: $this, body is ${this.bodyAsText()}"
+    )
+    this
+}
+
 
 val expectRedirect: HttpResponse.() -> HttpResponse = {
     assertTrue(this.status == HttpStatusCode.Found, "HTTP status is non-successful")
@@ -55,4 +63,11 @@ fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {
     element
 }
 
+fun loadJsonResource(resourceName: String): JsonObject {
+    return Json.decodeFromString<JsonObject>(loadResource(resourceName))
+}
+
+fun JsonObject.toSdMap(): SDMap {
+    return Json.decodeFromJsonElement<SDMap>(this)
+}
 

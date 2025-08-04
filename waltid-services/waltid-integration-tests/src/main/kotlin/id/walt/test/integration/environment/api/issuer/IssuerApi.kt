@@ -6,25 +6,34 @@ import id.walt.test.integration.expectSuccess
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import kotlinx.serialization.json.JsonObject
 
 class IssuerApi(
     private val e2e: E2ETest,
     private val client: HttpClient
 ) {
 
-    suspend fun issueJwtCredentialRaw(request: JsonObject, cbUrl: String? = null) =
+    suspend fun issueJwtCredentialRaw(request: IssuanceRequest, cbUrl: String? = null) =
         issueCredentialRaw("/openid4vc/jwt/issue", request, cbUrl)
 
-    suspend fun issueJwtCredential(request: JsonObject, cbUrl: String? = null): String =
+    suspend fun issueJwtCredential(request: IssuanceRequest, cbUrl: String? = null): String =
         issueJwtCredentialRaw(request, cbUrl).let {
             it.expectSuccess()
             it.body<String>()
         }
 
+    suspend fun issueSdJwtCredentialRaw(request: IssuanceRequest, cbUrl: String? = null) =
+        issueCredentialRaw("/openid4vc/sdjwt/issue", request, cbUrl)
+
+    suspend fun issueSdJwtCredential(request: IssuanceRequest, cbUrl: String? = null): String =
+        issueSdJwtCredentialRaw(request, cbUrl).let {
+            it.expectSuccess()
+            it.body<String>()
+        }
+
+
     private suspend fun issueCredentialRaw(
         url: String,
-        request: JsonObject,
+        request: IssuanceRequest,
         cbUrl: String? = null
     ) = client.post(url) {
         if (!cbUrl.isNullOrEmpty()) {
@@ -32,21 +41,6 @@ class IssuerApi(
         }
         setBody(request)
     }
-
-
-    suspend fun jwt(request: IssuanceRequest, output: ((String) -> Unit)? = null) = issue(
-        name = "/openid4vc/jwt/issue - issue jwt credential",
-        url = "/openid4vc/jwt/issue",
-        request = request,
-        output = output,
-    )
-
-    suspend fun sdjwt(request: IssuanceRequest, output: ((String) -> Unit)? = null) = issue(
-        name = "/openid4vc/sdjwt/issue - issue sdjwt credential",
-        url = "/openid4vc/sdjwt/issue",
-        request = request,
-        output = output,
-    )
 
     suspend fun mdoc(request: IssuanceRequest, output: ((String) -> Unit)? = null) = issue(
         name = "/openid4vc/mdoc/issue - issue mdoc credential",

@@ -19,7 +19,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.assertEquals
 
-
+//TODO: needs to be ported to JUnit test
 class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpClient) {
 
     fun testIssuerAPI() = runBlocking {
@@ -33,10 +33,7 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
         //
         val issuanceRequestIdToken =
             Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-id-token.json"))
-        issuerApi.jwt(issuanceRequestIdToken) {
-            offerUrl = it
-            println("offer: $offerUrl")
-        }
+        offerUrl = issuerApi.issueJwtCredential(issuanceRequestIdToken)
 
         var offerUrlParams = Url(offerUrl).parameters.toMap()
         var offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)
@@ -62,7 +59,12 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
                     type = "openid_credential",
                     locations = listOf(credOffer["credential_issuer"]!!.jsonPrimitive.content),
                     format = CredentialFormat.jwt_vc,
-                    credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "OpenBadgeCredential"))
+                    credentialDefinition = CredentialDefinition(
+                        type = listOf(
+                            "VerifiableCredential",
+                            "OpenBadgeCredential"
+                        )
+                    )
                 )
             )
         )
@@ -79,10 +81,7 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
         //
         val issuanceRequestVpToken =
             Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-vp-token.json"))
-        issuerApi.jwt(issuanceRequestVpToken) {
-            offerUrl = it
-            println("offer: $offerUrl")
-        }
+        offerUrl = issuerApi.issueJwtCredential(issuanceRequestVpToken)
 
         offerUrlParams = Url(offerUrl).parameters.toMap()
         offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)
@@ -96,7 +95,12 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
                     type = "openid_credential",
                     locations = listOf(credOffer["credential_issuer"]!!.jsonPrimitive.content),
                     format = CredentialFormat.jwt_vc,
-                    credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "OpenBadgeCredential"))
+                    credentialDefinition = CredentialDefinition(
+                        type = listOf(
+                            "VerifiableCredential",
+                            "OpenBadgeCredential"
+                        )
+                    )
                 )
             )
         )
@@ -114,10 +118,7 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
         //
         val issuanceRequestPwd =
             Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-pwd.json"))
-        issuerApi.jwt(issuanceRequestPwd) {
-            offerUrl = it
-            println("offer: $offerUrl")
-        }
+        offerUrl = issuerApi.issueJwtCredential(issuanceRequestPwd)
 
         offerUrlParams = Url(offerUrl).parameters.toMap()
         offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)
@@ -131,7 +132,12 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
                     type = "openid_credential",
                     locations = listOf(credOffer["credential_issuer"]!!.jsonPrimitive.content),
                     format = CredentialFormat.jwt_vc,
-                    credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "OpenBadgeCredential"))
+                    credentialDefinition = CredentialDefinition(
+                        type = listOf(
+                            "VerifiableCredential",
+                            "OpenBadgeCredential"
+                        )
+                    )
                 )
             )
         )
