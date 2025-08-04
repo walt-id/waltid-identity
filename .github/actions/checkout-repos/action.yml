@@ -21,9 +21,10 @@ runs:
       shell: bash
       env:
         REF: ${{ github.ref_name }}
+        TOKEN: ${{ inputs.token }}
       run: |
         REPO="walt-id/waltid-unified-build"
-        if [ -n "$REF" ] && git ls-remote --exit-code "https://github.com/${REPO}.git" "$REF"; then
+        if [ -n "$REF" ] && git ls-remote --exit-code "https://${TOKEN}@github.com/${REPO}.git" "$REF"; then
           echo "ref=$REF" >> "$GITHUB_OUTPUT"
         else
           echo "ref=main" >> "$GITHUB_OUTPUT"
