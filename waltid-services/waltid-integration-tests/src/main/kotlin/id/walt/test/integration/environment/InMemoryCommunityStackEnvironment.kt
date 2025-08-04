@@ -48,7 +48,7 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
 
     constructor(
         host: String = "localhost",
-        port: Int = 22222,
+        port: Int = 22323,
     ) : this(E2ETest(host, port, true))
 
     val defaultEmailAccount = EmailAccountRequest(

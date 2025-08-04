@@ -765,7 +765,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
                           ],
                           "filter": {
                             "type": "string",
-                            "pattern": "http://localhost:22222/identity_credential"
+                            "pattern": "http://localhost:22323/identity_credential"
                           }
                         }
                       ]
