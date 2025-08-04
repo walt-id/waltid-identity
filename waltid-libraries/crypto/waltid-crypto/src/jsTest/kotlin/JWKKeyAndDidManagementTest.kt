@@ -5,14 +5,14 @@ import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import kotlin.test.*
+import kotlin.time.Duration.Companion.seconds
 
 class JWKKeyAndDidManagementTest {
 
     private val testObj = JsonObject(mapOf("value1" to JsonPrimitive("123456789")))
 
     @Test
-    //TODO: This tests does not work - timeout error
-    fun jwkKeyGenerationTest() = runTest {
+    fun jwkKeyGenerationTest() = runTest(timeout = 20.seconds) {
         KeyType.entries.forEach {
             println("Generate key for key type $it")
             val generatedKey = JWKKey.generate(it)
