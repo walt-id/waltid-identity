@@ -10,8 +10,8 @@ class CoseAlgorithmsTest {
 
     @Test
     fun testAllCoseAlgorithms() = runTest {
-        KeyType.entries.forEach { keyType ->
-            println("> Testing key type: $keyType")
+        KeyType.entries.forEachNumbered { idx, total, keyType ->
+            println("> Testing key type  $idx/$total: $keyType")
             val key = JWKKey.generate(keyType)
 
             val protectedHeaders = CoseHeaders(algorithm = keyType.toCoseAlgorithm())
@@ -51,10 +51,12 @@ class CoseAlgorithmsTest {
             val verified1 = toVerify1.verify(publicKey)
             val verified2 = toVerify2.verify(publicKey, externalAad)
 
-            println("""
+            println(
+                """
                 Verified: $verified1
                 Verified w/ external aad: $verified2
-            """.trimIndent())
+            """.trimIndent()
+            )
 
             require(verified1 && verified2) { "Verification failed" }
             println()

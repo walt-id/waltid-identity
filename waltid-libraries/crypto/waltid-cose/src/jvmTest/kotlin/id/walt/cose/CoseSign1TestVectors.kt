@@ -213,27 +213,27 @@ class CoseSign1TestVectors {
 
         println("Testing ${testVectors.size} test vectors...")
 
-        val results = testVectors.map {
+        val results = testVectors.mapNumbered { idx, total, vector ->
             println(
                 """
-                |------------------------
-                |TESTING COSE TEST VECTOR
-                |Title:       ${it.title}
-                |UUID:        ${it.uuid}
-                |Description: ${it.description}
-                |Key:         ${it.jwkKey}: ${it.jwkKey.exportJWKPretty().replace("\n", " ").replace("    ", "")}
-                |Alg:         ${it.alg}
-                |${if (it.verifyData != null) "Verify:" else "Sign:  "}      ${it.verifyData ?: it.signData}
-                |- - - - - - - - - - - -
+                |-----------------------------
+                |TESTING COSE TEST VECTOR $idx/$total
+                |Title:       ${vector.title}
+                |UUID:        ${vector.uuid}
+                |Description: ${vector.description}
+                |Key:         ${vector.jwkKey}: ${vector.jwkKey.exportJWKPretty().replace("\n", " ").replace("    ", "")}
+                |Alg:         ${vector.alg}
+                |${if (vector.verifyData != null) "Verify:" else "Sign:  "}      ${vector.verifyData ?: vector.signData}
+                |- - - - - - - - - - - - - -
             """.trimMargin()
             )
-            val testVectorResult = it.checkTestVector()
+            val testVectorResult = vector.checkTestVector()
 
             println(
                 """
-                |- - - - - - - - - - - -
+                |- - - - - - - - - - - - - -
                 | Test vector result: $testVectorResult
-                |------------------------
+                |-----------------------------
                 |
             """.trimMargin()
             )
