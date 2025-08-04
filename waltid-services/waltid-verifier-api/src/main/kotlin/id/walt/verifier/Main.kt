@@ -18,7 +18,6 @@ suspend fun main(args: Array<String>) {
         ServiceConfiguration("verifier"), ServiceInitialization(
             features = FeatureCatalog,
             init = {
-                //WaltidServices.init()
                 DidService.apply {
                     registerResolver(LocalResolver())
                     updateResolversForMethods()
