@@ -11,10 +11,10 @@ import kotlin.js.JsExport
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
-enum class KeyType(val jwsAlg: String, val jwkKty: String, val jwkCurve: String?, val oid: String?) {
+enum class KeyType(val jwsAlg: String, val jwkKty: String, val jwkCurve: String?, val oid: String) {
     // EdDSA
     /** EdDSA + Curve25519 */
-    Ed25519(jwsAlg = "EdDSA", jwkKty = "OKP", jwkCurve = "Ed25519", oid = null),
+    Ed25519(jwsAlg = "EdDSA", jwkKty = "OKP", jwkCurve = "Ed25519", oid = "1.3.101.112"),
 
     // TODO: Ed448(jwsAlg = "Ed448", oid = null)
     // TODO: X25519(jwsAlg = "X25519", oid = null)
@@ -52,14 +52,10 @@ enum class KeyType(val jwsAlg: String, val jwkKty: String, val jwkCurve: String?
      */
 
     /** RS256 */
-    RSA(
-        jwsAlg = "RS256",
-        jwkKty = "RSA",
-        jwkCurve = null,
-        oid = null
-    ), // WARNING: do not remove this enum name. There might be old keys existing with it.
-    RSA3072(jwsAlg = "RS384", jwkKty = "RSA", jwkCurve = null, oid = null),
-    RSA4096(jwsAlg = "RS512", jwkKty = "RSA", jwkCurve = null, oid = null)
+    // WARNING: do not remove this enum name. There might be old keys existing with it.
+    RSA(jwsAlg = "RS256", jwkKty = "RSA", jwkCurve = null, oid = "1.2.840.113549.1.1.11"),
+    RSA3072(jwsAlg = "RS384", jwkKty = "RSA", jwkCurve = null, oid = "1.2.840.113549.1.1.12"),
+    RSA4096(jwsAlg = "RS512", jwkKty = "RSA", jwkCurve = null, oid = "1.2.840.113549.1.1.13")
 
 }
 
