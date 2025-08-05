@@ -16,15 +16,17 @@ import io.ktor.http.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestMethodOrder
-import org.junit.jupiter.api.assertNotNull
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 
 private val sdjwtCredential = IssuanceRequest(
@@ -47,11 +49,22 @@ class IssueSdJwtCredentialIntegrationTest : AbstractIntegrationTest() {
     @Test
     fun shouldIssueCredential() = runTest {
         val offerUrl = issuerApi.issueSdJwtCredential(sdjwtCredential)
-
         defaultWalletApi.resolveCredentialOffer(defaultWallet.id, offerUrl)
         newCredential = defaultWalletApi.claimCredential(defaultWallet.id, offerUrl).let {
             assertEquals(1, it.size)
             it.first()
+        }
+        assertEquals(defaultWallet.id, newCredential!!.wallet)
+        assertNotNull(newCredential?.parsedDocument) { parsedDocument ->
+            // issuerDid should be set by data function <issuerDid>
+            assertEquals(sdjwtCredential.issuerDid, parsedDocument["issuer"]?.jsonObject["id"]?.jsonPrimitive?.content)
+            // subject did should e set by data function <subjectDid>
+            assertEquals(
+                defaultWalletApi.getDefaultDid(defaultWallet.id).did,
+                parsedDocument["credentialSubject"]?.jsonObject["id"]?.jsonPrimitive?.contentOrNull
+            )
+            // must contain 1 selective disclosure
+            assertEquals(1, parsedDocument["_sd"]?.jsonArray?.size)
         }
         assertContains(JwtUtils.parseJWTPayload(newCredential!!.document).keys, JwsSignatureScheme.JwsOption.VC)
     }
