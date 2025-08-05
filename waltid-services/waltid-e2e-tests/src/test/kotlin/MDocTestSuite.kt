@@ -1,16 +1,16 @@
 @file:OptIn(ExperimentalSerializationApi::class)
 
 import com.nimbusds.jose.jwk.ECKey
-import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.issuer.config.CredentialTypeConfig
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.openapi.issuerapi.MdocDocs
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
+import id.walt.mdoc.cose.COSECryptoProvider
 import id.walt.mdoc.cose.COSEX5Chain
 import id.walt.mdoc.dataelement.DEType
 import id.walt.mdoc.dataelement.NumberElement
@@ -18,10 +18,8 @@ import id.walt.mdoc.dataelement.toJsonElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
-import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.mdoc.issuersigned.IssuerSignedItem
 import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.providers.CredentialIssuerConfig
 import id.walt.verifier.openapi.VerifierApiExamples
 import id.walt.webwallet.db.models.WalletCredential
 import io.ktor.client.call.*
@@ -49,6 +47,7 @@ class MDocTestSuite(
     private val TEST_SUITE = "MDoc Test Suite"
 
     private val ISO_IEC_MDL_NAMESPACE_ID = "org.iso.18013.5.1"
+    private val MDL_DOC_TYPE = "org.iso.18013.5.1.mDL"
 
     private val mDocWallet: MDocPreparedWallet by lazy {
         runBlocking {
@@ -77,10 +76,6 @@ class MDocTestSuite(
             )
         }
     }
-
-    private val credentialIssuerConfig = CredentialIssuerConfig(
-        credentialConfigurationsSupported = ConfigManager.getConfig<CredentialTypeConfig>().parse()
-    )
 
     private val iacaRootX509Certificate = CertificateFactory.getInstance("X509").let { certificateFactory ->
         PemReader(StringReader(VerifierApiExamples.iacaRootCertificate)).readPemObject().content.let {
@@ -123,49 +118,10 @@ class MDocTestSuite(
         }
     }
 
-    private fun assertMdocDataEqualsIssuerSigned(
-        mDocData: Map<String, JsonObject>,
-        issuerSigned: IssuerSigned,
-    ) {
-        val nameSpaces = assertNotNull(issuerSigned.nameSpaces)
-        assertEquals(
-            expected = mDocData.keys,
-            actual = nameSpaces.keys,
-        )
-        nameSpaces.forEach { nameSpace, encodedElements ->
-            val mDocDataNamespaceElements = mDocData[nameSpace] as JsonObject
-            assertEquals(
-                expected = mDocDataNamespaceElements.size,
-                actual = encodedElements.size,
-            )
-            //start comparing element by element
-            encodedElements.forEach { encodedElement ->
-                val issuerSignedItem = encodedElement.decode<IssuerSignedItem>()
-                assertContains(mDocDataNamespaceElements, issuerSignedItem.elementIdentifier.value)
-                val jsonValue = assertNotNull(mDocDataNamespaceElements[issuerSignedItem.elementIdentifier.value])
-                /*
-                This is a very very crude and bad way of comparing encoded elements with their JSON counterparts but
-                such is life at the moment.
-                * */
-                if (issuerSignedItem.elementValue.type == DEType.number) {
-                    assertEquals(
-                        expected = jsonValue.jsonPrimitive.content,
-                        actual = (issuerSignedItem.elementValue as NumberElement).value.toString(),
-                    )
-                } else {
-                    assertEquals(
-                        expected = jsonValue,
-                        actual = issuerSignedItem.elementValue.toJsonElement(),
-                    )
-                }
-            }
-        }
-    }
-
     private suspend fun mDLIssuanceRequestValidations(
         mDLIssuanceRequest: IssuanceRequest,
         iacaCertificate: X509Certificate,
-    ) {
+    ): MDLIssuanceRequestDecodedParameters {
         assertNull(mDLIssuanceRequest.trustedRootCAs)
         val x5Chain = assertNotNull(mDLIssuanceRequest.x5Chain)
         assertTrue {
@@ -180,14 +136,14 @@ class MDocTestSuite(
             expected = setOf(ISO_IEC_MDL_NAMESPACE_ID),
             actual = mDocData.keys,
         )
-        val mDLAsJsonObject = assertNotNull(mDocData[ISO_IEC_MDL_NAMESPACE_ID])
+        val mDLNamespaceDataJson = assertNotNull(mDocData[ISO_IEC_MDL_NAMESPACE_ID])
         val mDLRequiredFields = setOf(
             "family_name", "given_name", "birth_date", "issue_date", "expiry_date",
             "issuing_country", "issuing_authority", "document_number", "portrait",
             "driving_privileges", "un_distinguishing_sign"
         )
         assertTrue {
-            mDLAsJsonObject.keys.containsAll(mDLRequiredFields)
+            mDLNamespaceDataJson.keys.containsAll(mDLRequiredFields)
         }
         val issuanceRequestKey = KeyManager.resolveSerializedKey(mDLIssuanceRequest.issuerKey)
         assertTrue {
@@ -211,6 +167,7 @@ class MDocTestSuite(
         assertDoesNotThrow {
             issuanceRequestDSCertificate.verify(iacaCertificate.publicKey)
         }
+        //awesome public key equality code
         val dsCertificatePublicKeyParsedAsKey = assertDoesNotThrow {
             JWKKey.importRawPublicKey(
                 type = issuanceRequestKey.keyType,
@@ -221,6 +178,94 @@ class MDocTestSuite(
             expected = issuanceRequestKey.getPublicKey().exportJWKObject().minus("kid"),
             actual = dsCertificatePublicKeyParsedAsKey.exportJWKObject(),
         )
+        return MDLIssuanceRequestDecodedParameters(
+            mDLNamespaceDataJson = mDLNamespaceDataJson,
+            dsCertificate = issuanceRequestDSCertificate,
+            key = issuanceRequestKey,
+        )
+    }
+
+    private fun mDLIssuedCredentialValidations(
+        mDL: MDoc,
+        mDLIssuanceRequestParams: MDLIssuanceRequestDecodedParameters,
+        mDLCOSECryptoProviderInfo: MDLCOSECryptoProviderInfo,
+        iacaCertificate: X509Certificate,
+    ) {
+        val issuerAuthCOSESign1 = assertNotNull(mDL.issuerSigned.issuerAuth)
+        assertNotNull(issuerAuthCOSESign1.payload)
+        assertTrue {
+            mDLCOSECryptoProviderInfo.provider.verify1(
+                coseSign1 = issuerAuthCOSESign1,
+                keyID = mDLCOSECryptoProviderInfo.verificationKeyId,
+            )
+        }
+        assertTrue {
+            mDL.verify(
+                verificationParams = MDocVerificationParams(
+                    verificationTypes = VerificationType.forIssuance,
+                    issuerKeyID = mDLCOSECryptoProviderInfo.verificationKeyId,
+                ),
+                cryptoProvider = mDLCOSECryptoProviderInfo.provider,
+            )
+        }
+        val issuerAuth = assertNotNull(mDL.issuerSigned.issuerAuth)
+        val x5c = assertNotNull(issuerAuth.x5ChainSafe)
+        val x5cSingleElement = assertIs<COSEX5Chain.SingleElement>(x5c)
+        val dsCertificate = CertificateFactory.getInstance("X509").let { certificateFactory ->
+            certificateFactory.generateCertificate(ByteArrayInputStream(x5cSingleElement.data)) as X509Certificate
+        }
+        assertDoesNotThrow {
+            dsCertificate.checkValidity()
+        }
+        assertDoesNotThrow {
+            dsCertificate.verify(iacaCertificate.publicKey)
+        }
+        assertEquals(
+            actual = dsCertificate,
+            expected = mDLIssuanceRequestParams.dsCertificate,
+        )
+        assertEquals(
+            expected = MDL_DOC_TYPE,
+            actual = mDL.docType.value,
+        )
+        assertNull(mDL.deviceSigned)
+        assertNull(mDL.errors)
+        assertNotNull(mDL.issuerSigned.issuerAuth)
+        val nameSpaces = assertNotNull(mDL.issuerSigned.nameSpaces)
+        assertEquals(
+            expected = 1,
+            actual = nameSpaces.size,
+        )
+        assertEquals(
+            expected = 1,
+            actual = mDL.nameSpaces.size,
+        )
+        assertContains(nameSpaces, ISO_IEC_MDL_NAMESPACE_ID)
+        val mDLNamespaceEncodedElements = assertNotNull(nameSpaces[ISO_IEC_MDL_NAMESPACE_ID])
+        assertEquals(
+            expected = mDLIssuanceRequestParams.mDLNamespaceDataJson.size,
+            actual = mDLNamespaceEncodedElements.size,
+        )
+        mDLNamespaceEncodedElements.forEach { encodedElement ->
+            val issuerSignedItem = encodedElement.decode<IssuerSignedItem>()
+            assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, issuerSignedItem.elementIdentifier.value)
+            val jsonValue = assertNotNull(mDLIssuanceRequestParams.mDLNamespaceDataJson[issuerSignedItem.elementIdentifier.value])
+            /*
+            This is a very very crude and bad way of comparing encoded elements with their JSON counterparts but
+            such is life at the moment.
+            * */
+            if (issuerSignedItem.elementValue.type == DEType.number) {
+                assertEquals(
+                    expected = jsonValue.jsonPrimitive.content.toInt(),
+                    actual = (issuerSignedItem.elementValue as NumberElement).value.toInt(),
+                )
+            } else {
+                assertEquals(
+                    expected = jsonValue,
+                    actual = issuerSignedItem.elementValue.toJsonElement(),
+                )
+            }
+        }
     }
 
     private suspend fun issueMdlOnlyRequiredFields() =
@@ -230,7 +275,7 @@ class MDocTestSuite(
 
             val mDLIssuanceRequest = MdocDocs.mdlBaseIssuanceExample
 
-            mDLIssuanceRequestValidations(
+            val mDLIssuanceRequestParams = mDLIssuanceRequestValidations(
                 mDLIssuanceRequest = mDLIssuanceRequest,
                 iacaCertificate = iacaRootX509Certificate,
             )
@@ -244,79 +289,18 @@ class MDocTestSuite(
             }.expectSuccess().body<List<WalletCredential>>().let {
                 mDLHandleOfferWalletRetrievedCredentials(it)
             }
-            val issuerAuthCOSESign1 = assertNotNull(mDL.issuerSigned.issuerAuth)
-            assertNotNull(issuerAuthCOSESign1.payload)
-            assertTrue {
-                mDLDSCOSECryptoProvider.verify1(
-                    coseSign1 = issuerAuthCOSESign1,
-                    keyID = coseProviderVerificationKeyId,
-                )
 
-            }
-            assertTrue {
-                mDL.verify(
-                    verificationParams = MDocVerificationParams(
-                        verificationTypes = VerificationType.forIssuance,
-                        issuerKeyID = coseProviderVerificationKeyId,
-                    ),
-                    cryptoProvider = mDLDSCOSECryptoProvider,
-                )
-            }
-            val issuanceRequestDSCertificate = MdocDocs.mdlBaseIssuanceExample.x5Chain!!.first().let {
-                PemReader(StringReader(it)).readPemObject().content.let { derCertificate ->
-                    CertificateFactory.getInstance("X509").let { certificateFactory ->
-                        certificateFactory.generateCertificate(ByteArrayInputStream(derCertificate)) as X509Certificate
-                    }
-                }
-            }
-            val issuerAuth = assertNotNull(mDL.issuerSigned.issuerAuth)
-            val x5c = assertNotNull(issuerAuth.x5ChainSafe)
-            val x5cSingleElement = assertIs<COSEX5Chain.SingleElement>(x5c)
-            val dsCertificate = CertificateFactory.getInstance("X509").let { certificateFactory ->
-                certificateFactory.generateCertificate(ByteArrayInputStream(x5cSingleElement.data)) as X509Certificate
-            }
-            assertEquals(
-                expected = issuerOneKey.AsPublicKey(),
-                actual = dsCertificate.publicKey,
+            mDLIssuedCredentialValidations(
+                mDL = mDL,
+                mDLIssuanceRequestParams = mDLIssuanceRequestParams,
+                mDLCOSECryptoProviderInfo = MDLCOSECryptoProviderInfo(
+                    provider = mDLDSCOSECryptoProvider,
+                    verificationKeyId = coseProviderVerificationKeyId,
+                    signingKeyId = coseProviderSigningKeyId,
+                ),
+                iacaCertificate = iacaRootX509Certificate
             )
-            assertDoesNotThrow {
-                issuanceRequestDSCertificate.checkValidity()
-            }
-            assertDoesNotThrow {
-                issuanceRequestDSCertificate.verify(iacaRootX509Certificate.publicKey)
-            }
-            assertDoesNotThrow {
-                dsCertificate.checkValidity()
-            }
-            assertDoesNotThrow {
-                dsCertificate.verify(iacaRootX509Certificate.publicKey)
-            }
-            assertEquals(
-                actual = dsCertificate,
-                expected = issuanceRequestDSCertificate,
-            )
-            assertEquals(
-                expected = credentialIssuerConfig
-                    .credentialConfigurationsSupported[MdocDocs.mdlBaseIssuanceExample.credentialConfigurationId]!!
-                    .docType!!,
-                actual = mDL.docType.value,
-            )
-            assertNull(mDL.deviceSigned)
-            assertNull(mDL.errors)
-            assertNotNull(mDL.issuerSigned.issuerAuth)
-            val nameSpaces = assertNotNull(mDL.issuerSigned.nameSpaces)
-            assertEquals(
-                expected = 1,
-                actual = nameSpaces.size,
-            )
-            assertEquals(
-                expected = 1,
-                actual = mDL.nameSpaces.size,
-            )
-            assertMdocDataEqualsIssuerSigned(
-                mDocData = MdocDocs.mdlBaseIssuanceExample.mdocData!!,
-                issuerSigned = mDL.issuerSigned,
-            )
+
         }
 
     private suspend fun issueMdlSingleAgeAttestation() =
@@ -326,7 +310,7 @@ class MDocTestSuite(
 
             val mDLIssuanceRequest = MdocDocs.mDLSingleAgeAttestation
 
-            mDLIssuanceRequestValidations(
+            val mDLIssuanceRequestParams = mDLIssuanceRequestValidations(
                 mDLIssuanceRequest = mDLIssuanceRequest,
                 iacaCertificate = iacaRootX509Certificate,
             )
@@ -340,6 +324,17 @@ class MDocTestSuite(
             }.expectSuccess().body<List<WalletCredential>>().let {
                 mDLHandleOfferWalletRetrievedCredentials(it)
             }
+
+            mDLIssuedCredentialValidations(
+                mDL = mDL,
+                mDLIssuanceRequestParams = mDLIssuanceRequestParams,
+                mDLCOSECryptoProviderInfo = MDLCOSECryptoProviderInfo(
+                    provider = mDLDSCOSECryptoProvider,
+                    verificationKeyId = coseProviderVerificationKeyId,
+                    signingKeyId = coseProviderSigningKeyId,
+                ),
+                iacaCertificate = iacaRootX509Certificate
+            )
 
         }
 
@@ -350,7 +345,7 @@ class MDocTestSuite(
 
             val mDLIssuanceRequest = MdocDocs.mDLMultipleAgeAttestations
 
-            mDLIssuanceRequestValidations(
+            val mDLIssuanceRequestParams = mDLIssuanceRequestValidations(
                 mDLIssuanceRequest = mDLIssuanceRequest,
                 iacaCertificate = iacaRootX509Certificate,
             )
@@ -364,6 +359,17 @@ class MDocTestSuite(
             }.expectSuccess().body<List<WalletCredential>>().let {
                 mDLHandleOfferWalletRetrievedCredentials(it)
             }
+
+            mDLIssuedCredentialValidations(
+                mDL = mDL,
+                mDLIssuanceRequestParams = mDLIssuanceRequestParams,
+                mDLCOSECryptoProviderInfo = MDLCOSECryptoProviderInfo(
+                    provider = mDLDSCOSECryptoProvider,
+                    verificationKeyId = coseProviderVerificationKeyId,
+                    signingKeyId = coseProviderSigningKeyId,
+                ),
+                iacaCertificate = iacaRootX509Certificate
+            )
 
         }
 
@@ -374,7 +380,7 @@ class MDocTestSuite(
 
             val mDLIssuanceRequest = MdocDocs.mDLAllFieldsMultipleAgeAttestations
 
-            mDLIssuanceRequestValidations(
+            val mDLIssuanceRequestParams = mDLIssuanceRequestValidations(
                 mDLIssuanceRequest = mDLIssuanceRequest,
                 iacaCertificate = iacaRootX509Certificate,
             )
@@ -389,6 +395,17 @@ class MDocTestSuite(
                 mDLHandleOfferWalletRetrievedCredentials(it)
             }
 
+            mDLIssuedCredentialValidations(
+                mDL = mDL,
+                mDLIssuanceRequestParams = mDLIssuanceRequestParams,
+                mDLCOSECryptoProviderInfo = MDLCOSECryptoProviderInfo(
+                    provider = mDLDSCOSECryptoProvider,
+                    verificationKeyId = coseProviderVerificationKeyId,
+                    signingKeyId = coseProviderSigningKeyId,
+                ),
+                iacaCertificate = iacaRootX509Certificate
+            )
+
         }
 
     suspend fun runTestSuite() {
@@ -397,4 +414,17 @@ class MDocTestSuite(
         issueMdlMultipleAgeAttestations()
         issueMdlAllFieldsMultipleAgeAttestations()
     }
+
+    private data class MDLIssuanceRequestDecodedParameters(
+        val mDLNamespaceDataJson: JsonObject,
+        val dsCertificate: X509Certificate,
+        val key: Key,
+    )
+
+    private data class MDLCOSECryptoProviderInfo(
+        val provider: COSECryptoProvider,
+        val verificationKeyId: String,
+        val signingKeyId: String,
+    )
+
 }
