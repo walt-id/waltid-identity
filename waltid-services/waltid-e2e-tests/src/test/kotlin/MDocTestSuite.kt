@@ -335,19 +335,10 @@ class MDocTestSuite(
                 setBody(mDLIssuanceRequest)
             }.expectSuccess().bodyAsText()
 
-            mDocWallet.walletClient.post(WALLET_HANDLE_OFFER_URL) {
+            val mDL = mDocWallet.walletClient.post(WALLET_HANDLE_OFFER_URL) {
                 setBody(offerUrl)
             }.expectSuccess().body<List<WalletCredential>>().let {
-                assertEquals(
-                    expected = 1,
-                    actual = it.size,
-                )
-                val credential = it.first()
-                assertEquals(
-                    expected = CredentialFormat.mso_mdoc,
-                    actual = credential.format,
-                )
-                assertNull(credential.disclosures)
+                mDLHandleOfferWalletRetrievedCredentials(it)
             }
 
         }
@@ -368,19 +359,10 @@ class MDocTestSuite(
                 setBody(mDLIssuanceRequest)
             }.expectSuccess().bodyAsText()
 
-            mDocWallet.walletClient.post(WALLET_HANDLE_OFFER_URL) {
+            val mDL = mDocWallet.walletClient.post(WALLET_HANDLE_OFFER_URL) {
                 setBody(offerUrl)
             }.expectSuccess().body<List<WalletCredential>>().let {
-                assertEquals(
-                    expected = 1,
-                    actual = it.size,
-                )
-                val credential = it.first()
-                assertEquals(
-                    expected = CredentialFormat.mso_mdoc,
-                    actual = credential.format,
-                )
-                assertNull(credential.disclosures)
+                mDLHandleOfferWalletRetrievedCredentials(it)
             }
 
         }
@@ -401,19 +383,10 @@ class MDocTestSuite(
                 setBody(mDLIssuanceRequest)
             }.expectSuccess().bodyAsText()
 
-            mDocWallet.walletClient.post(WALLET_HANDLE_OFFER_URL) {
+            val mDL = mDocWallet.walletClient.post(WALLET_HANDLE_OFFER_URL) {
                 setBody(offerUrl)
             }.expectSuccess().body<List<WalletCredential>>().let {
-                assertEquals(
-                    expected = 1,
-                    actual = it.size,
-                )
-                val credential = it.first()
-                assertEquals(
-                    expected = CredentialFormat.mso_mdoc,
-                    actual = credential.format,
-                )
-                assertNull(credential.disclosures)
+                mDLHandleOfferWalletRetrievedCredentials(it)
             }
 
         }
