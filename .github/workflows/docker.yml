@@ -39,7 +39,7 @@ jobs:
           echo "${{ matrix.image }}::: ${{ inputs.tag }} / ${{ inputs.version }}"
 
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@ae0a52f29dd8059f2d3ed1d51b8afb7d0a11af41
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@29f904ce0de831e02fe64507ebe284b02e66b50e
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
       - name: Login to Docker Hub
