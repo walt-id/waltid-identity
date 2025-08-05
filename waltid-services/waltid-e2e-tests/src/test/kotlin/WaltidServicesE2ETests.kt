@@ -421,6 +421,10 @@ class WaltidServicesE2ETests {
         MDocPreparedWallet(e2e).testWalletSetup()
         //endregion -MDoc Prepared/Ready Wallet Test Utility (Wallet)
 
+        //region -MDoc Mega Consolidated Test Suite-
+        MDocTestSuite(e2e).runTestSuite()
+        //endregion -MDoc Mega Consolidated Test Suite-
+
         //region -Presented Credentials Feature (Verifier)-
         VerifierPresentedCredentialsTests(e2e).runTests()
         //endregion -Presented Credentials Feature (Verifier)-
