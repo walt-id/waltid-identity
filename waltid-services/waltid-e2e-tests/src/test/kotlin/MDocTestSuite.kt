@@ -15,6 +15,7 @@ import id.walt.mdoc.cose.COSECryptoProvider
 import id.walt.mdoc.cose.COSEX5Chain
 import id.walt.mdoc.dataelement.DEType
 import id.walt.mdoc.dataelement.NumberElement
+import id.walt.mdoc.dataelement.StringElement
 import id.walt.mdoc.dataelement.toJsonElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.doc.MDocVerificationParams
@@ -29,8 +30,8 @@ import io.ktor.client.statement.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonPrimitive
 import org.bouncycastle.util.io.pem.PemReader
 import org.cose.java.AlgorithmID
@@ -192,6 +193,7 @@ class MDocTestSuite(
         mDLIssuanceRequestParams: MDLIssuanceRequestDecodedParameters,
         mDLCOSECryptoProviderInfo: MDLCOSECryptoProviderInfo,
         iacaCertificate: X509Certificate,
+        optionalClaimsMap: Map<String, JsonElement>? = null,
     ) {
         val issuerAuthCOSESign1 = assertNotNull(mDL.issuerSigned.issuerAuth)
         assertNotNull(issuerAuthCOSESign1.payload)
@@ -248,8 +250,10 @@ class MDocTestSuite(
             expected = mDLIssuanceRequestParams.mDLNamespaceDataJson.size,
             actual = mDLNamespaceEncodedElements.size,
         )
-        mDLNamespaceEncodedElements.forEach { encodedElement ->
-            val issuerSignedItem = encodedElement.decode<IssuerSignedItem>()
+        val mDLNamespaceDecodedElements = mDLNamespaceEncodedElements.map {
+            it.decode<IssuerSignedItem>()
+        }
+        mDLNamespaceDecodedElements.forEach { issuerSignedItem ->
             assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, issuerSignedItem.elementIdentifier.value)
             val jsonValue =
                 assertNotNull(mDLIssuanceRequestParams.mDLNamespaceDataJson[issuerSignedItem.elementIdentifier.value])
@@ -268,6 +272,28 @@ class MDocTestSuite(
                     actual = issuerSignedItem.elementValue.toJsonElement(),
                 )
             }
+        }
+        optionalClaimsMap?.let { otherClaimsMap ->
+
+            assertTrue {
+                otherClaimsMap.isNotEmpty()
+            }
+
+            otherClaimsMap.forEach { (key, value) ->
+
+                assertTrue {
+                    mDLNamespaceDecodedElements.any {
+                        it.elementIdentifier == StringElement(key) &&
+                                if (it.elementValue.type == DEType.number) {
+                                    value.jsonPrimitive.content.toInt() == (it.elementValue as NumberElement).value.toInt()
+                                } else {
+                                    it.elementValue.toJsonElement() == value
+                                }
+                    }
+                }
+
+            }
+
         }
     }
 
@@ -347,7 +373,8 @@ class MDocTestSuite(
                     verificationKeyId = coseProviderVerificationKeyId,
                     signingKeyId = coseProviderSigningKeyId,
                 ),
-                iacaCertificate = iacaRootX509Certificate
+                iacaCertificate = iacaRootX509Certificate,
+                optionalClaimsMap = optionalClaimsMap,
             )
 
         }
@@ -395,7 +422,8 @@ class MDocTestSuite(
                     verificationKeyId = coseProviderVerificationKeyId,
                     signingKeyId = coseProviderSigningKeyId,
                 ),
-                iacaCertificate = iacaRootX509Certificate
+                iacaCertificate = iacaRootX509Certificate,
+                optionalClaimsMap = optionalClaimsMap,
             )
 
         }
@@ -463,7 +491,8 @@ class MDocTestSuite(
                     verificationKeyId = coseProviderVerificationKeyId,
                     signingKeyId = coseProviderSigningKeyId,
                 ),
-                iacaCertificate = iacaRootX509Certificate
+                iacaCertificate = iacaRootX509Certificate,
+                optionalClaimsMap = optionalClaimsMap,
             )
 
         }
