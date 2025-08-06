@@ -21,7 +21,9 @@ import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.issuersigned.IssuerSignedItem
+import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.CredentialFormat
+import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.verifier.openapi.VerifierApiExamples
 import id.walt.webwallet.db.models.WalletCredential
 import io.ktor.client.call.*
@@ -80,6 +82,8 @@ class MDocTestSuite(
         }
     }
 
+    private val ISSUER_MDL_CREDENTIAL_CONFIGURATION_ID = "org.iso.18013.5.1.mDL"
+
     private val iacaRootX509Certificate = CertificateFactory.getInstance("X509").let { certificateFactory ->
         PemReader(StringReader(VerifierApiExamples.iacaRootCertificate)).readPemObject().content.let {
             certificateFactory.generateCertificate(ByteArrayInputStream(it)) as X509Certificate
@@ -102,6 +106,49 @@ class MDocTestSuite(
             ),
         ),
     )
+
+    private suspend fun validateIssuerMetadata() =
+        e2e.test(
+            name = "$TEST_SUITE : Validate Issuer Metadata mDL Entry",
+        ) {
+            val draft13IssuerMetadata = client.get("/${OpenID4VCIVersion.DRAFT13.versionString}/.well-known/openid-credential-issuer")
+                .expectSuccess().body<OpenIDProviderMetadata.Draft13>()
+
+            val credentialConfigurationsSupported = assertNotNull(
+                draft13IssuerMetadata.credentialConfigurationsSupported
+            )
+
+            assertContains(
+                credentialConfigurationsSupported,
+                ISSUER_MDL_CREDENTIAL_CONFIGURATION_ID,
+            )
+
+            val mDLCredentialConfiguration = assertNotNull(
+                credentialConfigurationsSupported[ISSUER_MDL_CREDENTIAL_CONFIGURATION_ID]
+            )
+
+            assertEquals(
+                expected = setOf("cose_key"),
+                actual = mDLCredentialConfiguration.cryptographicBindingMethodsSupported,
+            )
+
+            assertEquals(
+                expected = "mso_mdoc",
+                actual = mDLCredentialConfiguration.format.value,
+            )
+
+            assertTrue {
+                mDLCredentialConfiguration.credentialSigningAlgValuesSupported!!.contains("ES256")
+            }
+
+            assertEquals(
+                expected = MDL_DOC_TYPE,
+                actual = mDLCredentialConfiguration.docType!!,
+            )
+
+//            client.get("/${OpenID4VCIVersion.DRAFT11.versionString}/.well-known/openid-credential-issuer")
+//                .expectSuccess().body<OpenIDProviderMetadata.Draft11>()
+        }
 
     private fun mDLHandleOfferWalletRetrievedCredentials(
         walletCredentials: List<WalletCredential>,
@@ -498,6 +545,7 @@ class MDocTestSuite(
         }
 
     suspend fun runTestSuite() {
+        validateIssuerMetadata()
         issueMdlOnlyRequiredFields()
         issueMdlSingleAgeAttestation()
         issueMdlMultipleAgeAttestations()
