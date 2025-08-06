@@ -6,6 +6,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.openapi.issuerapi.MdocDocs
 import id.walt.mdoc.COSECryptoProviderKeyInfo
@@ -317,11 +318,16 @@ class MDocTestSuite(
                 iacaCertificate = iacaRootX509Certificate,
             )
 
-            assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, "age_over_18")
-            assertEquals(
-                expected = true,
-                actual = mDLIssuanceRequestParams.mDLNamespaceDataJson["age_over_18"]!!.jsonPrimitive.boolean,
+            val optionalClaimsMap = mapOf(
+                "age_over_18" to true.toJsonElement(),
             )
+
+            assertTrue {
+                mDLIssuanceRequestParams
+                    .mDLNamespaceDataJson
+                    .entries
+                    .containsAll(optionalClaimsMap.entries)
+            }
 
             val offerUrl = client.post(MDOC_ISSUE_URL) {
                 setBody(mDLIssuanceRequest)
@@ -358,21 +364,18 @@ class MDocTestSuite(
                 iacaCertificate = iacaRootX509Certificate,
             )
 
-            assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, "age_over_18")
-            assertEquals(
-                expected = true,
-                actual = mDLIssuanceRequestParams.mDLNamespaceDataJson["age_over_18"]!!.jsonPrimitive.boolean,
+            val optionalClaimsMap = mapOf(
+                "age_over_18" to true.toJsonElement(),
+                "age_over_24" to true.toJsonElement(),
+                "age_over_60" to false.toJsonElement(),
             )
-            assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, "age_over_24")
-            assertEquals(
-                expected = true,
-                actual = mDLIssuanceRequestParams.mDLNamespaceDataJson["age_over_24"]!!.jsonPrimitive.boolean,
-            )
-            assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, "age_over_60")
-            assertEquals(
-                expected = false,
-                actual = mDLIssuanceRequestParams.mDLNamespaceDataJson["age_over_60"]!!.jsonPrimitive.boolean,
-            )
+
+            assertTrue {
+                mDLIssuanceRequestParams
+                    .mDLNamespaceDataJson
+                    .entries
+                    .containsAll(optionalClaimsMap.entries)
+            }
 
             val offerUrl = client.post(MDOC_ISSUE_URL) {
                 setBody(mDLIssuanceRequest)
@@ -409,33 +412,37 @@ class MDocTestSuite(
                 iacaCertificate = iacaRootX509Certificate,
             )
 
-            assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, "age_over_18")
-            assertEquals(
-                expected = true,
-                actual = mDLIssuanceRequestParams.mDLNamespaceDataJson["age_over_18"]!!.jsonPrimitive.boolean,
-            )
-            assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, "age_over_24")
-            assertEquals(
-                expected = true,
-                actual = mDLIssuanceRequestParams.mDLNamespaceDataJson["age_over_24"]!!.jsonPrimitive.boolean,
-            )
-            assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, "age_over_60")
-            assertEquals(
-                expected = false,
-                actual = mDLIssuanceRequestParams.mDLNamespaceDataJson["age_over_60"]!!.jsonPrimitive.boolean,
-            )
-
-            val optionalFields = listOf(
-                "sex", "height", "weight", "eye_colour", "hair_colour", "birth_place",
-                "resident_address", "portrait_capture_date", "age_in_years", "age_birth_year",
-                "issuing_jurisdiction", "nationality", "resident_city", "resident_state",
-                "resident_postal_code", "biometric_template_face",
-                "family_name_national_character", "given_name_national_character",
-                "signature_usual_mark",
+            val optionalClaimsMap = mapOf(
+                "age_over_18" to true.toJsonElement(),
+                "age_over_24" to true.toJsonElement(),
+                "age_over_60" to false.toJsonElement(),
+                "administrative_number" to "123456789".toJsonElement(),
+                "sex" to 9.toJsonElement(),
+                "height" to 180.toJsonElement(),
+                "weight" to 100.toJsonElement(),
+                "eye_colour" to "black".toJsonElement(),
+                "hair_colour" to "black".toJsonElement(),
+                "birth_place" to "Vienna".toJsonElement(),
+                "resident_address" to "Some Street 4".toJsonElement(),
+                "portrait_capture_date" to "2018-08-09".toJsonElement(),
+                "age_in_years" to 33.toJsonElement(),
+                "age_birth_year" to 1986.toJsonElement(),
+                "issuing_jurisdiction" to "AT-9".toJsonElement(),
+                "nationality" to "AT".toJsonElement(),
+                "resident_city" to "Vienna".toJsonElement(),
+                "resident_state" to "Vienna".toJsonElement(),
+                "resident_postal_code" to "07008".toJsonElement(),
+                "biometric_template_face" to listOf(141, 182, 121, 111, 238, 50, 120, 94, 54, 111, 113, 13, 241, 12, 12).toJsonElement(),
+                "family_name_national_character" to "Doe".toJsonElement(),
+                "given_name_national_character" to "John".toJsonElement(),
+                "signature_usual_mark" to listOf(141, 182, 121, 111, 238, 50, 120, 94, 54, 111, 113, 13, 241, 12, 12).toJsonElement(),
             )
 
             assertTrue {
-                mDLIssuanceRequestParams.mDLNamespaceDataJson.keys.containsAll(optionalFields)
+                mDLIssuanceRequestParams
+                    .mDLNamespaceDataJson
+                    .entries
+                    .containsAll(optionalClaimsMap.entries)
             }
 
             val offerUrl = client.post(MDOC_ISSUE_URL) {
