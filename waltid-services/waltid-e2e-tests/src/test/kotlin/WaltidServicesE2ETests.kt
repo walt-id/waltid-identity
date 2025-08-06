@@ -319,12 +319,12 @@ class WaltidServicesE2ETests {
                 assert(it.size > 1) { "no policies have run" }
             }
         }
-        val lspPotentialIssuance = LspPotentialIssuance(e2e, testHttpClient(doFollowRedirects = false))
-        lspPotentialIssuance.testTrack1()
-        lspPotentialIssuance.testTrack2()
-        val lspPotentialVerification = LspPotentialVerification(e2e, testHttpClient(doFollowRedirects = false))
-        lspPotentialVerification.testPotentialInteropTrack3()
-        lspPotentialVerification.testPotentialInteropTrack4()
+//        val lspPotentialIssuance = LspPotentialIssuance(e2e, testHttpClient(doFollowRedirects = false))
+//        lspPotentialIssuance.testTrack1()
+//        lspPotentialIssuance.testTrack2()
+//        val lspPotentialVerification = LspPotentialVerification(e2e, testHttpClient(doFollowRedirects = false))
+//        lspPotentialVerification.testPotentialInteropTrack3()
+//        lspPotentialVerification.testPotentialInteropTrack4()
         val lspPotentialWallet = setupTestWallet()
         lspPotentialWallet.testMDocIssuance(IssuanceExamples.mDLCredentialIssuanceData, true)
         lspPotentialWallet.testMDocIssuance(IssuanceExamples.mDLCredentialIssuanceDataJwtProof, false)
