@@ -29,6 +29,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonPrimitive
 import org.bouncycastle.util.io.pem.PemReader
 import org.cose.java.AlgorithmID
@@ -249,7 +250,8 @@ class MDocTestSuite(
         mDLNamespaceEncodedElements.forEach { encodedElement ->
             val issuerSignedItem = encodedElement.decode<IssuerSignedItem>()
             assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, issuerSignedItem.elementIdentifier.value)
-            val jsonValue = assertNotNull(mDLIssuanceRequestParams.mDLNamespaceDataJson[issuerSignedItem.elementIdentifier.value])
+            val jsonValue =
+                assertNotNull(mDLIssuanceRequestParams.mDLNamespaceDataJson[issuerSignedItem.elementIdentifier.value])
             /*
             This is a very very crude and bad way of comparing encoded elements with their JSON counterparts but
             such is life at the moment.
@@ -315,6 +317,12 @@ class MDocTestSuite(
                 iacaCertificate = iacaRootX509Certificate,
             )
 
+            assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, "age_over_18")
+            assertEquals(
+                expected = true,
+                actual = mDLIssuanceRequestParams.mDLNamespaceDataJson["age_over_18"]!!.jsonPrimitive.boolean,
+            )
+
             val offerUrl = client.post(MDOC_ISSUE_URL) {
                 setBody(mDLIssuanceRequest)
             }.expectSuccess().bodyAsText()
@@ -348,6 +356,22 @@ class MDocTestSuite(
             val mDLIssuanceRequestParams = mDLIssuanceRequestValidations(
                 mDLIssuanceRequest = mDLIssuanceRequest,
                 iacaCertificate = iacaRootX509Certificate,
+            )
+
+            assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, "age_over_18")
+            assertEquals(
+                expected = true,
+                actual = mDLIssuanceRequestParams.mDLNamespaceDataJson["age_over_18"]!!.jsonPrimitive.boolean,
+            )
+            assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, "age_over_24")
+            assertEquals(
+                expected = true,
+                actual = mDLIssuanceRequestParams.mDLNamespaceDataJson["age_over_24"]!!.jsonPrimitive.boolean,
+            )
+            assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, "age_over_60")
+            assertEquals(
+                expected = false,
+                actual = mDLIssuanceRequestParams.mDLNamespaceDataJson["age_over_60"]!!.jsonPrimitive.boolean,
             )
 
             val offerUrl = client.post(MDOC_ISSUE_URL) {
@@ -384,6 +408,35 @@ class MDocTestSuite(
                 mDLIssuanceRequest = mDLIssuanceRequest,
                 iacaCertificate = iacaRootX509Certificate,
             )
+
+            assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, "age_over_18")
+            assertEquals(
+                expected = true,
+                actual = mDLIssuanceRequestParams.mDLNamespaceDataJson["age_over_18"]!!.jsonPrimitive.boolean,
+            )
+            assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, "age_over_24")
+            assertEquals(
+                expected = true,
+                actual = mDLIssuanceRequestParams.mDLNamespaceDataJson["age_over_24"]!!.jsonPrimitive.boolean,
+            )
+            assertContains(mDLIssuanceRequestParams.mDLNamespaceDataJson, "age_over_60")
+            assertEquals(
+                expected = false,
+                actual = mDLIssuanceRequestParams.mDLNamespaceDataJson["age_over_60"]!!.jsonPrimitive.boolean,
+            )
+
+            val optionalFields = listOf(
+                "sex", "height", "weight", "eye_colour", "hair_colour", "birth_place",
+                "resident_address", "portrait_capture_date", "age_in_years", "age_birth_year",
+                "issuing_jurisdiction", "nationality", "resident_city", "resident_state",
+                "resident_postal_code", "biometric_template_face",
+                "family_name_national_character", "given_name_national_character",
+                "signature_usual_mark",
+            )
+
+            assertTrue {
+                mDLIssuanceRequestParams.mDLNamespaceDataJson.keys.containsAll(optionalFields)
+            }
 
             val offerUrl = client.post(MDOC_ISSUE_URL) {
                 setBody(mDLIssuanceRequest)
