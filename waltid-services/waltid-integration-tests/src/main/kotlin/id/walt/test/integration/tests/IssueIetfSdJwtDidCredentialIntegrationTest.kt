@@ -22,11 +22,10 @@ private val credentialIetfSdJwtDidIssuanceRequest = IssuanceRequest(
     issuerKey = loadJsonResource("issuance/key.json"),
     credentialConfigurationId = "identity_credential_vc+sd-jwt", //format= vc+sd-jwt (IETF)
     credentialData = buildJsonObject {
+        put("sub", "a-user-id")
         put("family_name", "Doe")
         put("given_name", "John")
         put("birthdate", "1940-01-01")
-        put("sub", "<subjectDid>")
-        put("iss", "<issuerDid>")
     },
     mdocData = null,
     selectiveDisclosure = SDMap(
@@ -59,6 +58,7 @@ class IssueIetfSdJwtDidCredentialIntegrationTest : AbstractIntegrationTest() {
                 credentialIetfSdJwtDidIssuanceRequest.issuerDid,
                 parsedDocument["iss"]?.jsonPrimitive?.content
             )
+            assertEquals("a-user-id", parsedDocument["sub"]?.jsonPrimitive?.contentOrNull)
             assertEquals("Doe", parsedDocument["family_name"]?.jsonPrimitive?.contentOrNull)
             assertEquals("John", parsedDocument["given_name"]?.jsonPrimitive?.contentOrNull)
             assertNull(parsedDocument["birthdate"], "Is selective disclosure and must not be present")
