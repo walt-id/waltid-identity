@@ -32,7 +32,7 @@ import kotlin.uuid.ExperimentalUuidApi
 private val sdjwtCredential = IssuanceRequest(
     issuerKey = loadJsonResource("issuance/key.json"),
     issuerDid = loadResource("issuance/did.txt"),
-    credentialConfigurationId = "OpenBadgeCredential_jwt_vc_json",
+    credentialConfigurationId = "OpenBadgeCredential_jwt_vc_json", //format= jwt_vc_json (W3c)
     credentialData = loadJsonResource("issuance/openbadgecredential.json"),
     mapping = loadJsonResource("issuance/mapping.json"),
     selectiveDisclosure = loadJsonResource("issuance/disclosure.json").toSdMap()
