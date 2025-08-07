@@ -228,3 +228,40 @@ publishing {
         }
     }
 }
+
+fun waltidPrivateCredentials(repoName:String): Pair<String, String> = let {
+    val envUsername = System.getenv(repoName.uppercase() + "_USERNAME")
+    val envPassword = System.getenv(repoName.uppercase() + "_PASSWORD")
+
+    val usernameFile = File("$rootDir/secret-${repoName.lowercase()}-username.txt")
+    val passwordFile = File("$rootDir/secret-${repoName.lowercase()}-password.txt")
+
+    return Pair(
+        envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" },
+        envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+    )
+}
+
+ktor {
+    docker {
+        jreVersion.set(JavaVersion.VERSION_21)
+        localImageName.set("waltid/waltid-wallet-api")
+        imageTag.set("${project.version}")
+        portMappings.set(listOf(
+            io.ktor.plugin.features.DockerPortMapping(
+                7001,
+                7001,
+                io.ktor.plugin.features.DockerPortMappingProtocol.TCP
+            )
+        ))
+
+        val (username, password) = waltidPrivateCredentials("DOCKER")
+        externalRegistry.set(
+            io.ktor.plugin.features.DockerImageRegistry.dockerHub(
+                appName = provider { "waltid-wallet-api" },
+                username = provider { username },
+                password = provider { password }
+            )
+        )
+    }
+}
