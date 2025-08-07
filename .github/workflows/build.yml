@@ -39,6 +39,7 @@ jobs:
     with:
       images: ${{ needs.api-docker-matrix.outputs.json }}
       version: ${{ needs.version.outputs.release_version }}
+      artifact: true
   ebsi-ct-v3:
     uses: walt-id/waltid-identity/.github/workflows/ebsictv3.yml@3f56b05ff315770abd06e7a931b5a73942296cc4
     needs: [ version, docker, api-docker ]
