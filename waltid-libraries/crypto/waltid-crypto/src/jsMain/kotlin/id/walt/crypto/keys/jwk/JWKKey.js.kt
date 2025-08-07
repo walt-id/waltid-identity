@@ -2,12 +2,14 @@ package id.walt.crypto.keys.jwk
 
 import JWK
 import KeyLike
+import WebCrypto
 import crypto
 import id.walt.crypto.keys.*
 import id.walt.crypto.utils.ArrayUtils.toByteArray
 import id.walt.crypto.utils.PromiseUtils
 import io.ktor.utils.io.core.*
 import jose
+import kotlinx.coroutines.await
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -16,7 +18,11 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import love.forte.plugin.suspendtrans.annotation.JsPromise
+import org.khronos.webgl.ArrayBuffer
+import org.khronos.webgl.Int8Array
 import org.khronos.webgl.Uint8Array
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.json
 
 @OptIn(ExperimentalJsExport::class)
@@ -115,6 +121,52 @@ actual class JWKKey actual constructor(
         }
     }
 
+
+    private fun getAlgorithmParams(keyType: KeyType): dynamic {
+        return when (keyType) {
+            // For Ed25519, the algorithm is just a string
+            KeyType.Ed25519 -> "Ed25519"
+
+            // For ECDSA, it's an object with name and curve
+            KeyType.secp256r1 -> js("{ name: 'ECDSA', namedCurve: 'P-256' }")
+            KeyType.secp384r1 -> js("{ name: 'ECDSA', namedCurve: 'P-384' }")
+            KeyType.secp521r1 -> js("{ name: 'ECDSA', namedCurve: 'P-521' }")
+
+            // For RSA, it's an object with name and hash
+            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 ->
+                js("{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }")
+
+            else -> throw IllegalArgumentException("Unsupported key type for Web Crypto: $keyType")
+        }
+    }
+
+    private fun getSigningAlgorithmParams(keyType: KeyType): dynamic {
+        return when (keyType) {
+            // For ECDSA signing, specify the hash
+            KeyType.secp256r1 -> js("{ name: 'ECDSA', hash: 'SHA-256' }")
+            KeyType.secp384r1 -> js("{ name: 'ECDSA', hash: 'SHA-384' }")
+            KeyType.secp521r1 -> js("{ name: 'ECDSA', hash: 'SHA-512' }")
+
+            // Otherwise, it's the same as the import algorithm
+            else -> getAlgorithmParams(keyType)
+        }
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun parsePemToBinary(pem: String): ArrayBuffer {
+        // 1. Remove header, footer, and line breaks
+        val pemBody = pem
+            .replace("-----BEGIN PRIVATE KEY-----", "")
+            .replace("-----END PRIVATE KEY-----", "")
+            .replace("\\s".toRegex(), "")
+
+        // 2. Base64 decode to a ByteArray
+        val binaryDer = Base64.decode(pemBody)
+
+        // 3. Convert to ArrayBuffer for the Web Crypto API
+        return (binaryDer as Int8Array).buffer
+    }
+
     /* FIXME: annotation @JsPromise
 
     error:
@@ -127,15 +179,36 @@ actual class JWKKey actual constructor(
      */
     @JsExport.Ignore
     actual override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
+        println("! JS JWK KEY SIGN RAW !")
         check(hasPrivateKey) { "No private key is attached to this key!" }
-        return crypto.sign(
-            when (keyType) {
-                KeyType.Ed25519 -> null
-                else -> "sha256"
-            },
-            plaintext,
-            exportPEM()
-        )
+        // 1. Get the PEM-encoded private key string
+        val pemString = exportPEM()
+
+        // 2. Parse the PEM string into a raw binary format (ArrayBuffer)
+        val privateKeyData = parsePemToBinary(pemString)
+
+        // 3. Get the correct algorithm parameters for your key type
+        val importAlgorithm = getAlgorithmParams(keyType)
+
+        // 4. Import the key to get a CryptoKey object
+        val cryptoKey = WebCrypto.subtle.importKey(
+            "pkcs8",             // Private key format
+            privateKeyData,      // The raw key data
+            importAlgorithm,     // Algorithm details
+            true,                // Whether the key can be exported
+            arrayOf("sign")      // What we want to use the key for
+        ).await()
+
+        // 5. Sign the data using the imported CryptoKey
+        val signingAlgorithm = getSigningAlgorithmParams(keyType)
+        val signatureBuffer = WebCrypto.subtle.sign(
+            signingAlgorithm,
+            cryptoKey,
+            Uint8Array(plaintext.toTypedArray())
+        ).await()
+
+        // 6. Convert the resulting ArrayBuffer back to a Kotlin ByteArray
+        return Int8Array(signatureBuffer).unsafeCast<ByteArray>()
     }
 
     /**
@@ -289,7 +362,7 @@ actual class JWKKey actual constructor(
     actual override suspend fun getThumbprint(): String =
         PromiseUtils.await(jose.calculateJwkThumbprint(JSON.parse(exportJWK())))
 
-    actual companion object : JWKKeyCreator {
+    actual companion object : JWKKeyCreator() {
         @JsPromise
         @JsExport.Ignore
         actual override suspend fun generate(type: KeyType, metadata: JwkKeyMeta?): JWKKey =

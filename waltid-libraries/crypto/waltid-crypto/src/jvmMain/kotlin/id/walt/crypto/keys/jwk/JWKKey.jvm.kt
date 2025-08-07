@@ -436,7 +436,7 @@ actual class JWKKey actual constructor(
          return keyFactory.generatePublic(publicKeySpec)
      }*/
 
-    actual companion object : JWKKeyCreator {
+    actual companion object : JWKKeyCreator() {
 
 //        val prettyJson = Json { prettyPrint = true }
 
