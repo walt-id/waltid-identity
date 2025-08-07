@@ -5,6 +5,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class CoseAlgorithmsTest {
 
@@ -58,8 +59,8 @@ class CoseAlgorithmsTest {
             """.trimIndent()
             )
 
-            require(verified1 && verified2) { "Verification failed" }
-            println()
+            assertTrue(verified1, "Verification of decoded re-encoded failed")
+            assertTrue(verified2, "Verification of decoded re-encoded aad failed")
         }
     }
 }
