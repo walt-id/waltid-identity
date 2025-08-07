@@ -21,8 +21,8 @@ services:
       - "$SERVICE_HOST:host-gateway"
       - "waltid.enterprise.localhost:host-gateway"
     volumes:
-      - ./wallet-api/config:/waltid-wallet-api/config
-      - ./wallet-api/data:/waltid-wallet-api/data
+      - ./wallet-api/config:/config
+      - ./wallet-api/data:/data
 
   issuer-api:
     platform: linux/amd64
@@ -40,7 +40,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./issuer-api/config:/waltid-issuer-api/config
+      - ./issuer-api/config:/config
 
   verifier-api:
     platform: linux/amd64
@@ -58,7 +58,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./verifier-api/config:/waltid-verifier-api/config
+      - ./verifier-api/config:/config
     environment:
       OPA_SERVER_URL: "http://opa-server:8181"
 
