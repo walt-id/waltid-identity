@@ -34,7 +34,7 @@ jobs:
     with:
       jsonpath: ".github/workflows/data/api-docker-matrix.json"
   api-docker:
-    uses: walt-id/waltid-identity/.github/workflows/api-docker.yml@0346ee26cf4ddc6544d55f3094f174fe748f0496
+    uses: walt-id/waltid-identity/.github/workflows/api-docker.yml@ae0d819db389bc64a60a4aef2f78ee4358f26121
     secrets: inherit
     needs: [ version, api-docker-matrix ]
     with:
