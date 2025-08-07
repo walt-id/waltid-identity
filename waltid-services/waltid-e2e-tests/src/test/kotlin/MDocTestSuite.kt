@@ -29,21 +29,28 @@ import id.walt.webwallet.db.models.WalletCredential
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.bouncycastle.asn1.ASN1InputStream
+import org.bouncycastle.asn1.ASN1OctetString
+import org.bouncycastle.asn1.DERIA5String
+import org.bouncycastle.asn1.x509.*
 import org.bouncycastle.util.io.pem.PemReader
 import org.cose.java.AlgorithmID
 import org.cose.java.OneKey
 import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.ByteArrayInputStream
 import java.io.StringReader
+import java.math.BigInteger
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import kotlin.test.*
+
 
 class MDocTestSuite(
     val e2e: E2ETest,
@@ -111,8 +118,9 @@ class MDocTestSuite(
         e2e.test(
             name = "$TEST_SUITE : Validate Issuer Metadata mDL Entry",
         ) {
-            val draft13IssuerMetadata = client.get("/${OpenID4VCIVersion.DRAFT13.versionString}/.well-known/openid-credential-issuer")
-                .expectSuccess().body<OpenIDProviderMetadata.Draft13>()
+            val draft13IssuerMetadata =
+                client.get("/${OpenID4VCIVersion.DRAFT13.versionString}/.well-known/openid-credential-issuer")
+                    .expectSuccess().body<OpenIDProviderMetadata.Draft13>()
 
             val credentialConfigurationsSupported = assertNotNull(
                 draft13IssuerMetadata.credentialConfigurationsSupported
@@ -168,10 +176,155 @@ class MDocTestSuite(
         }
     }
 
+    private fun validateIACACertificate(
+        iacaCertificate: X509Certificate,
+    ) {
+
+        assertDoesNotThrow {
+            iacaCertificate.verify(iacaCertificate.publicKey)
+        }
+
+        assertDoesNotThrow {
+            iacaCertificate.checkValidity()
+        }
+
+        // === Serial Number checks ===
+        // 1. Must be positive
+        assertTrue(iacaCertificate.serialNumber.signum() > 0, "Serial number must be positive")
+
+        // 2. Must be non-zero
+        assertTrue(iacaCertificate.serialNumber != BigInteger.ZERO, "Serial number must not be zero")
+
+        // 3. Must be <= 20 octets (160 bits)
+        assertTrue(iacaCertificate.serialNumber.bitLength() <= 160, "Serial number must not exceed 20 bytes (160 bits)")
+
+        // 4. Must contain at least 63 bits (required)
+        assertTrue(iacaCertificate.serialNumber.bitLength() >= 63, "Serial number must contain at least 63 bits of entropy")
+
+        // 5. Should contain at least 71 bits (recommended)
+        assertTrue(iacaCertificate.serialNumber.bitLength() >= 71, "Serial number should contain at least 71 bits of entropy")
+
+        assertEquals(
+            expected = iacaCertificate.subjectX500Principal,
+            actual = iacaCertificate.issuerX500Principal,
+        )
+
+        val basicConstraintsBytes = iacaCertificate.getExtensionValue(
+            /* oid = */ Extension.basicConstraints.id
+        )
+
+        val basicConstraints = ASN1InputStream(basicConstraintsBytes).use {
+            (it.readObject() as ASN1OctetString).let {
+                ASN1InputStream(it.octets).use {
+                    BasicConstraints.getInstance(it.readObject())
+                }
+            }
+        }
+
+        assertTrue {
+            basicConstraints.isCA
+        }
+
+        assertTrue {
+            iacaCertificate.criticalExtensionOIDs.contains(Extension.basicConstraints.id)
+        }
+
+        assertEquals(
+            expected = 0,
+            actual = basicConstraints.pathLenConstraint.toInt(),
+        )
+
+        assertNotNull(
+            iacaCertificate.getExtensionValue(
+                /* oid = */ Extension.subjectKeyIdentifier.id
+            )
+        )
+
+        assertTrue {
+            iacaCertificate.nonCriticalExtensionOIDs.contains(Extension.subjectKeyIdentifier.id)
+        }
+
+        assertNotNull(
+            iacaCertificate.getExtensionValue(
+                /* oid = */ Extension.issuerAlternativeName.id
+            )
+        )
+
+        assertTrue {
+            iacaCertificate.nonCriticalExtensionOIDs.contains(Extension.issuerAlternativeName.id)
+        }
+
+        //key-usage
+        val keyUsageBytes = iacaCertificate.getExtensionValue(
+            /* oid = */ Extension.keyUsage.id
+        )
+
+        val keyUsage = ASN1InputStream(keyUsageBytes).use {
+            (it.readObject() as ASN1OctetString).let {
+                ASN1InputStream(it.octets).use {
+                    KeyUsage.getInstance(it.readObject())
+                }
+            }
+        }
+
+        assertTrue {
+            keyUsage.hasUsages(KeyUsage.keyCertSign or KeyUsage.cRLSign)
+        }
+
+        assertTrue {
+            iacaCertificate.criticalExtensionOIDs.contains(Extension.keyUsage.id)
+        }
+
+        //check crl distribution point if it exists
+
+        iacaCertificate.getExtensionValue(
+            Extension.cRLDistributionPoints.id
+        )?.let { crlDistributionPointBytes ->
+            ASN1InputStream(crlDistributionPointBytes).use {
+                (it.readObject() as ASN1OctetString).let {
+                    ASN1InputStream(it.octets).use {
+                        CRLDistPoint.getInstance(it.readObject())
+                    }
+                }
+            }.let { crlDistPoint ->
+                assertTrue {
+                    crlDistPoint.distributionPoints.size > 0
+                }
+
+                crlDistPoint.distributionPoints.forEach { distributionPoint ->
+                    assertTrue {
+                        distributionPoint.reasons == null
+                    }
+                    assertTrue {
+                        distributionPoint.crlIssuer == null
+                    }
+
+                    (distributionPoint.distributionPoint.name as GeneralName).let {
+                        assertEquals(
+                            expected = GeneralName.uniformResourceIdentifier,
+                            actual = it.tagNo,
+                        )
+
+                        assertDoesNotThrow {
+                            Url((it.name as DERIA5String).string)
+                        }
+                    }
+                }
+            }
+
+            assertTrue {
+                iacaCertificate.criticalExtensionOIDs.contains(Extension.cRLDistributionPoints.id)
+            }
+        }
+
+    }
+
     private suspend fun mDLIssuanceRequestValidations(
         mDLIssuanceRequest: IssuanceRequest,
         iacaCertificate: X509Certificate,
     ): MDLIssuanceRequestDecodedParameters {
+
+        validateIACACertificate(iacaCertificate)
         assertNull(mDLIssuanceRequest.trustedRootCAs)
         val x5Chain = assertNotNull(mDLIssuanceRequest.x5Chain)
         assertTrue {
@@ -507,10 +660,42 @@ class MDocTestSuite(
                 "resident_city" to "Vienna".toJsonElement(),
                 "resident_state" to "Vienna".toJsonElement(),
                 "resident_postal_code" to "07008".toJsonElement(),
-                "biometric_template_face" to listOf(141, 182, 121, 111, 238, 50, 120, 94, 54, 111, 113, 13, 241, 12, 12).toJsonElement(),
+                "biometric_template_face" to listOf(
+                    141,
+                    182,
+                    121,
+                    111,
+                    238,
+                    50,
+                    120,
+                    94,
+                    54,
+                    111,
+                    113,
+                    13,
+                    241,
+                    12,
+                    12
+                ).toJsonElement(),
                 "family_name_national_character" to "Doe".toJsonElement(),
                 "given_name_national_character" to "John".toJsonElement(),
-                "signature_usual_mark" to listOf(141, 182, 121, 111, 238, 50, 120, 94, 54, 111, 113, 13, 241, 12, 12).toJsonElement(),
+                "signature_usual_mark" to listOf(
+                    141,
+                    182,
+                    121,
+                    111,
+                    238,
+                    50,
+                    120,
+                    94,
+                    54,
+                    111,
+                    113,
+                    13,
+                    241,
+                    12,
+                    12
+                ).toJsonElement(),
             )
 
             assertTrue {
