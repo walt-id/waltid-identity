@@ -188,21 +188,25 @@ class MDocTestSuite(
             iacaCertificate.checkValidity()
         }
 
-        // === Serial Number checks ===
-        // 1. Must be positive
-        assertTrue(iacaCertificate.serialNumber.signum() > 0, "Serial number must be positive")
+        assertTrue {
+            iacaCertificate.serialNumber.signum() > 0
+        }
 
-        // 2. Must be non-zero
-        assertTrue(iacaCertificate.serialNumber != BigInteger.ZERO, "Serial number must not be zero")
+        assertTrue {
+            iacaCertificate.serialNumber != BigInteger.ZERO
+        }
 
-        // 3. Must be <= 20 octets (160 bits)
-        assertTrue(iacaCertificate.serialNumber.bitLength() <= 160, "Serial number must not exceed 20 bytes (160 bits)")
+        assertTrue {
+            iacaCertificate.serialNumber.bitLength() <= 160
+        }
 
-        // 4. Must contain at least 63 bits (required)
-        assertTrue(iacaCertificate.serialNumber.bitLength() >= 63, "Serial number must contain at least 63 bits of entropy")
+        assertTrue {
+            iacaCertificate.serialNumber.bitLength() >= 63
+        }
 
-        // 5. Should contain at least 71 bits (recommended)
-        assertTrue(iacaCertificate.serialNumber.bitLength() >= 71, "Serial number should contain at least 71 bits of entropy")
+        assertTrue {
+            iacaCertificate.serialNumber.bitLength() >= 71
+        }
 
         assertEquals(
             expected = iacaCertificate.subjectX500Principal,
