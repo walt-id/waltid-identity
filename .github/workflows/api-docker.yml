@@ -45,6 +45,9 @@ jobs:
 
       - name: Build Docker images (${{ matrix.image }})
         run: cd waltid-unified-build && ./gradlew ${{ matrix.commandPath }}:publishImageToLocalRegistry
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
       - name: Publish Docker images (${{ matrix.image }})
         if: ${{ inputs.publish }}
         run: ./gradlew ${{ matrix.commandPath }}:publishImage
