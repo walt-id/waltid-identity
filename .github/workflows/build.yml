@@ -28,22 +28,27 @@ jobs:
       images: ${{ needs.docker-matrix.outputs.json }}
       version: ${{ needs.version.outputs.release_version }}
       artifact: true
-  enterprise-api-docker:
-    uses: walt-id/waltid-identity/.github/workflows/enterprise-api-docker.yml@3c360ff47f15ed48833e75df5fc39c6a22356912
-    secrets: inherit
-    needs: [ version, docker-matrix ]
+  api-docker-matrix:
+    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@927c4233610e90dd8a57418662fad7293b7b29a4
     with:
+      jsonpath: ".github/workflows/data/api-docker-matrix.json"
+  api-docker:
+    uses: walt-id/waltid-identity/.github/workflows/api-docker.yml@f440fbe524b7c9b6b28a73df852e551374686d79
+    secrets: inherit
+    needs: [ version, api-docker-matrix ]
+    with:
+      images: ${{ needs.api-docker-matrix.outputs.json }}
       version: ${{ needs.version.outputs.release_version }}
   ebsi-ct-v3:
     uses: walt-id/waltid-identity/.github/workflows/ebsictv3.yml@3f56b05ff315770abd06e7a931b5a73942296cc4
-    needs: [ version, docker ]
+    needs: [ version, docker, api-docker ]
     secrets: inherit
     with:
       artifact: issuer-api
       tag: "waltid/issuer-api:${{ needs.version.outputs.release_version }}"
   compose-test:
     uses: walt-id/waltid-identity/.github/workflows/docker-compose-testing.yml@30f3806290f5652dd371a682cf17961250607e71
-    needs: [ version, docker ]
+    needs: [ version, docker, api-docker ]
     secrets: inherit
     with:
       artifact: true
