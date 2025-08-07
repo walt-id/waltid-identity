@@ -1,3 +1,4 @@
+import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 
@@ -6,6 +7,6 @@ val didMethodsToTest = listOf("key", "jwk", "web") // cheqd removed for now, as 
 class JWKKeyAndDidManagementTest {
     @Test
     fun localDidKeyTest() = runTest {
-        testDidMethodsAndKeys(didMethodsToTest)
+        testDidMethodsAndKeys(didMethodsToTest, KeyType.entries)
     }
 }
