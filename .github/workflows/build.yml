@@ -41,7 +41,7 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       artifact: true
   ebsi-ct-v3:
-    uses: walt-id/waltid-identity/.github/workflows/ebsictv3.yml@3f56b05ff315770abd06e7a931b5a73942296cc4
+    uses: walt-id/waltid-identity/.github/workflows/ebsictv3.yml@834fc56b855b35fe0f71f8a37fe2701f1a8c9150
     needs: [ version, docker, api-docker ]
     secrets: inherit
     with:
