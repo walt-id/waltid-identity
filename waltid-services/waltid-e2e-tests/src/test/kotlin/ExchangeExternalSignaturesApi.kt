@@ -50,11 +50,13 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
 import org.cose.java.AlgorithmID
+import org.junit.jupiter.api.Assertions.assertTrue
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -217,8 +219,8 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         //check that it's the only key in the wallet
         var response = client.get("/wallet-api/wallet/$walletId/keys").expectSuccess()
         val keyList = response.body<List<SingleKeyResponse>>()
-        assert(keyList.size == 1) { "There should only be one key in the holder's wallet now" }
-        assert(keyList[0].keyId.id == holderKey.getKeyId()) { "keyId mismatch" }
+        assertTrue(keyList.size == 1) { "There should only be one key in the holder's wallet now" }
+        assertTrue(keyList[0].keyId.id == holderKey.getKeyId()) { "keyId mismatch" }
         //generate a DID
         didsApi.create(
             walletId,
@@ -230,7 +232,7 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         //check that it is the only did in the wallet
         response = client.get("/wallet-api/wallet/$walletId/dids").expectSuccess()
         val didList = response.body<List<WalletDid>>()
-        assert(didList.size == 1) { "There should only be one did in the holder's wallet now" }
+        assertTrue(didList.size == 1) { "There should only be one did in the holder's wallet now" }
         holderDID = didList[0].did
     }
 
@@ -414,7 +416,7 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         issuanceRequests: List<IssuanceRequest>,
     ): String {
         lateinit var offerURL: String
-        assert(issuanceRequests.isNotEmpty()) { "How can I test the flow with no issuance requests?" }
+        assertTrue(issuanceRequests.isNotEmpty()) { "How can I test the flow with no issuance requests?" }
         val firstIssuanceRequest = issuanceRequests.first()
         assertNotNull(firstIssuanceRequest.credentialFormat) { "Credential format must be defined to infer which issuer endpoint to call" }
         if (issuanceRequests.size == 1) {
@@ -504,7 +506,7 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
             )
         }.expectSuccess()
         val credList = response.body<List<WalletCredential>>()
-        assert(credList.size == issuanceRequests.size) { "There should be as many credentials in the wallet as requested" }
+        assertTrue(credList.size == issuanceRequests.size) { "There should be as many credentials in the wallet as requested" }
     }
 
     private suspend fun testOID4VP(
@@ -522,8 +524,8 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         val walletCredentialList = response.body<List<WalletCredential>>()
         verifierVerificationApi.verify(presentationRequest) {
             presentationRequestURL = it
-            assert(presentationRequestURL.contains("presentation_definition_uri="))
-            assert(!presentationRequestURL.contains("presentation_definition="))
+            assertTrue(presentationRequestURL.contains("presentation_definition_uri="))
+            assertTrue(!presentationRequestURL.contains("presentation_definition="))
             verificationID = Url(presentationRequestURL).parameters.getOrFail("state")
         }
         exchangeApi.resolvePresentationRequest(
@@ -588,13 +590,13 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         else
             submitResponse.expectFailure()
         verifierSessionApi.get(verificationID) { sessionInfo ->
-            assert(sessionInfo.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-            assert(sessionInfo.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+            assertTrue(sessionInfo.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
+            assertTrue(sessionInfo.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
 
-            assert(sessionInfo.verificationResult == !forgeDisclosures) { "overall verification should be ${!forgeDisclosures}" }
+            assertTrue(sessionInfo.verificationResult == !forgeDisclosures) { "overall verification should be ${!forgeDisclosures}" }
             sessionInfo.policyResults.let {
                 require(it != null) { "policyResults should be available after running policies" }
-                assert(it.size > 1) { "no policies have run" }
+                assertTrue(it.size > 1) { "no policies have run" }
             }
         }
     }
@@ -693,13 +695,13 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         else
             submitResponse.expectFailure()
         verifierSessionApi.get(verificationID) { sessionInfo ->
-//            assert(sessionInfo.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-            assert(sessionInfo.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+//            assertTrue(sessionInfo.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
+            assertTrue(sessionInfo.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
 
-            assert(sessionInfo.verificationResult == !forgeDisclosures) { "overall verification should be ${!forgeDisclosures}" }
+            assertTrue(sessionInfo.verificationResult == !forgeDisclosures) { "overall verification should be ${!forgeDisclosures}" }
             sessionInfo.policyResults.let {
                 require(it != null) { "policyResults should be available after running policies" }
-                assert(it.size > 1) { "no policies have run" }
+                assertTrue(it.size > 1) { "no policies have run" }
             }
         }
     }
@@ -792,13 +794,13 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
             )
         }.expectSuccess()
         verifierSessionApi.get(verificationID) { sessionInfo ->
-//            assert(sessionInfo.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-            assert(sessionInfo.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+//            assertTrue(sessionInfo.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
+            assertTrue(sessionInfo.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
 
-            assert(sessionInfo.verificationResult == true) { "overall verification should be valid" }
+            assertTrue(sessionInfo.verificationResult == true) { "overall verification should be valid" }
             sessionInfo.policyResults.let {
                 require(it != null) { "policyResults should be available after running policies" }
-                assert(it.size > 1) { "no policies have run" }
+                assertTrue(it.size > 1) { "no policies have run" }
             }
         }
     }

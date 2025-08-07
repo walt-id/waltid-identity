@@ -5,7 +5,6 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.KeyTypes
 
-
 /** A suspendable interface for a COSE-compatible signer. */
 fun interface CoseSigner {
     suspend fun sign(data: ByteArray): ByteArray

@@ -9,12 +9,14 @@ import id.walt.did.dids.resolver.local.LocalResolverMethod
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
+import kotlin.test.assertTrue
 
 class DidWebResolverTest : DidResolverTestBase() {
     override val resolver: LocalResolverMethod = DidWebResolver(TestClient.http)
@@ -81,14 +83,14 @@ class DidWebResolverTest : DidResolverTestBase() {
                         Json.decodeFromString<JsonObject>("{\"alg\":\"EdDSA\",\"crv\":\"Ed25519\",\"kid\":\"key1\",\"kty\":\"OKP\",\"use\":\"sig\",\"x\":\"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM\"}"),
                         { did: String, key: JsonObject, result: Result<DidDocument> ->
                             // Ensure we got a successful result
-                            assert(result.isSuccess)
+                            assertTrue(result.isSuccess)
 
                             // Get the document
                             val doc = result.getOrThrow()
 
                             // Verify document contains verification methods
                             val hasVerificationMethods = doc.get("verificationMethod") != null
-                            assert(hasVerificationMethods) { "No verification methods found in document" }
+                            assertTrue(hasVerificationMethods) { "No verification methods found in document" }
                         }
                     )
                 )
@@ -106,12 +108,12 @@ class DidWebResolverTest : DidResolverTestBase() {
                         Json.decodeFromString<JsonObject>("{\"alg\":\"EdDSA\",\"crv\":\"Ed25519\",\"kid\":\"key1\",\"kty\":\"OKP\",\"use\":\"sig\",\"x\":\"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM\"}"),
                         { did: String, key: JsonObject, result: Result<Key> ->
                             // Just check that we got some key successfully
-                            assert(result.isSuccess)
-                            assert(result.getOrThrow() != null)
+                            assertTrue(result.isSuccess)
+                            assertTrue(result.getOrThrow() != null)
 
                             // Just having a non-null key is sufficient for this test
                             val key = result.getOrThrow()
-                            assert(key != null)
+                            assertTrue(key != null)
                         }
                     )
                 )
@@ -129,11 +131,11 @@ class DidWebResolverTest : DidResolverTestBase() {
                         Json.decodeFromString<JsonObject>("{\"alg\":\"EdDSA\",\"crv\":\"Ed25519\",\"kid\":\"key1\",\"kty\":\"OKP\",\"use\":\"sig\",\"x\":\"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM\"}"),
                         { did: String, key: JsonObject, result: Result<Set<Key>> ->
                             // Ensure we got a successful result with multiple keys
-                            assert(result.isSuccess)
+                            assertTrue(result.isSuccess)
                             val keys = result.getOrThrow()
 
                             // Test that we got exactly 3 keys
-                            assert(keys.size == 3) { "Expected 3 keys, got ${keys.size}" }
+                            assertTrue(keys.size == 3) { "Expected 3 keys, got ${keys.size}" }
                         }
                     )
                 )

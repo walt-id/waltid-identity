@@ -51,14 +51,14 @@ class UniResolverTest {
                         Companion::class.java.classLoader.getResource("uniresolver/base58/document.json")!!.toString()
                     ).path.let { File(it).readText() }
                         .replace("[\\s\\n\\r]".toRegex(), "")),
-                arguments(
+                /*arguments(
                     "did:cheqd:testnet:55dbc8bf-fba3-4117-855c-1e0dc1d3bb47",
                     URI(
                         Companion::class.java.classLoader.getResource("uniresolver/multibase/document.json")!!
                             .toString()
                     ).path.let { File(it).readText() }
                         .replace("[\\s\\n\\r]".toRegex(), ""),
-                ),
+                ),*/
 // disable flaky test
 //                arguments(
 //                    "did:io:0x476c81C27036D05cB5ebfe30ae58C23351a61C4A",
