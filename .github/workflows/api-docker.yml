@@ -50,7 +50,7 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
       - name: Publish Docker images (${{ matrix.image }})
         if: ${{ inputs.publish }}
-        run: ./gradlew ${{ matrix.commandPath }}:publishImage
+        run: cd waltid-unified-build && ./gradlew ${{ matrix.commandPath }}:publishImage
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
