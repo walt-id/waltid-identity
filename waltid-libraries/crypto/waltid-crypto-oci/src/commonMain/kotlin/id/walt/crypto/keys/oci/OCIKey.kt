@@ -22,16 +22,13 @@ expect class OCIKey(
     override suspend fun exportJWK(): String
     override suspend fun exportJWKObject(): JsonObject
     override suspend fun exportPEM(): String
-    override suspend fun signRaw(plaintext: ByteArray): ByteArray
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray
     override suspend fun signJws(
         plaintext: ByteArray,
         headers: Map<String, JsonElement>
     ): String
 
-    override suspend fun verifyRaw(
-        signed: ByteArray,
-        detachedPlaintext: ByteArray?
-    ): Result<ByteArray>
+    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray>
 
     override suspend fun verifyJws(signedJws: String): Result<JsonElement>
     override suspend fun getPublicKey(): Key

@@ -3,12 +3,8 @@ package id.walt.crypto.keys.jwk
 import JWK
 import KeyLike
 import crypto
-import id.walt.crypto.keys.JsJWKKeyCreator
-import id.walt.crypto.keys.JwkKeyMeta
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.*
 import id.walt.crypto.utils.ArrayUtils.toByteArray
-import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.crypto.utils.PromiseUtils
 import io.ktor.utils.io.core.*
 import jose
@@ -130,7 +126,7 @@ actual class JWKKey actual constructor(
         @JsPromise() @Api4Js() actual fun signRawAsync(plaintext: ByteArray): Promise<out ByteArray>
      */
     @JsExport.Ignore
-    actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    actual override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         check(hasPrivateKey) { "No private key is attached to this key!" }
         return crypto.sign(
             when (keyType) {
@@ -157,14 +153,18 @@ actual class JWKKey actual constructor(
 
         return PromiseUtils.await(
             jose.CompactSign(Uint8Array(plaintext.toTypedArray()))
-                .setProtectedHeader(json("alg" to keyType.jwsAlg(), *headerEntries))
+                .setProtectedHeader(json("alg" to keyType.jwsAlg, *headerEntries))
                 .sign(_internalKey)
         )
     }
 
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
+    actual override suspend fun verifyRaw(
+        signed: ByteArray,
+        detachedPlaintext: ByteArray?,
+        customSignatureAlgorithm: String?
+    ): Result<ByteArray> {
         return runCatching {
             val verified = crypto.verify(
                 when (keyType) {
@@ -248,7 +248,9 @@ actual class JWKKey actual constructor(
                         "rsa", "rsa-pss" -> KeyType.RSA // see k.asymmetricKeyDetails.modulusLength 2048, 4096 ...; mgf1HashAlgorithm (Name of the message digest used by MGF1 (RSA-PSS))
                         "ec" -> {
                             when (k.asymmetricKeyDetails.namedCurve) {
-                                "prime256v1" -> KeyType.secp256r1
+                                "prime256v1", "secp256r1" -> KeyType.secp256r1
+                                "prime384v1", "secp384r1" -> KeyType.secp384r1
+                                "prime521v1", "secp521r1" -> KeyType.secp521r1
                                 "secp256k1" -> KeyType.secp256k1
                                 else -> TODO("Unsupported EC curve: ${k.asymmetricKeyDetails.namedCurve}")
                             }
@@ -263,7 +265,8 @@ actual class JWKKey actual constructor(
 
                 k.algorithm != undefined -> when (k.algorithm.name as String) { // CryptoKey (web)
                     "RSASSA-PKCS1-v1_5", "RSA-PSS", "RSA-OAEP" -> KeyType.RSA // TODO: check k.algorithm.modulusLength: 2048, 4096, ...; k.algorithm.hash: SHA-256, SHA-384, SHA-512
-                    "ECDSA", "ECDH" -> KeyType.secp256r1 // TODO: check k.algorithm.namedCurve: P-256, P-384, P-521
+                    "ECDSA", "ECDH" -> KeyTypes.EC_KEYS.firstOrNull { it.jwkCurve == (k.algorithm.namedCurve as String) }
+                        ?: throw IllegalArgumentException("Unknown ECDSA key algorithm name: ${k.algorithm.name}. Supported: ${KeyTypes.EC_KEYS.joinToString { it.jwkCurve ?: "?" }}")
                     // other available: AES, HMAC
                     else -> throw IllegalArgumentException("Unsupported algorithm for CryptoKey (web): ${k.algorithm.name}")
                 }

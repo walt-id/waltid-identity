@@ -15,7 +15,7 @@ class ImportAndExportTests {
     @Test
     @Ignore
     fun testRSA() {
-        testBidirectionalConversion(KeyType.RSA) // Not working. Keving is looking at it.
+        testBidirectionalConversion(KeyType.RSA)
     }
 
     @Test
@@ -33,6 +33,16 @@ class ImportAndExportTests {
     @Test
     fun testSecp256r1() {
         testBidirectionalConversion(KeyType.secp256r1)
+    }
+
+    @Test
+    fun testSecp384r1() {
+        testBidirectionalConversion(KeyType.secp384r1)
+    }
+
+    @Test
+    fun testSecp521r1() {
+        testBidirectionalConversion(KeyType.secp521r1)
     }
 
     private fun testBidirectionalConversion(keyType: KeyType) {

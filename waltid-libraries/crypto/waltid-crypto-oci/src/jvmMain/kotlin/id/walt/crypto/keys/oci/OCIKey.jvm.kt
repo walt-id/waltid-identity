@@ -13,13 +13,13 @@ import com.oracle.bmc.keymanagement.requests.*
 import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyTypes
 import id.walt.crypto.keys.OciKeyMeta
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JvmEccUtils
-import id.walt.crypto.utils.JwsUtils.jwsAlg
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.delay
 import kotlinx.serialization.SerialName
@@ -106,7 +106,7 @@ actual class OCIKey actual constructor(
 
 
     @OptIn(ExperimentalEncodingApi::class)
-    actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    actual override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         val encodedMessage: String = Base64.encode(SHA256().digest(plaintext))
 
         val signDataDetails =
@@ -121,12 +121,7 @@ actual class OCIKey actual constructor(
     }
 
     private val _internalJwsAlgorithm by lazy {
-        when (keyType) {
-            KeyType.Ed25519 -> JWSAlgorithm.EdDSA
-            KeyType.secp256k1 -> JWSAlgorithm.ES256K
-            KeyType.secp256r1 -> JWSAlgorithm.ES256
-            KeyType.RSA -> JWSAlgorithm.RS256 // TODO: RS384 RS512
-        }
+        JWSAlgorithm.parse(keyType.jwsAlg)
     }
 
     @OptIn(ExperimentalStdlibApi::class)
@@ -139,7 +134,7 @@ actual class OCIKey actual constructor(
         var signed = signRaw(payloadToSign.encodeToByteArray())
 
 
-        if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) {
+        if (keyType in KeyTypes.EC_KEYS) {
             log.trace { "Converted DER to IEEE P1363 signature." }
             val originalSigned = signed
 
@@ -162,7 +157,11 @@ actual class OCIKey actual constructor(
 
     }
 
-    actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
+    actual override suspend fun verifyRaw(
+        signed: ByteArray,
+        detachedPlaintext: ByteArray?,
+        customSignatureAlgorithm: String?
+    ): Result<ByteArray> {
 
         val verifyDataDetails =
             VerifyDataDetails.builder().keyId(id).message(detachedPlaintext?.encodeToBase64Url())
@@ -182,7 +181,7 @@ actual class OCIKey actual constructor(
         val headers: Map<String, JsonElement> = Json.decodeFromString(header.decodeFromBase64Url().decodeToString())
         headers["alg"]?.let {
             val algValue = it.jsonPrimitive.content
-            check(algValue == keyType.jwsAlg()) { "Invalid key algorithm for JWS: JWS has $algValue, key is ${keyType.jwsAlg()}!" }
+            check(algValue == keyType.jwsAlg) { "Invalid key algorithm for JWS: JWS has $algValue, key is ${keyType.jwsAlg}!" }
         }
 
         val payload = parts[1]
@@ -228,14 +227,14 @@ actual class OCIKey actual constructor(
                 .curveId(KeyShape.CurveId.NistP256).build()
 
         private fun keyTypeToOciKeyMapping(type: KeyType) = when (type) {
-            KeyType.secp256r1 -> "ECDSA"
-            KeyType.RSA -> "RSA"
+            KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> "ECDSA"
+            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> "RSA"
             KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")
             KeyType.Ed25519 -> throw IllegalArgumentException("Not supported: $type")
         }
 
         private fun ociKeyToKeyTypeMapping(type: String) = when (type) {
-            "ECDSA" -> KeyType.secp256r1
+            "ECDSA" -> KeyType.secp256r1 // TODO: KeyType.secp384r1, KeyType.secp521r1
             "RSA" -> KeyType.RSA
             else -> throw IllegalArgumentException("Not supported: $type")
         }
