@@ -44,3 +44,4 @@ external interface SubtleCrypto {
         data: Uint8Array
     ): Promise<Boolean>
 }
+

@@ -122,7 +122,7 @@ actual class JWKKey actual constructor(
     }
 
 
-    private fun getAlgorithmParams(keyType: KeyType): dynamic {
+    private fun getSignatureAlgorithmParams(keyType: KeyType): dynamic {
         return when (keyType) {
             // For Ed25519, the algorithm is just a string
             KeyType.Ed25519 -> "Ed25519"
@@ -148,7 +148,7 @@ actual class JWKKey actual constructor(
             KeyType.secp521r1 -> js("{ name: 'ECDSA', hash: 'SHA-512' }")
 
             // Otherwise, it's the same as the import algorithm
-            else -> getAlgorithmParams(keyType)
+            else -> getSignatureAlgorithmParams(keyType)
         }
     }
 
@@ -179,7 +179,6 @@ actual class JWKKey actual constructor(
      */
     @JsExport.Ignore
     actual override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
-        println("! JS JWK KEY SIGN RAW !")
         check(hasPrivateKey) { "No private key is attached to this key!" }
         // 1. Get the PEM-encoded private key string
         val pemString = exportPEM()
@@ -188,7 +187,7 @@ actual class JWKKey actual constructor(
         val privateKeyData = parsePemToBinary(pemString)
 
         // 3. Get the correct algorithm parameters for your key type
-        val importAlgorithm = getAlgorithmParams(keyType)
+        val importAlgorithm = getSignatureAlgorithmParams(keyType)
 
         // 4. Import the key to get a CryptoKey object
         val cryptoKey = WebCrypto.subtle.importKey(
@@ -231,6 +230,45 @@ actual class JWKKey actual constructor(
         )
     }
 
+    private data class WebCryptoParams(val importAlgorithm: dynamic, val signAlgorithm: dynamic)
+
+
+    private fun getVerificationWebCryptoParams(): WebCryptoParams {
+        return when (keyType) {
+            KeyType.secp256r1 -> WebCryptoParams(
+                importAlgorithm = js("{ name: 'ECDSA', namedCurve: 'P-256' }"),
+                signAlgorithm = js("{ name: 'ECDSA', hash: 'SHA-256' }")
+            )
+
+            KeyType.secp384r1 -> WebCryptoParams(
+                importAlgorithm = js("{ name: 'ECDSA', namedCurve: 'P-384' }"),
+                signAlgorithm = js("{ name: 'ECDSA', hash: 'SHA-384' }")
+            )
+
+            KeyType.secp521r1 -> WebCryptoParams(
+                importAlgorithm = js("{ name: 'ECDSA', namedCurve: 'P-521' }"),
+                signAlgorithm = js("{ name: 'ECDSA', hash: 'SHA-512' }")
+            )
+
+            KeyType.RSA -> WebCryptoParams(
+                importAlgorithm = js("{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }"),
+                signAlgorithm = js("{ name: 'RSASSA-PKCS1-v1_5' }")
+            )
+
+            KeyType.RSA3072 -> WebCryptoParams(
+                importAlgorithm = js("{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-384' }"),
+                signAlgorithm = js("{ name: 'RSASSA-PKCS1-v1_5' }")
+            )
+
+            KeyType.RSA4096 -> WebCryptoParams(
+                importAlgorithm = js("{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' }"),
+                signAlgorithm = js("{ name: 'RSASSA-PKCS1-v1_5' }")
+            )
+
+            else -> throw IllegalArgumentException("Unsupported algorithm for Javascript verification: $keyType")
+        }
+    }
+
     @JsPromise
     @JsExport.Ignore
     actual override suspend fun verifyRaw(
@@ -238,6 +276,48 @@ actual class JWKKey actual constructor(
         detachedPlaintext: ByteArray?,
         customSignatureAlgorithm: String?
     ): Result<ByteArray> {
+        /*runCatching {
+            require(detachedPlaintext != null) { "Detached plaintext cannot be null." }
+
+            // Assume a method exists to get the public key in PEM format.
+            val pemString = exportPEM()
+
+            // 1. Parse the public key from PEM format to a raw binary ArrayBuffer.
+            val publicKeyData = parsePemToBinary(pemString)
+
+            // 2. Get the algorithm parameters required by the Web Crypto API.
+            val jwsAlgorithm = keyType.jwsAlg
+            val cryptoParams = getVerificationWebCryptoParams()
+
+            // 3. Import the public key to create a CryptoKey object for verification.
+            val cryptoKey = WebCrypto.subtle.importKey(
+                "spki",              // Public key format for public keys
+                publicKeyData,       // The raw key data
+                cryptoParams.importAlgorithm,
+                true,
+                arrayOf("verify")    // Specify that this key will be used for verification.
+            ).await()
+
+            // 4. IMPORTANT: Ensure the signature is in the IEEE P1363 format required by `subtle.verify`.
+            val p1363Signature = convertDERtoIEEEP1363(signed)
+            val signatureBuffer = (p1363Signature as Int8Array).buffer
+
+            // 5. Call `subtle.verify` with the key, signature, and original data.
+            val isValid = WebCrypto.subtle.verify(
+                cryptoParams.signAlgorithm,
+                cryptoKey,
+                signatureBuffer,
+                Uint8Array(detachedPlaintext.toTypedArray())
+            ).await()
+
+            // 6. Check the result and return the plaintext or throw an exception.
+            if (isValid) {
+                detachedPlaintext
+            } else {
+                throw IllegalArgumentException("Signature verification failed.")
+            }*/
+
+
         return runCatching {
             val verified = crypto.verify(
                 when (keyType) {
@@ -318,7 +398,16 @@ actual class JWKKey actual constructor(
             return when {
                 k.asymmetricKeyType != undefined -> { // KeyObject (node)
                     when (k.asymmetricKeyType) {
-                        "rsa", "rsa-pss" -> KeyType.RSA // see k.asymmetricKeyDetails.modulusLength 2048, 4096 ...; mgf1HashAlgorithm (Name of the message digest used by MGF1 (RSA-PSS))
+                        "rsa", "rsa-pss" -> {
+                            // see k.asymmetricKeyDetails.modulusLength 2048, 4096 ...; mgf1HashAlgorithm (Name of the message digest used by MGF1 (RSA-PSS))
+                            when (val modulusLength = k.asymmetricKeyDetails.modulusLength) {
+                                2048 -> KeyType.RSA
+                                3072 -> KeyType.RSA3072
+                                4096 -> KeyType.RSA4096
+                                else -> error("Unknown RSA key length: $modulusLength")
+                            }
+                        }
+
                         "ec" -> {
                             when (k.asymmetricKeyDetails.namedCurve) {
                                 "prime256v1", "secp256r1" -> KeyType.secp256r1
