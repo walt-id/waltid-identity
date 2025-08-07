@@ -216,7 +216,7 @@ fun waltidPrivateCredentials(repoName:String): Pair<String, String> = let {
 ktor {
     docker {
         jreVersion.set(JavaVersion.VERSION_21)
-        localImageName.set("waltid/waltid-issuer-api")
+        localImageName.set("waltid/issuer-api")
         imageTag.set("${project.version}")
         portMappings.set(listOf(
             io.ktor.plugin.features.DockerPortMapping(
@@ -229,7 +229,7 @@ ktor {
         val (username, password) = waltidPrivateCredentials("DOCKER")
         externalRegistry.set(
             io.ktor.plugin.features.DockerImageRegistry.dockerHub(
-                appName = provider { "waltid-issuer-api" },
+                appName = provider { "issuer-api" },
                 username = provider { username },
                 password = provider { password }
             )
