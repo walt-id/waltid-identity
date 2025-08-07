@@ -41,8 +41,14 @@ fun Application.exchange() = walletRoute {
         post("useOfferRequest", getUseOfferRequestDocs()) {
             val wallet = call.getWalletService()
 
-            val did = call.request.queryParameters["did"] ?: wallet.listDids().firstOrNull()?.did
-            ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
+            val did = call.request.queryParameters["did"]
+                ?: wallet.listDids().run {
+                    // use default did if no did is provided in the parameters
+                    firstOrNull { it -> it.default }?.did
+                    // use first did, if no did is marked as default
+                        ?: firstOrNull()?.did
+                }
+                ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
 
             val requireUserInput = call.request.queryParameters["requireUserInput"].toBoolean()
             val pinOrTxCode = call.request.queryParameters["pinOrTxCode"]
