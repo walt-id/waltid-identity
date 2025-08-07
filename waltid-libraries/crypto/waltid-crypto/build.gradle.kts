@@ -1,8 +1,4 @@
-import love.forte.plugin.suspendtrans.configuration.ClassInfo
-import love.forte.plugin.suspendtrans.configuration.SuspendTransformConfiguration
-import love.forte.plugin.suspendtrans.configuration.TargetPlatform
 import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
-import love.forte.plugin.suspendtrans.gradle.SuspendTransformPluginExtension
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -76,7 +72,9 @@ kotlin {
         nodejs {
             generateTypeScriptDefinitions()
             testTask {
-                useMocha()
+                useMocha {
+                    timeout = "30s"
+                }
             }
         }
         binaries.library()
