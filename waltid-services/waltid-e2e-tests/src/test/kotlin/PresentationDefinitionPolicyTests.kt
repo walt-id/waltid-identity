@@ -21,6 +21,8 @@ import io.ktor.http.*
 import io.ktor.server.util.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.api.Assertions.assertTrue
+import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -68,7 +70,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
     private suspend fun getAccountWalletId() {
         client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().apply {
             val listing = body<AccountWalletListing>()
-            assert(listing.wallets.isNotEmpty()) { "No wallets available!" }
+            assertTrue(listing.wallets.isNotEmpty()) { "No wallets available!" }
             walletId = listing.wallets.first().id.toString()
             walletUuid = Uuid.parse(walletId)
         }
@@ -478,7 +480,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
                     }.expectSuccess()
                         .body<List<WalletCredential>>()
                         .let {
-                            assert(it.isNotEmpty())
+                            assertTrue(it.isNotEmpty())
                         }
                 }
         }
@@ -520,7 +522,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
             .expectSuccess()
             .body<PresentationSessionInfo>()
             .let {
-                assert(it.verificationResult == expectedVerificationResult)
+                assertTrue(it.verificationResult == expectedVerificationResult)
             }
     }
 

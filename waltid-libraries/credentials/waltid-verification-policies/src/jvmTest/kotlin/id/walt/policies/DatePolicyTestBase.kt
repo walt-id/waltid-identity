@@ -8,6 +8,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
 abstract class DatePolicyTestBase {
 
@@ -72,10 +73,10 @@ abstract class DatePolicyTestBase {
         // when
         val result = sut.verify(data, context = emptyMap())
         // then
-        assert(result.isSuccess)
+        assertTrue(result.isSuccess)
         val json = result.getOrThrow() as JsonObject
-        assert(json.containsKey("policy_available"))
-        assert(!json["policy_available"]!!.jsonPrimitive.boolean)
+        assertTrue(json.containsKey("policy_available"))
+        assertTrue(!json["policy_available"]!!.jsonPrimitive.boolean)
     }
 
     private fun buildJson(claim: String, instant: String, root: String? = null): JsonObject = buildJsonObject {

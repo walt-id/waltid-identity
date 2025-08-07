@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Named.named
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import java.util.stream.Stream
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 
 class NotBeforeDatePolicyTest : DatePolicyTestBase() {
@@ -108,26 +109,26 @@ class NotBeforeDatePolicyTest : DatePolicyTestBase() {
         }.let { Stream.of(*it.toTypedArray()) }
 
         private fun assertSuccessResult(result: Result<Any>, claim: Claims, nbf: Instant) {
-            assert(result.isSuccess)
+            assertTrue(result.isSuccess)
             val json = result.getOrThrow() as JsonObject
-            assert(json.containsKey("policy_available"))
-            assert(json["policy_available"]!!.jsonPrimitive.boolean)
-            assert(json.containsKey("used_key"))
-            assert(json["used_key"]!!.jsonPrimitive.content == claim.getValue())
-            assert(json.containsKey("date_seconds"))
-            assert(json["date_seconds"]!!.jsonPrimitive.content == nbf.epochSeconds.toString())
-            assert(json.containsKey("available_since_seconds"))
-            assert(json["available_since_seconds"]!!.jsonPrimitive.content.toLong() in withTolerance((Clock.System.now() - nbf).inWholeSeconds))
+            assertTrue(json.containsKey("policy_available"))
+            assertTrue(json["policy_available"]!!.jsonPrimitive.boolean)
+            assertTrue(json.containsKey("used_key"))
+            assertTrue(json["used_key"]!!.jsonPrimitive.content == claim.getValue())
+            assertTrue(json.containsKey("date_seconds"))
+            assertTrue(json["date_seconds"]!!.jsonPrimitive.content == nbf.epochSeconds.toString())
+            assertTrue(json.containsKey("available_since_seconds"))
+            assertTrue(json["available_since_seconds"]!!.jsonPrimitive.content.toLong() in withTolerance((Clock.System.now() - nbf).inWholeSeconds))
         }
 
         private fun assertFailureResult(result: Result<Any>, claim: Claims, nbf: Instant) {
-            assert(result.isFailure)
-            assert(result.exceptionOrNull() is NotBeforePolicyException)
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull() is NotBeforePolicyException)
             val exception = result.exceptionOrNull() as NotBeforePolicyException
-            assert(exception.policyAvailable)
-            assert(exception.key == claim.getValue())
-            assert(exception.date.epochSeconds == nbf.epochSeconds)
-            assert(exception.availableInSeconds in withTolerance((nbf - Clock.System.now()).inWholeSeconds))
+            assertTrue(exception.policyAvailable)
+            assertTrue(exception.key == claim.getValue())
+            assertTrue(exception.date.epochSeconds == nbf.epochSeconds)
+            assertTrue(exception.availableInSeconds in withTolerance((nbf - Clock.System.now()).inWholeSeconds))
         }
     }
 }

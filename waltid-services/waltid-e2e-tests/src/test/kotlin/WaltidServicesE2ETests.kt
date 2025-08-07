@@ -40,7 +40,11 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.util.*
 import kotlinx.serialization.json.*
-import kotlin.test.*
+import org.junit.jupiter.api.Assertions.assertTrue
+import kotlin.test.Test
+import kotlin.test.assertContains
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -176,7 +180,7 @@ class WaltidServicesE2ETests {
         lateinit var did: String
         val createdDids = mutableListOf<String>()
         didsApi.list(wallet, DidsApi.DefaultDidOption.Any, 1) {
-            assert(it.first().default)
+            assertTrue(it.first().default)
             did = it.first().did
         }
         //todo: test for optional registration defaults
@@ -298,7 +302,7 @@ class WaltidServicesE2ETests {
         }
 
         sessionApi.get(verificationId) {
-            assert(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
+            assertTrue(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
         }
 
         exchangeApi.matchCredentialsForPresentationDefinition(
@@ -310,13 +314,13 @@ class WaltidServicesE2ETests {
         )
 
         sessionApi.get(verificationId) {
-            assert(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-            assert(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+            assertTrue(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
+            assertTrue(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
 
-            assert(it.verificationResult == true) { "overall verification should be valid" }
+            assertTrue(it.verificationResult == true) { "overall verification should be valid" }
             it.policyResults.let {
                 require(it != null) { "policyResults should be available after running policies" }
-                assert(it.size > 1) { "no policies have run" }
+                assertTrue(it.size > 1) { "no policies have run" }
             }
         }
         val lspPotentialIssuance = LspPotentialIssuance(e2e, testHttpClient(doFollowRedirects = false))
@@ -341,8 +345,8 @@ class WaltidServicesE2ETests {
         //region -History-
         val historyApi = HistoryApi(e2e, client)
         historyApi.list(wallet) {
-            assert(it.size >= 2) { "missing history items" }
-            assert(it.any { it.operation == "useOfferRequest" } && it.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
+            assertTrue(it.size >= 2) { "missing history items" }
+            assertTrue(it.any { it.operation == "useOfferRequest" } && it.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
         }
         //endregion -History-
         val sdJwtTest = E2ESdJwtTest(issuerApi, exchangeApi, sessionApi, verificationApi)
@@ -549,7 +553,7 @@ class WaltidServicesE2ETests {
         val didsApi = DidsApi(e2e, client)
         lateinit var did: String
         didsApi.list(wallet, DidsApi.DefaultDidOption.Any, 1) {
-            assert(it.first().default)
+            assertTrue(it.first().default)
             did = it.first().did
         }
 
@@ -640,19 +644,19 @@ class WaltidServicesE2ETests {
 }
 
 fun String.expectLooksLikeJwt(): String =
-    also { assert(startsWith("ey") && count { it == '.' } == 2) { "Does not look like JWT" } }
+    also { assertTrue(startsWith("ey") && count { it == '.' } == 2) { "Does not look like JWT" } }
 
 
 val expectSuccess: suspend HttpResponse.() -> HttpResponse = {
-    assert(this.status.isSuccess()) { "HTTP status is non-successful for response: $this, body is ${this.bodyAsText()}" }; this
+    kotlin.test.assertTrue(this.status.isSuccess(), "HTTP status is non-successful for response: $this, body is ${this.bodyAsText()}"); this
 }
 
 val expectRedirect: HttpResponse.() -> HttpResponse = {
-    assert(this.status == HttpStatusCode.Found) { "HTTP status is non-successful" }; this
+    assertTrue(this.status == HttpStatusCode.Found) { "HTTP status is non-successful" }; this
 }
 
 val expectFailure: HttpResponse.() -> HttpResponse = {
-    assert(!status.isSuccess()) { "HTTP status is successful" }; this
+    assertTrue(!status.isSuccess()) { "HTTP status is successful" }; this
 }
 
 fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {

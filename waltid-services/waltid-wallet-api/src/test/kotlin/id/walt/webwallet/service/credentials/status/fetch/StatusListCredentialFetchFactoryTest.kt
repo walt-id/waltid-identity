@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
+import kotlin.test.assertTrue
 
 class StatusListCredentialFetchFactoryTest {
     private val sut = StatusListCredentialFetchFactory(defaultStrategy, entraStrategy)
@@ -17,7 +18,7 @@ class StatusListCredentialFetchFactoryTest {
         url: String, strategy: StatusListCredentialFetchStrategy
     ) {
         val result = sut.new(url)
-        assert(result == strategy)
+        assertTrue(result == strategy)
     }
 
     companion object {

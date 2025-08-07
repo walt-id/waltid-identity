@@ -9,7 +9,9 @@ import io.ktor.client.request.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.api.Assertions.assertTrue
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -32,7 +34,7 @@ class KeysApi(private val e2e: E2ETest, private val client: HttpClient) {
                 setBody(request)
             }.expectSuccess().apply {
                 val generatedKeyId = body<String>()
-                assert(generatedKeyId.isNotEmpty()) { "Empty key id is returned!" }
+                assertTrue(generatedKeyId.isNotEmpty()) { "Empty key id is returned!" }
                 output?.invoke(generatedKeyId)
             }
         }
@@ -50,10 +52,10 @@ class KeysApi(private val e2e: E2ETest, private val client: HttpClient) {
             client.get("/wallet-api/wallet/$wallet/keys/$keyId/meta").expectSuccess().apply {
                 val response = body<JsonElement>()
                 assertNotNull(response.tryGetData("keyId")?.jsonPrimitive?.content) { "Missing _keyId_ component!" }
-                assert(response.tryGetData("keyId")?.jsonPrimitive?.content == keyId) { "Wrong _keyId_ value!" }
+                assertTrue(response.tryGetData("keyId")?.jsonPrimitive?.content == keyId) { "Wrong _keyId_ value!" }
                 assertNotNull(response.tryGetData("type")?.jsonPrimitive?.content) { "Missing _type_ component!" }
                 when (expected.backend) {
-                    "jwt" -> assert(response.tryGetData("type")!!.jsonPrimitive.content.endsWith("JwkKeyMeta")) { "Missing _type_ component!" }
+                    "jwt" -> assertTrue(response.tryGetData("type")!!.jsonPrimitive.content.endsWith("JwkKeyMeta")) { "Missing _type_ component!" }
                     "tse" -> TODO()
                     "oci" -> TODO()
                     "oci-rest-api" -> TODO()

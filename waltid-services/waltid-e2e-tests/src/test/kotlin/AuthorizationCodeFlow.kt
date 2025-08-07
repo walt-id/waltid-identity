@@ -15,6 +15,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.api.Assertions.assertTrue
 import kotlin.test.assertEquals
 
 
@@ -68,8 +69,10 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
         client.get("$authorizeEndpoint?${authorizationRequest.toHttpQueryString()}") {}
             .expectRedirect().apply {
                 val idTokenRequest = AuthorizationRequest.fromHttpQueryString(headers["location"]!!)
-                assert(idTokenRequest.responseType == setOf(ResponseType.IdToken)) { "response type should be id_token" }
-                assert(idTokenRequest.responseMode == ResponseMode.direct_post) { "response mode should be direct post" }
+                kotlin.test.assertTrue(idTokenRequest.responseType.size == 1, "response type should be id_token")
+                kotlin.test.assertTrue(idTokenRequest.responseType.first() == ResponseType.IdToken, "response type should be id_token")
+
+                kotlin.test.assertTrue(idTokenRequest.responseMode == ResponseMode.direct_post, "response mode should be direct post")
             }
 
         //
@@ -102,9 +105,9 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
         client.get("$authorizeEndpoint?${authorizationRequest.toHttpQueryString()}") {
         }.expectRedirect().apply {
             val vpTokenRequest = AuthorizationRequest.fromHttpQueryString(headers["location"]!!)
-            assert(vpTokenRequest.responseType == setOf(ResponseType.VpToken)) { "response type should be vp_token" }
-            assert(vpTokenRequest.responseMode == ResponseMode.direct_post) { "response mode should be direct post" }
-            assert(vpTokenRequest.presentationDefinition != null) { "presentation definition should exists" }
+            assertTrue(vpTokenRequest.responseType == setOf(ResponseType.VpToken)) { "response type should be vp_token" }
+            assertTrue(vpTokenRequest.responseMode == ResponseMode.direct_post) { "response mode should be direct post" }
+            assertTrue(vpTokenRequest.presentationDefinition != null) { "presentation definition should exists" }
         }
 
         //

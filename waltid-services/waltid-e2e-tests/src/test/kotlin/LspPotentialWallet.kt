@@ -28,6 +28,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -60,7 +61,7 @@ class LspPotentialWallet(val e2e: E2ETest, val client: HttpClient, val walletId:
             contentType(ContentType.Application.Json)
             setBody(Json.encodeToJsonElement(issuanceReq).toString())
         }
-        assert(offerResp.status == HttpStatusCode.OK)
+        assertTrue(offerResp.status == HttpStatusCode.OK)
         val offerUri = offerResp.bodyAsText()
 
         // === resolve credential offer ===
@@ -214,7 +215,7 @@ class LspPotentialWallet(val e2e: E2ETest, val client: HttpClient, val walletId:
             contentType(ContentType.Application.Json)
             setBody(Json.encodeToJsonElement(issuanceReq).toString())
         }
-        assert(offerResp.status == HttpStatusCode.OK)
+        assertTrue(offerResp.status == HttpStatusCode.OK)
         val offerUri = offerResp.bodyAsText()
 
         // === resolve credential offer ===
@@ -247,16 +248,16 @@ class LspPotentialWallet(val e2e: E2ETest, val client: HttpClient, val walletId:
         assertEquals(issuedCred.format, fetchedCredential.format)
         runBlocking { issuedSDJwtVCId = fetchedCredential.id }
         val sdJwtVC = SDJwtVC.parse("${fetchedCredential.document}~${fetchedCredential.disclosures}")
-        assert(sdJwtVC.disclosures.isNotEmpty())
-        assert(sdJwtVC.sdMap["birthdate"]!!.sd)
+        assertTrue(sdJwtVC.disclosures.isNotEmpty())
+        assertTrue(sdJwtVC.sdMap["birthdate"]!!.sd)
         val id = sdJwtVC.undisclosedPayload["id"]?.jsonPrimitive?.contentOrNull ?: ""
         val iat = sdJwtVC.undisclosedPayload["iat"]?.jsonPrimitive?.longOrNull ?: 0L
         val nbf = sdJwtVC.undisclosedPayload["nbf"]?.jsonPrimitive?.longOrNull ?: 0L
         val exp = sdJwtVC.undisclosedPayload["exp"]?.jsonPrimitive?.longOrNull ?: 0L
-        assert(iat > 0)
-        assert(iat == nbf)
-        assert(exp == iat + 365 * 24 * 60 * 60)
-        assert(id.startsWith("urn:uuid:"))
+        assertTrue(iat > 0)
+        assertTrue(iat == nbf)
+        assertTrue(exp == iat + 365 * 24 * 60 * 60)
+        assertTrue(id.startsWith("urn:uuid:"))
 
     }
 

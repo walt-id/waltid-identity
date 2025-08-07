@@ -6,6 +6,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlin.test.assertTrue
 
 object Verifier {
     class SessionApi(private val e2e: E2ETest, private val client: HttpClient) {
@@ -23,8 +24,8 @@ object Verifier {
                 setBody(Json.decodeFromString<JsonObject>(payload))
             }.expectSuccess().apply {
                 val url = bodyAsText()
-                assert(url.contains("presentation_definition_uri="))
-                assert(!url.contains("presentation_definition="))
+                assertTrue(url.contains("presentation_definition_uri="))
+                assertTrue(!url.contains("presentation_definition="))
                 output?.invoke(bodyAsText())
             }
         }

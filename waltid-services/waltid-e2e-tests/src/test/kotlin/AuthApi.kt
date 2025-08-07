@@ -25,6 +25,7 @@ import java.security.cert.X509Certificate
 import java.util.Base64
 import java.util.Date
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -33,7 +34,7 @@ class AuthApi(private val e2e: E2ETest, private val client: HttpClient) {
     suspend fun userInfo(expectedStatus: HttpStatusCode, output: ((Account) -> Unit)? = null) =
         e2e.test("/wallet-api/auth/user-info - wallet-api user-info") {
             client.get("/wallet-api/auth/user-info").apply {
-                assert(status == expectedStatus) { "Expected status: $expectedStatus, but had $status" }
+                assertTrue(status == expectedStatus, "Expected status: $expectedStatus, but had $status")
                 output?.invoke(body<Account>())
             }
         }
@@ -65,8 +66,8 @@ class AuthApi(private val e2e: E2ETest, private val client: HttpClient) {
         e2e.test("/wallet-api/wallet/accounts/wallets - get wallets") {
             client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().apply {
                 val listing = body<AccountWalletListing>()
-                assert(expectedAccountId == listing.account) { "Wallet listing is for wrong account!" }
-                assert(listing.wallets.isNotEmpty()) { "No wallets available!" }
+                assertTrue(expectedAccountId == listing.account, "Wallet listing is for wrong account!")
+                assertTrue(listing.wallets.isNotEmpty(), "No wallets available!")
                 output?.invoke(listing)
             }
         }
@@ -237,7 +238,7 @@ class AuthApi(private val e2e: E2ETest, private val client: HttpClient) {
             }
             val response = tempClient.get("/wallet-api/wallet/accounts/wallets").expectSuccess()
             val accWalletListing = response.body<AccountWalletListing>()
-            assert(accWalletListing.wallets.isNotEmpty())
+            assertTrue(accWalletListing.wallets.isNotEmpty())
         }
 
         suspend fun executeTestCases() {

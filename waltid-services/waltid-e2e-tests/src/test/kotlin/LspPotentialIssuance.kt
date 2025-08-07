@@ -45,6 +45,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.kotlincrypto.hash.sha2.SHA256
 import java.io.FileReader
 import java.security.KeyPairGenerator
@@ -59,7 +60,7 @@ class LspPotentialIssuance(private val e2e: E2ETest, val client: HttpClient) {
         // ### steps 1-6
         val offerResp = client.get("/lsp-potential/lspPotentialCredentialOfferT1")
         println("Offer resp: $offerResp")
-        assert(offerResp.status == HttpStatusCode.OK)
+        assertTrue(offerResp.status == HttpStatusCode.OK)
         val offerUri = offerResp.bodyAsText()
         println("Offer uri: $offerUri")
         val parsedOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(offerUri)
@@ -77,7 +78,7 @@ class LspPotentialIssuance(private val e2e: E2ETest, val client: HttpClient) {
         val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOffer, providerMetadata)
         println("offered credentials: $offeredCredentials")
 
-        assert(offeredCredentials.isNotEmpty()) { "Offered credentials is empty" }
+        assertTrue(offeredCredentials.isNotEmpty()) { "Offered credentials is empty" }
 
         val offeredCredential = offeredCredentials.first()
         assertEquals(CredentialFormat.mso_mdoc, offeredCredential.format)

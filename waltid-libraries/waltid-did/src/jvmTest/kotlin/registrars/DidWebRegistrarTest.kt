@@ -15,15 +15,16 @@ import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
+import kotlin.test.assertTrue
 
 class DidWebRegistrarTest : DidRegistrarTestBase(DidWebRegistrar()) {
     @ParameterizedTest
     @MethodSource
     override fun `given did options with no key when register then returns a valid did result`(
         options: DidCreateOptions,
-        assert: registrarDidAssertion,
+        registrarDidAssertion: registrarDidAssertion,
     ) {
-        super.`given did options with no key when register then returns a valid did result`(options, assert)
+        super.`given did options with no key when register then returns a valid did result`(options, registrarDidAssertion)
     }
 
     @ParameterizedTest
@@ -31,9 +32,9 @@ class DidWebRegistrarTest : DidRegistrarTestBase(DidWebRegistrar()) {
     override fun `given did options and key when register with key then returns a valid did result`(
         key: Key,
         options: DidCreateOptions,
-        assert: registrarKeyAssertion,
+        registrarKeyAssertion: registrarKeyAssertion,
     ) {
-        super.`given did options and key when register with key then returns a valid did result`(key, options, assert)
+        super.`given did options and key when register with key then returns a valid did result`(key, options, registrarKeyAssertion)
     }
 
     companion object {
@@ -89,7 +90,7 @@ class DidWebRegistrarTest : DidRegistrarTestBase(DidWebRegistrar()) {
 
         private fun identifierAssertions(did: String, domain: String, path: String?) {
             // assert [did identifier] and [domain + path] are identical
-            assert(
+            assertTrue(
                 //TODO: avoid computations in result comparison
                 UrlEncoderUtil.decode(DidUtils.identifierFromDid(did)!!) == domain.plus(
                     path.takeIf { !it.isNullOrEmpty() }?.ensurePrefix("/")?.replace("/", ":") ?: ""
