@@ -74,6 +74,7 @@ val modules = listOfNotNull(
 
     // Service tests
     "$services:waltid-e2e-tests",
+    "$services:waltid-integration-tests",
 
     // CLI
     "$applications:waltid-cli",
