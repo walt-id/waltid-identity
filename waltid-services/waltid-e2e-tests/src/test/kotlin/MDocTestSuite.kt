@@ -37,6 +37,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.bouncycastle.asn1.ASN1InputStream
+import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.ASN1OctetString
 import org.bouncycastle.asn1.DERIA5String
 import org.bouncycastle.asn1.x509.*
@@ -60,6 +61,8 @@ class MDocTestSuite(
 
     private val ISO_IEC_MDL_NAMESPACE_ID = "org.iso.18013.5.1"
     private val MDL_DOC_TYPE = "org.iso.18013.5.1.mDL"
+
+    private val MDL_KEY_PURPOSE_DS_OID = ASN1ObjectIdentifier("1.0.18013.5.1.2")
 
     private val mDocWallet: MDocPreparedWallet by lazy {
         runBlocking {
@@ -176,6 +179,32 @@ class MDocTestSuite(
         }
     }
 
+    private fun certificateSerialNoAssertions(
+        serialNumber: BigInteger,
+    ) {
+
+        assertTrue {
+            serialNumber.signum() > 0
+        }
+
+        assertTrue {
+            serialNumber != BigInteger.ZERO
+        }
+
+        assertTrue {
+            serialNumber.bitLength() <= 160
+        }
+
+        assertTrue {
+            serialNumber.bitLength() >= 63
+        }
+
+        assertTrue {
+            serialNumber.bitLength() >= 71
+        }
+
+    }
+
     private fun validateIACACertificate(
         iacaCertificate: X509Certificate,
     ) {
@@ -188,25 +217,7 @@ class MDocTestSuite(
             iacaCertificate.checkValidity()
         }
 
-        assertTrue {
-            iacaCertificate.serialNumber.signum() > 0
-        }
-
-        assertTrue {
-            iacaCertificate.serialNumber != BigInteger.ZERO
-        }
-
-        assertTrue {
-            iacaCertificate.serialNumber.bitLength() <= 160
-        }
-
-        assertTrue {
-            iacaCertificate.serialNumber.bitLength() >= 63
-        }
-
-        assertTrue {
-            iacaCertificate.serialNumber.bitLength() >= 71
-        }
+        certificateSerialNoAssertions(iacaCertificate.serialNumber)
 
         assertEquals(
             expected = iacaCertificate.subjectX500Principal,
@@ -323,6 +334,59 @@ class MDocTestSuite(
 
     }
 
+    private fun validateDSCertificate(
+        dsCertificate: X509Certificate,
+        iacaCertificate: X509Certificate,
+    ) {
+
+        assertDoesNotThrow {
+            dsCertificate.verify(iacaCertificate.publicKey)
+        }
+
+        assertDoesNotThrow {
+            dsCertificate.checkValidity()
+        }
+
+        certificateSerialNoAssertions(dsCertificate.serialNumber)
+
+        assertNull(
+            dsCertificate.getExtensionValue(
+                /* oid = */ Extension.basicConstraints.id
+            )
+        )
+
+        assertNotNull(
+            dsCertificate.getExtensionValue(
+                /* oid = */ Extension.authorityKeyIdentifier.id
+            )
+        )
+
+        assertTrue {
+            dsCertificate.nonCriticalExtensionOIDs.contains(Extension.authorityKeyIdentifier.id)
+        }
+
+        assertNotNull(
+            dsCertificate.getExtensionValue(
+                /* oid = */ Extension.subjectKeyIdentifier.id
+            )
+        )
+
+        assertTrue {
+            dsCertificate.nonCriticalExtensionOIDs.contains(Extension.subjectKeyIdentifier.id)
+        }
+
+        assertNotNull(
+            dsCertificate.getExtensionValue(
+                /* oid = */ Extension.issuerAlternativeName.id
+            )
+        )
+
+        assertTrue {
+            dsCertificate.nonCriticalExtensionOIDs.contains(Extension.issuerAlternativeName.id)
+        }
+
+    }
+
     private suspend fun mDLIssuanceRequestValidations(
         mDLIssuanceRequest: IssuanceRequest,
         iacaCertificate: X509Certificate,
@@ -368,12 +432,12 @@ class MDocTestSuite(
                     certificateFactory.generateCertificate(ByteArrayInputStream(derCertificate)) as X509Certificate
                 }
             }
-        assertDoesNotThrow {
-            issuanceRequestDSCertificate.checkValidity()
-        }
-        assertDoesNotThrow {
-            issuanceRequestDSCertificate.verify(iacaCertificate.publicKey)
-        }
+
+        validateDSCertificate(
+            dsCertificate = issuanceRequestDSCertificate,
+            iacaCertificate = iacaCertificate,
+        )
+
         //awesome public key equality code
         val dsCertificatePublicKeyParsedAsKey = assertDoesNotThrow {
             JWKKey.importRawPublicKey(
