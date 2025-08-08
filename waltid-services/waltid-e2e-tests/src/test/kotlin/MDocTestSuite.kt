@@ -36,10 +36,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.bouncycastle.asn1.ASN1InputStream
-import org.bouncycastle.asn1.ASN1ObjectIdentifier
-import org.bouncycastle.asn1.ASN1OctetString
-import org.bouncycastle.asn1.DERIA5String
+import org.bouncycastle.asn1.*
+import org.bouncycastle.asn1.x500.X500Name
+import org.bouncycastle.asn1.x500.style.BCStyle
 import org.bouncycastle.asn1.x509.*
 import org.bouncycastle.util.io.pem.PemReader
 import org.cose.java.AlgorithmID
@@ -314,16 +313,19 @@ class MDocTestSuite(
                         distributionPoint.crlIssuer == null
                     }
 
-                    (distributionPoint.distributionPoint.name as GeneralName).let {
-                        assertEquals(
-                            expected = GeneralName.uniformResourceIdentifier,
-                            actual = it.tagNo,
-                        )
+                    (distributionPoint.distributionPoint.name as GeneralNames).let {
+                        it.names.forEach { generalName ->
+                            assertEquals(
+                                expected = GeneralName.uniformResourceIdentifier,
+                                actual = generalName.tagNo,
+                            )
 
-                        assertDoesNotThrow {
-                            Url((it.name as DERIA5String).string)
+                            assertDoesNotThrow {
+                                Url((generalName.name as DERIA5String).string)
+                            }
                         }
                     }
+
                 }
             }
 
@@ -365,6 +367,35 @@ class MDocTestSuite(
             dsCertificate.nonCriticalExtensionOIDs.contains(Extension.authorityKeyIdentifier.id)
         }
 
+        val iacaSKI = iacaCertificate.getExtensionValue(
+            /* oid = */ Extension.subjectKeyIdentifier.id
+        ).let {
+            ASN1OctetString.getInstance(it).octets.let {
+                SubjectKeyIdentifier.getInstance(
+                    /* obj = */ ASN1Primitive.fromByteArray(it)
+                )
+            }
+        }
+
+        val dsAKI = dsCertificate.getExtensionValue(
+            /* oid = */ Extension.authorityKeyIdentifier.id
+        ).let {
+            ASN1OctetString.getInstance(it).octets.let {
+                AuthorityKeyIdentifier.getInstance(
+                    /* obj = */ ASN1Primitive.fromByteArray(it)
+                )
+            }
+        }
+
+        assertNotNull(dsAKI.keyIdentifier)
+
+
+        assertContentEquals(
+            expected = iacaSKI.keyIdentifier,
+            actual = dsAKI.keyIdentifier,
+        )
+
+
         assertNotNull(
             dsCertificate.getExtensionValue(
                 /* oid = */ Extension.subjectKeyIdentifier.id
@@ -374,6 +405,112 @@ class MDocTestSuite(
         assertTrue {
             dsCertificate.nonCriticalExtensionOIDs.contains(Extension.subjectKeyIdentifier.id)
         }
+
+        assertNotNull(
+            dsCertificate.getExtensionValue(
+                /* oid = */ Extension.issuerAlternativeName.id
+            )
+        )
+
+        assertTrue {
+            dsCertificate.nonCriticalExtensionOIDs.contains(Extension.issuerAlternativeName.id)
+        }
+
+        //key-usage
+        val keyUsage = dsCertificate.getExtensionValue(
+            /* oid = */ Extension.keyUsage.id
+        ).let {
+            ASN1OctetString.getInstance(it).octets.let {
+                KeyUsage.getInstance(it)
+            }
+        }
+
+        assertTrue {
+            keyUsage.hasUsages(KeyUsage.digitalSignature)
+        }
+
+        assertTrue {
+            dsCertificate.criticalExtensionOIDs.contains(Extension.keyUsage.id)
+        }
+
+        //extended key-usage
+        //key-usage
+        val extKeyUsage = dsCertificate.getExtensionValue(
+            /* oid = */ Extension.extendedKeyUsage.id
+        ).let {
+            ASN1OctetString.getInstance(it).octets.let {
+                ExtendedKeyUsage.getInstance(it)
+            }
+        }
+
+        assertTrue {
+            dsCertificate.criticalExtensionOIDs.contains(Extension.extendedKeyUsage.id)
+        }
+
+        assertTrue {
+            extKeyUsage.hasKeyPurposeId(KeyPurposeId.getInstance(MDL_KEY_PURPOSE_DS_OID))
+        }
+
+        val crlDistributionPointsBytes = assertNotNull(
+            dsCertificate.getExtensionValue(
+                /* oid = */ Extension.cRLDistributionPoints.id
+            )
+        )
+
+        val crlDistributionPoints = ASN1OctetString
+            .getInstance(crlDistributionPointsBytes)
+            .octets.let {
+                CRLDistPoint
+                    .getInstance(
+                        ASN1Sequence.fromByteArray(it)
+                    )
+            }
+
+        crlDistributionPoints.distributionPoints.forEach { distributionPoint ->
+
+            assertNull(distributionPoint.reasons)
+            assertNull(distributionPoint.crlIssuer)
+
+            (distributionPoint.distributionPoint.name as GeneralNames).let {
+                it.names.forEach { generalName ->
+                    assertEquals(
+                        expected = GeneralName.uniformResourceIdentifier,
+                        actual = generalName.tagNo,
+                    )
+
+                    assertDoesNotThrow {
+                        Url((generalName.name as DERIA5String).string)
+                    }
+                }
+            }
+        }
+
+        val iacaX500Name = X500Name.getInstance(iacaCertificate.issuerX500Principal.encoded)
+        val dsX500Name = X500Name.getInstance(dsCertificate.subjectX500Principal.encoded)
+
+        assertContentEquals(
+            expected = iacaX500Name.getRDNs(BCStyle.C),
+            actual = dsX500Name.getRDNs(BCStyle.C)
+        )
+
+        assertContentEquals(
+            expected = iacaX500Name.getRDNs(BCStyle.ST),
+            actual = dsX500Name.getRDNs(BCStyle.ST)
+        )
+
+        assertTrue {
+            iacaCertificate.notBefore <= dsCertificate.notBefore
+        }
+
+
+        assertTrue {
+            iacaCertificate.notAfter >= dsCertificate.notAfter
+        }
+
+        assertContentEquals(
+            expected = iacaCertificate.subjectX500Principal.encoded,
+            actual = dsCertificate.issuerX500Principal.encoded,
+        )
 
         assertNotNull(
             dsCertificate.getExtensionValue(
