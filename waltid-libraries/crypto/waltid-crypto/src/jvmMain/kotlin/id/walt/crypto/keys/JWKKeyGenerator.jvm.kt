@@ -24,7 +24,7 @@ import java.security.interfaces.RSAPublicKey
 import java.security.spec.RSAPublicKeySpec
 import java.text.ParseException
 
-object JvmJWKKeyCreator : JWKKeyCreator {
+object JvmJWKKeyCreator : JWKKeyCreator() {
 
     override suspend fun generate(type: KeyType, metadata: JwkKeyMeta?): JWKKey {
         val keyGenerator: JWKGenerator<out JWK> = when (type) {

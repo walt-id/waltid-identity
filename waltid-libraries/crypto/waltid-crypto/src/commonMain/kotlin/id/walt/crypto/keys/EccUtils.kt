@@ -2,6 +2,10 @@ package id.walt.crypto.keys
 
 object EccUtils {
 
+    /**
+     * P-256/k1 (64), P-384 (96), and P-521 (132)
+     */
+    private val p1363Lengths = setOf(64, 96, 132)
 
     /**
      * Converts a DER-encoded ECDSA signature to the IEEE P1363 format (raw R||S).
@@ -18,6 +22,13 @@ object EccUtils {
         // A DER-encoded signature is an ASN.1 SEQUENCE.
         // It must start with 0x30.
         if (derSignature.isEmpty() || derSignature[0] != 0x30.toByte()) {
+            // Passed data might already be in IEEE P1363 format, or it might just be invalid.
+
+            if (derSignature.size in p1363Lengths) {
+                // Signature is already in IEEE P1363 format
+                return derSignature
+            }
+
             throw IllegalArgumentException("Signature is not a valid DER sequence.")
         }
 

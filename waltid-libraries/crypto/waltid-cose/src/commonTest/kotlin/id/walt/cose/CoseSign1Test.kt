@@ -6,17 +6,15 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.encodeToHexString
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 @OptIn(ExperimentalSerializationApi::class)
 class CoseSign1Test {
 
-    private val key = KeyManager.resolveSerializedKeyBlocking(
-        """{"type": "jwk", "jwk": {
+    private val key by lazy {
+        suspend {
+            KeyManager.resolveSerializedKey(
+                """{"type": "jwk", "jwk": {
                     "kty": "EC",
                     "d": "GKZgxuL71bvt-nK9zfNSUKfxPzyqPqBFgBHQYxiRbaI",
                     "use": "sig",
@@ -26,10 +24,12 @@ class CoseSign1Test {
                     "y": "js-Yzh4FEoyG3ZN3CesYF4nNAnSqjZjY9_NafCS48Nw",
                     "alg": "ES256"
                 }}"""
-    )
+            )
+        }
+    }
 
     private val testSignerKey = key
-    suspend fun testVerifierKey() = key.getPublicKey()
+    suspend fun testVerifierKey() = key().getPublicKey()
 
     @Test
     fun `1 - CoseHeaders serializer should enforce canonical order`() {
@@ -66,7 +66,7 @@ class CoseSign1Test {
         val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
             payload = payload,
-            signer = testSignerKey.toCoseSigner()
+            signer = testSignerKey().toCoseSigner()
         )
         println("Created CoseSign1: $coseSign1")
 
@@ -87,7 +87,7 @@ class CoseSign1Test {
         val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
             payload = payload,
-            signer = testSignerKey.toCoseSigner()
+            signer = testSignerKey().toCoseSigner()
         )
         println("Created CoseSign1: $coseSign1")
 
@@ -111,13 +111,13 @@ class CoseSign1Test {
         val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = originalHeaders,
             payload = payload,
-            signer = testSignerKey.toCoseSigner()
+            signer = testSignerKey().toCoseSigner()
         )
         println("Created CoseSign1: $coseSign1")
 
         println("Create tampered headers and re-encode them")
         val tamperedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES384)
-        val tamperedProtectedBytes = coseCbor.encodeToByteArray(tamperedHeaders)
+        val tamperedProtectedBytes = coseCompliantCbor.encodeToByteArray(tamperedHeaders)
 
         println("Tamper with the protected header bytes")
         val tamperedCose = coseSign1.copy(protected = tamperedProtectedBytes)
@@ -144,7 +144,7 @@ class CoseSign1Test {
             protectedHeaders = protectedHeaders,
             unprotectedHeaders = unprotectedHeaders,
             payload = payload,
-            signer = testSignerKey.toCoseSigner()
+            signer = testSignerKey().toCoseSigner()
         )
         println("Original CoseSign1: $originalCose")
 
@@ -173,7 +173,7 @@ class CoseSign1Test {
             protectedHeaders = protectedHeaders,
             unprotectedHeaders = unprotectedHeaders,
             payload = payload,
-            signer = testSignerKey.toCoseSigner()
+            signer = testSignerKey().toCoseSigner()
         )
         println("Original CoseSign1: $originalCose")
 
@@ -196,7 +196,7 @@ class CoseSign1Test {
         val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
             payload = null, // Null payload
-            signer = testSignerKey.toCoseSigner()
+            signer = testSignerKey().toCoseSigner()
         )
         println("Created CoseSign1: $coseSign1")
 
@@ -218,7 +218,7 @@ class CoseSign1Test {
         val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
             payload = payload,
-            signer = testSignerKey.toCoseSigner(),
+            signer = testSignerKey().toCoseSigner(),
             externalAad = externalAad
         )
         println("Created CoseSign1: $coseSign1")

@@ -383,8 +383,9 @@ actual class JWKKey actual constructor(
         KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> _internalJwk.toRSAKey().toPrivateKey()
     }
 
-    private fun getInternalPublicKey() = when (keyType) {
+    fun getInternalPublicKey(): PublicKey = when (keyType) {
         KeyType.secp256k1, KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> _internalJwk.toECKey().toECPublicKey()
+        KeyType.Ed25519 -> _internalJwk.toOctetKeyPair().toPublicKey()
 //        KeyType.Ed25519 -> decodeEd25519RawPublicKey(_internalJwk.toOctetKeyPair())
 //        KeyType.Ed25519 -> _internalJwk.toOctetKeyPair().toPublicKey()
         KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> _internalJwk.toRSAKey().toRSAPublicKey()
@@ -436,7 +437,7 @@ actual class JWKKey actual constructor(
          return keyFactory.generatePublic(publicKeySpec)
      }*/
 
-    actual companion object : JWKKeyCreator {
+    actual companion object : JWKKeyCreator() {
 
 //        val prettyJson = Json { prettyPrint = true }
 

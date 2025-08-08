@@ -6,23 +6,24 @@ import id.walt.crypto.keys.KeyType
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.io.encoding.Base64
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-interface JWKKeyCreator {
+abstract class JWKKeyCreator {
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun generate(type: KeyType, metadata: JwkKeyMeta? = null): JWKKey
+    abstract suspend fun generate(type: KeyType, metadata: JwkKeyMeta? = null): JWKKey
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun importRawPublicKey(
+    abstract suspend fun importRawPublicKey(
         type: KeyType,
         rawPublicKey: ByteArray,
         metadata: JwkKeyMeta? = null
@@ -32,11 +33,24 @@ interface JWKKeyCreator {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun importJWK(jwk: String): Result<JWKKey>
+    abstract suspend fun importJWK(jwk: String): Result<JWKKey>
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun importPEM(pem: String): Result<JWKKey>
+    abstract suspend fun importPEM(pem: String): Result<JWKKey>
+
+    fun convertDerCertificateToPemCertificate(der: ByteArray): String =
+"""-----BEGIN CERTIFICATE-----
+${Base64.Pem.encode(der)}
+-----END CERTIFICATE-----"""
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    suspend fun importFromDerCertificate(der: ByteArray): Result<JWKKey> =
+        importPEM(convertDerCertificateToPemCertificate(der))
+
 }

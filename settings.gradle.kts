@@ -33,7 +33,8 @@ val modules = listOfNotNull(
         "waltid-dif-definitions-parser",
         "waltid-dcql",
         "waltid-verification-policies",
-        "waltid-holder-policies"
+        "waltid-holder-policies",
+        "waltid-vical"
     ),
 
     * "$libraries:protocols".group(

@@ -11,7 +11,7 @@ import kotlin.js.json
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-object JsJWKKeyCreator : JWKKeyCreator {
+object JsJWKKeyCreator : JWKKeyCreator() {
 
     @JsPromise
     @JsExport.Ignore
@@ -19,7 +19,6 @@ object JsJWKKeyCreator : JWKKeyCreator {
         val alg = type.jwsAlg
 
         @Suppress("UNCHECKED_CAST_TO_EXTERNAL_INTERFACE")
-        println("alg: $alg")
         val key = await(jose.generateKeyPair<KeyLike>(alg, json("extractable" to true) as jose.GenerateKeyPairOptions)).privateKey
 
         return JWKKey(key).apply { init() }

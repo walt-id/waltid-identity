@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.cose
 
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -14,12 +16,20 @@ import kotlinx.serialization.encodeToByteArray
  * It MUST encode defaults (like the "Signature1" context string) and use
  * definite-length encoding as required by the COSE specification.
  */
-private val cborForSigStructure = Cbor {
+private val cborForSigStructure2 = Cbor {
     encodeDefaults = true
     useDefiniteLengthEncoding = true
 }
+private val cborForSigStructure = Cbor(from = Cbor.CoseCompliant) {
+    encodeDefaults = true
+}
 
-internal val coseCbor = Cbor.CoseCompliant
+val coseCompliantCbor by lazy {
+    Cbor(from = Cbor.CoseCompliant) {
+        ignoreUnknownKeys = true
+        alwaysUseByteString = true
+    }
+}
 
 /**
  * Internal structure for the data that gets signed/verified.
