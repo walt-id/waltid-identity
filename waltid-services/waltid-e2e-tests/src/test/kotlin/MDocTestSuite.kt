@@ -124,44 +124,42 @@ class MDocTestSuite(
                 client.get("/${OpenID4VCIVersion.DRAFT13.versionString}/.well-known/openid-credential-issuer")
                     .expectSuccess().body<OpenIDProviderMetadata.Draft13>()
 
-            val credentialConfigurationsSupported = assertNotNull(
+            val credentialConfigurationsSupportedDraft13 = assertNotNull(
                 draft13IssuerMetadata.credentialConfigurationsSupported
             )
 
             assertContains(
-                credentialConfigurationsSupported,
+                credentialConfigurationsSupportedDraft13,
                 ISSUER_MDL_CREDENTIAL_CONFIGURATION_ID,
             )
 
-            val mDLCredentialConfiguration = assertNotNull(
-                credentialConfigurationsSupported[ISSUER_MDL_CREDENTIAL_CONFIGURATION_ID]
+            val mDLCredentialConfigurationDraft13 = assertNotNull(
+                credentialConfigurationsSupportedDraft13[ISSUER_MDL_CREDENTIAL_CONFIGURATION_ID]
             )
 
             assertEquals(
                 expected = setOf("cose_key"),
-                actual = mDLCredentialConfiguration.cryptographicBindingMethodsSupported,
+                actual = mDLCredentialConfigurationDraft13.cryptographicBindingMethodsSupported,
             )
 
             assertEquals(
                 expected = "mso_mdoc",
-                actual = mDLCredentialConfiguration.format.value,
+                actual = mDLCredentialConfigurationDraft13.format.value,
             )
 
             assertTrue {
-                mDLCredentialConfiguration.credentialSigningAlgValuesSupported!!.contains("ES256")
+                mDLCredentialConfigurationDraft13.credentialSigningAlgValuesSupported!!.contains("ES256")
             }
 
             assertEquals(
                 expected = MDL_DOC_TYPE,
-                actual = mDLCredentialConfiguration.docType!!,
+                actual = mDLCredentialConfigurationDraft13.docType!!,
             )
 
             assertTrue {
-                credentialConfigurationsSupported.values.filter { it.docType == MDL_DOC_TYPE }.size == 1
+                credentialConfigurationsSupportedDraft13.values.filter { it.docType == MDL_DOC_TYPE }.size == 1
             }
 
-//            client.get("/${OpenID4VCIVersion.DRAFT11.versionString}/.well-known/openid-credential-issuer")
-//                .expectSuccess().body<OpenIDProviderMetadata.Draft11>()
         }
 
     private fun mDLHandleOfferWalletRetrievedCredentials(
