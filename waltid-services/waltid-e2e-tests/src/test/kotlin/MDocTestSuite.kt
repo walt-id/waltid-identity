@@ -156,6 +156,10 @@ class MDocTestSuite(
                 actual = mDLCredentialConfiguration.docType!!,
             )
 
+            assertTrue {
+                credentialConfigurationsSupported.values.filter { it.docType == MDL_DOC_TYPE }.size == 1
+            }
+
 //            client.get("/${OpenID4VCIVersion.DRAFT11.versionString}/.well-known/openid-credential-issuer")
 //                .expectSuccess().body<OpenIDProviderMetadata.Draft11>()
         }
