@@ -11,17 +11,6 @@ import kotlin.test.assertTrue
 
 class JWKKeyAndDidManagementTest {
 
-    private val keyTypeMap = mapOf(
-        KeyType.Ed25519 to "OKP",
-        KeyType.secp256k1 to "EC",
-        KeyType.secp256r1 to "EC",
-        KeyType.RSA to "RSA"
-    )
-
-    private fun getKeyTypeMap(kt: KeyType): String? {
-        return keyTypeMap[kt]
-    }
-
     private val testObj = JsonObject(mapOf("value1" to JsonPrimitive("123456789")))
 
     @Test
@@ -46,7 +35,7 @@ class JWKKeyAndDidManagementTest {
             val kid = jwk["kid"].toString().removeSurrounding("\"")
             val x = jwk["x"].toString().removeSurrounding("\"")
 
-            assertEquals(kty, getKeyTypeMap(it))
+            assertEquals(kty, it.jwkKty)
             assertNotNull(d)
             assertNotNull(crv)
             assertNotNull(kid)

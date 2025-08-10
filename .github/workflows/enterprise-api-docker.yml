@@ -1,0 +1,56 @@
+name: Build and/or push enterprise api docker (reusable workflow)
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "release version"
+        required: true
+        type: string
+      publish:
+        description: "Specifies whether to publish the images (defaults to false)"
+        required: false
+        type: boolean
+        default: false
+      artifact:
+        description: "Upload docker artifact (defaults to false)"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@29f904ce0de831e02fe64507ebe284b02e66b50e
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          checkoutUnifiedToRepoDir: true
+      - name: Configure gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@a4a92e12ee9b7396ee9a22083ff21b3277c627d6
+      - name: Patch *.gradle.kts for CI paths
+        run: |
+          sed -i '/allprojects {/,/}/{s/version = ".*"/version = "${{ inputs.version }}"/}' ${{ github.workspace }}/waltid-unified-build/build.gradle.kts
+          sed -i 's|val waltidIdentityPath = "waltid-identity"|val waltidIdentityPath = "../waltid-identity"|' ${{ github.workspace }}/waltid-unified-build/settings.gradle.kts
+          sed -i 's|val waltidIdentityEnterprisePath = "waltid-identity-enterprise"|val waltidIdentityEnterprisePath = "../waltid-identity-enterprise"|' ${{ github.workspace }}/waltid-unified-build/settings.gradle.kts
+
+      - name: Build and push Docker images (waltid-enterprise-api)
+        run: cd waltid-unified-build && ./gradlew :waltid-enterprise-api:publishImage
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+
+      - name: Save Docker Image to waltid-enterprise-api.tar.gz
+        if: ${{ inputs.artifact }}
+        run: docker save waltid/waltid-enterprise-api:${{ inputs.version }} | gzip > ${{ runner.temp }}/waltid-enterprise-api.tar.gz
+        continue-on-error: false
+      - name: Upload artifact
+        if: ${{ inputs.artifact }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: waltid-enterprise-api
+          path: ${{ runner.temp }}/waltid-enterprise-api.tar.gz
+          retention-days: 1

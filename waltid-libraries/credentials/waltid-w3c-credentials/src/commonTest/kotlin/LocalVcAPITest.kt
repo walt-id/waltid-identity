@@ -10,7 +10,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 
-val keysToTest = listOf(KeyType.Ed25519, KeyType.secp256r1, KeyType.secp256k1, KeyType.RSA)
+val keysToTest = KeyType.entries
 
 private suspend fun init(didMethodsToTest: List<String>) {
     DidService.minimalInit()

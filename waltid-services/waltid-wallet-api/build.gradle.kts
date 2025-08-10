@@ -66,7 +66,7 @@ dependencies {
 
     /* -- KTOR -- */
 
-    val ktor_version = "3.1.2"
+    val ktor_version = "3.2.0"
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-auth-jvm:$ktor_version")

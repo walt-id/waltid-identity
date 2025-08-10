@@ -16,13 +16,6 @@ import kotlin.js.JsExport
 @JsExport
 object JwsUtils {
 
-    fun KeyType.jwsAlg() = when (this) {
-        KeyType.Ed25519 -> "EdDSA"
-        KeyType.secp256r1 -> "ES256"
-        KeyType.secp256k1 -> "ES256K"
-        KeyType.RSA -> "RS256" // TODO: RS384 RS512
-    }
-
     private fun String.decodeJwsPart(): JsonObject =
         Json.parseToJsonElement(this.base64toBase64Url().decodeFromBase64Url().decodeToString()).jsonObject
 

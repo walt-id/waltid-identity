@@ -1,0 +1,81 @@
+name: Checkout all repos with ref fallback
+description: |
+  Checks out waltid-unified-build, waltid-identity, and waltid-identity-enterprise
+  repositories using a provided ref, falling back to main if it doesn't exist.
+
+inputs:
+  token:
+    description: 'GitHub token (optional, defaults to github.token)'
+    required: false
+    default: ${{ github.token }}
+  checkoutUnifiedToRepoDir:
+    description: 'If set to "yes", checkout waltid-unified-build to its repo name instead of "."'
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Determine ref for waltid-unified-build
+      id: ref_unified
+      shell: bash
+      env:
+        REF: ${{ github.ref_name }}
+        TOKEN: ${{ inputs.token }}
+      run: |
+        REPO="walt-id/waltid-unified-build"
+        if [ -n "$REF" ] && git ls-remote --exit-code "https://${TOKEN}@github.com/${REPO}.git" "$REF"; then
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+        else
+          echo "ref=main" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Checkout waltid-unified-build
+      uses: actions/checkout@v4
+      with:
+        repository: walt-id/waltid-unified-build
+        ref: ${{ steps.ref_unified.outputs.ref }}
+        token: ${{ inputs.token }}
+        path: ${{ inputs.checkoutUnifiedToRepoDir == 'true' && 'waltid-unified-build' || '.' }}
+
+    - name: Determine ref for waltid-identity
+      id: ref_identity
+      shell: bash
+      env:
+        REF: ${{ github.ref_name }}
+      run: |
+        REPO="walt-id/waltid-identity"
+        if [ -n "$REF" ] && git ls-remote --exit-code "https://github.com/${REPO}.git" "$REF"; then
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+        else
+          echo "ref=main" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Checkout waltid-identity
+      uses: actions/checkout@v4
+      with:
+        repository: walt-id/waltid-identity
+        ref: ${{ steps.ref_identity.outputs.ref }}
+        token: ${{ inputs.token }}
+        path: waltid-identity
+
+    - name: Determine ref for waltid-identity-enterprise
+      id: ref_enterprise
+      shell: bash
+      env:
+        REF: ${{ github.ref_name }}
+      run: |
+        REPO="walt-id/waltid-identity-enterprise"
+        if [ -n "$REF" ] && git ls-remote --exit-code "https://github.com/${REPO}.git" "$REF"; then
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+        else
+          echo "ref=main" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Checkout waltid-identity-enterprise
+      uses: actions/checkout@v4
+      with:
+        repository: walt-id/waltid-identity-enterprise
+        ref: ${{ steps.ref_enterprise.outputs.ref }}
+        token: ${{ inputs.token }}
+        path: waltid-identity-enterprise

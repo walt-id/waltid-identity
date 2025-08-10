@@ -4,6 +4,7 @@ import id.walt.did.dids.resolver.UniresolverResolver
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.condition.EnabledIf
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
@@ -16,28 +17,30 @@ import kotlin.test.assertEquals
 
 class UniResolverTest {
 
-    private val sut = UniresolverResolver()
+    private val uniresolver = UniresolverResolver()
 
     @ParameterizedTest
     @MethodSource
     @EnabledIf("isUniresolverAvailable")
+    @Disabled("uniresolver failing to resolve test dids")
     fun `given a did String, when calling resolve, then the result is a valid did document`(
         did: String, document: String,
     ) = runTest {
         println("Resolving: $did")
-        val result = sut.resolve(did).getOrThrow()
+        val resolved = uniresolver.resolve(did).getOrThrow()
 
-        check(Json.parseToJsonElement(document) == result) { "Non equal: $document  !=  $result" }
+        check(Json.parseToJsonElement(document) == resolved) { "Non equal: $document != resolved $resolved" }
     }
 
     @ParameterizedTest
     @MethodSource
     @EnabledIf("isUniresolverAvailable")
+    @Disabled("uniresolver failing to resolve test dids")
     fun `given a did String, when calling resolveToKey, then the result is valid key`(
         did: String, key: String,
     ) = runTest {
         println("Resolving: $did")
-        val result = sut.resolveToKey(did)
+        val result = uniresolver.resolveToKey(did)
         assertEquals(true, result.isSuccess)
         assertEquals(key, result.getOrNull()?.exportJWK())
     }

@@ -1,6 +1,5 @@
 package id.walt.crypto.keys.azure
 
-import id.walt.crypto.exceptions.KeyTypeNotSupportedException
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.KeyUtils.rawSignaturePayloadForJws
 import id.walt.crypto.keys.KeyUtils.signJwsWithRawSignature
@@ -11,7 +10,6 @@ import id.walt.crypto.keys.azure.AzureKey.AzureKeyFunctions.parseAzurePublicKey
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
-import id.walt.crypto.utils.jwsSigningAlgorithm
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -143,7 +141,7 @@ class AzureKey(
         val sha256Digest: ByteArray = SHA256().digest(plaintext)
         val base64UrlEncoded: String = sha256Digest.encodeToBase64Url()
 
-        val signingAlgorithm = jwsSigningAlgorithm(keyType)
+        val signingAlgorithm = keyType.jwsAlg
 
         val body = buildJsonObject {
             put("alg", JsonPrimitive(signingAlgorithm))
@@ -158,7 +156,7 @@ class AzureKey(
 
         // Convert signature from Azure IEEE P1363 to default DER format for raw sign
         // if not explicitly asked to leave it in IEEE P1363 with `ieeeP1363Signature`
-        if (!ieeeP1363Signature && keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) {
+        if (!ieeeP1363Signature && keyType in KeyTypes.EC_KEYS) {
             signature = EccUtils.convertP1363toDER(signature)
         }
 
@@ -170,7 +168,7 @@ class AzureKey(
     @JsPromise
     @JsExport.Ignore
     @OptIn(ExperimentalStdlibApi::class)
-    override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         return signRawAzure(plaintext, ieeeP1363Signature = false)
     }
 
@@ -195,10 +193,7 @@ class AzureKey(
     @JsPromise
     @JsExport.Ignore
     @OptIn(ExperimentalEncodingApi::class)
-    override suspend fun verifyRaw(
-        signed: ByteArray,
-        detachedPlaintext: ByteArray?
-    ): Result<ByteArray> {
+    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> {
 
         val publicKey = getPublicKey()
         val verification = publicKey.verifyRaw(signed, detachedPlaintext)
@@ -277,23 +272,12 @@ class AzureKey(
     }
 
     object AzureKeyFunctions {
-        internal fun keyTypeToAzureKeyMapping(type: KeyType): Pair<String, String?> = when (type) {
-            KeyType.secp256r1 -> "EC" to "P-256"  // EC key with P-256 curve
-            KeyType.secp256k1 -> "EC" to "P-256K" // EC key with P-256K curve
-            KeyType.RSA -> "RSA" to null  // RSA key, no curve
-            else -> throw KeyTypeNotSupportedException(type.name)
-        }
+        // See: https://docs.azure.cn/en-us/key-vault/keys/about-keys-details
+        internal fun keyTypeToAzureKeyMapping(type: KeyType): Pair<String, String?> =
+            if (type == KeyType.secp256k1) "EC" to "P-256K" // Azure uses old "P-256K" instead of modern "secp256k1"
+            else type.jwkKty to type.jwkCurve
 
-        internal fun azureKeyToKeyTypeMapping(crv: String, kty: String): KeyType = when (kty) {
-            "EC" -> when (crv) {
-                "P-256" -> KeyType.secp256r1  // Mapping P-256 curve to secp256r1
-                "P-256K" -> KeyType.secp256k1 // Mapping P-256K curve to secp256k1
-                else -> throw KeyTypeNotSupportedException(crv)
-            }
-
-            "RSA" -> KeyType.RSA  // Mapping RSA key type
-            else -> throw KeyTypeNotSupportedException(kty)
-        }
+        internal fun azureKeyToKeyTypeMapping(crv: String, kty: String): KeyType = KeyTypes.getKeyTypeByJwkId(jwkKty = kty, jwkCrv = crv)
 
         data class ParsedAzurePublicKey(
             val kid: String,

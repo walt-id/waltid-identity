@@ -2,7 +2,6 @@ package id.walt.crypto.keys
 
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.crypto.utils.jwsSigningAlgorithm
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
@@ -15,7 +14,7 @@ object KeyUtils {
         keyType: KeyType,
     ): Triple<String, String, ByteArray> {
         val appendedHeader = HashMap(headers).apply {
-            put("alg", jwsSigningAlgorithm(keyType).toJsonElement())
+            put("alg", keyType.jwsAlg.toJsonElement())
         }
 
         val header = Json.encodeToString(appendedHeader).encodeToByteArray().encodeToBase64Url()

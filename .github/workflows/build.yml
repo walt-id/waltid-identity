@@ -1,7 +1,7 @@
-name: Build on every push except main branch
+name: Build on every push
 
 on:
-  workflow_dispatch:
+  push:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -11,7 +11,8 @@ jobs:
   version:
     uses: walt-id/waltid-identity/.github/workflows/version.yml@266f5c09359450c39019a6da38f2b331e7122918
   gradle-build:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@02e2ecf03928acb9ed2e6024fdab3dc9f75c4a2d
+    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@3c360ff47f15ed48833e75df5fc39c6a22356912
+    secrets: inherit
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
@@ -20,12 +21,19 @@ jobs:
     with:
       jsonpath: ".github/workflows/data/docker-matrix.json"
   docker:
-    uses: walt-id/waltid-identity/.github/workflows/docker.yml@a99af313ae1f930dbf03c1bd41f006ac74f77e43
+    uses: walt-id/waltid-identity/.github/workflows/docker.yml@3c360ff47f15ed48833e75df5fc39c6a22356912
+    secrets: inherit
     needs: [ version, docker-matrix ]
     with:
       images: ${{ needs.docker-matrix.outputs.json }}
       version: ${{ needs.version.outputs.release_version }}
       artifact: true
+  enterprise-api-docker:
+    uses: walt-id/waltid-identity/.github/workflows/enterprise-api-docker.yml@3c360ff47f15ed48833e75df5fc39c6a22356912
+    secrets: inherit
+    needs: [ version, docker-matrix ]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
   ebsi-ct-v3:
     uses: walt-id/waltid-identity/.github/workflows/ebsictv3.yml@3f56b05ff315770abd06e7a931b5a73942296cc4
     needs: [ version, docker ]

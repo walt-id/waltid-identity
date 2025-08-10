@@ -1,0 +1,35 @@
+{
+  "uuid": "E693D0C8-C702-4E6C-A70D-0D4DA4C408A0",
+  "title": "Sign1 - ECDSA w/ SHA-384 (sign)",
+  "description": "Sign with one signer using ECDSA w/ SHA-384",
+  "key": {
+    "kty": "EC",
+    "kid": "P384",
+    "crv": "P-384",
+    "x": "kTJyP2KSsBBhnb4kjWmMF7WHVsY55xUPgb7k64rDcjatChoZ1nvjKmYmPh5STRKc",
+    "y": "mM0weMVU2DKsYDxDJkEP9hZiRZtB8fPfXbzINZj_fF7YQRynNWedHEyzAJOX2e8s",
+    "d": "ok3Nq97AXlpEusO7jIy1FZATlBP9PNReMU7DWbkLQ5dU90snHuuHVDjEPmtV0fTo"
+  },
+  "alg": "ES384",
+  "sign1::sign": {
+    "payload": "546869732069732074686520636f6e74656e742e",
+    "protectedHeaders": {
+      "cborHex": "a1013822",
+      "cborDiag": "{1: -35}"
+    },
+    "unprotectedHeaders": {
+      "cborHex": "a1044450333834",
+      "cborDiag": "{4: 'P384'}"
+    },
+    "tbsHex": {
+      "cborHex": "846a5369676e61747572653144a10138224054546869732069732074686520636f6e74656e742e",
+      "cborDiag": "[\"Signature1\", h'A1013822', h'', h'546869732069732074686520636F6E74656E742E']"
+    },
+    "detached": false,
+    "expectedOutput": {
+      "cborHex": "d28444a1013822a104445033383454546869732069732074686520636f6e74656e742e5860aa46c1ab71cd3c1e68ed62c27653797cb72cba3a856fd5e2f38794eee0d666e88139ec51fb62466f4865ca56df493905911e329e829c1887f6259681360a8e7f7d3fd080dcb0720066f13e1621656700c99d6e3771ac2549fde998ee9b1e2cad",
+      "cborDiag": "18([h'A1013822', {4: 'P384'}, h'546869732069732074686520636F6E74656E742E', h'AA46C1AB71CD3C1E68ED62C27653797CB72CBA3A856FD5E2F38794EEE0D666E88139EC51FB62466F4865CA56DF493905911E329E829C1887F6259681360A8E7F7D3FD080DCB0720066F13E1621656700C99D6E3771AC2549FDE998EE9B1E2CAD'])"
+    },
+    "fixedOutputLength": 35
+  }
+}

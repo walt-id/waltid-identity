@@ -37,7 +37,11 @@ jobs:
     steps:
       - run: |
           echo "${{ matrix.image }}::: ${{ inputs.tag }} / ${{ inputs.version }}"
-      - uses: actions/checkout@v4
+
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@29f904ce0de831e02fe64507ebe284b02e66b50e
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
       - name: Login to Docker Hub
         if: ${{ inputs.publish }}
         uses: docker/login-action@v3
@@ -51,6 +55,7 @@ jobs:
         with:
           push: ${{ inputs.publish }}
           file: ${{ matrix.folder }}/Dockerfile
+          context: ${{ matrix.context }}
           tags: waltid/${{ matrix.image }}:${{ inputs.tag }}, waltid/${{ matrix.image }}:${{ inputs.version }}
           load: true
           build-args: |

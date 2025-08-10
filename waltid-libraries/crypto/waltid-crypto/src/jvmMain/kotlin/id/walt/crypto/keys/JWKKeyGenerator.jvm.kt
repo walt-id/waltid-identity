@@ -30,8 +30,12 @@ object JvmJWKKeyCreator : JWKKeyCreator {
         val keyGenerator: JWKGenerator<out JWK> = when (type) {
             KeyType.Ed25519 -> OctetKeyPairGenerator(Curve.Ed25519)
             KeyType.secp256r1 -> ECKeyGenerator(Curve.P_256)
+            KeyType.secp384r1 -> ECKeyGenerator(Curve.P_384)
+            KeyType.secp521r1 -> ECKeyGenerator(Curve.P_521)
             KeyType.secp256k1 -> ECKeyGenerator(Curve.SECP256K1)
             KeyType.RSA -> RSAKeyGenerator(metadata?.keySize ?: 2048)
+            KeyType.RSA3072 -> RSAKeyGenerator(metadata?.keySize ?: 3072)
+            KeyType.RSA4096 -> RSAKeyGenerator(metadata?.keySize ?: 4096)
         }.run {
             if (type == KeyType.secp256k1) {
                 provider(BouncyCastleProviderSingleton.getInstance())
@@ -40,7 +44,7 @@ object JvmJWKKeyCreator : JWKKeyCreator {
 
         val jwk = keyGenerator.generate()
 
-        return JWKKey(jwk)
+        return JWKKey(jwk).apply { init() }
     }
 
     override suspend fun importRawPublicKey(type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMeta?): Key =
@@ -49,7 +53,9 @@ object JvmJWKKeyCreator : JWKKeyCreator {
                 KeyType.Ed25519 -> OctetKeyPair.Builder(Curve.Ed25519, Base64URL.encode(rawPublicKey)).build()
                 KeyType.secp256k1 -> ecRawToJwk(rawPublicKey, Curve.SECP256K1)
                 KeyType.secp256r1 -> ecRawToJwk(rawPublicKey, Curve.P_256)
-                KeyType.RSA -> rawRsaToJwk(rawPublicKey)
+                KeyType.secp384r1 -> ecRawToJwk(rawPublicKey, Curve.P_384)
+                KeyType.secp521r1 -> ecRawToJwk(rawPublicKey, Curve.P_521)
+                KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> rawRsaToJwk(rawPublicKey)
             }
         )
 
