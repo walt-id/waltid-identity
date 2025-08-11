@@ -14,7 +14,6 @@ import id.walt.issuer.issuerModule
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
-import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
 import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.config.RegistrationDefaultsConfig
@@ -88,7 +87,6 @@ class WaltidServicesE2ETests {
         issuerModule(false)
         lspPotentialIssuanceTestApi()
         verifierModule(false)
-        lspPotentialVerificationTestApi()
     }
 
     val e2e = E2ETest()
