@@ -44,6 +44,7 @@ jobs:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
       - name: Set up Docker
+        if: ${{ inputs.artifact }}
         uses: docker/setup-docker-action@v4
         with:
           daemon-config: |
@@ -70,7 +71,7 @@ jobs:
           file: ${{ matrix.folder }}/Dockerfile
           context: ${{ matrix.context }}
           tags: waltid/${{ matrix.image }}:${{ inputs.tag }}, waltid/${{ matrix.image }}:${{ inputs.version }}
-          load: true
+          load: ${{ inputs.artifact }}
           build-args: |
             --progress=plain
         continue-on-error: false
