@@ -96,7 +96,6 @@ services:
       PORT: $DEV_WALLET_FRONTEND_PORT
 
   web-portal:
-    platform: linux/amd64
     image: ${IMAGE_PREFIX}waltid/portal:${VERSION_TAG:-latest}
     profiles:
       - apps
