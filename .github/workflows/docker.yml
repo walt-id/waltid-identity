@@ -53,6 +53,7 @@ jobs:
       - name: Build and push Docker images (${{ matrix.image }})
         uses: docker/build-push-action@v6
         with:
+          platforms: linux/amd64,linux/arm64
           push: ${{ inputs.publish }}
           file: ${{ matrix.folder }}/Dockerfile
           context: ${{ matrix.context }}

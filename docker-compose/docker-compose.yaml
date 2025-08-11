@@ -60,7 +60,6 @@ services:
       OPA_SERVER_URL: "http://opa-server:8181"
 
   waltid-demo-wallet:
-    platform: linux/amd64
     image: ${IMAGE_PREFIX}waltid/waltid-demo-wallet:${VERSION_TAG:-latest}
     profiles:
       - apps
@@ -79,7 +78,6 @@ services:
       PORT: $DEMO_WALLET_FRONTEND_PORT
 
   waltid-dev-wallet:
-    platform: linux/amd64
     image: ${IMAGE_PREFIX}waltid/waltid-dev-wallet:${VERSION_TAG:-latest}
     profiles:
       - apps
