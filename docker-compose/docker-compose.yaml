@@ -1,6 +1,5 @@
 services:
   wallet-api:
-    platform: linux/amd64
     image: ${IMAGE_PREFIX}waltid/wallet-api:${VERSION_TAG:-latest}
     profiles:
       - services
@@ -25,7 +24,6 @@ services:
       - ./wallet-api/data:/data
 
   issuer-api:
-    platform: linux/amd64
     image: ${IMAGE_PREFIX}waltid/issuer-api:${VERSION_TAG:-latest}
     profiles:
       - services
@@ -43,7 +41,6 @@ services:
       - ./issuer-api/config:/config
 
   verifier-api:
-    platform: linux/amd64
     image: ${IMAGE_PREFIX}waltid/verifier-api:${VERSION_TAG:-latest}
     profiles:
       - services
