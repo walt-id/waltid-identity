@@ -18,8 +18,6 @@ import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
 import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.config.RegistrationDefaultsConfig
-import id.walt.webwallet.service.issuers.IssuersService
-import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.webWalletModule
@@ -439,115 +437,6 @@ class WaltidServicesE2ETests {
         timeout = defaultTestTimeout,
     ) {
         PresentationDefinitionPolicyTests(e2e).runTests()
-    }
-
-    //@Test
-    fun testExternalSignatureAPIs() = E2ETest().testBlock(
-        config = ServiceConfiguration("e2e-test"),
-        features = listOf(
-            id.walt.issuer.FeatureCatalog,
-            id.walt.verifier.FeatureCatalog,
-            id.walt.webwallet.FeatureCatalog
-        ),
-        featureAmendments = mapOf(
-            CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
-            // CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
-        ),
-        init = {
-            id.walt.webwallet.webWalletSetup()
-            id.walt.did.helpers.WaltidServices.minimalInit()
-            id.walt.webwallet.db.Db.start()
-        },
-        module = e2eTestModule,
-        timeout = defaultTestTimeout
-    ) {
-        ExchangeExternalSignatures(this).executeTestCases()
-    }
-
-    //@Test
-    fun inputDescriptorTest() = E2ETest().testBlock(
-        config = ServiceConfiguration("e2e-test"),
-        features = listOf(
-            id.walt.issuer.FeatureCatalog,
-            id.walt.verifier.FeatureCatalog,
-            id.walt.webwallet.FeatureCatalog
-        ),
-        featureAmendments = mapOf(
-            CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
-            // CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
-        ),
-        init = {
-            id.walt.webwallet.webWalletSetup()
-            id.walt.did.helpers.WaltidServices.minimalInit()
-            id.walt.webwallet.db.Db.start()
-        },
-        module = e2eTestModule,
-        timeout = defaultTestTimeout
-    ) {
-        var client = testHttpClient()
-        lateinit var accountId: Uuid
-        lateinit var wallet: Uuid
-        var authApi = AuthApi(this, client)
-
-        // the e2e http request tests here
-
-        //region -Auth-
-
-        authApi.apply {
-            test("1. Auth - Login") {
-                userInfo(HttpStatusCode.Unauthorized)
-                val loginResult = login(defaultEmailAccount)
-                client = testHttpClient(token = loginResult["token"]!!.jsonPrimitive.content)
-                authApi = AuthApi(e2e, client)
-            }
-        }
-        authApi.apply {
-            userInfo(HttpStatusCode.OK) {
-                accountId = it.id
-            }
-            userSession()
-            userWallets(accountId) {
-                wallet = it.wallets.first().id
-                println("Selected wallet: $wallet")
-            }
-        }
-        //region -Dids-
-        val didsApi = DidsApi(e2e, client)
-        lateinit var did: String
-        didsApi.list(wallet, DidsApi.DefaultDidOption.Any, 1) {
-            assert(it.first().default)
-            did = it.first().did
-        }
-
-        val issuerApi = IssuerApi(e2e, client)
-        val exchangeApi = ExchangeApi(e2e, client)
-        val credentialsApi = CredentialsApi(e2e, client)
-        val sessionApi = Verifier.SessionApi(e2e, client)
-        val verificationApi = Verifier.VerificationApi(e2e, client)
-
-        // Input descriptor matching test
-        val inputDescTest = InputDescriptorMatchingTest(issuerApi, exchangeApi, sessionApi, verificationApi)
-
-        inputDescTest.e2e(wallet, did)
-    }
-
-    //@Test
-    suspend fun issuerCredentialsListTest() {
-        var client = testHttpClient()
-        assertFalse(
-            IssuerUseCaseImpl(
-                IssuersService,
-                client
-            ).fetchCredentials("https://issuer.portal.walt-test.cloud/draft11/.well-known/openid-credential-issuer")
-                .isEmpty()
-        )
-        assertFalse(
-            IssuerUseCaseImpl(
-                IssuersService,
-                client
-            ).fetchCredentials("https://issuer.portal.walt-test.cloud/draft13/.well-known/openid-credential-issuer")
-                .isEmpty()
-        )
     }
 }
 
