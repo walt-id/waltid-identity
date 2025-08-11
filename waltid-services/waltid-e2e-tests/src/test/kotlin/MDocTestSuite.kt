@@ -1,6 +1,7 @@
-@file:OptIn(ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUuidApi::class)
 
 import com.nimbusds.jose.jwk.ECKey
+import com.upokecenter.cbor.CBORObject
 import id.walt.commons.testing.E2ETest
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
@@ -13,19 +14,25 @@ import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSECryptoProvider
 import id.walt.mdoc.cose.COSEX5Chain
-import id.walt.mdoc.dataelement.DEType
-import id.walt.mdoc.dataelement.NumberElement
-import id.walt.mdoc.dataelement.StringElement
+import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.dataelement.toJsonElement
+import id.walt.mdoc.dataretrieval.DeviceResponse
+import id.walt.mdoc.dataretrieval.DeviceResponseStatus
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.issuersigned.IssuerSignedItem
+import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.oid4vc.OpenID4VCIVersion
+import id.walt.oid4vc.OpenID4VP
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.OpenIDProviderMetadata
+import id.walt.oid4vc.data.ResponseMode
+import id.walt.oid4vc.requests.AuthorizationRequest
+import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.verifier.openapi.VerifierApiExamples
 import id.walt.webwallet.db.models.WalletCredential
+import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -50,6 +57,10 @@ import java.math.BigInteger
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import kotlin.test.*
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 
 class MDocTestSuite(
@@ -72,6 +83,9 @@ class MDocTestSuite(
     private val MDOC_ISSUE_URL = "/openid4vc/mdoc/issue"
     private val WALLET_HANDLE_OFFER_URL =
         "/wallet-api/wallet/${mDocWallet.walletId}/exchange/useOfferRequest"
+    private val WALLET_HANDLE_VERIFY_URL =
+        "/wallet-api/wallet/${mDocWallet.walletId}/exchange/usePresentationRequest"
+    private val VERIFY_URL = "/openid4vc/verify"
 
     private val client = e2e.testHttpClient()
 
@@ -116,7 +130,7 @@ class MDocTestSuite(
         ),
     )
 
-    private suspend fun validateIssuerMetadata() =
+    private suspend fun validateIssuerMetadataMdlEntry() =
         e2e.test(
             name = "$TEST_SUITE : Validate Issuer Metadata mDL Entry",
         ) {
@@ -349,6 +363,11 @@ class MDocTestSuite(
 
         assertDoesNotThrow {
             dsCertificate.checkValidity()
+        }
+
+        assertTrue {
+            (dsCertificate.notAfter.time - dsCertificate.notBefore.time)
+                .toDuration(DurationUnit.MILLISECONDS) <= (457).toDuration(DurationUnit.DAYS)
         }
 
         certificateSerialNoAssertions(dsCertificate.serialNumber)
@@ -704,9 +723,155 @@ class MDocTestSuite(
         }
     }
 
-    private suspend fun issueMdlOnlyRequiredFields() =
+    private suspend fun validateMdlPresentation(
+        mDL: MDoc,
+        mDLCredentialId: String,
+        presentationRequest: JsonObject,
+    ) {
+
+        val sessionId = Uuid.random().toString()
+
+        val presentationUrl = client.post(VERIFY_URL) {
+            headers {
+                append("stateId", sessionId)
+                append("responseMode", ResponseMode.direct_post_jwt.toString())
+            }
+            setBody(presentationRequest)
+        }.expectSuccess().bodyAsText()
+
+        mDocWallet.walletClient.post(WALLET_HANDLE_VERIFY_URL) {
+            setBody(
+                UsePresentationRequest(
+                    presentationRequest = presentationUrl,
+                    selectedCredentials = listOf(mDLCredentialId),
+                )
+            )
+        }.expectSuccess()
+
+        val sessionInfo = client.get("/openid4vc/session/${sessionId}")
+            .expectSuccess().body<PresentationSessionInfo>().let {
+                assertTrue(it.verificationResult!!)
+                it
+            }
+
+        val authReq = client.get("/openid4vc/request/${sessionId}")
+            .expectSuccess().bodyAsText().let {
+                AuthorizationRequest.fromRequestObject(it)
+            }
+
+        val authReqNonce = assertNotNull(authReq.nonce)
+
+        val tokenResponse = assertNotNull(sessionInfo.tokenResponse)
+
+        val vpToken = assertNotNull(tokenResponse.vpToken)
+
+        val deviceResponse = assertDoesNotThrow {
+            DeviceResponse.fromCBORBase64URL(vpToken.jsonPrimitive.content)
+        }
+
+        assertNull(deviceResponse.documentErrors)
+
+        assertEquals(
+            expected = DeviceResponseStatus.OK.status.toInt(),
+            actual = deviceResponse.status.value.toInt(),
+        )
+
+        assertEquals(
+            expected = StringElement("1.0"),
+            actual = deviceResponse.version,
+        )
+
+        assertEquals(
+            expected = 1,
+            actual = deviceResponse.documents.size,
+        )
+
+        val presentedMdoc = assertNotNull(
+            deviceResponse.documents.first()
+        )
+
+        assertEquals(
+            expected = mDL.docType,
+            actual = presentedMdoc.docType,
+        )
+
+        assertEquals(
+            expected = mDL.issuerSigned.nameSpaces!!.size,
+            actual = presentedMdoc.issuerSigned.nameSpaces!!.size,
+        )
+
+        val issuedSignedItems = mDL.issuerSigned.nameSpaces!![ISO_IEC_MDL_NAMESPACE_ID]!!
+        val presentedSignedItems = presentedMdoc.issuerSigned.nameSpaces!![ISO_IEC_MDL_NAMESPACE_ID]!!
+
+        assertTrue {
+            issuedSignedItems.containsAll(presentedSignedItems)
+        }
+
+        assertEquals(
+            expected = mDL.MSO!!.toMapElement(),
+            actual = presentedMdoc.MSO!!.toMapElement(),
+        )
+
+        val deviceSigned = assertNotNull(presentedMdoc.deviceSigned)
+
+        assertNull(deviceSigned.deviceAuth.deviceMac)
+
+        val deviceSignature = assertNotNull(deviceSigned.deviceAuth.deviceSignature)
+
+        val deviceOneKey = assertDoesNotThrow {
+            OneKey(
+                CBORObject.DecodeFromBytes(
+                    mDL.MSO!!.deviceKeyInfo.deviceKey.toCBOR()
+                )
+            )
+        }
+
+
+        val walletVerificationKeyId = "wallet-verification-key"
+
+        val deviceSignatureCoseVerifier = SimpleCOSECryptoProvider(
+            keys = listOf(
+                COSECryptoProviderKeyInfo(
+                    keyID = walletVerificationKeyId,
+                    algorithmID = AlgorithmID.ECDSA_256,
+                    publicKey = deviceOneKey.AsPublicKey(),
+                ),
+            )
+        )
+
+        val mDocRestoredHandover = OpenID4VP.generateMDocOID4VPHandover(
+            authorizationRequest = authReq,
+            mdocNonce = authReqNonce,
+        )
+
+        val sessionTranscript = ListElement(
+            value = listOf(
+                NullElement(),
+                NullElement(),
+                mDocRestoredHandover,
+            ),
+        )
+
+        val deviceAuthentication = DeviceAuthentication(
+            sessionTranscript = sessionTranscript,
+            docType = presentedMdoc.docType.value,
+            deviceNameSpaces = EncodedCBORElement(MapElement(mapOf())),
+        )
+
+        assertTrue {
+            deviceSignatureCoseVerifier.verify1(
+                coseSign1 = deviceSignature.attachPayload(
+                    payload = EncodedCBORElement(deviceAuthentication.toDE()).toCBOR()
+                ),
+                keyID = walletVerificationKeyId,
+            )
+        }
+
+    }
+
+    private suspend fun e2eIssuePresentMdlOnlyRequiredFields() =
         e2e.test(
-            name = "$TEST_SUITE : Issue mDL to wallet with only required fields",
+            name = "$TEST_SUITE : e2e mDL: Issuance and Presentation of mDL with only required fields",
         ) {
 
             val mDLIssuanceRequest = MdocDocs.mdlBaseIssuanceExample
@@ -720,10 +885,10 @@ class MDocTestSuite(
                 setBody(mDLIssuanceRequest)
             }.expectSuccess().bodyAsText()
 
-            val mDL = mDocWallet.walletClient.post(WALLET_HANDLE_OFFER_URL) {
+            val (mDL, mDLCredentialId) = mDocWallet.walletClient.post(WALLET_HANDLE_OFFER_URL) {
                 setBody(offerUrl)
             }.expectSuccess().body<List<WalletCredential>>().let {
-                mDLHandleOfferWalletRetrievedCredentials(it)
+                mDLHandleOfferWalletRetrievedCredentials(it) to it.first().id
             }
 
             mDLIssuedCredentialValidations(
@@ -737,11 +902,16 @@ class MDocTestSuite(
                 iacaCertificate = iacaRootX509Certificate
             )
 
+            validateMdlPresentation(
+                mDL = mDL,
+                mDLCredentialId = mDLCredentialId,
+                presentationRequest = VerifierApiExamples.mDLRequiredFieldsExample,
+            )
         }
 
-    private suspend fun issueMdlSingleAgeAttestation() =
+    private suspend fun e2eIssuePresentMdlSingleAgeAttestation() =
         e2e.test(
-            name = "$TEST_SUITE : Issue mDL to wallet with all required fields and a single age attestation",
+            name = "$TEST_SUITE : e2e mDL: Issuance and Presentation of mDL with all required fields and a single age attestation",
         ) {
 
             val mDLIssuanceRequest = MdocDocs.mDLSingleAgeAttestation
@@ -766,10 +936,10 @@ class MDocTestSuite(
                 setBody(mDLIssuanceRequest)
             }.expectSuccess().bodyAsText()
 
-            val mDL = mDocWallet.walletClient.post(WALLET_HANDLE_OFFER_URL) {
+            val (mDL, mDLCredentialId) = mDocWallet.walletClient.post(WALLET_HANDLE_OFFER_URL) {
                 setBody(offerUrl)
             }.expectSuccess().body<List<WalletCredential>>().let {
-                mDLHandleOfferWalletRetrievedCredentials(it)
+                mDLHandleOfferWalletRetrievedCredentials(it) to it.first().id
             }
 
             mDLIssuedCredentialValidations(
@@ -784,11 +954,17 @@ class MDocTestSuite(
                 optionalClaimsMap = optionalClaimsMap,
             )
 
+            validateMdlPresentation(
+                mDL = mDL,
+                mDLCredentialId = mDLCredentialId,
+                presentationRequest = VerifierApiExamples.mDLRequiredFieldsExample,
+            )
+
         }
 
-    private suspend fun issueMdlMultipleAgeAttestations() =
+    private suspend fun e2eIssuePresentMdlMultipleAgeAttestations() =
         e2e.test(
-            name = "$TEST_SUITE : Issue mDL to wallet with all required fields and multiple age attestations",
+            name = "$TEST_SUITE : e2e mDL: Issuance and Presentation of mDL with all required fields and multiple age attestations",
         ) {
 
             val mDLIssuanceRequest = MdocDocs.mDLMultipleAgeAttestations
@@ -815,10 +991,10 @@ class MDocTestSuite(
                 setBody(mDLIssuanceRequest)
             }.expectSuccess().bodyAsText()
 
-            val mDL = mDocWallet.walletClient.post(WALLET_HANDLE_OFFER_URL) {
+            val (mDL, mDLCredentialId) = mDocWallet.walletClient.post(WALLET_HANDLE_OFFER_URL) {
                 setBody(offerUrl)
             }.expectSuccess().body<List<WalletCredential>>().let {
-                mDLHandleOfferWalletRetrievedCredentials(it)
+                mDLHandleOfferWalletRetrievedCredentials(it) to it.first().id
             }
 
             mDLIssuedCredentialValidations(
@@ -833,11 +1009,18 @@ class MDocTestSuite(
                 optionalClaimsMap = optionalClaimsMap,
             )
 
+            validateMdlPresentation(
+                mDL = mDL,
+                mDLCredentialId = mDLCredentialId,
+                presentationRequest = VerifierApiExamples.mDLRequiredFieldsExample,
+            )
+
         }
 
-    private suspend fun issueMdlAllFieldsMultipleAgeAttestations() =
+    private suspend fun e2eIssuePresentMdlAllFieldsMultipleAgeAttestations() =
         e2e.test(
-            name = "$TEST_SUITE : Issue mDL to wallet with all fields and multiple age attestations",
+            name = "$TEST_SUITE : e2e mDL: Issuance and Presentation of mDL with all fields and multiple age attestations",
+
         ) {
 
             val mDLIssuanceRequest = MdocDocs.mDLAllFieldsMultipleAgeAttestations
@@ -916,10 +1099,10 @@ class MDocTestSuite(
                 setBody(mDLIssuanceRequest)
             }.expectSuccess().bodyAsText()
 
-            val mDL = mDocWallet.walletClient.post(WALLET_HANDLE_OFFER_URL) {
+            val (mDL, mDLCredentialId) = mDocWallet.walletClient.post(WALLET_HANDLE_OFFER_URL) {
                 setBody(offerUrl)
             }.expectSuccess().body<List<WalletCredential>>().let {
-                mDLHandleOfferWalletRetrievedCredentials(it)
+                mDLHandleOfferWalletRetrievedCredentials(it) to it.first().id
             }
 
             mDLIssuedCredentialValidations(
@@ -934,14 +1117,20 @@ class MDocTestSuite(
                 optionalClaimsMap = optionalClaimsMap,
             )
 
+            validateMdlPresentation(
+                mDL = mDL,
+                mDLCredentialId = mDLCredentialId,
+                presentationRequest = VerifierApiExamples.mDLRequiredFieldsExample,
+            )
+
         }
 
     suspend fun runTestSuite() {
-        validateIssuerMetadata()
-        issueMdlOnlyRequiredFields()
-        issueMdlSingleAgeAttestation()
-        issueMdlMultipleAgeAttestations()
-        issueMdlAllFieldsMultipleAgeAttestations()
+        validateIssuerMetadataMdlEntry()
+        e2eIssuePresentMdlOnlyRequiredFields()
+        e2eIssuePresentMdlSingleAgeAttestation()
+        e2eIssuePresentMdlMultipleAgeAttestations()
+        e2eIssuePresentMdlAllFieldsMultipleAgeAttestations()
     }
 
     private data class MDLIssuanceRequestDecodedParameters(
