@@ -10,25 +10,20 @@ import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer.feat.lspPotential.lspPotentialIssuanceTestApi
 import id.walt.issuer.issuance.IssuanceRequest
-import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
 import id.walt.issuer.issuerModule
 import id.walt.oid4vc.OpenID4VCIVersion
-import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
 import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.config.RegistrationDefaultsConfig
-import id.walt.webwallet.db.models.AccountWalletListing
 import id.walt.webwallet.service.issuers.IssuersService
 import id.walt.webwallet.usecase.issuer.IssuerUseCaseImpl
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
-import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.webWalletModule
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -319,23 +314,6 @@ class WaltidServicesE2ETests {
                 assert(it.size > 1) { "no policies have run" }
             }
         }
-//        val lspPotentialIssuance = LspPotentialIssuance(e2e, testHttpClient(doFollowRedirects = false))
-//        lspPotentialIssuance.testTrack1()
-//        lspPotentialIssuance.testTrack2()
-//        val lspPotentialVerification = LspPotentialVerification(e2e, testHttpClient(doFollowRedirects = false))
-//        lspPotentialVerification.testPotentialInteropTrack3()
-//        lspPotentialVerification.testPotentialInteropTrack4()
-        val lspPotentialWallet = setupTestWallet()
-        lspPotentialWallet.testMDocIssuance(IssuanceExamples.mDLCredentialIssuanceData, true)
-//        lspPotentialWallet.testMDocIssuance(IssuanceExamples.mDLCredentialIssuanceDataJwtProof, false)
-        lspPotentialWallet.testMdocPresentation()
-        lspPotentialWallet.testSDJwtVCIssuance()
-        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
-        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
-        lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
-        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
-        lspPotentialWallet.testPresentationDefinitionCredentialMatching()
-
         //endregion -Exchange / presentation-
 
         //region -History-
@@ -439,22 +417,6 @@ class WaltidServicesE2ETests {
         //endregion -Batch Issuance Test Suite-
 
     }
-
-    /* @Test // enable to execute test selectively
-    fun lspIssuanceTests() = testBlock(timeout = defaultTestTimeout) {
-        val client = testHttpClient(doFollowRedirects = false)
-        val lspPotentialIssuance = LspPotentialIssuance(client)
-        lspPotentialIssuance.testTrack1()
-        lspPotentialIssuance.testTrack2()
-    }*/
-
-    /* @Test
-    fun lspVerifierTests() = testBlock(timeout = defaultTestTimeout) {
-        val client = testHttpClient(doFollowRedirects = false)
-        val lspPotentialVerification = LspPotentialVerification(client)
-        lspPotentialVerification.testPotentialInteropTrack3()
-        lspPotentialVerification.testPotentialInteropTrack4()
-    }*/
 
     //        @Test
     fun e2ePresDefPolicyTests() = E2ETest().testBlock(
@@ -587,60 +549,6 @@ class WaltidServicesE2ETests {
                 .isEmpty()
         )
     }
-
-    suspend fun setupTestWallet(): LspPotentialWallet {
-        var client = testHttpClient()
-        client.post("/wallet-api/auth/login") {
-            setBody(
-                EmailAccountRequest(
-                    email = "user@email.com", password = "password"
-                ) as AccountRequest
-            )
-        }.expectSuccess().apply {
-            body<JsonObject>().let { result ->
-                assertNotNull(result["token"])
-                val token = result["token"]!!.jsonPrimitive.content.expectLooksLikeJwt()
-
-                client = testHttpClient(token = token)
-            }
-        }
-        val walletId = client.get("/wallet-api/wallet/accounts/wallets").expectSuccess()
-            .body<AccountWalletListing>().wallets.first().id.toString()
-        return LspPotentialWallet(e2e, client, walletId)
-    }
-
-    /* @Test // enable to execute test selectively
-    fun lspWalletTests() = E2ETest.testBlock(
-        config = ServiceConfiguration("e2e-test"),
-        features = listOf(id.walt.issuer.FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
-        featureAmendments = mapOf(
-            CommonsFeatureCatalog.authenticationServiceFeature to id.walt.webwallet.web.plugins.walletAuthenticationPluginAmendment,
-            // CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
-        ),
-        init = {
-            id.walt.webwallet.webWalletSetup()
-            id.walt.did.helpers.WaltidServices.minimalInit()
-            id.walt.webwallet.db.Db.start()
-        },
-        module = e2eTestModule,
-        timeout = defaultTestTimeout
-    ) {
-        val lspPotentialWallet = setupTestWallet()
-        lspPotentialWallet.testMDocIssuance()
-        lspPotentialWallet.testMdocPresentation()
-
-        lspPotentialWallet.testSDJwtVCIssuance()
-        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.HAIP)
-        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
-        lspPotentialWallet.testPresentationDefinitionCredentialMatching()
-    }*/
-
-    /* @Test // enable to execute test selectively
-    fun testSdJwtVCIssuanceWithIssuerDid() = testBlock(timeout = defaultTestTimeout) {
-        val lspPotentialWallet = setupTestWallet()
-        lspPotentialWallet.testSDJwtVCIssuanceByIssuerDid()
-        lspPotentialWallet.testSDJwtPresentation(OpenId4VPProfile.DEFAULT)
-    }*/
 }
 
 fun String.expectLooksLikeJwt(): String =
