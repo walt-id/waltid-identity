@@ -778,12 +778,13 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
 
     @OptIn(ExperimentalEncodingApi::class)
     fun forgeSDisclosureString(disclosures: String): String {
-        return disclosures.split("~").filter { it.isNotEmpty() }.map { SDisclosure.parse(it) }.map { disclosure ->
-            Base64.UrlSafe.encode(buildJsonArray {
-                add(disclosure.salt)
-                add(disclosure.key)
-                add(JsonPrimitive("<forged>"))
-            }.toString().encodeToByteArray()).trimEnd('=')
-        }.joinToString("~")
+        return disclosures.split("~").filter { it.isNotEmpty() }.map { SDisclosure.parse(it) }
+            .joinToString("~") { disclosure ->
+                Base64.UrlSafe.encode(buildJsonArray {
+                    add(disclosure.salt)
+                    add(disclosure.key)
+                    add(JsonPrimitive("<forged>"))
+                }.toString().encodeToByteArray()).trimEnd('=')
+            }
     }
 }
