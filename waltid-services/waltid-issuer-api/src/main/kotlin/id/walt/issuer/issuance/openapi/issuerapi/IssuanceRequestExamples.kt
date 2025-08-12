@@ -473,8 +473,6 @@ object IssuanceExamples {
        }
     """.trimIndent()
 
-    val mDLCredentialIssuanceExample = typedValueExampleDescriptorDsl<IssuanceRequest>(mDLCredentialIssuanceData)
-
     val mDLCredentialIssuanceDataJwtProof = """
         {
           "issuerKey": { 
@@ -495,10 +493,6 @@ object IssuanceExamples {
           "trustedRootCAs": ${buildJsonArray { add(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT) }}
        }
     """.trimIndent()
-
-    val mDLCredentialIssuanceJwtProofExample = typedValueExampleDescriptorDsl<IssuanceRequest>(
-        mDLCredentialIssuanceDataJwtProof
-    )
 
     // language=JSON
     val batchExampleJwt = typedValueExampleDescriptorDsl<List<IssuanceRequest>>(
