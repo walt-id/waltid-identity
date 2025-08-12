@@ -60,19 +60,19 @@ class AndroidKey() : Key() {
                 val keyFactory = KeyFactory.getInstance(internalKeyType.name)
                 val keySpec = keyFactory.getKeySpec(publicKey, RSAPublicKeySpec::class.java)
                 JSONObject().run {
-                    put("kty", internalKeyType.name)
+                    put("kty", internalKeyType.jwkKty)
                     put("n", keySpec.modulus.toByteArray().encodeToBase64Url())
                     put("e", keySpec.publicExponent.toByteArray().encodeToBase64Url())
                     toString()
                 }
             }
 
-            KeyType.secp256r1 -> {
+            KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1, KeyType.secp256k1 -> {
                 val keyFactory = KeyFactory.getInstance("EC")
                 val keySpec = keyFactory.getKeySpec(publicKey, ECPublicKeySpec::class.java)
                 JSONObject().run {
-                    put("kty", "EC")
-                    put("crv", "P-256")
+                    put("kty", internalKeyType.jwkKty)
+                    put("crv", internalKeyType.jwkCurve)
                     put("x", keySpec.w.affineX.toByteArray().encodeToBase64Url())
                     put("y", keySpec.w.affineY.toByteArray().encodeToBase64Url())
                     toString()
@@ -80,7 +80,6 @@ class AndroidKey() : Key() {
             }
 
             KeyType.Ed25519 -> throw IllegalArgumentException("Ed25519 is not supported in Android KeyStore")
-            KeyType.secp256k1 -> throw IllegalArgumentException("secp256k1 is not supported in Android KeyStore")
         }
     }
 
@@ -206,13 +205,14 @@ class AndroidKey() : Key() {
 
     private fun getSignature(): Signature {
         val sig = when (keyType) {
-            KeyType.secp256k1 -> Signature.getInstance(
-                "SHA256withECDSA",
-                "BC"
-            )//Legacy SunEC curve disabled
+            KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC")
             KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
+            KeyType.secp384r1 -> Signature.getInstance("SHA384withECDSA")
+            KeyType.secp521r1 -> Signature.getInstance("SHA512withECDSA")
             KeyType.Ed25519 -> Signature.getInstance("Ed25519")
             KeyType.RSA -> Signature.getInstance("SHA256withRSA")
+            KeyType.RSA3072 -> Signature.getInstance("SHA384withRSA")
+            KeyType.RSA4096 -> Signature.getInstance("SHA512withRSA")
         }
         log.trace { "Signature instance created {algorithm: '${sig.algorithm}'}" }
         return sig

@@ -1,0 +1,19 @@
+{
+  "uuid": "2AF74107-34AB-4DD5-BC3C-E83895CAE1A4",
+  "title": "Sign1 - ECDSA w/ SHA-256 (verify)",
+  "description": "Verify signature with one signer using ECDSA w/ SHA-256",
+  "key": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "usWxHK2PmfnHKwXPS54m0kTcGJ90UiglWiGahtagnv8",
+    "y": "IBOL-C3BttVivg-lSreASjpkttcsz-1rb7btKLv8EX4"
+  },
+  "alg": "ES256",
+  "sign1::verify": {
+    "taggedCOSESign1": {
+      "cborHex": "d28445a201260300a10442313154546869732069732074686520636f6e74656e742e58402ad3b9dcc1e13d04f357e11cc8acd825196620e62f0d8deca72672508b829d90e07a3f23be6aa36fd6ebd31e2ed08d1760bffd981f991bfc94a45199a54875c4",
+      "cborDiag": "18([h'A201260300', {4: '11'}, h'546869732069732074686520636F6E74656E742E', h'2AD3B9DCC1E13D04F357E11CC8ACD825196620E62F0D8DECA72672508B829D90E07A3F23BE6AA36FD6EBD31E2ED08D1760BFFD981F991BFC94A45199A54875C4'])"
+    },
+    "shouldVerify": true
+  }
+}

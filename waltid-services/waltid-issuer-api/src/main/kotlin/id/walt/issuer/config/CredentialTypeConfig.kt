@@ -172,7 +172,24 @@ data class CredentialTypeConfig(
                     """.trimIndent()
                 ),
             )
-        )
+        ),
+        "photoID_credential_vc+sd-jwt" to vc(
+            CredentialSupported(
+                format = CredentialFormat.sd_jwt_vc,
+                cryptographicBindingMethodsSupported = setOf("jwk"),
+                credentialSigningAlgValuesSupported = setOf("ES256"),
+                vct = baseUrl + "/PhotoIDCredential",
+                sdJwtVcTypeMetadata = SDJWTVCTypeMetadata(
+                    vct = baseUrl + "/PhotoIDCredential",
+                    name = "PhotoID VC (ISO 23220‑4)",
+                    description = "SD‑JWT Verifiable Credential based on Photo ID schema 1.0 (ISO 23220‑4 compliant)"
+                ),
+                credentialDefinition = CredentialDefinition(
+                    type = listOf("VerifiableCredential", "VerifiableAttestation", "PhotoIDCredential")
+                )
+            )
+        ),
+
     ),
 ) : WaltConfig() {
     fun parse(): Map<String, CredentialSupported> {

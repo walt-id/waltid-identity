@@ -9,7 +9,6 @@ import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.crypto.utils.JwsUtils.jwsAlg
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -162,7 +161,7 @@ class TSEKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun signRaw(plaintext: ByteArray): Any {
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         val body = mapOf("input" to plaintext.encodeBase64())
         val signatureBase64 = httpRequest(HttpMethod.Post, "sign/$id", body)
             .tseJsonDataBody().jsonObject["signature"]?.jsonPrimitive?.content?.removePrefix("vault:v1:")
@@ -182,7 +181,7 @@ class TSEKey(
         val header = Json.encodeToString(
             mutableMapOf(
                 "typ" to "JWT".toJsonElement(),
-                "alg" to keyType.jwsAlg().toJsonElement(),
+                "alg" to keyType.jwsAlg.toJsonElement(),
             ).apply { putAll(headers) }).encodeToByteArray().encodeToBase64Url()
 
         val payload = plaintext.encodeToBase64Url()
@@ -199,7 +198,7 @@ class TSEKey(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
+    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> {
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
         val body = mapOf(
@@ -227,7 +226,7 @@ class TSEKey(
         val headers: Map<String, JsonElement> = Json.decodeFromString(header.decodeFromBase64Url().decodeToString())
         headers["alg"]?.let {
             val algValue = it.jsonPrimitive.content
-            check(algValue == keyType.jwsAlg()) { "Invalid key algorithm for JWS: JWS has $algValue, key is ${keyType.jwsAlg()}!" }
+            check(algValue == keyType.jwsAlg) { "Invalid key algorithm for JWS: JWS has $algValue, key is ${keyType.jwsAlg}!" }
         }
 
         val payload = parts[1]
@@ -299,19 +298,33 @@ class TSEKey(
     }
 
     companion object : TSEKeyCreator {
-
-
+        /**
+        See https://developer.hashicorp.com/vault/api-docs/secret/transit#type
+        for key types.
+         */
         private fun keyTypeToTseKeyMapping(type: KeyType) = when (type) {
             KeyType.Ed25519 -> "ed25519"
             KeyType.secp256r1 -> "ecdsa-p256"
+            KeyType.secp384r1 -> "ecdsa-p384"
+            KeyType.secp521r1 -> "ecdsa-p521"
             KeyType.RSA -> "rsa-2048"
+            KeyType.RSA3072 -> "rsa-3072"
+            KeyType.RSA4096 -> "rsa-4096"
             KeyType.secp256k1 -> throw KeyTypeNotSupportedException(type.name)
         }
 
+        /**
+        See https://developer.hashicorp.com/vault/api-docs/secret/transit#type
+        for key types.
+         */
         private fun tseKeyToKeyTypeMapping(type: String) = when (type) {
             "ed25519" -> KeyType.Ed25519
             "ecdsa-p256" -> KeyType.secp256r1
+            "ecdsa-p384" -> KeyType.secp384r1
+            "ecdsa-p521" -> KeyType.secp521r1
             "rsa-2048" -> KeyType.RSA
+            "rsa-3072" -> KeyType.RSA3072
+            "rsa-4096" -> KeyType.RSA4096
             else -> throw KeyTypeNotSupportedException(type)
         }
 

@@ -31,7 +31,7 @@ expect class JWKKey(jwk: String?, _keyId: String? = null) : Key {
      * @param plaintext data to be signed
      * @return signed (JWS)
      */
-    override suspend fun signRaw(plaintext: ByteArray): ByteArray
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String
 
     /**
@@ -39,7 +39,7 @@ expect class JWKKey(jwk: String?, _keyId: String? = null) : Key {
      * @param signed signed
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
-    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray>
+    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray>
     override suspend fun verifyJws(signedJws: String): Result<JsonElement>
     /*
     /**

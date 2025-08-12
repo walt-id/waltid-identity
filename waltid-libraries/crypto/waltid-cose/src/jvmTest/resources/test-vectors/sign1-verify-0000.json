@@ -1,0 +1,20 @@
+{
+  "uuid": "66584A57-390B-4A52-B7B6-B7CA4FC4204F",
+  "title": "Sign1 w/ external input - ECDSA w/ SHA-256 (verify)",
+  "description": "Verify signature with one signer using ECDSA w/ SHA-256 supplying external input",
+  "key": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "usWxHK2PmfnHKwXPS54m0kTcGJ90UiglWiGahtagnv8",
+    "y": "IBOL-C3BttVivg-lSreASjpkttcsz-1rb7btKLv8EX4"
+  },
+  "alg": "ES256",
+  "sign1::verify": {
+    "taggedCOSESign1": {
+      "cborHex": "d28443a10126a10442313154546869732069732074686520636f6e74656e742e58403a7487d9a528cb61dd8e99bd652c12577fc47d70ee5af2e703c420584f060fc7a8d61e4a35862b2b531a8447030ab966aeed8dd45ebc507c761431e349995770",
+      "cborDiag": "18([h'A10126', {4: h'3131'}, h'546869732069732074686520636F6E74656E742E', h'3A7487D9A528CB61DD8E99BD652C12577FC47D70EE5AF2E703C420584F060FC7A8D61E4A35862B2B531A8447030AB966AEED8DD45EBC507C761431E349995770'])"
+    },
+    "external": "11aa22bb33cc44dd55006699",
+    "shouldVerify": true
+  }
+}

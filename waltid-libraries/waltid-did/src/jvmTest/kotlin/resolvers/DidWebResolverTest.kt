@@ -38,7 +38,7 @@ class DidWebResolverTest : DidResolverTestBase() {
     ) {
         super.`given a did String, when calling resolveToKey, then the result is valid key`(did, key, assert)
     }
-    
+
     @ParameterizedTest
     @MethodSource
     override fun `given a did String, when calling resolveToKeys, then the result is valid keys set`(
@@ -82,13 +82,10 @@ class DidWebResolverTest : DidResolverTestBase() {
                         { did: String, key: JsonObject, result: Result<DidDocument> ->
                             // Ensure we got a successful result
                             assert(result.isSuccess)
-                            
+
                             // Get the document
                             val doc = result.getOrThrow()
-                            
-                            // Test that we got a document
-                            assert(doc != null)
-                            
+
                             // Verify document contains verification methods
                             val hasVerificationMethods = doc.get("verificationMethod") != null
                             assert(hasVerificationMethods) { "No verification methods found in document" }
@@ -111,7 +108,7 @@ class DidWebResolverTest : DidResolverTestBase() {
                             // Just check that we got some key successfully
                             assert(result.isSuccess)
                             assert(result.getOrThrow() != null)
-                            
+
                             // Just having a non-null key is sufficient for this test
                             val key = result.getOrThrow()
                             assert(key != null)
@@ -119,7 +116,7 @@ class DidWebResolverTest : DidResolverTestBase() {
                     )
                 )
             )
-            
+
         @JvmStatic
         fun `given a did String, when calling resolveToKeys, then the result is valid keys set`(): Stream<Arguments> =
             Stream.concat(
@@ -134,7 +131,7 @@ class DidWebResolverTest : DidResolverTestBase() {
                             // Ensure we got a successful result with multiple keys
                             assert(result.isSuccess)
                             val keys = result.getOrThrow()
-                            
+
                             // Test that we got exactly 3 keys
                             assert(keys.size == 3) { "Expected 3 keys, got ${keys.size}" }
                         }

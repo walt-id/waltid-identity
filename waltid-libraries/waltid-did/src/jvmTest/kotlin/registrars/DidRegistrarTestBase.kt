@@ -86,7 +86,7 @@ abstract class DidRegistrarTestBase(private val registrar: LocalRegistrarMethod)
             })
         }
 
-        val secp256DidAssertions: registrarDidAssertion = { result, options ->
+        val secpDidAssertions: registrarDidAssertion = { result, options ->
             ed25519DidAssertions(result, options)
             val doc = result.didDocument.toJsonObject()
             assert(doc["verificationMethod"]!!.jsonArray.none {
@@ -123,7 +123,7 @@ abstract class DidRegistrarTestBase(private val registrar: LocalRegistrarMethod)
             })
         }
 
-        val secp256KeyAssertions: registrarKeyAssertion = { result, options, key ->
+        val secpKeyAssertions: registrarKeyAssertion = { result, options, key ->
             ed25519KeyAssertions(result, options, key)
             val doc = result.didDocument
             val publicKey = runBlocking { key.getPublicKey().exportJWKObject() }

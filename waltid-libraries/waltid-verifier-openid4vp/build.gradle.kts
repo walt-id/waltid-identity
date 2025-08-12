@@ -41,7 +41,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.1.2"
+    val ktor_version = "3.2.0"
 
     sourceSets {
         val commonMain by getting {

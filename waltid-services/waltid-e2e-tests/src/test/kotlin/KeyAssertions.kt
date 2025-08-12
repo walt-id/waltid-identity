@@ -12,8 +12,8 @@ fun assertKeyComponents(document: JsonElement, keyId: String, type: KeyType, isP
     when (type) {
         KeyType.Ed25519 -> assertEd25519KeyComponents(document, isPrivate)
         KeyType.secp256k1 -> assertSecp256k1KeyComponents(document, isPrivate)
-        KeyType.secp256r1 -> assertSecp256r1KeyComponents(document, isPrivate)
-        KeyType.RSA -> assertRSAKeyComponents(document, isPrivate)
+        KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> assertSecpKeyComponents(document, isPrivate)
+        KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> assertRSAKeyComponents(document, isPrivate)
     }
 }
 
@@ -33,7 +33,7 @@ fun assertSecp256k1KeyComponents(document: JsonElement, isPrivate: Boolean) {
     if (isPrivate) assertNotNull(document.tryGetData("d")?.jsonPrimitive?.content) { "Missing _d_ component!" }
 }
 
-fun assertSecp256r1KeyComponents(document: JsonElement, isPrivate: Boolean) {
+fun assertSecpKeyComponents(document: JsonElement, isPrivate: Boolean) {
     assert(document.tryGetData("kty")?.jsonPrimitive?.content == "EC") { "Wrong _kty_ value!" }
     assertNotNull(document.tryGetData("crv")?.jsonPrimitive?.content) { "Missing _crv_ component!" }
     assert(document.tryGetData("crv")?.jsonPrimitive?.content == "P-256") { "Wrong _crv_ value!" }
