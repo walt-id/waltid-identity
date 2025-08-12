@@ -8,7 +8,6 @@ import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import id.walt.commons.web.plugins.httpJson
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
-import id.walt.issuer.feat.lspPotential.lspPotentialIssuanceTestApi
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuerModule
 import id.walt.oid4vc.OpenID4VCIVersion
@@ -85,7 +84,6 @@ class WaltidServicesE2ETests {
     val e2eTestModule: Application.() -> Unit = {
         webWalletModule(true)
         issuerModule(false)
-        lspPotentialIssuanceTestApi()
         verifierModule(false)
     }
 

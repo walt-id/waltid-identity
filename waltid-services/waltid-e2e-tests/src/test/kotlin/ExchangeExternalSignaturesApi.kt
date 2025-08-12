@@ -11,7 +11,6 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
-import id.walt.issuer.feat.lspPotential.LspPotentialIssuanceInterop
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
 import id.walt.mdoc.COSECryptoProviderKeyInfo
@@ -104,7 +103,7 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
 
     //ietf sd_jwt_vc - with disclosures
     private val identityCredentialIETFSdJwtX5cIssuanceRequest = IssuanceRequest(
-        Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
+        Json.parseToJsonElement(KeySerialization.serializeKey(IssuanceExamples.ISSUER_JWK_KEY)).jsonObject,
         "identity_credential_vc+sd-jwt",
         credentialData = buildJsonObject {
             put("family_name", "Doe")
@@ -122,7 +121,7 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         credentialFormat = CredentialFormat.sd_jwt_vc
     )
     private val identityCredentialIETFSdJwtDidIssuanceRequest = IssuanceRequest(
-        Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
+        Json.parseToJsonElement(KeySerialization.serializeKey(IssuanceExamples.ISSUER_JWK_KEY)).jsonObject,
         "identity_credential_vc+sd-jwt",
         credentialData = buildJsonObject {
             put("family_name", "Doe")
@@ -135,7 +134,7 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
                 "birthdate" to SDField(sd = true)
             )
         ),
-        issuerDid = LspPotentialIssuanceInterop.ISSUER_DID,
+        issuerDid = IssuanceExamples.ISSUER_DID,
         credentialFormat = CredentialFormat.sd_jwt_vc
     )
 
@@ -253,32 +252,6 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         mDocTestCases()
         w3cSdJwtVcTestCases()
         ietfSdJwtVcTestCases()
-    }
-
-    /**
-     * The following test function fails because the Verifier is currently
-     * unable to handle multiple vp token entries in the token response.
-     * The Verifier only checks for JsonPrimitive and JsonObject types to
-     * decode the vp token.
-     * @see [id.walt.verifier.oidc.OIDCVerifierService.doVerify]
-     */
-    private suspend fun combinedW3CIETFSdJwtVCTestCase() {
-        testPreAuthorizedOID4VCI(
-            useOptionalParameters = false,
-            issuanceRequests = listOf(
-                identityCredentialIETFSdJwtDidIssuanceRequest,
-            ),
-        )
-        val openbadgeSdJwtIssuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(WaltidServicesE2ETests.sdjwtCredential).apply {
-            credentialFormat = CredentialFormat.jwt_vc_json
-        }
-        testPreAuthorizedOID4VCI(
-            useOptionalParameters = false,
-            issuanceRequests = listOf(
-                openbadgeSdJwtIssuanceRequest,
-            ),
-        )
-        testOID4VPW3CIETFSdJwtVc(true)
     }
 
     private suspend fun regularJwtVcJsonTestCases() {

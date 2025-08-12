@@ -2,12 +2,13 @@ package id.walt.issuer.issuance.openapi.issuerapi
 
 import id.walt.commons.interop.LspPotentialInterop
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.IssuerOnboardingResponse
 import id.walt.issuer.issuance.OnboardingRequest
-import id.walt.issuer.feat.lspPotential.LspPotentialIssuanceInterop
 import id.walt.w3c.utils.VCFormat
 import io.github.smiley4.ktoropenapi.config.ValueExampleDescriptorConfig
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
@@ -19,6 +20,20 @@ object IssuanceExamples {
         {
             value = Json.decodeFromString<T>(content)
         }
+
+    val ISSUER_JWK_KEY = runBlocking {
+        JWKKey.importJWK("""
+            {
+                "kty": "EC",
+                "d": "KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ",
+                "crv": "P-256",
+                "x": "G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM",
+                "y": "ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"
+            }
+        """.trimIndent()).getOrThrow()
+    }
+
+    val ISSUER_DID = "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6IkcwUklOQmlGLW9RVUQzZDVER25lZ1F1WGVuSTI5SkRhTUdvTXZpb0tSQk0iLCJ5IjoiZWQzZUZHczJwRXRycDd2QVo3QkxjYnJVdHBLa1lXQVQySlBVUUs0bE40RSJ9"
 
     // language=json
     val openBadgeCredentialData = """
@@ -442,7 +457,7 @@ object IssuanceExamples {
         {
           "issuerKey": { 
             "type": "jwk",
-            "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
+            "jwk": ${Json.parseToJsonElement(ISSUER_JWK_KEY.jwk!!)}
           },
           "issuerDid":"",
           "credentialConfigurationId":"org.iso.18013.5.1.mDL",
@@ -464,7 +479,7 @@ object IssuanceExamples {
         {
           "issuerKey": { 
             "type": "jwk",
-            "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
+            "jwk": ${Json.parseToJsonElement(ISSUER_JWK_KEY.jwk!!)}
           },
           "issuerDid":"",
           "credentialConfigurationId":"org.iso.18013.5.1.mDL-JWT-Proof",
@@ -1163,7 +1178,7 @@ object IssuanceExamples {
         {
             "issuerKey": { 
                 "type": "jwk",
-                "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
+                "jwk": ${Json.parseToJsonElement(ISSUER_JWK_KEY.jwk!!)}
             },
             "credentialConfigurationId": "identity_credential_vc+sd-jwt",
             "credentialData": $sdjwt_vc_identity_credential,
@@ -1194,7 +1209,7 @@ object IssuanceExamples {
         {
             "issuerKey": { 
                 "type": "jwk",
-                "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
+                "jwk": ${Json.parseToJsonElement(ISSUER_JWK_KEY.jwk!!)}
             },
             "credentialConfigurationId": "identity_credential_vc+sd-jwt",
             "credentialData": $sdjwt_vc_identity_credential,
@@ -1214,7 +1229,7 @@ object IssuanceExamples {
                     }
                 }
             },
-            "issuerDid": "${LspPotentialIssuanceInterop.ISSUER_DID}"
+            "issuerDid": "$ISSUER_DID"
         }
     """.trimIndent()
 
@@ -1224,7 +1239,7 @@ object IssuanceExamples {
         {
             "issuerKey": { 
                 "type": "jwk",
-                "jwk": ${Json.parseToJsonElement(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY.jwk!!)}
+                "jwk": ${Json.parseToJsonElement(ISSUER_JWK_KEY.jwk!!)}
             },
             "credentialConfigurationId": "identity_credential_vc+sd-jwt",
             "credentialData": $sdjwt_vc_identity_credential,
