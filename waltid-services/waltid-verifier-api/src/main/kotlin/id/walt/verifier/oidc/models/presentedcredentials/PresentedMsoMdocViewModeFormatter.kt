@@ -23,7 +23,7 @@ object PresentedMsoMdocViewModeFormatter {
 
     private suspend fun parseDeviceKeyFromMso(
         mso: MSO,
-    ) = JWKKey.Companion.importRawPublicKey(
+    ) = JWKKey.importRawPublicKey(
         type = KeyType.secp256r1,
         rawPublicKey = OneKey(
             CBORObject.DecodeFromBytes(
