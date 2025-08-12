@@ -17,6 +17,7 @@ import id.walt.issuer.issuance.openapi.issuerapi.MdocDocs
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.MapElement
+import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ProofType
@@ -139,7 +140,10 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
     )
 
     //mDL
-    private val mDLIssuanceRequest = MdocDocs.mdlBaseIssuanceExample
+    private val mDLIssuanceRequest = MdocDocs.mdlBaseIssuanceExample.copy(
+        authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+        credentialFormat = CredentialFormat.mso_mdoc,
+    )
 
     //presentation requests
     //w3c jwt_vc_json
