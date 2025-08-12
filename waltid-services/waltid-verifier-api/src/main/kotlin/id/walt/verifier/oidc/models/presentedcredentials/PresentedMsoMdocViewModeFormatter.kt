@@ -18,9 +18,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import org.cose.java.OneKey
-import java.io.ByteArrayInputStream
-import java.security.cert.CertificateFactory
-import java.security.cert.X509Certificate
 
 object PresentedMsoMdocViewModeFormatter {
 
@@ -41,12 +38,11 @@ object PresentedMsoMdocViewModeFormatter {
 
     private fun parseX5cFromIssuerSigned(
         issuerSigned: IssuerSigned,
-    ) = CertificateFactory
-        .getInstance("X509")
-        .generateCertificates(ByteArrayInputStream(issuerSigned.issuerAuth!!.x5Chain))
-        .map {
-            X509CertUtils.toPEMString((it as X509Certificate))
+    ) = issuerSigned.issuerAuth!!.x5Chain!!.map {
+        X509CertUtils.parse(it).let {
+            X509CertUtils.toPEMString(it)
         }
+    }
 
     private fun mapTransformValidityInfo(
         validityInfo: ValidityInfo,

@@ -13,7 +13,6 @@ import id.walt.issuer.issuance.openapi.issuerapi.MdocDocs
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSECryptoProvider
-import id.walt.mdoc.cose.COSEX5Chain
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.dataelement.toJsonElement
 import id.walt.mdoc.dataretrieval.DeviceResponse
@@ -637,10 +636,13 @@ class MDocTestSuite(
             )
         }
         val issuerAuth = assertNotNull(mDL.issuerSigned.issuerAuth)
-        val x5c = assertNotNull(issuerAuth.x5ChainSafe)
-        val x5cSingleElement = assertIs<COSEX5Chain.SingleElement>(x5c)
+        val x5c = assertNotNull(issuerAuth.x5Chain)
+        assertEquals(
+            expected = 1,
+            actual = x5c.size,
+        )
         val dsCertificate = CertificateFactory.getInstance("X509").let { certificateFactory ->
-            certificateFactory.generateCertificate(ByteArrayInputStream(x5cSingleElement.data)) as X509Certificate
+            certificateFactory.generateCertificate(ByteArrayInputStream(x5c.first())) as X509Certificate
         }
         assertDoesNotThrow {
             dsCertificate.checkValidity()
