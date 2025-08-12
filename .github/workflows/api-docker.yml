@@ -34,23 +34,20 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@29f904ce0de831e02fe64507ebe284b02e66b50e
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
-          checkoutUnifiedToRepoDir: true
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@a4a92e12ee9b7396ee9a22083ff21b3277c627d6
       - name: Patch *.gradle.kts for CI paths
         run: |
-          sed -i '/allprojects {/,/}/{s/version = ".*"/version = "${{ inputs.version }}"/}' ${{ github.workspace }}/waltid-unified-build/build.gradle.kts
-          sed -i 's|val waltidIdentityPath = "waltid-identity"|val waltidIdentityPath = "../waltid-identity"|' ${{ github.workspace }}/waltid-unified-build/settings.gradle.kts
-          sed -i 's|val waltidIdentityEnterprisePath = "waltid-identity-enterprise"|val waltidIdentityEnterprisePath = "../waltid-identity-enterprise"|' ${{ github.workspace }}/waltid-unified-build/settings.gradle.kts
+          sed -i '/allprojects {/,/}/{s/version = ".*"/version = "${{ inputs.version }}"/}' build.gradle.kts
 
       - name: Build Docker images (${{ matrix.image }})
-        run: cd waltid-unified-build && ./gradlew ${{ matrix.commandPath }}:publishImageToLocalRegistry
+        run: ./gradlew ${{ matrix.commandPath }}:publishImageToLocalRegistry
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
       - name: Publish Docker images (${{ matrix.image }})
         if: ${{ inputs.publish }}
-        run: cd waltid-unified-build && ./gradlew ${{ matrix.commandPath }}:publishImage
+        run: ./gradlew ${{ matrix.commandPath }}:publishImage
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
