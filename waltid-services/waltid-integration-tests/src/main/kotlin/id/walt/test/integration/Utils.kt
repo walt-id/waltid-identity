@@ -5,11 +5,15 @@ import id.walt.sdjwt.SDMap
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.json.*
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 fun String.expectLooksLikeJwt(): String =
-    also { assertTrue(startsWith("ey") && count { it == '.' } == 2, "Does not look like JWT") }
+    also {
+        assertTrue(startsWith("ey"), "Expected JWT to start with \"ey\"")
+        assertEquals(2, count { it == '.' }, "Expected JWT to have 2 dots")
+    }
 
 val expectSuccess: suspend HttpResponse.() -> HttpResponse = {
     assertTrue(

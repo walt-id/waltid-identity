@@ -1,8 +1,11 @@
 package id.walt.test.integration.environment.api.verifier
 
 import id.walt.commons.testing.E2ETest
+import id.walt.oid4vc.data.ResponseMode
 import id.walt.test.integration.expectSuccess
 import id.walt.verifier.oidc.PresentationSessionInfo
+import id.walt.verifier.oidc.models.presentedcredentials.PresentationSessionPresentedCredentials
+import id.walt.verifier.oidc.models.presentedcredentials.PresentedCredentialsViewMode
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -12,7 +15,7 @@ import kotlinx.serialization.json.JsonObject
 
 class VerifierApi(
     private val e2e: E2ETest,
-    private val client: HttpClient
+    val client: HttpClient
 ) {
 
     suspend fun getSessionRaw(sessionId: String) =
@@ -24,16 +27,44 @@ class VerifierApi(
             it.body<PresentationSessionInfo>()
         }
 
-    suspend fun verifyRaw(payload: String) =
-        client.post("/openid4vc/verify") {
-            setBody(Json.decodeFromString<JsonObject>(payload))
+    suspend fun getPresentedCredentialsRaw(sessionId: String, responseFormat: PresentedCredentialsViewMode? = null) =
+        client.get("/openid4vc/session/${sessionId}/presented-credentials") {
+            if (responseFormat != null) {
+                url {
+                    parameters.append("viewMode", responseFormat.name)
+                }
+            }
         }
 
-    suspend fun verify(payload: String) = verifyRaw(payload).let {
-        it.expectSuccess()
-        val url = it.bodyAsText()
-        assert(url.contains("presentation_definition_uri="))
-        assert(!url.contains("presentation_definition="))
-        url
+    suspend fun getPresentedCredentials(
+        sessionId: String,
+        responseFormat: PresentedCredentialsViewMode? = null
+    ): PresentationSessionPresentedCredentials {
+        val response = getPresentedCredentialsRaw(sessionId, responseFormat)
+        response.expectSuccess()
+        return response.body<PresentationSessionPresentedCredentials>()
     }
+
+    suspend fun verifyRaw(payload: JsonObject, sessionId: String? = null, responseMode: ResponseMode? = null) =
+        client.post("/openid4vc/verify") {
+            if (sessionId != null || responseMode != null) {
+                headers {
+                    sessionId?.also { append("stateId", it) }
+                    responseMode?.also { append("responseMode", it.toString()) }
+                }
+            }
+            setBody(payload)
+        }
+
+    suspend fun verify(payload: JsonObject, sessionId: String? = null, responseMode: ResponseMode? = null) =
+        verifyRaw(payload, sessionId, responseMode).let {
+            it.expectSuccess()
+            val url = it.bodyAsText()
+            assert(url.contains("presentation_definition_uri="))
+            assert(!url.contains("presentation_definition="))
+            url
+        }
+
+    suspend fun verify(payload: String, sessionId: String? = null, responseMode: ResponseMode? = null) =
+        verify(Json.decodeFromString<JsonObject>(payload), sessionId, responseMode)
 }

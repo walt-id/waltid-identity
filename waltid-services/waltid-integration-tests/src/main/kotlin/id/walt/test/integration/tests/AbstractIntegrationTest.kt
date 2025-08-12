@@ -6,6 +6,7 @@ import id.walt.test.integration.environment.InMemoryCommunityStackEnvironment
 import id.walt.test.integration.environment.api.issuer.IssuerApi
 import id.walt.test.integration.environment.api.verifier.VerifierApi
 import id.walt.test.integration.environment.api.wallet.WalletApi
+import id.walt.test.integration.environment.api.wallet.WalletContainerApi
 import id.walt.test.integration.junit.LogTestStartExtension
 import id.walt.webwallet.db.models.AccountWalletListing.WalletListing
 import kotlinx.coroutines.runBlocking
@@ -30,31 +31,31 @@ abstract class AbstractIntegrationTest {
 
         lateinit var issuerApi: IssuerApi
         lateinit var verifierApi: VerifierApi
+        lateinit var walletContainerApi: WalletContainerApi
         lateinit var defaultWalletApi: WalletApi
-        lateinit var defaultWallet: WalletListing
 
         @JvmStatic
         @BeforeAll
         fun loadWalletAndDefaultDid(): Unit = runBlocking {
-            defaultWalletApi = environment.getDefaultAccountWalletApi()
+            walletContainerApi = environment.getDefaultAccountWalletContainerApi()
             issuerApi = environment.getIssuerApi()
             verifierApi = environment.getVerifierApi()
-            defaultWallet = defaultWalletApi.listAccountWallets().wallets.first()
+            defaultWalletApi = walletContainerApi.selectDefaultWallet()
             deleteAllCategoriesAndCredentialOfDefaultWallet()
         }
 
         @JvmStatic
         @AfterAll
         fun deleteAllCategoriesAndCredentialOfDefaultWallet(): Unit = runBlocking {
-            defaultWalletApi.listCategories(defaultWallet.id).map {
+            defaultWalletApi.listCategories().map {
                 it["name"]?.jsonPrimitive?.content
             }.forEach {
-                defaultWalletApi.deleteCategory(defaultWallet.id, it!!)
+                defaultWalletApi.deleteCategory(it!!)
             }
             // The test expects an empty wallet in the beginning, so delete all
             // credentials first, before test start
-            defaultWalletApi.listCredentials(defaultWallet.id).forEach {
-                defaultWalletApi.deleteCredential(defaultWallet.id, it.id)
+            defaultWalletApi.listCredentials().forEach {
+                defaultWalletApi.deleteCredential(it.id)
             }
         }
     }

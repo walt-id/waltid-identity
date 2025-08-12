@@ -9,6 +9,7 @@ import id.walt.issuer.issuerModule
 import id.walt.test.integration.environment.api.issuer.IssuerApi
 import id.walt.test.integration.environment.api.verifier.VerifierApi
 import id.walt.test.integration.environment.api.wallet.WalletApi
+import id.walt.test.integration.environment.api.wallet.WalletContainerApi
 import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.web.model.EmailAccountRequest
@@ -121,8 +122,8 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
         IssuerApi(e2e, testHttpClient())
 
 
-    fun getWalletApi(token: String? = null): WalletApi =
-        WalletApi(
+    fun getWalletContainerApi(token: String? = null): WalletContainerApi =
+        WalletContainerApi(
             defaultEmailAccount,
             clientFactory = { token: String? ->
                 testHttpClient(
@@ -134,7 +135,6 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
             token
         )
 
-    suspend fun getDefaultAccountWalletApi(): WalletApi =
-        getWalletApi().loginWithDefaultUser()
-
+    suspend fun getDefaultAccountWalletContainerApi(): WalletContainerApi =
+        getWalletContainerApi().loginWithDefaultUser()
 }

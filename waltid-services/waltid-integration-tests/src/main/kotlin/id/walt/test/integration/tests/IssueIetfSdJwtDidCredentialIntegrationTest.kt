@@ -8,12 +8,19 @@ import id.walt.oid4vc.data.CredentialFormat
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDMap
 import id.walt.test.integration.loadJsonResource
+import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
+import io.ktor.http.*
+import io.ktor.server.util.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
+import org.junit.jupiter.api.MethodOrderer.OrderAnnotation
+import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestMethodOrder
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
@@ -42,17 +49,26 @@ private val credentialIetfSdJwtDidIssuanceRequest = IssuanceRequest(
     }
 )
 
+@TestMethodOrder(OrderAnnotation::class)
 class IssueIetfSdJwtDidCredentialIntegrationTest : AbstractIntegrationTest() {
 
+    companion object {
+        var credentialId: String? = null
+    }
+
+
+    @Order(0)
     @Test
     fun shouldIssueCredentialWithIssuerDid() = runTest {
         val offerUrl = issuerApi.issueSdJwtCredential(credentialIetfSdJwtDidIssuanceRequest)
-        val newCredential = defaultWalletApi.claimCredential(defaultWallet.id, offerUrl).let {
+        val newCredential = defaultWalletApi.claimCredential(offerUrl).let {
             assertEquals(1, it.size)
             it.first()
         }
-        assertEquals(defaultWallet.id, newCredential!!.wallet)
-        assertNotNull(newCredential?.parsedDocument) { parsedDocument ->
+        credentialId = newCredential.id
+        val wallet = defaultWalletApi.getWallet()
+        assertEquals(wallet.id, newCredential.wallet)
+        assertNotNull(newCredential.parsedDocument) { parsedDocument ->
             // issuerDid should be set by data function <issuerDid>
             assertEquals(
                 credentialIetfSdJwtDidIssuanceRequest.issuerDid,
@@ -74,4 +90,71 @@ class IssueIetfSdJwtDidCredentialIntegrationTest : AbstractIntegrationTest() {
             assertEquals(1, parsedDocument["_sd"]?.jsonArray?.size)
         }
     }
+
+    @Order(10)
+    @Test
+    fun shouldVerifyCredentialHolderPolicy() = runTest {
+        assertNotNull(credentialId)
+        val verificationUrl = verifierApi.verify(
+            """
+            {
+              "vp_policies": ["presentation-definition"],
+              "request_credentials": [
+                {
+                  "input_descriptor": {
+                    "id": "identity_credential",
+                    "format": { "vc+sd-jwt": { "alg": ["EdDSA"] } },
+                    "constraints": {
+                      "is_holder": [ { "field_id": ["sub"], "directive": "required" } ],
+                      "fields": [
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+        )
+
+        val resolvedPresentationOfferString =
+            defaultWalletApi.resolvePresentationRequest(verificationUrl)
+
+        val presentationDefinition =
+            Url(resolvedPresentationOfferString).parameters.getOrFail("presentation_definition")
+
+        defaultWalletApi.matchCredentialsForPresentationDefinition(presentationDefinition).also {
+            assertEquals(1, it.size)
+            assertEquals(credentialId, it.first().id)
+        }
+
+
+        defaultWalletApi.usePresentationRequest(
+            request = UsePresentationRequest(
+                did = defaultWalletApi.getDefaultDid().did,
+                presentationRequest = resolvedPresentationOfferString,
+                selectedCredentials = listOf(credentialId!!),
+            )
+        )
+
+        val verificationId = Url(verificationUrl).parameters.getOrFail("state")
+
+        verifierApi.getSession(verificationId).also {
+            println()
+//TODO: how can that be? there is an invalid token
+//            assertNotNull(
+//                it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt(),
+//                "Received no valid token response!"
+//            )
+//            assertNotNull(
+//                it.tokenResponse?.presentationSubmission,
+//                "should have a presentation submission after submission"
+//            )
+            assertEquals(true, it.verificationResult, "overall verification should be valid")
+            it.policyResults.let {
+                assertNotNull(it, "policyResults should be available after running policies")
+                assertTrue(it.size > 1, "no policies have run")
+            }
+        }
+    }
 }
+

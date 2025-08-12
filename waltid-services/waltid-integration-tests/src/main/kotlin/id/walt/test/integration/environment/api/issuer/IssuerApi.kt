@@ -40,6 +40,16 @@ class IssuerApi(
             it.body<String>()
         }
 
+    suspend fun issueMdocCredentialRaw(request: IssuanceRequest, cbUrl: String? = null) =
+        issueCredentialRaw("/openid4vc/mdoc/issue", request, cbUrl)
+
+    suspend fun issueMdocCredential(request: IssuanceRequest, cbUrl: String? = null): String =
+        issueMdocCredentialRaw(request, cbUrl).let {
+            it.expectSuccess()
+            it.body<String>()
+        }
+
+
 
     private suspend fun issueCredentialRaw(
         url: String,

@@ -49,18 +49,18 @@ class IssueSdJwtCredentialIntegrationTest : AbstractIntegrationTest() {
     @Test
     fun shouldIssueCredential() = runTest {
         val offerUrl = issuerApi.issueSdJwtCredential(sdjwtCredential)
-        defaultWalletApi.resolveCredentialOffer(defaultWallet.id, offerUrl)
-        newCredential = defaultWalletApi.claimCredential(defaultWallet.id, offerUrl).let {
+        defaultWalletApi.resolveCredentialOffer(offerUrl)
+        newCredential = defaultWalletApi.claimCredential(offerUrl).let {
             assertEquals(1, it.size)
             it.first()
         }
-        assertEquals(defaultWallet.id, newCredential!!.wallet)
+        assertEquals(defaultWalletApi.getWallet().id, newCredential!!.wallet)
         assertNotNull(newCredential?.parsedDocument) { parsedDocument ->
             // issuerDid should be set by data function <issuerDid>
             assertEquals(sdjwtCredential.issuerDid, parsedDocument["issuer"]?.jsonObject["id"]?.jsonPrimitive?.content)
             // subject did should e set by data function <subjectDid>
             assertEquals(
-                defaultWalletApi.getDefaultDid(defaultWallet.id).did,
+                defaultWalletApi.getDefaultDid().did,
                 parsedDocument["credentialSubject"]?.jsonObject["id"]?.jsonPrimitive?.contentOrNull
             )
             // must contain 1 selective disclosure
@@ -79,7 +79,7 @@ class IssueSdJwtCredentialIntegrationTest : AbstractIntegrationTest() {
         val verificationId = Url(verificationUrl).parameters.getOrFail("state")
 
         val resolvedPresentationOfferString =
-            defaultWalletApi.resolvePresentationRequest(defaultWallet.id, verificationUrl)
+            defaultWalletApi.resolvePresentationRequest(verificationUrl)
         val presentationDefinition =
             Url(resolvedPresentationOfferString).parameters.getOrFail("presentation_definition")
 
@@ -90,18 +90,17 @@ class IssueSdJwtCredentialIntegrationTest : AbstractIntegrationTest() {
             )
         }
 
-        defaultWalletApi.matchCredentialsForPresentationDefinition(defaultWallet.id, presentationDefinition).also {
+        defaultWalletApi.matchCredentialsForPresentationDefinition(presentationDefinition).also {
             assertEquals(1, it.size)
             assertEquals(newCredential!!.id, it.first().id)
         }
 
-        defaultWalletApi.unmatchedCredentialsForPresentationDefinition(defaultWallet.id, presentationDefinition).also {
+        defaultWalletApi.unmatchedCredentialsForPresentationDefinition(presentationDefinition).also {
             assertTrue(it.isEmpty())
         }
         defaultWalletApi.usePresentationRequest(
-            walletId = defaultWallet.id,
             request = UsePresentationRequest(
-                did = defaultWalletApi.getDefaultDid(defaultWallet.id).did,
+                did = defaultWalletApi.getDefaultDid().did,
                 presentationRequest = resolvedPresentationOfferString,
                 selectedCredentials = listOf(newCredential!!.id),
                 disclosures = newCredential!!.disclosures?.let { mapOf(newCredential!!.id to listOf(it)) }
@@ -135,7 +134,7 @@ class IssueSdJwtCredentialIntegrationTest : AbstractIntegrationTest() {
         val verificationId = Url(verificationUrl).parameters.getOrFail("state")
 
         val resolvedPresentationOfferString =
-            defaultWalletApi.resolvePresentationRequest(defaultWallet.id, verificationUrl)
+            defaultWalletApi.resolvePresentationRequest(verificationUrl)
         val presentationDefinition =
             Url(resolvedPresentationOfferString).parameters.getOrFail("presentation_definition")
 
@@ -146,18 +145,17 @@ class IssueSdJwtCredentialIntegrationTest : AbstractIntegrationTest() {
             )
         }
 
-        defaultWalletApi.matchCredentialsForPresentationDefinition(defaultWallet.id, presentationDefinition).also {
+        defaultWalletApi.matchCredentialsForPresentationDefinition(presentationDefinition).also {
             assertEquals(1, it.size)
             assertEquals(newCredential!!.id, it.first().id)
         }
 
-        defaultWalletApi.unmatchedCredentialsForPresentationDefinition(defaultWallet.id, presentationDefinition).also {
+        defaultWalletApi.unmatchedCredentialsForPresentationDefinition(presentationDefinition).also {
             assertTrue(it.isEmpty())
         }
         val error = defaultWalletApi.usePresentationRequestExpectError(
-            walletId = defaultWallet.id,
             request = UsePresentationRequest(
-                did = defaultWalletApi.getDefaultDid(defaultWallet.id).did,
+                did = defaultWalletApi.getDefaultDid().did,
                 presentationRequest = resolvedPresentationOfferString,
                 selectedCredentials = listOf(newCredential!!.id),
                 disclosures = newCredential!!.disclosures?.let { mapOf(newCredential!!.id to listOf(it)) }

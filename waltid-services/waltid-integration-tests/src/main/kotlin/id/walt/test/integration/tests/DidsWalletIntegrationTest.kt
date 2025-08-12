@@ -24,15 +24,15 @@ class DidsWalletIntegrationTest : AbstractIntegrationTest() {
         @JvmStatic
         @BeforeAll
         fun loadWalletAndDefaultDid(): Unit = runBlocking {
-            defaultDidString = defaultWalletApi.getDefaultDid(defaultWallet.id).did
+            defaultDidString = defaultWalletApi.getDefaultDid().did
         }
 
         @JvmStatic
         @AfterAll
         fun deleteCreatedDidsAndResetDefaultDid(): Unit = runBlocking {
-            defaultWalletApi.setDefaultDid(defaultWallet.id, defaultDidString)
+            defaultWalletApi.setDefaultDid(defaultDidString)
             createdDids.forEach {
-                defaultWalletApi.deleteDidRaw(defaultWallet.id, it)
+                defaultWalletApi.deleteDidRaw(it)
             }
         }
     }
@@ -42,9 +42,9 @@ class DidsWalletIntegrationTest : AbstractIntegrationTest() {
     fun shouldCreateKeyDidWithJwkJcsPubFalse() = runTest {
         //todo: test for optional registration defaults
         val createdDidString =
-            defaultWalletApi.createDid(defaultWallet.id, method = "key", options = mapOf("useJwkJcsPub" to false))
+            defaultWalletApi.createDid(method = "key", options = mapOf("useJwkJcsPub" to false))
         createdDids.add(createdDidString)
-        val loadedDid = defaultWalletApi.getDid(defaultWallet.id, createdDidString)
+        val loadedDid = defaultWalletApi.getDid(createdDidString)
         assertEquals(createdDidString, loadedDid["id"]?.jsonPrimitive?.content)
         val verificationMethod = loadedDid["verificationMethod"]?.jsonArray?.get(0)?.jsonObject
         assertNotNull(verificationMethod?.jsonObject["publicKeyJwk"])
@@ -53,9 +53,9 @@ class DidsWalletIntegrationTest : AbstractIntegrationTest() {
     @Order(0)
     @Test
     fun shouldCreateJwkKey() = runTest {
-        val createdDidString = defaultWalletApi.createDid(defaultWallet.id, method = "jwk")
+        val createdDidString = defaultWalletApi.createDid(method = "jwk")
         createdDids.add(createdDidString)
-        val loadedDid = defaultWalletApi.getDid(defaultWallet.id, createdDidString)
+        val loadedDid = defaultWalletApi.getDid(createdDidString)
         assertEquals(createdDidString, loadedDid["id"]?.jsonPrimitive?.content)
         val verificationMethod = loadedDid["verificationMethod"]?.jsonArray?.get(0)?.jsonObject
         assertNotNull(verificationMethod?.jsonObject["publicKeyJwk"])
@@ -65,12 +65,11 @@ class DidsWalletIntegrationTest : AbstractIntegrationTest() {
     @Test
     fun shouldCreateWebKey() = runTest {
         val createdDidString = defaultWalletApi.createDid(
-            defaultWallet.id,
             method = "web",
             options = mapOf("domain" to "domain", "path" to "path")
         )
         createdDids.add(createdDidString)
-        val loadedDid = defaultWalletApi.getDid(defaultWallet.id, createdDidString)
+        val loadedDid = defaultWalletApi.getDid(createdDidString)
         assertEquals(createdDidString, loadedDid["id"]?.jsonPrimitive?.content)
         val verificationMethod = loadedDid["verificationMethod"]?.jsonArray?.get(0)?.jsonObject
         assertNotNull(verificationMethod?.jsonObject).also {
@@ -84,11 +83,10 @@ class DidsWalletIntegrationTest : AbstractIntegrationTest() {
     @Test
     fun shouldCreateCheqdDid() = runTest {
         val createdDidString = defaultWalletApi.createDid(
-            defaultWallet.id,
             method = "cheqd", options = mapOf("network" to "testnet")
         )
         createdDids.add(createdDidString)
-        val loadedDid = defaultWalletApi.getDid(defaultWallet.id, createdDidString)
+        val loadedDid = defaultWalletApi.getDid(createdDidString)
         assertEquals(createdDidString, loadedDid["id"]?.jsonPrimitive?.content)
         //TODO: more assertions
 
@@ -98,11 +96,10 @@ class DidsWalletIntegrationTest : AbstractIntegrationTest() {
     @Test
     fun shouldCreateEbsiDid() = runTest {
         val createdDidString = defaultWalletApi.createDid(
-            defaultWallet.id,
             method = "ebsi", options = mapOf("version" to 2, "bearerToken" to "token")
         )
         createdDids.add(createdDidString)
-        val loadedDid = defaultWalletApi.getDid(defaultWallet.id, createdDidString)
+        val loadedDid = defaultWalletApi.getDid(createdDidString)
         assertEquals(createdDidString, loadedDid["id"]?.jsonPrimitive?.content)
         // TODO: more assertions
     }
@@ -110,24 +107,23 @@ class DidsWalletIntegrationTest : AbstractIntegrationTest() {
     @Test
     fun shouldUpdateDefaultDid() = runTest {
         val createdDidString = defaultWalletApi.createDid(
-            defaultWallet.id,
             method = "web",
             options = mapOf("domain" to "test.walt.id", "path" to "/dids/a001")
         )
         createdDids.add(createdDidString)
-        defaultWalletApi.setDefaultDid(defaultWallet.id, createdDidString)
-        val newDefaultDid = defaultWalletApi.getDefaultDid(defaultWallet.id)
+        defaultWalletApi.setDefaultDid(createdDidString)
+        val newDefaultDid = defaultWalletApi.getDefaultDid()
         assertEquals(createdDidString, newDefaultDid.did)
     }
 
     @Test
     fun shouldDeleteDid() = runTest {
-        val createdDidString = defaultWalletApi.createDid(defaultWallet.id, method = "jwk")
+        val createdDidString = defaultWalletApi.createDid(method = "jwk")
         createdDids.add(createdDidString)
-        val loadedDid = defaultWalletApi.getDid(defaultWallet.id, createdDidString)
+        val loadedDid = defaultWalletApi.getDid(createdDidString)
         assertEquals(createdDidString, loadedDid["id"]?.jsonPrimitive?.content)
-        defaultWalletApi.deleteDid(defaultWallet.id, createdDidString)
-        assertFalse(defaultWalletApi.listDids(defaultWallet.id).any {
+        defaultWalletApi.deleteDid(createdDidString)
+        assertFalse(defaultWalletApi.listDids().any {
             it.did == createdDidString
         }, "Did should be deleted")
     }

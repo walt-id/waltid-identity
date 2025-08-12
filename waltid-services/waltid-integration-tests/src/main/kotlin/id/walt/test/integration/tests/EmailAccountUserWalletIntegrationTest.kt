@@ -19,7 +19,7 @@ class EmailAccountUserWalletIntegrationTest : AbstractIntegrationTest() {
 
     @Test
     fun shouldLoginWithDefaultCredentials() = runTest {
-        val api = environment.getWalletApi()
+        val api = environment.getWalletContainerApi()
         val infoResponse = api.userInfoRaw()
         assertEquals(
             HttpStatusCode.Unauthorized, infoResponse.status,
@@ -56,7 +56,7 @@ class EmailAccountUserWalletIntegrationTest : AbstractIntegrationTest() {
 
     @Test
     fun shouldListWallets() = runTest {
-        val wallet = environment.getWalletApi().loginWithDefaultUser()
+        val wallet = environment.getWalletContainerApi().loginWithDefaultUser()
         val account = wallet.userInfo()
         val wallets = wallet.listAccountWallets()
         assertNotNull(wallets).also {

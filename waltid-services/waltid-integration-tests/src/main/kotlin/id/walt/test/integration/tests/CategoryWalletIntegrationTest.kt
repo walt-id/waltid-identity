@@ -14,8 +14,8 @@ class CategoryWalletIntegrationTest : AbstractIntegrationTest() {
 
     @Test
     fun shouldCreateCategory() = runTest {
-        defaultWalletApi.createCategory(defaultWallet.id, "My-New-Category")
-        assertTrue(defaultWalletApi.listCategories(defaultWallet.id).any { category ->
+        defaultWalletApi.createCategory("My-New-Category")
+        assertTrue(defaultWalletApi.listCategories().any { category ->
             "My-New-Category" == category["name"]?.jsonPrimitive?.content
         }, "Category was not created")
     }
@@ -23,8 +23,8 @@ class CategoryWalletIntegrationTest : AbstractIntegrationTest() {
     @Disabled("Spaces are replace with '+' character")
     @Test
     fun shouldCreateCategoryWithSpaceInTheName() = runTest {
-        defaultWalletApi.createCategory(defaultWallet.id, "My New Category")
-        assertTrue(defaultWalletApi.listCategories(defaultWallet.id).any { category ->
+        defaultWalletApi.createCategory("My New Category")
+        assertTrue(defaultWalletApi.listCategories().any { category ->
             "My New Category" == category["name"]?.jsonPrimitive?.content
         }, "Category was not created")
     }
@@ -33,9 +33,9 @@ class CategoryWalletIntegrationTest : AbstractIntegrationTest() {
     fun shouldRenameCategory() = runTest {
         val originalName = "Category-to-rename"
         val newName = "Category-with-new-name"
-        defaultWalletApi.createCategory(defaultWallet.id, originalName)
-        defaultWalletApi.renameCategory(defaultWallet.id, originalName, newName)
-        assertTrue(defaultWalletApi.listCategories(defaultWallet.id).any {
+        defaultWalletApi.createCategory(originalName)
+        defaultWalletApi.renameCategory(originalName, newName)
+        assertTrue(defaultWalletApi.listCategories().any {
             newName == it["name"]?.jsonPrimitive?.content
         }, "Category was not renamed")
     }
@@ -43,12 +43,12 @@ class CategoryWalletIntegrationTest : AbstractIntegrationTest() {
     @Test
     fun shouldDeleteCategory() = runTest {
         val categoryName = "Category-to-delete"
-        defaultWalletApi.createCategory(defaultWallet.id, categoryName)
-        assertTrue(defaultWalletApi.listCategories(defaultWallet.id).any {
+        defaultWalletApi.createCategory(categoryName)
+        assertTrue(defaultWalletApi.listCategories().any {
             categoryName == it["name"]?.jsonPrimitive?.content
         }, "Category was not created")
-        defaultWalletApi.deleteCategory(defaultWallet.id, categoryName)
-        assertFalse(defaultWalletApi.listCategories(defaultWallet.id).any {
+        defaultWalletApi.deleteCategory(categoryName)
+        assertFalse(defaultWalletApi.listCategories().any {
             categoryName == it["name"]?.jsonPrimitive?.content
         }, "Category was not deleted")
     }

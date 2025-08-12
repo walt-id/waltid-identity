@@ -35,8 +35,8 @@ import kotlin.uuid.ExperimentalUuidApi
 class X5cUserWalletIntegrationTest : AbstractIntegrationTest() {
 
     private val e2e = environment.e2e
-    private val walletApi = environment.getWalletApi()
-    private val client = walletApi.httpClient
+    private val walletContainerApi = environment.getWalletContainerApi()
+    private val client = walletContainerApi.httpClient
 
     companion object {
         //we don't care about the bit size of the key, it's a test case (as long as it's bigger than 512)
@@ -126,7 +126,7 @@ class X5cUserWalletIntegrationTest : AbstractIntegrationTest() {
     @Order(1)
     fun shouldRegisterX5cUserWithTrustworthySubjectCertificate() = runTest {
         //register with a subject certificate that is signed by the trusted root CA
-        val response = walletApi.registerX5cUserRaw(createX5CAccountRequest(subjectJWKPrivateKey, subjectCert))
+        val response = walletContainerApi.registerX5cUserRaw(createX5CAccountRequest(subjectJWKPrivateKey, subjectCert))
         response.expectSuccess()
         assertNotNull(response.body<String>()).also {
             assertEquals("Registration succeeded", it.trim())
@@ -137,7 +137,7 @@ class X5cUserWalletIntegrationTest : AbstractIntegrationTest() {
     @Order(2)
     fun shouldLoginX5cUserWithTrustworthySubjectCertificate() = runTest {
         //login with a subject certificate that is signed by the trusted root CA
-        val response = walletApi.loginX5cUserRaw(createX5CAccountRequest(subjectJWKPrivateKey, subjectCert))
+        val response = walletContainerApi.loginX5cUserRaw(createX5CAccountRequest(subjectJWKPrivateKey, subjectCert))
         response.expectSuccess()
         assertNotNull(response.body<JsonObject>()).also {
             assertNotNull(it["id"])
@@ -160,7 +160,7 @@ class X5cUserWalletIntegrationTest : AbstractIntegrationTest() {
             rootCADistinguishedName,
             subjectDistinguishedName,
         )
-        val response = walletApi.registerX5cUserRaw(
+        val response = walletContainerApi.registerX5cUserRaw(
             createX5CAccountRequest(subjectJWKPrivateKey, nonTrustworthySubjectCert)
         )
         response.expectFailure()
@@ -205,7 +205,7 @@ class X5cUserWalletIntegrationTest : AbstractIntegrationTest() {
             dn,
         )
         val jwkPrivateKey = PKIXUtils.javaPrivateKeyToJWKKey(keyPair.private)
-        val authenticatedWalletApi = walletApi.login(createX5CAccountRequest(jwkPrivateKey, cert))
+        val authenticatedWalletApi = walletContainerApi.login(createX5CAccountRequest(jwkPrivateKey, cert))
         val userInfo = authenticatedWalletApi.userInfo()
         assertNotNull(userInfo.id) { "User info is null" }
         assertNotNull(authenticatedWalletApi.listAccountWallets()).also { wallets ->

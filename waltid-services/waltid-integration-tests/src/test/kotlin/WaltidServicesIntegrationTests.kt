@@ -42,8 +42,10 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@Deprecated("Old Testcase Style: lock at id.walt.test.integration.tests.IssueSdJwtCredentialIntegrationTest to" +
-        "see how integration tests should be written")
+@Deprecated(
+    "Old Testcase Style: lock at id.walt.test.integration.tests.IssueSdJwtCredentialIntegrationTest to" +
+            "see how integration tests should be written"
+)
 class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
 
     companion object {
@@ -87,17 +89,17 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         // All tests here should be ported to JUnit tests. Example: id.walt.test.integration.tests.IssueSdJwtCredentialIntegrationTest
         logger.error { "*************************** RUNNING TESTS **************************************" }
         val e2e = environment.e2e
-        val walletApi = environment.getWalletApi().loginWithDefaultUser()
+        val walletApi = defaultWalletApi
+        val wallet = walletApi.getWallet()
+
         var client = walletApi.httpClient
-        val wallets = walletApi.listAccountWallets()
-        val wallet = wallets.wallets.first()
         val issuerApi = environment.getIssuerApi()
         val exchangeApi = walletApi.exchangeApi
         val sessionApi = Verifier.SessionApi(e2e, client)
         val verificationApi = Verifier.VerificationApi(e2e, client)
 
         // ---------------------------------------------------------------
-        val defaultDid = walletApi.getDefaultDid(wallet.id)
+        val defaultDid = walletApi.getDefaultDid()
         val did = defaultDid.did
         val lspPotentialIssuance = LspPotentialIssuance(e2e, environment.testHttpClient(doFollowRedirects = false))
         lspPotentialIssuance.testTrack1()
@@ -302,8 +304,6 @@ fun lspVerifierTests() = testBlock(timeout = defaultTestTimeout) {
         var client = testHttpClient()
         lateinit var accountId: Uuid
         lateinit var wallet: Uuid
-        var authApi = environment.getWalletApi().loginWithDefaultUser()
-
         // the e2e http request tests here
 
         //region -Auth-

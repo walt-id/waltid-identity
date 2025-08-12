@@ -36,7 +36,7 @@ class KeysWalletIntegrationTest : AbstractIntegrationTest() {
     fun walletShouldContainKeyWithDefaultConfiguration() = runTest {
         val defaultKeyConfig = ConfigManager.getConfig<RegistrationDefaultsConfig>().defaultKeyConfig
         // requires registration-defaults to not be disabled in _features.conf val defaultKeyConfig = ConfigManager.getConfig<RegistrationDefaultsConfig>().defaultKeyConfig
-        val keys = defaultWalletApi.listKeys(defaultWallet.id)
+        val keys = defaultWalletApi.listKeys()
         assertNotNull(keys).also {
             assertTrue(
                 it.any { key -> KeyType.valueOf(key.algorithm) == defaultKeyConfig.keyType },
@@ -48,7 +48,7 @@ class KeysWalletIntegrationTest : AbstractIntegrationTest() {
     @Test
     @Order(2)
     fun walletShouldGenerateKey() = runTest {
-        generatedKeyId = defaultWalletApi.generateKey(defaultWallet.id, keyGenRequest)
+        generatedKeyId = defaultWalletApi.generateKey(keyGenRequest)
         assertFalse(generatedKeyId.isNullOrEmpty())
     }
 
@@ -56,7 +56,7 @@ class KeysWalletIntegrationTest : AbstractIntegrationTest() {
     @Order(3)
     fun walletShouldLoadKey() = runTest {
         assertFalse(generatedKeyId.isNullOrEmpty(), "No key generated - test order ??")
-        val key = defaultWalletApi.loadKey(defaultWallet.id, generatedKeyId!!)
+        val key = defaultWalletApi.loadKey(generatedKeyId!!)
         assertKeyComponents(key, generatedKeyId!!, keyGenRequest.keyType, true)
     }
 
@@ -64,7 +64,7 @@ class KeysWalletIntegrationTest : AbstractIntegrationTest() {
     @Order(4)
     fun walletShouldLoadKeyMeta() = runTest {
         assertFalse(generatedKeyId.isNullOrEmpty(), "No key generated - test order ??")
-        val keyMeta = defaultWalletApi.loadKeyMeta(defaultWallet.id, generatedKeyId!!)
+        val keyMeta = defaultWalletApi.loadKeyMeta(generatedKeyId!!)
         when (keyGenRequest.backend) {
             "jwt" -> assert(keyMeta.tryGetData("type")!!.jsonPrimitive.content.endsWith("JwkKeyMeta")) { "Missing _type_ component!" }
             "tse" -> TODO()
@@ -80,7 +80,7 @@ class KeysWalletIntegrationTest : AbstractIntegrationTest() {
     fun walletShouldExportKeyJwk() = runTest {
         val isPrivate = true
         assertFalse(generatedKeyId.isNullOrEmpty(), "No key generated - test order ??")
-        val key = defaultWalletApi.exportKey(defaultWallet.id, generatedKeyId!!, "JWK", isPrivate)
+        val key = defaultWalletApi.exportKey(generatedKeyId!!, "JWK", isPrivate)
         assertKeyComponents(
             key,
             generatedKeyId!!,
@@ -93,8 +93,8 @@ class KeysWalletIntegrationTest : AbstractIntegrationTest() {
     @Order(6)
     fun walletShouldDeleteKey() = runTest {
         assertFalse(generatedKeyId.isNullOrEmpty(), "No key generated - test order ??")
-        defaultWalletApi.deleteKey(defaultWallet.id, generatedKeyId!!)
-        val response = defaultWalletApi.deleteKeyRaw(defaultWallet.id, generatedKeyId!!)
+        defaultWalletApi.deleteKey(generatedKeyId!!)
+        val response = defaultWalletApi.deleteKeyRaw(generatedKeyId!!)
         // TODO: Not found would be better code than bad request
         // TODO: Maybe consider making endpoint idempotent and return OK if key doesn't exist
         assertEquals(HttpStatusCode.BadRequest, response.status)
@@ -105,8 +105,8 @@ class KeysWalletIntegrationTest : AbstractIntegrationTest() {
     @Order(7)
     fun shouldImportJwkKey() = runTest {
         val rsaJwkImport = loadResource("keys/rsa.json")
-        val importedKeyId = defaultWalletApi.importKey(defaultWallet.id, rsaJwkImport)
-        val importedKey = defaultWalletApi.loadKey(defaultWallet.id, importedKeyId)
+        val importedKeyId = defaultWalletApi.importKey(rsaJwkImport)
+        val importedKey = defaultWalletApi.loadKey(importedKeyId)
         assertNotNull(importedKey).also {
             assertEquals("RSA", it.jsonObject["kty"]?.jsonPrimitive?.content)
             assertEquals(importedKeyId, it.jsonObject["kid"]?.jsonPrimitive?.content)
