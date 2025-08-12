@@ -22,6 +22,7 @@ import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
@@ -867,6 +868,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
     }
 
 
+    @Disabled("A wallet with other key type is needed")
     @Test
     fun issueMdl() = runTest {
         val wal = defaultWalletApi.getWallet()
