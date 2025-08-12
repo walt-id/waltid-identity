@@ -21,9 +21,9 @@ class DidCheqdRegistrarTest : DidRegistrarTestBase(DidCheqdRegistrar()) {
     @MethodSource
     override fun `given did options with no key when register then returns a valid did result`(
         options: DidCreateOptions,
-        assert: registrarDidAssertion,
+        registrarDidAssertion: registrarDidAssertion,
     ) {
-        super.`given did options with no key when register then returns a valid did result`(options, assert)
+        super.`given did options with no key when register then returns a valid did result`(options, registrarDidAssertion)
     }
 
     @Ignore // FIXME: CHEQD registrar returns "e.g. ..." instaed of actual secret
@@ -32,9 +32,9 @@ class DidCheqdRegistrarTest : DidRegistrarTestBase(DidCheqdRegistrar()) {
     override fun `given did options and key when register with key then returns a valid did result`(
         key: Key,
         options: DidCreateOptions,
-        assert: registrarKeyAssertion,
+        registrarKeyAssertion: registrarKeyAssertion,
     ) {
-        super.`given did options and key when register with key then returns a valid did result`(key, options, assert)
+        super.`given did options and key when register with key then returns a valid did result`(key, options, registrarKeyAssertion)
     }
 
     companion object {

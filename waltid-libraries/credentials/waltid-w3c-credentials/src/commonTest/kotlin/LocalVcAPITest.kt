@@ -10,8 +10,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 
-val keysToTest = KeyType.entries
-
 private suspend fun init(didMethodsToTest: List<String>) {
     DidService.minimalInit()
 
@@ -23,7 +21,7 @@ private suspend fun init(didMethodsToTest: List<String>) {
     }
 }
 
-suspend fun testDidMethodsAndKeys(methods: List<String>) {
+suspend fun testDidMethodsAndKeys(methods: List<String>, keysToTest: List<KeyType>) {
     init(methods)
 
     // test create and sign credential using 4 different key types

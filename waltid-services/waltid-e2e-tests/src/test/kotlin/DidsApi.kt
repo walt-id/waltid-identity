@@ -7,6 +7,7 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.api.Assertions.assertTrue
 import kotlin.test.assertNotNull
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -23,11 +24,11 @@ class DidsApi(private val e2e: E2ETest, private val client: HttpClient) {
         e2e.test("/wallet-api/wallet/{wallet}/dids - list DIDs") {
             client.get("/wallet-api/wallet/$wallet/dids").expectSuccess().apply {
                 val dids = body<List<WalletDid>>()
-                assert(dids.isNotEmpty()) { "Wallet has no DIDs!" }
-                size?.let { assert(dids.size == it) { "Wallet has invalid number of DIDs!" } }
-                expectedDefault.whenNone { assert(dids.none { it.default }) }
+                assertTrue(dids.isNotEmpty()) { "Wallet has no DIDs!" }
+                size?.let { assertTrue(dids.size == it) { "Wallet has invalid number of DIDs!" } }
+                expectedDefault.whenNone { assertTrue(dids.none { it.default }) }
                 expectedDefault.whenAny { assertNotNull(dids.single { it.default }) }
-                expectedDefault.whenSome { did -> assert(dids.single { it.did == did }.default) }
+                expectedDefault.whenSome { did -> assertTrue(dids.single { it.did == did }.default) }
                 output?.invoke(dids)
             }
         }
@@ -35,7 +36,7 @@ class DidsApi(private val e2e: E2ETest, private val client: HttpClient) {
     suspend fun get(wallet: Uuid, did: String) = e2e.test("/wallet-api/wallet/{wallet}/dids/{did} - show specific DID") {
         client.get("/wallet-api/wallet/$wallet/dids/$did").expectSuccess().apply {
             val response = body<JsonObject>()
-            assert(response["id"]?.jsonPrimitive?.content == did)
+            assertTrue(response["id"]?.jsonPrimitive?.content == did)
             println("DID document: $response")
         }
     }
@@ -59,7 +60,7 @@ class DidsApi(private val e2e: E2ETest, private val client: HttpClient) {
                 }
             }.expectSuccess().apply {
                 val did = body<String>()
-                assert(String.format(didRegexPattern, payload.method).toRegex().matches(did))
+                assertTrue(String.format(didRegexPattern, payload.method).toRegex().matches(did))
                 output?.invoke(did)
             }
         }
