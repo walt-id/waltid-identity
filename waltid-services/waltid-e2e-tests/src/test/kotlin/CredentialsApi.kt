@@ -10,7 +10,9 @@ import io.ktor.client.request.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
+import org.junit.jupiter.api.Assertions.assertTrue
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -29,7 +31,7 @@ class CredentialsApi(private val e2e: E2ETest, private val client: HttpClient) {
             }
         }.expectSuccess().apply {
             val credentials = body<List<WalletCredential>>()
-            assert(credentials.size == expectedSize) { "should have $expectedSize credentials, but has ${credentials.size}" }
+            assertTrue(credentials.size == expectedSize) { "should have $expectedSize credentials, but has ${credentials.size}" }
             expectedCredential.onEach { cid -> assertNotNull(credentials.single { it.id == cid }) { "credential not found for id: $cid" } }
         }
     }

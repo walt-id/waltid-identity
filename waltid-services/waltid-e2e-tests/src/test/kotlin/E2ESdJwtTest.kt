@@ -1,9 +1,9 @@
 import WaltidServicesE2ETests.Companion.nameFieldSchemaPresentationRequestPayload
 import WaltidServicesE2ETests.Companion.sdjwtCredential
-import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
+import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.ktor.http.*
@@ -13,6 +13,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.api.Assertions.assertTrue
 import kotlin.test.assertContains
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -64,7 +65,7 @@ class E2ESdJwtTest(
         }
 
         sessionApi.get(verificationId) {
-            assert(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
+            assertTrue(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
         }
 
         exchangeApi.matchCredentialsForPresentationDefinition(
@@ -83,13 +84,13 @@ class E2ESdJwtTest(
         )
 
         sessionApi.get(verificationId) {
-            assert(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-            assert(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+            assertTrue(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
+            assertTrue(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
 
-            assert(it.verificationResult == false) { "overall verification should be valid" }
+            assertTrue(it.verificationResult == false) { "overall verification should be valid" }
             it.policyResults.let {
                 require(it != null) { "policyResults should be available after running policies" }
-                assert(it.size > 1) { "no policies have run" }
+                assertTrue(it.size > 1) { "no policies have run" }
             }
         }
         //endregion -Exchange / presentation-

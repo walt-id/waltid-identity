@@ -15,6 +15,7 @@ import resolvers.DidResolverTestBase.Companion.ed25519DidAssertions
 import resolvers.DidResolverTestBase.Companion.ed25519KeyAssertions
 import resolvers.DidResolverTestBase.Companion.keyAssertions
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 abstract class DidResolverTestBase {
     protected abstract val resolver: LocalResolverMethod
@@ -35,33 +36,33 @@ abstract class DidResolverTestBase {
     open fun `given a did String, when calling resolve, then the result is a valid did document`(
         did: String,
         key: JsonObject,
-        assert: resolverAssertion<DidDocument>,
+        resolverAssertion: resolverAssertion<DidDocument>,
     ) {
         allowFailWithSocketTimeout {
             val result = runBlocking { resolver.resolve(did) }
-            assert(did, key, result)
+            resolverAssertion(did, key, result)
         }
     }
 
     open fun `given a did String, when calling resolveToKey, then the result is valid key`(
         did: String,
         key: JsonObject,
-        assert: resolverAssertion<Key>,
+        resolverAssertion: resolverAssertion<Key>,
     ) {
         allowFailWithSocketTimeout {
             val result = runBlocking { resolver.resolveToKey(did) }
-            assert(did, key, result)
+            resolverAssertion(did, key, result)
         }
     }
 
     open fun `given a did String, when calling resolveToKeys, then the result is valid keys set`(
         did: String,
         key: JsonObject,
-        assert: resolverAssertion<Set<Key>>,
+        resolverAssertion: resolverAssertion<Set<Key>>,
     ) {
         allowFailWithSocketTimeout {
             val result = runBlocking { resolver.resolveToKeys(did) }
-            assert(did, key, result)
+            resolverAssertion(did, key, result)
         }
     }
 
@@ -71,7 +72,7 @@ abstract class DidResolverTestBase {
         private val didDocAssertions: resolverAssertion<DidDocument> = { did, key, result ->
             val doc = result.getOrThrow()
             // assert [id] and [did] are identical
-            assert(doc["id"]!!.jsonPrimitive.content == did)
+            assertTrue(doc["id"]!!.jsonPrimitive.content == did)
             verificationMethodAssertions(doc, key) { v, k ->
                 defaultKeyChecks(v, k)
             }
@@ -117,10 +118,10 @@ abstract class DidResolverTestBase {
         //region -Key assertions-
         private val keyAssertions: resolverAssertion<Key> = { did, key, result ->
             val keyResult = result.getOrNull()
-            assert(result.isSuccess)
+            assertTrue(result.isSuccess)
             assertNotNull(keyResult)
             val publicKey = runBlocking { keyResult.getPublicKey().exportJWKObject() }
-            assert(defaultKeyChecks(publicKey, key))
+            assertTrue(defaultKeyChecks(publicKey, key))
         }
 
         /**
@@ -130,7 +131,7 @@ abstract class DidResolverTestBase {
         val ed25519KeyAssertions: resolverAssertion<Key> = { did, key, result ->
             keyAssertions(did, key, result)
             val publicKey = runBlocking { result.getOrNull()!!.getPublicKey().exportJWKObject() }
-            assert(ed25519KeyChecks(publicKey, key))
+            assertTrue(ed25519KeyChecks(publicKey, key))
         }
 
         /**
@@ -140,7 +141,7 @@ abstract class DidResolverTestBase {
         val secp256KeyAssertions: resolverAssertion<Key> = { did, key, result ->
             ed25519KeyAssertions(did, key, result)
             val publicKey = runBlocking { result.getOrNull()!!.getPublicKey().exportJWKObject() }
-            assert(secp256KeyChecks(publicKey, key))
+            assertTrue(secp256KeyChecks(publicKey, key))
         }
 
         /**
@@ -150,22 +151,22 @@ abstract class DidResolverTestBase {
         val rsaKeyAssertions: resolverAssertion<Key> = { did, key, result ->
             keyAssertions(did, key, result)
             val publicKey = runBlocking { result.getOrNull()!!.getPublicKey().exportJWKObject() }
-            assert(rsaKeyChecks(publicKey, key))
+            assertTrue(rsaKeyChecks(publicKey, key))
         }
 
         //region -KeySet assertions-
         private val keysSetAssertions: resolverAssertion<Set<Key>> = { did, key, result ->
             val keysResult = result.getOrNull()
-            assert(result.isSuccess)
+            assertTrue(result.isSuccess)
             assertNotNull(keysResult)
-            assert(keysResult.isNotEmpty())
+            assertTrue(keysResult.isNotEmpty())
 
             // At least one of the keys should match the expected key
             val foundMatchingKey = keysResult.any { resolvedKey ->
                 val publicKey = runBlocking { resolvedKey.getPublicKey().exportJWKObject() }
                 defaultKeyChecks(publicKey, key)
             }
-            assert(foundMatchingKey)
+            assertTrue(foundMatchingKey)
         }
 
         /**
@@ -181,7 +182,7 @@ abstract class DidResolverTestBase {
                 val publicKey = runBlocking { resolvedKey.getPublicKey().exportJWKObject() }
                 ed25519KeyChecks(publicKey, key)
             }
-            assert(foundMatchingKey)
+            assertTrue(foundMatchingKey)
         }
 
         /**
@@ -197,7 +198,7 @@ abstract class DidResolverTestBase {
                 val publicKey = runBlocking { resolvedKey.getPublicKey().exportJWKObject() }
                 secp256KeyChecks(publicKey, key)
             }
-            assert(foundMatchingKey)
+            assertTrue(foundMatchingKey)
         }
 
         /**
@@ -213,7 +214,7 @@ abstract class DidResolverTestBase {
                 val publicKey = runBlocking { resolvedKey.getPublicKey().exportJWKObject() }
                 rsaKeyChecks(publicKey, key)
             }
-            assert(foundMatchingKey)
+            assertTrue(foundMatchingKey)
         }
         //endregion -KeySet assertions-
         //endregion -Key assertions-
@@ -223,7 +224,7 @@ abstract class DidResolverTestBase {
         ) -> Unit = { doc, key, runChecks ->
             // verification method is optional
             doc["verificationMethod"]?.takeIf { it != JsonNull }?.run {
-                assert(this.jsonArray.any {
+                assertTrue(this.jsonArray.any {
                     runChecks(it.jsonObject["publicKeyJwk"]!!.jsonObject, key)
                 })
             }
