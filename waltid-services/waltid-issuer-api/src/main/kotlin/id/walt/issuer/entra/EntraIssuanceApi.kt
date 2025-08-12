@@ -33,7 +33,7 @@ private val http = HttpClient {
 data class EntraAuthorizationInformation(
     val tenantId: String, // "8bc955d9-38fd-4c15-a520-0c656407537a"
     val clientId: String, // "e50ceaa6-8554-4ae6-bfdf-fd95e2243ae0"
-    val clientSecret: String, // "ctL8Q~Ezdrcrju85gEtvbCmQQDmm7bXjJKsdXbCr"
+    val clientSecret: String,
     val scope: String, // 3db474b9-6a0c-4840-96ac-1fceb342124f/.default
 ) {
     suspend fun getAccessToken(): String {
