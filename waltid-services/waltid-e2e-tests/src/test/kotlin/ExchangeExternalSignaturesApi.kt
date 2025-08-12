@@ -2,7 +2,6 @@
 
 import cbor.Cbor
 import com.nimbusds.jose.jwk.ECKey
-import id.walt.commons.interop.LspPotentialInterop
 import id.walt.commons.testing.E2ETest
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import id.walt.crypto.keys.KeySerialization
@@ -112,8 +111,8 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
             put("birthdate", "1940-01-01")
         },
         "identity_credential",
-        x5Chain = listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT),
-        trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT),
+        x5Chain = listOf(IssuanceExamples.ISSUER_CERT),
+        trustedRootCAs = listOf(IssuanceExamples.ROOT_CA_CERT),
         selectiveDisclosure = SDMap(
             mapOf(
                 "birthdate" to SDField(sd = true)
