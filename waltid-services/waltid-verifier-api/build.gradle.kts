@@ -192,3 +192,58 @@ publishing {
         }
     }
 }
+
+fun waltidPrivateCredentials(repoName:String): Pair<String, String> = let {
+    val envUsername = System.getenv(repoName.uppercase() + "_USERNAME")
+    val envPassword = System.getenv(repoName.uppercase() + "_PASSWORD")
+
+    val usernameFile = File("$rootDir/secret-${repoName.lowercase()}-username.txt")
+    val passwordFile = File("$rootDir/secret-${repoName.lowercase()}-password.txt")
+
+    return Pair(
+        envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" },
+        envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+    )
+}
+
+ktor {
+    docker {
+        jreVersion.set(JavaVersion.VERSION_21)
+        localImageName.set("waltid/verifier-api")
+        imageTag.set("${project.version}")
+        portMappings.set(listOf(
+            io.ktor.plugin.features.DockerPortMapping(
+                7003,
+                7003,
+                io.ktor.plugin.features.DockerPortMappingProtocol.TCP
+            )
+        ))
+
+        val (username, password) = waltidPrivateCredentials("DOCKER")
+        externalRegistry.set(
+            io.ktor.plugin.features.DockerImageRegistry.dockerHub(
+                appName = provider { "verifier-api" },
+                username = provider { username },
+                password = provider { password }
+            )
+        )
+    }
+
+    jib {
+        container {
+            mainClass = "id.walt.verifier.MainKt"
+        }
+        from {
+            platforms {
+                platform {
+                    architecture = "amd64"
+                    os = "linux"
+                }
+                platform {
+                    architecture = "arm64"
+                    os = "linux"
+                }
+            }
+        }
+    }
+}
