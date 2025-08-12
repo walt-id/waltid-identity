@@ -73,8 +73,10 @@ actual class JWKKey actual constructor(
 
     actual override suspend fun getPublicKeyRepresentation(): ByteArray = when (keyType) {
         KeyType.Ed25519 -> _internalJwk.toOctetKeyPair().decodedX
-        KeyType.RSA -> getRsaPublicKeyBytes(_internalJwk.toRSAKey().toPublicKey())
-        KeyType.secp256k1, KeyType.secp256r1 -> getECPublicKeyBytes(_internalJwk.toECKey().toECPublicKey())
+        KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> getRsaPublicKeyBytes(_internalJwk.toRSAKey().toPublicKey())
+        KeyType.secp256k1, KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> getECPublicKeyBytes(
+            _internalJwk.toECKey().toECPublicKey()
+        )
     }
 
     actual override suspend fun getMeta(): JwkKeyMeta = JwkKeyMeta(getKeyId())
@@ -98,7 +100,7 @@ actual class JWKKey actual constructor(
         val pemObjects = ArrayList<PemObject>()
 
         when (keyType) {
-            KeyType.secp256r1, KeyType.secp256k1 -> _internalJwk.toECKey().let {
+            KeyType.secp256k1, KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> _internalJwk.toECKey().let {
                 if (hasPrivateKey) {
                     pemObjects.add(PemObject("PRIVATE KEY", it.toECPrivateKey().encoded))
                     pemObjects.add(
@@ -114,7 +116,7 @@ actual class JWKKey actual constructor(
 
             KeyType.Ed25519 -> throw NotImplementedError("Ed25519 keys cannot be exported as PEM yet.")
 
-            KeyType.RSA -> _internalJwk.toRSAKey().let {
+            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> _internalJwk.toRSAKey().let {
                 if (hasPrivateKey) {
                     pemObjects.add(PemObject("RSA PRIVATE KEY", it.toRSAPrivateKey().encoded))
                     pemObjects.add(
@@ -148,9 +150,9 @@ actual class JWKKey actual constructor(
                 jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
             }
 
-            KeyType.secp256r1 -> ECDSASigner(_internalJwk as ECKey)
+            KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> ECDSASigner(_internalJwk as ECKey)
 
-            KeyType.RSA -> RSASSASigner(_internalJwk as RSAKey)
+            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> RSASSASigner(_internalJwk as RSAKey)
         }
     }
 
@@ -162,9 +164,9 @@ actual class JWKKey actual constructor(
                 jcaContext.provider = BouncyCastleProviderSingleton.getInstance()
             }
 
-            KeyType.secp256r1 -> ECDSAVerifier(_internalJwk as ECKey)
+            KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> ECDSAVerifier(_internalJwk as ECKey)
 
-            KeyType.RSA -> RSASSAVerifier(_internalJwk as RSAKey)
+            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> RSASSAVerifier(_internalJwk as RSAKey)
         }
     }
 
@@ -173,14 +175,18 @@ actual class JWKKey actual constructor(
             KeyType.Ed25519 -> JWSAlgorithm.EdDSA
             KeyType.secp256k1 -> JWSAlgorithm.ES256K
             KeyType.secp256r1 -> JWSAlgorithm.ES256
-            KeyType.RSA -> JWSAlgorithm.RS256 // TODO: RS384 RS512
+            KeyType.secp384r1 -> JWSAlgorithm.ES384
+            KeyType.secp521r1 -> JWSAlgorithm.ES512
+            KeyType.RSA -> JWSAlgorithm.RS256
+            KeyType.RSA3072 -> JWSAlgorithm.RS384
+            KeyType.RSA4096 -> JWSAlgorithm.RS512
         }
     }
 
-    actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    actual override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
-        val signature = getSignatureAlgorithm()
+        val signature = getSignatureAlgorithm(customSignatureAlgorithm)
         signature.initSign(getPrivateKey())
         signature.update(plaintext)
         val sig = signature.sign()
@@ -241,7 +247,7 @@ actual class JWKKey actual constructor(
         val payloadToSign = jwsObject.header.toBase64URL().toString() + '.' + jwsObject.payload.toBase64URL().toString()
         var signed = signRaw(payloadToSign.encodeToByteArray())
 
-        if (keyType in listOf(KeyType.secp256r1, KeyType.secp256k1)) { // Convert DER to IEEE P1363
+        if (keyType in KeyTypes.EC_KEYS) { // Convert DER to IEEE P1363
             log.trace { "Converted DER to IEEE P1363 signature" }
             signed = EccUtils.convertDERtoIEEEP1363(signed)
         }
@@ -252,7 +258,11 @@ actual class JWKKey actual constructor(
         return customJws
     }
 
-    actual override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> {
+    actual override suspend fun verifyRaw(
+        signed: ByteArray,
+        detachedPlaintext: ByteArray?,
+        customSignatureAlgorithm: String?
+    ): Result<ByteArray> {
         check(detachedPlaintext != null) { "Detached plaintext is required." }
 
         if (keyType == KeyType.Ed25519) {
@@ -263,7 +273,7 @@ actual class JWKKey actual constructor(
             return runCatching { tinkVerifier.verify(signed, detachedPlaintext) }.map { detachedPlaintext }
         }*/
 
-        val signature = getSignatureAlgorithm()
+        val signature = getSignatureAlgorithm(customSignatureAlgorithm)
         signature.initVerify(getInternalPublicKey())
         signature.update(detachedPlaintext)
 
@@ -316,19 +326,29 @@ actual class JWKKey actual constructor(
 
     actual override val keyType: KeyType by lazy {
         when (_internalJwk.keyType) {
-            com.nimbusds.jose.jwk.KeyType.RSA -> KeyType.RSA
+            com.nimbusds.jose.jwk.KeyType.RSA -> {
+                when (val bitLength = _internalJwk.toRSAKey().modulus.decodeToBigInteger().bitLength()) {
+                    1024, 2048 -> KeyType.RSA
+                    3072 -> KeyType.RSA3072
+                    4096 -> KeyType.RSA4096
+                    else -> throw IllegalArgumentException("RSA key has invalid bit size: $bitLength")
+                }
+            }
+
             com.nimbusds.jose.jwk.KeyType.EC -> {
-                when (_internalJwk.toECKey().curve) {
+                when (val curve = _internalJwk.toECKey().curve) {
                     Curve.P_256 -> KeyType.secp256r1
+                    Curve.P_384 -> KeyType.secp384r1
+                    Curve.P_521 -> KeyType.secp521r1
                     Curve.SECP256K1 -> KeyType.secp256k1
-                    else -> throw IllegalArgumentException("EC key with curve ${_internalJwk.toECKey().curve} not suppoerted")
+                    else -> throw IllegalArgumentException("EC key with curve ${curve} not suppoerted")
                 }
             }
 
             com.nimbusds.jose.jwk.KeyType.OKP -> {
-                when (_internalJwk.toOctetKeyPair().curve) {
+                when (val curve = _internalJwk.toOctetKeyPair().curve) {
                     Curve.Ed25519 -> KeyType.Ed25519
-                    else -> throw IllegalArgumentException("OKP key with curve ${_internalJwk.toOctetKeyPair().curve} not supported")
+                    else -> throw IllegalArgumentException("OKP key with curve ${curve} not supported")
                 }
             }
 
@@ -358,25 +378,31 @@ actual class JWKKey actual constructor(
     }
 
     private fun getPrivateKey() = when (keyType) {
-        KeyType.secp256r1, KeyType.secp256k1 -> _internalJwk.toECKey().toPrivateKey()
+        KeyType.secp256k1, KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> _internalJwk.toECKey().toPrivateKey()
         KeyType.Ed25519 -> decodeEd25519RawPrivateKey(_internalJwk.toOctetKeyPair().d.toString())
-        KeyType.RSA -> _internalJwk.toRSAKey().toPrivateKey()
+        KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> _internalJwk.toRSAKey().toPrivateKey()
     }
 
     private fun getInternalPublicKey() = when (keyType) {
-        KeyType.secp256r1, KeyType.secp256k1 -> _internalJwk.toECKey().toECPublicKey()
+        KeyType.secp256k1, KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> _internalJwk.toECKey().toECPublicKey()
 //        KeyType.Ed25519 -> decodeEd25519RawPublicKey(_internalJwk.toOctetKeyPair())
 //        KeyType.Ed25519 -> _internalJwk.toOctetKeyPair().toPublicKey()
-        KeyType.RSA -> _internalJwk.toRSAKey().toRSAPublicKey()
+        KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> _internalJwk.toRSAKey().toRSAPublicKey()
         else -> TODO("Not yet supported: $keyType")
     }
 
-    private fun getSignatureAlgorithm(): Signature = when (keyType) {
-        KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC") // Legacy SunEC curve disabled
-        KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
-        KeyType.Ed25519 -> Signature.getInstance("Ed25519")
-        KeyType.RSA -> Signature.getInstance("SHA256withRSA")
-    }
+    private fun getSignatureAlgorithm(customSignatureAlgorithm: String? = null): Signature =
+        if (customSignatureAlgorithm != null) Signature.getInstance(customSignatureAlgorithm)
+        else when (keyType) {
+            KeyType.secp256k1 -> Signature.getInstance("SHA256withECDSA", "BC")
+            KeyType.secp256r1 -> Signature.getInstance("SHA256withECDSA")
+            KeyType.secp384r1 -> Signature.getInstance("SHA384withECDSA")
+            KeyType.secp521r1 -> Signature.getInstance("SHA512withECDSA")
+            KeyType.Ed25519 -> Signature.getInstance("Ed25519")
+            KeyType.RSA -> Signature.getInstance("SHA256withRSA") // RSASSA-PKCS1-v1_5
+            KeyType.RSA3072 -> Signature.getInstance("SHA384withRSA") // RSASSA-PKCS1-v1_5
+            KeyType.RSA4096 -> Signature.getInstance("SHA512withRSA") // RSASSA-PKCS1-v1_5
+        }
 
     private fun decodeEd25519RawPrivateKey(base64: String): PrivateKey {
         val keyFactory = KeyFactory.getInstance("EdDSA")

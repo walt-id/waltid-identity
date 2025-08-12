@@ -23,6 +23,7 @@ val modules = listOfNotNull(
         "waltid-crypto-ios" whenEnabled enableIosBuild,
         "waltid-target-ios" whenEnabled enableIosBuild,
         "waltid-target-ios:implementation" whenEnabled enableIosBuild,
+        "waltid-cose",
     ),
 
     * "$libraries:credentials".group(

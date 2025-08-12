@@ -41,13 +41,17 @@ class DidJwkRegistrarTest : DidRegistrarTestBase(DidJwkRegistrar()) {
             Stream.of(
                 arguments(DidJwkCreateOptions(KeyType.Ed25519), ed25519DidAssertions),
                 arguments(DidJwkCreateOptions(KeyType.RSA), rsaDidAssertions),
-                arguments(DidJwkCreateOptions(KeyType.secp256k1), secp256DidAssertions),
-                arguments(DidJwkCreateOptions(KeyType.secp256r1), secp256DidAssertions),
+                arguments(DidJwkCreateOptions(KeyType.RSA3072), rsaDidAssertions),
+                arguments(DidJwkCreateOptions(KeyType.RSA4096), rsaDidAssertions),
+                arguments(DidJwkCreateOptions(KeyType.secp256k1), secpDidAssertions),
+                arguments(DidJwkCreateOptions(KeyType.secp256r1), secpDidAssertions),
+                arguments(DidJwkCreateOptions(KeyType.secp384r1), secpDidAssertions),
+                arguments(DidJwkCreateOptions(KeyType.secp521r1), secpDidAssertions),
             )
 
         @JvmStatic
         fun `given did options and key when register with key then returns a valid did result`(): Stream<Arguments> =
-            keyTestData(secp256KeyAssertions, ed25519KeyAssertions, rsaKeyAssertions)
+            keyTestData(secpKeyAssertions, ed25519KeyAssertions, rsaKeyAssertions)
 
         private fun keyTestData(
             secpAssertions: registrarKeyAssertion,
@@ -66,6 +70,18 @@ class DidJwkRegistrarTest : DidRegistrarTestBase(DidJwkRegistrar()) {
                 DidJwkCreateOptions(),
                 rsaAssertions
             ),
+            //rsa3072
+            arguments(
+                runBlocking { JWKKey.generate(KeyType.RSA3072) },
+                DidJwkCreateOptions(),
+                rsaAssertions
+            ),
+            //rsa4096
+            arguments(
+                runBlocking { JWKKey.generate(KeyType.RSA4096) },
+                DidJwkCreateOptions(),
+                rsaAssertions
+            ),
             //secp256k1
             arguments(
                 runBlocking { JWKKey.generate(KeyType.secp256k1) },
@@ -75,6 +91,18 @@ class DidJwkRegistrarTest : DidRegistrarTestBase(DidJwkRegistrar()) {
             //secp256r1
             arguments(
                 runBlocking { JWKKey.generate(KeyType.secp256r1) },
+                DidJwkCreateOptions(),
+                secpAssertions
+            ),
+            //secp384r1
+            arguments(
+                runBlocking { JWKKey.generate(KeyType.secp384r1) },
+                DidJwkCreateOptions(),
+                secpAssertions
+            ),
+            //secp521r1
+            arguments(
+                runBlocking { JWKKey.generate(KeyType.secp521r1) },
                 DidJwkCreateOptions(),
                 secpAssertions
             ),

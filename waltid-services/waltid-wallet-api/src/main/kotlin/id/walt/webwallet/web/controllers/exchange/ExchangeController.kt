@@ -42,11 +42,11 @@ fun Application.exchange() = walletRoute {
             val wallet = call.getWalletService()
 
             val did = call.request.queryParameters["did"]
-                ?: wallet.listDids().let { dids ->
+                ?: wallet.listDids().run {
                     // use default did if no did is provided in the parameters
-                    dids.firstOrNull { it -> it.default }?.did
-                        // use first did, if no did is marked as default
-                        ?: dids.firstOrNull()?.did
+                    firstOrNull { it -> it.default }?.did
+                    // use first did, if no did is marked as default
+                        ?: firstOrNull()?.did
                 }
                 ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
 

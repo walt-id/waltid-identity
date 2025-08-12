@@ -14,7 +14,7 @@ repositories {
 }
 
 object Versions {
-    const val KTOR_VERSION = "3.1.2" // also change 1 plugin
+    const val KTOR_VERSION = "3.2.0" // also change 1 plugin
 }
 
 dependencies {

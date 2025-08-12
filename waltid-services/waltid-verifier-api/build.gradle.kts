@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
 
 object Versions {
-    const val KTOR_VERSION = "3.1.2" // also change 1 plugin
+    const val KTOR_VERSION = "3.2.0" // also change 1 plugin
     const val COROUTINES_VERSION = "1.10.1"
     const val HOPLITE_VERSION = "2.9.0"
 }

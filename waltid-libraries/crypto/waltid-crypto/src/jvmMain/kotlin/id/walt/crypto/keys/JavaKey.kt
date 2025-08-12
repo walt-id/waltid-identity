@@ -30,13 +30,13 @@ abstract class JavaKey : Key() {
     override suspend fun exportPEM(): String = javaExportPEM()
 
     abstract fun javaSignRaw(plaintext: ByteArray): Any
-    override suspend fun signRaw(plaintext: ByteArray): Any = javaSignRaw(plaintext)
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): Any = javaSignRaw(plaintext)
 
     abstract fun javaSignJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String = javaSignJws(plaintext, headers)
 
     abstract fun javaVerifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): ByteArray
-    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?): Result<ByteArray> =
+    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> =
         runBlocking { runCatching { javaVerifyRaw(signed, detachedPlaintext) } }
 
 

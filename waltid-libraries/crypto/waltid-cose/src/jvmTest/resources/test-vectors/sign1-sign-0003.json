@@ -1,0 +1,36 @@
+{
+  "uuid": "06EFA821-9026-4CDD-A4FB-634103472BC3",
+  "title": "Sign1 - ECDSA w/ SHA-512 (sign)",
+  "description": "Sign with one signer using ECDSA w/ SHA-512",
+  "key": {
+    "kty": "EC",
+    "kid": "bilbo.baggins@hobbiton.example",
+    "use": "sig",
+    "crv": "P-521",
+    "x": "AHKZLLOsCOzz5cY97ewNUajB957y-C-U88c3v13nmGZx6sYl_oJXu9A5RkTKqjqvjyekWF-7ytDyRXYgCF5cj0Kt",
+    "y": "AdymlHvOiLxXkEhayXQnNCvDX4h9htZaCJN34kfmC6pV5OhQHiraVySsUdaQkAgDPrwQrJmbnX9cwlGfP-HqHZR1",
+    "d": "AAhRON2r9cqXX1hg-RoI6R1tX5p2rUAYdmpHZoC1XNM56KtscrX6zbKipQrCW9CGZH3T4ubpnoTKLDYJ_fF3_rJt"
+  },
+  "alg": "ES512",
+  "sign1::sign": {
+    "payload": "546869732069732074686520636f6e74656e742e",
+    "protectedHeaders": {
+      "cborHex": "a1013823",
+      "cborDiag": "{1: -36}"
+    },
+    "unprotectedHeaders": {
+      "cborHex": "a104581e62696c626f2e62616767696e7340686f626269746f6e2e6578616d706c65",
+      "cborDiag": "{4: 'bilbo.baggins@hobbiton.example'}"
+    },
+    "tbsHex": {
+      "cborHex": "846a5369676e61747572653144a10138234054546869732069732074686520636f6e74656e742e",
+      "cborDiag": "[\"Signature1\", h'A1013823', h'', h'546869732069732074686520636F6E74656E742E']"
+    },
+    "detached": false,
+    "expectedOutput": {
+      "cborHex": "d28444a1013823a104581e62696c626f2e62616767696e7340686f626269746f6e2e6578616d706c6554546869732069732074686520636f6e74656e742e58840128bbda237a1b55568da74cefe02cf2d2a6216f80ac757bea8effc056d2f634f6e257077b0dabe9d4b3689eb8228e20f60bc74ff84ae3a38ee9a69e158cbf80f93a017acf5877e5083548a45143b602ccd776c5eb39537a2e68dc8c47ff62e10fc42f045b781e4313fbf421903785c3dfeb181c3a93b46a67a9b0e82947ee83f7b44cf0",
+      "cborDiag": "18([h'A1013823', {4: 'bilbo.baggins@hobbiton.example'}, h'546869732069732074686520636F6E74656E742E', h'0128BBDA237A1B55568DA74CEFE02CF2D2A6216F80AC757BEA8EFFC056D2F634F6E257077B0DABE9D4B3689EB8228E20F60BC74FF84AE3A38EE9A69E158CBF80F93A017ACF5877E5083548A45143B602CCD776C5EB39537A2E68DC8C47FF62E10FC42F045B781E4313FBF421903785C3DFEB181C3A93B46A67A9B0E82947EE83F7B44CF0'])"
+    },
+    "fixedOutputLength": 62
+  }
+}
