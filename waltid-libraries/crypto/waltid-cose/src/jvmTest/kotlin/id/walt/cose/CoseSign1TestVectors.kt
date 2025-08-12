@@ -51,7 +51,7 @@ class CoseSign1TestVectors {
 
 
         suspend fun checkTestVector(): Result<Unit> {
-            val cbor = Cbor.CoseCompliant
+            val cbor = coseCompliantCbor
             when {
                 signData != null -> {
                     println("Loading test vector data... -> $signData")
