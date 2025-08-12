@@ -30,6 +30,7 @@ import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.verifier.oidc.PresentationSessionInfo
+import id.walt.verifier.oidc.RequestedCredential
 import id.walt.verifier.openapi.VerifierApiExamples
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
@@ -39,10 +40,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import org.bouncycastle.asn1.*
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.style.BCStyle
@@ -807,6 +805,43 @@ class MDocTestSuite(
             issuedSignedItems.containsAll(presentedSignedItems)
         }
 
+        assertNotNull(
+            presentationRequest["request_credentials"]
+        )
+
+        val requestedCredentials = assertDoesNotThrow {
+            (presentationRequest["request_credentials"] as JsonArray).map {
+                Json.decodeFromJsonElement<RequestedCredential>(it)
+
+            }
+        }
+
+        assertEquals(
+            expected = 1,
+            actual = requestedCredentials.size,
+        )
+
+        val requestedMdl = assertNotNull(
+            requestedCredentials.first()
+        )
+
+        val requestedMdlInputDescriptor = assertNotNull(
+            requestedMdl.inputDescriptor
+        )
+
+        val requestedMdlInputDescriptorConstraints = assertNotNull(
+            requestedMdlInputDescriptor.constraints
+        )
+
+        val requestedMdlInputDescriptorConstraintsFields = assertNotNull(
+            requestedMdlInputDescriptorConstraints.fields
+        )
+
+        assertEquals(
+            expected = requestedMdlInputDescriptorConstraintsFields.size,
+            actual = presentedSignedItems.size,
+        )
+
         assertEquals(
             expected = mDL.MSO!!.toMapElement(),
             actual = presentedMdoc.MSO!!.toMapElement(),
@@ -907,6 +942,12 @@ class MDocTestSuite(
                 mDLCredentialId = mDLCredentialId,
                 presentationRequest = VerifierApiExamples.mDLRequiredFieldsExample,
             )
+
+            validateMdlPresentation(
+                mDL = mDL,
+                mDLCredentialId = mDLCredentialId,
+                presentationRequest = VerifierApiExamples.mDLBirthDateSelectiveDisclosureExample,
+            )
         }
 
     private suspend fun e2eIssuePresentMdlSingleAgeAttestation() =
@@ -958,6 +999,12 @@ class MDocTestSuite(
                 mDL = mDL,
                 mDLCredentialId = mDLCredentialId,
                 presentationRequest = VerifierApiExamples.mDLRequiredFieldsExample,
+            )
+
+            validateMdlPresentation(
+                mDL = mDL,
+                mDLCredentialId = mDLCredentialId,
+                presentationRequest = VerifierApiExamples.mDLAgeOver18AttestationExample,
             )
 
         }
@@ -1013,6 +1060,18 @@ class MDocTestSuite(
                 mDL = mDL,
                 mDLCredentialId = mDLCredentialId,
                 presentationRequest = VerifierApiExamples.mDLRequiredFieldsExample,
+            )
+
+            validateMdlPresentation(
+                mDL = mDL,
+                mDLCredentialId = mDLCredentialId,
+                presentationRequest = VerifierApiExamples.mDLAgeOver18AttestationExample,
+            )
+
+            validateMdlPresentation(
+                mDL = mDL,
+                mDLCredentialId = mDLCredentialId,
+                presentationRequest = VerifierApiExamples.mDLBirthDateSelectiveDisclosureExample,
             )
 
         }
@@ -1121,6 +1180,18 @@ class MDocTestSuite(
                 mDL = mDL,
                 mDLCredentialId = mDLCredentialId,
                 presentationRequest = VerifierApiExamples.mDLRequiredFieldsExample,
+            )
+
+            validateMdlPresentation(
+                mDL = mDL,
+                mDLCredentialId = mDLCredentialId,
+                presentationRequest = VerifierApiExamples.mDLAgeOver18AttestationExample,
+            )
+
+            validateMdlPresentation(
+                mDL = mDL,
+                mDLCredentialId = mDLCredentialId,
+                presentationRequest = VerifierApiExamples.mDLBirthDateSelectiveDisclosureExample,
             )
 
         }
