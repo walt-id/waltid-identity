@@ -1,4 +1,5 @@
-import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
+
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -8,38 +9,17 @@ val enableIosBuild = getSetting("enableIosBuild")
 
 plugins {
     kotlin("multiplatform")
+    kotlin("plugin.power-assert")
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
-    id("love.forte.plugin.suspend-transform")
+    //id("love.forte.plugin.suspend-transform")
 }
 
-group = "id.walt.crypto"
+group = "id.walt.credentials"
 
 repositories {
     mavenCentral()
-    maven("https://jitpack.io")
-}
-
-suspendTransformPlugin {
-    enabled = true
-    includeRuntime = true
-    transformers { useDefault() }
-
-    includeAnnotation = false // Required in the current version to avoid "compileOnly" warning
-}
-
-tasks.withType<ProcessResources> {
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_15
-    targetCompatibility = JavaVersion.VERSION_15
-}
-
-kotlin {
-    jvmToolchain(17)
 }
 
 kotlin {
@@ -61,20 +41,18 @@ kotlin {
     jvm {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
         compilerOptions {
-            jvmTarget = JvmTarget.JVM_15 // JVM got Ed25519 at version 15
+            jvmTarget = JvmTarget.JVM_17
         }
         tasks.withType<Test>().configureEach {
             useJUnitPlatform()
         }
     }
     js(IR) {
-        outputModuleName = "crypto"
+        outputModuleName = "vical"
         nodejs {
             generateTypeScriptDefinitions()
             testTask {
-                useMocha {
-                    timeout = "30s"
-                }
+                useMocha()
             }
         }
         binaries.library()
@@ -84,7 +62,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.2.0"
+    //val ktor_version = "3.2.0"
 
     sourceSets {
 
@@ -94,8 +72,15 @@ kotlin {
         }
         val commonMain by getting {
             dependencies {
-                // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                // CBOR
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
+
+                // Waltid
+                implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+                implementation(project(":waltid-libraries:crypto:waltid-cose"))
+
+                /*
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -124,7 +109,7 @@ kotlin {
 
 
                 implementation(project.dependencies.platform("org.kotlincrypto.macs:bom:0.6.1"))
-                implementation("org.kotlincrypto.macs:hmac-sha2")
+                implementation("org.kotlincrypto.macs:hmac-sha2")*/
 
             }
         }
@@ -133,23 +118,12 @@ kotlin {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
             }
         }
         val jvmMain by getting {
             dependencies {
-                implementation("com.google.crypto.tink:tink:1.16.0") // for JOSE using Ed25519
-
-                implementation("org.bouncycastle:bcprov-lts8on:2.73.7") // for secp256k1 (which was removed with Java 17)
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.7") // PEM import
-
-                // Ktor client
-                implementation("io.ktor:ktor-client-okhttp:$ktor_version")
-
-                // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.10.1")
-
-                // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
 
             }
         }
@@ -162,14 +136,11 @@ kotlin {
                 implementation(kotlin("test"))
 
                 implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
             }
         }
         val jsMain by getting {
             dependencies {
-                // JOSE
-                implementation(npm("jose", "5.2.3"))
 
             }
         }
@@ -206,69 +177,19 @@ kotlin {
     }
 }
 
-/*extensions.getByType<SuspendTransformGradleExtension>().apply {
-    transformers[TargetPlatform.JS] = mutableListOf(
-        SuspendTransformConfiguration.jsPromiseTransformer.copy(
-            copyAnnotationExcludes = listOf(
-                ClassInfo("kotlin.js", "JsExport.Ignore")
-            )
-        )
-    )
-}*/
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["kotlin"])
-            pom {
-                name.set("walt.id crypto")
-                description.set("walt.id crypto")
-                url.set("https://walt.id")
-
-                licenses {
-                    license {
-                        name.set("Apache License 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
-                    }
-                }
-
-                developers {
-                    developer {
-                        id.set("walt.id")
-                        name.set("walt.id")
-                        email.set("office@walt.id")
-                    }
-                }
-            }
-        }
-    }
-
-    repositories {
-        maven {
-            val releasesRepoUrl = uri("https://maven.waltid.dev/releases")
-            val snapshotsRepoUrl = uri("https://maven.waltid.dev/snapshots")
-            url = uri(
-                if (version.toString().endsWith("SNAPSHOT")
-                ) snapshotsRepoUrl else releasesRepoUrl
-            )
-
-            val envUsername = System.getenv("MAVEN_USERNAME")
-            val envPassword = System.getenv("MAVEN_PASSWORD")
-
-            val usernameFile = File("$rootDir/secret_maven_username.txt")
-            val passwordFile = File("$rootDir/secret_maven_password.txt")
-
-            val secretMavenUsername = envUsername ?: usernameFile.let {
-                if (it.isFile) it.readLines().first() else ""
-            }
-            val secretMavenPassword = envPassword ?: passwordFile.let {
-                if (it.isFile) it.readLines().first() else ""
-            }
-            credentials {
-                username = secretMavenUsername
-                password = secretMavenPassword
-            }
-        }
-
-    }
+kotlin {
+    jvmToolchain(21)
 }
+
+powerAssert {
+    includedSourceSets = listOf("commonTest")
+    functions = listOf(
+        // kotlin.test
+        "kotlin.assert", "kotlin.test.assertEquals", "kotlin.test.assertNull", "kotlin.test.assertTrue", "kotlin.test.assertFalse",
+        "kotlin.test.assertContentEquals",
+
+        // checks
+        "kotlin.require", "kotlin.check"
+    )
+}
+

@@ -6,19 +6,10 @@ import kotlinx.serialization.*
 import kotlinx.serialization.cbor.ByteString
 import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborLabel
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 
 /** A base interface for all top-level COSE messages. */
 interface CoseMessage
 
-/**
- * Represents a COSE_Sign1 object, which contains a single signature.
- * Aligned with RFC 8152, Section 4.2.
- */
 @Serializable
 @CborArray
 data class CoseSign1(
@@ -45,7 +36,7 @@ data class CoseSign1(
      * A COSE_Sign1 object is tagged with CBOR tag 18.
      */
     fun toTagged(): ByteArray {
-        val messageBytes = coseCbor.encodeToByteArray(this)
+        val messageBytes = coseCompliantCbor.encodeToByteArray(this)
         // CBOR tag 18 (major type 6, value 18) is encoded as the single byte 0xd2
         val tag = 0xD2.toByte()
         return byteArrayOf(tag) + messageBytes
@@ -57,14 +48,25 @@ data class CoseSign1(
          * The CBOR tag for a COSE Single Signer Data Object is 18.
          */
         fun fromTagged(cborBytes: ByteArray): CoseSign1 {
-            // CBOR tag 18 (major type 6, value 18) is encoded as the single byte 0xd2
-            val expectedTag = 0xD2.toByte()
-            if (cborBytes.isEmpty() || cborBytes[0] != expectedTag) {
-                throw IllegalArgumentException("Data is not a valid tagged COSE_Sign1 message (Tag 18 not found).")
+            if (cborBytes.isEmpty()) {
+                throw IllegalArgumentException("Input CBOR data cannot be empty.")
             }
-            // Decode the byte array starting *after* the tag byte
-            val messageBytes = cborBytes.copyOfRange(1, cborBytes.size)
-            return coseCbor.decodeFromByteArray(messageBytes)
+
+            val tag18 = 0xD2.toByte() // COSE_Sign1
+            val array4InitialByte = 0x84.toByte() // CBOR Array of 4 elements
+
+            val messageBytes = when (cborBytes[0]) {
+                tag18 -> cborBytes.copyOfRange(1, cborBytes.size)
+
+                array4InitialByte -> {
+                    // Data appears to be an **untagged** COSE_Sign1 object
+                    cborBytes
+                }
+
+                else -> throw IllegalArgumentException("Data is not a valid COSE_Sign1 message. Expected CBOR Tag 18 (0xD2) or an untagged array. Got byte: (hex) ${cborBytes[0].toHexString()}")
+            }
+
+            return coseCompliantCbor.decodeFromByteArray(messageBytes)
         }
 
         fun fromTagged(cborHex: String) = fromTagged(cborHex.hexToByteArray())
@@ -85,7 +87,7 @@ data class CoseSign1(
                 // Encode an empty map as an empty byte string
                 byteArrayOf()
             } else {
-                coseCbor.encodeToByteArray(protectedHeaders)
+                coseCompliantCbor.encodeToByteArray(protectedHeaders)
             }
 
             val dataToSign = buildSignatureStructure(protectedBytes, payload, externalAad)
@@ -136,97 +138,6 @@ data class CoseSign1(
     }
 }
 
-/**
- * Represents COSE Header Parameters.
- * See: https://www.iana.org/assignments/cose/cose.xhtml#header-parameters
- *
- * **IMPORTANT**: For COSE compliance, properties **MUST** be declared in
- * ascending order of their integer `@CborLabel`. This class adheres to that rule.
- * The library relies on `kotlinx.serialization`'s behaviour of serializing properties
- * in their declaration order.
- */
-@OptIn(ExperimentalSerializationApi::class)
-@Serializable
-data class CoseHeaders(
-    /** 1: Cryptographic algorithm to use */
-    @CborLabel(1) @SerialName("alg") val algorithm: Int? = null,
-    /** 2: Critical headers to be understood */
-    @CborLabel(2) val crit: List<Int>? = null,
-    /** 3: Content type of the payload */
-    @CborLabel(3) val contentType: CoseContentType? = null,
-    /** 4: Key identifier */
-    @CborLabel(4) @ByteString val kid: ByteArray? = null,
-    /** 5: Full Initialization Vector */
-    @CborLabel(5) @ByteString val iv: ByteArray? = null,
-    /** 6: Partial Initialization Vector */
-    @CborLabel(6) @ByteString val partialIv: ByteArray? = null,
-    /** 10: Identifies the context for the key identifier (RFC 8613) */
-    @CborLabel(10) @ByteString val kidContext: ByteArray? = null,
-    /** 16: Content type of the complete COSE object (RFC 9596) */
-    @CborLabel(16) val typ: CoseContentType? = null,
-    /** 32: An unordered bag of X.509 certificates (RFC 9360) */
-    @CborLabel(32) @ByteString val x5bag: List<ByteArray>? = null,
-    /** 33: An ordered chain of X.509 certificates (RFC 9360) */
-    @CborLabel(33) @ByteString val x5chain: List<ByteArray>? = null,
-    /** 45: Hash of an X.509 certificate (RFC 9360) */
-    @CborLabel(34) @ByteString val x5t: ByteArray? = null,
-    /** 35: URI pointing to an X.509 certificate (RFC 9360) */
-    @CborLabel(35) val x5u: String? = null,
-) {
-//    /**
-//     * Convenience property to get the content type, regardless of whether it was
-//     * encoded as an Int or a String.
-//     */
-//    @Transient
-//    val contentType = contentTypeString ?: contentTypeInt
-}
-
-/**
- * Represents the COSE Content Type header, which can be an Int or a String.
- * This is used for both the 'content type' (3) and 'typ' (16) headers.
- */
-@Serializable(with = CoseContentTypeSerializer::class)
-sealed class CoseContentType {
-    data class AsInt(val value: Int) : CoseContentType()
-    data class AsString(val value: String) : CoseContentType()
-}
-
-/**
- * Custom serializer for the CoseContentType sealed class to handle the tstr/uint union type.
- */
-object CoseContentTypeSerializer : KSerializer<CoseContentType> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("CoseContentType", PrimitiveKind.STRING)
-
-    override fun serialize(encoder: Encoder, value: CoseContentType) {
-        when (value) {
-            is CoseContentType.AsInt -> encoder.encodeInt(value.value)
-            is CoseContentType.AsString -> encoder.encodeString(value.value)
-        }
-    }
-
-    /**
-     * This custom deserialization is required, as the content type could be either a RFC6838 Section 4.2 string
-     * in the form of "<type-name>/<subtype-name>", or it can be a Integer from the "CoAP Content-Formats" IANA registry table.
-     * And there is no possible differentiator in the headers, so during deserialization we don't actually know if
-     * we handle a string content-type, or an int content-type. Thus, we can only try with `decodeString()` and `decodeInt()`.
-     *
-     * NOTE: It is required to give priority to `decodeString()`, and use `decodeInt()` as an fallback. The reason
-     * is that calling `decodeInt()` on a string content type (like "text/plain") will work, e.g. it reads 10. But then,
-     * the rest of the data stream will be corrupted. The reverse is not possible however, as strings are prefixed with 0B,
-     * so calling `decodeString()` on an int content type will throw an error. This is the only way I found to decode them
-     * to the correct data type.
-     */
-    override fun deserialize(decoder: Decoder): CoseContentType {
-        // Probe the type by attempting to decode as a String first, falling back to Int.
-        return try {
-            CoseContentType.AsString(decoder.decodeString())
-        } catch (e: SerializationException) {
-            require(e.message?.startsWith("Expected start of string, but found") == true) { "Error deserializing CoseContentType: ${e.stackTraceToString()}" }
-            CoseContentType.AsInt(decoder.decodeInt())
-        }
-    }
-}
 
 
 /** Represents a COSE Key object. Aligned with RFC 8152, Section 7. */
