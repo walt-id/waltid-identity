@@ -448,27 +448,6 @@ object IssuanceExamples {
         openBadgeCredentialIssuancePwd
     )
 
-    // language=json
-    val mDLCredentialIssuanceData = """
-        {
-          "issuerKey": { 
-            "type": "jwk",
-            "jwk": ${Json.parseToJsonElement(ISSUER_JWK_KEY.jwk!!)}
-          },
-          "issuerDid":"",
-          "credentialConfigurationId":"org.iso.18013.5.1.mDL",
-          "credentialData":null,
-          "mdocData": { 
-              "org.iso.18013.5.1": {
-                  "family_name": "Doe",
-                  "given_name": "John",
-                  "birth_date": "1980-01-02"
-              }
-          },
-          "x5Chain": ${buildJsonArray { add("-----BEGIN CERTIFICATE-----\nMIIBeTCCAR8CFHrWgrGl5KdefSvRQhR+aoqdf48+MAoGCCqGSM49BAMCMBcxFTATBgNVBAMMDE1ET0MgUk9PVCBDQTAgFw0yNTA1MTQxNDA4MDlaGA8yMDc1MDUwMjE0MDgwOVowZTELMAkGA1UEBhMCQVQxDzANBgNVBAgMBlZpZW5uYTEPMA0GA1UEBwwGVmllbm5hMRAwDgYDVQQKDAd3YWx0LmlkMRAwDgYDVQQLDAd3YWx0LmlkMRAwDgYDVQQDDAd3YWx0LmlzMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG0RINBiF+oQUD3d5DGnegQuXenI29JDaMGoMvioKRBN53d4UazakS2unu8BnsEtxutS2kqRhYBPYk9RAriU3gTAKBggqhkjOPQQDAgNIADBFAiAOMwM7hH7q9Di+mT6qCi4LvB+kH8OxMheIrZ2eRPxtDQIhALHzTxwvN8Udt0Z2Cpo8JBihqacfeXkIxVAO8XkxmXhB\n-----END CERTIFICATE-----") }}
-       }
-    """.trimIndent()
-
     // language=JSON
     val batchExampleJwt = typedValueExampleDescriptorDsl<List<IssuanceRequest>>(
         """
