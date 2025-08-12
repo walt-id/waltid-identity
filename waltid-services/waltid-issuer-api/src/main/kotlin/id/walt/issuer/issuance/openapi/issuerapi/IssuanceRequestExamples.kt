@@ -422,10 +422,6 @@ object IssuanceExamples {
         }
     """.trimIndent()
 
-    val jwkKeyExample = typedValueExampleDescriptorDsl<String>(
-        issuerKey
-    )
-
     val universityDegreeIssuanceCredentialExample = typedValueExampleDescriptorDsl<IssuanceRequest>(
         universityDegreeCredentialIssuance
     )
