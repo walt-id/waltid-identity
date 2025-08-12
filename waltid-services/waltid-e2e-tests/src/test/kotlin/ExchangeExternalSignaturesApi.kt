@@ -13,10 +13,10 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
+import id.walt.issuer.issuance.openapi.issuerapi.MdocDocs
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.MapElement
-import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ProofType
@@ -138,13 +138,8 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         credentialFormat = CredentialFormat.sd_jwt_vc
     )
 
-    //mDoc
-    private val mDocIssuanceRequest = Json.decodeFromString<IssuanceRequest>(
-        IssuanceExamples.mDLCredentialIssuanceData
-    ).copy(
-        authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
-        credentialFormat = CredentialFormat.mso_mdoc,
-    )
+    //mDL
+    private val mDLIssuanceRequest = MdocDocs.mdlBaseIssuanceExample
 
     //presentation requests
     //w3c jwt_vc_json
@@ -292,7 +287,7 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         e2e.test("External signatures - mDocTestCases") {
             testPreAuthorizedOID4VCI(
                 useOptionalParameters = false,
-                issuanceRequests = listOf(mDocIssuanceRequest),
+                issuanceRequests = listOf(mDLIssuanceRequest),
             )
             clearWalletCredentials()
         }
