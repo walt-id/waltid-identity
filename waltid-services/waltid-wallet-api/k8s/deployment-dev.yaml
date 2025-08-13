@@ -108,7 +108,7 @@ spec:
               name: wallet-data
       containers:
         - name: wallet-api
-          image: waltid/wallet-api:dev
+          image: waltid/wallet-api:__DEFAULT_IMAGE_TAG__
 
           imagePullPolicy: Always
           volumeMounts:
@@ -179,7 +179,7 @@ spec:
     spec:
       containers:
         - name: waltid-dev-wallet
-          image: waltid/waltid-dev-wallet:dev
+          image: waltid/waltid-dev-wallet:__DEFAULT_IMAGE_TAG__
           imagePullPolicy: Always
           env:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
@@ -208,7 +208,7 @@ spec:
     spec:
       containers:
         - name: waltid-demo-wallet
-          image: waltid/waltid-demo-wallet:dev
+          image: waltid/waltid-demo-wallet:__DEFAULT_IMAGE_TAG__
           imagePullPolicy: Always
           env:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
