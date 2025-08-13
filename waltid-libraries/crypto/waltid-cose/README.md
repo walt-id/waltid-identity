@@ -8,6 +8,8 @@ defining feature is the use of [CBOR (Concise Binary Object Representation)](htt
 defined in RFC 8949, a compact binary format that makes COSE messages significantly smaller and more
 efficient to process than text-based alternatives.
 
+It is built on top of the multiplatform libraries kotlinx-serialization-cbor and waltid-crypto.
+
 ### COSE vs JOSE
 
 For developers familiar with the **JOSE** (JSON Object Signing and Encryption) framework, COSE (CBOR Object Signing and Encryption) offers a
