@@ -265,6 +265,9 @@ ktor {
         )
     }
     jib {
+        container {
+            workingDirectory = "/waltid-wallet-api"
+        }
         from {
             platforms {
                 platform {

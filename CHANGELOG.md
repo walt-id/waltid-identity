@@ -56,7 +56,7 @@ We're excited to introduce `waltid-cose`, a simple and powerful new library for 
 Object Signing and Encryption). It's perfect for managing credential signatures and is built on our
 multiplatform `waltid-crypto` library and `kotlinx-serialization`.
 
-Here’s how easy it is to sign and verify data:
+Here's how easy it is to sign and verify data:
 
 #### Sign Data
 
@@ -88,14 +88,17 @@ val verified: Boolean = coseSelf.verify(verifier, externalAad)
 println(verified) // true / false
 ```
 
-
 ---
 
 ### ✅ Trust at Scale: Introducing the VICAL Library
 
-Building on our new COSE library, we're also releasing waltid-vical, a library for issuing and verifying VICAL (Verified Issuer Certificate Authority Lists). VICAL, defined in the ISO/IEC 18013-5 standard for mobile Driver's Licenses (mDL), provides a standardized way to trust and manage lists of authorized credential issuers.
+Building on our new COSE library, we're also releasing waltid-vical, a library for issuing and
+verifying VICAL (Verified Issuer Certificate Authority Lists). VICAL, defined in the ISO/IEC 18013-5
+standard for mobile Driver's Licenses (mDL), provides a standardized way to trust and manage lists
+of authorized credential issuers.
 
-Here’s a quick example showing how to verify the AAMVA (American Association of Motor Vehicles Administrators) VICAL and list its allowed issuers.
+Here's a quick example showing how to verify the AAMVA (American Association of Motor Vehicles
+Administrators) VICAL and list its allowed issuers.
 
 ```kotlin
 /* -- Decode the VICAL file -- */
@@ -126,3 +129,32 @@ vical.vicalData.getAllAllowedIssuers().entries.forEachIndexed { idx, (certificat
 }
 println("Allowed issuers per this VICAL: ${allowedIssuers.size}")
 ```
+
+### 🔐 Custom authentication methods (Enterprise feature)
+
+For on-prem deployments of the Enterprise stacks, you can now configure custom authentication
+methods to be used. This feature is based on the multiplatform waltid-ktor-authnz library.
+
+This library provides various authentication methods to choose from besides email/username +
+password,
+including OIDC, LDAP, RADIUS.
+
+To get started using this feature, edit your `auth.conf` configuration file to set the
+authentication flow:
+
+```hocon
+# Configure the Auth Flow (refer to: waltid-ktor-authnz)
+authFlow = {
+    method: radius
+    config: {
+        radiusServerHost: "localhost"
+        radiusServerPort: 1812
+        radiusServerSecret: "testing123"
+    }
+    expiration: "7d" # optional: Set expiration time for login tokens, e.g. a week
+    ok: true # Auth flow ends successfuly with this step
+}
+```
+
+Just like that, users can now authenticate against `POST /auth/account/radius` with their RADIUS
+credentials.
