@@ -32,7 +32,7 @@ spec:
     spec:
       containers:
         - name: issuer
-          image: waltid/issuer-api:dev
+          image: waltid/issuer-api:__DEFAULT_IMAGE_TAG__
           imagePullPolicy: Always
           volumeMounts:
             - name: issuer-web-config

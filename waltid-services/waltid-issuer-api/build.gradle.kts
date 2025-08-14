@@ -238,6 +238,9 @@ ktor {
         )
     }
     jib {
+        container {
+            workingDirectory = "/waltid-issuer-api"
+        }
         from {
             platforms {
                 platform {
