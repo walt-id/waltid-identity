@@ -37,71 +37,20 @@ object MdocDocs {
             example(
                 name = "mDL example - Mandatory fields & Age attestation (single)",
             ) {
-                value = mdlBaseIssuanceExample.copy(
-                    mdocData = mdlBaseIssuanceExample.mdocData!!.toMutableMap().apply {
-                        this[ISO_IEC_MDL_NAMESPACE_ID] = JsonObject(
-                            (this[ISO_IEC_MDL_NAMESPACE_ID] as JsonObject).toMutableMap().apply {
-                                put("age_over_18", true.toJsonElement())
-                            }
-                        )
-                    }
-                )
+                value = mDLSingleAgeAttestation
             }
 
             example(
                 name = "mDL example - Mandatory fields & Age attestations (multiple)",
             ) {
-                value = mdlBaseIssuanceExample.copy(
-                    mdocData = mdlBaseIssuanceExample.mdocData!!.toMutableMap().apply {
-                        this[ISO_IEC_MDL_NAMESPACE_ID] = JsonObject(
-                            (this[ISO_IEC_MDL_NAMESPACE_ID] as JsonObject).toMutableMap().apply {
-                                put("age_over_18", true.toJsonElement())
-                                put("age_over_24", true.toJsonElement())
-                                put("age_over_60", false.toJsonElement())
-                            }
-                        )
-                    }
-                )
+                value = mDLMultipleAgeAttestations
             }
 
             example(
                 name = "mDL example - All fields & Age attestations (multiple)",
             ) {
-                value = mdlBaseIssuanceExample.copy(
-                    mdocData = mdlBaseIssuanceExample.mdocData!!.toMutableMap().apply {
-                        this[ISO_IEC_MDL_NAMESPACE_ID] = JsonObject(
-                            (this[ISO_IEC_MDL_NAMESPACE_ID] as JsonObject).toMutableMap().apply {
-                                put("age_over_18", true.toJsonElement())
-                                put("age_over_24", true.toJsonElement())
-                                put("age_over_60", false.toJsonElement())
-
-                                put("administrative_number", "123456789".toJsonElement())
-                                put("sex", 9.toJsonElement())
-                                put("height", 180.toJsonElement())
-                                put("weight", 100.toJsonElement())
-                                put("eye_colour", "black".toJsonElement())
-                                put("hair_colour", "black".toJsonElement())
-                                put("birth_place", "Vienna".toJsonElement())
-                                put("resident_address", "Some Street 4".toJsonElement())
-                                put("portrait_capture_date", "2018-08-09".toJsonElement())
-                                put("age_in_years", 33.toJsonElement())
-                                put("age_birth_year", 1986.toJsonElement())
-
-                                put("issuing_jurisdiction", "AT-9".toJsonElement())
-                                put("nationality", "AT".toJsonElement())
-                                put("resident_city", "Vienna".toJsonElement())
-                                put("resident_state", "Vienna".toJsonElement())
-                                put("resident_postal_code", "07008".toJsonElement())
-                                put("biometric_template_face", listOf(141, 182, 121, 111, 238, 50, 120, 94, 54, 111, 113, 13, 241, 12, 12).toJsonElement())
-                                put("family_name_national_character", "Doe".toJsonElement())
-                                put("given_name_national_character", "John".toJsonElement())
-                                put("signature_usual_mark", listOf(141, 182, 121, 111, 238, 50, 120, 94, 54, 111, 113, 13, 241, 12, 12).toJsonElement())
-                            }
-                        )
-                    }
-                )
+                value = mDLAllFieldsMultipleAgeAttestations
             }
-
         }
     }
 
@@ -158,4 +107,59 @@ object MdocDocs {
     """.trimIndent()
     )
 
+    val mDLSingleAgeAttestation = mdlBaseIssuanceExample.copy(
+        mdocData = mdlBaseIssuanceExample.mdocData!!.toMutableMap().apply {
+            this[ISO_IEC_MDL_NAMESPACE_ID] = JsonObject(
+                (this[ISO_IEC_MDL_NAMESPACE_ID] as JsonObject).toMutableMap().apply {
+                    put("age_over_18", true.toJsonElement())
+                }
+            )
+        }
+    )
+
+    val mDLMultipleAgeAttestations = mdlBaseIssuanceExample.copy(
+        mdocData = mdlBaseIssuanceExample.mdocData!!.toMutableMap().apply {
+            this[ISO_IEC_MDL_NAMESPACE_ID] = JsonObject(
+                (this[ISO_IEC_MDL_NAMESPACE_ID] as JsonObject).toMutableMap().apply {
+                    put("age_over_18", true.toJsonElement())
+                    put("age_over_24", true.toJsonElement())
+                    put("age_over_60", false.toJsonElement())
+                }
+            )
+        }
+    )
+
+    val mDLAllFieldsMultipleAgeAttestations = mdlBaseIssuanceExample.copy(
+        mdocData = mdlBaseIssuanceExample.mdocData!!.toMutableMap().apply {
+            this[ISO_IEC_MDL_NAMESPACE_ID] = JsonObject(
+                (this[ISO_IEC_MDL_NAMESPACE_ID] as JsonObject).toMutableMap().apply {
+                    put("age_over_18", true.toJsonElement())
+                    put("age_over_24", true.toJsonElement())
+                    put("age_over_60", false.toJsonElement())
+
+                    put("administrative_number", "123456789".toJsonElement())
+                    put("sex", 9.toJsonElement())
+                    put("height", 180.toJsonElement())
+                    put("weight", 100.toJsonElement())
+                    put("eye_colour", "black".toJsonElement())
+                    put("hair_colour", "black".toJsonElement())
+                    put("birth_place", "Vienna".toJsonElement())
+                    put("resident_address", "Some Street 4".toJsonElement())
+                    put("portrait_capture_date", "2018-08-09".toJsonElement())
+                    put("age_in_years", 33.toJsonElement())
+                    put("age_birth_year", 1986.toJsonElement())
+
+                    put("issuing_jurisdiction", "AT-9".toJsonElement())
+                    put("nationality", "AT".toJsonElement())
+                    put("resident_city", "Vienna".toJsonElement())
+                    put("resident_state", "Vienna".toJsonElement())
+                    put("resident_postal_code", "07008".toJsonElement())
+                    put("biometric_template_face", listOf(141, 182, 121, 111, 238, 50, 120, 94, 54, 111, 113, 13, 241, 12, 12).toJsonElement())
+                    put("family_name_national_character", "Doe".toJsonElement())
+                    put("given_name_national_character", "John".toJsonElement())
+                    put("signature_usual_mark", listOf(141, 182, 121, 111, 238, 50, 120, 94, 54, 111, 113, 13, 241, 12, 12).toJsonElement())
+                }
+            )
+        }
+    )
 }

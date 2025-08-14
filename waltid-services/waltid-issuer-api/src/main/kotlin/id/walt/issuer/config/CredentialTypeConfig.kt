@@ -106,7 +106,13 @@ data class CredentialTypeConfig(
                         ),
                     )
                 ),
-                credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableAttestation" , "KiwiAccessCredential"))
+                credentialDefinition = CredentialDefinition(
+                    type = listOf(
+                        "VerifiableCredential",
+                        "VerifiableAttestation",
+                        "KiwiAccessCredential"
+                    )
+                )
             )
         ),
         MDocTypes.ISO_MDL to vc(
@@ -199,7 +205,7 @@ data class CredentialTypeConfig(
                 is JsonArray -> {
                     val type = element.jsonArray.map { it.jsonPrimitive.content }
 
-                    CredentialFormat.entries.associate { format ->
+                    CredentialFormat.entries.minus(CredentialFormat.mso_mdoc).associate { format ->
                         "${entry.key}_${format.value}" to CredentialSupported(
                             format = format,
                             cryptographicBindingMethodsSupported = if (format == CredentialFormat.sd_jwt_vc) setOf("jwk") else setOf(
@@ -210,7 +216,6 @@ data class CredentialTypeConfig(
                                 type = type
                             ) else null,
                             vct = if (format == CredentialFormat.sd_jwt_vc) baseUrl.plus("/${entry.key}") else null,
-                            docType = if (format == CredentialFormat.mso_mdoc) MDocTypes.ISO_MDL else null
                         )
                     }.entries
                 }
