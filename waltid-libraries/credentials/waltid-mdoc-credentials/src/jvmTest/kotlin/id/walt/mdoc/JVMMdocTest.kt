@@ -1,7 +1,5 @@
 package id.walt.mdoc
 
-import org.cose.java.AlgorithmID
-import org.cose.java.OneKey
 import cbor.Cbor
 import com.upokecenter.cbor.CBORObject
 import id.walt.mdoc.cose.COSESign1Serializer
@@ -32,6 +30,8 @@ import org.bouncycastle.cert.X509v3CertificateBuilder
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
+import org.cose.java.AlgorithmID
+import org.cose.java.OneKey
 import org.junit.jupiter.api.BeforeAll
 import java.io.ByteArrayInputStream
 import java.math.BigInteger
@@ -41,7 +41,7 @@ import java.security.SecureRandom
 import java.security.Security
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
-import java.util.Date
+import java.util.*
 import kotlin.test.*
 
 class JVMMdocTest {
@@ -198,7 +198,7 @@ class JVMMdocTest {
 
         val mdoc = Cbor.decodeFromHexString<DeviceResponse>(mdocExample)
         // Get the public key certificate from the COSE_Sign1 unprotected header
-        val certificateDER = mdoc.documents[0].issuerSigned.issuerAuth!!.x5Chain!!
+        val certificateDER = mdoc.documents[0].issuerSigned.issuerAuth!!.x5Chain!!.first()
         val cert = CertificateFactory.getInstance("X509")
             .generateCertificate(ByteArrayInputStream(certificateDER)) as X509Certificate
 
@@ -275,7 +275,7 @@ class JVMMdocTest {
             expected = "ReaderAuthentication", actual = (readerAuthentication.data[0] as? StringElement)?.value
         )
 
-        val certificateDER = devRequest.docRequests[0].readerAuth!!.x5Chain
+        val certificateDER = devRequest.docRequests[0].readerAuth!!.x5Chain!!.first()
         val cert = CertificateFactory.getInstance("X509")
             .generateCertificate(ByteArrayInputStream(certificateDER)) as X509Certificate
         val cryptoProvider = SimpleCOSECryptoProvider(
@@ -344,7 +344,7 @@ class JVMMdocTest {
             })
 
         // validate issuer signature, tamper check and device mac
-        val certificateDER = mdoc.issuerSigned.issuerAuth!!.x5Chain!!
+        val certificateDER = mdoc.issuerSigned.issuerAuth!!.x5Chain!!.first()
         val cert = CertificateFactory.getInstance("X509")
             .generateCertificate(ByteArrayInputStream(certificateDER)) as X509Certificate
         val cryptoProvider = SimpleCOSECryptoProvider(

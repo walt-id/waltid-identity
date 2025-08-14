@@ -10,7 +10,7 @@ data class RADIUSConfiguration(
     val radiusServerHost: String,
     val radiusServerPort: Int,
     val radiusServerSecret: String,
-    val radiusNasIdentifier: String,
+    val radiusNasIdentifier: String? = null,
 ) : AuthMethodConfiguration {
     override fun authMethod() = RADIUS
 }

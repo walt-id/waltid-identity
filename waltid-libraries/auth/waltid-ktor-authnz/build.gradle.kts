@@ -37,7 +37,7 @@ dependencies {
 
 
     // RADIUS
-    implementation("org.aaa4j.radius:aaa4j-radius-client:0.3.1")
+    implementation("org.aaa4j.radius:aaa4j-radius-client:0.4.0")
 
     // LDAP
     implementation("org.apache.directory.api:apache-ldap-api:2.1.7") {

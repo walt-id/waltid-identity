@@ -84,7 +84,7 @@ jobs:
             docker build -t $image -f waltid-services/waltid-issuer-api/Dockerfile .
           fi
           
-          docker run --net=host -d -v $PWD/waltid-services/waltid-issuer-api/config:/config --name waltid-issuer-api $image
+          docker run --net=host -d -v $PWD/waltid-services/waltid-issuer-api/config:/waltid-issuer-api/config --name waltid-issuer-api $image
           
           curl --retry 5 --retry-delay 5 --retry-connrefused http://localhost:7002/livez
 

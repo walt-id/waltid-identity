@@ -48,13 +48,13 @@ data class AuthFlow(
     fun toString(index: Int): String {
         val prefix = " " * index * 2
 
-        val config = if (config != null) "\n${prefix}config=$config" else ""
+        //val config = if (config != null) "\n${prefix}config=$config" else ""
         val end = when {
             ok -> "$prefix-> Flow end (success)"
             continueWith != null -> "${prefix}continue on success ->\n${continueWith.joinToString("\n") { it.toString(index + 1) }}"
             else -> "$prefix?"
         }
-        return "${prefix}Method: $method$config\n$end"
+        return "${prefix}Method: $method\n$end"
     }
 
     companion object {
