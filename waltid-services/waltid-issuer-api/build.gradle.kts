@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.*
 
 object Versions {
-    const val KTOR_VERSION = "3.2.0" // also change 1 plugin
+    const val KTOR_VERSION = "3.2.3" // also change 1 plugin
     const val COROUTINES_VERSION = "1.10.1"
     const val HOPLITE_VERSION = "2.9.0"
 }
@@ -12,7 +12,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
 
-    id("io.ktor.plugin") version "3.2.0" // Versions.KTOR_VERSION
+    id("io.ktor.plugin") version "3.2.3" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.2.0"
     id("com.github.jk1.dependency-license-report") version "2.9"
     id("maven-publish")
@@ -200,7 +200,7 @@ publishing {
     }
 }
 
-fun waltidPrivateCredentials(repoName:String): Pair<String, String> = let {
+fun waltidPrivateCredentials(repoName: String): Pair<String, String> = let {
     val envUsername = System.getenv(repoName.uppercase() + "_USERNAME")
     val envPassword = System.getenv(repoName.uppercase() + "_PASSWORD")
 
@@ -218,13 +218,15 @@ ktor {
         jreVersion.set(JavaVersion.VERSION_21)
         localImageName.set("waltid/issuer-api")
         imageTag.set("${project.version}")
-        portMappings.set(listOf(
-            io.ktor.plugin.features.DockerPortMapping(
-                7002,
-                7002,
-                io.ktor.plugin.features.DockerPortMappingProtocol.TCP
+        portMappings.set(
+            listOf(
+                io.ktor.plugin.features.DockerPortMapping(
+                    7002,
+                    7002,
+                    io.ktor.plugin.features.DockerPortMappingProtocol.TCP
+                )
             )
-        ))
+        )
 
         val (username, password) = waltidPrivateCredentials("DOCKER")
         externalRegistry.set(

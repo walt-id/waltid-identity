@@ -83,7 +83,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    //val ktor_version = "3.2.0"
+    //val ktor_version = "3.2.3"
     sourceSets {
         val commonMain by getting {
             dependencies {
