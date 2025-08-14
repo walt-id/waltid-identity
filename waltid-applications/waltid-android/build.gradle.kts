@@ -17,6 +17,8 @@ android {
         versionCode = 1
         versionName = "1.0"
 
+        multiDexEnabled = true
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -75,6 +77,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.lifecycle:lifecycle-runtime-compose")
+
+    // https://mvnrepository.com/artifact/androidx.multidex/multidex
+    runtimeOnly("androidx.multidex:multidex:2.0.1")
 
     // Testing
     testImplementation(kotlin("test"))

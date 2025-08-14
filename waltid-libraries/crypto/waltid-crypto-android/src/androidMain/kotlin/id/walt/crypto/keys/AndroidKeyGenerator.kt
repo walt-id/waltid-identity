@@ -57,9 +57,8 @@ object AndroidKeyGenerator : AndroidKeyCreator {
     private fun getAlgorithmFor(keyType: KeyType): String {
         return when (keyType) {
             KeyType.RSA -> KeyProperties.KEY_ALGORITHM_RSA
-            KeyType.Ed25519 -> throw IllegalArgumentException("Ed25519 is not supported in Android KeyStore")
-            KeyType.secp256k1 -> throw IllegalArgumentException("secp256k1 is not supported in Android KeyStore")
             KeyType.secp256r1 -> KeyProperties.KEY_ALGORITHM_EC
+            else -> throw IllegalArgumentException("KeyType $keyType is not supported in Android KeyStore")
         }
     }
 }
