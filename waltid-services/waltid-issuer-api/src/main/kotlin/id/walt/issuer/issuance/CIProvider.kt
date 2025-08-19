@@ -88,6 +88,18 @@ open class CIProvider(
             version = OpenID4VCIVersion.DRAFT11
         ) as OpenIDProviderMetadata.Draft11)
 
+    val openIdMetadata
+        get() = (OpenID4VCI.createDefaultProviderMetadata(
+            baseUrl = baseUrl,
+            version = OpenID4VCIVersion.DRAFT13
+        ) as OpenIDProviderMetadata.Draft13)
+
+    val openIdMetadataDraft11
+        get() = (OpenID4VCI.createDefaultProviderMetadata(
+            baseUrl = baseUrlDraft11,
+            version = OpenID4VCIVersion.DRAFT11
+        ) as OpenIDProviderMetadata.Draft11)
+
     companion object {
         private val log = KotlinLogging.logger { }
         private val http = HttpClient {
@@ -843,7 +855,7 @@ open class CIProvider(
         )
     }
 
-    fun getMetadataForVersion(
+    fun getMetadataByVersion(
         standardVersion: String?,
     ): OpenIDProviderMetadata {
         val version = OpenID4VCIVersion.from(
@@ -853,6 +865,19 @@ open class CIProvider(
         return when (version) {
             OpenID4VCIVersion.DRAFT11 -> metadataDraft11
             OpenID4VCIVersion.DRAFT13 -> metadata
+        }
+    }
+
+    fun getOpenIdProviderMetadataByVersion(
+        standardVersion: String?,
+    ): OpenIDProviderMetadata {
+        val version = OpenID4VCIVersion.from(
+            standardVersion ?: throw IllegalArgumentException("standardVersion parameter is required")
+        )
+
+        return when (version) {
+            OpenID4VCIVersion.DRAFT11 -> openIdMetadataDraft11
+            OpenID4VCIVersion.DRAFT13 -> openIdMetadata
         }
     }
 
