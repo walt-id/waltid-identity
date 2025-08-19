@@ -49,21 +49,27 @@ class CI_JVM_Test {
         authorizationEndpoint = "https://localhost/oidc",
         credentialConfigurationsSupported = mapOf(
             "UniversityDegreeCredential_jwt_vc_json" to CredentialSupported(
-                CredentialFormat.jwt_vc_json,
+                format = CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"),
-                credentialSigningAlgValuesSupported =  setOf("ES256K"),
+                credentialSigningAlgValuesSupported = setOf("ES256K"),
                 display = listOf(
                     DisplayProperties(
-                        "University Credential",
-                        "en-US",
-                        LogoProperties(
-                            "https://exampleuniversity.com/public/logo.png",
-                            "a square logo of a university"
+                        name = "University Credential",
+                        locale = "en-US",
+                        logo = LogoProperties(
+                            url = "https://exampleuniversity.com/public/logo.png",
+                            altText = "a square logo of a university"
                         ),
-                        backgroundColor = "#12107c", textColor = "#FFFFFF"
+                        backgroundColor = "#12107c",
+                        textColor = "#FFFFFF"
                     )
                 ),
-                credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "UniversityDegreeCredential")),
+                credentialDefinition = CredentialDefinition(
+                    type = listOf(
+                        "VerifiableCredential",
+                        "UniversityDegreeCredential"
+                    )
+                ),
                 credentialSubject = mapOf(
                     "name" to ClaimDescriptor(
                         mandatory = false,
@@ -82,7 +88,7 @@ class CI_JVM_Test {
                 )
             ),
             "VerifiableId_ldp_vc" to CredentialSupported(
-                CredentialFormat.ldp_vc,
+                format = CredentialFormat.ldp_vc,
                 cryptographicBindingMethodsSupported = setOf("did"),
                 credentialSigningAlgValuesSupported = setOf("ES256K"),
                 display = listOf(DisplayProperties("Verifiable ID")),
@@ -205,7 +211,7 @@ class CI_JVM_Test {
         val parsedReq = AuthorizationRequest.fromHttpQueryString(authorizationReq)
         assertEquals(expected = "s6BhdRkqt3", actual = parsedReq.clientId)
         assertNotNull(actual = parsedReq.authorizationDetails)
-        assertEquals(expected = "openid_credential", actual = parsedReq.authorizationDetails!!.first().type)
+        assertEquals(expected = "openid_credential", actual = parsedReq.authorizationDetails.first().type)
 
         val expectedReq = AuthorizationRequest(
             clientId = "s6BhdRkqt3", redirectUri = "https://client.example.org/cb",
@@ -213,7 +219,12 @@ class CI_JVM_Test {
                 AuthorizationDetails(
                     type = OPENID_CREDENTIAL_AUTHORIZATION_TYPE,
                     format = CredentialFormat.jwt_vc_json,
-                    credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "UniversityDegreeCredential"))
+                    credentialDefinition = CredentialDefinition(
+                        type = listOf(
+                            "VerifiableCredential",
+                            "UniversityDegreeCredential"
+                        )
+                    )
                 )
             ),
             customParameters = mapOf(
@@ -234,7 +245,9 @@ class CI_JVM_Test {
         //credential["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull shouldBe subjectId // TODO <-- use this
         assertEquals(
             expected = subjectId,
-            actual = credential["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull?.substringBefore("#")
+            actual = credential["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull?.substringBefore(
+                "#"
+            )
         ) // FIXME <-- remove
     }
 
@@ -247,20 +260,21 @@ class CI_JVM_Test {
         assertNotNull(actual = credOfferReq.credentialOffer?.credentialIssuer)
         println("// get issuer metadata")
         val providerMetadataUri =
-            credentialWallet.getCIProviderMetadataUrl(credOfferReq.credentialOffer!!.credentialIssuer)
-        val providerMetadata = ktorClient.get(providerMetadataUri).call.body<OpenIDProviderMetadata>() as OpenIDProviderMetadata.Draft13
+            credentialWallet.getCIProviderMetadataUrl(credOfferReq.credentialOffer.credentialIssuer)
+        val providerMetadata =
+            ktorClient.get(providerMetadataUri).call.body<OpenIDProviderMetadata>() as OpenIDProviderMetadata.Draft13
         println("providerMetadata: $providerMetadata")
         assertNotNull(actual = providerMetadata.authorizationEndpoint)
         println("// resolve offered credentials")
-        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credOfferReq.credentialOffer!!, providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credOfferReq.credentialOffer, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
 
         assertContains(iterable = providerMetadata.grantTypesSupported, element = GrantType.pre_authorized_code)
-        assertContains(map = credOfferReq.credentialOffer!!.grants, key = GrantType.pre_authorized_code.value)
+        assertContains(map = credOfferReq.credentialOffer.grants, key = GrantType.pre_authorized_code.value)
 
         // make token request
         val tokenReq = TokenRequest.PreAuthorizedCode(
-            preAuthorizedCode =  credOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!
+            preAuthorizedCode = credOfferReq.credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!
         )
 
         println("tokenReq: $tokenReq")
@@ -279,14 +293,14 @@ class CI_JVM_Test {
 
         val credentialResp = ktorClient.post(providerMetadata.credentialEndpoint!!) {
             contentType(ContentType.Application.Json)
-            bearerAuth(tokenResp.accessToken!!)
+            bearerAuth(tokenResp.accessToken)
             setBody(credReq.toJSON())
         }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
         println("credentialResp: $credentialResp")
 
         assertTrue(actual = credentialResp.isSuccess)
         assertNotNull(actual = credentialResp.credential)
-        println(SDJwt.parse(credentialResp.credential!!.jsonPrimitive.content).fullPayload.toString())
+        println(SDJwt.parse(credentialResp.credential.jsonPrimitive.content).fullPayload.toString())
     }
 
     val mattrCredentialOffer =
@@ -298,21 +312,22 @@ class CI_JVM_Test {
         assertNotNull(actual = credOfferReq.credentialOffer?.credentialIssuer)
         println("// get issuer metadata")
         val providerMetadataUri =
-            credentialWallet.getCIProviderMetadataUrl(credOfferReq.credentialOffer!!.credentialIssuer)
+            credentialWallet.getCIProviderMetadataUrl(credOfferReq.credentialOffer.credentialIssuer)
         val providerMetadata =
-            ktorClient.get(providerMetadataUri).call.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }  as OpenIDProviderMetadata.Draft13
+            ktorClient.get(providerMetadataUri).call.body<JsonObject>()
+                .let { OpenIDProviderMetadata.fromJSON(it) } as OpenIDProviderMetadata.Draft13
         println("providerMetadata: $providerMetadata")
         assertNotNull(actual = providerMetadata.authorizationEndpoint)
         println("// resolve offered credentials")
-        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credOfferReq.credentialOffer!!, providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credOfferReq.credentialOffer, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
 
         assertContains(iterable = providerMetadata.grantTypesSupported, element = GrantType.pre_authorized_code)
-        assertContains(credOfferReq.credentialOffer!!.grants, GrantType.pre_authorized_code.value)
+        assertContains(credOfferReq.credentialOffer.grants, GrantType.pre_authorized_code.value)
 
         // make token request
         val tokenReq = TokenRequest.PreAuthorizedCode(
-            preAuthorizedCode =  credOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!
+            preAuthorizedCode = credOfferReq.credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!
         )
 
         println("tokenReq: ${tokenReq.toHttpQueryString()}")
@@ -326,21 +341,21 @@ class CI_JVM_Test {
         val credReq = CredentialRequest.forOfferedCredential(
             offeredCredentials.first(),
             credentialWallet.generateDidProof(
-                credentialWallet.TEST_DID, credOfferReq.credentialOffer!!.credentialIssuer, tokenResp.cNonce
+                credentialWallet.TEST_DID, credOfferReq.credentialOffer.credentialIssuer, tokenResp.cNonce
             )
         )
         println("credReq: $credReq")
 
         val credentialResp = ktorClient.post(providerMetadata.credentialEndpoint!!) {
             contentType(ContentType.Application.Json)
-            bearerAuth(tokenResp.accessToken!!)
+            bearerAuth(tokenResp.accessToken)
             setBody(credReq.toJSON())
         }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
         println("credentialResp: $credentialResp")
 
         assertTrue(actual = credentialResp.isSuccess)
         assertNotNull(actual = credentialResp.credential)
-        println(SDJwt.parse(credentialResp.credential!!.jsonPrimitive.content).fullPayload.toString())
+        println(SDJwt.parse(credentialResp.credential.jsonPrimitive.content).fullPayload.toString())
     }
 
     val spheronCredOffer =
@@ -351,24 +366,25 @@ class CI_JVM_Test {
         val credOfferReq = CredentialOfferRequest.fromHttpQueryString(Url(spheronCredOffer).encodedQuery)
         assertNotNull(actual = credOfferReq.credentialOffer)
         val providerMetadataUri =
-            credentialWallet.getCIProviderMetadataUrl(credOfferReq.credentialOffer!!.credentialIssuer)
+            credentialWallet.getCIProviderMetadataUrl(credOfferReq.credentialOffer.credentialIssuer)
         val providerMetadata =
-            ktorClient.get(providerMetadataUri).call.body<JsonObject>().let { OpenIDProviderMetadata.fromJSON(it) }  as OpenIDProviderMetadata.Draft13
+            ktorClient.get(providerMetadataUri).call.body<JsonObject>()
+                .let { OpenIDProviderMetadata.fromJSON(it) } as OpenIDProviderMetadata.Draft13
         println("providerMetadata: $providerMetadata")
         assertNotNull(actual = providerMetadata.tokenEndpoint)
         assertNotNull(actual = providerMetadata.credentialEndpoint)
         println("// resolve offered credentials")
-        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credOfferReq.credentialOffer!!, providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(credOfferReq.credentialOffer, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
 
         // make token request
         val tokenReq = TokenRequest.PreAuthorizedCode(
-            preAuthorizedCode =  credOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!
+            preAuthorizedCode = credOfferReq.credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!
         )
 
         println("tokenReq: ${tokenReq.toHttpQueryString()}")
         val tokenResp = ktorClient.submitForm(
-            providerMetadata.tokenEndpoint!!, formParameters = parametersOf(tokenReq.toHttpParameters())
+            providerMetadata.tokenEndpoint, formParameters = parametersOf(tokenReq.toHttpParameters())
         ).body<JsonObject>().let { TokenResponse.fromJSON(it) }
         println("tokenResp: $tokenResp")
         assertNotNull(actual = tokenResp.accessToken)
@@ -377,22 +393,21 @@ class CI_JVM_Test {
         val credReq = CredentialRequest.forOfferedCredential(
             offeredCredentials.first(),
             credentialWallet.generateDidProof(
-                credentialWallet.TEST_DID, credOfferReq.credentialOffer?.credentialIssuer
-                    ?: credOfferReq.credentialOffer!!.credentialIssuer, tokenResp.cNonce
+                credentialWallet.TEST_DID, credOfferReq.credentialOffer.credentialIssuer, tokenResp.cNonce
             )
         )
         println("credReq: $credReq")
 
-        val credentialResp = ktorClient.post(providerMetadata.credentialEndpoint!!) {
+        val credentialResp = ktorClient.post(providerMetadata.credentialEndpoint) {
             contentType(ContentType.Application.Json)
-            bearerAuth(tokenResp.accessToken!!)
+            bearerAuth(tokenResp.accessToken)
             setBody(credReq.toJSON())
         }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
         println("credentialResp: $credentialResp")
 
         assertTrue(actual = credentialResp.isSuccess)
         assertNotNull(actual = credentialResp.credential)
-        println(SDJwt.parse(credentialResp.credential!!.jsonPrimitive.content).fullPayload.toString())
+        println(SDJwt.parse(credentialResp.credential.jsonPrimitive.content).fullPayload.toString())
     }
 
     val http = HttpClient {
@@ -460,7 +475,7 @@ class CI_JVM_Test {
     val ENTRA_CALLBACK_PORT = 9002
     val CALLBACK_COMPLETE = Object()
     var ENTRA_STATUS: String = "none"
-    suspend fun startEntraCallbackServer() {
+    fun startEntraCallbackServer() {
         embeddedServer(Netty, port = ENTRA_CALLBACK_PORT) {
             install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) {
                 json()
@@ -468,9 +483,10 @@ class CI_JVM_Test {
             routing {
                 post("/callback") {
                     println("ENTRA CALLBACK (Issuer)")
-                    val callbackBody = call.receiveText().also { println(it) }.let { Json.parseToJsonElement(it) }.jsonObject
+                    val callbackBody =
+                        call.receiveText().also { println(it) }.let { Json.parseToJsonElement(it) }.jsonObject
                     ENTRA_STATUS = callbackBody["requestStatus"]!!.jsonPrimitive.content
-                    if(ENTRA_STATUS == "issuance_successful")
+                    if (ENTRA_STATUS == "issuance_successful")
                         CALLBACK_COMPLETE.notifyAll()
                 }
             }
@@ -520,7 +536,8 @@ class CI_JVM_Test {
 
         println("> Create issuance request: $createIssuanceReq")
 
-        val createIssuanceRequestUrl = "https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createIssuanceRequest"
+        val createIssuanceRequestUrl =
+            "https://verifiedid.did.msidentity.com/v1.0/verifiableCredentials/createIssuanceRequest"
 
         println("> Sending HTTP POST with create issuance request to: $createIssuanceRequestUrl")
         val response = http.post(createIssuanceRequestUrl) {
@@ -567,7 +584,12 @@ class CI_JVM_Test {
 
         println("> Response (SDPayload) token payload creating... DID = $TEST_WALLET_DID")
         val responseTokenPayload = SDPayload.createSDPayload(
-            entraIssuanceRequest.getResponseObject(testWalletKey.getThumbprint(), TEST_WALLET_DID, testWalletKey.getPublicKey().jwk!!, pin),
+            entraIssuanceRequest.getResponseObject(
+                testWalletKey.getThumbprint(),
+                TEST_WALLET_DID,
+                testWalletKey.getPublicKey().jwk!!,
+                pin
+            ),
             SDMap.fromJSON("{}")
         )
         println("> Created response token payload: $responseTokenPayload")
@@ -604,14 +626,24 @@ class CI_JVM_Test {
         val vc = Json.parseToJsonElement(resp.bodyAsText()).jsonObject["vc"]!!.jsonPrimitive.content
         println("> VC is: $vc")
 
-        println("> Success: " + CredentialResponse.Companion.success(CredentialFormat.jwt_vc_json, vc).credential?.toString())
+        println(
+            "> Success: " + CredentialResponse.Companion.success(
+                CredentialFormat.jwt_vc_json,
+                vc
+            ).credential?.toString()
+        )
 
         assertEquals(
             expected = HttpStatusCode.Accepted,
             actual = entraIssuanceRequest.authorizationRequest.redirectUri?.let { redirectUri ->
                 http.post(redirectUri) {
                     contentType(ContentType.Application.Json)
-                    setBody(EntraIssuanceCompletionResponse(EntraIssuanceCompletionCode.issuance_successful, entraIssuanceRequest.authorizationRequest.state!!))
+                    setBody(
+                        EntraIssuanceCompletionResponse(
+                            EntraIssuanceCompletionCode.issuance_successful,
+                            entraIssuanceRequest.authorizationRequest.state!!
+                        )
+                    )
                 }.also {
                     println("ENTRA redirect URI response: ${it.status}")
                     println(it.bodyAsText())
@@ -653,8 +685,12 @@ class CI_JVM_Test {
     }
 }
 
-fun testCredentialIssuanceIsolatedFunctionsAuthCodeFlowRedirectWithCode(authCodeResponse: AuthorizationCodeResponse, authReq: AuthorizationRequest): String {
-    val redirectUri = authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.query)
+fun testCredentialIssuanceIsolatedFunctionsAuthCodeFlowRedirectWithCode(
+    authCodeResponse: AuthorizationCodeResponse,
+    authReq: AuthorizationRequest
+): String {
+    val redirectUri =
+        authCodeResponse.toRedirectUri(authReq.redirectUri ?: TODO(), authReq.responseMode ?: ResponseMode.query)
     Url(redirectUri).let {
         assertContains(iterable = it.parameters.names(), element = ResponseType.Code.name.lowercase())
         assertEquals(
@@ -665,7 +701,11 @@ fun testCredentialIssuanceIsolatedFunctionsAuthCodeFlowRedirectWithCode(authCode
     return redirectUri
 }
 
-fun testIsolatedFunctionsCreateCredentialOffer(baseUrl: String, issuerState: String, issuedCredentialId: String): String {
+fun testIsolatedFunctionsCreateCredentialOffer(
+    baseUrl: String,
+    issuerState: String,
+    issuedCredentialId: String
+): String {
     val credOffer = CredentialOffer.Draft13.Builder(baseUrl)
         .addOfferedCredentialByReference(issuedCredentialId)
         .addAuthorizationCodeGrant(issuerState)
