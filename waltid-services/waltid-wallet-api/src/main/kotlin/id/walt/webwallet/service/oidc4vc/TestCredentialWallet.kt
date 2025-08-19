@@ -53,7 +53,6 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
 import org.cose.java.AlgorithmID
-import kotlin.IllegalArgumentException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
