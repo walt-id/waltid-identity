@@ -43,6 +43,8 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.submitForm
+import io.ktor.client.request.headers
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
@@ -62,7 +64,8 @@ class TestCredentialWallet(
     val did: String,
 ) : OpenIDCredentialWallet<VPresentationSession>(WALLET_BASE_URL, config) {
 
-    private val sessionCache = mutableMapOf<String, VPresentationSession>() // TODO not stateless because of oidc4vc library
+    private val sessionCache =
+        mutableMapOf<String, VPresentationSession>() // TODO not stateless because of oidc4vc library
 
     private val ktorClient = getHttpClient()
     private val credentialsService = CredentialsService()
@@ -77,7 +80,13 @@ class TestCredentialWallet(
         }
     }
 
-    override fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject?, keyId: String?, privKey: Key?): String =
+    override fun signToken(
+        target: TokenTarget,
+        payload: JsonObject,
+        header: JsonObject?,
+        keyId: String?,
+        privKey: Key?
+    ): String =
         runBlocking {
             fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
 
@@ -108,7 +117,12 @@ class TestCredentialWallet(
         val ecKey = ECKey.parseFromPEMEncodedObjects(key.exportPEM()).toECKey()
         val cryptoProvider = SimpleCOSECryptoProvider(
             listOf(
-                COSECryptoProviderKeyInfo(key.getKeyId(), AlgorithmID.ECDSA_256, ecKey.toECPublicKey(), ecKey.toECPrivateKey())
+                COSECryptoProviderKeyInfo(
+                    keyID = key.getKeyId(),
+                    algorithmID = AlgorithmID.ECDSA_256,
+                    publicKey = ecKey.toECPublicKey(),
+                    privateKey = ecKey.toECPrivateKey()
+                )
             )
         )
         return@runBlocking cryptoProvider.sign1(payload.toCBOR(), header, null, keyId).toCBOR().encodeToBase64Url()
@@ -120,7 +134,8 @@ class TestCredentialWallet(
             Json.parseToJsonElement(token.split(".")[0].base64UrlDecode().decodeToString()).jsonObject
         }.getOrElse {
             throw IllegalArgumentException(
-                "Could not verify token signature, as JWT header could not be coded for token: $token, cause attached.", it
+                "Could not verify token signature, as JWT header could not be coded for token: $token, cause attached.",
+                it
             )
         }
 
@@ -149,14 +164,42 @@ class TestCredentialWallet(
     }
 
     override fun httpPostObject(url: Url, jsonObject: JsonObject, headers: Headers?): SimpleHttpResponse {
-        TODO("Not yet implemented")
+        return runBlocking {
+            ktorClient.post(url) {
+                headers {
+                    headers?.let { appendAll(it) }
+                }
+                contentType(ContentType.Application.Json)
+                setBody(jsonObject)
+            }.let { httpResponse ->
+                SimpleHttpResponse(
+                    httpResponse.status,
+                    httpResponse.headers,
+                    httpResponse.bodyAsText()
+                )
+            }
+        }
     }
 
     override fun httpSubmitForm(url: Url, formParameters: Parameters, headers: Headers?): SimpleHttpResponse {
-        TODO("Not yet implemented")
+        return runBlocking {
+            ktorClient.submitForm(
+                url = url.toString(),
+                formParameters = formParameters
+            ).let { httpResponse ->
+                SimpleHttpResponse(
+                    httpResponse.status,
+                    httpResponse.headers,
+                    httpResponse.bodyAsText()
+                )
+            }
+        }
     }
 
-    override fun generatePresentationForVPToken(session: VPresentationSession, tokenRequest: TokenRequest): PresentationResult {
+    override fun generatePresentationForVPToken(
+        session: VPresentationSession,
+        tokenRequest: TokenRequest
+    ): PresentationResult {
         println("=== GENERATING PRESENTATION FOR VP TOKEN - Session: $session")
 
         val selectedCredentials =
@@ -176,7 +219,10 @@ class TestCredentialWallet(
                     ?.let { KeyManager.resolveSerializedKey(it.document) }
             }
         }.getOrElse {
-            throw IllegalArgumentException("Could not resolve key to sign JWS to generate presentation for vp_token", it)
+            throw IllegalArgumentException(
+                "Could not resolve key to sign JWS to generate presentation for vp_token",
+                it
+            )
         } ?: error("No key was resolved when trying to resolve key to sign JWS to generate presentation for vp_token")
 
         val jwtsPresented = CredentialFilterUtils.getJwtVcList(matchedCredentials, selectedDisclosures)
@@ -206,7 +252,12 @@ class TestCredentialWallet(
                 val ecKey = ECKey.parse(key.exportJWK()).toECKey()
                 val cryptoProvider = SimpleCOSECryptoProvider(
                     listOf(
-                        COSECryptoProviderKeyInfo(key.getKeyId(), AlgorithmID.ECDSA_256, ecKey.toECPublicKey(), ecKey.toECPrivateKey())
+                        COSECryptoProviderKeyInfo(
+                            key.getKeyId(),
+                            AlgorithmID.ECDSA_256,
+                            ecKey.toECPublicKey(),
+                            ecKey.toECPrivateKey()
+                        )
                     )
                 )
                 matchingMDocs.map { cred ->
@@ -254,14 +305,16 @@ class TestCredentialWallet(
             )
         } else null
 
-        val deviceResponse = if (mdocsPresented.isNotEmpty()) mdocsPresented.let { DeviceResponse(it).toCBORBase64URL() } else null
+        val deviceResponse =
+            if (mdocsPresented.isNotEmpty()) mdocsPresented.let { DeviceResponse(it).toCBORBase64URL() } else null
 
         println("GENERATED VP: $signedJwtVP")
 
         // DONE: filter presentations if null
         // DONE: generate descriptor mappings based on type (vp or mdoc device response)
         // DONE: set root path of descriptor mapping based on whether there are multiple presentations or just one ("$" or "$[idx]")
-        val presentations = listOf(signedJwtVP, deviceResponse).filterNotNull().plus(sdJwtVCsPresented).map { JsonPrimitive(it) }
+        val presentations =
+            listOf(signedJwtVP, deviceResponse).filterNotNull().plus(sdJwtVCsPresented).map { JsonPrimitive(it) }
         println("presentations: $presentations")
 
         val rootPathVP = "$" + (if (presentations.size == 2) "[0]" else "")
@@ -359,9 +412,10 @@ class TestCredentialWallet(
         expiresIn: Duration,
         selectedCredentials: Set<String>,
     ): VPresentationSession {
-        return super.initializeAuthorization(authorizationRequest, expiresIn, null).copy(selectedCredentialIds = selectedCredentials).also {
-            putSession(it.id, it)
-        }
+        return super.initializeAuthorization(authorizationRequest, expiresIn, null)
+            .copy(selectedCredentialIds = selectedCredentials).also {
+                putSession(it.id, it)
+            }
     }
 
     fun getVpJson(credentialsPresented: List<String>, presentationId: String, nonce: String?, aud: String): String {
@@ -397,7 +451,10 @@ class TestCredentialWallet(
             ?: "VerifiableCredential"
 
         DescriptorMapping(
-            id =  presentationDefinition?.inputDescriptors?.get(index)?.id ?: getDescriptorId(type, presentationDefinition),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
+            id = presentationDefinition?.inputDescriptors?.get(index)?.id ?: getDescriptorId(
+                type,
+                presentationDefinition
+            ),//session.presentationDefinition?.inputDescriptors?.get(index)?.id,
             format = VCFormat.jwt_vp,  // jwt_vp_json
             path = rootPath,
             pathNested = DescriptorMapping(

@@ -32,7 +32,11 @@ class EBSI_Conformance_Test {
     @ParameterizedTest
     @MethodSource
     @EnabledIf("vcTestsEnabled")
-    suspend fun `issue in-time credential`(url: String, clientId: String, offerRequestCaller: credentialOfferRequestCaller) {
+    suspend fun `issue in-time credential`(
+        url: String,
+        clientId: String,
+        offerRequestCaller: credentialOfferRequestCaller
+    ) {
         val credentialOfferRequest = getCredentialOfferRequest(url, clientId, offerRequestCaller)
         val credentialOffer = credentialWallet.resolveCredentialOffer(credentialOfferRequest)
         val credentialResponses =
@@ -49,7 +53,11 @@ class EBSI_Conformance_Test {
     @ParameterizedTest
     @MethodSource
     @EnabledIf("vcTestsEnabled")
-    suspend fun `issue deferred credential`(url: String, clientId: String, offerRequestCaller: credentialOfferRequestCaller) {
+    suspend fun `issue deferred credential`(
+        url: String,
+        clientId: String,
+        offerRequestCaller: credentialOfferRequestCaller
+    ) {
         val deferredCredentialOfferRequest = getCredentialOfferRequest(url, clientId, offerRequestCaller)
         val deferredCredentialOffer = credentialWallet.resolveCredentialOffer(deferredCredentialOfferRequest)
         val deferredCredentialResponses = credentialWallet.executeFullAuthIssuance(
@@ -103,10 +111,13 @@ class EBSI_Conformance_Test {
                 })
                 build()
             }
-        val credentialOfferRequestUri = runBlocking { ktorClient.get(initIssuanceWithPresentationExchangeUrl).bodyAsText() }
-        val credentialOfferRequest = CredentialOfferRequest.fromHttpQueryString(Url(credentialOfferRequestUri).encodedQuery)
+        val credentialOfferRequestUri =
+            runBlocking { ktorClient.get(initIssuanceWithPresentationExchangeUrl).bodyAsText() }
+        val credentialOfferRequest =
+            CredentialOfferRequest.fromHttpQueryString(Url(credentialOfferRequestUri).encodedQuery)
         val credentialOffer = credentialWallet.resolveCredentialOffer(credentialOfferRequest)
-        val credentialResponses = credentialWallet.executeFullAuthIssuance(credentialOffer, credentialWallet.TEST_DID, ebsiClientConfig)
+        val credentialResponses =
+            credentialWallet.executeFullAuthIssuance(credentialOffer, credentialWallet.TEST_DID, ebsiClientConfig)
         assertEquals(expected = 1, actual = credentialResponses.size)
         assertFalse(actual = credentialResponses[0].isDeferred)
         assertNotNull(actual = credentialResponses[0].credential)
@@ -120,7 +131,8 @@ class EBSI_Conformance_Test {
             }
             followRedirects = false
         }
-        const val credentialOfferUrl = "https://api-conformance.ebsi.eu/conformance/v3/issuer-mock/initiate-credential-offer?credential_type="
+        const val credentialOfferUrl =
+            "https://api-conformance.ebsi.eu/conformance/v3/issuer-mock/initiate-credential-offer?credential_type="
         lateinit var crossDeviceCredentialOfferRequestCaller: credentialOfferRequestCaller
         lateinit var sameDeviceCredentialOfferRequestCaller: credentialOfferRequestCaller
         lateinit var credentialWallet: EBSITestWallet
@@ -188,6 +200,7 @@ class EBSI_Conformance_Test {
                 crossDeviceCredentialOfferRequestCaller
             ),
         )
+
         @JvmStatic
         fun vcTestsEnabled() = false
 
