@@ -57,7 +57,7 @@ jobs:
           docker load --input ${{ runner.temp }}/${{ inputs.artifact }}.tar
 
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Start ngrok tunnel
         run: |
