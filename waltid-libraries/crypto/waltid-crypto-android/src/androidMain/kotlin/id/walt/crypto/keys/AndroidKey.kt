@@ -6,7 +6,6 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJwsStrings
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -108,7 +107,7 @@ class AndroidKey() : Key() {
         return signature
     }
 
-    override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         val signature: ByteArray = signWithKeystore(plaintext)
 
         log.trace { "Raw message signed - {raw: '${plaintext.decodeToString()}'}" }
@@ -131,6 +130,7 @@ class AndroidKey() : Key() {
     override suspend fun verifyRaw(
         signed: ByteArray,
         detachedPlaintext: ByteArray?,
+        customSignatureAlgorithm: String?
     ): Result<ByteArray> {
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
