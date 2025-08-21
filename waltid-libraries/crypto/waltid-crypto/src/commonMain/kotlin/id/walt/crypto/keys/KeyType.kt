@@ -16,10 +16,6 @@ enum class KeyType(val jwsAlg: String, val jwkKty: String, val jwkCurve: String?
     /** EdDSA + Curve25519 */
     Ed25519(jwsAlg = "EdDSA", jwkKty = "OKP", jwkCurve = "Ed25519", oid = "1.3.101.112"),
 
-    // TODO: Ed448(jwsAlg = "Ed448", oid = null)
-    // TODO: X25519(jwsAlg = "X25519", oid = null)
-    // TODO: X448(jwsAlg = "X448", oid = null)
-
     // ECC
     /** SECP P-256K1 - ECDSA + SECG curve secp256k1 (Koblitz curve as used in Bitcoin), OID = 1.3.132.0.10 */
     secp256k1(jwsAlg = "ES256K", jwkKty = "EC", jwkCurve = "secp256k1", oid = "1.3.132.0.10"),
@@ -57,6 +53,9 @@ enum class KeyType(val jwsAlg: String, val jwkKty: String, val jwkCurve: String?
     RSA3072(jwsAlg = "RS384", jwkKty = "RSA", jwkCurve = null, oid = "1.2.840.113549.1.1.12"),
     RSA4096(jwsAlg = "RS512", jwkKty = "RSA", jwkCurve = null, oid = "1.2.840.113549.1.1.13")
 
+    // TODO: Ed448(jwsAlg = "Ed448", oid = null)
+    // TODO: X25519(jwsAlg = "X25519", oid = null)
+    // TODO: X448(jwsAlg = "X448", oid = null)
 }
 
 object KeyTypes {

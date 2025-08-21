@@ -4,7 +4,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.power-assert")
     kotlin("plugin.serialization")
-    id("io.ktor.plugin") version "3.2.0"
+    id("io.ktor.plugin") version "3.2.2"
     id("maven-publish")
 
     application
