@@ -79,7 +79,7 @@ class AndroidKey() : Key() {
                 }
             }
 
-            KeyType.Ed25519 -> throw IllegalArgumentException("Ed25519 is not supported in Android KeyStore")
+            else -> throw IllegalArgumentException("${internalKeyType} is not supported in Android KeyStore")
         }
     }
 
@@ -106,7 +106,7 @@ class AndroidKey() : Key() {
         return signature
     }
 
-    override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         val signature: ByteArray = signWithKeystore(plaintext)
 
         log.trace { "Raw message signed - {raw: '${plaintext.decodeToString()}'}" }
@@ -129,6 +129,7 @@ class AndroidKey() : Key() {
     override suspend fun verifyRaw(
         signed: ByteArray,
         detachedPlaintext: ByteArray?,
+        customSignatureAlgorithm: String?
     ): Result<ByteArray> {
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
