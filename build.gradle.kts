@@ -24,8 +24,8 @@ plugins {
 
     id("love.forte.plugin.suspend-transform") version "2.2.0-0.13.1" apply false
 
-    id("com.android.library") version "8.11.1" apply false
-    id("com.android.application") version "8.11.1" apply false
+    id("com.android.library") version "8.10.1" apply false
+    id("com.android.application") version "8.10.1" apply false
 
     id("com.github.ben-manes.versions") version "0.52.0" apply false
     id("io.ktor.plugin") version "3.2.2" apply false
