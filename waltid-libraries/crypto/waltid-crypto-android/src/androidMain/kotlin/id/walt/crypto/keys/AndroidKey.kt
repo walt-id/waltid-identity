@@ -67,7 +67,10 @@ class AndroidKey() : Key() {
                 }
             }
 
-            KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1, KeyType.secp256k1 -> {
+            KeyType.secp256r1,
+            KeyType.secp384r1,
+            KeyType.secp521r1,
+            KeyType.secp256k1 -> {
                 val keyFactory = KeyFactory.getInstance("EC")
                 val keySpec = keyFactory.getKeySpec(publicKey, ECPublicKeySpec::class.java)
                 JSONObject().run {
@@ -78,8 +81,7 @@ class AndroidKey() : Key() {
                     toString()
                 }
             }
-
-            KeyType.Ed25519 -> throw IllegalArgumentException("Ed25519 is not supported in Android KeyStore")
+            else -> throw IllegalArgumentException("KeyType $internalKeyType is not supported in Android KeyStore")
         }
     }
 
