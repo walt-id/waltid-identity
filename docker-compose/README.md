@@ -245,3 +245,9 @@ docker volume rm docker-compose_wallet-api-db
 pg_dump -U your_user_name -h your_host -d your_db_name > backup.sql
 psql -U your_user_name -h your_host -d your_db_name < backup.sql
 ```
+
+#### Unable to resolve `host.docker.internal`
+
+The hostname `host.docker.internal` is a Docker Desktop feature and may not be available.
+
+Try replacing `host.docker.internal` with `localhost` in the configuration files.
