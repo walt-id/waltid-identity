@@ -6,7 +6,6 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJwsStrings
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -67,7 +66,10 @@ class AndroidKey() : Key() {
                 }
             }
 
-            KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1, KeyType.secp256k1 -> {
+            KeyType.secp256r1,
+            KeyType.secp384r1,
+            KeyType.secp521r1,
+            KeyType.secp256k1 -> {
                 val keyFactory = KeyFactory.getInstance("EC")
                 val keySpec = keyFactory.getKeySpec(publicKey, ECPublicKeySpec::class.java)
                 JSONObject().run {
@@ -78,8 +80,7 @@ class AndroidKey() : Key() {
                     toString()
                 }
             }
-
-            KeyType.Ed25519 -> throw IllegalArgumentException("Ed25519 is not supported in Android KeyStore")
+            else -> throw IllegalArgumentException("KeyType $internalKeyType is not supported in Android KeyStore")
         }
     }
 
@@ -106,7 +107,7 @@ class AndroidKey() : Key() {
         return signature
     }
 
-    override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         val signature: ByteArray = signWithKeystore(plaintext)
 
         log.trace { "Raw message signed - {raw: '${plaintext.decodeToString()}'}" }
@@ -129,6 +130,7 @@ class AndroidKey() : Key() {
     override suspend fun verifyRaw(
         signed: ByteArray,
         detachedPlaintext: ByteArray?,
+        customSignatureAlgorithm: String?
     ): Result<ByteArray> {
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 

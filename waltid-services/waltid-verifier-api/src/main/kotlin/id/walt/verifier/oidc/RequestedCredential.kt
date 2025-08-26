@@ -1,7 +1,7 @@
 package id.walt.verifier.oidc
 
-import id.walt.w3c.utils.VCFormat
 import id.walt.oid4vc.data.dif.*
+import id.walt.w3c.utils.VCFormat
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
@@ -26,7 +26,7 @@ data class RequestedCredential(
     private fun getDefaultFormatDefinition(): VCFormatDefinition {
         return when (format) {
             VCFormat.jwt_vc_json -> VCFormatDefinition(alg = setOf("EdDSA"))
-            VCFormat.mso_mdoc -> VCFormatDefinition(alg = setOf("EdDSA", "ES256"))
+            VCFormat.mso_mdoc -> VCFormatDefinition(alg = setOf("ES256"))
             VCFormat.jwt_vc -> VCFormatDefinition(alg = setOf("ES256"))
             else -> VCFormatDefinition()
         }
@@ -49,14 +49,49 @@ data class RequestedCredential(
                 limitDisclosure = DisclosureLimitation.required,
                 fields = listOf(
                     InputDescriptorField(
-                        path = listOf("$['docType']"),
+                        path = listOf("$['org.iso.18013.5.1']['family_name']"),
                         intentToRetain = false,
-                        filter = JsonObject(
-                            mapOf(
-                                "type" to JsonPrimitive("string"), "pattern" to JsonPrimitive(docType)
-                            )
-                        )
-                    )
+                    ),
+                    InputDescriptorField(
+                        path = listOf("$['org.iso.18013.5.1']['given_name']"),
+                        intentToRetain = false,
+                    ),
+                    InputDescriptorField(
+                        path = listOf("$['org.iso.18013.5.1']['birth_date']"),
+                        intentToRetain = false,
+                    ),
+                    InputDescriptorField(
+                        path = listOf("$['org.iso.18013.5.1']['issue_date']"),
+                        intentToRetain = false,
+                    ),
+                    InputDescriptorField(
+                        path = listOf("$['org.iso.18013.5.1']['expiry_date']"),
+                        intentToRetain = false,
+                    ),
+                    InputDescriptorField(
+                        path = listOf("$['org.iso.18013.5.1']['issuing_country']"),
+                        intentToRetain = false,
+                    ),
+                    InputDescriptorField(
+                        path = listOf("$['org.iso.18013.5.1']['issuing_authority']"),
+                        intentToRetain = false,
+                    ),
+                    InputDescriptorField(
+                        path = listOf("$['org.iso.18013.5.1']['document_number']"),
+                        intentToRetain = false,
+                    ),
+                    InputDescriptorField(
+                        path = listOf("$['org.iso.18013.5.1']['portrait']"),
+                        intentToRetain = false,
+                    ),
+                    InputDescriptorField(
+                        path = listOf("$['org.iso.18013.5.1']['driving_privileges']"),
+                        intentToRetain = false,
+                    ),
+                    InputDescriptorField(
+                        path = listOf("$['org.iso.18013.5.1']['un_distinguishing_sign']"),
+                        intentToRetain = false,
+                    ),
                 )
             )
 

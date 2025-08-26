@@ -467,17 +467,15 @@ object OpenIDProviderMetadataSerializer : KSerializer<OpenIDProviderMetadata> {
         val rawJsonElement = jsonDecoder.decodeJsonElement()
 
         return when {
-            "credential_configurations_supported" in rawJsonElement.jsonObject -> Json.decodeFromJsonElement(
-                Draft13OpenIDProviderMetadataSerializer,
-                rawJsonElement
-            )
-
             "credentials_supported" in rawJsonElement.jsonObject -> Json.decodeFromJsonElement(
                 Draft11OpenIDProviderMetadataSerializer,
                 rawJsonElement
             )
 
-            else -> throw IllegalArgumentException("Unknown OpenIDProviderMetadata version: missing expected fields")
+            else -> Json.decodeFromJsonElement(
+                Draft13OpenIDProviderMetadataSerializer,
+                rawJsonElement
+            )
         }
     }
 }

@@ -21,6 +21,7 @@ import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
+import org.junit.jupiter.api.Assertions.assertTrue
 import kotlin.test.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -161,11 +162,11 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient)  {
 
         when (issuanceReq.authenticationMethod) {
             AuthenticationMethod.ID_TOKEN -> {
-                assert(authJarTokenRequest.responseType == setOf(ResponseType.IdToken)) { "response type should be id_token" }
+                assertTrue(authJarTokenRequest.responseType == setOf(ResponseType.IdToken)) { "response type should be id_token" }
             }
 
             AuthenticationMethod.VP_TOKEN -> {
-                assert(authJarTokenRequest.responseType == setOf(ResponseType.VpToken)) { "response type should be vp_token" }
+                assertTrue(authJarTokenRequest.responseType == setOf(ResponseType.VpToken)) { "response type should be vp_token" }
 
                 val presentationDefinitionJ = requestJwt.payload["presentation_definition"]
                 assertNotNull(presentationDefinitionJ)

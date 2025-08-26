@@ -4,7 +4,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.power-assert")
     kotlin("plugin.serialization")
-    id("io.ktor.plugin") version "3.2.0"
+    id("io.ktor.plugin") version "3.2.2"
     id("maven-publish")
 
     application
@@ -37,7 +37,7 @@ dependencies {
 
 
     // RADIUS
-    implementation("org.aaa4j.radius:aaa4j-radius-client:0.3.1")
+    implementation("org.aaa4j.radius:aaa4j-radius-client:0.4.0")
 
     // LDAP
     implementation("org.apache.directory.api:apache-ldap-api:2.1.7") {

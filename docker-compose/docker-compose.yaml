@@ -1,6 +1,5 @@
 services:
   wallet-api:
-    platform: linux/amd64
     image: ${IMAGE_PREFIX}waltid/wallet-api:${VERSION_TAG:-latest}
     profiles:
       - services
@@ -25,7 +24,6 @@ services:
       - ./wallet-api/data:/waltid-wallet-api/data
 
   issuer-api:
-    platform: linux/amd64
     image: ${IMAGE_PREFIX}waltid/issuer-api:${VERSION_TAG:-latest}
     profiles:
       - services
@@ -43,7 +41,6 @@ services:
       - ./issuer-api/config:/waltid-issuer-api/config
 
   verifier-api:
-    platform: linux/amd64
     image: ${IMAGE_PREFIX}waltid/verifier-api:${VERSION_TAG:-latest}
     profiles:
       - services
@@ -63,7 +60,6 @@ services:
       OPA_SERVER_URL: "http://opa-server:8181"
 
   waltid-demo-wallet:
-    platform: linux/amd64
     image: ${IMAGE_PREFIX}waltid/waltid-demo-wallet:${VERSION_TAG:-latest}
     profiles:
       - apps
@@ -82,7 +78,6 @@ services:
       PORT: $DEMO_WALLET_FRONTEND_PORT
 
   waltid-dev-wallet:
-    platform: linux/amd64
     image: ${IMAGE_PREFIX}waltid/waltid-dev-wallet:${VERSION_TAG:-latest}
     profiles:
       - apps
@@ -101,7 +96,6 @@ services:
       PORT: $DEV_WALLET_FRONTEND_PORT
 
   web-portal:
-    platform: linux/amd64
     image: ${IMAGE_PREFIX}waltid/portal:${VERSION_TAG:-latest}
     profiles:
       - apps

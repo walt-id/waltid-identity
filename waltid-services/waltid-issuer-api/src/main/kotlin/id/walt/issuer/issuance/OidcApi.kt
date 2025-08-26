@@ -57,7 +57,7 @@ object OidcApi : CIProvider() {
             tags = listOf("oidc")
         }) {
             get("{standardVersion}/.well-known/openid-configuration", getStandardVersionDocs()) {
-                val metadata = getMetadataForVersion(
+                val metadata = getOpenIdProviderMetadataByVersion(
                     standardVersion = call.parameters["standardVersion"]
                         ?: throw IllegalArgumentException("standardVersion parameter is required"),
                 )
@@ -66,7 +66,7 @@ object OidcApi : CIProvider() {
             }
 
             get("{standardVersion}/.well-known/openid-credential-issuer", getStandardVersionDocs()) {
-                val metadata = getMetadataForVersion(
+                val metadata = getMetadataByVersion(
                     standardVersion = call.parameters["standardVersion"]
                         ?: throw IllegalArgumentException("standardVersion parameter is required"),
                 )
@@ -75,7 +75,7 @@ object OidcApi : CIProvider() {
             }
 
             get("{standardVersion}/.well-known/oauth-authorization-server", getStandardVersionDocs()) {
-                val metadata = getMetadataForVersion(
+                val metadata = getOpenIdProviderMetadataByVersion(
                     standardVersion = call.parameters["standardVersion"]
                         ?: throw IllegalArgumentException("standardVersion parameter is required"),
                 )
@@ -203,7 +203,7 @@ object OidcApi : CIProvider() {
                                         authorizationRequest = authReq,
                                         authServerState = authServerState,
                                         responseType = ResponseType.IdToken,
-                                        providerMetadata = getMetadataForVersion(standardVersion),
+                                        providerMetadata = getMetadataByVersion(standardVersion),
                                         tokenKey = CI_TOKEN_KEY,
                                         isJar = issuanceSession.issuanceRequests.first().useJar
                                     )
@@ -265,7 +265,7 @@ object OidcApi : CIProvider() {
                                         authorizationRequest = authReq,
                                         authServerState = authServerState,
                                         responseType = ResponseType.VpToken,
-                                        providerMetadata = getMetadataForVersion(standardVersion),
+                                        providerMetadata = getMetadataByVersion(standardVersion),
                                         tokenKey = CI_TOKEN_KEY,
                                         isJar = issuanceSession.issuanceRequests.first().useJar,
                                         presentationDefinition = presentationDefinition

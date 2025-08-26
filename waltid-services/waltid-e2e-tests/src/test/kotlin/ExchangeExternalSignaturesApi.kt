@@ -2,7 +2,6 @@
 
 import cbor.Cbor
 import com.nimbusds.jose.jwk.ECKey
-import id.walt.commons.interop.LspPotentialInterop
 import id.walt.commons.testing.E2ETest
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import id.walt.crypto.keys.KeySerialization
@@ -11,9 +10,9 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
-import id.walt.issuer.feat.lspPotential.LspPotentialIssuanceInterop
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
+import id.walt.issuer.issuance.openapi.issuerapi.MdocDocs
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.MapElement
@@ -104,7 +103,7 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
 
     //ietf sd_jwt_vc - with disclosures
     private val identityCredentialIETFSdJwtX5cIssuanceRequest = IssuanceRequest(
-        Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
+        Json.parseToJsonElement(KeySerialization.serializeKey(IssuanceExamples.ISSUER_JWK_KEY)).jsonObject,
         "identity_credential_vc+sd-jwt",
         credentialData = buildJsonObject {
             put("family_name", "Doe")
@@ -112,8 +111,8 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
             put("birthdate", "1940-01-01")
         },
         "identity_credential",
-        x5Chain = listOf(LspPotentialInterop.POTENTIAL_ISSUER_CERT),
-        trustedRootCAs = listOf(LspPotentialInterop.POTENTIAL_ROOT_CA_CERT),
+        x5Chain = listOf(IssuanceExamples.ISSUER_CERT),
+        trustedRootCAs = listOf(IssuanceExamples.ROOT_CA_CERT),
         selectiveDisclosure = SDMap(
             mapOf(
                 "birthdate" to SDField(sd = true)
@@ -122,7 +121,7 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         credentialFormat = CredentialFormat.sd_jwt_vc
     )
     private val identityCredentialIETFSdJwtDidIssuanceRequest = IssuanceRequest(
-        Json.parseToJsonElement(KeySerialization.serializeKey(LspPotentialIssuanceInterop.POTENTIAL_ISSUER_JWK_KEY)).jsonObject,
+        Json.parseToJsonElement(KeySerialization.serializeKey(IssuanceExamples.ISSUER_JWK_KEY)).jsonObject,
         "identity_credential_vc+sd-jwt",
         credentialData = buildJsonObject {
             put("family_name", "Doe")
@@ -135,14 +134,12 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
                 "birthdate" to SDField(sd = true)
             )
         ),
-        issuerDid = LspPotentialIssuanceInterop.ISSUER_DID,
+        issuerDid = IssuanceExamples.ISSUER_DID,
         credentialFormat = CredentialFormat.sd_jwt_vc
     )
 
-    //mDoc
-    private val mDocIssuanceRequest = Json.decodeFromString<IssuanceRequest>(
-        IssuanceExamples.mDLCredentialIssuanceData
-    ).copy(
+    //mDL
+    private val mDLIssuanceRequest = MdocDocs.mdlBaseIssuanceExample.copy(
         authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
         credentialFormat = CredentialFormat.mso_mdoc,
     )
@@ -255,32 +252,6 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         ietfSdJwtVcTestCases()
     }
 
-    /**
-     * The following test function fails because the Verifier is currently
-     * unable to handle multiple vp token entries in the token response.
-     * The Verifier only checks for JsonPrimitive and JsonObject types to
-     * decode the vp token.
-     * @see [id.walt.verifier.oidc.OIDCVerifierService.doVerify]
-     */
-    private suspend fun combinedW3CIETFSdJwtVCTestCase() {
-        testPreAuthorizedOID4VCI(
-            useOptionalParameters = false,
-            issuanceRequests = listOf(
-                identityCredentialIETFSdJwtDidIssuanceRequest,
-            ),
-        )
-        val openbadgeSdJwtIssuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(WaltidServicesE2ETests.sdjwtCredential).apply {
-            credentialFormat = CredentialFormat.jwt_vc_json
-        }
-        testPreAuthorizedOID4VCI(
-            useOptionalParameters = false,
-            issuanceRequests = listOf(
-                openbadgeSdJwtIssuanceRequest,
-            ),
-        )
-        testOID4VPW3CIETFSdJwtVc(true)
-    }
-
     private suspend fun regularJwtVcJsonTestCases() {
         e2e.test("External signatures - regularJwtVcJsonTestCases") {
             testPreAuthorizedOID4VCI(
@@ -319,7 +290,7 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         e2e.test("External signatures - mDocTestCases") {
             testPreAuthorizedOID4VCI(
                 useOptionalParameters = false,
-                issuanceRequests = listOf(mDocIssuanceRequest),
+                issuanceRequests = listOf(mDLIssuanceRequest),
             )
             clearWalletCredentials()
         }
@@ -704,113 +675,15 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         }
     }
 
-    private suspend fun testOID4VPW3CIETFSdJwtVc(
-        addDisclosures: Boolean = false,
-    ) {
-        lateinit var presentationRequestURL: String
-        lateinit var resolvedPresentationRequestURL: String
-        lateinit var presentationDefinition: String
-        lateinit var matchedCredentialList: List<WalletCredential>
-        var response = client.get("/wallet-api/wallet/$walletId/credentials").expectSuccess()
-        val walletCredentialList = response.body<List<WalletCredential>>()
-        val createReqResponse = client.post("/openid4vc/verify") {
-            header("authorizeBaseUrl", "openid4vp://")
-            header("openId4VPProfile", OpenId4VPProfile.DEFAULT)
-            header("responseMode", "direct_post")
-            contentType(ContentType.Application.Json)
-            setBody(buildJsonObject {
-                put(
-                    "request_credentials", JsonArray(
-                        listOf(
-                            RequestedCredential(
-                                format = VCFormat.sd_jwt_vc,
-                                vct = "${e2e.getBaseURL()}/identity_credential",
-                            ).let {
-                                Json.encodeToJsonElement(it)
-                            },
-                            RequestedCredential(
-                                format = VCFormat.jwt_vc_json,
-                                type = "OpenBadgeCredential",
-                            ).let {
-                                Json.encodeToJsonElement(it)
-                            },
-                        )
-                    )
-                )
-            })
-        }
-        assertEquals(200, createReqResponse.status.value)
-        presentationRequestURL = createReqResponse.bodyAsText()
-        val verificationID = Url(presentationRequestURL).parameters.getOrFail("state")
-        exchangeApi.resolvePresentationRequest(
-            walletId, presentationRequestURL
-        ) {
-            resolvedPresentationRequestURL = it
-            presentationDefinition = Url(resolvedPresentationRequestURL).parameters.getOrFail("presentation_definition")
-        }
-        exchangeApi.matchCredentialsForPresentationDefinition(
-            walletId,
-            presentationDefinition,
-            walletCredentialList.map { it.id },
-        ) {
-            matchedCredentialList = it
-        }
-        val prepareRequest = PrepareOID4VPRequest(
-            did = holderDID,
-            presentationRequest = presentationRequestURL,
-            selectedCredentialIdList = matchedCredentialList.map { it.id },
-            disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }.associate {
-                Pair(it.id, listOf(it.disclosures!!))
-            } else null,
-        )
-        println(prepareRequest)
-        response = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/prepare") {
-            setBody(prepareRequest)
-        }.expectSuccess()
-        val prepareResponse = response.body<PrepareOID4VPResponse>()
-        client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/submit") {
-            setBody(
-                SubmitOID4VPRequest.build(
-                    prepareResponse,
-                    disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }.associate {
-                        Pair(it.id, listOf(it.disclosures!!))
-                    } else null,
-                    w3cJwtVpProof = prepareResponse.w3CJwtVpProofParameters?.let { params ->
-                        holderKey.signJws(
-                            params.payload.toJsonElement().toString().toByteArray(),
-                            params.header,
-                        )
-                    },
-                    ietfSdJwtVpProofs = prepareResponse.ietfSdJwtVpProofParameters?.map { params ->
-                        IETFSdJwtVpTokenProof(
-                            credentialId = params.credentialId, sdJwtVc = params.sdJwtVc, vpTokenProof = holderKey.signJws(
-                                params.payload.toJsonElement().toString().toByteArray(),
-                                params.header,
-                            )
-                        )
-                    })
-            )
-        }.expectSuccess()
-        verifierSessionApi.get(verificationID) { sessionInfo ->
-//            assert(sessionInfo.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-            assert(sessionInfo.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
-
-            assert(sessionInfo.verificationResult == true) { "overall verification should be valid" }
-            sessionInfo.policyResults.let {
-                require(it != null) { "policyResults should be available after running policies" }
-                assert(it.size > 1) { "no policies have run" }
-            }
-        }
-    }
-
     @OptIn(ExperimentalEncodingApi::class)
     fun forgeSDisclosureString(disclosures: String): String {
-        return disclosures.split("~").filter { it.isNotEmpty() }.map { SDisclosure.parse(it) }.map { disclosure ->
-            Base64.UrlSafe.encode(buildJsonArray {
-                add(disclosure.salt)
-                add(disclosure.key)
-                add(JsonPrimitive("<forged>"))
-            }.toString().encodeToByteArray()).trimEnd('=')
-        }.joinToString("~")
+        return disclosures.split("~").filter { it.isNotEmpty() }.map { SDisclosure.parse(it) }
+            .joinToString("~") { disclosure ->
+                Base64.UrlSafe.encode(buildJsonArray {
+                    add(disclosure.salt)
+                    add(disclosure.key)
+                    add(JsonPrimitive("<forged>"))
+                }.toString().encodeToByteArray()).trimEnd('=')
+            }
     }
 }

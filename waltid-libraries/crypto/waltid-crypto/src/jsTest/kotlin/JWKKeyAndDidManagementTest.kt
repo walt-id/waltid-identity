@@ -1,6 +1,7 @@
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyTypes
 import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
@@ -11,9 +12,12 @@ class JWKKeyAndDidManagementTest {
 
     private val testObj = JsonObject(mapOf("value1" to JsonPrimitive("123456789")))
 
+    /** Ed25519 + secp256k1 are not available in Nodejs */
+    val keyTypes = (KeyTypes.EC_KEYS.filterNot { it == KeyType.secp256k1 } union KeyTypes.RSA_KEYS).toList()
+
     @Test
     fun jwkKeyGenerationTest() = runTest(timeout = 20.seconds) {
-        KeyType.entries.forEach {
+        keyTypes.forEach {
             println("Generate key for key type $it")
             val generatedKey = JWKKey.generate(it)
 

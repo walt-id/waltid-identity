@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.*
 
 object Versions {
-    const val KTOR_VERSION = "3.2.0" // also change 1 plugin
+    const val KTOR_VERSION = "3.2.2" // also change 1 plugin
     const val COROUTINES_VERSION = "1.10.1"
     const val HOPLITE_VERSION = "2.9.0"
 }
@@ -12,7 +12,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
 
-    id("io.ktor.plugin") version "3.2.0" // Versions.KTOR_VERSION
+    id("io.ktor.plugin") version "3.2.2" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.2.0"
     id("com.github.jk1.dependency-license-report") version "2.9"
     id("maven-publish")
@@ -194,6 +194,60 @@ publishing {
                         name.set("walt.id")
                         email.set("office@walt.id")
                     }
+                }
+            }
+        }
+    }
+}
+
+fun waltidPrivateCredentials(repoName:String): Pair<String, String> = let {
+    val envUsername = System.getenv(repoName.uppercase() + "_USERNAME")
+    val envPassword = System.getenv(repoName.uppercase() + "_PASSWORD")
+
+    val usernameFile = File("$rootDir/secret-${repoName.lowercase()}-username.txt")
+    val passwordFile = File("$rootDir/secret-${repoName.lowercase()}-password.txt")
+
+    return Pair(
+        envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" },
+        envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
+    )
+}
+
+ktor {
+    docker {
+        jreVersion.set(JavaVersion.VERSION_21)
+        localImageName.set("waltid/issuer-api")
+        imageTag.set("${project.version}")
+        portMappings.set(listOf(
+            io.ktor.plugin.features.DockerPortMapping(
+                7002,
+                7002,
+                io.ktor.plugin.features.DockerPortMappingProtocol.TCP
+            )
+        ))
+
+        val (username, password) = waltidPrivateCredentials("DOCKER")
+        externalRegistry.set(
+            io.ktor.plugin.features.DockerImageRegistry.dockerHub(
+                appName = provider { "issuer-api" },
+                username = provider { username },
+                password = provider { password }
+            )
+        )
+    }
+    jib {
+        container {
+            workingDirectory = "/waltid-issuer-api"
+        }
+        from {
+            platforms {
+                platform {
+                    architecture = "amd64"
+                    os = "linux"
+                }
+                platform {
+                    architecture = "arm64"
+                    os = "linux"
                 }
             }
         }

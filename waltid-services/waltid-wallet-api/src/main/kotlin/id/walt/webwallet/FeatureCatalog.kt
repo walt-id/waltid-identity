@@ -49,7 +49,7 @@ object FeatureCatalog : ServiceFeatureCatalog {
     val x5cAuthFeature = OptionalFeature(
         name = "trusted-ca",
         description = "Trusted CA configuration",
-        TrustedCAConfig::class,
+        config = TrustedCAConfig::class,
         default = false
     )
 

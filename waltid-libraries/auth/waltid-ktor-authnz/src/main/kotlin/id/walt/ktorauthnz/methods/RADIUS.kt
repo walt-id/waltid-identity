@@ -17,6 +17,7 @@ import org.aaa4j.radius.client.RadiusClient
 import org.aaa4j.radius.client.clients.UdpRadiusClient
 import org.aaa4j.radius.core.attribute.StringData
 import org.aaa4j.radius.core.attribute.TextData
+import org.aaa4j.radius.core.attribute.attributes.MessageAuthenticator
 import org.aaa4j.radius.core.attribute.attributes.NasIdentifier
 import org.aaa4j.radius.core.attribute.attributes.UserName
 import org.aaa4j.radius.core.attribute.attributes.UserPassword
@@ -40,10 +41,12 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
         val identifier = RADIUSIdentifier(host, credential.name)
 
         val accessRequest = AccessRequest(
-            listOf(
+            listOfNotNull(
+                MessageAuthenticator(),
                 UserName(TextData(credential.name)),
                 UserPassword(StringData(credential.password.toByteArray())),
-                NasIdentifier(TextData(config.radiusNasIdentifier))
+                if (config.radiusNasIdentifier != null)
+                    NasIdentifier(TextData(config.radiusNasIdentifier)) else null
             )
         )
 

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.cose
 
 import cbor.Cbor
@@ -28,16 +30,17 @@ abstract class COSESimpleBase<T : COSESimpleBase<T>> {
     /**
      * Certificate chain, if present in unprotected header of COSE structure
      */
-    val x5Chain: ByteArray?
+    val x5Chain: List<ByteArray>?
         get() {
             if (data.size != 4) throw SerializationException("Invalid COSE_Sign1/COSE_Mac0 array")
             val unprotectedHeader =
                 data[1] as? MapElement ?: throw SerializationException("Missing COSE_Sign1 unprotected header")
             return when (val headerParameter = unprotectedHeader.value[MapKey(X5_CHAIN)]) {
-                is ByteStringElement -> headerParameter.value
+                is ByteStringElement -> listOf(headerParameter.value)
                 is ListElement -> {
-                    val byteArrays = headerParameter.value.map { (it as? ByteStringElement)?.value ?: ByteArray(0) }
-                    byteArrays.reduceOrNull { acc, bytes -> acc + bytes }
+                    headerParameter.value.map {
+                        (it as ByteStringElement).value
+                    }
                 }
 
                 else -> null

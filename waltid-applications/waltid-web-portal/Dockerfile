@@ -1,5 +1,8 @@
 # BUILD
-FROM docker.io/gplane/pnpm:8.6 AS buildstage
+FROM node:20-slim AS buildstage
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
 COPY waltid-applications/waltid-web-portal/. /build
 
@@ -18,4 +21,3 @@ WORKDIR /app
 
 EXPOSE 7102
 CMD ["node", "server.js"]
-

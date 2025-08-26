@@ -77,6 +77,7 @@ jobs:
         if: matrix.services.name == 'waltid-enterprise'
         run: |
           sed "s/_DEFAULT_DEPLOYMENT_/${GITHUB_SHA}/g" ${{ matrix.services.k8s }}/deployment-${{ inputs.deployment }}.yaml | 
+          sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" |
           sed "s!mongodb://root:password@localhost:27017/!${{ secrets.MONGODB_URL }}!g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
 
       - name: Continuous deployment - ${{ matrix.services.name }}

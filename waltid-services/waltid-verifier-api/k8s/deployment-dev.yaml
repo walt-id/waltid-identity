@@ -36,7 +36,7 @@ spec:
     spec:
       containers:
         - name: verifier
-          image: waltid/verifier-api:dev
+          image: waltid/verifier-api:__DEFAULT_IMAGE_TAG__
           imagePullPolicy: Always
           volumeMounts:
             - name: verifier-web-config
