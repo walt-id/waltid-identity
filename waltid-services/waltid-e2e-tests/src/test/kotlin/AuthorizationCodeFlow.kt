@@ -40,8 +40,13 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
         var offerUrlParams = Url(offerUrl).parameters.toMap()
         var offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)
         var credOffer = client.get(offerObj.credentialOfferUri!!).body<JsonObject>()
+        var credentialOfferUrlParams = Url(offerUrl).parameters.toMap()
+        var credentialOfferRequest = CredentialOfferRequest.fromHttpParameters(credentialOfferUrlParams)
+        var credentialOfferJsonObject = client.get(credentialOfferRequest.credentialOfferUri!!).body<JsonObject>()
+
         issuerState =
-            credOffer["grants"]!!.jsonObject["authorization_code"]!!.jsonObject["issuer_state"]!!.jsonPrimitive.content
+            credentialOfferJsonObject["grants"]!!.jsonObject["authorization_code"]!!.jsonObject["issuer_state"]!!.jsonPrimitive.content
+
         var authorizationRequest = AuthorizationRequest(
             issuerState = issuerState,
             clientId = "did:key:xzy",
@@ -59,7 +64,7 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
             authorizationDetails = listOf(
                 AuthorizationDetails(
                     type = "openid_credential",
-                    locations = listOf(credOffer["credential_issuer"]!!.jsonPrimitive.content),
+                    locations = listOf(credentialOfferJsonObject["credential_issuer"]!!.jsonPrimitive.content),
                     format = CredentialFormat.jwt_vc,
                     credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "OpenBadgeCredential"))
                 )
@@ -85,17 +90,17 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
             println("offer: $offerUrl")
         }
 
-        offerUrlParams = Url(offerUrl).parameters.toMap()
-        offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)
-        credOffer = client.get(offerObj.credentialOfferUri!!).body<JsonObject>()
+        credentialOfferUrlParams = Url(offerUrl).parameters.toMap()
+        credentialOfferRequest = CredentialOfferRequest.fromHttpParameters(credentialOfferUrlParams)
+        credentialOfferJsonObject = client.get(credentialOfferRequest.credentialOfferUri!!).body<JsonObject>()
         issuerState =
-            credOffer["grants"]!!.jsonObject["authorization_code"]!!.jsonObject["issuer_state"]!!.jsonPrimitive.content
+            credentialOfferJsonObject["grants"]!!.jsonObject["authorization_code"]!!.jsonObject["issuer_state"]!!.jsonPrimitive.content
         authorizationRequest = authorizationRequest.copy(
             issuerState = issuerState,
             authorizationDetails = listOf(
                 AuthorizationDetails(
                     type = "openid_credential",
-                    locations = listOf(credOffer["credential_issuer"]!!.jsonPrimitive.content),
+                    locations = listOf(credentialOfferJsonObject["credential_issuer"]!!.jsonPrimitive.content),
                     format = CredentialFormat.jwt_vc,
                     credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "OpenBadgeCredential"))
                 )
@@ -120,17 +125,17 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
             println("offer: $offerUrl")
         }
 
-        offerUrlParams = Url(offerUrl).parameters.toMap()
-        offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)
-        credOffer = client.get(offerObj.credentialOfferUri!!).body<JsonObject>()
+        credentialOfferUrlParams = Url(offerUrl).parameters.toMap()
+        credentialOfferRequest = CredentialOfferRequest.fromHttpParameters(credentialOfferUrlParams)
+        credentialOfferJsonObject = client.get(credentialOfferRequest.credentialOfferUri!!).body<JsonObject>()
         issuerState =
-            credOffer["grants"]!!.jsonObject["authorization_code"]!!.jsonObject["issuer_state"]!!.jsonPrimitive.content
+            credentialOfferJsonObject["grants"]!!.jsonObject["authorization_code"]!!.jsonObject["issuer_state"]!!.jsonPrimitive.content
         authorizationRequest = authorizationRequest.copy(
             issuerState = issuerState,
             authorizationDetails = listOf(
                 AuthorizationDetails(
                     type = "openid_credential",
-                    locations = listOf(credOffer["credential_issuer"]!!.jsonPrimitive.content),
+                    locations = listOf(credentialOfferJsonObject["credential_issuer"]!!.jsonPrimitive.content),
                     format = CredentialFormat.jwt_vc,
                     credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "OpenBadgeCredential"))
                 )
@@ -139,7 +144,7 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
 
         client.get("$authorizeEndpoint?${authorizationRequest.toHttpQueryString()}") {
         }.expectRedirect().apply {
-            assertEquals(true, headers["location"]!!.toString().contains("external_login"))
+            assertEquals(true, headers["location"]!!.contains("external_login"))
         }
     }
 

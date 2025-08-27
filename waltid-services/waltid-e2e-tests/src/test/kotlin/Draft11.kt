@@ -26,7 +26,7 @@ import kotlin.test.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-class Draft11(private val e2e: E2ETest, private val client: HttpClient)  {
+class Draft11(private val e2e: E2ETest, private val client: HttpClient) {
 
     fun testIssuerAPIDraft11AuthFlowWithJar(issuanceReq: IssuanceRequest) = runBlocking {
         lateinit var offerUrl: String
@@ -54,13 +54,19 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient)  {
         val issuerMetadataUrl = getCIProviderMetadataUrl(credOffer.credentialIssuer)
         val rawJsonMetadata = client.get(issuerMetadataUrl).bodyAsText()
         val jsonElementMetadata = Json.parseToJsonElement(rawJsonMetadata)
-        assertTrue(jsonElementMetadata.jsonObject["credentials_supported"] is JsonArray, "Expected credentials_supported in Open ID Provider Metadata to be a JsonArray")
+        assertTrue(
+            jsonElementMetadata.jsonObject["credentials_supported"] is JsonArray,
+            "Expected credentials_supported in Open ID Provider Metadata to be a JsonArray"
+        )
 
         val issuerMetadata = OpenIDProviderMetadata.fromJSONString(rawJsonMetadata) as OpenIDProviderMetadata.Draft11
         assertContains(issuerMetadata.grantTypesSupported, GrantType.authorization_code)
         assertContains(issuerMetadata.grantTypesSupported, GrantType.pre_authorized_code)
         assertNotNull(issuerMetadata.jwksUri)
-        assertTrue(issuerMetadata.credentialSupported!!.keys.all { it.toIntOrNull() != null }, "Expected credentials_supported keys to be array indices (e.g., '0', '1')")
+        assertTrue(
+            issuerMetadata.credentialSupported!!.keys.all { it.toIntOrNull() != null },
+            "Expected credentials_supported keys to be array indices (e.g., '0', '1')"
+        )
 
         assertEquals(issuerMetadata.issuer, credOffer.credentialIssuer)
         assertEquals(issuerMetadata.credentialIssuer, credOffer.credentialIssuer)
@@ -119,7 +125,12 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient)  {
                     type = "openid_credential",
                     locations = listOf(credOffer.credentialIssuer),
                     format = CredentialFormat.jwt_vc,
-                    credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "OpenBadgeCredential"))
+                    credentialDefinition = CredentialDefinition(
+                        type = listOf(
+                            "VerifiableCredential",
+                            "OpenBadgeCredential"
+                        )
+                    )
                 )
             )
         )
@@ -148,7 +159,7 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient)  {
 
         val signingKey = JWKKey.importJWK(matchingKey.toString()).getOrThrow()
 
-        assertTrue (signingKey.verifyJws(authJarTokenRequest.request!!).isSuccess)
+        assertTrue(signingKey.verifyJws(authJarTokenRequest.request!!).isSuccess)
 
         val jarPayload = requestJwt.payload
         assertNotNull(jarPayload)
@@ -182,9 +193,15 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient)  {
                 val theInputDescriptor = inputDescriptors.first()
 
                 assertNotNull(theInputDescriptor.format, "theInputDescriptor format should not be null")
-                assertTrue(theInputDescriptor.format!!.containsKey(VCFormat.jwt_vc), "theInputDescriptor should be jwt_vc")
+                assertTrue(
+                    theInputDescriptor.format!!.containsKey(VCFormat.jwt_vc),
+                    "theInputDescriptor should be jwt_vc"
+                )
 
-                assertTrue(theInputDescriptor.format!![VCFormat.jwt_vc]?.alg?.contains(JWSAlgorithm.ES256.name) == true, "theInputDescriptor alg should be ES256")
+                assertTrue(
+                    theInputDescriptor.format!![VCFormat.jwt_vc]?.alg?.contains(JWSAlgorithm.ES256.name) == true,
+                    "theInputDescriptor alg should be ES256"
+                )
             }
 
             else -> throw AssertionError("Unexpected authentication method ${issuanceReq.authenticationMethod}")
@@ -212,13 +229,19 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient)  {
         val issuerMetadataUrl = getCIProviderMetadataUrl(credOffer.credentialIssuer)
         val rawJsonMetadata = client.get(issuerMetadataUrl).bodyAsText()
         val jsonElementMetadata = Json.parseToJsonElement(rawJsonMetadata)
-        assertTrue(jsonElementMetadata.jsonObject["credentials_supported"] is JsonArray, "Expected credentials_supported in Open ID Provider Metadata to be a JsonArray")
+        assertTrue(
+            jsonElementMetadata.jsonObject["credentials_supported"] is JsonArray,
+            "Expected credentials_supported in Open ID Provider Metadata to be a JsonArray"
+        )
 
         val issuerMetadata = OpenIDProviderMetadata.fromJSONString(rawJsonMetadata) as OpenIDProviderMetadata.Draft11
         assertContains(issuerMetadata.grantTypesSupported, GrantType.authorization_code)
         assertContains(issuerMetadata.grantTypesSupported, GrantType.pre_authorized_code)
         assertNotNull(issuerMetadata.jwksUri)
-        assertTrue(issuerMetadata.credentialSupported!!.keys.all { it.toIntOrNull() != null }, "Expected credentials_supported keys to be array indices (e.g., '0', '1')")
+        assertTrue(
+            issuerMetadata.credentialSupported!!.keys.all { it.toIntOrNull() != null },
+            "Expected credentials_supported keys to be array indices (e.g., '0', '1')"
+        )
 
         assertEquals(issuerMetadata.issuer, credOffer.credentialIssuer)
         assertEquals(issuerMetadata.credentialIssuer, credOffer.credentialIssuer)
@@ -270,7 +293,7 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient)  {
     }
 
     private fun validateAuthorizationData(
-        issuerMetadata: OpenIDProviderMetadata. Draft11,
+        issuerMetadata: OpenIDProviderMetadata.Draft11,
         holderAuthorizationRequest: AuthorizationRequest,
         jarPayload: Map<String, Any?>? = null,
         issuerAuthorizationRequest: AuthorizationRequest? = null
@@ -296,14 +319,14 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient)  {
 
         issuerAuthorizationRequest?.let {
             validateData(
-                expectedData =commonData,
+                expectedData = commonData,
                 actualData = mapOf(
                     "client_id" to it.clientId,
                     "redirect_uri" to it.redirectUri,
                     "response_mode" to it.responseMode
                 ),
 
-            )
+                )
         }
     }
 
