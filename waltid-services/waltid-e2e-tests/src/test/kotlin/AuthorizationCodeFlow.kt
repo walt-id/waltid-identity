@@ -37,12 +37,16 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
             println("offer: $offerUrl")
         }
 
-        var offerUrlParams = Url(offerUrl).parameters.toMap()
-        var offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)
-        var credOffer = client.get(offerObj.credentialOfferUri!!).body<JsonObject>()
+
         var credentialOfferUrlParams = Url(offerUrl).parameters.toMap()
         var credentialOfferRequest = CredentialOfferRequest.fromHttpParameters(credentialOfferUrlParams)
         var credentialOfferJsonObject = client.get(credentialOfferRequest.credentialOfferUri!!).body<JsonObject>()
+
+
+        val credentialOffer = parseAndResolveCredentialOfferRequestUrl(offerUrl)
+        val issuerMetadata = resolveCIProviderMetadata(credentialOffer) as OpenIDProviderMetadata.Draft13
+
+        assertNull(issuerMetadata.pushedAuthorizationRequestEndpoint)
 
         issuerState =
             credentialOfferJsonObject["grants"]!!.jsonObject["authorization_code"]!!.jsonObject["issuer_state"]!!.jsonPrimitive.content
