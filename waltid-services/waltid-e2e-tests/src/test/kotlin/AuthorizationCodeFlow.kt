@@ -2,6 +2,8 @@ import id.walt.commons.testing.E2ETest
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.oid4vc.OpenID4VCI.parseAndResolveCredentialOfferRequestUrl
+import id.walt.oid4vc.OpenID4VCI.resolveCIProviderMetadata
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
@@ -17,6 +19,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions.assertTrue
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 
 class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpClient) {
