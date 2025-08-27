@@ -116,7 +116,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
     actual override val hasPrivateKey: Boolean
         get() = _jwkObj.toMap().any { it.key in privateParameters }
 
-    actual companion object : JWKKeyCreator {
+    actual companion object : JWKKeyCreator() {
         actual override suspend fun generate(
             type: KeyType, metadata: JwkKeyMeta?
         ): JWKKey {
