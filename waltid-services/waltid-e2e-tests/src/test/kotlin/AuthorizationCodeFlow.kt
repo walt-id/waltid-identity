@@ -25,7 +25,7 @@ import kotlin.test.assertNull
 class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpClient) {
 
     fun testIssuerAPI() = runBlocking {
-        lateinit var offerUrl: String
+        lateinit var credentialOfferUrl: String
         lateinit var issuerState: String
         val issuerApi = IssuerApi(e2e, client)
         val authorizeEndpoint = "draft13/authorize"
@@ -36,17 +36,17 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
         val issuanceRequestIdToken =
             Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-id-token.json"))
         issuerApi.jwt(issuanceRequestIdToken) {
-            offerUrl = it
-            println("offer: $offerUrl")
+            credentialOfferUrl = it
+            println("offer: $credentialOfferUrl")
         }
 
 
-        var credentialOfferUrlParams = Url(offerUrl).parameters.toMap()
+        var credentialOfferUrlParams = Url(credentialOfferUrl).parameters.toMap()
         var credentialOfferRequest = CredentialOfferRequest.fromHttpParameters(credentialOfferUrlParams)
         var credentialOfferJsonObject = client.get(credentialOfferRequest.credentialOfferUri!!).body<JsonObject>()
 
 
-        val credentialOffer = parseAndResolveCredentialOfferRequestUrl(offerUrl)
+        val credentialOffer = parseAndResolveCredentialOfferRequestUrl(credentialOfferUrl)
         val issuerMetadata = resolveCIProviderMetadata(credentialOffer) as OpenIDProviderMetadata.Draft13
 
         assertNull(issuerMetadata.pushedAuthorizationRequestEndpoint)
@@ -93,11 +93,11 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
         val issuanceRequestVpToken =
             Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-vp-token.json"))
         issuerApi.jwt(issuanceRequestVpToken) {
-            offerUrl = it
-            println("offer: $offerUrl")
+            credentialOfferUrl = it
+            println("offer: $credentialOfferUrl")
         }
 
-        credentialOfferUrlParams = Url(offerUrl).parameters.toMap()
+        credentialOfferUrlParams = Url(credentialOfferUrl).parameters.toMap()
         credentialOfferRequest = CredentialOfferRequest.fromHttpParameters(credentialOfferUrlParams)
         credentialOfferJsonObject = client.get(credentialOfferRequest.credentialOfferUri!!).body<JsonObject>()
         issuerState =
@@ -128,11 +128,11 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
         val issuanceRequestPwd =
             Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request-with-authorization-code-flow-and-pwd.json"))
         issuerApi.jwt(issuanceRequestPwd) {
-            offerUrl = it
-            println("offer: $offerUrl")
+            credentialOfferUrl = it
+            println("offer: $credentialOfferUrl")
         }
 
-        credentialOfferUrlParams = Url(offerUrl).parameters.toMap()
+        credentialOfferUrlParams = Url(credentialOfferUrl).parameters.toMap()
         credentialOfferRequest = CredentialOfferRequest.fromHttpParameters(credentialOfferUrlParams)
         credentialOfferJsonObject = client.get(credentialOfferRequest.credentialOfferUri!!).body<JsonObject>()
         issuerState =

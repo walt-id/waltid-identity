@@ -29,29 +29,29 @@ import kotlin.uuid.Uuid
 class Draft11(private val e2e: E2ETest, private val client: HttpClient) {
 
     fun testIssuerAPIDraft11AuthFlowWithJar(issuanceReq: IssuanceRequest) = runBlocking {
-        lateinit var offerUrl: String
+        lateinit var credentialOfferUrl: String
         lateinit var issuerState: String
         lateinit var authJarTokenRequest: AuthorizationRequest
 
         val issuerApi = IssuerApi(e2e, client)
 
         issuerApi.jwt(issuanceReq) {
-            offerUrl = it
+            credentialOfferUrl = it
         }
 
-        val offerUrlParams = Url(offerUrl).parameters.toMap()
-        val offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)
+        val credentialOfferUrlParams = Url(credentialOfferUrl).parameters.toMap()
+        val offerObj = CredentialOfferRequest.fromHttpParameters(credentialOfferUrlParams)
         assertTrue(offerObj.credentialOfferUri!!.contains("draft11"))
         assertFalse(offerObj.credentialOfferUri!!.contains("draft13"))
 
-        val credOffer = client.get(offerObj.credentialOfferUri!!).body<CredentialOffer.Draft11>()
+        val credentialOffer = client.get(offerObj.credentialOfferUri!!).body<CredentialOffer.Draft11>()
 
-        assertNotNull(credOffer.credentialIssuer)
-        assertNotNull(credOffer.credentials)
-        assertNotNull(credOffer.grants)
+        assertNotNull(credentialOffer.credentialIssuer)
+        assertNotNull(credentialOffer.credentials)
+        assertNotNull(credentialOffer.grants)
 
 
-        val issuerMetadataUrl = getCIProviderMetadataUrl(credOffer.credentialIssuer)
+        val issuerMetadataUrl = getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
         val rawJsonMetadata = client.get(issuerMetadataUrl).bodyAsText()
         val jsonElementMetadata = Json.parseToJsonElement(rawJsonMetadata)
         assertTrue(
@@ -69,9 +69,9 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient) {
             "Expected credentials_supported keys to be array indices (e.g., '0', '1')"
         )
 
-        assertEquals(issuerMetadata.issuer, credOffer.credentialIssuer)
-        assertEquals(issuerMetadata.credentialIssuer, credOffer.credentialIssuer)
-        assertEquals(issuerMetadata.credentialIssuer, credOffer.credentialIssuer)
+        assertEquals(issuerMetadata.issuer, credentialOffer.credentialIssuer)
+        assertEquals(issuerMetadata.credentialIssuer, credentialOffer.credentialIssuer)
+        assertEquals(issuerMetadata.credentialIssuer, credentialOffer.credentialIssuer)
 
         val rawJsonJwks = client.get(issuerMetadata.jwksUri!!).bodyAsText()
 
@@ -105,7 +105,7 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient) {
         )
 
 
-        issuerState = credOffer.grants[GrantType.authorization_code.name]!!.issuerState!!
+        issuerState = credentialOffer.grants[GrantType.authorization_code.name]!!.issuerState!!
 
         val authorizationRequest = AuthorizationRequest(
             issuerState = issuerState,
@@ -124,7 +124,7 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient) {
             authorizationDetails = listOf(
                 AuthorizationDetails(
                     type = "openid_credential",
-                    locations = listOf(credOffer.credentialIssuer),
+                    locations = listOf(credentialOffer.credentialIssuer),
                     format = CredentialFormat.jwt_vc,
                     credentialDefinition = CredentialDefinition(
                         type = listOf(
@@ -211,23 +211,23 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient) {
 
     @OptIn(ExperimentalUuidApi::class)
     fun testIssuanceDraft11PreAuthFlow(issuanceReq: IssuanceRequest, wallet: Uuid) = runBlocking {
-        lateinit var offerUrl: String
+        lateinit var credentialOfferUrl: String
 
         val issuerApi = IssuerApi(e2e, client)
 
         issuerApi.jwt(issuanceReq) {
-            offerUrl = it
+            credentialOfferUrl = it
         }
 
-        val offerUrlParams = Url(offerUrl).parameters.toMap()
-        val offerObj = CredentialOfferRequest.fromHttpParameters(offerUrlParams)
-        val credOffer = client.get(offerObj.credentialOfferUri!!).body<CredentialOffer.Draft11>()
+        val credentialOfferUrlParams = Url(credentialOfferUrl).parameters.toMap()
+        val offerObj = CredentialOfferRequest.fromHttpParameters(credentialOfferUrlParams)
+        val credentialOffer = client.get(offerObj.credentialOfferUri!!).body<CredentialOffer.Draft11>()
 
-        assertNotNull(credOffer.credentialIssuer)
-        assertNotNull(credOffer.credentials)
-        assertNotNull(credOffer.grants)
+        assertNotNull(credentialOffer.credentialIssuer)
+        assertNotNull(credentialOffer.credentials)
+        assertNotNull(credentialOffer.grants)
 
-        val issuerMetadataUrl = getCIProviderMetadataUrl(credOffer.credentialIssuer)
+        val issuerMetadataUrl = getCIProviderMetadataUrl(credentialOffer.credentialIssuer)
         val rawJsonMetadata = client.get(issuerMetadataUrl).bodyAsText()
         val jsonElementMetadata = Json.parseToJsonElement(rawJsonMetadata)
         assertTrue(
@@ -244,9 +244,9 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient) {
             "Expected credentials_supported keys to be array indices (e.g., '0', '1')"
         )
 
-        assertEquals(issuerMetadata.issuer, credOffer.credentialIssuer)
-        assertEquals(issuerMetadata.credentialIssuer, credOffer.credentialIssuer)
-        assertEquals(issuerMetadata.credentialIssuer, credOffer.credentialIssuer)
+        assertEquals(issuerMetadata.issuer, credentialOffer.credentialIssuer)
+        assertEquals(issuerMetadata.credentialIssuer, credentialOffer.credentialIssuer)
+        assertEquals(issuerMetadata.credentialIssuer, credentialOffer.credentialIssuer)
 
         val rawJsonJwks = client.get(issuerMetadata.jwksUri!!).bodyAsText()
 
@@ -281,12 +281,12 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient) {
 
         val exchangeApi = ExchangeApi(e2e, client)
         lateinit var newCredentialId: String
-        exchangeApi.resolveCredentialOffer(wallet, offerUrl)
-        exchangeApi.useOfferRequest(wallet, offerUrl, 1) {
+        exchangeApi.resolveCredentialOffer(wallet, credentialOfferUrl)
+        exchangeApi.useOfferRequest(wallet, credentialOfferUrl, 1) {
             assertNotNull(it)
-            val cred = it.first()
-            assertContains(JwtUtils.parseJWTPayload(cred.document).keys, JwsSignatureScheme.JwsOption.VC)
-            newCredentialId = cred.id
+            val credential = it.first()
+            assertContains(JwtUtils.parseJWTPayload(credential.document).keys, JwsSignatureScheme.JwsOption.VC)
+            newCredentialId = credential.id
         }
 
         assertNotNull(newCredentialId)
