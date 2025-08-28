@@ -36,6 +36,7 @@ class E2ESdJwtTest(
     private val exchangeApi: ExchangeApi,
     private val sessionApi: Verifier.SessionApi,
     private val verificationApi: Verifier.VerificationApi,
+    private val credentialsApi: CredentialsApi,
 ) {
 
     fun testW3CVC(wallet: Uuid, did: String) = runTest {
@@ -106,6 +107,9 @@ class E2ESdJwtTest(
             }
         }
         //endregion -Exchange / presentation-
+
+        //delete credential
+        credentialsApi.delete(wallet, newCredential.id)
     }
 
     fun testIEFTSDJWTVC(wallet: Uuid, did: String) = runTest {

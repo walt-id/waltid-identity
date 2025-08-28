@@ -324,9 +324,12 @@ class WaltidServicesE2ETests {
             assertTrue(it.any { it.operation == "useOfferRequest" } && it.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
         }
         //endregion -History-
-        val sdJwtTest = E2ESdJwtTest(issuerApi, exchangeApi, sessionApi, verificationApi)
+
         //cleanup credentials
         credentialsApi.delete(wallet, newCredentialId)
+
+        // Test sdJwt
+        val sdJwtTest = E2ESdJwtTest(issuerApi, exchangeApi, sessionApi, verificationApi, credentialsApi)
         sdJwtTest.testW3CVC(wallet, did)
 
         // Test Authorization Code flow with available authentication methods in Issuer API
