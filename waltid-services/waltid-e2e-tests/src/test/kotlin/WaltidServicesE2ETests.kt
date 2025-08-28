@@ -53,7 +53,7 @@ class WaltidServicesE2ETests {
         val openBadgeCredentialData = loadResource("issuance/openbadgecredential.json")
         val credentialMapping = loadResource("issuance/mapping.json")
         val credentialDisclosure = loadResource("issuance/disclosure.json")
-        val sdjwtCredential = buildJsonObject {
+        val sdjwtW3CCredential = buildJsonObject {
             put("issuerKey", Json.decodeFromString<JsonElement>(issuerKey))
             put("issuerDid", issuerDid)
             put("credentialConfigurationId", "OpenBadgeCredential_jwt_vc_json")
@@ -61,7 +61,8 @@ class WaltidServicesE2ETests {
             put("mapping", Json.decodeFromString<JsonElement>(credentialMapping))
             put("selectiveDisclosure", Json.decodeFromString<JsonElement>(credentialDisclosure))
         }
-        val jwtCredential = JsonObject(sdjwtCredential.minus("selectiveDisclosure"))
+        val jwtCredential = JsonObject(sdjwtW3CCredential.minus("selectiveDisclosure"))
+
         val simplePresentationRequestPayload =
             loadResource("presentation/openbadgecredential-presentation-request.json")
         val nameFieldSchemaPresentationRequestPayload =

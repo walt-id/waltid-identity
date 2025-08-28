@@ -97,9 +97,10 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
     }
 
     //w3c jwt_vc_json - with disclosures
-    private val openbadgeSdJwtIssuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(WaltidServicesE2ETests.sdjwtCredential).apply {
-        credentialFormat = CredentialFormat.jwt_vc_json
-    }
+    private val openbadgeSdJwtIssuanceRequest =
+        Json.decodeFromJsonElement<IssuanceRequest>(WaltidServicesE2ETests.sdjwtW3CCredential).apply {
+            credentialFormat = CredentialFormat.jwt_vc_json
+        }
 
     //ietf sd_jwt_vc - with disclosures
     private val identityCredentialIETFSdJwtX5cIssuanceRequest = IssuanceRequest(
