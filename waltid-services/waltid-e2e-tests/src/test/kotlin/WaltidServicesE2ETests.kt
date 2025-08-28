@@ -356,9 +356,10 @@ class WaltidServicesE2ETests {
         val draft11 = Draft11(e2e, client)
 
         val preAuthFlowIssuanceReq =
-            Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request.json")).copy(
-                standardVersion = OpenID4VCIVersion.DRAFT11,
-            )
+            Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request.json"))
+                .copy(
+                    standardVersion = OpenID4VCIVersion.DRAFT11,
+                )
 
         draft11.testIssuanceDraft11PreAuthFlow(preAuthFlowIssuanceReq, wallet)
 
@@ -418,9 +419,10 @@ class WaltidServicesE2ETests {
         val testCredentialWallet = TestOpenIdCredentialWallet(e2e, client)
 
         val preAuthFlowIssuanceReqDraft13 =
-            Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request.json")).copy(
-                standardVersion = OpenID4VCIVersion.DRAFT13,
-            )
+            Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request.json"))
+                .copy(
+                    standardVersion = OpenID4VCIVersion.DRAFT13,
+                )
 
         testCredentialWallet.testCredentialWallet(
             issuanceReq = preAuthFlowIssuanceReqDraft13,
@@ -434,7 +436,10 @@ fun String.expectLooksLikeJwt(): String =
 
 
 val expectSuccess: suspend HttpResponse.() -> HttpResponse = {
-    kotlin.test.assertTrue(this.status.isSuccess(), "HTTP status is non-successful for response: $this, body is ${this.bodyAsText()}"); this
+    kotlin.test.assertTrue(
+        this.status.isSuccess(),
+        "HTTP status is non-successful for response: $this, body is ${this.bodyAsText()}"
+    ); this
 }
 
 val expectRedirect: HttpResponse.() -> HttpResponse = {

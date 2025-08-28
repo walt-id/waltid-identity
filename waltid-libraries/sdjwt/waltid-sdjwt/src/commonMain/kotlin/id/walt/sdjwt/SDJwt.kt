@@ -96,10 +96,10 @@ open class SDJwt internal constructor(
     @JsName("present")
     fun present(sdMap: SDMap?, withKBJwt: KeyBindingJwt? = null): SDJwt {
         return SDJwt(
-            jwt,
-            header,
-            sdMap?.let { sdPayload.withSelectiveDisclosures(it) } ?: sdPayload.withoutDisclosures(),
-            withKBJwt ?: keyBindingJwt, isPresentation = true)
+            jwt = jwt,
+            header = header,
+            sdPayload = sdMap?.let { sdPayload.withSelectiveDisclosures(it) } ?: sdPayload.withoutDisclosures(),
+            keyBindingJwt = withKBJwt ?: keyBindingJwt, isPresentation = true)
     }
 
     /**
@@ -110,14 +110,15 @@ open class SDJwt internal constructor(
     @JsName("presentAll")
     fun present(discloseAll: Boolean, withKBJwt: KeyBindingJwt? = null): SDJwt {
         return SDJwt(
-            jwt,
-            header,
-            if (discloseAll) {
+            jwt = jwt,
+            header = header,
+            sdPayload = if (discloseAll) {
                 sdPayload
             } else {
                 sdPayload.withoutDisclosures()
             },
-            withKBJwt ?: keyBindingJwt, isPresentation = true
+            keyBindingJwt = withKBJwt ?: keyBindingJwt,
+            isPresentation = true
         )
     }
 
@@ -137,7 +138,16 @@ open class SDJwt internal constructor(
         kbCryptoProvider: JWTCryptoProvider,
         kbKeyId: String? = null
     ) =
-        present(sdMap, KeyBindingJwt.sign(present(sdMap).toString(), audience, nonce, kbCryptoProvider, kbKeyId))
+        present(
+            sdMap = sdMap,
+            withKBJwt = KeyBindingJwt.sign(
+                presentedSdJwt = present(sdMap).toString(),
+                audience = audience,
+                nonce = nonce,
+                cryptoProvider = kbCryptoProvider,
+                keyId = kbKeyId
+            )
+        )
 
     /**
      * Shortcut to presenting the SD-JWT, with all disclosures selected or unselected
@@ -156,8 +166,16 @@ open class SDJwt internal constructor(
         kbKeyId: String? = null
     ) =
         present(
-            discloseAll,
-            KeyBindingJwt.sign(present(discloseAll).toString(), audience, nonce, kbCryptoProvider, kbKeyId)
+            discloseAll = discloseAll,
+            withKBJwt = KeyBindingJwt.sign(
+                presentedSdJwt = present(
+                    discloseAll
+                ).toString(),
+                audience = audience,
+                nonce = nonce,
+                cryptoProvider = kbCryptoProvider,
+                keyId = kbKeyId
+            )
         )
 
     /**
@@ -208,17 +226,18 @@ open class SDJwt internal constructor(
                 ?: throw IllegalArgumentException("Invalid SD-JWT format: $sdJwt")
             val matchedGroups = matchResult.groups as MatchNamedGroupCollection
             val disclosures = matchedGroups["disclosures"]?.value?.trim(SEPARATOR)?.split(SEPARATOR)?.toSet() ?: setOf()
+
             return SDJwt(
-                matchedGroups["sdjwt"]!!.value,
-                Json.parseToJsonElement(
+                jwt = matchedGroups["sdjwt"]!!.value,
+                header = Json.parseToJsonElement(
                     matchedGroups["header"]!!.value.decodeFromBase64Url().decodeToString()
                 ).jsonObject,
-                SDPayload.parse(
+                sdPayload = SDPayload.parse(
                     matchedGroups["body"]!!.value,
                     disclosures
                 ),
-                matchedGroups["kbjwt"]?.value?.let { KeyBindingJwt.parse(it) },
-                matchedGroups["kbjwt"] != null || sdJwt.endsWith("~")
+                keyBindingJwt = matchedGroups["kbjwt"]?.value?.let { KeyBindingJwt.parse(it) },
+                isPresentation = matchedGroups["kbjwt"] != null || sdJwt.endsWith("~")
             )
         }
 
@@ -227,7 +246,10 @@ open class SDJwt internal constructor(
          * @return parsed SD-JWT, if token has been verified
          * @throws Exception if SD-JWT cannot be parsed
          */
-        fun verifyAndParse(sdJwt: String, jwtCryptoProvider: JWTCryptoProvider): VerificationResult<SDJwt> {
+        fun verifyAndParse(
+            sdJwt: String,
+            jwtCryptoProvider: JWTCryptoProvider
+        ): VerificationResult<SDJwt> {
             return parse(sdJwt).verify(jwtCryptoProvider)
         }
 
@@ -244,14 +266,18 @@ open class SDJwt internal constructor(
             return parse(sdJwt).verifyAsync(jwtCryptoProvider)
         }
 
-        fun createFromSignedJwt(signedJwt: String, sdPayload: SDPayload, withKBJwt: KeyBindingJwt? = null): SDJwt {
+        fun createFromSignedJwt(
+            signedJwt: String,
+            sdPayload: SDPayload,
+            withKBJwt: KeyBindingJwt? = null
+        ): SDJwt {
             val sdJwt = parse(signedJwt)
             return SDJwt(
                 jwt = sdJwt.jwt,
                 header = sdJwt.header,
                 sdPayload = sdPayload,
                 keyBindingJwt = withKBJwt,
-                sdJwt.isPresentation || withKBJwt != null
+                isPresentation = sdJwt.isPresentation || withKBJwt != null
             )
         }
 
@@ -269,7 +295,13 @@ open class SDJwt internal constructor(
             typ: String = "JWT",
             additionalHeaders: Map<String, Any> = mapOf()
         ): SDJwt = createFromSignedJwt(
-            jwtCryptoProvider.sign(sdPayload.undisclosedPayload, keyID, typ, additionalHeaders), sdPayload
+            signedJwt = jwtCryptoProvider.sign(
+                payload = sdPayload.undisclosedPayload,
+                keyID = keyID,
+                typ = typ,
+                headers = additionalHeaders
+            ),
+            sdPayload = sdPayload
         )
 
         /**
@@ -286,7 +318,11 @@ open class SDJwt internal constructor(
             jwtCryptoProvider: AsyncJWTCryptoProvider,
             keyID: String? = null
         ): SDJwt = createFromSignedJwt(
-            jwtCryptoProvider.sign(sdPayload.undisclosedPayload, keyID), sdPayload
+            signedJwt = jwtCryptoProvider.sign(
+                payload = sdPayload.undisclosedPayload,
+                keyID = keyID
+            ),
+            sdPayload = sdPayload
         )
 
         /**
