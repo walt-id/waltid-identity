@@ -32,6 +32,7 @@ import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertNull
 import kotlin.collections.first
 import kotlin.test.*
+import kotlin.text.isBlank
 import kotlin.text.isNotBlank
 import kotlin.text.toByteArray
 import kotlin.text.trimIndent
@@ -414,7 +415,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         var credentials =
             assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-        assert(credentials.size == 1)
+        assertEquals(1, credentials.size)
 
         val jwtVcJsonPresentationSimpleView = assertDoesNotThrow {
             credentials.first() as PresentedJwtVcJsonSimpleViewMode
@@ -427,7 +428,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
             actual = holder.jsonPrimitive.content,
         )
 
-        assert(jwtVcJsonPresentationSimpleView.verifiableCredentials.size == 1)
+        assertEquals(1, jwtVcJsonPresentationSimpleView.verifiableCredentials.size)
 
         val simpleViewResponse = verifierApi.getPresentedCredentials(sessionId, PresentedCredentialsViewMode.simple)
         assertEquals(
@@ -454,13 +455,13 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         credentials =
             assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-        assert(credentials.size == 1)
+        assertEquals(1, credentials.size)
 
         val jwtVcJsonPresentationVerboseView = assertDoesNotThrow {
             credentials.first() as PresentedJwtVcJsonVerboseViewMode
         }
 
-        assert(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 1)
+        assertEquals(1, jwtVcJsonPresentationVerboseView.verifiableCredentials.size)
 
     }
 
@@ -508,7 +509,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         var credentials =
             assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-        assert(credentials.size == 1)
+        assertEquals(1, credentials.size)
 
         val jwtVcJsonPresentationSimpleView = assertDoesNotThrow {
             credentials.first() as PresentedJwtVcJsonSimpleViewMode
@@ -521,7 +522,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
             actual = holder.jsonPrimitive.content,
         )
 
-        assert(jwtVcJsonPresentationSimpleView.verifiableCredentials.size == 1)
+        assertEquals(1, jwtVcJsonPresentationSimpleView.verifiableCredentials.size)
 
         val simpleViewResponse = verifierApi.getPresentedCredentials(sessionId, PresentedCredentialsViewMode.simple)
         assertEquals(
@@ -548,19 +549,19 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         credentials =
             assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-        assert(credentials.size == 1)
+        assertEquals(1, credentials.size)
 
         val jwtVcJsonPresentationVerboseView = assertDoesNotThrow {
             credentials.first() as PresentedJwtVcJsonVerboseViewMode
         }
 
-        assert(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 1)
+        assertEquals(1, jwtVcJsonPresentationVerboseView.verifiableCredentials.size)
 
         val verboseCredential = jwtVcJsonPresentationVerboseView.verifiableCredentials.first()
 
-        assert(verboseCredential.fullPayload != verboseCredential.undisclosedPayload)
+        assertNotEquals(verboseCredential.fullPayload, verboseCredential.undisclosedPayload)
 
-        assert((verboseCredential.undisclosedPayload["vc"] as JsonObject).containsKey("_sd"))
+        assertTrue((verboseCredential.undisclosedPayload["vc"] as JsonObject).containsKey("_sd"))
 
         universityDegreeWithDisclosuresIssuanceRequest.selectiveDisclosure!!.fields.keys.forEach {
             assertContains(
@@ -571,8 +572,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
 
         val disclosures = assertNotNull(verboseCredential.disclosures)
 
-        assert(disclosures.size == 2)
-
+        assertEquals(2, disclosures.size)
     }
 
 
@@ -611,7 +611,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         var credentials =
             assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-        assert(credentials.size == 1)
+        assertEquals(1, credentials.size)
 
         val jwtVcJsonPresentationSimpleView = assertDoesNotThrow {
             credentials.first() as PresentedJwtVcJsonSimpleViewMode
@@ -624,7 +624,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
             actual = holder.jsonPrimitive.content,
         )
 
-        assert(jwtVcJsonPresentationSimpleView.verifiableCredentials.size == 1)
+        assertEquals(1, jwtVcJsonPresentationSimpleView.verifiableCredentials.size)
 
         val simpleViewResponse = verifierApi.getPresentedCredentials(sessionId, PresentedCredentialsViewMode.simple)
         assertEquals(
@@ -651,13 +651,13 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         credentials =
             assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-        assert(credentials.size == 1)
+        assertEquals(1, credentials.size)
 
         val jwtVcJsonPresentationVerboseView = assertDoesNotThrow {
             credentials.first() as PresentedJwtVcJsonVerboseViewMode
         }
 
-        assert(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 1)
+        assertEquals(1, jwtVcJsonPresentationVerboseView.verifiableCredentials.size)
 
     }
 
@@ -704,7 +704,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         var credentials =
             assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.sd_jwt_vc])
 
-        assert(credentials.size == 1)
+        assertEquals(1, credentials.size)
 
         val sdJwtVcPresentationSimpleView = assertDoesNotThrow {
             credentials.first() as PresentedSdJwtVcSimpleViewMode
@@ -737,18 +737,21 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         credentials =
             assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.sd_jwt_vc])
 
-        assert(credentials.size == 1)
+        assertEquals(1, credentials.size)
 
         val sdJwtVcPresentationVerboseView = assertDoesNotThrow {
             credentials.first() as PresentedSdJwtVcVerboseViewMode
         }
 
-        assert(sdJwtVcPresentationVerboseView.raw.isNotBlank())
+        assertFalse(sdJwtVcPresentationVerboseView.raw.isBlank())
         assertNotNull(sdJwtVcPresentationVerboseView.keyBinding)
 
-        assert(sdJwtVcPresentationVerboseView.vc.fullPayload != sdJwtVcPresentationVerboseView.vc.undisclosedPayload)
+        assertNotEquals(
+            sdJwtVcPresentationVerboseView.vc.fullPayload,
+            sdJwtVcPresentationVerboseView.vc.undisclosedPayload
+        )
 
-        assert(sdJwtVcPresentationVerboseView.vc.undisclosedPayload.containsKey("_sd"))
+        assertTrue(sdJwtVcPresentationVerboseView.vc.undisclosedPayload.containsKey("_sd"))
 
         sdJwtVcIssuanceRequest.selectiveDisclosure!!.fields.keys.forEach {
             assertContains(
@@ -759,7 +762,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
 
         val disclosures = assertNotNull(sdJwtVcPresentationVerboseView.vc.disclosures)
 
-        assert(disclosures.size == 2)
+        assertEquals(2, disclosures.size)
     }
 
     @Order(10)
@@ -806,7 +809,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         var credentials =
             assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-        assert(credentials.size == 1)
+        assertEquals(1, credentials.size)
 
         val jwtVcJsonPresentationSimpleView = assertDoesNotThrow {
             credentials.first() as PresentedJwtVcJsonSimpleViewMode
@@ -819,7 +822,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
             actual = holder.jsonPrimitive.content,
         )
 
-        assert(jwtVcJsonPresentationSimpleView.verifiableCredentials.size == 1)
+        assertEquals(1, jwtVcJsonPresentationSimpleView.verifiableCredentials.size)
 
         val simpleViewResponse = verifierApi.getPresentedCredentials(sessionId, PresentedCredentialsViewMode.simple)
         assertEquals(
@@ -846,19 +849,19 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         credentials =
             assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-        assert(credentials.size == 1)
+        assertEquals(1, credentials.size)
 
         val jwtVcJsonPresentationVerboseView = assertDoesNotThrow {
             credentials.first() as PresentedJwtVcJsonVerboseViewMode
         }
 
-        assert(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 1)
+        assertEquals(1, jwtVcJsonPresentationVerboseView.verifiableCredentials.size)
 
         val verboseCredential = jwtVcJsonPresentationVerboseView.verifiableCredentials.first()
 
-        assert(verboseCredential.fullPayload != verboseCredential.undisclosedPayload)
+        assertNotEquals(verboseCredential.fullPayload, verboseCredential.undisclosedPayload)
 
-        assert((verboseCredential.undisclosedPayload["vc"] as JsonObject).containsKey("_sd"))
+        assertTrue((verboseCredential.undisclosedPayload["vc"] as JsonObject).containsKey("_sd"))
 
         openBadgeWithDisclosuresIssuanceRequest.selectiveDisclosure!!.fields.keys.forEach {
             assertContains(
@@ -869,7 +872,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
 
         val disclosures = assertNotNull(verboseCredential.disclosures)
 
-        assert(disclosures.size == 2)
+        assertEquals(2, disclosures.size)
 
     }
 
@@ -914,7 +917,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         var credentials =
             assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.mso_mdoc])
 
-        assert(credentials.size == 1)
+        assertEquals(1, credentials.size)
 
         val msoMdocPresentationSimpleView = assertDoesNotThrow {
             credentials.first() as PresentedMsoMdocSimpleViewMode
@@ -1096,7 +1099,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         var credentials =
             assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-        assert(credentials.size == 1)
+        assertEquals(1, credentials.size)
 
         val jwtVcJsonPresentationSimpleView = assertDoesNotThrow {
             credentials.first() as PresentedJwtVcJsonSimpleViewMode
@@ -1109,7 +1112,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
             actual = holder.jsonPrimitive.content,
         )
 
-        assert(jwtVcJsonPresentationSimpleView.verifiableCredentials.size == 2)
+        assertEquals(2, jwtVcJsonPresentationSimpleView.verifiableCredentials.size)
 
         val simpleViewResponse = verifierApi.getPresentedCredentials(sessionId, PresentedCredentialsViewMode.simple)
         assertEquals(
@@ -1136,13 +1139,13 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         credentials =
             assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-        assert(credentials.size == 1)
+        assertEquals(1, credentials.size)
 
         val jwtVcJsonPresentationVerboseView = assertDoesNotThrow {
             credentials.first() as PresentedJwtVcJsonVerboseViewMode
         }
 
-        assert(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 2)
+        assertEquals(2, jwtVcJsonPresentationVerboseView.verifiableCredentials.size)
 
     }
 }

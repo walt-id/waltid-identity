@@ -66,7 +66,7 @@ class KeysWalletIntegrationTest : AbstractIntegrationTest() {
         assertFalse(generatedKeyId.isNullOrEmpty(), "No key generated - test order ??")
         val keyMeta = defaultWalletApi.loadKeyMeta(generatedKeyId!!)
         when (keyGenRequest.backend) {
-            "jwt" -> assert(keyMeta.tryGetData("type")!!.jsonPrimitive.content.endsWith("JwkKeyMeta")) { "Missing _type_ component!" }
+            "jwt" -> assertTrue(keyMeta.tryGetData("type")!!.jsonPrimitive.content.endsWith("JwkKeyMeta"), "Missing _type_ component!" )
             "tse" -> TODO()
             "oci" -> TODO()
             "oci-rest-api" -> TODO()

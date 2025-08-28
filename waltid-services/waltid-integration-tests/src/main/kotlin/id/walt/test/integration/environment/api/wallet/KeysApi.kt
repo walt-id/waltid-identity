@@ -15,6 +15,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.uuid.ExperimentalUuidApi
@@ -61,7 +62,7 @@ class KeysApi(private val e2e: E2ETest, private val client: HttpClient) {
         loadMetaRaw(wallet, keyId).let {
             val response = it.body<JsonObject>()
             assertNotNull(response.tryGetData("keyId")?.jsonPrimitive?.content) { "Missing _keyId_ component!" }
-            assert(response.tryGetData("keyId")?.jsonPrimitive?.content == keyId) { "Wrong _keyId_ value!" }
+            assertEquals(keyId, response.tryGetData("keyId")?.jsonPrimitive?.content, "Wrong _keyId_ value!")
             assertNotNull(response.tryGetData("type")?.jsonPrimitive?.content) { "Missing _type_ component!" }
             response
         }

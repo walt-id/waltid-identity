@@ -15,7 +15,8 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.json.JsonObject
-import kotlin.test.assertTrue
+import org.junit.jupiter.api.Assertions.assertTrue
+import kotlin.test.assertEquals
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -144,7 +145,11 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
             setBody(offerUrl)
         }.expectSuccess().apply {
             val newCredentials = body<List<WalletCredential>>()
-            assert(newCredentials.size == numberOfExpected) { "should have received a number of $numberOfExpected credential(s), but received ${newCredentials.size}" }
+            assertEquals(
+                numberOfExpected,
+                newCredentials.size,
+                "should have received a number of $numberOfExpected credential(s), but received ${newCredentials.size}"
+            )
             output?.invoke(newCredentials)
         }
     }
@@ -161,7 +166,7 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
             setBody(presentationRequestUrl)
         }.expectSuccess().apply {
             val resolvedPresentationOfferString = body<String>()
-            assert(resolvedPresentationOfferString.contains("presentation_definition="))
+            assertTrue(resolvedPresentationOfferString.contains("presentation_definition="))
             output?.invoke(resolvedPresentationOfferString)
         }
     }
@@ -179,8 +184,12 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
                 setBody(presentationDefinition)
             }.expectSuccess().apply {
                 val matched = body<List<WalletCredential>>()
-                assert(matched.size == expectedCredentialIds.size) { "presentation definition should match $expectedCredentialIds credential(s), but have ${matched.size}" }
-                assert(matched.map { it.id }
+                assertEquals(
+                    matched.size,
+                    expectedCredentialIds.size,
+                    "presentation definition should match $expectedCredentialIds credential(s), but have ${matched.size}"
+                )
+                assertTrue(matched.map { it.id }
                     .containsAll(expectedCredentialIds)) { "matched credentials does not contain all of the expected ones" }
                 output?.invoke(matched)
             }
@@ -199,7 +208,10 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
                 setBody(presentationDefinition)
             }.expectSuccess().apply {
                 val unmatched = body<List<FilterData>>()
-                assert(unmatched.containsAll(expectedData)) { "the unmatched filters does not contain all of the expected filters" }
+                assertTrue(
+                    unmatched.containsAll(expectedData),
+                    "the unmatched filters does not contain all of the expected filters"
+                )
                 output?.invoke(unmatched)
             }
         }
