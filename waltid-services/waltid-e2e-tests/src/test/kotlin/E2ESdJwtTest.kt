@@ -48,50 +48,27 @@ class E2ESdJwtTest(
 
         assertContains(JwtUtils.parseJWTPayload(newCredential.document).keys, JwsSignatureScheme.JwsOption.VC)
 
-        //region -Verifier / request url-
-        lateinit var verificationUrl: String
-        lateinit var verificationId: String
-        verificationApi.verify(nameFieldSchemaPresentationRequestPayload) {
-            verificationUrl = it
-            verificationId = Url(verificationUrl).parameters.getOrFail("state")
-        }
-        //endregion -Verifier / request url-
-
-        //region -Exchange / presentation-
-        lateinit var resolvedPresentationOfferString: String
-        lateinit var presentationDefinition: String
-        exchangeApi.resolvePresentationRequest(wallet, verificationUrl) {
-            resolvedPresentationOfferString = it
-            presentationDefinition = Url(it).parameters.getOrFail("presentation_definition")
-        }
-
-        sessionApi.get(verificationId) {
-            assertTrue(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
-        }
-
-        exchangeApi.matchCredentialsForPresentationDefinition(
-            wallet, presentationDefinition, listOf(newCredential.id)
-        )
-        exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet, presentationDefinition)
-        exchangeApi.usePresentationRequest(
+        val verificationId = executePresentation(
             wallet = wallet,
-            request = UsePresentationRequest(
-                did = did,
-                presentationRequest = resolvedPresentationOfferString,
-                selectedCredentials = listOf(newCredential.id),
-                disclosures = newCredential.disclosures?.let { mapOf(newCredential.id to listOf(it)) },
-            ),
-            expectStatus = expectFailure,
+            presentationRequest = nameFieldSchemaPresentationRequestPayload,
+            newCredential = newCredential,
+            did = did
         )
 
         sessionApi.get(verificationId) {
-            assertTrue(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null, "Received no valid token response!" )
-            assertTrue(it.tokenResponse?.presentationSubmission != null, "should have a presentation submission after submission" )
+            assertTrue(
+                it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null,
+                "Received no valid token response!"
+            )
+            assertTrue(
+                it.tokenResponse?.presentationSubmission != null,
+                "should have a presentation submission after submission"
+            )
 
-            assertTrue(it.verificationResult == false,  "overall verification should be valid" )
+            assertTrue(it.verificationResult == false, "overall verification should be valid")
             it.policyResults.let {
                 require(it != null) { "policyResults should be available after running policies" }
-                assertTrue(it.size > 1, "no policies have run" )
+                assertTrue(it.size > 1, "no policies have run")
             }
         }
         //endregion -Exchange / presentation-
@@ -194,7 +171,7 @@ class E2ESdJwtTest(
 
     }
 
-    private suspend fun executePreAuthorizedFlow(wallet: Uuid, issuanceRequest: IssuanceRequest,) : WalletCredential {
+    private suspend fun executePreAuthorizedFlow(wallet: Uuid, issuanceRequest: IssuanceRequest): WalletCredential {
         lateinit var credentialOfferUrl: String
         lateinit var newCredential: WalletCredential
 
@@ -210,4 +187,48 @@ class E2ESdJwtTest(
 
         return newCredential
     }
+
+    private suspend fun executePresentation(
+        wallet: Uuid,
+        presentationRequest: String,
+        newCredential: WalletCredential,
+        did: String,
+    ): String {
+        lateinit var verificationUrl: String
+        lateinit var verificationId: String
+        verificationApi.verify(presentationRequest) {
+            verificationUrl = it
+            verificationId = Url(verificationUrl).parameters.getOrFail("state")
+        }
+
+        //region - Exchange / presentation -
+        lateinit var resolvedPresentationOfferString: String
+        lateinit var presentationDefinition: String
+        exchangeApi.resolvePresentationRequest(wallet, verificationUrl) {
+            resolvedPresentationOfferString = it
+            presentationDefinition = Url(it).parameters.getOrFail("presentation_definition")
+        }
+
+        sessionApi.get(verificationId) {
+            assertTrue(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
+        }
+
+        exchangeApi.matchCredentialsForPresentationDefinition(
+            wallet, presentationDefinition, listOf(newCredential.id)
+        )
+        exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet, presentationDefinition)
+        exchangeApi.usePresentationRequest(
+            wallet = wallet,
+            request = UsePresentationRequest(
+                did = did,
+                presentationRequest = resolvedPresentationOfferString,
+                selectedCredentials = listOf(newCredential.id),
+                disclosures = newCredential.disclosures?.let { mapOf(newCredential.id to listOf(it)) },
+            ),
+            expectStatus = expectFailure,
+        )
+
+        return verificationId
+    }
+
 }
