@@ -104,14 +104,14 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
 
     //ietf sd_jwt_vc - with disclosures
     private val identityCredentialIETFSdJwtX5cIssuanceRequest = IssuanceRequest(
-        Json.parseToJsonElement(KeySerialization.serializeKey(IssuanceExamples.ISSUER_JWK_KEY)).jsonObject,
-        "identity_credential_vc+sd-jwt",
+        issuerKey = Json.parseToJsonElement(KeySerialization.serializeKey(IssuanceExamples.ISSUER_JWK_KEY)).jsonObject,
+        credentialConfigurationId = "identity_credential_vc+sd-jwt",
         credentialData = buildJsonObject {
             put("family_name", "Doe")
             put("given_name", "John")
             put("birthdate", "1940-01-01")
         },
-        "identity_credential",
+        vct = "http://localhost:22222/draft13/identity_credential",
         x5Chain = listOf(IssuanceExamples.ISSUER_CERT),
         trustedRootCAs = listOf(IssuanceExamples.ROOT_CA_CERT),
         selectiveDisclosure = SDMap(
@@ -122,14 +122,13 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         credentialFormat = CredentialFormat.sd_jwt_vc
     )
     private val identityCredentialIETFSdJwtDidIssuanceRequest = IssuanceRequest(
-        Json.parseToJsonElement(KeySerialization.serializeKey(IssuanceExamples.ISSUER_JWK_KEY)).jsonObject,
-        "identity_credential_vc+sd-jwt",
+        issuerKey = Json.parseToJsonElement(KeySerialization.serializeKey(IssuanceExamples.ISSUER_JWK_KEY)).jsonObject,
+        credentialConfigurationId = "identity_credential_vc+sd-jwt",
         credentialData = buildJsonObject {
             put("family_name", "Doe")
             put("given_name", "John")
             put("birthdate", "1940-01-01")
         },
-        mdocData = null,
         selectiveDisclosure = SDMap(
             mapOf(
                 "birthdate" to SDField(sd = true)
@@ -597,7 +596,7 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
                         listOf(
                             RequestedCredential(
                                 format = VCFormat.sd_jwt_vc,
-                                vct = "${e2e.getBaseURL()}/identity_credential",
+                                vct = "${e2e.getBaseURL()}/draft13/identity_credential",
                             ).let {
                                 Json.encodeToJsonElement(it)
                             })

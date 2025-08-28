@@ -1030,7 +1030,7 @@ object PresentedCredentialsDocs {
                                         "y": "XQrS0p2BJf_WXIcn-RAdFoX17DJsefpED3Ct4t4W-X0"
                                     }
                                 },
-                                "vct": "http://localhost:22222/identity_credential",
+                                "vct": "http://localhost:22222/draft13/identity_credential",
                                 "display": [],
                                 "family_name": "Doe",
                                 "birthdate": "1940-01-01"
@@ -1100,7 +1100,7 @@ object PresentedCredentialsDocs {
                                         "y": "XQrS0p2BJf_WXIcn-RAdFoX17DJsefpED3Ct4t4W-X0"
                                     }
                                 },
-                                "vct": "http://localhost:22222/identity_credential",
+                                "vct": "http://localhost:22222/draft13/identity_credential",
                                 "display": [],
                                 "family_name": "Doe",
                                 "birthdate": "1940-01-01"
@@ -1132,7 +1132,7 @@ object PresentedCredentialsDocs {
                                         "y": "XQrS0p2BJf_WXIcn-RAdFoX17DJsefpED3Ct4t4W-X0"
                                     }
                                 },
-                                "vct": "http://localhost:22222/identity_credential",
+                                "vct": "http://localhost:22222/draft13/identity_credential",
                                 "display": [],
                                 "_sd": [
                                     "WCsMVa1lmRPnDMEIumJH5R2w07KzNlEyf-qbm-lvReA",
