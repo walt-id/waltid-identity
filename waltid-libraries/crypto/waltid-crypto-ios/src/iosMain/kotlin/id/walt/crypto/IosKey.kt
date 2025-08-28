@@ -167,7 +167,7 @@ class IosKey private constructor(
         else -> error("Not implemented key type ${options.keyType}")
     }.pem()
 
-    override suspend fun signRaw(plaintext: ByteArray): Any {
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): Any {
         check(hasPrivateKey) { "Only private key can do signing." }
 
         return when (options.keyType) {
@@ -191,7 +191,8 @@ class IosKey private constructor(
     }
 
     override suspend fun verifyRaw(
-        signed: ByteArray, detachedPlaintext: ByteArray?
+        signed: ByteArray, detachedPlaintext: ByteArray?,
+        customSignatureAlgorithm: String?
     ): Result<ByteArray> = when (options.keyType) {
             KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement).publicKey()
             KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid).publicKey()
