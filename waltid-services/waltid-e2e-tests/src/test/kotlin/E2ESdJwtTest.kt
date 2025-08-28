@@ -1,8 +1,12 @@
 import WaltidServicesE2ETests.Companion.nameFieldSchemaPresentationRequestPayload
+import WaltidServicesE2ETests.Companion.sdjwtIETFCredential
 import WaltidServicesE2ETests.Companion.sdjwtW3CCredential
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.did.dids.resolver.local.DidKeyResolver
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
+import id.walt.sdjwt.SDJwtVC
 import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
@@ -15,8 +19,16 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.assertTrue
 import kotlin.test.assertContains
+import kotlin.test.assertNotNull
+import kotlin.test.assertEquals
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import id.walt.oid4vc.util.http
+import id.walt.sdjwt.SDJWTVCTypeMetadata
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonObject
 
 @OptIn(ExperimentalUuidApi::class)
 class E2ESdJwtTest(
@@ -114,6 +126,10 @@ class E2ESdJwtTest(
             newCredential = it.first()
         }
 
+////         assert parsedDocument
+////        assertContains(newCredential.parsedDocument!!.keys, "_sd_alg")
+////        assertEquals("sha-256", newCredential.parsedDocument!!["_sd_alg"]!!.jsonPrimitive.content)
+
         // assert SDJwtVC token
         val credential = SDJwtVC.parse(newCredential.document)
 
@@ -143,5 +159,57 @@ class E2ESdJwtTest(
         assertNotNull(issuerJwk)
         val verifyResult = issuerJwk.verifyJws(credential.jwt)
         assert(verifyResult.isSuccess)
+
+////        //endregion - Exchange / claim-
+//////
+//////        //region - Verifier / request url-
+//////        lateinit var verificationUrl: String
+//////        lateinit var verificationId: String
+//////        verificationApi.verify(nameFieldSchemaPresentationRequestPayload) {
+//////            verificationUrl = it
+//////            verificationId = Url(verificationUrl).parameters.getOrFail("state")
+//////        }
+//////        //endregion -Verifier / request url-
+//////
+//////        //region - Exchange / presentation-
+//////        lateinit var resolvedPresentationOfferString: String
+//////        lateinit var presentationDefinition: String
+//////        exchangeApi.resolvePresentationRequest(wallet, verificationUrl) {
+//////            resolvedPresentationOfferString = it
+//////            presentationDefinition = Url(it).parameters.getOrFail("presentation_definition")
+//////        }
+//////
+//////        sessionApi.get(verificationId) {
+//////            assertTrue(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
+//////        }
+//////
+//////        exchangeApi.matchCredentialsForPresentationDefinition(
+//////            wallet, presentationDefinition, listOf(newCredential.id)
+//////        )
+//////        exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet, presentationDefinition)
+//////        exchangeApi.usePresentationRequest(
+//////            wallet = wallet,
+//////            request = UsePresentationRequest(
+//////                did = did,
+//////                presentationRequest = resolvedPresentationOfferString,
+//////                selectedCredentials = listOf(newCredential.id),
+//////                disclosures = newCredential.disclosures?.let { mapOf(newCredential.id to listOf(it)) },
+//////            ),
+//////            expectStatus = expectFailure,
+//////        )
+//////
+//////        sessionApi.get(verificationId) {
+//////            assertTrue(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
+//////            assertTrue(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+//////
+//////            assertTrue(it.verificationResult == false) { "overall verification should be valid" }
+//////            it.policyResults.let {
+//////                require(it != null) { "policyResults should be available after running policies" }
+//////                assertTrue(it.size > 1) { "no policies have run" }
+//////            }
+//////        }
+//////        //endregion - Exchange / presentation-
+////        credentialsApi.delete(wallet, newCredential.id)
+
     }
 }

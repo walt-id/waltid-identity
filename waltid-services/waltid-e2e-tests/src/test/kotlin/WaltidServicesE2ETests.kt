@@ -63,6 +63,8 @@ class WaltidServicesE2ETests {
         }
         val jwtCredential = JsonObject(sdjwtW3CCredential.minus("selectiveDisclosure"))
 
+        val sdjwtIETFCredential = Json.decodeFromString<JsonElement>(loadResource("issuance/9-credential-issuance-request.json")).jsonObject
+
         val simplePresentationRequestPayload =
             loadResource("presentation/openbadgecredential-presentation-request.json")
         val nameFieldSchemaPresentationRequestPayload =
