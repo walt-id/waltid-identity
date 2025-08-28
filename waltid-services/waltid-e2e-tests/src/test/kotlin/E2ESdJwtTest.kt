@@ -40,25 +40,13 @@ class E2ESdJwtTest(
 ) {
 
     fun testW3CVC(wallet: Uuid, did: String) = runTest {
-        //region -Issuer / offer url-
-        lateinit var credentialOfferUrl: String
-        val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(sdjwtW3CCredential)
-        println("issuance-request:")
-        println(issuanceRequest)
-        issuerApi.sdjwt(issuanceRequest) {
-            credentialOfferUrl = it
-            println("offer: $credentialOfferUrl")
-        }
-        //endregion -Issuer / offer url-
-
-        //region -Exchange / claim-
         lateinit var newCredential: WalletCredential
-        exchangeApi.resolveCredentialOffer(wallet, credentialOfferUrl)
-        exchangeApi.useOfferRequest(wallet, credentialOfferUrl, 1) {
-            newCredential = it.first()
-        }
+
+        val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(sdjwtW3CCredential)
+
+        newCredential = executePreAuthorizedFlow(wallet, issuanceRequest)
+
         assertContains(JwtUtils.parseJWTPayload(newCredential.document).keys, JwsSignatureScheme.JwsOption.VC)
-        //endregion -Exchange / claim-
 
         //region -Verifier / request url-
         lateinit var verificationUrl: String
@@ -113,22 +101,11 @@ class E2ESdJwtTest(
     }
 
     fun testIEFTSDJWTVC(wallet: Uuid, did: String) = runTest {
-        //region - Issuer / offer url-
-        lateinit var credentialOfferUrl: String
+        lateinit var newCredential: WalletCredential
+
         val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(sdjwtIETFCredential)
 
-        issuerApi.sdjwt(issuanceRequest) {
-            credentialOfferUrl = it
-        }
-
-        //endregion - Issuer / offer url-
-
-        //region - Exchange / claim-
-        lateinit var newCredential: WalletCredential
-        exchangeApi.resolveCredentialOffer(wallet, credentialOfferUrl)
-        exchangeApi.useOfferRequest(wallet, credentialOfferUrl, 1) {
-            newCredential = it.first()
-        }
+        newCredential = executePreAuthorizedFlow(wallet, issuanceRequest)
 
 ////         assert parsedDocument
 ////        assertContains(newCredential.parsedDocument!!.keys, "_sd_alg")
@@ -215,5 +192,22 @@ class E2ESdJwtTest(
 //////        //endregion - Exchange / presentation-
 ////        credentialsApi.delete(wallet, newCredential.id)
 
+    }
+
+    private suspend fun executePreAuthorizedFlow(wallet: Uuid, issuanceRequest: IssuanceRequest,) : WalletCredential {
+        lateinit var credentialOfferUrl: String
+        lateinit var newCredential: WalletCredential
+
+        issuerApi.sdjwt(issuanceRequest) {
+            credentialOfferUrl = it
+            println("offer: $credentialOfferUrl")
+        }
+
+        exchangeApi.resolveCredentialOffer(wallet, credentialOfferUrl)
+        exchangeApi.useOfferRequest(wallet, credentialOfferUrl, 1) {
+            newCredential = it.first()
+        }
+
+        return newCredential
     }
 }
