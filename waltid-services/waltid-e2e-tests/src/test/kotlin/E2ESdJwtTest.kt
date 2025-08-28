@@ -95,4 +95,53 @@ class E2ESdJwtTest(
         }
         //endregion -Exchange / presentation-
     }
+
+    fun testIEFTSDJWTVC(wallet: Uuid, did: String) = runTest {
+        //region - Issuer / offer url-
+        lateinit var credentialOfferUrl: String
+        val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(sdjwtIETFCredential)
+
+        issuerApi.sdjwt(issuanceRequest) {
+            credentialOfferUrl = it
+        }
+
+        //endregion - Issuer / offer url-
+
+        //region - Exchange / claim-
+        lateinit var newCredential: WalletCredential
+        exchangeApi.resolveCredentialOffer(wallet, credentialOfferUrl)
+        exchangeApi.useOfferRequest(wallet, credentialOfferUrl, 1) {
+            newCredential = it.first()
+        }
+
+        // assert SDJwtVC token
+        val credential = SDJwtVC.parse(newCredential.document)
+
+        // check SD-JWT-VC type metadata
+        assertNotNull(credential.vct)
+        val vctUrl = Url(credential.vct!!)
+        val typeMetadataUrl =
+            "${vctUrl.protocolWithAuthority}/.well-known/vct/${vctUrl.fullPath.substringAfter("/")}"
+
+        val typeMetadata = http.get(typeMetadataUrl).expectSuccess().body<SDJWTVCTypeMetadata>()
+        assertEquals(credential.vct, typeMetadata.vct)
+
+        // check SD-JWT-VC issuer metadata
+        assertNotNull(credential.issuer)
+        assertEquals(issuanceRequest.issuerDid, credential.issuer)
+
+        // check issuer key and signature
+        val resolvedIssuerDid = DidKeyResolver().resolve(credential.issuer!!)
+        assert(resolvedIssuerDid.isSuccess)
+        // TODO: this works, but check if there's a more elegant way to find the right key for verification!
+        val keyJwk = (resolvedIssuerDid.getOrNull()!!.get("verificationMethod") as JsonArray).first {
+            it.jsonObject["id"]!!.jsonPrimitive.content == credential.keyID!!
+        }.jsonObject["publicKeyJwk"]!!.jsonObject
+
+        val issuerJwk = JWKKey.importJWK(keyJwk.toString()).getOrNull()
+
+        assertNotNull(issuerJwk)
+        val verifyResult = issuerJwk.verifyJws(credential.jwt)
+        assert(verifyResult.isSuccess)
+    }
 }
