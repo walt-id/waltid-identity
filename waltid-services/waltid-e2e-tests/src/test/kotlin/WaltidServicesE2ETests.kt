@@ -325,7 +325,7 @@ class WaltidServicesE2ETests {
         val sdJwtTest = E2ESdJwtTest(issuerApi, exchangeApi, sessionApi, verificationApi)
         //cleanup credentials
         credentialsApi.delete(wallet, newCredentialId)
-        sdJwtTest.e2e(wallet, did)
+        sdJwtTest.testW3CVC(wallet, did)
 
         // Test Authorization Code flow with available authentication methods in Issuer API
         val authorizationCodeFlow = AuthorizationCodeFlow(e2e, testHttpClient(doFollowRedirects = false))

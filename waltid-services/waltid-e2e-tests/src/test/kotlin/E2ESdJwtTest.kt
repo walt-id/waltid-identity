@@ -1,5 +1,5 @@
 import WaltidServicesE2ETests.Companion.nameFieldSchemaPresentationRequestPayload
-import WaltidServicesE2ETests.Companion.sdjwtCredential
+import WaltidServicesE2ETests.Companion.sdjwtW3CCredential
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
@@ -26,22 +26,22 @@ class E2ESdJwtTest(
     private val verificationApi: Verifier.VerificationApi,
 ) {
 
-    fun e2e(wallet: Uuid, did: String) = runTest {
+    fun testW3CVC(wallet: Uuid, did: String) = runTest {
         //region -Issuer / offer url-
-        lateinit var offerUrl: String
-        val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(sdjwtCredential)
+        lateinit var credentialOfferUrl: String
+        val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(sdjwtW3CCredential)
         println("issuance-request:")
         println(issuanceRequest)
         issuerApi.sdjwt(issuanceRequest) {
-            offerUrl = it
-            println("offer: $offerUrl")
+            credentialOfferUrl = it
+            println("offer: $credentialOfferUrl")
         }
         //endregion -Issuer / offer url-
 
         //region -Exchange / claim-
         lateinit var newCredential: WalletCredential
-        exchangeApi.resolveCredentialOffer(wallet, offerUrl)
-        exchangeApi.useOfferRequest(wallet, offerUrl, 1) {
+        exchangeApi.resolveCredentialOffer(wallet, credentialOfferUrl)
+        exchangeApi.useOfferRequest(wallet, credentialOfferUrl, 1) {
             newCredential = it.first()
         }
         assertContains(JwtUtils.parseJWTPayload(newCredential.document).keys, JwsSignatureScheme.JwsOption.VC)
