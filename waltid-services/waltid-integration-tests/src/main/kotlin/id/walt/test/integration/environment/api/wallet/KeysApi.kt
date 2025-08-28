@@ -15,6 +15,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -39,7 +40,7 @@ class KeysApi(private val e2e: E2ETest, private val client: HttpClient) {
         generateRaw(walletId, request).let {
             it.expectSuccess()
             val generatedKeyId = it.body<String>()
-            assert(generatedKeyId.isNotEmpty()) { "Empty key id is returned!" }
+            assertFalse(generatedKeyId.isEmpty(), "Empty key id is returned!")
             generatedKeyId
         }
 

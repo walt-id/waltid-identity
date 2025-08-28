@@ -1,21 +1,23 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package id.walt.test.integration.environment
 
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.testing.E2ETest
 import id.walt.commons.web.plugins.httpJson
-import id.walt.issuer.feat.lspPotential.lspPotentialIssuanceTestApi
 import id.walt.issuer.issuerModule
 import id.walt.test.integration.environment.api.issuer.IssuerApi
 import id.walt.test.integration.environment.api.verifier.VerifierApi
 import id.walt.test.integration.environment.api.wallet.WalletApi
 import id.walt.test.integration.environment.api.wallet.WalletContainerApi
-import id.walt.verifier.lspPotential.lspPotentialVerificationTestApi
+import id.walt.test.integration.expectSuccess
 import id.walt.verifier.verifierModule
 import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.webWalletModule
 import io.klogging.Klogging
 import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -26,7 +28,12 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.utils.io.*
 import kotlinx.coroutines.*
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 val defaultTestTimeout = 5.minutes
 
@@ -42,9 +49,7 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
     private val e2eTestModule: Application.() -> Unit = {
         webWalletModule(true)
         issuerModule(false)
-        lspPotentialIssuanceTestApi()
         verifierModule(false)
-        lspPotentialVerificationTestApi()
     }
 
     constructor(
@@ -55,6 +60,12 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
     val defaultEmailAccount = EmailAccountRequest(
         name = "Max Mustermann",
         email = "user@email.com",
+        password = "password"
+    )
+
+    val mdocEmailAccount = EmailAccountRequest(
+        name = "Mdoc Mustermann",
+        email = "mdoc@email.com",
         password = "password"
     )
 
@@ -121,10 +132,8 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
     fun getIssuerApi() =
         IssuerApi(e2e, testHttpClient())
 
-
-    fun getWalletContainerApi(token: String? = null): WalletContainerApi =
+    fun getWalletContainerApi(): WalletContainerApi =
         WalletContainerApi(
-            defaultEmailAccount,
             clientFactory = { token: String? ->
                 testHttpClient(
                     token,
@@ -132,9 +141,41 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
                 )
             },
             e2e,
-            token
+            null,
+            null
+        )
+
+
+    fun getWalletContainerApi(token: String, accountId: Uuid): WalletContainerApi =
+        WalletContainerApi(
+            clientFactory = { token: String? ->
+                testHttpClient(
+                    token,
+                    true
+                )
+            },
+            e2e,
+            token,
+            accountId
         )
 
     suspend fun getDefaultAccountWalletContainerApi(): WalletContainerApi =
-        getWalletContainerApi().loginWithDefaultUser()
+        getWalletContainerApi().login(defaultEmailAccount)
+
+    suspend fun getMdocWalletApi(): WalletApi {
+        val walletApi = getWalletContainerApi()
+        var loginResponse = walletApi.loginEmailAccountUserRaw(mdocEmailAccount)
+        if (loginResponse.status == HttpStatusCode.Unauthorized) {
+            //Mdoc User doesn't exist ... need to register
+            walletApi.register(mdocEmailAccount)
+            loginResponse = walletApi.loginEmailAccountUserRaw(mdocEmailAccount)
+        }
+        loginResponse.expectSuccess()
+        val token = assertNotNull(loginResponse.body<JsonObject>()["token"]?.jsonPrimitive?.content)
+        val accountId = Uuid.parse(assertNotNull(loginResponse.body<JsonObject>()["id"]?.jsonPrimitive?.content))
+        val mdocWalletContainer = getWalletContainerApi(token, accountId)
+        val defaulMdocWallet = mdocWalletContainer.selectDefaultWallet()
+        MDocPreparedWallet.ensureWalletIsPreparedForMdoc(defaulMdocWallet)
+        return defaulMdocWallet
+    }
 }

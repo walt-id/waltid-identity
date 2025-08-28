@@ -9,6 +9,8 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @Deprecated("Old API", ReplaceWith("id.walt.test.integration.environment.api.verifier.VerifierApi"))
 object Verifier {
@@ -27,8 +29,8 @@ object Verifier {
                 setBody(Json.decodeFromString<JsonObject>(payload))
             }.expectSuccess().apply {
                 val url = bodyAsText()
-                assert(url.contains("presentation_definition_uri="))
-                assert(!url.contains("presentation_definition="))
+                assertTrue(url.contains("presentation_definition_uri="))
+                assertFalse(url.contains("presentation_definition="))
                 output?.invoke(bodyAsText())
             }
         }

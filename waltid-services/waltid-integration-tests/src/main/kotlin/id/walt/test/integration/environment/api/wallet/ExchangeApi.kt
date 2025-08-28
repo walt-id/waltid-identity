@@ -4,8 +4,8 @@ package id.walt.test.integration.environment.api.wallet
 
 import id.walt.commons.testing.E2ETest
 import id.walt.test.integration.environment.api.ResponseError
-import id.walt.test.integration.expectSuccess
 import id.walt.test.integration.expectError
+import id.walt.test.integration.expectSuccess
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
@@ -15,6 +15,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.json.JsonObject
+import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -73,7 +74,7 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
     ) = resolvePresentationRequestRaw(wallet, presentationRequestUrl).let {
         it.expectSuccess()
         val resolvedPresentationOfferString = it.body<String>()
-        assert(resolvedPresentationOfferString.contains("presentation_definition="))
+        assertTrue(resolvedPresentationOfferString.contains("presentation_definition="))
         resolvedPresentationOfferString
     }
 

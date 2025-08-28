@@ -15,6 +15,12 @@ fun String.expectLooksLikeJwt(): String =
         assertEquals(2, count { it == '.' }, "Expected JWT to have 2 dots")
     }
 
+fun String.assertContainsPresentationDefinitionUri(): String =
+    also {
+        assertTrue(it.contains("presentation_definition_uri="))
+        assertFalse(it.contains("presentation_definition="))
+    }
+
 val expectSuccess: suspend HttpResponse.() -> HttpResponse = {
     assertTrue(
         this.status.isSuccess(),

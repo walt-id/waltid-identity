@@ -174,11 +174,19 @@ class Draft11(private val e2e: E2ETest, private val client: HttpClient) {
 
         when (issuanceReq.authenticationMethod) {
             AuthenticationMethod.ID_TOKEN -> {
-                assert(authJarTokenRequest.responseType == setOf(ResponseType.IdToken)) { "response type should be id_token" }
+                assertEquals(
+                    setOf(ResponseType.IdToken),
+                    authJarTokenRequest.responseType,
+                    "response type should be id_token"
+                )
             }
 
             AuthenticationMethod.VP_TOKEN -> {
-                assert(authJarTokenRequest.responseType == setOf(ResponseType.VpToken)) { "response type should be vp_token" }
+                assertEquals(
+                    setOf(ResponseType.VpToken),
+                    authJarTokenRequest.responseType,
+                    "response type should be vp_token"
+                )
 
                 val presentationDefinitionJ = requestJwt.payload["presentation_definition"]
                 assertNotNull(presentationDefinitionJ)

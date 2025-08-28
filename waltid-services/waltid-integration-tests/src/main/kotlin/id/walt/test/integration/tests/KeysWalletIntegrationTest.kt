@@ -2,11 +2,11 @@
 
 package id.walt.test.integration.tests
 
+import assertKeyComponents
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
-import id.walt.test.integration.assertKeyComponents
 import id.walt.test.integration.tryGetData
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import io.ktor.http.*

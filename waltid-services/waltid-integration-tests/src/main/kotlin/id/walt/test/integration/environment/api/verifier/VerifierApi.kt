@@ -2,6 +2,7 @@ package id.walt.test.integration.environment.api.verifier
 
 import id.walt.commons.testing.E2ETest
 import id.walt.oid4vc.data.ResponseMode
+import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.test.integration.expectSuccess
 import id.walt.verifier.oidc.PresentationSessionInfo
 import id.walt.verifier.oidc.models.presentedcredentials.PresentationSessionPresentedCredentials
@@ -25,6 +26,15 @@ class VerifierApi(
         getSessionRaw(sessionId).let {
             it.expectSuccess()
             it.body<PresentationSessionInfo>()
+        }
+
+    suspend fun getSignedAuthorizationRequestRaw(sessionId: String) =
+        client.get("/openid4vc/request/${sessionId}")
+
+    suspend fun getSignedAuthorizationRequest(sessionId: String): AuthorizationRequest =
+        getSignedAuthorizationRequestRaw(sessionId).let {
+            it.expectSuccess()
+            AuthorizationRequest.fromRequestObject(it.bodyAsText())
         }
 
     suspend fun getPresentedCredentialsRaw(sessionId: String, responseFormat: PresentedCredentialsViewMode? = null) =
@@ -59,10 +69,7 @@ class VerifierApi(
     suspend fun verify(payload: JsonObject, sessionId: String? = null, responseMode: ResponseMode? = null) =
         verifyRaw(payload, sessionId, responseMode).let {
             it.expectSuccess()
-            val url = it.bodyAsText()
-            assert(url.contains("presentation_definition_uri="))
-            assert(!url.contains("presentation_definition="))
-            url
+            it.bodyAsText()
         }
 
     suspend fun verify(payload: String, sessionId: String? = null, responseMode: ResponseMode? = null) =

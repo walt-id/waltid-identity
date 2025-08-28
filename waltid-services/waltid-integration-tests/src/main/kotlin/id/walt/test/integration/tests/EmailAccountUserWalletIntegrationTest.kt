@@ -14,6 +14,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class EmailAccountUserWalletIntegrationTest : AbstractIntegrationTest() {
 
@@ -32,7 +33,7 @@ class EmailAccountUserWalletIntegrationTest : AbstractIntegrationTest() {
             "Not logged in - retrieval of user session should not be possible."
         )
 
-        val loginResponse = api.loginWithDefaultUserRaw()
+        val loginResponse = api.loginEmailAccountUserRaw(environment.defaultEmailAccount)
         loginResponse.expectSuccess()
         val loginResponseBody = loginResponse.body<JsonObject>()
         assertNotNull(loginResponseBody).also {
@@ -41,7 +42,8 @@ class EmailAccountUserWalletIntegrationTest : AbstractIntegrationTest() {
             assertEquals(environment.defaultEmailAccount.email, it["username"]?.jsonPrimitive?.content)
         }
         val token = loginResponseBody["token"]!!.jsonPrimitive.content
-        val authenticatedApi = api.withToken(token)
+        val accountId = Uuid.parse(loginResponseBody["id"]!!.jsonPrimitive.content)
+        val authenticatedApi = api.withToken(token, accountId)
         assertNotNull(authenticatedApi.userInfo()).also {
             assertNotNull(it.id)
             assertEquals(environment.defaultEmailAccount.email, it.email)
@@ -56,7 +58,7 @@ class EmailAccountUserWalletIntegrationTest : AbstractIntegrationTest() {
 
     @Test
     fun shouldListWallets() = runTest {
-        val wallet = environment.getWalletContainerApi().loginWithDefaultUser()
+        val wallet = environment.getDefaultAccountWalletContainerApi()
         val account = wallet.userInfo()
         val wallets = wallet.listAccountWallets()
         assertNotNull(wallets).also {

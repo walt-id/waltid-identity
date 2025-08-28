@@ -8,6 +8,7 @@ import id.walt.webwallet.db.models.AccountWalletListing.WalletListing
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.service.credentials.CredentialFilterObject
+import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.ktor.client.*
 import kotlin.test.assertEquals
@@ -34,8 +35,8 @@ class WalletApi(
     //=========================================================================
     // Keys API
     //=========================================================================
-    suspend fun listKeys() = keysApi.list(walletId)
-    suspend fun generateKey(request: KeyGenerationRequest) = keysApi.generate(walletId, request)
+    suspend fun listKeys(): List<SingleKeyResponse> = keysApi.list(walletId)
+    suspend fun generateKey(request: KeyGenerationRequest): String = keysApi.generate(walletId, request)
     suspend fun loadKey(keyId: String) = keysApi.load(walletId, keyId)
     suspend fun loadKeyMeta(keyId: String) = keysApi.loadMeta(walletId, keyId)
     suspend fun exportKey(keyId: String, format: String, isPrivate: Boolean) =
@@ -62,7 +63,7 @@ class WalletApi(
         keyId: String? = null,
         alias: String? = null,
         options: Map<String, Any> = emptyMap()
-    ) = didsApi.createDid(walletId, method, keyId, alias, options)
+    ): String = didsApi.createDid(walletId, method, keyId, alias, options)
 
     suspend fun getDid(did: String) = didsApi.getDid(walletId, did)
     suspend fun getDefaultDid(): WalletDid {
@@ -132,7 +133,6 @@ class WalletApi(
         credentialApi.getCredentialStatus(walletId, credentialId)
 
     suspend fun listCredentials(
-
         filter: CredentialFilterObject = CredentialFilterObject.default
     ): List<WalletCredential> =
         credentialApi.listCredentials(walletId, filter)

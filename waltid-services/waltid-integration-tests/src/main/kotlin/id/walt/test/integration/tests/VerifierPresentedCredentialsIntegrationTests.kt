@@ -12,6 +12,7 @@ import id.walt.issuer.issuance.openapi.issuerapi.MdocDocs
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDMap
+import id.walt.test.integration.assertContainsPresentationDefinitionUri
 import id.walt.test.integration.expectFailure
 import id.walt.test.integration.loadJsonResource
 import id.walt.verifier.oidc.models.presentedcredentials.*
@@ -30,10 +31,10 @@ import org.junit.jupiter.api.TestMethodOrder
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertNull
 import kotlin.collections.first
-import kotlin.ranges.first
-import kotlin.sequences.first
 import kotlin.test.*
-import kotlin.text.first
+import kotlin.text.isNotBlank
+import kotlin.text.toByteArray
+import kotlin.text.trimIndent
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -385,6 +386,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
 
         val sessionId = Uuid.random().toString()
         val presentationUrl = verifierApi.verify(universityDegreeNoDisclosurePresentationRequest, sessionId)
+            .assertContainsPresentationDefinitionUri()
 
         defaultWalletApi.usePresentationRequest(
             UsePresentationRequest(
@@ -476,6 +478,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
 
         val sessionId = Uuid.random().toString()
         val presentationUrl = verifierApi.verify(universityDegreeWithDisclosuresPresentationRequest, sessionId)
+            .assertContainsPresentationDefinitionUri()
         defaultWalletApi.usePresentationRequest(
             UsePresentationRequest(
                 presentationRequest = presentationUrl,
@@ -582,6 +585,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
 
         val sessionId = Uuid.Companion.random().toString()
         val presentationUrl = verifierApi.verify(openBadgeNoDisclosurePresentationRequest, sessionId)
+            .assertContainsPresentationDefinitionUri()
         defaultWalletApi.usePresentationRequest(
             UsePresentationRequest(
                 presentationRequest = presentationUrl,
@@ -670,6 +674,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
 
         val sessionId = Uuid.random().toString()
         val presentationUrl = verifierApi.verify(sdJwtVcPresentationRequest, sessionId)
+            .assertContainsPresentationDefinitionUri()
 
         defaultWalletApi.usePresentationRequest(
             UsePresentationRequest(
@@ -771,6 +776,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
 
         val sessionId = Uuid.random().toString()
         val presentationUrl = verifierApi.verify(openBadgeWithDisclosuresPresentationRequest, sessionId)
+            .assertContainsPresentationDefinitionUri()
 
         defaultWalletApi.usePresentationRequest(
             UsePresentationRequest(
@@ -871,20 +877,19 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
     @Disabled("A wallet with other key type is needed")
     @Test
     fun issueMdl() = runTest {
-        val wal = defaultWalletApi.getWallet()
-        assertNotNull(wal)
-        val keys = defaultWalletApi.listKeys()
+        val mDocWallet = environment.getMdocWalletApi()
+        val keys = mDocWallet.listKeys()
         assertNotNull(keys)
         val offerUrl = issuerApi.issueMdocCredential(MdocDocs.mdlBaseIssuanceExample)
-        val mDLWalletCredentialId = defaultWalletApi.claimCredential(offerUrl).first().id
+        val mDLWalletCredentialId = mDocWallet.claimCredential(offerUrl).first().id
         val sessionId = Uuid.random().toString()
         val presentationUrl = verifierApi.verify(
             VerifierApiExamples.mDLRequiredFieldsExample,
             sessionId,
             ResponseMode.direct_post_jwt
-        )
+        ).assertContainsPresentationDefinitionUri()
 
-        defaultWalletApi.usePresentationRequest(
+        mDocWallet.usePresentationRequest(
             UsePresentationRequest(
                 presentationRequest = presentationUrl,
                 selectedCredentials = listOf(mDLWalletCredentialId),
@@ -950,13 +955,13 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         credentials =
             assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.mso_mdoc])
 
-        assert(credentials.size == 1)
+        assertEquals(1, credentials.size)
 
         val msoMdocPresentationVerboseView = assertDoesNotThrow {
             credentials.first() as PresentedMsoMdocVerboseViewMode
         }
 
-        assert(msoMdocPresentationVerboseView.raw.isNotBlank())
+        assertTrue(msoMdocPresentationVerboseView.raw.isNotBlank())
 
         assertEquals(
             expected = "1.0",
@@ -968,7 +973,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
             actual = msoMdocPresentationVerboseView.status,
         )
 
-        assert(msoMdocPresentationVerboseView.documents.size == 1)
+        assertEquals(1, msoMdocPresentationVerboseView.documents.size)
 
         val mDoc = msoMdocPresentationVerboseView.documents[0]
 
@@ -979,7 +984,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
 
         assertNull(mDoc.errors)
 
-        assert(mDoc.issuerSigned.nameSpaces.size == 1)
+        assertEquals(1, mDoc.issuerSigned.nameSpaces.size)
 
         assertEquals(
             actual = mDoc.issuerSigned.nameSpaces.keys,
@@ -991,6 +996,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
     fun queryPresentedCredentialsBeforeVpTokenSubmission() = runTest {
         val sessionId = Uuid.random().toString()
         verifierApi.verify(universityDegreeWithDisclosuresPresentationRequest, sessionId)
+            .assertContainsPresentationDefinitionUri()
 
         verifierApi.getPresentedCredentialsRaw(sessionId)
             .expectFailure()
@@ -1006,6 +1012,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
     fun queryPresentedCredentialsAfterInvalidVpTokenSubmission() = runTest {
         val sessionId = Uuid.Companion.random().toString()
         verifierApi.verify(universityDegreeWithDisclosuresPresentationRequest, sessionId)
+            .assertContainsPresentationDefinitionUri()
 
         val dummyEcKey = KeyManager.createKey(
             generationRequest = KeyGenerationRequest(
@@ -1055,6 +1062,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         assertNotNull(universityDegreeDisclosures, "Test Order !!")
         val sessionId = Uuid.random().toString()
         val presentationUrl = verifierApi.verify(uniDegreeOpenBadgePresentationRequest, sessionId)
+            .assertContainsPresentationDefinitionUri()
 
         defaultWalletApi.usePresentationRequest(
             UsePresentationRequest(

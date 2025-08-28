@@ -15,6 +15,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.uuid.ExperimentalUuidApi
@@ -87,7 +88,7 @@ class AuthApi(
     suspend fun userInfo(expectedStatus: HttpStatusCode, output: ((Account) -> Unit)? = null) =
         e2e.test("/wallet-api/auth/user-info - wallet-api user-info") {
             client.get("/wallet-api/auth/user-info").apply {
-                assert(status == expectedStatus) { "Expected status: $expectedStatus, but had $status" }
+                assertEquals(expectedStatus, status, "Expected status: $expectedStatus, but had $status")
                 output?.invoke(body<Account>())
             }
         }
@@ -113,8 +114,8 @@ class AuthApi(
         e2e.test("/wallet-api/wallet/accounts/wallets - get wallets") {
             client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().apply {
                 val listing = body<AccountWalletListing>()
-                assert(expectedAccountId == listing.account) { "Wallet listing is for wrong account!" }
-                assert(listing.wallets.isNotEmpty()) { "No wallets available!" }
+                assertEquals(expectedAccountId, listing.account, "Wallet listing is for wrong account!")
+                assertFalse(listing.wallets.isEmpty(), "No wallets available!")
                 output?.invoke(listing)
             }
         }

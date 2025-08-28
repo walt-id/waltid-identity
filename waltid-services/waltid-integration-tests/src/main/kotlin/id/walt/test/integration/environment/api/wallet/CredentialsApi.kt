@@ -10,9 +10,7 @@ import id.walt.webwallet.usecase.credential.CredentialStatusResult
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -42,7 +40,15 @@ class CredentialsApi(private val e2e: E2ETest, private val client: HttpClient) {
     ) = client.get("/wallet-api/wallet/$wallet/credentials") {
         url {
             filter.toMap().onEach {
-                parameters.append(it.key, it.value.toString())
+                if (it.key == "categories" && it.value is JsonArray) {
+                    it.value.jsonArray.forEach { category ->
+                        parameters.append("category", category.jsonPrimitive.content)
+                    }
+                } else {
+                    if (it.value !is JsonNull && !it.value.jsonPrimitive.content.isBlank()) {
+                        parameters.append(it.key, it.value.toString())
+                    }
+                }
             }
         }
     }
