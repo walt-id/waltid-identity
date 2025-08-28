@@ -41,6 +41,8 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       artifact: true
   ebsi-ct-v3:
+    # disabled job because of ebsi certificate issues (expired certificate)
+    if: false
     uses: walt-id/waltid-identity/.github/workflows/ebsictv3.yml@08e5e54d8028acba56454e0f1f0c65cc18297a4f
     needs: [ version, docker, api-docker ]
     secrets: inherit
