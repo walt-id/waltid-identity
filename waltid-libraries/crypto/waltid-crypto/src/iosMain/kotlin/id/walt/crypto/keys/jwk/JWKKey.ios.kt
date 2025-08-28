@@ -62,7 +62,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
      * @param plaintext data to be signed
      * @return signed (JWS)
      */
-    actual override suspend fun signRaw(plaintext: ByteArray): ByteArray {
+    actual override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         error("Not implemented")
     }
 
@@ -78,7 +78,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
      * @return Result wrapping the plaintext; Result failure when the signature fails
      */
     actual override suspend fun verifyRaw(
-        signed: ByteArray, detachedPlaintext: ByteArray?
+        signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?
     ): Result<ByteArray> = when (keyType) {
         KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!)
         KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!)
@@ -116,7 +116,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
     actual override val hasPrivateKey: Boolean
         get() = _jwkObj.toMap().any { it.key in privateParameters }
 
-    actual companion object : JWKKeyCreator {
+    actual companion object : JWKKeyCreator() {
         actual override suspend fun generate(
             type: KeyType, metadata: JwkKeyMeta?
         ): JWKKey {
