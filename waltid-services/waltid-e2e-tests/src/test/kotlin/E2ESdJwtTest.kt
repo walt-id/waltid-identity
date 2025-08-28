@@ -13,7 +13,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonPrimitive
-import org.junit.jupiter.api.Assertions.assertTrue
+import kotlin.test.assertTrue
 import kotlin.test.assertContains
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -84,13 +84,13 @@ class E2ESdJwtTest(
         )
 
         sessionApi.get(verificationId) {
-            assertTrue(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-            assertTrue(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
+            assertTrue(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null, "Received no valid token response!" )
+            assertTrue(it.tokenResponse?.presentationSubmission != null, "should have a presentation submission after submission" )
 
-            assertTrue(it.verificationResult == false) { "overall verification should be valid" }
+            assertTrue(it.verificationResult == false,  "overall verification should be valid" )
             it.policyResults.let {
                 require(it != null) { "policyResults should be available after running policies" }
-                assertTrue(it.size > 1) { "no policies have run" }
+                assertTrue(it.size > 1, "no policies have run" )
             }
         }
         //endregion -Exchange / presentation-
