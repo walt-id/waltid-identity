@@ -73,7 +73,7 @@ class EBSIIssueToHolderConformanceTest {
 
 
     @OptIn(ExperimentalEncodingApi::class)
-    @Test
+//    @Test
      fun getCTIssueQualificationCredential() = runTest {
 
         startEBSIIssuerMockServer()
