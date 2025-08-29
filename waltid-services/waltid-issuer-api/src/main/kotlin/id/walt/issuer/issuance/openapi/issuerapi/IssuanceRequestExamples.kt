@@ -348,6 +348,24 @@ object IssuanceExamples {
         }
         """.trimIndent()
 
+    private val openBadgeCredentialIssuanceTxCode = """
+        {
+          "issuerKey": $issuerKey,
+          "issuerDid": $issuerDid,
+          "credentialConfigurationId": "OpenBadgeCredential_jwt_vc_json",
+          "credentialData": $openBadgeCredentialData,
+          "mdocData": null,
+          "mapping": $mapping,
+          "txCode": {
+            "input_mode": "numeric",
+            "length": 4,
+            "description": "Please enter the PIN to proceed with the issuance"
+          }
+          "txCodeValue": "1234"
+        }
+        """.trimIndent()
+
+
     private val openBadgeCredentialIssuanceVpToken = """
         {
           "authenticationMethod": "VP_TOKEN",
@@ -443,6 +461,10 @@ object IssuanceExamples {
 
     val openBadgeCredentialIssuanceExample = typedValueExampleDescriptorDsl<IssuanceRequest>(
         openBadgeCredentialIssuance
+    )
+
+    val openBadgeCredentialIssuanceExampleWithTxCode = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        openBadgeCredentialIssuanceTxCode
     )
 
     val openBadgeCredentialIssuanceExampleWithIdToken = typedValueExampleDescriptorDsl<IssuanceRequest>(
