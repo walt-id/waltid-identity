@@ -5,16 +5,41 @@ import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.resolver.local.DidEbsiResolver
 import id.walt.did.dids.resolver.local.LocalResolverMethod
 import io.ktor.client.*
+import io.ktor.client.engine.cio.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
+import java.security.cert.X509Certificate
 import java.util.stream.Stream
+import javax.net.ssl.X509TrustManager
 
 class DidEbsiResolverTest : DidResolverTestBase() {
-    override val resolver: LocalResolverMethod = DidEbsiResolver(HttpClient())
+    override val resolver: LocalResolverMethod =
+        DidEbsiResolver(HttpClient(CIO) {
+            engine {
+                https {
+                    //disable https certificate verification
+                    trustManager = object : X509TrustManager {
+                        override fun checkClientTrusted(
+                            chain: Array<out X509Certificate?>?,
+                            authType: String?
+                        ) {
+                        }
+
+                        override fun checkServerTrusted(
+                            chain: Array<out X509Certificate?>?,
+                            authType: String?
+                        ) {
+                        }
+
+                        override fun getAcceptedIssuers(): Array<out X509Certificate?>? = null
+                    }
+                }
+            }
+        })
 
 
     // TODO: Include test in the scope of WAL-842
@@ -256,7 +281,7 @@ class DidEbsiResolverTest : DidResolverTestBase() {
                 )
             ),
             TestEntry(
-                did= "did:ebsi:zreDnmXLU5HoQc7HWjkmNkw",
+                did = "did:ebsi:zreDnmXLU5HoQc7HWjkmNkw",
                 expectedDidDoc = Json.decodeFromString<JsonObject>(
                     """
                                 {
@@ -320,7 +345,7 @@ class DidEbsiResolverTest : DidResolverTestBase() {
                 )
             ),
             TestEntry(
-                did =  "did:ebsi:zjysjDAy9ejkpZ2HdkwNw4k",
+                did = "did:ebsi:zjysjDAy9ejkpZ2HdkwNw4k",
                 expectedDidDoc = Json.decodeFromString<JsonObject>(
                     """
                                 {

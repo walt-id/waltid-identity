@@ -11,7 +11,7 @@ import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.AuthorizationCodeResponse
 import id.walt.oid4vc.responses.TokenResponse
 import io.ktor.client.*
-import io.ktor.client.engine.okhttp.*
+import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
@@ -29,6 +29,8 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
+import java.security.cert.X509Certificate
+import javax.net.ssl.X509TrustManager
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
@@ -38,12 +40,13 @@ import kotlin.test.assertNotNull
 
 const val ISSUER_MOCK_PORT = 7018
 const val ISSUER_MOCK_URL = "http://localhost:$ISSUER_MOCK_PORT"
-const val ISSUER_MOCK_DID = "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx"
+const val ISSUER_MOCK_DID =
+    "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx"
 
 suspend fun getIssuerKey(): JWKKey {
-    return JWKKey.importJWK("{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"d\":\"UPzeJStN6Wg7zXULIlGVhYh4gG5RN-5knejePt6deqY\"}").getOrThrow()
+    return JWKKey.importJWK("{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"d\":\"UPzeJStN6Wg7zXULIlGVhYh4gG5RN-5knejePt6deqY\"}")
+        .getOrThrow()
 }
-
 
 
 class EBSIIssueToHolderConformanceTest {
@@ -59,22 +62,45 @@ class EBSIIssueToHolderConformanceTest {
                     println(call.parameters.toString())
                 }
                 get("/jwks") {
-                    call.respondText( "{\"keys\":[{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"kid\":\"z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx\"}]}")
+                    call.respondText("{\"keys\":[{\"kty\":\"EC\",\"x\":\"bo4FsmViF9au5-iCZbvEy-WZGaRes_eZdpIucmg4XH8\",\"y\":\"htYUXUmIc-IxyR6QMFPwXHXAgj__Fqw9kuSVtSyulhI\",\"crv\":\"P-256\",\"kid\":\"z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9KbrJNL5rEcHRKkRBDnxzu2352jxSjTEFmM9hjTL2wMtzcTDjjDAQmPpQkaihjoAo8AygRr9M6yZsXHzWXnJRMNPzR3cCYbmvE9Q1sSQ1qzXHBo4iEc7Yb3MGu31ZAHKSd9Qx\"}]}")
                 }
             }
         }.start()
     }
 
-    val ktorClient = HttpClient(OkHttp){
+    val ktorClient = HttpClient(CIO) {
         install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
+        }
+
+        engine {
+            https {
+                https {
+                    //disable https certificate verification
+                    trustManager = object : X509TrustManager {
+                        override fun checkClientTrusted(
+                            chain: Array<out X509Certificate?>?,
+                            authType: String?
+                        ) {
+                        }
+
+                        override fun checkServerTrusted(
+                            chain: Array<out X509Certificate?>?,
+                            authType: String?
+                        ) {
+                        }
+
+                        override fun getAcceptedIssuers(): Array<out X509Certificate?>? = null
+                    }
+                }
+            }
         }
     }
 
 
     @OptIn(ExperimentalEncodingApi::class)
-//    @Test
-     fun getCTIssueQualificationCredential() = runTest {
+    @Test
+    fun getCTIssueQualificationCredential() = runTest {
 
         startEBSIIssuerMockServer()
         // val taoIssuerServer = "http://localhost:3000/conformance/v3/issuer-mock"
@@ -102,10 +128,12 @@ class EBSIIssueToHolderConformanceTest {
                     locations = listOf(taoIssuerServer)
                 )
             ),
-            clientMetadata = OpenIDClientMetadata(customParameters = mapOf(
-                "jwks_uri" to JsonPrimitive("$ISSUER_MOCK_URL/jwks"),
-                "authorization_endpoint" to JsonPrimitive("openid:")
-            )),
+            clientMetadata = OpenIDClientMetadata(
+                customParameters = mapOf(
+                    "jwks_uri" to JsonPrimitive("$ISSUER_MOCK_URL/jwks"),
+                    "authorization_endpoint" to JsonPrimitive("openid:")
+                )
+            ),
             codeChallenge = codeChallenge,
             codeChallengeMethod = "S256"
         )
@@ -121,27 +149,40 @@ class EBSIIssueToHolderConformanceTest {
                 put("redirect_uri", authReq.redirectUri)
                 put("code_challenge", authReq.codeChallenge)
                 put("code_challenge_method", authReq.codeChallengeMethod)
-                put("authorization_details", JsonArray(listOf(
+                put(
+                    "authorization_details", JsonArray(
+                        listOf(
                             buildJsonObject {
                                 put("format", CredentialFormat.jwt_vc.value)
-                                put("types", JsonArray(listOf("VerifiableCredential".toJsonElement(),"VerifiableAttestation".toJsonElement(),"CTIssueQualificationCredential".toJsonElement())))
+                                put(
+                                    "types",
+                                    JsonArray(
+                                        listOf(
+                                            "VerifiableCredential".toJsonElement(),
+                                            "VerifiableAttestation".toJsonElement(),
+                                            "CTIssueQualificationCredential".toJsonElement()
+                                        )
+                                    )
+                                )
                                 put("type", "openid_credential")
                                 put("locations", JsonArray(listOf(taoIssuerServer.toJsonElement())))
                             }
-                         )
+                        )
                     )
                 )
             }.toString().toByteArray(),
             mapOf(
-              "kid" to (ISSUER_MOCK_DID+"#"+ISSUER_MOCK_DID.replaceRange(0..7, "")).toJsonElement(),
-              "typ" to "JWT".toJsonElement(),
-              "alg" to "ES256".toJsonElement())
+                "kid" to (ISSUER_MOCK_DID + "#" + ISSUER_MOCK_DID.replaceRange(0..7, "")).toJsonElement(),
+                "typ" to "JWT".toJsonElement(),
+                "alg" to "ES256".toJsonElement()
+            )
         )
 
         println(signedRequestObject)
 
         var httpResp = ktorClient.get("https://api-conformance.ebsi.eu/conformance/v3/auth-mock/authorize") {
-            url { parameters.appendAll(parametersOf(authReq.toHttpParameters()))
+            url {
+                parameters.appendAll(parametersOf(authReq.toHttpParameters()))
                 println(buildString())
             }
         }
@@ -178,8 +219,9 @@ class EBSIIssueToHolderConformanceTest {
                 put("nonce", idTokenReqMap["nonce"]!!.first())
             }.toString().toByteArray(),
             mapOf(
-              "kid" to (ISSUER_MOCK_DID+"#"+ISSUER_MOCK_DID.replaceRange(0..7, "")).toJsonElement(),
-              "typ" to "JWT".toJsonElement())
+                "kid" to (ISSUER_MOCK_DID + "#" + ISSUER_MOCK_DID.replaceRange(0..7, "")).toJsonElement(),
+                "typ" to "JWT".toJsonElement()
+            )
         )
 
         println("ID Token is: $idToken")
@@ -202,9 +244,9 @@ class EBSIIssueToHolderConformanceTest {
         // Get Access Token
         //
         val tokenReq = TokenRequest.AuthorizationCode(
-            clientId =  ISSUER_MOCK_DID,
+            clientId = ISSUER_MOCK_DID,
             redirectUri = ISSUER_MOCK_URL,
-            code =  codeResp.code!!,
+            code = codeResp.code!!,
             codeVerifier = codeVerifier
         )
 
@@ -217,7 +259,7 @@ class EBSIIssueToHolderConformanceTest {
         val jwtProof = ProofOfPossession.JWTProofBuilder(
             ISSUER_MOCK_DID,
             ISSUER_MOCK_DID, tokenResp.cNonce,
-            ISSUER_MOCK_DID+"#"+ISSUER_MOCK_DID.replaceRange(0..7, ""),
+            ISSUER_MOCK_DID + "#" + ISSUER_MOCK_DID.replaceRange(0..7, ""),
             audience = taoIssuerServer
         ).build(getIssuerKey())
         println(jwtProof.jwt)
@@ -228,7 +270,13 @@ class EBSIIssueToHolderConformanceTest {
         val credReq = CredentialRequest(
             CredentialFormat.jwt_vc,
             proof = jwtProof,
-            credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableAttestation", "CTIssueQualificationCredential"))
+            credentialDefinition = CredentialDefinition(
+                type = listOf(
+                    "VerifiableCredential",
+                    "VerifiableAttestation",
+                    "CTIssueQualificationCredential"
+                )
+            )
         )
 
         val credRespRaw = ktorClient.post("$taoIssuerServer/credential") {
