@@ -65,7 +65,7 @@ class E2ESdJwtTest(
                 "should have a presentation submission after submission"
             )
 
-            assertTrue(it.verificationResult == false, "overall verification should be valid")
+            assertTrue(it.verificationResult == true, "overall verification should be valid")
             it.policyResults.let {
                 require(it != null) { "policyResults should be available after running policies" }
                 assertTrue(it.size > 1, "no policies have run")
@@ -225,7 +225,7 @@ class E2ESdJwtTest(
                 selectedCredentials = listOf(newCredential.id),
                 disclosures = newCredential.disclosures?.let { mapOf(newCredential.id to listOf(it)) },
             ),
-            expectStatus = expectFailure,
+            expectStatus = expectSuccess,
         )
 
         return verificationId
