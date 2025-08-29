@@ -1,3 +1,4 @@
+import WaltidServicesE2ETests.Companion.ieftSdjwtPresentationRequestPayload
 import WaltidServicesE2ETests.Companion.nameFieldSchemaPresentationRequestPayload
 import WaltidServicesE2ETests.Companion.sdjwtIETFCredential
 import WaltidServicesE2ETests.Companion.sdjwtW3CCredential
@@ -108,7 +109,7 @@ class E2ESdJwtTest(
         val resolvedIssuerDid = DidKeyResolver().resolve(credential.issuer!!)
         assert(resolvedIssuerDid.isSuccess)
         // TODO: this works, but check if there's a more elegant way to find the right key for verification!
-        val keyJwk = (resolvedIssuerDid.getOrNull()!!.get("verificationMethod") as JsonArray).first {
+        val keyJwk = (resolvedIssuerDid.getOrNull()!!["verificationMethod"] as JsonArray).first {
             it.jsonObject["id"]!!.jsonPrimitive.content == credential.keyID!!
         }.jsonObject["publicKeyJwk"]!!.jsonObject
 
@@ -118,57 +119,29 @@ class E2ESdJwtTest(
         val verifyResult = issuerJwk.verifyJws(credential.jwt)
         assert(verifyResult.isSuccess)
 
-////        //endregion - Exchange / claim-
-//////
-//////        //region - Verifier / request url-
-//////        lateinit var verificationUrl: String
-//////        lateinit var verificationId: String
-//////        verificationApi.verify(nameFieldSchemaPresentationRequestPayload) {
-//////            verificationUrl = it
-//////            verificationId = Url(verificationUrl).parameters.getOrFail("state")
-//////        }
-//////        //endregion -Verifier / request url-
-//////
-//////        //region - Exchange / presentation-
-//////        lateinit var resolvedPresentationOfferString: String
-//////        lateinit var presentationDefinition: String
-//////        exchangeApi.resolvePresentationRequest(wallet, verificationUrl) {
-//////            resolvedPresentationOfferString = it
-//////            presentationDefinition = Url(it).parameters.getOrFail("presentation_definition")
-//////        }
-//////
-//////        sessionApi.get(verificationId) {
-//////            assertTrue(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
-//////        }
-//////
-//////        exchangeApi.matchCredentialsForPresentationDefinition(
-//////            wallet, presentationDefinition, listOf(newCredential.id)
-//////        )
-//////        exchangeApi.unmatchedCredentialsForPresentationDefinition(wallet, presentationDefinition)
-//////        exchangeApi.usePresentationRequest(
-//////            wallet = wallet,
-//////            request = UsePresentationRequest(
-//////                did = did,
-//////                presentationRequest = resolvedPresentationOfferString,
-//////                selectedCredentials = listOf(newCredential.id),
-//////                disclosures = newCredential.disclosures?.let { mapOf(newCredential.id to listOf(it)) },
-//////            ),
-//////            expectStatus = expectFailure,
-//////        )
-//////
-//////        sessionApi.get(verificationId) {
-//////            assertTrue(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
-//////            assertTrue(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
-//////
-//////            assertTrue(it.verificationResult == false) { "overall verification should be valid" }
-//////            it.policyResults.let {
-//////                require(it != null) { "policyResults should be available after running policies" }
-//////                assertTrue(it.size > 1) { "no policies have run" }
-//////            }
-//////        }
-//////        //endregion - Exchange / presentation-
-////        credentialsApi.delete(wallet, newCredential.id)
+        val verificationId = executePresentation(
+            wallet = wallet,
+            presentationRequest = ieftSdjwtPresentationRequestPayload,
+            newCredential = newCredential,
+            did = did
+        )
 
+        sessionApi.get(verificationId) {
+            assertTrue(
+                it.tokenResponse?.presentationSubmission != null,
+                "should have a presentation submission after submission"
+            )
+
+            assertTrue(it.verificationResult == true, "overall verification should be valid")
+            it.policyResults.let {
+                require(it != null) { "policyResults should be available after running policies" }
+                assertTrue(it.size > 1, "no policies have run")
+            }
+        }
+        //endregion -Exchange / presentation-
+
+        //delete credential
+        credentialsApi.delete(wallet, newCredential.id)
     }
 
     private suspend fun executePreAuthorizedFlow(wallet: Uuid, issuanceRequest: IssuanceRequest): WalletCredential {

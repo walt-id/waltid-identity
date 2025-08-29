@@ -68,6 +68,8 @@ class WaltidServicesE2ETests {
         val nameFieldSchemaPresentationRequestPayload =
             loadResource("presentation/openbadgecredential-name-field-presentation-request.json")
 
+        val sdjwtIETFCredential = Json.decodeFromString<JsonElement>(loadResource("issuance/identity-credential-issuance-request.json")).jsonObject
+
         val ieftSdjwtPresentationRequestPayload =
             loadResource("presentation/identity-credential-sd-presentation-request.json")
 
@@ -332,6 +334,7 @@ class WaltidServicesE2ETests {
         // Test sdJwt
         val sdJwtTest = E2ESdJwtTest(issuerApi, exchangeApi, sessionApi, verificationApi, credentialsApi)
         sdJwtTest.testW3CVC(wallet, did)
+        sdJwtTest.testIEFTSDJWTVC(wallet, did)
 
         // Test Authorization Code flow with available authentication methods in Issuer API
         val authorizationCodeFlow = AuthorizationCodeFlow(e2e, testHttpClient(doFollowRedirects = false))
