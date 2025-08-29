@@ -1,11 +1,9 @@
 {
   "id": "<uuid>",
-  "issuer":
-  {
+  "issuer": {
     "id": "<issuerDid>"
   },
-  "credentialSubject":
-  {
+  "credentialSubject": {
     "id": "<subjectDid>"
   },
   "issuanceDate": "<timestamp>",

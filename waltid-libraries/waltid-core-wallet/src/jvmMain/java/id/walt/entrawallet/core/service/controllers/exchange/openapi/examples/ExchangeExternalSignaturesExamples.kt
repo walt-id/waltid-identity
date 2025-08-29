@@ -288,7 +288,7 @@ object ExchangeExternalSignaturesExamples {
             IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossessionParameters(
                 offeredCredential = OfferedCredential(
                     format = CredentialFormat.sd_jwt_vc,
-                    vct = "http://localhost:22222/identity_credential",
+                    vct = "http://localhost:22222/draft13/identity_credential",
                     cryptographicBindingMethodsSupported = setOf("jwk"),
                 ),
                 proofOfPossessionParameters = ProofOfPossessionParameters(
@@ -378,7 +378,7 @@ object ExchangeExternalSignaturesExamples {
             IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession(
                 offeredCredential = OfferedCredential(
                     format = CredentialFormat.sd_jwt_vc,
-                    vct = "http://localhost:22222/identity_credential",
+                    vct = "http://localhost:22222/draft13/identity_credential",
                     cryptographicBindingMethodsSupported = setOf("jwk"),
                 ),
                 proofType = ProofType.jwt,
