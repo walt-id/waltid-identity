@@ -1,0 +1,76 @@
+name: install-and-run-kdoctor
+description: install-and-run-kdoctor
+runs:
+  using: "composite"
+  steps:
+    - name: Check if KDoctor is installed
+      shell: bash
+      id: check-kdoctor
+      run: |
+        if command -v kdoctor &> /dev/null; then
+          echo "installed=true" >> $GITHUB_OUTPUT
+        else
+          echo "installed=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Install KDoctor (macOS)
+      if: steps.check-kdoctor.outputs.installed == 'false' && runner.os == 'macOS'
+      shell: bash
+      run: |
+        echo "Installing KDoctor on macOS using Homebrew..."
+        brew install kdoctor
+
+    - name: Get KDoctor release info
+      if: steps.check-kdoctor.outputs.installed == 'false' && (runner.os == 'Linux' || runner.os == 'Windows')
+      shell: bash
+      id: release-info
+      run: |
+        LATEST_RELEASE=$(curl -s https://api.github.com/repos/Kotlin/kdoctor/releases/latest)
+        VERSION=$(echo "$LATEST_RELEASE" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Install KDoctor (Linux)
+      if: steps.check-kdoctor.outputs.installed == 'false' && runner.os == 'Linux'
+      shell: bash
+      run: |
+        set -euo pipefail
+        VERSION=${{ steps.release-info.outputs.version }}
+        ASSET_NAME="kdoctor-${VERSION}-linux-x64.tar.gz"
+        DOWNLOAD_URL="https://github.com/Kotlin/kdoctor/releases/download/${VERSION}/${ASSET_NAME}"
+        
+        echo "Downloading KDoctor ${VERSION} for Linux..."
+        mkdir -p "$HOME/.local/bin"
+        cd "$HOME/.local/bin"
+        curl -L -o "${ASSET_NAME}" "${DOWNLOAD_URL}"
+        tar -xzf "${ASSET_NAME}"
+        chmod +x kdoctor
+        rm "${ASSET_NAME}"
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: Install KDoctor (Windows)
+      if: steps.check-kdoctor.outputs.installed == 'false' && runner.os == 'Windows'
+      shell: bash
+      run: |
+        set -euo pipefail
+        VERSION=${{ steps.release-info.outputs.version }}
+        ASSET_NAME="kdoctor-${VERSION}-windows-x64.zip"
+        DOWNLOAD_URL="https://github.com/Kotlin/kdoctor/releases/download/${VERSION}/${ASSET_NAME}"
+        
+        echo "Downloading KDoctor ${VERSION} for Windows..."
+        mkdir -p "$HOME/.local/bin"
+        cd "$HOME/.local/bin"
+        curl -L -o "${ASSET_NAME}" "${DOWNLOAD_URL}"
+        unzip -o "${ASSET_NAME}"
+        chmod +x kdoctor.exe
+        ln -sf kdoctor.exe kdoctor
+        rm "${ASSET_NAME}"
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: Run KDoctor diagnostics
+      shell: bash
+      run: |
+        echo "Running KDoctor diagnostics..."
+        kdoctor --verbose || {
+          echo "::warning::KDoctor found some issues, but continuing with build"
+          exit 0
+        }
