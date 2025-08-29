@@ -56,6 +56,8 @@ fun createCredentialOfferUri(
     val issuanceSession = OidcApi.initializeCredentialOffer(
         issuanceRequests = overwrittenIssuanceRequests,
         expiresIn = sessionTtl ?: expiresIn,
+        txCode = overwrittenIssuanceRequests.first().txCode,
+        txCodeValue = overwrittenIssuanceRequests.first().txCodeValue,
         callbackUrl = callbackUrl,
         standardVersion = overwrittenIssuanceRequests.first().standardVersion!!
     )
