@@ -1,5 +1,6 @@
 package id.walt.issuer.issuance
 
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.issuer.issuance.openapi.oidcapi.getCredentialOfferUriDocs
 import id.walt.issuer.issuance.openapi.oidcapi.getStandardVersionDocs
 import id.walt.issuer.issuance.openapi.oidcapi.standardVersionPathParameter
@@ -23,7 +24,6 @@ import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.sdjwt.JWTVCIssuerMetadata
 import id.walt.sdjwt.SDJWTVCTypeMetadata
-import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
@@ -459,7 +459,7 @@ object OidcApi : CIProvider() {
                     logger.info { "/token tokenResp: $tokenResp" }
                     call.respond(tokenResp.toJSON())
                 } catch (exc: TokenError) {
-                    logger.error(exc) { "Token error: " }
+                    logger.error(exc) { "Token error" }
                     call.respond(
                         status = HttpStatusCode.BadRequest,
                         message = exc.toAuthorizationErrorResponse().toJSON()
