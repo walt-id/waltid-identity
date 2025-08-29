@@ -44,7 +44,7 @@ jobs:
 
       - name: Configure IOS build
         if: ${{ runner.os == 'macos' }}
-        uses: walt-id/waltid-identity/.github/actions/ios-build-setup@ci-ios-build
+        uses: walt-id/waltid-identity/.github/actions/ios-build-setup@ci/ios-build
         with:
           gradle-properties-path: 'waltid-identity/gradle.properties'
 
