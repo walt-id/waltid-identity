@@ -97,20 +97,21 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
     }
 
     //w3c jwt_vc_json - with disclosures
-    private val openbadgeSdJwtIssuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(WaltidServicesE2ETests.sdjwtCredential).apply {
-        credentialFormat = CredentialFormat.jwt_vc_json
-    }
+    private val openbadgeSdJwtIssuanceRequest =
+        Json.decodeFromJsonElement<IssuanceRequest>(WaltidServicesE2ETests.sdjwtW3CCredential).apply {
+            credentialFormat = CredentialFormat.jwt_vc_json
+        }
 
     //ietf sd_jwt_vc - with disclosures
     private val identityCredentialIETFSdJwtX5cIssuanceRequest = IssuanceRequest(
-        Json.parseToJsonElement(KeySerialization.serializeKey(IssuanceExamples.ISSUER_JWK_KEY)).jsonObject,
-        "identity_credential_vc+sd-jwt",
+        issuerKey = Json.parseToJsonElement(KeySerialization.serializeKey(IssuanceExamples.ISSUER_JWK_KEY)).jsonObject,
+        credentialConfigurationId = "identity_credential_vc+sd-jwt",
         credentialData = buildJsonObject {
             put("family_name", "Doe")
             put("given_name", "John")
             put("birthdate", "1940-01-01")
         },
-        "identity_credential",
+        vct = "http://localhost:22222/draft13/identity_credential",
         x5Chain = listOf(IssuanceExamples.ISSUER_CERT),
         trustedRootCAs = listOf(IssuanceExamples.ROOT_CA_CERT),
         selectiveDisclosure = SDMap(
@@ -121,14 +122,13 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         credentialFormat = CredentialFormat.sd_jwt_vc
     )
     private val identityCredentialIETFSdJwtDidIssuanceRequest = IssuanceRequest(
-        Json.parseToJsonElement(KeySerialization.serializeKey(IssuanceExamples.ISSUER_JWK_KEY)).jsonObject,
-        "identity_credential_vc+sd-jwt",
+        issuerKey = Json.parseToJsonElement(KeySerialization.serializeKey(IssuanceExamples.ISSUER_JWK_KEY)).jsonObject,
+        credentialConfigurationId = "identity_credential_vc+sd-jwt",
         credentialData = buildJsonObject {
             put("family_name", "Doe")
             put("given_name", "John")
             put("birthdate", "1940-01-01")
         },
-        mdocData = null,
         selectiveDisclosure = SDMap(
             mapOf(
                 "birthdate" to SDField(sd = true)
@@ -367,7 +367,8 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
             val headers = Cbor.decodeFromByteArray<MapElement>(
                 Json.decodeFromJsonElement<String>(proofReq.proofOfPossessionParameters.header).decodeFromBase64()
             )
-            val payload = Json.decodeFromJsonElement<String>(proofReq.proofOfPossessionParameters.payload).decodeFromBase64()
+            val payload =
+                Json.decodeFromJsonElement<String>(proofReq.proofOfPossessionParameters.payload).decodeFromBase64()
             IssuanceServiceExternalSignatures.OfferedCredentialProofOfPossession(
                 proofReq.offeredCredential,
                 ProofType.cwt,
@@ -527,33 +528,37 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
             setBody(prepareRequest)
         }.expectSuccess()
         val prepareResponse = response.body<PrepareOID4VPResponse>()
-        val submitResponse = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/submit") {
-            setBody(
-                SubmitOID4VPRequest.build(
-                    prepareResponse,
-                    disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }.associate {
-                        Pair(
-                            it.id, listOf(
-                                if (forgeDisclosures) forgeSDisclosureString(it.disclosures!!) else it.disclosures!!
-                            )
-                        )
-                    } else null,
-                    w3cJwtVpProof = prepareResponse.w3CJwtVpProofParameters?.let { params ->
-                        holderKey.signJws(
-                            params.payload.toJsonElement().toString().toByteArray(),
-                            params.header,
-                        )
-                    },
-                    ietfSdJwtVpProofs = prepareResponse.ietfSdJwtVpProofParameters?.map { params ->
-                        IETFSdJwtVpTokenProof(
-                            credentialId = params.credentialId, sdJwtVc = params.sdJwtVc, vpTokenProof = holderKey.signJws(
+        val submitResponse =
+            client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/submit") {
+                setBody(
+                    SubmitOID4VPRequest.build(
+                        prepareResponse,
+                        disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }
+                            .associate {
+                                Pair(
+                                    it.id, listOf(
+                                        if (forgeDisclosures) forgeSDisclosureString(it.disclosures!!) else it.disclosures!!
+                                    )
+                                )
+                            } else null,
+                        w3cJwtVpProof = prepareResponse.w3CJwtVpProofParameters?.let { params ->
+                            holderKey.signJws(
                                 params.payload.toJsonElement().toString().toByteArray(),
                                 params.header,
                             )
-                        )
-                    })
-            )
-        }
+                        },
+                        ietfSdJwtVpProofs = prepareResponse.ietfSdJwtVpProofParameters?.map { params ->
+                            IETFSdJwtVpTokenProof(
+                                credentialId = params.credentialId,
+                                sdJwtVc = params.sdJwtVc,
+                                vpTokenProof = holderKey.signJws(
+                                    params.payload.toJsonElement().toString().toByteArray(),
+                                    params.header,
+                                )
+                            )
+                        })
+                )
+            }
         if (!forgeDisclosures)
             submitResponse.expectSuccess()
         else
@@ -591,7 +596,7 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
                         listOf(
                             RequestedCredential(
                                 format = VCFormat.sd_jwt_vc,
-                                vct = "${e2e.getBaseURL()}/identity_credential",
+                                vct = "${e2e.getBaseURL()}/draft13/identity_credential",
                             ).let {
                                 Json.encodeToJsonElement(it)
                             })
@@ -632,33 +637,37 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
             setBody(prepareRequest)
         }.expectSuccess()
         val prepareResponse = response.body<PrepareOID4VPResponse>()
-        val submitResponse = client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/submit") {
-            setBody(
-                SubmitOID4VPRequest.build(
-                    prepareResponse,
-                    disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }.associate {
-                        Pair(
-                            it.id, listOf(
-                                if (forgeDisclosures) forgeSDisclosureString(it.disclosures!!) else it.disclosures!!
-                            )
-                        )
-                    } else null,
-                    w3cJwtVpProof = prepareResponse.w3CJwtVpProofParameters?.let { params ->
-                        holderKey.signJws(
-                            params.payload.toJsonElement().toString().toByteArray(),
-                            params.header,
-                        )
-                    },
-                    ietfSdJwtVpProofs = prepareResponse.ietfSdJwtVpProofParameters?.map { params ->
-                        IETFSdJwtVpTokenProof(
-                            credentialId = params.credentialId, sdJwtVc = params.sdJwtVc, vpTokenProof = holderKey.signJws(
+        val submitResponse =
+            client.post("/wallet-api/wallet/$walletId/exchange/external_signatures/presentation/submit") {
+                setBody(
+                    SubmitOID4VPRequest.build(
+                        prepareResponse,
+                        disclosures = if (addDisclosures) matchedCredentialList.filter { it.disclosures != null }
+                            .associate {
+                                Pair(
+                                    it.id, listOf(
+                                        if (forgeDisclosures) forgeSDisclosureString(it.disclosures!!) else it.disclosures!!
+                                    )
+                                )
+                            } else null,
+                        w3cJwtVpProof = prepareResponse.w3CJwtVpProofParameters?.let { params ->
+                            holderKey.signJws(
                                 params.payload.toJsonElement().toString().toByteArray(),
                                 params.header,
                             )
-                        )
-                    })
-            )
-        }
+                        },
+                        ietfSdJwtVpProofs = prepareResponse.ietfSdJwtVpProofParameters?.map { params ->
+                            IETFSdJwtVpTokenProof(
+                                credentialId = params.credentialId,
+                                sdJwtVc = params.sdJwtVc,
+                                vpTokenProof = holderKey.signJws(
+                                    params.payload.toJsonElement().toString().toByteArray(),
+                                    params.header,
+                                )
+                            )
+                        })
+                )
+            }
         if (!forgeDisclosures)
             submitResponse.expectSuccess()
         else

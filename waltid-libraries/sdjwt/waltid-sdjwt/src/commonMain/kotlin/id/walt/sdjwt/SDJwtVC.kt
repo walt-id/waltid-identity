@@ -4,7 +4,13 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
 
 class SDJwtVC(sdJwt: SDJwt) :
-    SDJwt(sdJwt.jwt, sdJwt.header, sdJwt.sdPayload, sdJwt.keyBindingJwt, sdJwt.isPresentation) {
+    SDJwt(
+        sdJwt.jwt,
+        sdJwt.header,
+        sdJwt.sdPayload,
+        sdJwt.keyBindingJwt,
+        sdJwt.isPresentation
+    ) {
 
     val cnfObject: JsonObject? = undisclosedPayload["cnf"]?.jsonObject
     val holderDid: String? = cnfObject?.get("kid")?.jsonPrimitive?.content
@@ -16,18 +22,20 @@ class SDJwtVC(sdJwt: SDJwt) :
     val status = undisclosedPayload["status"]?.jsonObject
 
     private fun verifyHolderKeyBinding(
-        jwtCryptoProvider: JWTCryptoProvider, requiresHolderKeyBinding: Boolean,
-        audience: String? = null, nonce: String? = null
+        jwtCryptoProvider: JWTCryptoProvider,
+        requiresHolderKeyBinding: Boolean,
+        audience: String? = null,
+        nonce: String? = null
     ): Boolean {
         return if (!holderDid.isNullOrEmpty()) TODO("Holder DID verification not yet supported")
         else if (holderKeyJWK != null) {
             isPresentation && keyBindingJwt != null && !audience.isNullOrEmpty() && !nonce.isNullOrEmpty() &&
                     keyBindingJwt.verifyKB(
-                        jwtCryptoProvider,
-                        audience,
-                        nonce,
-                        this,
-                        holderKeyJWK["kid"]?.jsonPrimitive?.content
+                        jwtCryptoProvider = jwtCryptoProvider,
+                        reqAudience = audience,
+                        reqNonce = nonce,
+                        sdJwt = this,
+                        keyId = holderKeyJWK["kid"]?.jsonPrimitive?.content
                     )
         } else
             !requiresHolderKeyBinding
@@ -37,26 +45,32 @@ class SDJwtVC(sdJwt: SDJwt) :
     // TODO: should resolve issuer key from "iss" property
     // TODO: make use of Key interface from waltid-crypto lib instead or also?
     fun verifyVC(
-        jwtCryptoProvider: JWTCryptoProvider, requiresHolderKeyBinding: Boolean,
-        audience: String? = null, nonce: String? = null
+        jwtCryptoProvider: JWTCryptoProvider,
+        requiresHolderKeyBinding: Boolean,
+        audience: String? = null,
+        nonce: String? = null
     ): VCVerificationResult {
-        var message: String = ""
+        var message = ""
+
         return VCVerificationResult(
             sdJwtVC = this,
-            sdJwtVerificationResult = verify(jwtCryptoProvider, header["kid"]?.jsonPrimitive?.content ?: issuer),
+            sdJwtVerificationResult = verify(
+                jwtCryptoProvider = jwtCryptoProvider,
+                keyID = header["kid"]?.jsonPrimitive?.content ?: issuer
+            ),
             sdJwtVCVerified =
-            (notBefore?.let { Clock.System.now().epochSeconds >= it } ?: true).also {
-                if (!it) message = "$message, VC is not valid before $notBefore"
-            } &&
-                    (expiration?.let { Clock.System.now().epochSeconds < it } ?: true).also {
-                        if (!it) message = "$message, VC is not valid after $expiration"
-                    } &&
-                    !vct.isNullOrEmpty().also {
-                        if (it) message = "$message, VC has no verifiable credential type property (vct)"
-                    } &&
-                    verifyHolderKeyBinding(jwtCryptoProvider, requiresHolderKeyBinding, audience, nonce).also {
-                        if (!it) message = "$message, holder key binding could not be verified"
-                    },
+                (notBefore?.let { Clock.System.now().epochSeconds >= it } ?: true).also {
+                    if (!it) message = "$message, VC is not valid before $notBefore"
+                } &&
+                        (expiration?.let { Clock.System.now().epochSeconds < it } ?: true).also {
+                            if (!it) message = "$message, VC is not valid after $expiration"
+                        } &&
+                        !vct.isNullOrEmpty().also {
+                            if (it) message = "$message, VC has no verifiable credential type property (vct)"
+                        } &&
+                        verifyHolderKeyBinding(jwtCryptoProvider, requiresHolderKeyBinding, audience, nonce).also {
+                            if (!it) message = "$message, holder key binding could not be verified"
+                        },
             vcVerificationMessage = message
         )
     }
@@ -72,11 +86,19 @@ class SDJwtVC(sdJwt: SDJwt) :
          * @throws Exception if SD-JWT VC cannot be parsed
          */
         fun parseAndVerify(
-            sdJwtVC: String, jwtCryptoProvider: JWTCryptoProvider, requiresHolderKeyBinding: Boolean,
-            audience: String? = null, nonce: String? = null
+            sdJwtVC: String,
+            jwtCryptoProvider: JWTCryptoProvider,
+            requiresHolderKeyBinding: Boolean,
+            audience: String? = null,
+            nonce: String? = null
         ): VCVerificationResult {
             val parsedVC = parse(sdJwtVC)
-            return parsedVC.verifyVC(jwtCryptoProvider, requiresHolderKeyBinding, audience, nonce)
+            return parsedVC.verifyVC(
+                jwtCryptoProvider = jwtCryptoProvider,
+                requiresHolderKeyBinding = requiresHolderKeyBinding,
+                audience = audience,
+                nonce = nonce
+            )
         }
 
         fun sign(
@@ -85,13 +107,28 @@ class SDJwtVC(sdJwt: SDJwt) :
             issuerDid: String,
             holderDid: String,
             issuerKeyId: String? = null,
-            vct: String, nbf: Long? = null, exp: Long? = null, status: JsonObject? = null,
+            vct: String,
+            nbf: Long? = null,
+            exp: Long? = null,
+            status: JsonObject? = null,
             /** Set additional options in the JWT header */
             additionalJwtHeader: Map<String, Any> = emptyMap(),
             subject: String? = null
-        ): SDJwtVC = doSign(sdPayload, jwtCryptoProvider, issuerDid, buildJsonObject {
-            put("kid", holderDid)
-        }, issuerKeyId, vct, nbf, exp, status, additionalJwtHeader, subject)
+        ): SDJwtVC = doSign(
+            sdPayload = sdPayload,
+            jwtCryptoProvider = jwtCryptoProvider,
+            issuerDid = issuerDid,
+            cnf = buildJsonObject {
+                put("kid", holderDid)
+            },
+            issuerKeyId = issuerKeyId,
+            vct = vct,
+            nbf = nbf,
+            exp = exp,
+            status = status,
+            additionalJwtHeader = additionalJwtHeader,
+            subject = subject
+        )
 
         fun sign(
             sdPayload: SDPayload,
@@ -99,13 +136,28 @@ class SDJwtVC(sdJwt: SDJwt) :
             issuerDid: String,
             holderKeyJWK: JsonObject,
             issuerKeyId: String? = null,
-            vct: String, nbf: Long? = null, exp: Long? = null, status: JsonObject? = null,
+            vct: String,
+            nbf: Long? = null,
+            exp: Long? = null,
+            status: JsonObject? = null,
             /** Set additional options in the JWT header */
             additionalJwtHeader: Map<String, Any> = emptyMap(),
             subject: String? = null
-        ): SDJwtVC = doSign(sdPayload, jwtCryptoProvider, issuerDid, buildJsonObject {
-            put("jwk", holderKeyJWK)
-        }, issuerKeyId, vct, nbf, exp, status, additionalJwtHeader, subject)
+        ): SDJwtVC = doSign(
+            sdPayload = sdPayload,
+            jwtCryptoProvider = jwtCryptoProvider,
+            issuerDid = issuerDid,
+            cnf = buildJsonObject {
+                put("jwk", holderKeyJWK)
+            },
+            issuerKeyId = issuerKeyId,
+            vct = vct,
+            nbf = nbf,
+            exp = exp,
+            status = status,
+            additionalJwtHeader = additionalJwtHeader,
+            subject = subject
+        )
 
         fun sign(
             sdPayload: SDPayload,
@@ -114,7 +166,10 @@ class SDJwtVC(sdJwt: SDJwt) :
             holderDid: String?,
             holderKeyJWK: JsonObject?,
             issuerKeyId: String? = null,
-            vct: String, nbf: Long? = null, exp: Long? = null, status: JsonObject? = null,
+            vct: String,
+            nbf: Long? = null,
+            exp: Long? = null,
+            status: JsonObject? = null,
             /** Set additional options in the JWT header */
             additionalJwtHeader: Map<String, Any> = emptyMap()
         ): SDJwtVC = holderDid?.let {
@@ -129,30 +184,47 @@ class SDJwtVC(sdJwt: SDJwt) :
             issuerDid: String,
             cnf: JsonObject,
             issuerKeyId: String? = null,
-            vct: String, nbf: Long? = null, exp: Long? = null, status: JsonObject? = null,
+            vct: String,
+            nbf: Long? = null,
+            exp: Long? = null,
+            status: JsonObject? = null,
             /** Set additional options in the JWT header */
             additionalJwtHeader: Map<String, Any> = emptyMap(),
             subject: String? = null
         ): SDJwtVC {
             val undisclosedPayload = sdPayload.undisclosedPayload.plus(
-                defaultPayloadProperties(issuerDid, cnf, vct, nbf, exp, status, subject)
+                defaultPayloadProperties(
+                    issuerId = issuerDid,
+                    cnf = cnf,
+                    vct = vct,
+                    notBefore = nbf,
+                    expirationDate = exp,
+                    status = status,
+                    subject = subject
+                )
             ).let { JsonObject(it) }
 
             val finalSdPayload = SDPayload(undisclosedPayload, sdPayload.digestedDisclosures)
+
             return SDJwtVC(
-                sign(
-                    finalSdPayload,
-                    jwtCryptoProvider,
-                    issuerKeyId,
+                sdJwt = sign(
+                    sdPayload = finalSdPayload,
+                    jwtCryptoProvider = jwtCryptoProvider,
+                    keyID = issuerKeyId,
                     typ = SD_JWT_VC_TYPE_HEADER,
-                    additionalJwtHeader
+                    additionalHeaders = additionalJwtHeader
                 )
             )
         }
 
         fun defaultPayloadProperties(
-            issuerId: String, cnf: JsonObject, vct: String,
-            notBefore: Long? = null, expirationDate: Long? = null, status: JsonObject? = null, subject: String? = null
+            issuerId: String,
+            cnf: JsonObject,
+            vct: String,
+            notBefore: Long? = null,
+            expirationDate: Long? = null,
+            status: JsonObject? = null,
+            subject: String? = null
         ) = buildJsonObject {
             put("iss", JsonPrimitive(issuerId))
             put("cnf", cnf)
