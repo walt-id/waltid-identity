@@ -365,7 +365,7 @@ internal class TestCredentialWallet(
         TODO("Not yet implemented")
     }
 
-    override fun putSession(id: String, session: SIOPSession): Unit {
+    fun putSession(id: String, session: SIOPSession, ttl: Duration?): Unit
         sessionCache[id] = session
     }
 
