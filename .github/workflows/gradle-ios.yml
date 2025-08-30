@@ -1,0 +1,61 @@
+name: iOS Build
+
+on:
+  push:
+    branches-ignore: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@a4a92e12ee9b7396ee9a22083ff21b3277c627d6
+
+      - name: Cache Konan dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-konan-
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cocoapods/repos
+            ./Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Update CocoaPods
+        run: |
+          gem update cocoapods
+          pod repo update
+      
+      - name: Install and run KDoctor
+        run: |
+          brew install kdoctor
+          kdoctor
+
+      - name: Enable iOS build
+        run: sed -i '' 's/enableIosBuild=false/enableIosBuild=true/g' gradle.properties
+
+      - name: Build iOS Simulator Framework (ARM64)
+        run: ./gradlew linkDebugFrameworkIosSimulatorArm64 linkReleaseFrameworkIosSimulatorArm64
+
+#      - name: Build iOS Device Framework (ARM64)
+#        run: ./gradlew linkDebugFrameworkIosArm64 linkReleaseFrameworkIosArm64
+
+      - name: Run iOS Tests
+        run: ./gradlew iosX64Test
+
+      - name: Create XCFramework (if configured)
+        run: ./gradlew assembleXCFramework || echo "XCFramework task not found, skipping"
+        continue-on-error: true
