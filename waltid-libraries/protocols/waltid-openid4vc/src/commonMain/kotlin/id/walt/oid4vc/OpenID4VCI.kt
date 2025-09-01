@@ -137,7 +137,8 @@ object OpenID4VCI {
         return when {
 
             offerReq.credentialOfferUri != null -> {
-                runCatching { http.get(offerReq.credentialOfferUri) }.getOrElse { ex ->
+                runCatching {
+                    http.get(offerReq.credentialOfferUri) }.getOrElse { ex ->
                     throw UnresolvableCredentialOfferException(offerReq.credentialOfferUri, ex)
                 }.bodyAsText().let { text ->
                     runCatching { CredentialOffer.fromJSONString(text) }.getOrElse { ex ->
@@ -518,7 +519,6 @@ object OpenID4VCI {
                 issuer = baseUrl,
                 authorizationServers = setOf(baseUrl),
                 authorizationEndpoint = "$baseUrl/authorize",
-                pushedAuthorizationRequestEndpoint = "$baseUrl/par",
                 tokenEndpoint = "$baseUrl/token",
                 credentialEndpoint = "$baseUrl/credential",
                 batchCredentialEndpoint = "$baseUrl/batch_credential",
@@ -543,7 +543,6 @@ object OpenID4VCI {
                 issuer = baseUrl,
                 authorizationServer = baseUrl,
                 authorizationEndpoint = "$baseUrl/authorize",
-                pushedAuthorizationRequestEndpoint = "$baseUrl/par",
                 tokenEndpoint = "$baseUrl/token",
                 credentialEndpoint = "$baseUrl/credential",
                 batchCredentialEndpoint = "$baseUrl/batch_credential",

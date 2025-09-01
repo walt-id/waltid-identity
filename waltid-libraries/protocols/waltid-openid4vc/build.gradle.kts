@@ -76,7 +76,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.2.0"
+    val ktor_version = "3.2.2"
 
     sourceSets {
 
@@ -108,7 +108,7 @@ kotlin {
 
                 // -- Multiplatform --
                 // Multiplatform / Uuid
-                implementation("app.softwork:kotlinx-uuid-core:0.1.4")
+                implementation("app.softwork:kotlinx-uuid-core:0.1.6")
 
                 // Multiplatform / Date & time
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")

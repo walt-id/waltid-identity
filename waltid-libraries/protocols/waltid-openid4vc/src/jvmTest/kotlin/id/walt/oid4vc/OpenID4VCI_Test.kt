@@ -41,24 +41,22 @@ import org.junit.jupiter.api.BeforeAll
 import kotlin.test.*
 
 class OpenID4VCI_Test {
+    val CREDENTIAL_OFFER_BASE_URL = "openid-credential-offer://test"
+
     val DEPLOYED_ISSUER_BASE_URL = "https://issuer.portal.test.waltid.cloud"
     val ISSUER_BASE_URL = "https://test"
-    val CREDENTIAL_OFFER_BASE_URL = "openid-credential-offer://test"
     val ISSUER_METADATA = (OpenID4VCI.createDefaultProviderMetadata(
-        ISSUER_BASE_URL,
-        emptyMap(),
-        OpenID4VCIVersion.DRAFT13
-    ) as OpenIDProviderMetadata.Draft13).copy(
-        credentialConfigurationsSupported = mapOf(
+        baseUrl =  ISSUER_BASE_URL,
+        credentialSupported = mapOf(
             "VerifiableId" to CredentialSupported(
-                CredentialFormat.jwt_vc_json,
+                format = CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"),
                 credentialSigningAlgValuesSupported = setOf("ES256K"),
                 credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableId")),
                 customParameters = mapOf("foo" to JsonPrimitive("bar"))
             ),
             "VerifiableDiploma" to CredentialSupported(
-                CredentialFormat.jwt_vc_json,
+                format = CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"),
                 credentialSigningAlgValuesSupported = setOf("ES256K"),
                 credentialDefinition = CredentialDefinition(
@@ -69,8 +67,21 @@ class OpenID4VCI_Test {
                     )
                 )
             )
-        )
-    )
+        ),
+        version = OpenID4VCIVersion.DRAFT13
+    ) as OpenIDProviderMetadata.Draft13)
+
+
+    val ISSUER_TOKEN_KEY = runBlocking { JWKKey.generate(KeyType.RSA) }
+    val ISSUER_DID_KEY = runBlocking { JWKKey.generate(KeyType.Ed25519) }
+    val ISSUER_DID = runBlocking { DidService.registerByKey("jwk", ISSUER_DID_KEY).did }
+
+    val WALLET_CLIENT_ID = "test-client"
+    val WALLET_REDIRECT_URI = "http://blank"
+    val WALLET_KEY =
+        "{\"kty\":\"EC\",\"d\":\"uD-uxub011cplvr5Bd6MrIPSEUBsgLk-C1y3tnmfetQ\",\"use\":\"sig\",\"crv\":\"secp256k1\",\"kid\":\"48d8a34263cf492aa7ff61b6183e8bcf\",\"x\":\"TKaQ6sCocTDsmuj9tTR996tFXpEcS2EJN-1gOadaBvk\",\"y\":\"0TrIYHcfC93VpEuvj-HXTnyKt0snayOMwGSJA1XiDX8\"}"
+    val WALLET_DID =
+        "did:jwk:eyJrdHkiOiJFQyIsInVzZSI6InNpZyIsImNydiI6InNlY3AyNTZrMSIsImtpZCI6IjQ4ZDhhMzQyNjNjZjQ5MmFhN2ZmNjFiNjE4M2U4YmNmIiwieCI6IlRLYVE2c0NvY1REc211ajl0VFI5OTZ0RlhwRWNTMkVKTi0xZ09hZGFCdmsiLCJ5IjoiMFRySVlIY2ZDOTNWcEV1dmotSFhUbnlLdDBzbmF5T013R1NKQTFYaURYOCJ9"
 
     companion object {
         @BeforeAll
@@ -80,16 +91,6 @@ class OpenID4VCI_Test {
             assertContains(DidService.registrarMethods.keys, "jwk")
         }
     }
-
-    val ISSUER_TOKEN_KEY = runBlocking { JWKKey.generate(KeyType.RSA) }
-    val ISSUER_DID_KEY = runBlocking { JWKKey.generate(KeyType.Ed25519) }
-    val ISSUER_DID = runBlocking { DidService.registerByKey("jwk", ISSUER_DID_KEY).did }
-    val WALLET_CLIENT_ID = "test-client"
-    val WALLET_REDIRECT_URI = "http://blank"
-    val WALLET_KEY =
-        "{\"kty\":\"EC\",\"d\":\"uD-uxub011cplvr5Bd6MrIPSEUBsgLk-C1y3tnmfetQ\",\"use\":\"sig\",\"crv\":\"secp256k1\",\"kid\":\"48d8a34263cf492aa7ff61b6183e8bcf\",\"x\":\"TKaQ6sCocTDsmuj9tTR996tFXpEcS2EJN-1gOadaBvk\",\"y\":\"0TrIYHcfC93VpEuvj-HXTnyKt0snayOMwGSJA1XiDX8\"}"
-    val WALLET_DID =
-        "did:jwk:eyJrdHkiOiJFQyIsInVzZSI6InNpZyIsImNydiI6InNlY3AyNTZrMSIsImtpZCI6IjQ4ZDhhMzQyNjNjZjQ5MmFhN2ZmNjFiNjE4M2U4YmNmIiwieCI6IlRLYVE2c0NvY1REc211ajl0VFI5OTZ0RlhwRWNTMkVKTi0xZ09hZGFCdmsiLCJ5IjoiMFRySVlIY2ZDOTNWcEV1dmotSFhUbnlLdDBzbmF5T013R1NKQTFYaURYOCJ9"
 
     @Test
     fun testCredentialIssuanceIsolatedFunctions() = runTest {
@@ -171,7 +172,7 @@ class OpenID4VCI_Test {
         assertNotNull(actual = tokenResponse.cNonce)
 
         println("// receive credential")
-        val nonce = tokenResponse.cNonce!!
+        val nonce = tokenResponse.cNonce
         val holderDid = WALLET_DID
         val holderKey = JWKKey.importJWK(WALLET_KEY).getOrThrow()
         val holderKeyId = holderKey.getKeyId()
@@ -190,14 +191,14 @@ class OpenID4VCI_Test {
         val parsedHolderDid = parsedHolderKeyId.substringBefore("#")
         val resolvedKeyForHolderDid = DidService.resolveToKey(parsedHolderDid).getOrThrow()
 
-        val validPoP = credReq.proof?.validateJwtProof(
+        val validPoP = credReq.proof.validateJwtProof(
             resolvedKeyForHolderDid,
             ISSUER_BASE_URL,
             WALLET_CLIENT_ID,
             nonce,
             parsedHolderKeyId
         )
-        assertTrue(actual = validPoP!!)
+        assertTrue(actual = validPoP)
 
         val generatedCredential: JsonElement = runBlocking {
             CredentialBuilder(CredentialBuilderType.W3CV2CredentialBuilder).apply {
@@ -217,7 +218,7 @@ class OpenID4VCI_Test {
         assertTrue(actual = credentialResponse.credential!!.instanceOf(JsonPrimitive::class))
 
         println("// parse and verify credential")
-        val credential = credentialResponse.credential!!.jsonPrimitive.content
+        val credential = credentialResponse.credential.jsonPrimitive.content
         println(">>> Issued credential: $credential")
         verifyIssuerAndSubjectId(
             SDJwt.parse(credential).fullPayload["vc"]?.jsonObject!!,
@@ -255,7 +256,7 @@ class OpenID4VCI_Test {
         println(OpenID4VCI.getCredentialOfferRequestUrl(credOffer))
 
         println("// -------- WALLET ----------")
-        var providerMetadata = ISSUER_METADATA
+        val providerMetadata = ISSUER_METADATA
         assertEquals(expected = credOffer.credentialIssuer, actual = providerMetadata.credentialIssuer)
 
         println("// resolve offered credentials")
@@ -342,7 +343,7 @@ class OpenID4VCI_Test {
         assertNotNull(actual = tokenResponse.cNonce)
 
         println("// receive credential")
-        var nonce = tokenResponse.cNonce!!
+        var nonce = tokenResponse.cNonce
         val holderDid = WALLET_DID
         val holderKey = JWKKey.importJWK(WALLET_KEY).getOrThrow()
         val holderKeyId = holderKey.getKeyId()
@@ -355,7 +356,7 @@ class OpenID4VCI_Test {
 
         println("// -------- CREDENTIAL ISSUER ----------")
         // Issuer Client extracts Access Token from header
-        OpenID4VCI.verifyToken(tokenResponse.accessToken.toString(), ISSUER_TOKEN_KEY.getPublicKey())
+        OpenID4VCI.verifyToken(tokenResponse.accessToken, ISSUER_TOKEN_KEY.getPublicKey())
 
         //Then VC Stuff
 
@@ -504,7 +505,7 @@ class OpenID4VCI_Test {
         assertNotNull(actual = tokenResponse.cNonce)
 
         println("// receive credential")
-        nonce = tokenResponse.cNonce!!
+        nonce = tokenResponse.cNonce
         proofOfPossession = ProofOfPossession.JWTProofBuilder(ISSUER_BASE_URL, null, nonce, proofKeyId).build(holderKey)
 
         credReq = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
@@ -512,7 +513,7 @@ class OpenID4VCI_Test {
 
         println("// -------- CREDENTIAL ISSUER ----------")
         // Issuer Client extracts Access Token from header
-        OpenID4VCI.verifyToken(tokenResponse.accessToken.toString(), ISSUER_TOKEN_KEY.getPublicKey())
+        OpenID4VCI.verifyToken(tokenResponse.accessToken, ISSUER_TOKEN_KEY.getPublicKey())
 
         //Then VC Stuff
 
@@ -674,7 +675,7 @@ class OpenID4VCI_Test {
         assertNotNull(actual = tokenResponse.cNonce)
 
         println("// receive credential")
-        nonce = tokenResponse.cNonce!!
+        nonce = tokenResponse.cNonce
         proofOfPossession = ProofOfPossession.JWTProofBuilder(ISSUER_BASE_URL, null, nonce, proofKeyId).build(holderKey)
 
         credReq = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
@@ -753,7 +754,7 @@ class OpenID4VCI_Test {
         assertNotNull(actual = tokenResponse.cNonce)
 
         println("// receive credential")
-        nonce = tokenResponse.cNonce!!
+        nonce = tokenResponse.cNonce
         proofOfPossession = ProofOfPossession.JWTProofBuilder(ISSUER_BASE_URL, null, nonce, proofKeyId).build(holderKey)
 
         credReq = CredentialRequest.forOfferedCredential(offeredCredential, proofOfPossession)
@@ -761,7 +762,7 @@ class OpenID4VCI_Test {
 
         println("// -------- CREDENTIAL ISSUER ----------")
         // Issuer Client extracts Access Token from header
-        OpenID4VCI.verifyToken(tokenResponse.accessToken.toString(), ISSUER_TOKEN_KEY.getPublicKey())
+        OpenID4VCI.verifyToken(tokenResponse.accessToken, ISSUER_TOKEN_KEY.getPublicKey())
 
         //Then VC Stuff
 
@@ -973,7 +974,7 @@ class OpenID4VCI_Test {
         assertNotNull(credentialResponse.credential)
 
         println("Signed credential is: ${credentialResponse.credential}")
-        println("Credential data is: ${credentialResponse.credential!!.jsonPrimitive.content.decodeJws().payload["vc"]?.jsonObject}")
+        println("Credential data is: ${credentialResponse.credential.jsonPrimitive.content.decodeJws().payload["vc"]?.jsonObject}")
     }
 }
 

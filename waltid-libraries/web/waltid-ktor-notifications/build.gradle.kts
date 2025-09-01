@@ -1,94 +1,67 @@
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
-    id("dev.petuska.npm.publish") version "3.5.2"
     id("maven-publish")
     id("com.github.ben-manes.versions")
 }
 
-group = "id.walt.verifier"
+group = "id.walt.web"
 
 repositories {
     mavenCentral()
     maven("https://maven.waltid.dev/releases") {
-        content {
-            includeGroup("id.walt")
-        }
+        content { includeGroup("id.walt") }
     }
     maven("https://maven.waltid.dev/snapshots")
     mavenLocal()
 }
 
 fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableAndroidBuild = getSetting("enableAndroidBuild")
-val enableIosBuild = getSetting("enableIosBuild")
 
 kotlin {
     jvm()
 
-    js(IR) {
-        browser {
-
-        }
-        nodejs {
-            generateTypeScriptDefinitions()
-        }
-        binaries.library()
-    }
-
-    if (enableIosBuild) {
-        iosArm64()
-        iosSimulatorArm64()
-    }
-
-    val ktor_version = "3.2.0"
+    val ktor_version = "3.2.2"
 
     sourceSets {
         val commonMain by getting {
             dependencies {
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
                 // HTTP
                 implementation("io.ktor:ktor-client-core:$ktor_version")
                 implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
 
-                implementation("io.github.oshai:kotlin-logging:7.0.5")
+                // Logging
+                implementation("io.github.oshai:kotlin-logging:7.0.13")
 
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+
+                /*
+                 * walt.id:
+                 */
+                implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
+                implementation(project(":waltid-libraries:credentials:waltid-dcql"))
+                implementation(project(":waltid-libraries:credentials:waltid-verification-policies2"))
+                implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
+                api(project(":waltid-libraries:web:waltid-ktor-notifications-core"))
             }
         }
     }
 }
 
-npmPublish {
-    registries {
-        val envToken = System.getenv("NPM_TOKEN")
-        val npmTokenFile = File("secret_npm_token.txt")
-        val secretNpmToken =
-            envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
-        val hasNPMToken = secretNpmToken.isNotEmpty()
-        val isReleaseBuild = Regex("\\d+.\\d+.\\d+").matches(version.get())
-        if (isReleaseBuild && hasNPMToken) {
-            println("-- RELEASE BUILD & NPM TOKEN --")
-            readme.set(File("README.md"))
-            register("npmjs") {
-                uri.set(uri("https://registry.npmjs.org"))
-                authToken.set(secretNpmToken)
-            }
-        }
-    }
-}
+/* -- Publishing -- */
 
 publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["kotlin"])
             pom {
-                name.set("walt.id Verifier SDK - OpenID4VP version")
-                description.set("walt.id Kotlin/Java Verifier for OpenID4VP")
+                name.set("walt.id Ktor Server Notifications Library")
+                description.set("walt.id Kotlin/Java Ktor Server Notifications Library")
                 url.set("https://walt.id")
 
                 licenses {

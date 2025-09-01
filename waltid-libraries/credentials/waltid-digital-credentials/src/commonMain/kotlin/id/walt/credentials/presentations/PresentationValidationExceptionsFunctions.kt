@@ -3,6 +3,7 @@ package id.walt.credentials.presentations
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
+
 object PresentationValidationExceptionFunctions {
 
     @OptIn(ExperimentalContracts::class)

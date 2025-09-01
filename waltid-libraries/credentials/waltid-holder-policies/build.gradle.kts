@@ -96,7 +96,7 @@ kotlin {
 //
 //                // Kotlinx
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
-//                implementation("app.softwork:kotlinx-uuid-core:0.1.4")
+//                implementation("app.softwork:kotlinx-uuid-core:0.1.6")
 //
 //                // Logging
                 implementation("io.github.oshai:kotlin-logging:7.0.5")

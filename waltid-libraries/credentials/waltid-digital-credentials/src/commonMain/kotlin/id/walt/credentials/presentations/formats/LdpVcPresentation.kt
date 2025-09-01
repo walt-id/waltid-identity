@@ -8,7 +8,7 @@ import kotlinx.serialization.json.JsonObject
 /**
  * Represents a W3C Verifiable Presentation using Data Integrity and JSON-LD.
  * This presentation is a JSON object, not an encoded string.
- * It is stored here as a flexible [kotlinx.serialization.json.JsonObject].
+ * It is stored here as a flexible [JsonObject].
  */
 @Serializable
 @SerialName("ldp_vc")

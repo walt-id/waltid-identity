@@ -4,7 +4,7 @@ import java.util.*
 
 plugins {
     kotlin("jvm")
-    id("io.ktor.plugin") version "3.2.0"
+    id("io.ktor.plugin") version "3.2.2"
     kotlin("plugin.serialization")
     id("maven-publish")
     id("com.github.ben-manes.versions")
@@ -66,7 +66,7 @@ dependencies {
 
     /* -- KTOR -- */
 
-    val ktor_version = "3.2.0"
+    val ktor_version = "3.2.2"
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-auth-jvm:$ktor_version")
@@ -107,7 +107,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
     // Uuid
-    implementation("app.softwork:kotlinx-uuid-core:0.1.4")
+    implementation("app.softwork:kotlinx-uuid-core:0.1.6")
     //implementation("app.softwork:kotlinx-uuid-exposed:0.1.2")
 
     /* -- Security -- */

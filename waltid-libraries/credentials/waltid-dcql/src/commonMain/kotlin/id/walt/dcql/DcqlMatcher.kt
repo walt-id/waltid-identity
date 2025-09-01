@@ -435,7 +435,7 @@ object DcqlMatcher {
         log.trace { "Checking trusted authorities for credential ${credential.id} (simplified: returning true)" }
         // Actual implementation requires checking credential.issuer against
         // the types and values in authoritiesQuery. May involve trust list lookups.
-        return true // Simplified
+        return true // TODO
     }
 
     /** Check if a credential satisfies the claims constraints. */

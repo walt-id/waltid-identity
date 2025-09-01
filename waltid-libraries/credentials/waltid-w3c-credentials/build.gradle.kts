@@ -1,8 +1,4 @@
-import love.forte.plugin.suspendtrans.configuration.ClassInfo
-import love.forte.plugin.suspendtrans.configuration.SuspendTransformConfiguration
-import love.forte.plugin.suspendtrans.configuration.TargetPlatform
 import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
-import love.forte.plugin.suspendtrans.gradle.SuspendTransformPluginExtension
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -84,7 +80,7 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    val ktor_version = "3.2.0"
+    val ktor_version = "3.2.2"
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -105,7 +101,7 @@ kotlin {
 
                 // Kotlinx
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
-                implementation("app.softwork:kotlinx-uuid-core:0.1.4")
+                implementation("app.softwork:kotlinx-uuid-core:0.1.6")
 
                 // Loggin
                 implementation("io.github.oshai:kotlin-logging:7.0.5")

@@ -1,7 +1,6 @@
 {
   "type": "jwk",
-  "jwk":
-  {
+  "jwk": {
     "kty": "OKP",
     "d": "mDhpwaH6JYSrD2Bq7Cs-pzmsjlLj4EOhxyI-9DM1mFI",
     "crv": "Ed25519",

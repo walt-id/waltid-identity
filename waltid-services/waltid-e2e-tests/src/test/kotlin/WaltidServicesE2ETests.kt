@@ -53,7 +53,7 @@ class WaltidServicesE2ETests {
         val openBadgeCredentialData = loadResource("issuance/openbadgecredential.json")
         val credentialMapping = loadResource("issuance/mapping.json")
         val credentialDisclosure = loadResource("issuance/disclosure.json")
-        val sdjwtCredential = buildJsonObject {
+        val sdjwtW3CCredential = buildJsonObject {
             put("issuerKey", Json.decodeFromString<JsonElement>(issuerKey))
             put("issuerDid", issuerDid)
             put("credentialConfigurationId", "OpenBadgeCredential_jwt_vc_json")
@@ -61,11 +61,17 @@ class WaltidServicesE2ETests {
             put("mapping", Json.decodeFromString<JsonElement>(credentialMapping))
             put("selectiveDisclosure", Json.decodeFromString<JsonElement>(credentialDisclosure))
         }
-        val jwtCredential = JsonObject(sdjwtCredential.minus("selectiveDisclosure"))
+        val jwtCredential = JsonObject(sdjwtW3CCredential.minus("selectiveDisclosure"))
+
         val simplePresentationRequestPayload =
             loadResource("presentation/openbadgecredential-presentation-request.json")
         val nameFieldSchemaPresentationRequestPayload =
             loadResource("presentation/openbadgecredential-name-field-presentation-request.json")
+
+        val sdjwtIETFCredential = Json.decodeFromString<JsonElement>(loadResource("issuance/identity-credential-issuance-request.json")).jsonObject
+
+        val ieftSdjwtPresentationRequestPayload =
+            loadResource("presentation/identity-credential-sd-presentation-request.json")
 
         fun testHttpClient(token: String? = null, doFollowRedirects: Boolean = true) = HttpClient(CIO) {
             install(ContentNegotiation) {
@@ -321,10 +327,14 @@ class WaltidServicesE2ETests {
             assertTrue(it.any { it.operation == "useOfferRequest" } && it.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
         }
         //endregion -History-
-        val sdJwtTest = E2ESdJwtTest(issuerApi, exchangeApi, sessionApi, verificationApi)
+
         //cleanup credentials
         credentialsApi.delete(wallet, newCredentialId)
-        sdJwtTest.e2e(wallet, did)
+
+        // Test sdJwt
+        val sdJwtTest = E2ESdJwtTest(issuerApi, exchangeApi, sessionApi, verificationApi, credentialsApi)
+        sdJwtTest.testW3CVC(wallet, did)
+        sdJwtTest.testIEFTSDJWTVC(wallet, did)
 
         // Test Authorization Code flow with available authentication methods in Issuer API
         val authorizationCodeFlow = AuthorizationCodeFlow(e2e, testHttpClient(doFollowRedirects = false))
@@ -356,9 +366,10 @@ class WaltidServicesE2ETests {
         val draft11 = Draft11(e2e, client)
 
         val preAuthFlowIssuanceReq =
-            Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request.json")).copy(
-                standardVersion = OpenID4VCIVersion.DRAFT11,
-            )
+            Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request.json"))
+                .copy(
+                    standardVersion = OpenID4VCIVersion.DRAFT11,
+                )
 
         draft11.testIssuanceDraft11PreAuthFlow(preAuthFlowIssuanceReq, wallet)
 
@@ -414,6 +425,19 @@ class WaltidServicesE2ETests {
         batchIssuance.runTests()
         //endregion -Batch Issuance Test Suite-
 
+
+        val testCredentialWallet = TestOpenIdCredentialWallet(e2e, client)
+
+        val preAuthFlowIssuanceReqDraft13 =
+            Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request.json"))
+                .copy(
+                    standardVersion = OpenID4VCIVersion.DRAFT13,
+                )
+
+        testCredentialWallet.testCredentialWallet(
+            issuanceReq = preAuthFlowIssuanceReqDraft13,
+            did = did
+        )
     }
 }
 
@@ -422,7 +446,10 @@ fun String.expectLooksLikeJwt(): String =
 
 
 val expectSuccess: suspend HttpResponse.() -> HttpResponse = {
-    kotlin.test.assertTrue(this.status.isSuccess(), "HTTP status is non-successful for response: $this, body is ${this.bodyAsText()}"); this
+    kotlin.test.assertTrue(
+        this.status.isSuccess(),
+        "HTTP status is non-successful for response: $this, body is ${this.bodyAsText()}"
+    ); this
 }
 
 val expectRedirect: HttpResponse.() -> HttpResponse = {

@@ -14,7 +14,7 @@ repositories {
 }
 
 object Versions {
-    const val KTOR_VERSION = "3.2.0" // also change 1 plugin
+    const val KTOR_VERSION = "3.2.2" // also change 1 plugin
 }
 
 dependencies {
@@ -62,7 +62,7 @@ dependencies {
 
     // Persistence
     api("io.github.reactivecircus.cache4k:cache4k:0.14.0")
-    api("app.softwork:kotlinx-uuid-core:0.1.4")
+    api("app.softwork:kotlinx-uuid-core:0.1.6")
     api("redis.clients:jedis:5.2.0")
 
     // Testing
