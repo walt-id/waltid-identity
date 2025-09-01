@@ -56,7 +56,7 @@ object Verifier2Manager {
         clientId: String,
         clientMetadata: ClientMetadata? = null,
         uriPrefix: String,
-    ): VerificationSessionCreationResponse {
+    ): Verification2Session {
         setup.dcqlQuery.precheck()
 
         val sessionId = Uuid.random().toString()
@@ -161,12 +161,7 @@ object Verifier2Manager {
             policies = setup.policies
         )
 
-        return VerificationSessionCreationResponse(
-            sessionId = sessionId,
-            bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequest.toHttpUrl().toString(),
-            fullAuthorizationRequestUrl = authorizationRequest.toHttpUrl().toString(),
-            creationTarget = null
-        )
+        return newSession
     }
 
 }

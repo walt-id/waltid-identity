@@ -6,6 +6,7 @@ import id.walt.policies2.policies.CredentialSignaturePolicy
 import id.walt.policies2.PolicyList
 import id.walt.policies2.PolicyResults
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier2.Verifier2Manager.VerificationSessionCreationResponse
 import io.ktor.http.*
 import kotlinx.datetime.*
 import kotlinx.serialization.Serializable
@@ -118,5 +119,14 @@ data class Verification2Session(
 
         SUCCESSFUL(true),
         FAILED(false),
+    }
+
+    fun toSessionCreationResponse(): VerificationSessionCreationResponse {
+        return VerificationSessionCreationResponse(
+            sessionId = id,
+            bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequest.toHttpUrl().toString(),
+            fullAuthorizationRequestUrl = authorizationRequest.toHttpUrl().toString(),
+            creationTarget = null
+        )
     }
 }
