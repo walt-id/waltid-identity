@@ -17,7 +17,7 @@
     "pinia": "^3.0.3",
     "qr-scanner": "^1.4.2",
     "qrcode.vue": "^3.6.0",
-    "unocss": "^66.3.3",
+    "unocss": "66.5.0",
     "@metamask/sdk": "^0.33.0"
   },
   "devDependencies": {
@@ -25,10 +25,10 @@
     "@nuxtjs/color-mode": "3.5.2",
     "@nuxtjs/i18n": "10.0.3",
     "@sidebase/nuxt-auth": "^1.0.0",
-    "@unocss/nuxt": "66.3.3",
-    "@unocss/preset-icons": "^66.3.3",
-    "@unocss/transformer-directives": "^66.3.3",
-    "@unocss/transformer-variant-group": "^66.3.3",
+    "@unocss/nuxt": "66.5.0",
+    "@unocss/preset-icons": "66.5.0",
+    "@unocss/transformer-directives": "66.5.0",
+    "@unocss/transformer-variant-group": "66.5.0",
     "@vite-pwa/nuxt": "^1.0.4",
     "@vueuse/core": "^13.6.0",
     "@vueuse/nuxt": "13.6.0",
