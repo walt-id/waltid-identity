@@ -160,8 +160,10 @@ data class TokenResponse private constructor(
     /**
      * Converts the token response to a direct_post.jwt response, where currently only a JWE-only response is supported.
      */
-    fun toDirecPostJWTParameters(
-        encKeyJwk: JsonObject, alg: String = "ECDH-ES", enc: String = "A256GCM",
+    fun toDirectPostJWTParameters(
+        encKeyJwk: JsonObject,
+        alg: String = "ECDH-ES",
+        enc: String = "A256GCM",
         headerParams: Map<String, JsonElement> = mapOf()
     ): Map<String, List<String>> {
         return mapOf(

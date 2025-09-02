@@ -321,7 +321,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                             }?.jsonObject ?: throw Exception("No ephemeral reader key found")
                         val ephemeralWalletKey =
                             runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
-                        tokenResponse.toDirecPostJWTParameters(
+                        tokenResponse.toDirectPostJWTParameters(
                             encKey,
                             alg = authReq.clientMetadata!!.authorizationEncryptedResponseAlg!!,
                             enc = authReq.clientMetadata!!.authorizationEncryptedResponseEnc!!,
