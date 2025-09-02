@@ -85,12 +85,16 @@ class E2ESdJwtTest(
 
         newCredential = executePreAuthorizedFlow(wallet, issuanceRequest)
 
-////         assert parsedDocument
-////        assertContains(newCredential.parsedDocument!!.keys, "_sd_alg")
-////        assertEquals("sha-256", newCredential.parsedDocument!!["_sd_alg"]!!.jsonPrimitive.content)
+        // assert sd alg in raw object
+        assertContains(newCredential.parsedDocument!!.keys, "_sd_alg")
+        assertEquals("sha-256", newCredential.parsedDocument!!["_sd_alg"]!!.jsonPrimitive.content)
 
         // assert SDJwtVC token
         val credential = SDJwtVC.parse(newCredential.document)
+
+        // assert sd alg in SDJwtVC
+        assertNotNull(credential.sdAlg)
+        assertEquals("sha-256", credential.sdAlg)
 
         // check SD-JWT-VC type metadata
         assertNotNull(credential.vct)

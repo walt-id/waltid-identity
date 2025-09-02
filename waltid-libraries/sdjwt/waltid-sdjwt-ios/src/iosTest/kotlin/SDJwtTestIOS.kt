@@ -1,3 +1,14 @@
+import kotlinx.serialization.json.*
+import kotlin.test.*
+import io.kotest.matchers.collections.shouldContainAll
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldStartWith
+import kotlinx.cinterop.ExperimentalForeignApi
+import platform.Foundation.NSData
+import platform.Foundation.NSString
+import platform.Foundation.NSUTF8StringEncoding
+import platform.Foundation.dataUsingEncoding
 import id.walt.sdjwt.HMACJWTCryptoProvider
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDMap
@@ -8,9 +19,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlin.test.*
 
 class SDJwtTestIOS {
     private val sharedSecret = "ef23f749-7238-481a-815c-f0c2157dfa8e"
@@ -80,7 +88,7 @@ class SDJwtTestIOS {
 
     @Test
     fun parseAndVerify() {
-        // Create SimpleJWTCryptoProvider with MACSigner and MACVerifier
+        // Create HMACJWTCryptoProvider instead of SimpleJWTCryptoProvider
         val cryptoProvider = HMACJWTCryptoProvider("HS256", sharedSecret.encodeToByteArray())
         val undisclosedJwt =
             "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~"
@@ -108,8 +116,8 @@ class SDJwtTestIOS {
 
     @Test
     fun testJwtWithCustomHeaders() {
-        // Create SimpleJWTCryptoProvider with MACSigner and MACVerifier
-        val cryptoProvider = SimpleJWTCryptoProvider(JWSAlgorithm.HS256, MACSigner(sharedSecret), MACVerifier(sharedSecret))
+        // Create HMACJWTCryptoProvider instead of SimpleJWTCryptoProvider
+        val cryptoProvider = HMACJWTCryptoProvider("HS256", sharedSecret.encodeToByteArray())
         val signedJwt = cryptoProvider.sign(buildJsonObject { put("test", JsonPrimitive("hello")) },
             headers = mapOf(
                 "h1" to "v1",
@@ -126,10 +134,10 @@ class SDJwtTestIOS {
 
     @Test
     fun testPresentingSdJwtWithKeyBindingJwt() {
-        val cryptoProvider = SimpleJWTCryptoProvider(JWSAlgorithm.HS256, MACSigner(sharedSecret), MACVerifier(sharedSecret))
+        val cryptoProvider = HMACJWTCryptoProvider("HS256", sharedSecret.encodeToByteArray())
         val aud = "test-audience"
         val nonce = "test-nonce"
-        val signedJwt = SDJwt.sign(SDPayload.Companion.createSDPayload(
+        val signedJwt = SDJwt.sign(SDPayload.createSDPayload(
             buildJsonObject { put("test", JsonPrimitive("hello")) },
             SDMapBuilder().addField("test", true).build()), cryptoProvider)
         val presentedJwtNoKb = signedJwt.present(true)
@@ -140,6 +148,5 @@ class SDJwtTestIOS {
         presentedJwtWithKb.keyBindingJwt!!.audience shouldBe aud
         presentedJwtWithKb.keyBindingJwt!!.nonce shouldBe nonce
         presentedJwtWithKb.keyBindingJwt!!.sdHash shouldBe SHA256.digest(ASCII.encode(presentedJwtNoKb.toString())).base64Url
-
     }
 }

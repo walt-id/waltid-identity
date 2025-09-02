@@ -20,6 +20,7 @@ class SDJwtVC(sdJwt: SDJwt) :
     val expiration = undisclosedPayload["exp"]?.jsonPrimitive?.long
     val vct = undisclosedPayload["vct"]?.jsonPrimitive?.content
     val status = undisclosedPayload["status"]?.jsonObject
+    val sdAlg = undisclosedPayload["_sd_alg"]?.jsonPrimitive?.content
 
     private fun verifyHolderKeyBinding(
         jwtCryptoProvider: JWTCryptoProvider,
@@ -226,13 +227,16 @@ class SDJwtVC(sdJwt: SDJwt) :
             status: JsonObject? = null,
             subject: String? = null
         ) = buildJsonObject {
+            put("_sd_alg", "sha-256")
             put("iss", JsonPrimitive(issuerId))
             put("cnf", cnf)
             put("vct", JsonPrimitive(vct))
             notBefore?.let { put("nbf", JsonPrimitive(it)) }
             expirationDate?.let { put("exp", JsonPrimitive(it)) }
             status?.let { put("status", it) }
-            subject?.let { put("sub", JsonPrimitive(it)) }
+            subject?.let {
+                put("sub", JsonPrimitive(it))
+            }
         }
 
         fun isSdJwtVCPresentation(token: String): Boolean = parse(token).isPresentation
