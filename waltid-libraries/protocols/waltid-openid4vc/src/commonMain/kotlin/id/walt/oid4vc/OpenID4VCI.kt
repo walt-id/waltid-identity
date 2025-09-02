@@ -203,12 +203,12 @@ object OpenID4VCI {
         }
 
         return credentialsOffered.mapNotNull { credentialOffered ->
-            when {
-                credentialOffered is JsonPrimitive && credentialOffered.isString -> {
+            when (credentialOffered) {
+                is JsonPrimitive if credentialOffered.isString -> {
                     supportedCredentials[credentialOffered.content]?.let { OfferedCredential.fromProviderMetadata(it) }
                 }
 
-                credentialOffered is JsonObject -> {
+                is JsonObject -> {
                     OfferedCredential.fromJSON(credentialOffered)
                 }
 
