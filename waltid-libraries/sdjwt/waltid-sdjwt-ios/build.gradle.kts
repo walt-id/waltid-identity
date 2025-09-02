@@ -34,7 +34,8 @@ kotlin {
             //put your multiplatform dependencies here
         }
         commonTest.dependencies {
-
+            implementation("io.kotest:kotest-framework-engine:6.0.1")
+            implementation("io.kotest:kotest-assertions-core:6.0.1")
         }
 
         val iosArm64Main by getting
