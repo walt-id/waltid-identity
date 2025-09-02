@@ -414,7 +414,7 @@ object OpenID4VCI {
             nonce = nonce,
             requestUri = null,
             request = when (isJar!!) {
-                // Create a jwt as request object as defined in JAR OAuth2.0 specification
+                // Create a jwt as a request object as defined in JAR OAuth2.0 specification
                 true -> signToken(
                     privKey,
                     buildJsonObject {

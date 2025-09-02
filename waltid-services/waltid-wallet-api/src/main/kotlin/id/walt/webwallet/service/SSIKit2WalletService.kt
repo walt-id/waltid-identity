@@ -202,14 +202,20 @@ class SSIKit2WalletService(
     override suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?> {
         val credentialWallet = getCredentialWallet(parameter.did)
 
-        val authReq =
-            AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(parameter.request).encodedQuery).toMap())
-        logger.debug { "Auth req: $authReq" }
+        val authorizationRequest =
+            AuthorizationRequest.fromHttpParametersAuto(
+                parseQueryString(Url(parameter.request).encodedQuery).toMap()
+            )
+        logger.debug { "Authorization Request $authorizationRequest" }
 
         logger.debug { "Using presentation request, selected credentials: ${parameter.selectedCredentials}" }
 
         val presentationSession =
-            credentialWallet.initializeAuthorization(authReq, 60.seconds, parameter.selectedCredentials.toSet())
+            credentialWallet.initializeAuthorization(
+                authorizationRequest = authorizationRequest,
+                expiresIn = 60.seconds,
+                selectedCredentials = parameter.selectedCredentials.toSet()
+            )
         logger.debug { "Initialized authorization (VPPresentationSession): $presentationSession" }
 
         logger.debug { "Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}" }
@@ -217,32 +223,39 @@ class SSIKit2WalletService(
         SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
             parameter.selectedCredentials
         if (parameter.disclosures != null) {
-            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
+            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[presentationSession.authorizationRequest.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
                 parameter.disclosures
         }
 
         val tokenResponse =
-            credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest!!)
+            credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
+
         val submitFormParams =
             getFormParameters(presentationSession.authorizationRequest, tokenResponse, presentationSession)
 
         val resp = this.http.submitForm(
-            presentationSession.authorizationRequest.responseUri
-                ?: presentationSession.authorizationRequest.redirectUri ?: throw AuthorizationError(
-                    presentationSession.authorizationRequest,
-                    AuthorizationErrorCode.invalid_request,
-                    "No response_uri or redirect_uri found on authorization request"
-                ), parameters {
+            url = presentationSession.authorizationRequest.responseUri
+                ?: presentationSession.authorizationRequest.redirectUri
+                ?: throw AuthorizationError(
+                    authorizationRequest = presentationSession.authorizationRequest,
+                    errorCode = AuthorizationErrorCode.invalid_request,
+                    message = "No response_uri or redirect_uri found on authorization request"
+                ),
+            formParameters = parameters {
                 submitFormParams.forEach { entry ->
                     entry.value.forEach { append(entry.key, it) }
                 }
-            })
+            }
+        )
+
         val httpResponseBody = runCatching { resp.bodyAsText() }.getOrNull()
+
         val isResponseRedirectUrl = httpResponseBody != null && httpResponseBody.take(10).lowercase().let {
             @Suppress("HttpUrlsUsage")
             it.startsWith("http://") || it.startsWith("https://")
         }
         logger.debug { "HTTP Response: $resp, body: $httpResponseBody" }
+
         parameter.selectedCredentials.forEach {
             credentialService.get(walletId, it)?.run {
                 eventUseCase.log(
@@ -255,7 +268,7 @@ class SSIKit2WalletService(
                     data = eventUseCase.credentialEventData(
                         credential = this,
                         subject = eventUseCase.subjectData(this),
-                        organization = eventUseCase.verifierData(authReq),
+                        organization = eventUseCase.verifierData(authorizationRequest),
                         type = null
                     ),
                     credentialId = this.id,
@@ -609,7 +622,7 @@ class SSIKit2WalletService(
     override suspend fun sign(alias: String, data: JsonElement): String {
         val key = findKey(alias) ?: throw NotFoundException("Key not found: $alias")
 
-        // Check whether the given data is a partially initialised Flattened JWS+Json object
+        // Check whether the given data is a partially initialized Flattened JWS+Json object
         // https://datatracker.ietf.org/doc/html/rfc7515#section-7.2.2
         val jwsObj = (data as? JsonObject)
             ?.takeIf { it.keys == setOf("protected", "payload") }
