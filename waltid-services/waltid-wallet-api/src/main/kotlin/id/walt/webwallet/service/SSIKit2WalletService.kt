@@ -79,7 +79,6 @@ import kotlinx.serialization.json.*
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.nio.charset.StandardCharsets
 import java.util.Base64
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
@@ -277,37 +276,36 @@ class SSIKit2WalletService(
             }
         }
 
+        val isRedirect = resp.status.value == 302
+        val isErrorInLocationHeader = resp.headers["location"].toString().contains("error")
+        val isSuccess = resp.status.isSuccess()
 
-
-        return if (resp.status.value == 302 && !resp.headers["location"].toString().contains("error")) {
-            Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
-        } else if (resp.status.isSuccess()) {
-            Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
-        } else {
-            logger.debug { "Presentation failed, return = $httpResponseBody" }
-            if (isResponseRedirectUrl) {
-                Result.failure(
-                    PresentationError(
-                        message = "Presentation failed - redirecting to error page",
-                        redirectUri = httpResponseBody
-                    )
-                )
-            } else {
-                logger.debug { "Response body: $httpResponseBody" }
-                Result.failure(
-                    PresentationError(
-                        message =
-                            httpResponseBody?.let {
-                                if (it.couldBeJsonObject()) it.parseAsJsonObject().getOrNull()
-                                    ?.get("message")?.jsonPrimitive?.content
-                                    ?: "Presentation failed"
-                                else it
-                            } ?: "Presentation failed",
-                        redirectUri = ""
-                    )
-                )
-            }
+        if ((isRedirect && !isErrorInLocationHeader) || isSuccess) {
+            return Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
         }
+
+        logger.debug { "Presentation failed, return = $httpResponseBody" }
+        if (isResponseRedirectUrl) {
+            return Result.failure(
+                exception = PresentationError(
+                    message = "Presentation failed - redirecting to error page",
+                    redirectUri = httpResponseBody
+                )
+            )
+        }
+
+        return Result.failure(
+            exception = PresentationError(
+                message =
+                    httpResponseBody?.let {
+                        if (it.couldBeJsonObject()) it.parseAsJsonObject().getOrNull()
+                            ?.get("message")?.jsonPrimitive?.content
+                            ?: "Presentation failed"
+                        else it
+                    } ?: "Presentation failed",
+                redirectUri = ""
+            )
+        )
     }
 
     override suspend fun resolvePresentationRequest(request: String): String {
@@ -749,7 +747,7 @@ class SSIKit2WalletService(
             "key" ->
                 DidKeyCreateOptions(
                     args["key"]?.let { enumValueIgnoreCase<KeyType>(it.content) } ?: KeyType.Ed25519,
-                    args["useJwkJcsPub"]?.let { it.content.toBoolean() } == true)
+                    args["useJwkJcsPub"]?.content?.toBoolean() == true)
 
             "jwk" -> DidJwkCreateOptions()
             "web" ->
