@@ -86,6 +86,19 @@ open class SDJwt internal constructor(
             .plus((if (withKBJwt) keyBindingJwt else null)?.let { listOf(it) }
                 ?: (if (formatForPresentation) listOf("") else listOf()))
             .joinToString(SEPARATOR_STR)
+
+        val sdJwtParts = mutableListOf<String>()
+
+        sdJwtParts.add(jwt)
+        sdJwtParts.addAll(disclosures)
+
+        if (withKBJwt && keyBindingJwt != null) {
+            sdJwtParts.add(keyBindingJwt.toString())
+        } else if (formatForPresentation) {
+            sdJwtParts.add("")
+        }
+
+        return sdJwtParts.joinToString(SEPARATOR_STR)
     }
 
     /**
