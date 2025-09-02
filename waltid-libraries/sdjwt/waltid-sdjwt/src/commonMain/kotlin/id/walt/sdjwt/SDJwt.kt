@@ -81,11 +81,6 @@ open class SDJwt internal constructor(
 
     @JsName("toFormattedString")
     open fun toString(formatForPresentation: Boolean, withKBJwt: Boolean = true): String {
-        return listOf(jwt)
-            .plus(disclosures)
-            .plus((if (withKBJwt) keyBindingJwt else null)?.let { listOf(it) }
-                ?: (if (formatForPresentation) listOf("") else listOf()))
-            .joinToString(SEPARATOR_STR)
 
         val sdJwtParts = mutableListOf<String>()
 
