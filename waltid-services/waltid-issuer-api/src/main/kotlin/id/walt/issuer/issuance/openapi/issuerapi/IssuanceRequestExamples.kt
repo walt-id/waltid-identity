@@ -360,7 +360,7 @@ object IssuanceExamples {
             "input_mode": "numeric",
             "length": 4,
             "description": "Please enter the PIN to proceed with the issuance"
-          }
+          },
           "txCodeValue": "1234"
         }
         """.trimIndent()
