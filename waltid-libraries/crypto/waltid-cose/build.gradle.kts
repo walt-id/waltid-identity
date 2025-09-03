@@ -105,9 +105,9 @@ kotlin {
 
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
 
-
-                implementation(project.dependencies.platform("org.kotlincrypto.macs:bom:0.6.1"))
-                implementation("org.kotlincrypto.macs:hmac-sha2")*/
+                */
+                implementation(project.dependencies.platform("org.kotlincrypto.macs:bom:0.7.1"))
+                implementation("org.kotlincrypto.macs:hmac-sha2")
 
             }
         }

@@ -138,6 +138,103 @@ data class CoseSign1(
     }
 }
 
+@Serializable
+@CborArray
+data class CoseMac0(
+    @ByteString val protected: ByteArray,
+    val unprotected: CoseHeaders,
+    @ByteString val payload: ByteArray?,
+    @ByteString val tag: ByteArray, // This is the MAC tag
+) : CoseMessage {
+
+    /**
+     * Verifies the MAC tag of this COSE_Mac0 object.
+     */
+    suspend fun verify(verifier: CoseMacVerifier, externalAad: ByteArray = byteArrayOf()): Boolean {
+        val dataToVerify = buildMacStructure(protected, payload, externalAad)
+        return verifier.verify(dataToVerify, tag)
+    }
+
+    /**
+     * Encodes this CoseMac0 object into its tagged CBOR representation.
+     * A COSE_Mac0 object is tagged with CBOR tag 17.
+     */
+    fun toTagged(): ByteArray {
+        val messageBytes = coseCompliantCbor.encodeToByteArray(this)
+        // CBOR tag 17 (major type 6, value 17) is encoded as the single byte 0xd1
+        val tag = 0xD1.toByte()
+        return byteArrayOf(tag) + messageBytes
+    }
+
+    companion object {
+        /**
+         * Decodes a CoseMac0 object from its tagged CBOR representation.
+         * The CBOR tag for a COSE MAC w/o Recipients Object is 17.
+         */
+        fun fromTagged(cborBytes: ByteArray): CoseMac0 {
+            if (cborBytes.isEmpty()) {
+                throw IllegalArgumentException("Input CBOR data cannot be empty.")
+            }
+
+            val tag17 = 0xD1.toByte()
+            val array4InitialByte = 0x84.toByte()
+
+            val messageBytes = when (cborBytes[0]) {
+                tag17 -> cborBytes.copyOfRange(1, cborBytes.size)
+                array4InitialByte -> cborBytes
+                else -> throw IllegalArgumentException("Data is not a valid COSE_Mac0 message. Expected CBOR Tag 17 (0xD1). Got byte: (hex) ${cborBytes[0].toHexString()}")
+            }
+            return coseCompliantCbor.decodeFromByteArray(messageBytes)
+        }
+
+        fun fromTagged(cborHex: String) = fromTagged(cborHex.hexToByteArray())
+
+        /**
+         * Creates and authenticates a CoseMac0 object.
+         */
+        suspend fun createAndMac(
+            protectedHeaders: CoseHeaders,
+            unprotectedHeaders: CoseHeaders = CoseHeaders(),
+            payload: ByteArray?,
+            creator: CoseMacCreator,
+            externalAad: ByteArray = byteArrayOf()
+        ): CoseMac0 {
+            val protectedBytes = if (protectedHeaders == CoseHeaders()) {
+                byteArrayOf()
+            } else {
+                coseCompliantCbor.encodeToByteArray(protectedHeaders)
+            }
+            val dataToMac = buildMacStructure(protectedBytes, payload, externalAad)
+            val tag = creator.mac(dataToMac)
+
+            return CoseMac0(
+                protected = protectedBytes,
+                unprotected = unprotectedHeaders,
+                payload = payload,
+                tag = tag
+            )
+        }
+    }
+
+    // Boilerplate for correct ByteArray comparison
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is CoseMac0) return false
+        if (!protected.contentEquals(other.protected)) return false
+        if (unprotected != other.unprotected) return false
+        if (!payload.contentEquals(other.payload)) return false
+        if (!tag.contentEquals(other.tag)) return false
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = protected.contentHashCode()
+        result = 31 * result + unprotected.hashCode()
+        result = 31 * result + (payload?.contentHashCode() ?: 0)
+        result = 31 * result + tag.contentHashCode()
+        return result
+    }
+}
 
 
 /** Represents a COSE Key object. Aligned with RFC 8152, Section 7. */
@@ -223,6 +320,16 @@ object Cose {
 
         /** RSASSA-PKCS1-v1_5 using SHA-512 */
         const val RS512 = -259
+
+        // HMAC:
+        /** HMAC w/ SHA-256 truncated to 64 bits */
+        const val HMAC_256_64 = 4
+        /** HMAC w/ SHA-256 */
+        const val HMAC_256 = 5
+        /** HMAC w/ SHA-384 */
+        const val HMAC_384 = 6
+        /** HMAC w/ SHA-512 */
+        const val HMAC_512 = 7
     }
 }
 
