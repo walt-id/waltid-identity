@@ -219,18 +219,25 @@ class SSIKit2WalletService(
 
         logger.debug { "Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}" }
 
-        SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
+        SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[
+            presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id
+        ] =
             parameter.selectedCredentials
+
         if (parameter.disclosures != null) {
-            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[presentationSession.authorizationRequest.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
+            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[
+                presentationSession.authorizationRequest.state + presentationSession.authorizationRequest.presentationDefinition?.id
+            ] =
                 parameter.disclosures
         }
 
-        val tokenResponse =
-            credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
+        val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
 
-        val submitFormParams =
-            getFormParameters(presentationSession.authorizationRequest, tokenResponse, presentationSession)
+        val submitFormParams = getFormParameters(
+            authorizationRequest = presentationSession.authorizationRequest,
+            tokenResponse = tokenResponse,
+            presentationSession = presentationSession
+        )
 
         val resp = this.http.submitForm(
             url = presentationSession.authorizationRequest.responseUri

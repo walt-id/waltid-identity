@@ -232,12 +232,16 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
     }
 
     override fun generateTokenResponse(session: S, tokenRequest: TokenRequest): TokenResponse {
-        val presentationDefinition = session.authorizationRequest?.presentationDefinition ?: throw TokenError(
-            tokenRequest,
-            TokenErrorCode.invalid_request
-        )
+        session.authorizationRequest?.presentationDefinition
+            ?: throw TokenError(
+                tokenRequest = tokenRequest,
+                errorCode = TokenErrorCode.invalid_request
+            )
+
         val result = generatePresentationForVPToken(session, tokenRequest)
+
         val holderDid = getDidFor(session)
+
         val idToken = if (session.authorizationRequest?.responseType?.contains(ResponseType.IdToken) == true) {
             signToken(TokenTarget.TOKEN, buildJsonObject {
                 put("iss", "https://self-issued.me/v2/openid-vc")
@@ -252,17 +256,18 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
                 })
             }, keyId = resolveDID(holderDid))
         } else null
+
         return if (result.presentations.size == 1) {
             TokenResponse.success(
-                result.presentations.first().let { VpTokenParameter.fromJsonElement(it) },
-                if (idToken == null) result.presentationSubmission else null,
+                vpToken = result.presentations.first().let { VpTokenParameter.fromJsonElement(it) },
+                presentationSubmission = if (idToken == null) result.presentationSubmission else null,
                 idToken = idToken,
                 state = session.authorizationRequest?.state
             )
         } else {
             TokenResponse.success(
-                JsonArray(result.presentations).let { VpTokenParameter.fromJsonElement(it) },
-                if (idToken == null) result.presentationSubmission else null,
+                vpToken = JsonArray(result.presentations).let { VpTokenParameter.fromJsonElement(it) },
+                presentationSubmission = if (idToken == null) result.presentationSubmission else null,
                 idToken = idToken,
                 state = session.authorizationRequest?.state
             )
