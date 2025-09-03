@@ -6,6 +6,7 @@ import id.walt.did.dids.DidService.resolve
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.errors.*
 import id.walt.oid4vc.interfaces.IHttpClient
 import id.walt.oid4vc.interfaces.ITokenProvider
@@ -243,18 +244,22 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         val holderDid = getDidFor(session)
 
         val idToken = if (session.authorizationRequest?.responseType?.contains(ResponseType.IdToken) == true) {
-            signToken(TokenTarget.TOKEN, buildJsonObject {
-                put("iss", "https://self-issued.me/v2/openid-vc")
-                put("sub", holderDid)
-                put("aud", session.authorizationRequest!!.clientId)
-                put("exp", Clock.System.now().plus(5.minutes).epochSeconds)
-                put("iat", Clock.System.now().epochSeconds)
-                put("state", session.id)
-                put("nonce", session.nonce)
-                put("_vp_token", buildJsonObject {
-                    put("presentation_submission", result.presentationSubmission.toJSON())
-                })
-            }, keyId = resolveDID(holderDid))
+            signToken(
+                target = TokenTarget.TOKEN,
+                payload = buildJsonObject {
+                    put(JWTClaims.Payload.issuer, "https://self-issued.me/v2/openid-vc")
+                    put(JWTClaims.Payload.subject, holderDid)
+                    put(JWTClaims.Payload.audience, session.authorizationRequest!!.clientId)
+                    put(JWTClaims.Payload.expirationTime, Clock.System.now().plus(5.minutes).epochSeconds)
+                    put(JWTClaims.Payload.issuedAtTime, Clock.System.now().epochSeconds)
+                    put(JWTClaims.Payload.nonce, session.nonce)
+                    put("state", session.id)
+                    put("_vp_token", buildJsonObject {
+                        put("presentation_submission", result.presentationSubmission.toJSON())
+                    })
+                },
+                keyId = resolveDID(holderDid)
+            )
         } else null
 
         return if (result.presentations.size == 1) {
