@@ -1,0 +1,40 @@
+name: enable-ios-build
+description: Updates gradle.properties to enable iOS builds
+inputs:
+  gradle-properties-path:
+    description: 'Path to gradle.properties file'
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Enable iOS build
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        GRADLE_PROPS="${{ inputs.gradle-properties-path }}"
+
+        if [[ ! -f "$GRADLE_PROPS" ]]; then
+          echo "::error::gradle.properties file not found at $GRADLE_PROPS"
+          exit 1
+        fi
+
+        # Create backup
+        cp "$GRADLE_PROPS" "$GRADLE_PROPS.backup"
+
+        # Enable iOS build - handle both cases where property exists or doesn't
+        if grep -q "enableIosBuild" "$GRADLE_PROPS"; then
+          sed -i '' 's/enableIosBuild=false/enableIosBuild=true/g' "$GRADLE_PROPS"
+          echo "Updated existing enableIosBuild property"
+        else
+          echo "enableIosBuild=true" >> "$GRADLE_PROPS"
+          echo "Added enableIosBuild property"
+        fi
+
+        # Verify the change
+        if grep -q "enableIosBuild=true" "$GRADLE_PROPS"; then
+          echo "✅ iOS build successfully enabled"
+        else
+          echo "::error::Failed to enable iOS build"
+          exit 1
+        fi 

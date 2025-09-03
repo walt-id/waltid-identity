@@ -1,0 +1,30 @@
+name: cocoapods-setup
+description: cocoapods-setup
+inputs:
+  version:
+    description: 'Specific CocoaPods version to install (optional)'
+    required: false
+    default: ''
+runs:
+  using: "composite"
+  steps:
+    - name: Setup CocoaPods
+      shell: bash
+      run: |
+        set -euo pipefail
+        
+        if [[ "${{ inputs.version }}" != "" ]]; then
+          echo "Installing CocoaPods version ${{ inputs.version }}"
+          gem install cocoapods -v ${{ inputs.version }} --no-document
+        else
+          echo "Updating CocoaPods to latest version"
+          gem update cocoapods --no-document
+        fi
+        
+        # Only update repo if cache miss or forced
+        if [[ ! -d ~/.cocoapods/repos/trunk/.git ]] || [[ "$GITHUB_EVENT_NAME" == "schedule" ]]; then
+          echo "Updating CocoaPods repository..."
+          pod repo update --silent
+        else
+          echo "Using cached CocoaPods repository"
+        fi

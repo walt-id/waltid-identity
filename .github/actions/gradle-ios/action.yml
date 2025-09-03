@@ -1,0 +1,36 @@
+name: gradle-ios
+description: gradle-ios
+inputs:
+  waltid-directory:
+    description: 'Path waltid-identity directory'
+    required: false
+    type: string
+    default: '.'
+runs:
+  using: "composite"
+  steps:
+    - name: Configure iOS build environment
+      uses: walt-id/waltid-identity/.github/actions/ios-build-setup@ci/ios-build
+      with:
+        gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
+
+    - name: Install CocoaPods dependencies for iOS libraries
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: |
+        ./gradlew podInstall --info
+#        ./gradlew :waltid-libraries:crypto:waltid-crypto-ios:podInstall --info
+#        ./gradlew :waltid-libraries:sdjwt:waltid-sdjwt-ios:podInstall --info
+
+    - name: Build iOS simulator frameworks (ARM64)
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: ./gradlew clean linkPodDebugFrameworkIosSimulatorArm64
+
+    - name: Execute iOS simulator tests (ARM64)
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: |
+        ./gradlew iosSimulatorArm64Test --info
+#        ./gradlew :waltid-libraries:crypto:waltid-crypto-ios:iosSimulatorArm64Test --info
+#        ./gradlew :waltid-libraries:sdjwt:waltid-sdjwt-ios:iosSimulatorArm64Test --info
