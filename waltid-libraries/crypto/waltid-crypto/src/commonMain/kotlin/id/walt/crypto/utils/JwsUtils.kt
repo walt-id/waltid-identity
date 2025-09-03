@@ -1,6 +1,5 @@
 package id.walt.crypto.utils
 
-import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
