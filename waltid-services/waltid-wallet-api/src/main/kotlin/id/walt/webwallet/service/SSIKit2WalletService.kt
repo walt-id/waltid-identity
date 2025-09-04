@@ -238,10 +238,12 @@ class SSIKit2WalletService(
                 }
             })
         val httpResponseBody = runCatching { resp.bodyAsText() }.getOrNull()
-        val isResponseRedirectUrl = httpResponseBody != null && httpResponseBody.take(10).lowercase().let {
+        val redirectUrl = httpResponseBody?.takeIf { it.couldBeJsonObject() }
+            ?.parseAsJsonObject()?.getOrNull()?.get("redirectUrl")?.jsonPrimitive?.contentOrNull
+        val isResponseRedirectUrl = redirectUrl != null || (httpResponseBody != null && httpResponseBody.take(10).lowercase().let {
             @Suppress("HttpUrlsUsage")
             it.startsWith("http://") || it.startsWith("https://")
-        }
+        })
         logger.debug { "HTTP Response: $resp, body: $httpResponseBody" }
         parameter.selectedCredentials.forEach {
             credentialService.get(walletId, it)?.run {
@@ -267,16 +269,16 @@ class SSIKit2WalletService(
 
 
         return if (resp.status.value == 302 && !resp.headers["location"].toString().contains("error")) {
-            Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
+            Result.success(redirectUrl ?: if (isResponseRedirectUrl) httpResponseBody else null)
         } else if (resp.status.isSuccess()) {
-            Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
+            Result.success(redirectUrl ?: if (isResponseRedirectUrl) httpResponseBody else null)
         } else {
             logger.debug { "Presentation failed, return = $httpResponseBody" }
             if (isResponseRedirectUrl) {
                 Result.failure(
                     PresentationError(
                         message = "Presentation failed - redirecting to error page",
-                        redirectUri = httpResponseBody
+                        redirectUri = redirectUrl ?: httpResponseBody
                     )
                 )
             } else {
@@ -290,11 +292,10 @@ class SSIKit2WalletService(
                                     ?: "Presentation failed"
                                 else it
                             } ?: "Presentation failed",
-                        redirectUri = ""
+                        redirectUri = "",
                     )
                 )
             }
-        }
     }
 
     override suspend fun resolvePresentationRequest(request: String): String {
