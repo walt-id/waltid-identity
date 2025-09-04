@@ -334,7 +334,6 @@ class TestCredentialWallet(
 
                         CredentialFormat.sd_jwt_vc -> buildDescriptorMappingSDJwtVC(
                             session.presentationDefinition,
-                            index,
                             credential.document,
                             "$",
                         )
@@ -491,7 +490,6 @@ class TestCredentialWallet(
 
     fun buildDescriptorMappingSDJwtVC(
         presentationDefinition: PresentationDefinition?,
-        index: Int,
         vcJwsStr: String,
         rootPath: String = "$",
     ) = let {

@@ -189,7 +189,6 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                             CredentialFormat.sd_jwt_vc -> {
                                 credentialWallet.buildDescriptorMappingSDJwtVC(
                                     resolvedAuthReq.presentationDefinition,
-                                    index,
                                     credential.document,
                                     "$",
                                 )
@@ -375,7 +374,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 ) {
                     responseBody
                 } else {
-                    //this logic is incorrect....
+                    //this logic is incorrect...
                     if (isResponseRedirectUrl) {
                         throw PresentationError(
                             message = "Presentation failed - redirecting to error page",
