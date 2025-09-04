@@ -116,7 +116,9 @@ abstract class IssuanceServiceBase {
         return CredentialDataResult(
             id = credentialId,
             document = credentialParts.jwsParts.toString(),
-            disclosures = credentialParts.sdJwtDisclosuresString().drop(1), // remove first '~'
+            disclosures = credentialParts.sdJwtDisclosuresString()
+                .drop(1) // remove the first '~'
+                .dropLast(1), // remove the last '~'
             manifest = manifest?.toString(),
             type = typ,
             format = credentialFormat,

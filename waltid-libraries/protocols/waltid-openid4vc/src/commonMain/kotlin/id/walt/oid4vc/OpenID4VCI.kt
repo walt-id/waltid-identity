@@ -27,6 +27,7 @@ import id.walt.oid4vc.util.http
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDJwt.Companion.SEPARATOR_STR
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDJwtVC.Companion.defaultPayloadProperties
@@ -751,12 +752,14 @@ object OpenID4VCI {
             headers = headers.mapValues { it.value.toJsonElement() }
         )
 
-        return SDJwtVC(
-            SDJwt.createFromSignedJwt(
+        val sdJwtVC = SDJwtVC(
+            sdJwt = SDJwt.createFromSignedJwt(
                 signedJwt = jwt,
                 sdPayload = finalSdPayload
             )
-        ).toString()
+        )
+
+        return sdJwtVC.toString().plus(SEPARATOR_STR)
     }
 
     suspend fun generateW3CJwtVC(

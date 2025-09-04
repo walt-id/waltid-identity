@@ -236,13 +236,26 @@ class TestCredentialWallet(
                 } else {
                     it.document
                 }
+                val sdJwtVC = SDJwtVC.parse(documentWithDisclosures)
 
-                SDJwtVC.parse(documentWithDisclosures).present(
-                    true, audience = session.authorizationRequest.clientId, nonce = session.nonce ?: "",
-                    WaltIdJWTCryptoProvider(mapOf(key.getKeyId() to key)), key.getKeyId()
+                val finalSDJwtVC = sdJwtVC.present(
+                    discloseAll = true,
+                    audience = session.authorizationRequest.clientId,
+                    nonce = session.nonce ?: "",
+                    kbCryptoProvider = WaltIdJWTCryptoProvider(
+                        keys = mapOf(key.getKeyId() to key)
+                    ),
+                    kbKeyId = key.getKeyId()
                 )
+
+                finalSDJwtVC
             }
-        }.map { it.toString(true, true) }
+        }.map {
+            it.toString(
+                formatForPresentation = true,
+                withKBJwt = true
+            )
+        }
         println("sdJwtVCsPresented: $sdJwtVCsPresented")
 
         val mDocsPresented = runBlocking {
