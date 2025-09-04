@@ -245,7 +245,7 @@ class TestCredentialWallet(
         }.map { it.toString(true, true) }
         println("sdJwtVCsPresented: $sdJwtVCsPresented")
 
-        val mdocsPresented = runBlocking {
+        val mDocsPresented = runBlocking {
             val matchingMDocs = matchedCredentials.filter { it.format == CredentialFormat.mso_mdoc }
             if (matchingMDocs.isNotEmpty()) {
                 val mdocHandover = OpenID4VP.generateMDocOID4VPHandover(session.authorizationRequest, session.nonce!!)
@@ -283,7 +283,7 @@ class TestCredentialWallet(
                 }
             } else listOf()
         }
-        println("mdocsPresented: $mdocsPresented")
+        println("mDocsPresented: $mDocsPresented")
 
         val presentationId = (session.presentationDefinition?.id ?: "urn:uuid:${randomUUIDString().lowercase()}")
 
@@ -306,7 +306,7 @@ class TestCredentialWallet(
         } else null
 
         val deviceResponse =
-            if (mdocsPresented.isNotEmpty()) mdocsPresented.let { DeviceResponse(it).toCBORBase64URL() } else null
+            if (mDocsPresented.isNotEmpty()) mDocsPresented.let { DeviceResponse(it).toCBORBase64URL() } else null
 
         println("GENERATED VP: $signedJwtVP")
 
