@@ -100,5 +100,5 @@ solutions. Learn more [here](https://walt.id/blog/p/community-stack).
 
 ## License
 
-**Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-ssikit/blob/master/LICENSE).**
+**Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE).**
 
