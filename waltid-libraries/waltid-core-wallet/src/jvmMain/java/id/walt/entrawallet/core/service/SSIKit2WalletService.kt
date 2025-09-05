@@ -206,7 +206,7 @@ class SSIKit2WalletService(
             JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false
         }?.jsonObject ?: throw Exception("No ephemeral reader key found")
         val ephemeralWalletKey = runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
-        return tokenResponse.toDirecPostJWTParameters(
+        return tokenResponse.toDirectPostJWTParameters(
             encKey,
             alg = authorizationRequest.clientMetadata!!.authorizationEncryptedResponseAlg!!,
             enc = authorizationRequest.clientMetadata!!.authorizationEncryptedResponseEnc!!,

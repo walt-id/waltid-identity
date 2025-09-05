@@ -51,13 +51,27 @@ data class TokenResponse private constructor(
             Json.decodeFromJsonElement(TokenResponseSerializer, jsonObject)
 
         fun success(
-            accessToken: String, tokenType: String, expiresIn: Long? = null, refreshToken: String? = null,
-            scope: String? = null, cNonce: String? = null, cNonceExpiresIn: Duration? = null,
-            authorizationPending: Boolean? = null, interval: Long? = null, state: String? = null
+            accessToken: String,
+            tokenType: String,
+            expiresIn: Long? = null,
+            refreshToken: String? = null,
+            scope: String? = null,
+            cNonce: String? = null,
+            cNonceExpiresIn: Duration? = null,
+            authorizationPending: Boolean? = null,
+            interval: Long? = null,
+            state: String? = null
         ) = TokenResponse(
-            accessToken, tokenType, expiresIn, refreshToken, scope = scope,
-            cNonce = cNonce, cNonceExpiresIn = cNonceExpiresIn, authorizationPending = authorizationPending,
-            interval = interval, state = state
+            accessToken = accessToken,
+            tokenType = tokenType,
+            expiresIn = expiresIn,
+            refreshToken = refreshToken,
+            scope = scope,
+            cNonce = cNonce,
+            cNonceExpiresIn = cNonceExpiresIn,
+            authorizationPending = authorizationPending,
+            interval = interval,
+            state = state
         )
 
         /**
@@ -77,8 +91,15 @@ data class TokenResponse private constructor(
                 state = state
             )
 
-        fun error(error: TokenErrorCode, errorDescription: String? = null, errorUri: String? = null) =
-            TokenResponse(error = error.name, errorDescription = errorDescription, errorUri = errorUri)
+        fun error(
+            error: TokenErrorCode,
+            errorDescription: String? = null,
+            errorUri: String? = null
+        ) = TokenResponse(
+            error = error.name,
+            errorDescription = errorDescription,
+            errorUri = errorUri
+        )
 
         private val knownKeys = setOf(
             "access_token",
@@ -160,8 +181,10 @@ data class TokenResponse private constructor(
     /**
      * Converts the token response to a direct_post.jwt response, where currently only a JWE-only response is supported.
      */
-    fun toDirecPostJWTParameters(
-        encKeyJwk: JsonObject, alg: String = "ECDH-ES", enc: String = "A256GCM",
+    fun toDirectPostJWTParameters(
+        encKeyJwk: JsonObject,
+        alg: String = "ECDH-ES",
+        enc: String = "A256GCM",
         headerParams: Map<String, JsonElement> = mapOf()
     ): Map<String, List<String>> {
         return mapOf(
