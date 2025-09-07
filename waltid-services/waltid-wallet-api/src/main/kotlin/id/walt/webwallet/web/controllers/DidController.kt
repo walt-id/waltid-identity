@@ -2,16 +2,21 @@
 
 package id.walt.webwallet.web.controllers
 
+import id.walt.commons.web.ConflictException
+import id.walt.commons.web.UnsupportedMediaTypeException
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.web.controllers.DidCreation.didCreate
 import id.walt.webwallet.web.controllers.auth.getWalletService
+import id.walt.webwallet.web.model.DidImportRequest
 import io.github.smiley4.ktoropenapi.delete
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.response.*
+import io.ktor.server.request.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlin.uuid.ExperimentalUuidApi
@@ -117,6 +122,34 @@ fun Application.dids() = walletRoute {
             }
         }) {
             didCreate()
+        }
+
+        post("import", {
+            summary = "Import an existing DID"
+            description = "Import a DID (did:key, did:web, did:cheqd) into the wallet. Optionally attach key material."
+            request {
+                body<DidImportRequest> {
+                    description = "Payload containing the DID and optional associated keys (JWK/PEM)."
+                }
+            }
+            response {
+                HttpStatusCode.Created to { description = "DID imported successfully" }
+                HttpStatusCode.BadRequest to { description = "Invalid DID or missing/invalid key material" }
+                HttpStatusCode.Conflict to { description = "DID already exists" }
+                HttpStatusCode.UnsupportedMediaType to { description = "Unsupported key format" }
+            }
+        }) {
+            val req = call.receive<DidImportRequest>()
+            try {
+                val result = call.getWalletService().importDid(did = req.did, keys = req.keys, alias = req.alias)
+                call.respond(HttpStatusCode.Created, result)
+            } catch (e: ConflictException) {
+                call.respond(HttpStatusCode.Conflict, e.message)
+            } catch (e: BadRequestException) {
+                call.respond(HttpStatusCode.BadRequest, e.message ?: "Bad request")
+            } catch (e: UnsupportedMediaTypeException) {
+                call.respond(HttpStatusCode.UnsupportedMediaType, e.message)
+            }
         }
     }
 }
