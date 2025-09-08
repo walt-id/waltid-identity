@@ -22,6 +22,9 @@ class SDJwtVC(sdJwt: SDJwt) :
     val status = undisclosedPayload["status"]?.jsonObject
     val sdAlg = undisclosedPayload["_sd_alg"]?.jsonPrimitive?.content
 
+    private val SD_JWT_NO_KB_REGEX = Regex("""^[^~]+(?:~[^~]+)*~$""")
+    private val SD_JWT_WITH_KB_REGEX = Regex("""^[^~]+(?:~[^~]+)+$""") // at least one ~ and no trailing ~
+
     private fun verifyHolderKeyBinding(
         jwtCryptoProvider: JWTCryptoProvider,
         requiresHolderKeyBinding: Boolean,
@@ -74,6 +77,14 @@ class SDJwtVC(sdJwt: SDJwt) :
                         },
             vcVerificationMessage = message
         )
+    }
+
+    fun isValidFormat(raw: String): Boolean {
+        return if (this.keyBindingJwt == null) {
+            SD_JWT_NO_KB_REGEX.matches(raw)
+        } else {
+            SD_JWT_WITH_KB_REGEX.matches(raw)
+        }
     }
 
     companion object {
