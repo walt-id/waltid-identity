@@ -10,6 +10,13 @@
           <!-- <KeyIcon aria-hidden="true" class="mr-1 h-5 w-5 text-white" /> -->
           <span>New</span>
         </button>
+        <button
+            class="inline-flex items-center rounded-lg bg-blue-500 px-9 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            @click="importDid"
+        >
+          <!-- <KeyIcon aria-hidden="true" class="mr-1 h-5 w-5 text-white" /> -->
+          <span>Import</span>
+        </button>
       </div>
     </div>
 
@@ -79,6 +86,10 @@ console.log(dids);
 
 function createDid() {
   navigateTo("dids/create");
+}
+
+function importDid() {
+  navigateTo("dids/import");
 }
 
 useHead({
