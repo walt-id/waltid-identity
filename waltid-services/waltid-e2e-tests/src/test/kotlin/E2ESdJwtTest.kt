@@ -56,7 +56,7 @@ class E2ESdJwtTest(
             did = did
         )
 
-        sessionApi.get(verificationId) {
+        sessionApi.get(verificationId) { it ->
             assertTrue(
                 it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null,
                 "Received no valid token response!"
@@ -130,7 +130,7 @@ class E2ESdJwtTest(
             did = did
         )
 
-        sessionApi.get(verificationId) {
+        sessionApi.get(verificationId) { it ->
             assertTrue(
                 it.tokenResponse?.presentationSubmission != null,
                 "should have a presentation submission after submission"
