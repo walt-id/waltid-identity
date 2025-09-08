@@ -130,7 +130,7 @@ jobs:
           chmod +x ./ping.sh
           ./ping.sh
       - name: Install node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "20"
       - name: Install newman
