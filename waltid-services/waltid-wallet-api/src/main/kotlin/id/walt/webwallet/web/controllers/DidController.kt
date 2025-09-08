@@ -19,6 +19,7 @@ import io.ktor.server.response.*
 import io.ktor.server.request.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.dids() = walletRoute {
@@ -141,7 +142,13 @@ fun Application.dids() = walletRoute {
         }) {
             val req = call.receive<DidImportRequest>()
             try {
-                val result = call.getWalletService().importDid(did = req.did, keys = req.keys, alias = req.alias)
+                val key: Any? = when (val k = req.keys) {
+                    null -> null
+                    is JsonObject -> k
+                    is JsonPrimitive -> if (k.isString) k.content else throw BadRequestException("keys must be a string (PEM/JWK JSON) or object (JWK)")
+                    else -> throw BadRequestException("keys must be a string (PEM/JWK JSON) or object (JWK)")
+                }
+                val result = call.getWalletService().importDid(did = req.did, keys = key, alias = req.alias)
                 call.respond(HttpStatusCode.Created, result)
             } catch (e: ConflictException) {
                 call.respond(HttpStatusCode.Conflict, e.message)

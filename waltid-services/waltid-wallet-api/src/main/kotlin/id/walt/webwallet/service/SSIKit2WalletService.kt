@@ -379,7 +379,7 @@ class SSIKit2WalletService(
 
     override suspend fun listDids() = DidsService.list(walletId)
 
-    override suspend fun importDid(did: String, keys: List<String>?, alias: String?): String {
+    override suspend fun importDid(did: String, keys: Any?, alias: String?): String {
         if (!did.startsWith("did:")) throw BadRequestException("Invalid DID: must start with 'did:'")
         val method = did.substringAfter("did:").substringBefore(":")
         val supported = setOf("key", "web", "jwk")
@@ -390,19 +390,27 @@ class SSIKit2WalletService(
         }
 
         val keyId: String = try {
-            if (!keys.isNullOrEmpty()) {
-                val firstKey = keys.first()
-                importKey(firstKey)
+            val provided = keys
+            if (provided != null) {
+                val keyString = when (provided) {
+                    is JsonObject -> provided.toString()
+                    is String -> provided
+                    else -> throw BadRequestException("Unsupported keys type: ${provided::class.simpleName}")
+                }
+                importKey(keyString)
             } else {
                 val vm = didDoc["verificationMethod"]?.jsonArray?.firstOrNull()?.jsonObject
                 val jwk = vm?.get("publicKeyJwk")?.jsonObject
-                if (jwk == null) throw BadRequestException("Missing key material: provide keys or ensure DID document includes publicKeyJwk")
+                    ?: throw BadRequestException("Missing key material: provide keys or ensure DID document includes publicKeyJwk")
                 importKey(jwk.toString())
             }
         } catch (e: ConflictException) {
-            val provided = keys?.firstOrNull()
             val candidateKid = runCatching {
-                if (provided != null && provided.trim().startsWith("{")) Json.parseToJsonElement(provided).jsonObject["kid"]?.jsonPrimitive?.content else null
+                when (keys) {
+                    is String -> if (keys.trim().startsWith("{")) Json.parseToJsonElement(keys).jsonObject["kid"]?.jsonPrimitive?.content else null
+                    is JsonObject -> keys["kid"]?.jsonPrimitive?.content
+                    else -> null
+                }
             }.getOrNull()
             candidateKid ?: throw e
         }
@@ -414,7 +422,7 @@ class SSIKit2WalletService(
         }
 
         eventUseCase.log(
-            action = EventType.Did.Register,
+            action = EventType.Did.Import,
             originator = "wallet",
             tenant = tenant,
             accountId = accountId,
