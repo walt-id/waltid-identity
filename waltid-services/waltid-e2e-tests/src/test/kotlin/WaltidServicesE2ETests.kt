@@ -17,6 +17,7 @@ import id.walt.verifier.verifierModule
 import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
+import id.walt.webwallet.web.model.DidImportRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
 import id.walt.webwallet.webWalletModule
 import io.ktor.client.*
@@ -47,6 +48,10 @@ class WaltidServicesE2ETests {
         val defaultEmailAccount = EmailAccountRequest(
             email = "user@email.com",
             password = "password"
+        )
+        val importDidRequest = DidImportRequest(
+            did = "did:key:z6MkpThz6fNQ8h6vF3p6LB7DL8v5L8VhZ7Z7ZsYkTqXK5J3S",
+            alias = "importedDid"
         )
         val issuerKey = loadResource("issuance/key.json")
         val issuerDid = loadResource("issuance/did.txt")
@@ -213,6 +218,7 @@ class WaltidServicesE2ETests {
         didsApi.get(wallet, did)
         didsApi.default(wallet, did)
         didsApi.list(wallet, DidsApi.DefaultDidOption.Some(did), 1)
+        didsApi.importDid(wallet , importDidRequest)
         //endregion -Dids-
 
         //region -Categories-
