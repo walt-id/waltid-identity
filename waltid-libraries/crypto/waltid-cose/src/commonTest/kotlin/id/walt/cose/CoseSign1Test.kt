@@ -131,7 +131,7 @@ class CoseSign1Test {
     }
 
     @Test
-    fun `5_1 - Should successfully roundtrip (serialize and deserialize) int contentType`() = runTest {
+    fun `5_1 - Should successfully roundtrip serialize and deserialize int contentType`() = runTest {
         println("-- Start: 5.1 - Should successfully roundtrip (serialize and deserialize) for int content type --")
         val protectedHeaders = CoseHeaders(
             algorithm = Cose.Algorithm.ES256,
@@ -160,7 +160,7 @@ class CoseSign1Test {
     }
 
     @Test
-    fun `5_2 - Should successfully roundtrip (serialize and deserialize) string contentType`() = runTest {
+    fun `5_2 - Should successfully roundtrip serialize and deserialize string contentType`() = runTest {
         println("-- Start: 5 - Should successfully roundtrip (serialize and deserialize) for string content type --")
         val protectedHeaders = CoseHeaders(
             algorithm = Cose.Algorithm.ES256,
@@ -209,7 +209,7 @@ class CoseSign1Test {
     }
 
     @Test
-    fun `7 - Should handle external authenticated data (AAD) correctly`() = runTest {
+    fun `7 - Should handle external authenticated data AAD correctly`() = runTest {
         println("-- Start: 7 - Should handle external authenticated data (AAD) correctly --")
         val protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES256)
         val payload = "Payload.".encodeToByteArray()
