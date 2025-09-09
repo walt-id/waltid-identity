@@ -52,9 +52,9 @@ jobs:
           echo "Will use filename $filenameNoExtension for reports"
           echo "dataset_filename=$filenameNoExtension" >> $GITHUB_ENV
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Checkout waltid-identity-postman
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: walt-id/waltid-identity-postman
           ref: main
