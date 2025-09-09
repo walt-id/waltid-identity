@@ -78,70 +78,79 @@ object Verifier2Service {
 
     fun Route.registerRoute() {
         route("verification-session") {
-            post<VerificationSessionSetup>("create", {
-                summary = "Create new verification session"
-                request {
-                    body<VerificationSessionSetup> {
-                        example("Basic example") { value = Verifier2OpenApiExamples.basicExample }
-                        example("W3C + path") { value = exampleOf(Verifier2OpenApiExamples.w3cPlusPath) }
-                        example("Empty meta") { value = exampleOf(Verifier2OpenApiExamples.emptyMeta) }
-                        example("Nested presentation request") {
-                            value = exampleOf(Verifier2OpenApiExamples.nestedPresentationRequestW3C)
+            route("", {
+                tags("Verification Session Management")
+            }) {
+                post<VerificationSessionSetup>("create", {
+                    summary = "Create new verification session"
+                    request {
+                        body<VerificationSessionSetup> {
+                            example("Basic example") { value = Verifier2OpenApiExamples.basicExample }
+                            example("W3C + path") { value = exampleOf(Verifier2OpenApiExamples.w3cPlusPath) }
+                            example("Empty meta") { value = exampleOf(Verifier2OpenApiExamples.emptyMeta) }
+                            example("Nested presentation request") {
+                                value = exampleOf(Verifier2OpenApiExamples.nestedPresentationRequestW3C)
+                            }
+                            example("Nested presentation request + multiple claims") {
+                                value = exampleOf(Verifier2OpenApiExamples.nestedPresentationRequestWithMultipleClaims)
+                            }
+                            example("W3C type values") { value = exampleOf(Verifier2OpenApiExamples.w3cTypeValues) }
+                            example("W3C without claims") { value = exampleOf(Verifier2OpenApiExamples.W3CWithoutClaims) }
+                            example("W3C with claims and values") { value = exampleOf(Verifier2OpenApiExamples.W3CWithClaimsAndValues) }
                         }
-                        example("Nested presentation request + multiple claims") {
-                            value = exampleOf(Verifier2OpenApiExamples.nestedPresentationRequestWithMultipleClaims)
+                    }
+                    response {
+                        HttpStatusCode.Created to {
+                            body<VerificationSessionCreationResponse>()
                         }
-                        example("W3C type values") { value = exampleOf(Verifier2OpenApiExamples.w3cTypeValues) }
-                        example("W3C without claims") { value = exampleOf(Verifier2OpenApiExamples.W3CWithoutClaims) }
-                        example("W3C with claims and values") { value = exampleOf(Verifier2OpenApiExamples.W3CWithClaimsAndValues) }
                     }
-                }
-                response {
-                    HttpStatusCode.Created to {
-                        body<VerificationSessionCreationResponse>()
-                    }
-                }
-            }) { sessionSetup ->
-                val newSession =
-                    Verifier2Manager.createVerificationSession(
-                        sessionSetup, config.clientId, config.clientMetadata, config.urlPrefix
-                    )
-                sessions[newSession.id] = newSession
-                val creationResponse = newSession.toSessionCreationResponse()
-                call.respond(creationResponse)
-            }
-
-            route("{sessionId}") {
-
-                get(
-                    "info", {
-                        summary = "View data of existing verification session"
-                        response { HttpStatusCode.OK to { body<Verification2Session>() } }
-                    }
-                ) {
-                    val verifierSession =
-                        sessions[call.parameters.getOrFail("sessionId")] ?: throw IllegalArgumentException("Unknown session id")
-                    call.respond(verifierSession)
+                }) { sessionSetup ->
+                    val newSession =
+                        Verifier2Manager.createVerificationSession(
+                            sessionSetup, config.clientId, config.clientMetadata, config.urlPrefix
+                        )
+                    sessions[newSession.id] = newSession
+                    val creationResponse = newSession.toSessionCreationResponse()
+                    call.respond(creationResponse)
                 }
 
-                route({
-                    summary = "Receive update events via SSE about the verification session"
-                }) {
-                    sse("verification-session/events", serialize = { typeInfo, it ->
-                        val serializer = Json.serializersModule.serializer(typeInfo.kotlinType!!)
-                        Json.encodeToString(serializer, it)
-                    }) {
+                route("{verification-session}") {
+
+                    get("info", {
+                            summary = "View data of existing verification session"
+                            request { pathParameter<String>("verification-session") }
+                            response { HttpStatusCode.OK to { body<Verification2Session>() } }
+                        }
+                    ) {
                         val verifierSession =
-                            sessions[call.parameters.getOrFail("sessionId")] ?: throw IllegalArgumentException("Unknown session id")
+                            sessions[call.parameters.getOrFail("verification-session")]
+                                ?: throw IllegalArgumentException("Unknown session id")
+                        call.respond(verifierSession)
+                    }
 
-                        // Get the flow for this specific target.
-                        val sseFlow = SseNotifier.getSseFlow(verifierSession.id.toString())
+                    route({
+                        summary = "Receive update events via SSE about the verification session"
+                    }) {
+                        sse("verification-session/events", serialize = { typeInfo, it ->
+                            val serializer = Json.serializersModule.serializer(typeInfo.kotlinType!!)
+                            Json.encodeToString(serializer, it)
+                        }) {
+                            val verifierSession =
+                                sessions[call.parameters.getOrFail("sessionId")] ?: throw IllegalArgumentException("Unknown session id")
 
-                        // This will suspend until the client disconnects.
-                        send(JsonObject(emptyMap()))
-                        sseFlow.collect { event -> send(event) }
+                            // Get the flow for this specific target.
+                            val sseFlow = SseNotifier.getSseFlow(verifierSession.id.toString())
+
+                            // This will suspend until the client disconnects.
+                            send(JsonObject(emptyMap()))
+                            sseFlow.collect { event -> send(event) }
+                        }
                     }
                 }
+            }
+            route("{verification-session}", {
+                tags("Client endpoints")
+            }) {
                 get(
                     "request",
                     {
@@ -150,7 +159,7 @@ object Verifier2Service {
                         response { HttpStatusCode.OK to { body<AuthorizationRequest>() } }
                     }) {
                     val verificationSession =
-                        sessions[call.parameters.getOrFail("sessionId")] ?: throw IllegalArgumentException("Unknown session id")
+                        sessions[call.parameters.getOrFail("verification-session")] ?: throw IllegalArgumentException("Unknown session id")
 
                     // TODO: JAR
 
@@ -169,7 +178,7 @@ object Verifier2Service {
                                 body<String> { description = "" /* TODO */ }
                             }
                         }) { body ->
-                        val sessionId = call.parameters.getOrFail("sessionId")
+                        val sessionId = call.parameters.getOrFail("verification-session")
                         log.trace { "Received verification session response to session: $sessionId" }
                         val verificationSession = sessions[sessionId]
 

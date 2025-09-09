@@ -88,8 +88,6 @@ dependencies {
     implementation("io.klogging:klogging-jvm:0.9.4")
     implementation("io.klogging:slf4j-klogging:0.9.4")
 
-    implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
-
     // Test
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
