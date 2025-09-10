@@ -45,10 +45,8 @@ data class OpenIDClientMetadata(
     @SerialName("default_acr_values") val defaultAcrValues: List<String>? = null,
     @SerialName("initiate_login_uri") val initiateLoginUri: String? = null,
     @SerialName("request_uris") val requestUris: List<String>? = null,
-    @SerialName("vp_formats") val vpFormats: Map<String, Map<String, List<String>>>? = null,
     override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
-
     override fun toJSON() = Json.encodeToJsonElement(OpenIDClientMetadataSerializer, this).jsonObject
 
     companion object : JsonDataObjectFactory<OpenIDClientMetadata>() {
