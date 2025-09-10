@@ -79,7 +79,6 @@ import kotlinx.serialization.json.*
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.nio.charset.StandardCharsets
 import java.util.Base64
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
@@ -202,47 +201,72 @@ class SSIKit2WalletService(
     override suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?> {
         val credentialWallet = getCredentialWallet(parameter.did)
 
-        val authReq =
-            AuthorizationRequest.fromHttpParametersAuto(parseQueryString(Url(parameter.request).encodedQuery).toMap())
-        logger.debug { "Auth req: $authReq" }
+        val authorizationRequest =
+            AuthorizationRequest.fromHttpParametersAuto(
+                parseQueryString(Url(parameter.request).encodedQuery).toMap()
+            )
+        logger.debug { "Authorization Request $authorizationRequest" }
 
         logger.debug { "Using presentation request, selected credentials: ${parameter.selectedCredentials}" }
 
         val presentationSession =
-            credentialWallet.initializeAuthorization(authReq, 60.seconds, parameter.selectedCredentials.toSet())
+            credentialWallet.initializeAuthorization(
+                authorizationRequest = authorizationRequest,
+                expiresIn = 60.seconds,
+                selectedCredentials = parameter.selectedCredentials.toSet()
+            )
         logger.debug { "Initialized authorization (VPPresentationSession): $presentationSession" }
 
         logger.debug { "Resolved presentation definition: ${presentationSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}" }
 
-        SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
+        SessionAttributes.HACK_outsideMappedSelectedCredentialsPerSession[
+            presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id
+        ] =
             parameter.selectedCredentials
+
         if (parameter.disclosures != null) {
-            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
+            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[
+                presentationSession.authorizationRequest.state + presentationSession.authorizationRequest.presentationDefinition?.id
+            ] =
                 parameter.disclosures
         }
 
-        val tokenResponse =
-            credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest!!)
-        val submitFormParams =
-            getFormParameters(presentationSession.authorizationRequest, tokenResponse, presentationSession)
+        val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
+
+        if (tokenResponse.vpToken!!.jsonPrimitive.content.contains("~"))
+            require(tokenResponse.vpToken!!.jsonPrimitive.content.last() != '~') {
+                "SD-JWT VC Presentations with Key Binding must not end with '~'"
+            }
+
+        val submitFormParams = getFormParameters(
+            authorizationRequest = presentationSession.authorizationRequest,
+            tokenResponse = tokenResponse,
+            presentationSession = presentationSession
+        )
 
         val resp = this.http.submitForm(
-            presentationSession.authorizationRequest.responseUri
-                ?: presentationSession.authorizationRequest.redirectUri ?: throw AuthorizationError(
-                    presentationSession.authorizationRequest,
-                    AuthorizationErrorCode.invalid_request,
-                    "No response_uri or redirect_uri found on authorization request"
-                ), parameters {
+            url = presentationSession.authorizationRequest.responseUri
+                ?: presentationSession.authorizationRequest.redirectUri
+                ?: throw AuthorizationError(
+                    authorizationRequest = presentationSession.authorizationRequest,
+                    errorCode = AuthorizationErrorCode.invalid_request,
+                    message = "No response_uri or redirect_uri found on authorization request"
+                ),
+            formParameters = parameters {
                 submitFormParams.forEach { entry ->
                     entry.value.forEach { append(entry.key, it) }
                 }
-            })
+            }
+        )
+
         val httpResponseBody = runCatching { resp.bodyAsText() }.getOrNull()
+
         val isResponseRedirectUrl = httpResponseBody != null && httpResponseBody.take(10).lowercase().let {
             @Suppress("HttpUrlsUsage")
             it.startsWith("http://") || it.startsWith("https://")
         }
         logger.debug { "HTTP Response: $resp, body: $httpResponseBody" }
+
         parameter.selectedCredentials.forEach {
             credentialService.get(walletId, it)?.run {
                 eventUseCase.log(
@@ -255,7 +279,7 @@ class SSIKit2WalletService(
                     data = eventUseCase.credentialEventData(
                         credential = this,
                         subject = eventUseCase.subjectData(this),
-                        organization = eventUseCase.verifierData(authReq),
+                        organization = eventUseCase.verifierData(authorizationRequest),
                         type = null
                     ),
                     credentialId = this.id,
@@ -264,37 +288,36 @@ class SSIKit2WalletService(
             }
         }
 
+        val isRedirect = resp.status.value == 302
+        val isErrorInLocationHeader = resp.headers["location"].toString().contains("error")
+        val isSuccess = resp.status.isSuccess()
 
-
-        return if (resp.status.value == 302 && !resp.headers["location"].toString().contains("error")) {
-            Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
-        } else if (resp.status.isSuccess()) {
-            Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
-        } else {
-            logger.debug { "Presentation failed, return = $httpResponseBody" }
-            if (isResponseRedirectUrl) {
-                Result.failure(
-                    PresentationError(
-                        message = "Presentation failed - redirecting to error page",
-                        redirectUri = httpResponseBody
-                    )
-                )
-            } else {
-                logger.debug { "Response body: $httpResponseBody" }
-                Result.failure(
-                    PresentationError(
-                        message =
-                            httpResponseBody?.let {
-                                if (it.couldBeJsonObject()) it.parseAsJsonObject().getOrNull()
-                                    ?.get("message")?.jsonPrimitive?.content
-                                    ?: "Presentation failed"
-                                else it
-                            } ?: "Presentation failed",
-                        redirectUri = ""
-                    )
-                )
-            }
+        if ((isRedirect && !isErrorInLocationHeader) || isSuccess) {
+            return Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
         }
+
+        logger.debug { "Presentation failed, return = $httpResponseBody" }
+        if (isResponseRedirectUrl) {
+            return Result.failure(
+                exception = PresentationError(
+                    message = "Presentation failed - redirecting to error page",
+                    redirectUri = httpResponseBody
+                )
+            )
+        }
+
+        return Result.failure(
+            exception = PresentationError(
+                message =
+                    httpResponseBody?.let {
+                        if (it.couldBeJsonObject()) it.parseAsJsonObject().getOrNull()
+                            ?.get("message")?.jsonPrimitive?.content
+                            ?: "Presentation failed"
+                        else it
+                    } ?: "Presentation failed",
+                redirectUri = ""
+            )
+        )
     }
 
     override suspend fun resolvePresentationRequest(request: String): String {
@@ -609,7 +632,7 @@ class SSIKit2WalletService(
     override suspend fun sign(alias: String, data: JsonElement): String {
         val key = findKey(alias) ?: throw NotFoundException("Key not found: $alias")
 
-        // Check whether the given data is a partially initialised Flattened JWS+Json object
+        // Check whether the given data is a partially initialized Flattened JWS+Json object
         // https://datatracker.ietf.org/doc/html/rfc7515#section-7.2.2
         val jwsObj = (data as? JsonObject)
             ?.takeIf { it.keys == setOf("protected", "payload") }
@@ -736,7 +759,7 @@ class SSIKit2WalletService(
             "key" ->
                 DidKeyCreateOptions(
                     args["key"]?.let { enumValueIgnoreCase<KeyType>(it.content) } ?: KeyType.Ed25519,
-                    args["useJwkJcsPub"]?.let { it.content.toBoolean() } == true)
+                    args["useJwkJcsPub"]?.content?.toBoolean() == true)
 
             "jwk" -> DidJwkCreateOptions()
             "web" ->
@@ -769,7 +792,7 @@ class SSIKit2WalletService(
             JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) == true
         }?.jsonObject ?: throw Exception("No ephemeral reader key found")
         val ephemeralWalletKey = runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
-        return tokenResponse.toDirecPostJWTParameters(
+        return tokenResponse.toDirectPostJWTParameters(
             encKey,
             alg = authorizationRequest.clientMetadata!!.authorizationEncryptedResponseAlg!!,
             enc = authorizationRequest.clientMetadata!!.authorizationEncryptedResponseEnc!!,

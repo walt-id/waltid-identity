@@ -18,7 +18,6 @@ import id.walt.policies.models.PolicyRequest
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.policies.policies.JwtSignaturePolicy
 import id.walt.policies.policies.SdJwtVCSignaturePolicy
-import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.verifier.oidc.models.presentedcredentials.PresentationSessionPresentedCredentials
 import id.walt.verifier.oidc.models.presentedcredentials.PresentedCredentialsViewMode
 import id.walt.w3c.utils.VCFormat

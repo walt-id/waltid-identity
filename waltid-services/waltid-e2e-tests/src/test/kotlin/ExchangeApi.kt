@@ -10,7 +10,6 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import org.junit.jupiter.api.Assertions.assertTrue
-import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -31,7 +30,6 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
         wallet: Uuid,
         offerUrl: String,
         numberOfExpected: Int,
-        requireUserInput: Boolean = false,
         output: ((List<WalletCredential>) -> Unit)? = null,
     ) = e2e.test("/wallet-api/wallet/{wallet}/exchange/useOfferRequest - claim credential from issuer") {
         client.post("/wallet-api/wallet/$wallet/exchange/useOfferRequest") {
@@ -66,7 +64,7 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
         expectedCredentialIds: List<String> = emptyList(),
         output: ((List<WalletCredential>) -> Unit)? = null,
     ) =
-        e2e.test("/wallet-api/wallet/{wallet}/exchange/matchCredentialsForPresentationDefinition - should match OpenBadgeCredential in wallet") {
+        e2e.test("/wallet-api/wallet/{wallet}/exchange/matchCredentialsForPresentationDefinition - should match") {
             client.post("/wallet-api/wallet/$wallet/exchange/matchCredentialsForPresentationDefinition") {
                 setBody(presentationDefinition)
             }.expectSuccess().apply {
