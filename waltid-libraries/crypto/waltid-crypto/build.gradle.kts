@@ -139,8 +139,8 @@ kotlin {
             dependencies {
                 implementation("com.google.crypto.tink:tink:1.16.0") // for JOSE using Ed25519
 
-                implementation("org.bouncycastle:bcprov-lts8on:2.73.7") // for secp256k1 (which was removed with Java 17)
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.7") // PEM import
+                implementation("org.bouncycastle:bcprov-lts8on:2.73.8") // for secp256k1 (which was removed with Java 17)
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.8") // PEM import
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
