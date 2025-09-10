@@ -18,7 +18,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        # macos-latest disabled until all multiplatform modules set up properly
+        # currently configured on workflow dispatch as a separate workflow (gradle-macos)
+        os: [ ubuntu-latest ]
     steps:
       - name: Free Disk Space (Ubuntu)
         if: ${{ runner.os == 'linux' }}
