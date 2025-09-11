@@ -45,7 +45,7 @@ fun Application.exchange() = walletRoute {
                 ?: wallet.listDids().run {
                     // use default did if no did is provided in the parameters
                     firstOrNull { it -> it.default }?.did
-                    // use first did, if no did is marked as default
+                    // use first DID if no DID is marked as default
                         ?: firstOrNull()?.did
                 }
                 ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
@@ -108,20 +108,21 @@ fun Application.exchange() = walletRoute {
 
             val req = call.receive<UsePresentationRequest>()
 
-            val request = req.presentationRequest
+            val presentationRequest = req.presentationRequest
 
             val did = req.did
                 ?: wallet.listDids().firstOrNull { it.default }?.did
                 ?: throw IllegalArgumentException("No DID to use supplied")
+
             val selectedCredentialIds = req.selectedCredentials
             // TODO -> ?: auto matching
+
             val disclosures = req.disclosures
 
-
             val result = wallet.usePresentationRequest(
-                PresentationRequestParameter(
+                parameter = PresentationRequestParameter(
                     did = did,
-                    request = request,
+                    request = presentationRequest,
                     selectedCredentials = selectedCredentialIds,
                     disclosures = disclosures,
                     note = req.note,
@@ -130,13 +131,13 @@ fun Application.exchange() = walletRoute {
 
             if (result.isSuccess) {
                 wallet.addOperationHistory(
-                    WalletOperationHistory.new(
+                    operationHistory = WalletOperationHistory.new(
                         tenant = wallet.tenant,
                         wallet = wallet,
-                        "usePresentationRequest",
-                        mapOf(
+                        operation = "usePresentationRequest",
+                        data = mapOf(
                             "did" to did,
-                            "request" to request,
+                            "request" to presentationRequest,
                             "selected-credentials" to selectedCredentialIds.joinToString(),
                             "success" to "true",
                             "redirect" to result.getOrThrow()
@@ -144,34 +145,42 @@ fun Application.exchange() = walletRoute {
                     )
                 )
 
-                call.respond(HttpStatusCode.OK, mapOf("redirectUri" to result.getOrThrow()))
+                call.respond(
+                    status = HttpStatusCode.OK,
+                    message = mapOf("redirectUri" to result.getOrThrow())
+                )
             } else {
                 val err = result.exceptionOrNull()
 
                 wallet.addOperationHistory(
-                    WalletOperationHistory.new(
+                    operationHistory = WalletOperationHistory.new(
                         tenant = wallet.tenant,
                         wallet = wallet,
-                        "usePresentationRequest",
-                        mapOf(
+                        operation = "usePresentationRequest",
+                        data = mapOf(
                             "did" to did,
-                            "request" to request,
+                            "request" to presentationRequest,
                             "success" to "false",
                             //"redirect" to ""
                         ) // change string false to bool
                     )
                 )
+
                 when (err) {
                     is SSIKit2WalletService.PresentationError -> {
                         call.respond(
-                            HttpStatusCode.BadRequest, mapOf(
+                            status = HttpStatusCode.BadRequest,
+                            message = mapOf(
                                 "redirectUri" to err.redirectUri,
                                 "errorMessage" to err.message
                             )
                         )
                     }
 
-                    else -> call.respond(HttpStatusCode.BadRequest, mapOf("errorMessage" to err?.message))
+                    else -> call.respond(
+                        status = HttpStatusCode.BadRequest,
+                        message = mapOf("errorMessage" to err?.message)
+                    )
                 }
             }
         }

@@ -74,8 +74,8 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.bouncycastle:bcprov-lts8on:2.73.7")
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.7")
+                implementation("org.bouncycastle:bcprov-lts8on:2.73.8")
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
                 implementation("io.mockk:mockk:1.13.16")
 
                 implementation(kotlin("reflect"))

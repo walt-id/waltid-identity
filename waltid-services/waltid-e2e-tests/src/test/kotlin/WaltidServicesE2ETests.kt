@@ -68,7 +68,11 @@ class WaltidServicesE2ETests {
         val nameFieldSchemaPresentationRequestPayload =
             loadResource("presentation/openbadgecredential-name-field-presentation-request.json")
 
-        val sdjwtIETFCredential = Json.decodeFromString<JsonElement>(loadResource("issuance/identity-credential-issuance-request.json")).jsonObject
+        val sdjwtIETFCredential =
+            Json.decodeFromString<JsonElement>(loadResource("issuance/identity-credential-issuance-request.json")).jsonObject
+
+        val sdjwtIETFCredentialWithoutDisclosures =
+            Json.decodeFromString<JsonElement>(loadResource("issuance/identity-credential-issuance-request-without-disclosures.json")).jsonObject
 
         val ieftSdjwtPresentationRequestPayload =
             loadResource("presentation/identity-credential-sd-presentation-request.json")
@@ -221,11 +225,11 @@ class WaltidServicesE2ETests {
         val categoryNewName = "name#2"
         categoryApi.list(wallet, 0)
         categoryApi.add(wallet, categoryName)
-        categoryApi.list(wallet, 1) {
+        categoryApi.list(wallet, 1) { it ->
             assertNotNull(it.single { it["name"]?.jsonPrimitive?.content == categoryName })
         }
         categoryApi.rename(wallet, categoryName, categoryNewName)
-        categoryApi.list(wallet, 1) {
+        categoryApi.list(wallet, 1) { it ->
             assertNotNull(it.single { it["name"]?.jsonPrimitive?.content == categoryNewName })
         }
         categoryApi.delete(wallet, categoryNewName)
@@ -308,7 +312,7 @@ class WaltidServicesE2ETests {
             wallet, UsePresentationRequest(did, resolvedPresentationOfferString, listOf(newCredentialId))
         )
 
-        sessionApi.get(verificationId) {
+        sessionApi.get(verificationId) { it ->
             assertTrue(it.tokenResponse?.vpToken?.jsonPrimitive?.contentOrNull?.expectLooksLikeJwt() != null) { "Received no valid token response!" }
             assertTrue(it.tokenResponse?.presentationSubmission != null) { "should have a presentation submission after submission" }
 
@@ -322,7 +326,7 @@ class WaltidServicesE2ETests {
 
         //region -History-
         val historyApi = HistoryApi(e2e, client)
-        historyApi.list(wallet) {
+        historyApi.list(wallet) { it ->
             assertTrue(it.size >= 2) { "missing history items" }
             assertTrue(it.any { it.operation == "useOfferRequest" } && it.any { it.operation == "usePresentationRequest" }) { "incorrect history items" }
         }
@@ -335,6 +339,7 @@ class WaltidServicesE2ETests {
         val sdJwtTest = E2ESdJwtTest(issuerApi, exchangeApi, sessionApi, verificationApi, credentialsApi)
         sdJwtTest.testW3CVC(wallet, did)
         sdJwtTest.testIEFTSDJWTVC(wallet, did)
+        sdJwtTest.testIEFTSDJWTVCWithoutDisclosures(wallet, did)
 
         // Test Authorization Code flow with available authentication methods in Issuer API
         val authorizationCodeFlow = AuthorizationCodeFlow(e2e, testHttpClient(doFollowRedirects = false))
@@ -460,7 +465,7 @@ val expectFailure: HttpResponse.() -> HttpResponse = {
     assertTrue(!status.isSuccess()) { "HTTP status is successful" }; this
 }
 
-fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let {
+fun JsonElement.tryGetData(key: String): JsonElement? = key.split('.').let { it ->
     var element: JsonElement? = this
     for (i in it) {
         element = when (element) {

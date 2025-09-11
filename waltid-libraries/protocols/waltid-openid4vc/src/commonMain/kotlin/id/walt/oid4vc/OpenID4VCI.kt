@@ -27,6 +27,7 @@ import id.walt.oid4vc.util.http
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDJwt.Companion.SEPARATOR_STR
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDJwtVC.Companion.defaultPayloadProperties
@@ -203,12 +204,12 @@ object OpenID4VCI {
         }
 
         return credentialsOffered.mapNotNull { credentialOffered ->
-            when {
-                credentialOffered is JsonPrimitive && credentialOffered.isString -> {
+            when (credentialOffered) {
+                is JsonPrimitive if credentialOffered.isString -> {
                     supportedCredentials[credentialOffered.content]?.let { OfferedCredential.fromProviderMetadata(it) }
                 }
 
-                credentialOffered is JsonObject -> {
+                is JsonObject -> {
                     OfferedCredential.fromJSON(credentialOffered)
                 }
 
@@ -414,7 +415,7 @@ object OpenID4VCI {
             nonce = nonce,
             requestUri = null,
             request = when (isJar!!) {
-                // Create a jwt as request object as defined in JAR OAuth2.0 specification
+                // Create a jwt as a request object as defined in JAR OAuth2.0 specification
                 true -> signToken(
                     privKey,
                     buildJsonObject {
@@ -751,12 +752,14 @@ object OpenID4VCI {
             headers = headers.mapValues { it.value.toJsonElement() }
         )
 
-        return SDJwtVC(
-            SDJwt.createFromSignedJwt(
+        val sdJwtVC = SDJwtVC(
+            sdJwt = SDJwt.createFromSignedJwt(
                 signedJwt = jwt,
                 sdPayload = finalSdPayload
             )
-        ).toString()
+        )
+
+        return sdJwtVC.toString().plus(SEPARATOR_STR)
     }
 
     suspend fun generateW3CJwtVC(

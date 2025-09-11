@@ -303,7 +303,11 @@ object Verifier {
         presentationContext: Map<String, Any> = emptyMap(),
     ): PresentationVerificationResponse {
         log.trace { "Verifying SD-JWT VC Presentation, vp_token: $vpToken" }
+
         val sdJwtVC = SDJwtVC.parse(vpToken)
+
+        require(sdJwtVC.isValidFormat(vpToken)) { "Invalid SD-JWT VC format" }
+
         val vpType = sdJwtVC.type ?: sdJwtVC.vct ?: ""
         log.trace { "SD-JWT VC Presentation vpType: $vpType" }
 
