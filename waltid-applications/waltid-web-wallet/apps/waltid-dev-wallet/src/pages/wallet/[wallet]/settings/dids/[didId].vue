@@ -96,7 +96,7 @@ import { TagIcon, TrashIcon } from "@heroicons/vue/24/outline";
 
 const route = useRoute();
 
-const didId = route.params.didId;
+const didId = decodeURIComponent(route.params.didId);
 
 const currentWallet = useCurrentWallet();
 
@@ -106,7 +106,7 @@ const {
   refresh,
   error,
 } = await useLazyFetch(
-  `/wallet-api/wallet/${currentWallet.value}/dids/${didId}`,
+  `/wallet-api/wallet/${currentWallet.value}/dids/${encodeURIComponent(didId)}`,
 );
 refreshNuxtData();
 

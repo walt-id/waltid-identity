@@ -25,6 +25,7 @@ sealed interface EventType {
         data object Delete : Action(this.javaClass.simpleName)
         data object Register : Action(this.javaClass.simpleName)
         data object Resolve : Action(this.javaClass.simpleName)
+        data object Import : Action(this.javaClass.simpleName)
     }
 
     data object Credential : EventType {
