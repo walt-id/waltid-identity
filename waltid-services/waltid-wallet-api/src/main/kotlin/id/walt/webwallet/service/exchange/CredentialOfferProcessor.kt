@@ -4,6 +4,7 @@ import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.requests.BatchCredentialRequest
 import id.walt.oid4vc.requests.CredentialRequest
+import kotlinx.serialization.json.jsonPrimitive
 
 object CredentialOfferProcessor {
     suspend fun process(
@@ -32,8 +33,8 @@ object CredentialOfferProcessor {
         return (batchCredentialResponse.credentialResponses
             ?: throw IllegalArgumentException("No credential responses returned")).indices.map {
             ProcessedCredentialOffer(
-                batchCredentialResponse.credentialResponses!![it],
-                batchCredentialRequest.credentialRequests[it]
+                credentialResponse = batchCredentialResponse.credentialResponses!![it],
+                credentialRequest = batchCredentialRequest.credentialRequests[it]
             )
         }
     }
@@ -54,6 +55,11 @@ object CredentialOfferProcessor {
                 credentialRequest = credReqs.first()
             )
         }
+
+        if (credentialResponse.credentialResponse.credential!!.jsonPrimitive.content.contains("~"))
+            require(credentialResponse.credentialResponse.credential!!.jsonPrimitive.content.last() == '~') {
+                "SD-JWT Credential must end with '~'"
+            }
 
         return listOf(credentialResponse)
     }

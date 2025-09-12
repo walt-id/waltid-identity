@@ -85,7 +85,10 @@ data class W3CVC(
                 )
             )
         )
-        return SDJwt.createFromSignedJwt(signed, sdPayload).toString()
+        return SDJwt.createFromSignedJwt(
+            signedJwt = signed,
+            sdPayload = sdPayload
+        ).toString().plus("~")
     }
 
     @JvmBlocking

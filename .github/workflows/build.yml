@@ -11,13 +11,13 @@ jobs:
   version:
     uses: walt-id/waltid-identity/.github/workflows/version.yml@266f5c09359450c39019a6da38f2b331e7122918
   gradle-build:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@3c360ff47f15ed48833e75df5fc39c6a22356912
+    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@82cfef8abfc585a741406a1275a533e9db6619ed
     secrets: inherit
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
   docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@927c4233610e90dd8a57418662fad7293b7b29a4
+    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@70e59bbea44de0b3511bb6bd72faa553e92f7bcf
     with:
       jsonpath: ".github/workflows/data/docker-matrix.json"
   docker:
@@ -29,7 +29,7 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       artifact: true
   api-docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@927c4233610e90dd8a57418662fad7293b7b29a4
+    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@70e59bbea44de0b3511bb6bd72faa553e92f7bcf
     with:
       jsonpath: ".github/workflows/data/api-docker-matrix.json"
   api-docker:
@@ -43,14 +43,14 @@ jobs:
   ebsi-ct-v3:
     # disabled job because of ebsi certificate issues (expired certificate)
     if: false
-    uses: walt-id/waltid-identity/.github/workflows/ebsictv3.yml@08e5e54d8028acba56454e0f1f0c65cc18297a4f
+    uses: walt-id/waltid-identity/.github/workflows/ebsictv3.yml@70e59bbea44de0b3511bb6bd72faa553e92f7bcf
     needs: [ version, docker, api-docker ]
     secrets: inherit
     with:
       artifact: issuer-api
       tag: "waltid/issuer-api:${{ needs.version.outputs.release_version }}"
   compose-test:
-    uses: walt-id/waltid-identity/.github/workflows/docker-compose-testing.yml@30f3806290f5652dd371a682cf17961250607e71
+    uses: walt-id/waltid-identity/.github/workflows/docker-compose-testing.yml@a35cb7a55c0760097214b15db938d49287fdd96c
     needs: [ version, docker, api-docker ]
     secrets: inherit
     with:

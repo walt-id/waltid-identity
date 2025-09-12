@@ -189,7 +189,6 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                             CredentialFormat.sd_jwt_vc -> {
                                 credentialWallet.buildDescriptorMappingSDJwtVC(
                                     resolvedAuthReq.presentationDefinition,
-                                    index,
                                     credential.document,
                                     "$",
                                 )
@@ -321,7 +320,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                             }?.jsonObject ?: throw Exception("No ephemeral reader key found")
                         val ephemeralWalletKey =
                             runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
-                        tokenResponse.toDirecPostJWTParameters(
+                        tokenResponse.toDirectPostJWTParameters(
                             encKey,
                             alg = authReq.clientMetadata!!.authorizationEncryptedResponseAlg!!,
                             enc = authReq.clientMetadata!!.authorizationEncryptedResponseEnc!!,
@@ -375,7 +374,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 ) {
                     responseBody
                 } else {
-                    //this logic is incorrect....
+                    //this logic is incorrect...
                     if (isResponseRedirectUrl) {
                         throw PresentationError(
                             message = "Presentation failed - redirecting to error page",

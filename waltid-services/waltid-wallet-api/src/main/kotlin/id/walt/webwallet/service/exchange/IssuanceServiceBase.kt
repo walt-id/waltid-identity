@@ -116,7 +116,9 @@ abstract class IssuanceServiceBase {
         return CredentialDataResult(
             id = credentialId,
             document = credentialParts.jwsParts.toString(),
-            disclosures = credentialParts.sdJwtDisclosuresString().drop(1), // remove first '~'
+            disclosures = credentialParts.sdJwtDisclosuresString()
+                .drop(1) // remove the first '~'
+                .dropLast(1), // remove the last '~'
             manifest = manifest?.toString(),
             type = typ,
             format = credentialFormat,
@@ -133,7 +135,7 @@ abstract class IssuanceServiceBase {
     }
 
     fun isKeyProofRequiredForOfferedCredential(offeredCredential: OfferedCredential) =
-        // Use key proof if supported cryptographic binding method is not empty, doesn't contain did and contains cose_key or jwk
+        // Use key proof if the supported cryptographic binding method is not empty, doesn't contain DID and contains cose_key or jwk
         (offeredCredential.cryptographicBindingMethodsSupported != null &&
                 (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
                         offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
