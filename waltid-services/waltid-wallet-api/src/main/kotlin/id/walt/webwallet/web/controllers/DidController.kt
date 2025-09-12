@@ -2,8 +2,7 @@
 
 package id.walt.webwallet.web.controllers
 
-import id.walt.commons.web.ConflictException
-import id.walt.commons.web.UnsupportedMediaTypeException
+
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.web.controllers.DidCreation.didCreate
 import id.walt.webwallet.web.controllers.auth.getWalletService
