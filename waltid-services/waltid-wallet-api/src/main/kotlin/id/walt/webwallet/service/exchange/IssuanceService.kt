@@ -177,7 +177,7 @@ object IssuanceService : IssuanceServiceBase() {
         // val walletKey = getKeyByDid(credentialWallet.did)
         val walletKey = DidService.resolveToKey(credentialWallet.did).getOrThrow()
 
-        // *) Create response JWT token, signed by key for holder DID
+        // *) Create response JWT token, signed by the key for holder DID
         val responseObject = entraIssuanceRequest.getResponseObject(
             walletKey.getThumbprint(),
             credentialWallet.did,

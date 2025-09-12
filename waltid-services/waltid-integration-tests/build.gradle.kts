@@ -38,7 +38,7 @@ dependencies {
     implementation("app.softwork:kotlinx-uuid-core:0.1.4")
     implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
-    implementation("org.bouncycastle:bcpkix-lts8on:2.73.7")
+    implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
 
     implementation("org.junit.jupiter:junit-jupiter-engine:5.12.2")
     implementation("org.junit.jupiter:junit-jupiter-params:5.12.2")

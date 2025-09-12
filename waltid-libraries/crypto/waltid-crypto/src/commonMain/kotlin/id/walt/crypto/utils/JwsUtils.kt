@@ -1,6 +1,5 @@
 package id.walt.crypto.utils
 
-import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -29,7 +28,9 @@ object JwsUtils {
     @Serializable
     data class JwsPartsSdJwt(val jwsParts: JwsParts, val sdJwtDisclosures: List<String>) {
 
-        fun sdJwtDisclosuresString() = if (sdJwtDisclosures.isNotEmpty()) "~${sdJwtDisclosures.joinToString("~")}" else ""
+        fun sdJwtDisclosuresString() =
+            if (sdJwtDisclosures.isNotEmpty()) "~${sdJwtDisclosures.joinToString("~")}" else ""
+
         override fun toString() = "$jwsParts${sdJwtDisclosuresString()}"
 
     }
@@ -49,8 +50,8 @@ object JwsUtils {
 
     fun String.decodeJwsStrings(): JwsStringParts {
         checkJwsPreconditions(this, false)
-        val splitted = split(".")
-        val (header, payload, signature) = splitted
+        val split = split(".")
+        val (header, payload, signature) = split
         return JwsStringParts(header, payload, signature)
     }
 

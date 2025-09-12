@@ -1,0 +1,50 @@
+name: ios-build-setup
+description: Composite Action to configure the environment for iOS builds
+inputs:
+  gradle-properties-path:
+    description: 'Path to gradle.properties file'
+    required: false
+    default: 'gradle.properties'
+runs:
+  using: "composite"
+  steps:
+    - name: Cache Konan dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.konan
+        key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          konan-${{ runner.os }}-${{ runner.arch }}-
+          konan-${{ runner.os }}-
+
+    - name: Cache CocoaPods
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cocoapods/repos
+          ./Pods
+          ~/Library/Caches/CocoaPods
+        key: pods-${{ runner.os }}-${{ hashFiles('**/Podfile.lock', '**/Podfile') }}
+        restore-keys: |
+          pods-${{ runner.os }}-
+
+    - name: Cache Homebrew
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/Library/Caches/Homebrew
+          /opt/homebrew/var/homebrew/locks
+        key: brew-${{ runner.os }}-${{ runner.arch }}-kdoctor
+        restore-keys: |
+          brew-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Update CocoaPods
+      uses: walt-id/waltid-identity/.github/actions/cocoapods-setup@805da89c85d4e64ce20c495aa69d0a18d0f7168b
+
+    - name: Install and run KDoctor
+      uses: walt-id/waltid-identity/.github/actions/install-and-run-kdoctor@94f207f4e29487705df200318f624842efcc8d95
+
+    - name: Enable iOS build
+      uses: walt-id/waltid-identity/.github/actions/enable-ios-build@44512a55c75a4296ccb833492c574f24a52f9c8f
+      with:
+        gradle-properties-path: ${{ inputs.gradle-properties-path }}
