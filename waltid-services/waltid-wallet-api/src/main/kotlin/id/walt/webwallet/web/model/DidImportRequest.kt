@@ -6,6 +6,6 @@ import kotlinx.serialization.json.JsonElement
 @Serializable
 data class DidImportRequest(
     val did: String,
-    val keys: JsonElement? = null,
+    val key: JsonElement?,
     val alias: String? = null,
 )

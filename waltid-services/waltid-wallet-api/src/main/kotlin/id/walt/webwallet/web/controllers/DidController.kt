@@ -127,10 +127,10 @@ fun Application.dids() = walletRoute {
 
         post("import", {
             summary = "Import an existing DID"
-            description = "Import a DID (did:key, did:web, did:cheqd) into the wallet. Optionally attach key material."
+            description = "Import a DID (did:key, did:web, did:jwk) into the wallet. Requires private key (PEM or JWK) to verify ownership."
             request {
                 body<DidImportRequest> {
-                    description = "Payload containing the DID and optional associated keys (JWK/PEM)."
+                    description = "Payload containing the DID and required associated private key (JWK/PEM)."
                 }
             }
             response {
@@ -141,22 +141,15 @@ fun Application.dids() = walletRoute {
             }
         }) {
             val req = call.receive<DidImportRequest>()
-            try {
-                val key: Any? = when (val k = req.keys) {
-                    null -> null
+
+                val key: Any = when (val k = req.key ?: throw BadRequestException("key is required (PEM or JWK)")) {
                     is JsonObject -> k
-                    is JsonPrimitive -> if (k.isString) k.content else throw BadRequestException("keys must be a string (PEM/JWK JSON) or object (JWK)")
-                    else -> throw BadRequestException("keys must be a string (PEM/JWK JSON) or object (JWK)")
+                    is JsonPrimitive -> if (k.isString) k.content else throw BadRequestException("key must be a string (PEM/JWK JSON) or object (JWK)")
+                    else -> throw BadRequestException("key must be a string (PEM/JWK JSON) or object (JWK)")
                 }
-                val result = call.getWalletService().importDid(did = req.did, keys = key, alias = req.alias)
-                call.respond(HttpStatusCode.Created, result)
-            } catch (e: ConflictException) {
-                call.respond(HttpStatusCode.Conflict, e.message)
-            } catch (e: BadRequestException) {
-                call.respond(HttpStatusCode.BadRequest, e.message ?: "Bad request")
-            } catch (e: UnsupportedMediaTypeException) {
-                call.respond(HttpStatusCode.UnsupportedMediaType, e.message)
-            }
+                val result = call.getWalletService().importDid(did = req.did, key = key, alias = req.alias)
+                call.respond(result)
+
         }
     }
 }

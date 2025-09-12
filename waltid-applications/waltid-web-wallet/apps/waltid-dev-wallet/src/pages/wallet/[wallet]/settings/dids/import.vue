@@ -26,7 +26,7 @@
         </label>
         <textarea
             id="keys"
-            v-model="keys"
+            v-model="key"
             rows="6"
             placeholder='-----BEGIN PRIVATE KEY----- ... or JSON {"kty": "OKP", ...}'
             class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm
@@ -76,37 +76,54 @@ import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import { DocumentPlusIcon } from "@heroicons/vue/24/outline";
 
 const did = ref("");
-const keys = ref("");
+const key = ref("");
 const alias = ref("");
 const responseMessage = ref("");
 const responseError = ref(false);
 const currentWallet = useCurrentWallet();
 
 async function importDid() {
+  let parsedKeys: string | object;
   try {
-    let parsedKeys: string | object = keys.value;
-    try {
-      parsedKeys = JSON.parse(keys.value);
-    } catch {
-      parsedKeys = keys.value;
-    }
-    const payload = {
-      did: did.value,
-      keys: parsedKeys,
-      alias: alias.value,
-    };
+    parsedKeys = JSON.parse(key.value);
+  } catch {
+    parsedKeys = key.value;
+  }
 
+  const payload = {
+    did: did.value,
+    key: parsedKeys,
+    alias: alias.value,
+  };
 
-   await $fetch(`/wallet-api/wallet/${currentWallet.value}/dids/import`, {
+  try {
+    const response = await $fetch(`/wallet-api/wallet/${currentWallet.value}/dids/import`, {
       method: "POST",
       body: payload,
     });
 
-    responseMessage.value = `DID imported successfully`;
-  } catch (e) {
+    responseError.value = false;
+
+    if (response && typeof response === "object" && "message" in response) {
+      responseMessage.value = (response as any).message;
+    } else {
+      responseMessage.value = `DID imported successfully`;
+    }
+
+    console.log("Success response:", response);
+  } catch (e: any) {
     console.error("Failed to import DID:", e);
+
     responseError.value = true;
-    responseMessage.value = `Failed to import DID: ${e?.data?.message || e.message}`;
+
+    if (e?.response?._data?.message) {
+      responseMessage.value = e.response._data.message;
+    } else if (e?.message) {
+      responseMessage.value = e.message;
+    } else {
+      responseMessage.value = "Unknown error while importing DID";
+    }
   }
 }
 </script>
+

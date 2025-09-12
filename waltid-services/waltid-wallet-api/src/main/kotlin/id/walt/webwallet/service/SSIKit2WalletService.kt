@@ -379,38 +379,72 @@ class SSIKit2WalletService(
 
     override suspend fun listDids() = DidsService.list(walletId)
 
-    override suspend fun importDid(did: String, keys: Any?, alias: String?): String {
+    override suspend fun importDid(did: String, key: Any?, alias: String?): String {
         if (!did.startsWith("did:")) throw BadRequestException("Invalid DID: must start with 'did:'")
         val method = did.substringAfter("did:").substringBefore(":")
-        val supported = setOf("key", "web", "jwk")
+        val supported = setOf("key", "web", "jwk" ,"cheqd")
         if (method !in supported) throw BadRequestException("Unsupported DID method: did:$method")
 
         val didDoc = DidService.resolve(did).getOrElse { ex ->
             throw BadRequestException("Failed to resolve DID: ${ex.message}")
         }
 
-        val keyId: String = try {
-            val provided = keys
-            if (provided != null) {
-                val keyString = when (provided) {
-                    is JsonObject -> provided.toString()
-                    is String -> provided
-                    else -> throw BadRequestException("Unsupported keys type: ${provided::class.simpleName}")
-                }
-                importKey(keyString)
-            } else {
-                val vm = didDoc["verificationMethod"]?.jsonArray?.firstOrNull()?.jsonObject
-                val jwk = vm?.get("publicKeyJwk")?.jsonObject
-                    ?: throw BadRequestException("Missing key material: provide keys or ensure DID document includes publicKeyJwk")
-                importKey(jwk.toString())
+        val provided = key ?: throw BadRequestException("key is required (PEM or JWK)")
+
+        val providedKeyString = when (provided) {
+            is JsonObject -> provided.toString()
+            is String -> provided
+            else -> throw BadRequestException("Unsupported key type , must be string (PEM/JWK JSON) or object (JWK)")
+        }
+        val providedKey = runCatching {
+            val type = getKeyType(providedKeyString)
+            when (type) {
+                "pem" -> JWKKey.importPEM(providedKeyString).getOrThrow()
+                "jwk" -> JWKKey.importJWK(providedKeyString).getOrThrow()
+                else -> throw UnsupportedMediaTypeException("Unknown key type: $type")
             }
+        }.getOrElse { throw BadRequestException("Failed to parse provided key: ${it.message}", it) }
+        val providedPublicJwk = providedKey.getPublicKey().exportJWKObject()
+
+        val vm = didDoc["verificationMethod"]?.jsonArray?.firstOrNull()?.jsonObject
+            ?: throw BadRequestException("DID document missing verificationMethod")
+        val didDocPubJwk = vm["publicKeyJwk"]?.jsonObject
+            ?: throw BadRequestException("DID document missing publicKeyJwk for method did:$method")
+
+        fun jwkComparable(j: JsonObject): Map<String, String> {
+            val kty = j["kty"]?.jsonPrimitive?.content
+            return when (kty) {
+                "OKP" -> mapOf(
+                    "kty" to (kty ?: ""),
+                    "crv" to (j["crv"]?.jsonPrimitive?.content ?: ""),
+                    "x" to (j["x"]?.jsonPrimitive?.content ?: "")
+                )
+                "EC" -> mapOf(
+                    "kty" to (kty ?: ""),
+                    "crv" to (j["crv"]?.jsonPrimitive?.content ?: ""),
+                    "x" to (j["x"]?.jsonPrimitive?.content ?: ""),
+                    "y" to (j["y"]?.jsonPrimitive?.content ?: "")
+                )
+                "RSA" -> mapOf(
+                    "kty" to (kty ?: ""),
+                    "n" to (j["n"]?.jsonPrimitive?.content ?: ""),
+                    "e" to (j["e"]?.jsonPrimitive?.content ?: "")
+                )
+                else -> j.mapValues { it.value.jsonPrimitive.contentOrNull ?: it.value.toString() }
+            }
+        }
+        val match = jwkComparable(providedPublicJwk) == jwkComparable(didDocPubJwk)
+        if (!match) {
+            throw BadRequestException("Provided private key does not match DID's key")
+        }
+
+        val keyId: String = try {
+            importKey(providedKeyString)
         } catch (e: ConflictException) {
             val candidateKid = runCatching {
-                when (keys) {
-                    is String -> if (keys.trim().startsWith("{")) Json.parseToJsonElement(keys).jsonObject["kid"]?.jsonPrimitive?.content else null
-                    is JsonObject -> keys["kid"]?.jsonPrimitive?.content
-                    else -> null
-                }
+                if (providedKeyString.trim().startsWith("{"))
+                    Json.parseToJsonElement(providedKeyString).jsonObject["kid"]?.jsonPrimitive?.content
+                else null
             }.getOrNull()
             candidateKid ?: throw e
         }

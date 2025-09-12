@@ -49,12 +49,17 @@ class WaltidServicesE2ETests {
             email = "user@email.com",
             password = "password"
         )
-        val importDidRequest = DidImportRequest(
-            did = "did:key:z6MkpThz6fNQ8h6vF3p6LB7DL8v5L8VhZ7Z7ZsYkTqXK5J3S",
-            alias = "importedDid"
-        )
         val issuerKey = loadResource("issuance/key.json")
         val issuerDid = loadResource("issuance/did.txt")
+        val importDidRequest = run {
+            val jwkElem = Json.decodeFromString<JsonElement>(issuerKey).jsonObject["jwk"]
+                ?: error("issuer key resource missing 'jwk' field")
+            DidImportRequest(
+                did = issuerDid,
+                key = jwkElem,
+                alias = "importedDid"
+            )
+        }
         val openBadgeCredentialData = loadResource("issuance/openbadgecredential.json")
         val credentialMapping = loadResource("issuance/mapping.json")
         val credentialDisclosure = loadResource("issuance/disclosure.json")
