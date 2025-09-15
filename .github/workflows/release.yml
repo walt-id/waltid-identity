@@ -9,7 +9,7 @@ on:
 
 jobs:
   version:
-    uses: walt-id/waltid-identity/.github/workflows/version.yml@266f5c09359450c39019a6da38f2b331e7122918
+    uses: walt-id/waltid-identity/.github/workflows/version.yml@46306b31b7de1f8f30b41edb5240e940269eab1f
     with:
       preferred: ${{ inputs.release_version }}
   gradle:
