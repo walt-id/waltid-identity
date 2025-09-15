@@ -101,7 +101,7 @@ $
 ### Build the Docker Webapp Images Locally
 
 ```bash
-$ cd docker-compse
+$ cd docker-compose
 $ docker compose build
 ```
 
