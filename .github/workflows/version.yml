@@ -36,5 +36,5 @@ jobs:
             echo "release_version=1.0.$(date +'%g%m%d%H%M')${SUFFIX}" >> $GITHUB_OUTPUT
           else
             echo "Using provided input"
-            echo "release_version=${{ inputs.preferred }}" >> $GITHUB_OUTPUT
+            echo "release_version=${{ inputs.preferred#v }}" >> $GITHUB_OUTPUT
           fi
