@@ -35,11 +35,11 @@ Available for Kotlin/Java and JavaScript environments.
 
 A set of APIs to build issuer, verifier, and wallet capabilities into any app.
 
-- **Issuer API** ([Docs](https://docs.walt.id/issuer/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-issuer-api)) -
+- **Issuer API** ([Docs](https://docs.walt.id/community-stack/issuer/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-issuer-api)) -
   enable apps to issue credentials (W3C JWTs and SD-JWTs) via OID4VC.
-- **Verifier API**  ([Docs](https://docs.walt.id/verifier/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-verifier-api)) -
+- **Verifier API**  ([Docs](https://docs.walt.id/community-stack/verifier/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-verifier-api)) -
   enable apps to verify credentials (W3C JWTs and SD-JWTs) via OID4VP/SIOPv2.
-- **Wallet API** ([Docs](https://docs.oss.walt.id/wallet/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-wallet-api)) -
+- **Wallet API** ([Docs](https://docs.walt.id/community-stack/verifier/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-wallet-api)) -
   extend apps with wallet capabilities to collect, store, manage and share identity credentials and tokens.
 
 ### Apps
