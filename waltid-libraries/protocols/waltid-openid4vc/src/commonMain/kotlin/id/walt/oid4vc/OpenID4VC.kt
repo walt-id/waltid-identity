@@ -368,7 +368,7 @@ object OpenID4VC {
         val headers = (header?.toMutableMap() ?: mutableMapOf())
             .plus(
                 mapOf(
-                    JWTClaims.Header.algorithm to "ES256".toJsonElement(),
+                    JWTClaims.Header.algorithm to privKey.keyType.jwsAlg.toJsonElement(),
                     JWTClaims.Header.type to "jwt".toJsonElement(),
                     JWTClaims.Header.keyID to keyId.toJsonElement()
                 )
