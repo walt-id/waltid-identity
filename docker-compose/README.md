@@ -22,7 +22,7 @@ If you prefer to run the services using latest release pre-built Docker images, 
 Start by pulling the latest release Docker images for the services:
 
 ```bash
-docker-compose pull
+$ docker compose pull
 ```
 
 This ensures that you're using the most recent release images from the Docker registry.
@@ -32,7 +32,7 @@ This ensures that you're using the most recent release images from the Docker re
 Once the images are pulled, start the services by running:
 
 ```bash
-docker-compose up
+$ docker compose up
 ```
 
 *Note:* If you are facing issues with the containers, try running the following command to remove the existing
@@ -42,13 +42,13 @@ above command again.
 ### Stop the Services
 
 ```bash
-docker-compose down
+$ docker compose down
 ```
 
 ### Tear down the Services
 
 ```bash
-docker-compose down -v
+$ docker compose down -v
 ```
 
 *Note:*
@@ -59,23 +59,56 @@ pulling the images.
 
 ## Building and Running Services Locally
 
+## Prerequisites
+
+Ensure you have the following tools installed:
+
+- [Docker]()
+- [Docker Compose]()
+- [Java 21 SDK]()
+
 ### Update the VERSION_TAG
 
 Before building locally, ensure the correct version is specified in the `.env` file.
-Update the `VERSION_TAG` variable to the desired version value for the local build.
+Update the `VERSION_TAG` variable to version `1.0.0-SNAPSHOT`
 
-### Build the Docker Images Locally
+### Build API Services Docker Images Locally
 
-Once the `VERSION_TAG` is set, build the Docker images based on your local changes by running:
+API Services Docker Images are build with the ktor gradle plugin. This
+requires Java SDK 21 installed. You build the images by
+executing the commands:
+```shell
+$ cd waltid-identity/
+$
+$ nano docker-compose/.env # set variable VERSION_TAG=1.0.0-SNAPSHOT so the build version is used
+$
+$ ./gradlew publishImageToLocalRegistry # build docker images
+$
+$ docker image ls # verify image is build and published in local docker registry
+REPOSITORY            TAG              IMAGE ID       CREATED        SIZE
+waltid/issuer-api     1.0.0-SNAPSHOT   0d8752382eae   55 years ago   359MB
+waltid/issuer-api     latest           0d8752382eae   55 years ago   359MB
+waltid/verifier-api   1.0.0-SNAPSHOT   5ce8428d031a   55 years ago   353MB
+waltid/verifier-api   latest           5ce8428d031a   55 years ago   353MB
+waltid/wallet-api     1.0.0-SNAPSHOT   712427b1f532   55 years ago   575MB
+waltid/wallet-api     latest           712427b1f532   55 years ago   575MB
+<none>                <none>           7bab5e2240b9   55 years ago   306MB
+ktor-docker-image     latest           989205060031   55 years ago   377MB
+
+$
+```
+
+### Build the Docker Webapp Images Locally
 
 ```bash
-docker-compose build
+$ cd docker-compse
+$ docker compose build
 ```
 
 ### Start the Services
 
 ```bash
-docker-compose up
+$ docker compose up
 ```
 
 ### Starting services selectively
@@ -85,7 +118,7 @@ It is possible to start services selectively, including their dependencies.
 #### Start the demo wallet and all dependant services
 
 ```console
-docker compose up waltid-demo-wallet
+$ docker compose up waltid-demo-wallet
 ```
 
 will start automatically:
@@ -122,13 +155,13 @@ vault-init            | Secret ID: 3abf1e00-2dc1-9e77-0705-9a81a95c7c59
 ### Stop the Services
 
 ```bash
-docker-compose down
+$ docker-compose down
 ```
 
 ### Tear down the Services
 
 ```bash
-docker-compose down -v
+$ docker-compose down -v
 ```
 
 ## Port mapping
