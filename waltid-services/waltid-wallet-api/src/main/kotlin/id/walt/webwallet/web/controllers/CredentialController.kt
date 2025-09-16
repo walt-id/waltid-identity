@@ -2,17 +2,20 @@
 
 package id.walt.webwallet.web.controllers
 
+import id.walt.commons.web.ConflictException
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.usecase.credential.CredentialStatusResult
 import id.walt.webwallet.web.controllers.auth.getWalletId
 import id.walt.webwallet.web.controllers.auth.getWalletService
+import id.walt.webwallet.web.model.CredentialImportRequest
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import id.walt.webwallet.web.parameter.NoteRequestParameter
 import io.github.smiley4.ktoropenapi.*
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.util.*
@@ -72,10 +75,35 @@ fun Application.credentials() = walletRoute {
             )
         }
 
-        put({
-            summary = "Store credential"
+        post("import", {
+            summary = "Import a signed VC JWT into the wallet"
+            request {
+                body<CredentialImportRequest> {
+                    description = "Request containing the signed VC JWT and associated DID"
+                    required = true
+                }
+            }
+            response {
+                HttpStatusCode.Created to {
+                    description = "Credential imported successfully"
+                    body<WalletCredential>()
+                }
+                HttpStatusCode.BadRequest to { description = "Invalid JWT or VC structure" }
+                HttpStatusCode.Conflict to { description = "Credential already exists" }
+            }
         }) {
-            TODO()
+            val req = call.receive<CredentialImportRequest>()
+            runCatching {
+                call.getWalletService().importCredential(req.jwt, req.associated_did)
+            }.onSuccess {
+                call.respond(HttpStatusCode.Created, it)
+            }.onFailure { ex ->
+                when (ex) {
+                    is ConflictException -> call.respond(HttpStatusCode.Conflict, ex.localizedMessage)
+                    is BadRequestException -> call.respond(HttpStatusCode.BadRequest, ex.localizedMessage)
+                    else -> throw ex
+                }
+            }
         }
 
         route("{credentialId}", {
