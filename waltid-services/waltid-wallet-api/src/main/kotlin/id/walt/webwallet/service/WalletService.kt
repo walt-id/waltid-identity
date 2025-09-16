@@ -37,6 +37,7 @@ abstract class WalletService(val tenant: String, val accountId: Uuid, val wallet
     abstract suspend fun detachCategory(credentialId: String, categories: List<String>): Boolean
     abstract suspend fun renameCategory(oldName: String, newName: String): Boolean
     abstract fun getCredentialsByIds(credentialIds: List<String>): List<WalletCredential>
+    abstract suspend fun importCredential(jwt: String, associatedDid: String): WalletCredential
 
     // SIOP
     abstract suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?>
