@@ -235,7 +235,7 @@ private suspend fun <T> checkValue(runner: suspend () -> T, message: (() -> Stri
 private suspend fun executeCredentialSigning(body: JsonObject) = run {
     val issuerKey =
         requireValue({ KeyManager.resolveSerializedKey(body["issuerKey"]!!.jsonObject) }) { "Invalid issuerKey Format" }
-    val issuerDid = body["subjectDid"]?.jsonPrimitive?.content ?: DidService.registerByKey("key", issuerKey).did
+    val issuerDid = body["issuerDid"]?.jsonPrimitive?.content ?: DidService.registerByKey("key", issuerKey).did
     val vc =
         requireValue({ W3CVC.fromJson(body["credentialData"]!!.jsonObject.toString()) }) { "Invalid credential format" }
     val subjectDid = body["subjectDid"]!!.jsonPrimitive.content
