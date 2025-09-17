@@ -64,7 +64,9 @@ kotlin {
                 implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
                 // CBOR
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
+                implementation("net.orandja.obor:obor:2.1.3")
 
                 // Crypto
                 implementation("org.kotlincrypto.random:crypto-rand:0.5.2") // SecureRandom
@@ -78,8 +80,14 @@ kotlin {
                 /*
                  * walt.id:
                  */
-                implementation(project(":waltid-libraries:crypto:waltid-cose"))
+                api(project(":waltid-libraries:crypto:waltid-cose"))
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+            }
+        }
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
             }
         }
     }
