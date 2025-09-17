@@ -1,4 +1,4 @@
-package id.walt.verifier2.verification
+package id.walt.openid4vp.verifier.verification
 
 import id.walt.dcql.models.DcqlQuery
 import io.github.oshai.kotlinlogging.KotlinLogging
