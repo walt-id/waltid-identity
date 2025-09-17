@@ -1,4 +1,4 @@
-package id.walt.verifier2
+package id.walt.openid4vp.verifier
 
 import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature

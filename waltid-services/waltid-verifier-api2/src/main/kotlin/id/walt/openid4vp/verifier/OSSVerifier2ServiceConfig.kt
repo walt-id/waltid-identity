@@ -1,4 +1,4 @@
-package id.walt.verifier2
+package id.walt.openid4vp.verifier
 
 import id.walt.commons.config.WaltConfig
 import id.walt.verifier.openid.models.authorization.ClientMetadata

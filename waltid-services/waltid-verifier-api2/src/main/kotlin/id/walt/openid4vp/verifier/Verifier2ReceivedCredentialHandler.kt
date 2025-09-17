@@ -1,20 +1,16 @@
-package id.walt.verifier2
+package id.walt.openid4vp.verifier
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.dcql.models.CredentialFormat
 import id.walt.policies2.PolicyResult
 import id.walt.policies2.PolicyResults
-import id.walt.verifier2.Verification2Session.VerificationSessionStatus
-import id.walt.verifier2.Verifier2Response.*
-import id.walt.verifier2.verification.DcqlFulfillmentChecker
-import id.walt.verifier2.verification.Verifier2PresentationValidator
+import id.walt.openid4vp.verifier.Verification2Session.VerificationSessionStatus
+import id.walt.openid4vp.verifier.Verifier2Response.*
+import id.walt.openid4vp.verifier.verification.DcqlFulfillmentChecker
+import id.walt.openid4vp.verifier.verification.Verifier2PresentationValidator
 import io.klogging.logger
-import io.ktor.http.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
-import io.ktor.server.util.*
 import kotlinx.serialization.json.Json
+import kotlin.collections.iterator
 
 /**
  * Here the receiving of credentials through the Verifiers endpoints
@@ -123,6 +119,7 @@ object Verifier2ReceivedCredentialHandler {
                     expectedFormat = originalCredentialQuery.format,
                     expectedAudience = session.authorizationRequest.clientId,
                     expectedNonce = session.authorizationRequest.nonce!!,
+                    responseUri = session.authorizationRequest.responseUri,
                     originalClaimsQuery = originalCredentialQuery.claims
                 )
 
