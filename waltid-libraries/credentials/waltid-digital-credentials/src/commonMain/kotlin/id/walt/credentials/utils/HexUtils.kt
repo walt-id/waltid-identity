@@ -66,8 +66,4 @@ object HexUtils {
         // 3. If the loop completes without returning false, the string is valid
         return true
     }
-
-// --- Examples ---
-
-
 }
