@@ -55,6 +55,7 @@ data class AuthorizationRequest(
     val codeChallengeMethod: String? = null,
     val claims: JsonObject? = null,
     val idTokenHint: String? = null,
+    val requireSignedRequestObject: Boolean? = null, //required by ISO 18013-7 specification
     override val customParameters: Map<String, List<String>> = mapOf()
 ) : HTTPDataObject(), IAuthorizationRequest {
     val isReferenceToPAR get() = requestUri?.startsWith(OpenID4VC.PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX) ?: false
@@ -89,6 +90,7 @@ data class AuthorizationRequest(
             codeChallenge?.let { put("code_challenge", listOf(it)) }
             codeChallengeMethod?.let { put("code_challenge_method", listOf(it)) }
             idTokenHint?.let { put("id_token_hint", listOf(it)) }
+            requireSignedRequestObject?.let { put("require_signed_request_object", listOf(it.toString())) }
             putAll(customParameters)
         }
     }
@@ -154,6 +156,7 @@ data class AuthorizationRequest(
             codeChallenge?.let { put("code_challenge", JsonPrimitive(it)) }
             codeChallengeMethod?.let { put("code_challenge_method", JsonPrimitive(it)) }
             idTokenHint?.let { put("id_token_hint", JsonPrimitive(it)) }
+            requireSignedRequestObject?.let { put("require_signed_request_object", JsonPrimitive(it)) }
             customParameters.forEach { (key, value) ->
                 when (value.size) {
                     1 -> put(key, JsonPrimitive(value.first()))
@@ -164,13 +167,17 @@ data class AuthorizationRequest(
     }
 
     fun toRequestObject(cryptoProvider: JWTCryptoProvider, keyId: String): String {
-        return cryptoProvider.sign(toJSON().addUpdateJsoObject(
-            buildJsonObject {
-                put(JWTClaims.Payload.issuer, clientId)
-                put(JWTClaims.Payload.audience, "")
-                put(JWTClaims.Payload.expirationTime, (Clock.System.now() + Duration.parse(1.days.toString())).epochSeconds)
-            }
-        ), keyId)
+        return cryptoProvider.sign(
+            toJSON().addUpdateJsoObject(
+                buildJsonObject {
+                    put(JWTClaims.Payload.issuer, clientId)
+                    put(JWTClaims.Payload.audience, "")
+                    put(
+                        JWTClaims.Payload.expirationTime,
+                        (Clock.System.now() + Duration.parse(1.days.toString())).epochSeconds
+                    )
+                }
+            ), keyId)
     }
 
     fun JsonObject.addUpdateJsoObject(updateJsonObject: JsonObject): JsonObject {
@@ -227,7 +234,8 @@ data class AuthorizationRequest(
             "code_challenge",
             "code_challenge_method",
             "id_token_hint",
-            "claims"
+            "claims",
+            "require_signed_request_object",
         )
 
         suspend fun fromRequestObjectByReference(requestUri: String): AuthorizationRequest {
@@ -264,38 +272,40 @@ data class AuthorizationRequest(
 
         override fun fromHttpParameters(parameters: Map<String, List<String>>): AuthorizationRequest {
             return AuthorizationRequest(
-                parameters["response_type"]!!.first().let { ResponseType.fromResponseTypeString(it) },
-                parameters["client_id"]!!.first(),
-                parameters["response_mode"]?.firstOrNull()?.let { ResponseMode.fromString(it) },
-                parameters["redirect_uri"]?.firstOrNull(),
-                parameters["scope"]?.flatMap { it.split(" ") }?.toSet() ?: setOf(),
-                parameters["state"]?.firstOrNull(),
-                parameters["authorization_details"]?.flatMap {
+                responseType = parameters["response_type"]!!.first().let { ResponseType.fromResponseTypeString(it) },
+                clientId = parameters["client_id"]!!.first(),
+                responseMode = parameters["response_mode"]?.firstOrNull()?.let { ResponseMode.fromString(it) },
+                redirectUri = parameters["redirect_uri"]?.firstOrNull(),
+                scope = parameters["scope"]?.flatMap { it.split(" ") }?.toSet() ?: setOf(),
+                state = parameters["state"]?.firstOrNull(),
+                authorizationDetails = parameters["authorization_details"]?.flatMap {
                     json.decodeFromString(
                         AuthorizationDetailsListSerializer,
                         it
                     )
                 },
-                parameters["wallet_issuer"]?.firstOrNull(),
-                parameters["user_hint"]?.firstOrNull(),
-                parameters["issuer_state"]?.firstOrNull(),
-                parameters["request_uri"]?.firstOrNull(),
-                parameters["request"]?.firstOrNull(),
-                parameters["presentation_definition"]?.firstOrNull()?.let { PresentationDefinition.fromJSONString(it) },
-                parameters["presentation_definition_uri"]?.firstOrNull(),
+                walletIssuer = parameters["wallet_issuer"]?.firstOrNull(),
+                userHint = parameters["user_hint"]?.firstOrNull(),
+                issuerState = parameters["issuer_state"]?.firstOrNull(),
+                requestUri = parameters["request_uri"]?.firstOrNull(),
+                request = parameters["request"]?.firstOrNull(),
+                presentationDefinition = parameters["presentation_definition"]?.firstOrNull()?.let { PresentationDefinition.fromJSONString(it) },
+                presentationDefinitionUri = parameters["presentation_definition_uri"]?.firstOrNull(),
                 //dcqlQuery = parameters["dcql_query"]?.firstOrNull()?.let { DcqlQuery.fromJSONString(it) },
-                parameters["client_id_scheme"]?.firstOrNull()?.let { ClientIdScheme.fromValue(it) },
-                (parameters["client_metadata"] ?: parameters["registration"])?.firstOrNull()?.let {
+                clientIdScheme = parameters["client_id_scheme"]?.firstOrNull()?.let { ClientIdScheme.fromValue(it) },
+                clientMetadata = (parameters["client_metadata"] ?: parameters["registration"])?.firstOrNull()?.let {
                     OpenIDClientMetadata.fromJSONString(it)
                 },
-                (parameters["client_metadata_uri"] ?: parameters["registration_uri"])?.firstOrNull(),
-                parameters["nonce"]?.firstOrNull(),
-                parameters["response_uri"]?.firstOrNull(),
-                parameters["code_challenge"]?.firstOrNull(),
-                parameters["code_challenge_method"]?.firstOrNull(),
-                parameters["claims"]?.firstOrNull()?.let { json.decodeFromString(it) },
-                parameters["id_token_hint"]?.firstOrNull(),
-                parameters.filterKeys { !knownKeys.contains(it) }
+                clientMetadataUri = (parameters["client_metadata_uri"] ?: parameters["registration_uri"])?.firstOrNull(),
+                nonce = parameters["nonce"]?.firstOrNull(),
+                responseUri = parameters["response_uri"]?.firstOrNull(),
+                codeChallenge = parameters["code_challenge"]?.firstOrNull(),
+                codeChallengeMethod = parameters["code_challenge_method"]?.firstOrNull(),
+                claims = parameters["claims"]?.firstOrNull()?.let { json.decodeFromString(it) },
+                idTokenHint = parameters["id_token_hint"]?.firstOrNull(),
+                requireSignedRequestObject = parameters["require_signed_request_object"]?.firstOrNull()
+                    ?.let { json.decodeFromString<Boolean>(it) },
+                customParameters = parameters.filterKeys { !knownKeys.contains(it) }
             )
         }
     }
