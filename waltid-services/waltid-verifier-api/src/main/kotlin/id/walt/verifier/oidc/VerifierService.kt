@@ -23,14 +23,11 @@ import id.walt.verifier.oidc.models.presentedcredentials.PresentedCredentialsVie
 import id.walt.w3c.utils.VCFormat
 import io.klogging.logger
 import io.ktor.client.*
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.logging.LogLevel
-import io.ktor.client.plugins.logging.Logger
-import io.ktor.client.plugins.logging.Logging
-import io.ktor.client.plugins.logging.SIMPLE
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.json
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
@@ -297,7 +294,7 @@ object VerifierService {
         PresentationSessionPresentedCredentials.fromVpTokenStringsByFormat(
             vpTokenStringsByFormat = mapOf(
                 when (format) {
-                    VCFormat.jwt_vp_json, VCFormat.jwt_vp, VCFormat.jwt_vc_json -> {
+                    VCFormat.jwt_vp_json, VCFormat.jwt_vp, VCFormat.jwt_vc_json, VCFormat.vc_jwt -> {
                         VCFormat.jwt_vc_json to listOf(vpTokenStringified)
                     }
 
@@ -346,6 +343,7 @@ object VerifierService {
             VCFormat.ldp_vc, VCFormat.ldp -> VCFormat.ldp_vp
             VCFormat.jwt_vc, VCFormat.jwt -> VCFormat.jwt_vp
             VCFormat.jwt_vc_json -> VCFormat.jwt_vp_json
+            VCFormat.vc_jwt -> VCFormat.vc_jwt
             else -> throw IllegalArgumentException("Credentials format $credentialFormat is not a valid format for a requested credential")
         }
     }

@@ -36,7 +36,7 @@ data class PresentationSessionPresentedCredentials private constructor(
                         }
                     }
 
-                    VCFormat.jwt_vc_json -> {
+                    VCFormat.vc_jwt, VCFormat.jwt_vc_json -> {
                         entry.value.map {
                             PresentedJwtVcJsonViewModeFormatter.fromJwtVpString(
                                 vpStr = it,
