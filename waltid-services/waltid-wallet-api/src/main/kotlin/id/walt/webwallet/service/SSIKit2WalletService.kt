@@ -739,66 +739,6 @@ class SSIKit2WalletService(
         return listCredentials(CredentialFilterObject.default).filter { it.id in credentialIds }
     }
 
-//    override suspend fun importCredential(jwt: String, associatedDid: String): WalletCredential {
-//        if (!jwt.contains('.')) throw BadRequestException("Invalid JWT format: missing segments")
-//        val jws = runCatching { JWSObject.parse(jwt) }.getOrElse { throw BadRequestException("Invalid JWT: ${it.message}") }
-//        val payloadJson = runCatching { Json.parseToJsonElement(jws.payload.toString()).jsonObject }
-//            .getOrElse { throw BadRequestException("JWT payload is not valid JSON") }
-//
-//        println("the payload: $payloadJson")
-//
-//        val vc = payloadJson["vc"]?.jsonObject ?: payloadJson
-//        val hasCredentialSubject = vc["credentialSubject"] != null
-//        val hasType = vc["type"] != null
-//        if (!(hasCredentialSubject && hasType)) {
-//            throw BadRequestException("JWT VC payload must contain vc.credentialSubject and vc.type (or top-level).")
-//        }
-//
-//
-//        val candidateId = payloadJson["jti"]?.jsonPrimitive?.content
-//            ?: vc["id"]?.jsonPrimitive?.content
-//            ?: computeHash(jwt)
-//
-//        println("the candidateId: $candidateId")
-//
-//        if (credentialService.get(walletId, candidateId) != null) {
-//            throw ConflictException("Credential with id: $candidateId  already exists in this wallet")
-//        }
-//        DidsService.get(walletId, associatedDid)
-//            ?: throw NotFoundException("Associated DID not found in this wallet: $associatedDid")
-//
-//        // Optional: best-effort signature verification (log only)
-//        runCatching {
-//            // We don't have issuer key here; just check that it's a signed JWS with 3 segments
-//            if (jwt.split('.').size == 3) {
-//                logger.info { "Imported JWT VC appears to be a signed JWS (signature verification skipped)" }
-//
-//            } else {
-//                logger.warn { "Imported JWT VC is not a signed JWS" }
-//            }
-//        }
-//
-//        val walletCredential = WalletCredential(
-//            wallet = walletId,
-//            id = candidateId,
-//            document = jwt,
-//            disclosures = null,
-//            addedOn = Clock.System.now(),
-//            manifest = null,
-//            deletedOn = null,
-//            pending = false,
-//            format = CredentialFormat.jwt_vc_json,
-//        )
-//
-//        credentialService.add(walletId, walletCredential)
-//        return walletCredential
-//    }
-//
-//    private fun computeHash(data: String): String {
-//        val md = java.security.MessageDigest.getInstance("SHA-256")
-//        val digest = md.digest(data.toByteArray(Charsets.UTF_8))
-//        return digest.joinToString("") { "%02x".format(it) }
-//    }
 
     override suspend fun importCredential(jwt: String, associatedDid: String): WalletCredential {
         if (jwt.split('.').size != 3) {
