@@ -72,6 +72,9 @@ kotlin {
         }
         val commonMain by getting {
             dependencies {
+                // JSON
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+
                 // CBOR
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
 
