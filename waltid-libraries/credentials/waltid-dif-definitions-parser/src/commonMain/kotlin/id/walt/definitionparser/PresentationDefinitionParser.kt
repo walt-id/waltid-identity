@@ -24,15 +24,16 @@ class JsonObjectEnquirer {
 
     fun filterConstraint(document: JsonObject, field: Field): Boolean {
         log.trace { "Processing constraint field: ${field.name ?: field.id ?: field}" }
-
-        /* Alternative if both vc-wrapped and non-wrapped should be used equally:
+        /* Alternative if both vc-wrapped and non-wrapped should be used equally:*/
           val resolvedPath = field.path.firstNotNullOfOrNull {
               document.resolveOrNull(getJsonPath(it))
                   ?: if (it.startsWith("$.vc.")) document.resolveOrNull(getJsonPath("$." + it.removePrefix("$.vc.")))
                   else null
           }
-          */
-        val resolvedPath = field.path.firstNotNullOfOrNull { document.resolveOrNull(getJsonPath(it)) }
+        // Alternative if vc-wrapped should be preferred, but non-wrapped used as fallback:
+        //val resolvedPath = field.path.firstNotNullOfOrNull { document.resolveOrNull(getJsonPath(it)) }
+
+
         log.trace { "Result of resolving ${field.path}: $resolvedPath" }
 
         return if (resolvedPath == null) {
