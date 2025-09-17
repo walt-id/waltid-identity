@@ -1,4 +1,4 @@
-package id.walt.verifier2
+package id.walt.openid4vp.verifier
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json

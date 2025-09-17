@@ -1,15 +1,14 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-package id.walt.verifier2
+package id.walt.openid4vp.verifier
 
 import id.walt.dcql.models.DcqlQuery
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
-import id.walt.verifier2.Verification2Session.*
+import id.walt.openid4vp.verifier.Verification2Session.*
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.http.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone

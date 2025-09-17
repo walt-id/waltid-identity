@@ -1,4 +1,4 @@
-package id.walt.verifier2
+package id.walt.openid4vp.verifier
 
 @Suppress("EnumEntryName")
     enum class SessionEvent {

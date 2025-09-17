@@ -64,6 +64,9 @@ kotlin {
                 implementation("io.github.optimumcode:json-schema-validator:0.5.2")
                 implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
+                // CBOR
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
+
                 /*
                  * walt.id:
                  */

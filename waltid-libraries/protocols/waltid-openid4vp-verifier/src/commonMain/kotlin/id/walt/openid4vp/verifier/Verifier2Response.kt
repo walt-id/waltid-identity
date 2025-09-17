@@ -1,4 +1,4 @@
-package id.walt.verifier2
+package id.walt.openid4vp.verifier
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -28,7 +28,7 @@ sealed class Verifier2Response {
                 Verifier2Error(errorDescription = "The presentation submission does not satisfy the requirements of the presentation definition. Required credentials were not provided.")
 
             val PRESENTATION_VALIDATION_FAILED =Verifier2Error(
-                error = Verifier2Error.Verifier2ErrorType.invalid_presentation,
+                error = Verifier2ErrorType.invalid_presentation,
                 errorDescription = "Presentation validation failed: One or more presentations in vp_token failed validation for session"
             )
         }

@@ -1,4 +1,4 @@
-package id.walt.verifier2
+package id.walt.openid4vp.verifier
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.ktornotifications.KtorSessionNotifications
@@ -6,7 +6,7 @@ import id.walt.policies2.policies.CredentialSignaturePolicy
 import id.walt.policies2.PolicyList
 import id.walt.policies2.PolicyResults
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.verifier2.Verifier2Manager.VerificationSessionCreationResponse
+import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionCreationResponse
 import io.ktor.http.*
 import kotlinx.datetime.*
 import kotlinx.serialization.Serializable

@@ -1,11 +1,11 @@
-package id.walt.verifier2
+package id.walt.openid4vp.verifier
 
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.SdJwtVcMeta
-import id.walt.verifier2.Verifier2Manager.VerificationSessionSetup
+import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionSetup
 import kotlinx.serialization.json.Json
 
 object Verifier2OpenApiExamples {
