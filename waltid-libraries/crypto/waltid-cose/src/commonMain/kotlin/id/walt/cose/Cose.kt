@@ -6,6 +6,13 @@ import kotlinx.serialization.*
 import kotlinx.serialization.cbor.ByteString
 import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborLabel
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlin.io.encoding.Base64
 
 /** A base interface for all top-level COSE messages. */
 interface CoseMessage
@@ -19,8 +26,32 @@ data class CoseSign1(
     @ByteString val signature: ByteArray,
 ) : CoseMessage {
 
+    inline fun <reified T> decodePayload(): T {
+        return coseCompliantCbor.decodeFromByteArray<T>(payload!!)
+    }
+
+    fun ByteArray.stripCborTag(tag: Byte): ByteArray {
+        val tagBytes = byteArrayOf(0xd8.toByte(), tag)
+        return if (this.size >= 2 && this[0] == tagBytes[0] && this[1] == tagBytes[1]) {
+            this.drop(2).toByteArray()
+        } else {
+            this
+        }
+    }
+
+    inline fun <reified T> decodeIsoPayload(): T {
+        // 1. Strip the outer tag (e.g., #6.24) from the payload.
+        val taggedContent = payload!!.stripCborTag(24)
+
+        // 2. Decode the now-exposed byte string (bstr) to get its inner content.
+        val msoBytes = coseCompliantCbor.decodeFromByteArray<ByteArray>(taggedContent)
+
+        // 3. Decode the actual MobileSecurityObject from the inner content bytes.
+        return coseCompliantCbor.decodeFromByteArray<T>(msoBytes)
+    }
+
     /**
-     * Verifies the signature of this COSE_Sign1 object.
+     * Verifies the signature of this COSE_Sign1 object - against an ATTACHED payload.
      *
      * @param verifier The verifier for the cryptographic algorithm used.
      * @param externalAad Externally supplied authenticated data, if any.
@@ -32,11 +63,23 @@ data class CoseSign1(
     }
 
     /**
+     * Verifies the signature of this COSE_Sign1 object against a DETACHED payload.
+     * The payload field of this CoseSign1 object MUST be null.
+     */
+    suspend fun verifyDetached(verifier: CoseVerifier, detachedPayload: ByteArray, externalAad: ByteArray = byteArrayOf()): Boolean {
+        require(payload == null) { "COSE_Sign1 payload must be null for detached signature verification." }
+        val dataToVerify = buildSignatureStructure(protected, detachedPayload, externalAad)
+        return verifier.verify(dataToVerify, signature)
+    }
+
+    fun serialize() = coseCompliantCbor.encodeToByteArray(this)
+
+    /**
      * Encodes this CoseSign1 object into its tagged CBOR representation as per RFC 9052.
      * A COSE_Sign1 object is tagged with CBOR tag 18.
      */
     fun toTagged(): ByteArray {
-        val messageBytes = coseCompliantCbor.encodeToByteArray(this)
+        val messageBytes = serialize()
         // CBOR tag 18 (major type 6, value 18) is encoded as the single byte 0xd2
         val tag = 0xD2.toByte()
         return byteArrayOf(tag) + messageBytes
@@ -79,6 +122,7 @@ data class CoseSign1(
 
         internal fun makeToBeSigned(
             protectedHeaders: CoseHeaders,
+            /** This can be either the attached payload or the detached payload */
             payload: ByteArray?,
             externalAad: ByteArray = byteArrayOf()
         ): TBS {
@@ -90,13 +134,14 @@ data class CoseSign1(
                 coseCompliantCbor.encodeToByteArray(protectedHeaders)
             }
 
+            // The signature is calculated over the Sig_structure, which includes the payload
             val dataToSign = buildSignatureStructure(protectedBytes, payload, externalAad)
 
             return TBS(protectedBytes, dataToSign)
         }
 
         /**
-         * Creates and signs a CoseSign1 object.
+         * Creates and signs a CoseSign1 object with an ATTACHED payload.
          */
         suspend fun createAndSign(
             protectedHeaders: CoseHeaders,
@@ -112,6 +157,29 @@ data class CoseSign1(
                 protected = protectedBytes,
                 unprotected = unprotectedHeaders,
                 payload = payload,
+                signature = signature
+            )
+        }
+
+        /**
+         * Creates and signs a CoseSign1 object with a DETACHED payload.
+         * The payload of the returned CoseSign1 object will be null.
+         */
+        suspend fun createAndSignDetached(
+            protectedHeaders: CoseHeaders,
+            unprotectedHeaders: CoseHeaders = CoseHeaders(),
+            detachedPayload: ByteArray,
+            signer: CoseSigner,
+            externalAad: ByteArray = byteArrayOf()
+        ): CoseSign1 {
+            // For detached signatures, the payload in the Sig_structure is the detached content.
+            val (protectedBytes, dataToSign) = makeToBeSigned(protectedHeaders, detachedPayload, externalAad)
+            val signature = signer.sign(dataToSign)
+
+            return CoseSign1(
+                protected = protectedBytes,
+                unprotected = unprotectedHeaders,
+                payload = null, // Payload is null for detached signatures
                 signature = signature
             )
         }
