@@ -6,9 +6,6 @@ services:
       - identity
       - all
     pull_policy: missing
-    build:
-      context: ../
-      dockerfile: waltid-services/waltid-wallet-api/Dockerfile
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,9 +27,6 @@ services:
       - identity
       - all
     pull_policy: missing
-    build:
-      context: ../
-      dockerfile: waltid-services/waltid-issuer-api/Dockerfile
     depends_on:
       - caddy
     env_file:
@@ -47,9 +41,6 @@ services:
       - identity
       - all
     pull_policy: missing
-    build:
-      context: ../
-      dockerfile: waltid-services/waltid-verifier-api/Dockerfile
     depends_on:
       - caddy
     env_file:
