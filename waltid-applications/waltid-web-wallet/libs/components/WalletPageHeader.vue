@@ -8,7 +8,7 @@
         <template v-slot:title>
             <img alt="" class="h-16 w-16 rounded-full sm:hidden" src="/svg/walt-s.svg"/>
             <!-- src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2.6&w=256&h=256&q=80"/> -->
-            <h1 class="ml-3 text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:leading-9">
+            <h1 class="ml-3 text-xl font-bold leading-7 text-gray-900 l:truncate sm:leading-9">
                 Good <span v-if="now.getHours() < 12">morning</span>
 
                 <span v-else-if="now.getHours() > 21">night</span>
@@ -40,6 +40,15 @@
                 <QrCodeIcon class="h-5 w-5 mr-1"/>
                 Scan to receive or present credentials
             </NuxtLink>
+            <NuxtLink
+
+                class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+                :to="`/wallet/${currentWallet}/import`"
+                type="button"
+            >
+                <ArrowDownIcon class="h-5 w-5 mr-1"/>
+                Import credential (JWT)
+            </NuxtLink>
         </template>
     </PageHeader>
 </template>
@@ -47,7 +56,7 @@
 <script setup>
 import {useNow} from "@vueuse/core";
 import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
-import {ArrowDownOnSquareStackIcon, QrCodeIcon} from "@heroicons/vue/24/outline";
+import {ArrowDownIcon, ArrowDownOnSquareStackIcon, QrCodeIcon} from "@heroicons/vue/24/outline";
 import PageHeader from "./PageHeader.vue";
 import {useUserStore} from "../stores/user.ts";
 import {storeToRefs} from "pinia";
