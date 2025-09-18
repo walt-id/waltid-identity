@@ -2,6 +2,7 @@
 
 import id.walt.commons.testing.E2ETest
 import id.walt.webwallet.db.models.WalletDid
+import id.walt.webwallet.web.model.DidImportRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -62,6 +63,16 @@ class DidsApi(private val e2e: E2ETest, private val client: HttpClient) {
                 val did = body<String>()
                 assertTrue(String.format(didRegexPattern, payload.method).toRegex().matches(did))
                 output?.invoke(did)
+            }
+        }
+
+    suspend fun importDid(wallet: Uuid , didImportRequest : DidImportRequest) =
+        e2e.test("/wallet-api/wallet/{wallet}/dids/import - import did") {
+            client.post("/wallet-api/wallet/$wallet/dids/import") {
+                setBody(didImportRequest)
+            }.expectSuccess().apply {
+                val did = body<String>()
+                assertTrue(String.format(didRegexPattern, did.substringAfter("did:").substringBefore(":")).toRegex().matches(did))
             }
         }
 
