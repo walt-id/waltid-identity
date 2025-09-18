@@ -6,8 +6,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class VCFormat(val value: String) {
   jwt("jwt"),
-    @SerialName("vc+jwt")
-    vc_jwt("vc+jwt"),
   jwt_vc("jwt_vc"),
   jwt_vp("jwt_vp"),
   ldp_vc("ldp_vc"),

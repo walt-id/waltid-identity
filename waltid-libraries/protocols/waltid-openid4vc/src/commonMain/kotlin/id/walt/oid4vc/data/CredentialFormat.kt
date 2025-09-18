@@ -18,7 +18,6 @@ enum class CredentialFormat(val value: String) {
     jwt_vp_json_ld("jwt_vp_json-ld"),
     ldp_vp("ldp_vp"),
     jwt_vc("jwt_vc"),
-    vc_jwt("vc+jwt"),
     jwt_vp("jwt_vp");
 
     companion object {
@@ -26,7 +25,6 @@ enum class CredentialFormat(val value: String) {
             return when (value) {
                 // TODO: Workaround for Ktor's parseQueryString interpreting '+' as space
                 "vc+sd-jwt", "vc sd-jwt" -> sd_jwt_vc
-                "vc+jwt", "vc jwt" -> vc_jwt
                 else -> entries.find { it.value == value }
             }
         }
