@@ -51,6 +51,7 @@ abstract class WalletService(val tenant: String, val accountId: Uuid, val wallet
     abstract suspend fun listDids(): List<WalletDid>
     abstract suspend fun loadDid(did: String): JsonObject
     abstract suspend fun createDid(method: String, args: Map<String, JsonPrimitive> = emptyMap()): String
+    abstract suspend fun importDid(did: String, key: Any? = null, alias: String? = null): String
     abstract suspend fun deleteDid(did: String): Boolean
     abstract suspend fun setDefault(did: String)
 

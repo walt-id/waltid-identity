@@ -399,6 +399,94 @@ class SSIKit2WalletService(
 
     override suspend fun listDids() = DidsService.list(walletId)
 
+    override suspend fun importDid(did: String, key: Any?, alias: String?): String {
+        if (!did.startsWith("did:")) throw BadRequestException("Invalid DID: must start with 'did:'")
+        val method = did.substringAfter("did:").substringBefore(":")
+        val supported = setOf("key", "web", "jwk" ,"cheqd")
+        if (method !in supported) throw BadRequestException("Unsupported DID method: did:$method")
+
+        val didDoc = DidService.resolve(did).getOrElse { ex ->
+            throw BadRequestException("Failed to resolve DID: ${ex.message}")
+        }
+
+        val provided = key ?: throw BadRequestException("key is required (PEM or JWK)")
+
+        val providedKeyString = when (provided) {
+            is JsonObject -> provided.toString()
+            is String -> provided
+            else -> throw BadRequestException("Unsupported key type , must be string (PEM/JWK JSON) or object (JWK)")
+        }
+        val providedKey = runCatching {
+            val type = getKeyType(providedKeyString)
+            when (type) {
+                "pem" -> JWKKey.importPEM(providedKeyString).getOrThrow()
+                "jwk" -> JWKKey.importJWK(providedKeyString).getOrThrow()
+                else -> throw UnsupportedMediaTypeException("Unknown key type: $type")
+            }
+        }.getOrElse { throw BadRequestException("Failed to parse provided key: ${it.message}", it) }
+        val providedPublicJwk = providedKey.getPublicKey().exportJWKObject()
+
+        val vm = didDoc["verificationMethod"]?.jsonArray?.firstOrNull()?.jsonObject
+            ?: throw BadRequestException("DID document missing verificationMethod")
+        val didDocPubJwk = vm["publicKeyJwk"]?.jsonObject
+            ?: throw BadRequestException("DID document missing publicKeyJwk for method did:$method")
+
+        fun jwkComparable(j: JsonObject): Map<String, String> {
+            val kty = j["kty"]?.jsonPrimitive?.content
+            return when (kty) {
+                "OKP" -> mapOf(
+                    "kty" to (kty ?: ""),
+                    "crv" to (j["crv"]?.jsonPrimitive?.content ?: ""),
+                    "x" to (j["x"]?.jsonPrimitive?.content ?: "")
+                )
+                "EC" -> mapOf(
+                    "kty" to (kty ?: ""),
+                    "crv" to (j["crv"]?.jsonPrimitive?.content ?: ""),
+                    "x" to (j["x"]?.jsonPrimitive?.content ?: ""),
+                    "y" to (j["y"]?.jsonPrimitive?.content ?: "")
+                )
+                "RSA" -> mapOf(
+                    "kty" to (kty ?: ""),
+                    "n" to (j["n"]?.jsonPrimitive?.content ?: ""),
+                    "e" to (j["e"]?.jsonPrimitive?.content ?: "")
+                )
+                else -> j.mapValues { it.value.jsonPrimitive.contentOrNull ?: it.value.toString() }
+            }
+        }
+        val match = jwkComparable(providedPublicJwk) == jwkComparable(didDocPubJwk)
+        if (!match) {
+            throw BadRequestException("Provided private key does not match DID's key")
+        }
+
+        val keyId: String = try {
+            importKey(providedKeyString)
+        } catch (e: ConflictException) {
+            val candidateKid = runCatching {
+                if (providedKeyString.trim().startsWith("{"))
+                    Json.parseToJsonElement(providedKeyString).jsonObject["kid"]?.jsonPrimitive?.content
+                else null
+            }.getOrNull()
+            candidateKid ?: throw e
+        }
+
+        try {
+            DidsService.add(wallet = walletId, did = did, document = didDoc.toString(), keyId = keyId, alias = alias)
+        } catch (e: ConflictException) {
+            throw ConflictException("DID already exists")
+        }
+
+        eventUseCase.log(
+            action = EventType.Did.Import,
+            originator = "wallet",
+            tenant = tenant,
+            accountId = accountId,
+            walletId = walletId,
+            data = eventUseCase.didEventData(did, didDoc.toString())
+        )
+
+        return did
+    }
+
     override suspend fun loadDid(did: String): JsonObject =
         DidsService.get(walletId, did)?.let { Json.parseToJsonElement(it.document).jsonObject }
             ?: throw NotFoundException("The DID ($did) could not be found for Wallet ID: $walletId")
