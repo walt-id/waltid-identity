@@ -57,7 +57,6 @@ import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.usecase.event.EventLogUseCase
-import id.walt.webwallet.utils.JsonUtils.toJsonPrimitive
 import id.walt.webwallet.utils.StringUtils.couldBeJsonObject
 import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
 import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
@@ -78,6 +77,7 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.util.Base64
 import kotlin.time.Clock
+import kotlin.collections.plus
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.toJavaInstant
@@ -733,13 +733,26 @@ class SSIKit2WalletService(
                 } else null
             }
 
-        // For JWS+Json we take the header as given
+        // For JWS+Json we take the header as given and add 'kid' when needed
+        //
         val signature = if (jwsObj != null) {
-            val headers = jwsObj.header.toJSONObject().toMutableMap()
-            headers["kid"]?.toJsonPrimitive()?.content?.also { kid ->
-                if (kid != alias) throw IllegalArgumentException("JWT headers.kid must match alias: $alias")
+            // Proof JWT headers must contain either jwk or kid
+            var headers = Json.decodeFromString<JsonObject>(jwsObj.header.toString())
+            when {
+                headers.containsKey("kid") -> {
+                    val kid = headers.getValue("kid").jsonPrimitive.content
+                    if (kid != alias) throw IllegalArgumentException("JWT headers.kid must match alias: $alias")
+                }
+                headers.containsKey("jwk") -> {
+                    val jwk = headers.getValue("jwk").jsonObject
+                    val kid = jwk["kid"]?.jsonPrimitive?.content
+                    if (kid != null && kid != alias)
+                        throw IllegalArgumentException("JWT headers.jwk.kid must match alias: $alias")
+                }
+                else -> {
+                    headers = JsonObject(headers + ("kid" to JsonPrimitive(alias)))
+                }
             }
-            headers["kid"] = JsonPrimitive(alias)
             val dataBytes = jwsObj.payload.toString().toByteArray(Charsets.UTF_8)
             key.signJws(dataBytes, headers.toJsonObject())
         }
