@@ -294,7 +294,7 @@ object VerifierService {
         PresentationSessionPresentedCredentials.fromVpTokenStringsByFormat(
             vpTokenStringsByFormat = mapOf(
                 when (format) {
-                    VCFormat.jwt_vp_json, VCFormat.jwt_vp, VCFormat.jwt_vc_json, VCFormat.vc_jwt -> {
+                    VCFormat.jwt_vp_json, VCFormat.jwt_vp, VCFormat.jwt_vc_json -> {
                         VCFormat.jwt_vc_json to listOf(vpTokenStringified)
                     }
 
@@ -343,7 +343,6 @@ object VerifierService {
             VCFormat.ldp_vc, VCFormat.ldp -> VCFormat.ldp_vp
             VCFormat.jwt_vc, VCFormat.jwt -> VCFormat.jwt_vp
             VCFormat.jwt_vc_json -> VCFormat.jwt_vp_json
-            VCFormat.vc_jwt -> VCFormat.vc_jwt
             else -> throw IllegalArgumentException("Credentials format $credentialFormat is not a valid format for a requested credential")
         }
     }

@@ -26,7 +26,6 @@ data class RequestedCredential(
     private fun getDefaultFormatDefinition(): VCFormatDefinition {
         return when (format) {
             VCFormat.jwt_vc_json -> VCFormatDefinition(alg = setOf("EdDSA"))
-            VCFormat.vc_jwt -> VCFormatDefinition(alg = setOf("RS256"))
             VCFormat.mso_mdoc -> VCFormatDefinition(alg = setOf("ES256"))
             VCFormat.jwt_vc -> VCFormatDefinition(alg = setOf("ES256"))
             else -> VCFormatDefinition()
