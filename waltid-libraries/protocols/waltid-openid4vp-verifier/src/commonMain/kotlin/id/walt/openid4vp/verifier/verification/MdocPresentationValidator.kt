@@ -48,6 +48,16 @@ object MdocPresentationValidator {
 
         requireNotNull(document.deviceSigned) { "Mdoc DeviceSigned is missing in document" }
 
+        // Merge credentialData
+        val issuerSignedNamespacesJson = document.issuerSigned.namespacesToJson()
+        val deviceSignedNamespacesJson = document.deviceSigned?.namespaces?.value?.namespacesToJson()
+
+        val mdocCredentialData = if (deviceSignedNamespacesJson == null) {
+            issuerSignedNamespacesJson
+        } else {
+            MdocSignedMerger.merge(issuerSignedNamespacesJson, deviceSignedNamespacesJson, strategy = MdocDuplicatesMergeStrategy.CLASH)
+        }
+
         log.trace { "Mdoc validation - 2. Decode the MSO from the issuerAuth payload" }
         val mso = document.issuerSigned.issuerAuth.decodeIsoPayload<MobileSecurityObject>()
         log.trace { "MSO: $mso" }
@@ -64,8 +74,17 @@ object MdocPresentationValidator {
         log.trace { "Signer key to be used: $issuerKey" }
         val issuerVirtualDid = LocalRegistrar().createByKey(issuerKey, DidJwkCreateOptions()).did
 
+        log.trace { "Mdoc validation - Wrap in Generic Credential object..." }
+        val mdocsCredential = MdocsCredential(
+            credentialData = mdocCredentialData,
+            signed = mdocBase64UrlString,
+            docType = document.docType,
+            issuer = issuerVirtualDid
+        )
+        log.trace { "Mdoc credential: $mdocsCredential" }
+
         log.trace { "Verifying issuerAuth signature with issuer key..." }
-        val issuerAuthSignatureValid = document.issuerSigned.issuerAuth.verify(issuerKey.toCoseVerifier())
+        val issuerAuthSignatureValid = mdocsCredential.verify().isSuccess
 
         require(issuerAuthSignatureValid) { "IssuerAuth signature is invalid!" }
 
@@ -218,26 +237,6 @@ object MdocPresentationValidator {
                 }
             }
         }
-
-        // Merge credentialData
-        val issuerSignedNamespacesJson = document.issuerSigned.namespacesToJson()
-        val deviceSignedNamespacesJson = document.deviceSigned?.namespaces?.value?.namespacesToJson()
-
-        val mdocCredentialData = if (deviceSignedNamespacesJson == null) {
-            issuerSignedNamespacesJson
-        } else {
-            MdocSignedMerger.merge(issuerSignedNamespacesJson, deviceSignedNamespacesJson, strategy = MdocDuplicatesMergeStrategy.CLASH)
-        }
-
-        log.trace { "Mdoc validation - Successful: wrap verified data in generic credential objects..." }
-        val mdocsCredential = MdocsCredential(
-            credentialData = mdocCredentialData,
-            signed = mdocBase64UrlString,
-            docType = document.docType,
-            issuer = issuerVirtualDid
-        )
-        log.trace { "Mdoc credential: $mdocsCredential" }
-
 
 
         PresentationValidationResult(

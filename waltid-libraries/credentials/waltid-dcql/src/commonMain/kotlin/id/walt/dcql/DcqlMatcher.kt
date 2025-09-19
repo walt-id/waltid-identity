@@ -323,7 +323,7 @@ object DcqlMatcher {
         if (!claimQuery.values.isNullOrEmpty()) {
             val matchesValue = claimQuery.values.any { queryValue -> queryValue == claimJsonElement }
             if (!matchesValue) {
-                log.trace { "Claim path ${claimQuery.path} value '$claimJsonElement' does not match required values ${claimQuery.values} in ${credential.id}" }
+                log.trace { "claimExistsAndMatchesValue: Claim path ${claimQuery.path} value '$claimJsonElement' (${if (claimJsonElement is JsonPrimitive && claimJsonElement.isString) "string" else "non-string"}) does not match required values ${claimQuery.values} in ${credential.id}" }
                 return Result.failure(DcqlMatchException("Claim value mismatch for ${claimQuery.path}"))
             }
         }
@@ -495,7 +495,7 @@ object DcqlMatcher {
                 queryValue == claimValue
             }
             if (!matchesValue) {
-                log.trace { "Claim path ${claimQuery.path} value '$claimValue' does not match required values ${claimQuery.values} in credential ${credential.id}" }
+                log.trace { "claimExistsAndMatches: Claim path ${claimQuery.path} value '$claimValue' does not match required values ${claimQuery.values} in credential ${credential.id}" }
                 return false
             }
         }

@@ -201,7 +201,7 @@ fun waltidPrivateCredentials(repoName:String): Pair<String, String> = let {
 ktor {
     docker {
         jreVersion.set(JavaVersion.VERSION_21)
-        localImageName.set("waltid/verifier-api")
+        localImageName.set("waltid/verifier-api2")
         imageTag.set("${project.version}")
         portMappings.set(listOf(
             io.ktor.plugin.features.DockerPortMapping(

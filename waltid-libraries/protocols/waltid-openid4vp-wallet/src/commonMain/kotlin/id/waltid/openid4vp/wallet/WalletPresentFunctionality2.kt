@@ -64,7 +64,7 @@ object WalletPresentFunctionality2 {
         matchedData: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
         /** For mdocs: this is the device key */
         holderKey: Key,
-        holderDid: String
+        holderDid: String?
     ): String {
         val vpTokenMapContents = mutableMapOf<String, JsonArray>()
 
@@ -80,7 +80,7 @@ object WalletPresentFunctionality2 {
                             matchResult = matchResult,
                             authorizationRequest = authorizationRequest,
                             holderKey = holderKey,
-                            holderDid = holderDid
+                            holderDid = holderDid ?: throw IllegalArgumentException("Missing DID for presentation")
                         )
 
                         "ldp_vc" -> LDPPresenter.presentLdpTodo()
@@ -90,7 +90,7 @@ object WalletPresentFunctionality2 {
                             matchResult = matchResult,
                             authorizationRequest = authorizationRequest,
                             holderKey = holderKey,
-                            holderDid = holderDid
+                            holderDid = holderDid ?: throw IllegalArgumentException("Missing DID for presentation")
                         )
 
                         "mso_mdoc" -> {
@@ -218,7 +218,7 @@ object WalletPresentFunctionality2 {
 
     suspend fun walletPresentHandling(
         holderKey: Key,
-        holderDid: String,
+        holderDid: String?,
         presentationRequestUrl: Url,
 
         selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>>,

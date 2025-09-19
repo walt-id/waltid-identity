@@ -1,11 +1,13 @@
 package id.walt.credentials.formats
 
 import id.walt.cose.coseCompliantCbor
+import id.walt.cose.toCoseVerifier
 import id.walt.credentials.signatures.CredentialSignature
 import id.walt.credentials.utils.Base64Utils.matchesBase64Url
 import id.walt.credentials.utils.HexUtils.matchesHex
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.did.dids.resolver.local.DidJwkResolver
 import id.walt.isocred.DeviceResponse
 import id.walt.isocred.Document
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -38,9 +40,30 @@ data class MdocsCredential(
 
     companion object {
         private val log = KotlinLogging.logger { }
+        private val issuerDidResolver = DidJwkResolver()
 
-        fun createFromDeviceResponse() {
+        suspend fun verifyMdocSignature(document: Document, issuerKey: Key) {
+            /*requireNotNull(document.deviceSigned) { "Mdoc DeviceSigned is missing in document" }
 
+            log.trace { "Mdoc validation - 2. Decode the MSO from the issuerAuth payload" }
+            val mso = document.issuerSigned.issuerAuth.decodeIsoPayload<MobileSecurityObject>()
+            log.trace { "MSO: $mso" }
+
+            log.trace { "Mdoc validation - 2.1. Verify MSO (IssuerAuth)" }
+
+            val signerCertificate = document.issuerSigned.issuerAuth.unprotected.x5chain?.first()?.rawBytes
+            requireNotNull(signerCertificate) { "Missing signer certificate" }
+            val signerPem = convertDerCertificateToPemCertificate(signerCertificate)
+            log.trace { "Signer PEM: $signerPem" }
+
+            log.trace { "Reading signer key from signer certificate..." }
+            val issuerKey = JWKKey.importFromDerCertificate(signerCertificate).getOrThrow()
+            log.trace { "Signer key to be used: $issuerKey" }*/
+
+            log.trace { "Verifying issuerAuth signature with issuer key..." }
+            val issuerAuthSignatureValid = document.issuerSigned.issuerAuth.verify(issuerKey.toCoseVerifier())
+
+            require(issuerAuthSignatureValid) { "IssuerAuth signature is invalid!" }
         }
 
     }
@@ -69,11 +92,18 @@ data class MdocsCredential(
         }.getOrThrow()
 
         return document
-
     }
 
     override suspend fun verify(publicKey: Key): Result<JsonElement> {
-        TODO("Not yet implemented: verify mdocs")
-        // TODO: Move certain code parts from Mdocs presentation validator to here
+        val document = parseToDocument()
+
+        return runCatching { verifyMdocSignature(document, publicKey) }
+            .map { credentialData }
+    }
+
+    suspend fun verify(): Result<JsonElement> {
+        val issuerVirtualDid = issuer ?: throw IllegalArgumentException("Missing virtual issuer DID")
+        val issuerKey = issuerDidResolver.resolveToKey(issuerVirtualDid).getOrThrow()
+        return verify(issuerKey)
     }
 }
