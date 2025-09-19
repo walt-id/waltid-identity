@@ -335,7 +335,7 @@ The wallet receive side is the same as in the [Receive credential into wallet se
 
 Alternatively, one can also manually store such credential into the wallet with the `/v1/{target}/credential-store-service-api/credentials/store` endpoint.
 
-## 1. Create Verification session with Verifier2
+## 1. ISO/Mdocs Credentials Presentation Flow
 
 Use the Verifier2 interface (OSS or Enterprise) for OpenID4VP 1.0 presentation flows.
 
@@ -823,7 +823,7 @@ curl -X 'POST' \
 }'
 ```
 
-#### 1.2.1. Create Verification Session
+#### 1.2.1. Create verification request
 
 `POST /v1/{target}/verifier2-service-api/verification-session/create`
 
@@ -932,7 +932,7 @@ Response:
 
 (note the creationTarget in the Enterprise)
 
-#### 1.2.2. Present with wallet
+#### 1.2.2. Present to Verifier with wallet
 
 `POST /v1/{target}/wallet-service-api/credentials/present`
 
@@ -968,7 +968,7 @@ Response:
 }
 ```
 
-#### 1.2.3. View Verification Session Information
+#### 1.2.3. View presentation result in Verifier
 
 `GET /v1/{target}/verifier2-service-api/verification-session/info`
 ->
