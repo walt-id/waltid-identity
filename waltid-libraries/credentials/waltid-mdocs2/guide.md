@@ -3,6 +3,16 @@
 The following guide will allow you to play through the new OpenID4VP 1.0
 flows for ISO credentials.
 
+Containers:
+- Enterprise API: `waltid/waltid-enterprise-api:dcql-2025-09-19` (preview of Enterprise with the wallet supporting mdocs via OpenID4VP 1.0)
+- OSS Verifier2: `waltid/verifier-api2:dcql-2025-09-19` (new OSS Verifier2, with iso/mdocs credentials preview)
+- OSS Issuer: `waltid/issuer-api:dcql-2025-09-19` (usual OSS Issuer, old iso/mdocs credentials stack)
+
+Hosted:
+- Enterprise API: https://enterprise.mdoc-test.waltid.cloud/swagger
+- OSS Verifier2: https://verifier.mdoc-test.waltid.cloud/swagger/index.html
+- OSS Issuer: https://issuer.mdoc-test.waltid.cloud/swagger/index.html
+
 ## 0. (Get credentials into wallet)
 
 To present credentials to a Relying Party with the wallet, one of course
