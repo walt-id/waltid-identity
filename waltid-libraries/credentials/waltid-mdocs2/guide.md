@@ -3,7 +3,7 @@
 The following guide will allow you to play through the new OpenID4VP 1.0
 flows for ISO credentials.
 
-## 0. Get credentials into wallet
+## 0. (Get credentials into wallet)
 
 To present credentials to a Relying Party with the wallet, one of course
 must first have a Verifiable Credential to present in their wallet.
@@ -15,6 +15,10 @@ ISO credential stack, and as such is not yet officially supported.
 The new Issuer for the new ISO credential stack based on OpenID4VCI 1.0 will be released in the near future.
 
 Below, a simple Photo ID is issued.
+
+### 0.1. With OSS Issuer
+
+#### 0.1.0. Configuration
 
 Add the supported credential type to the issuer (for the open source issuer, edit the config file `credential-issuer-metadata.conf`):
 ```ini
@@ -32,6 +36,7 @@ supportedCredentialTypes = {
 }
 ```
 
+#### 0.1.1. Issue credential
 And use the `/openid4vc/mdoc/issue` endpoint:
 
 ```shell
@@ -101,6 +106,8 @@ curl -X 'POST' \
 
 As you can see, in the JSON body you can set the namespaces and the namespace element that shall be issued into the ISO credential.
 This request will return an issuance offer URL. Enter this into the "offerUrl" in the wallets `/v1/{wallet}/wallet-service-api/credentials/receive` endpoint:
+
+#### 0.1.2. Receive credential into wallet
 
 For authentication, in development mode, use this user: "user@walt.id 123456". Alternatively you can create another account.
 
@@ -182,19 +189,20 @@ of the Wallet + Verifier flow. Especially non-primitive values for ISO credentia
 be work with the new Issuer2 interface (based on OpenID4VCI 1.0), as the old Issuer does not
 process them correctly.
 
-Alternatively, one can also manually store such credential into the wallet with the `/v1/{target}/credential-store-service-api/credentials/store` endpoint.
 
-## 0.1. Alternative - Enterprise Issuer
+### 0.2. With Enterprise Issuer
 
 Besides the OSS issue, the Enterprise Issuer can be used (with a slightly different API):
 
 ```shell
+# Create KMS for Issuer
 curl -X 'POST' \
   'https://waltid.enterprise.mdoc-test.waltid.cloud/v1/issuerkms/resource-api/services/create' \
   -H 'accept: */*' \
   -H 'Content-Type: application/json' \
   -d '{ "type": "kms" }'
 
+# Import Key into KMS
 curl -X 'POST' \
   'https://waltid.enterprise.mdoc-test.waltid.cloud/v1/issuerkms.key1/kms-service-api/keys/store' \
   -H 'accept: application/json' \
@@ -211,13 +219,14 @@ curl -X 'POST' \
     }
   }'
 
-# Or generate yourself (also create x5cchain then):
+# (Or generate Key yourself (also create x5cchain then)):
 curl -X 'POST' \
   'https://waltid.enterprise.mdoc-test.waltid.cloud/v1/issuerkms.key1/kms-service-api/keys/generate' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -d '{ "keyType": "secp256r1" }'
 
+# Create Issuer
 curl -X 'POST' \
   'https://waltid.enterprise.mdoc-test.waltid.cloud/v1/issuer/resource-api/services/create' \
   -H 'accept: */*' \
@@ -245,6 +254,7 @@ curl -X 'POST' \
   "kms": "waltid.issuerkms"
 }'
 
+# Issue Mdoc
 curl -X 'POST' \
   'https://issuer.mdoc-test.waltid.cloud/openid4vc/mdoc/issue' \
   -H 'accept: */*' \
@@ -309,11 +319,54 @@ curl -X 'POST' \
 ```
 (make sure x5Chain fits to the generated key)
 
+The wallet receive side is the same as in the [Receive credential into wallet section](#012-receive-credential-into-wallet).
+
+### 0.3. Manual import
+
+Alternatively, one can also manually store such credential into the wallet with the `/v1/{target}/credential-store-service-api/credentials/store` endpoint.
+
 ## 1. Create Verification session with Verifier2
 
 Use the Verifier2 interface (OSS or Enterprise) for OpenID4VP 1.0 presentation flows.
 
-### 1.1. Create verification request
+### 1.1. With OSS Verifier (waltid-verifier-api2)
+
+#### 1.1.0. Setup
+
+Config files:
+
+`_features.conf`:
+```hocon
+enabledFeatures = [
+    # entra,
+    # ...
+]
+disabledFeatures = [
+    # ...
+    # debug-endpoints
+]
+```
+(you can leave this default)
+
+`verifier-service.conf`:
+```hocon
+clientId: "verifier2"
+clientMetadata: {
+    clientName: "Verifier2"
+    logoUri: "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
+}
+urlPrefix:  "http://localhost:7003/verification-session/"
+```
+Set the `urlPrefix` to the publicly accessible URL for the verification-session API used by the wallet
+(the wallet calls the endpoints `/verification-session/{verification-session}/request` and `/verification-session/{verification-session}/response`).
+
+`web.conf`:
+```hocon
+webHost = "0.0.0.0"
+webPort = "7003"
+```
+
+#### 1.1.1 Create verification request
 
 With OpenID4VP 1.0, the credential query is specified with "DCQL", see this page for examples: https://openid.github.io/OpenID4VP/openid-4-verifiable-presentations-wg-draft.html#more_dcql_query_examples
 
@@ -423,7 +476,9 @@ Response:
 The created verification session request URL is contained in the response, this is what is then
 provided to the wallet.
 
-## 2. Present to Verifier with wallet
+
+
+#### 1.1.2. Present to Verifier with wallet
 Use the verification request URL generated with the Verifier to call the `/v1/{wallet}/wallet-service-api/credentials/present` endpoint:
 
 ```shell
@@ -459,7 +514,7 @@ The wallet tells us with `transmission_success`: `true` that the transmission fr
 the Relying Party (Verifier) was successful. In addition, the response replied by the Verifier
 can also be seen in `verifier_response`.
 
-## 3. View presentation result in Verifier
+#### 1.1.3. View presentation result in Verifier
 
 Now that the wallet has presented the Photo ID to the Verifier, we can inquire the Verifier
 about the verification status with the `GET /verification-session/{session}/info` endpoint.
@@ -718,3 +773,440 @@ In the above verification session information response we can find the full info
 
 In our case `presentedCredentials` contains the Photo ID that the wallet presented, with all the
 claims that we requested with the DCQL query we created, even spanning different namespaces.
+
+
+
+### 1.2. With Enterprise Verifier
+
+#### 1.2.0. Create & configure
+
+`POST /v1/v2/resource-api/services/create`
+
+```json
+{
+  "type": "verifier2",
+  "baseUrl": "https://waltid.enterprise.mdoc-test.waltid.cloud",
+  "clientId": "my-client-id",
+  "clientMetadata": {
+    "client_name": "Verifier2",
+    "logo_uri": "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
+  }
+}
+```
+(set the `baseUrl` to the publicly accessible URL, i.e. the part before /v1/)
+
+->
+
+```bash
+curl -X 'POST' \
+  'https://waltid.enterprise.mdoc-test.waltid.cloud/v1/v2/resource-api/services/create' \
+  -H 'accept: */*' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "type": "verifier2",
+  "baseUrl": "https://waltid.enterprise.mdoc-test.waltid.cloud",
+  "clientId": "my-client-id",
+  "clientMetadata": {
+    "client_name": "Verifier2",
+    "logo_uri": "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
+  }
+}'
+```
+
+#### 1.2.1. Create Verification Session
+
+`POST /v1/{target}/verifier2-service-api/verification-session/create`
+
+```json
+{
+  "dcql_query": {
+    "credentials": [
+      {
+        "id": "my_photoid",
+        "format": "mso_mdoc",
+        "meta": {
+          "doctype_value": "org.iso.23220.photoid.1"
+        },
+        "claims": [
+          { "path": [ "org.iso.18013.5.1", "family_name_unicode" ] },
+          { "path": [ "org.iso.18013.5.1", "given_name_unicode" ] },
+          { "path": [ "org.iso.18013.5.1", "issuing_authority_unicode" ] },
+          {
+            "path": [ "org.iso.18013.5.1", "resident_postal_code" ],
+            "values": [ 1180, 1190, 1200, 1210 ]
+          },
+          {
+            "path": [ "org.iso.18013.5.1", "issuing_country" ],
+            "values": [ "AT" ]
+          },
+
+          { "path": [ "org.iso.23220.photoid.1", "person_id" ] },
+          { "path": [ "org.iso.23220.photoid.1", "resident_street" ] },
+          { "path": [ "org.iso.23220.photoid.1", "administrative_number" ] },
+          { "path": [ "org.iso.23220.photoid.1", "travel_document_number" ] },
+
+          { "path": [ "org.iso.23220.dtc.1", "dtc_version" ] },
+          { "path": [ "org.iso.23220.dtc.1", "dtc_dg1" ] }
+        ]
+      }
+    ]
+  },
+  "policies": {
+    "vcPolicies": [
+      { "policy": "signature" },
+      { "policy": "regex", "path": "$.['org.iso.23220.dtc.1'].dtc_version", "regex": "^(\"[0-9]+\"|-?[0-9]+(\\.[0-9]+)?)$" }
+    ]
+  }
+}
+```
+
+->
+
+```bash
+curl -X 'POST' \
+  'https://waltid.enterprise.mdoc-test.waltid.cloud/v1/waltid.v2/verifier2-service-api/verification-session/create' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "dcql_query": {
+    "credentials": [
+      {
+        "id": "my_photoid",
+        "format": "mso_mdoc",
+        "meta": {
+          "doctype_value": "org.iso.23220.photoid.1"
+        },
+        "claims": [
+          { "path": [ "org.iso.18013.5.1", "family_name_unicode" ] },
+          { "path": [ "org.iso.18013.5.1", "given_name_unicode" ] },
+          { "path": [ "org.iso.18013.5.1", "issuing_authority_unicode" ] },
+          {
+            "path": [ "org.iso.18013.5.1", "resident_postal_code" ],
+            "values": [ 1180, 1190, 1200, 1210 ]
+          },
+          {
+            "path": [ "org.iso.18013.5.1", "issuing_country" ],
+            "values": [ "AT" ]
+          },
+
+          { "path": [ "org.iso.23220.photoid.1", "person_id" ] },
+          { "path": [ "org.iso.23220.photoid.1", "resident_street" ] },
+          { "path": [ "org.iso.23220.photoid.1", "administrative_number" ] },
+          { "path": [ "org.iso.23220.photoid.1", "travel_document_number" ] },
+
+          { "path": [ "org.iso.23220.dtc.1", "dtc_version" ] },
+          { "path": [ "org.iso.23220.dtc.1", "dtc_dg1" ] }
+        ]
+      }
+    ]
+  },
+  "policies": {
+    "vcPolicies": [
+      { "policy": "signature" },
+      { "policy": "regex", "path": "$.['\''org.iso.23220.dtc.1'\''].dtc_version", "regex": "^(\"[0-9]+\"|-?[0-9]+(\\.[0-9]+)?)$" }
+    ]
+  }
+}'
+```
+
+Response:
+
+```json
+{
+  "sessionId": "4ec07883-f1d0-4346-8013-cad30e862b56",
+  "bootstrapAuthorizationRequestUrl": "openid4vp://authorize?client_id=my-client-id&request_uri=https%3A%2F%2Fwaltid.enterprise.mdoc-test.waltid.cloud%2Fv1%2Fwaltid.v2%2Fverifier2-service-api%2F4ec07883-f1d0-4346-8013-cad30e862b56%2Frequest",
+  "fullAuthorizationRequestUrl": "openid4vp://authorize?response_type=vp_token&client_id=my-client-id&state=5c2c4802-be15-4441-9039-04bed76e3607&response_mode=direct_post&nonce=92698b40-f50d-4be1-97b4-dd1dba9bfe4a&response_uri=https%3A%2F%2Fwaltid.enterprise.mdoc-test.waltid.cloud%2Fv1%2Fwaltid.v2%2Fverifier2-service-api%2F4ec07883-f1d0-4346-8013-cad30e862b56%2Fresponse&dcql_query=%7B%22credentials%22%3A%5B%7B%22id%22%3A%22my_photoid%22%2C%22format%22%3A%22mso_mdoc%22%2C%22meta%22%3A%7B%22doctype_value%22%3A%22org.iso.23220.photoid.1%22%7D%2C%22claims%22%3A%5B%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22family_name_unicode%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22given_name_unicode%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22issuing_authority_unicode%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22resident_postal_code%22%5D%2C%22values%22%3A%5B1180%2C1190%2C1200%2C1210%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22issuing_country%22%5D%2C%22values%22%3A%5B%22AT%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22person_id%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22resident_street%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22administrative_number%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22travel_document_number%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.dtc.1%22%2C%22dtc_version%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.dtc.1%22%2C%22dtc_dg1%22%5D%7D%5D%7D%5D%7D&client_metadata=%7B%22client_name%22%3A%22Verifier2%22%2C%22logo_uri%22%3A%22https%3A%2F%2Fimages.squarespace-cdn.com%2Fcontent%2Fv1%2F609c0ddf94bcc0278a7cbdb4%2F4d493ccf-c893-4882-925f-fda3256c38f4%2FWalt.id_Logo_transparent.png%22%7D",
+  "creationTarget": "waltid.v2.4ec07883-f1d0-4346-8013-cad30e862b56"
+}
+```
+
+(note the creationTarget in the Enterprise)
+
+#### 1.2.2. Present with wallet
+
+`POST /v1/{target}/wallet-service-api/credentials/present`
+
+```json
+{
+  "requestUrl": "openid4vp://authorize?client_id=my-client-id&request_uri=https%3A%2F%2Fwaltid.enterprise.mdoc-test.waltid.cloud%2Fv1%2Fwaltid.v2%2Fverifier2-service-api%2F4ec07883-f1d0-4346-8013-cad30e862b56%2Frequest",
+  "keyReference": "waltid.test.kms.wallet_key"
+}
+```
+
+->
+
+```bash
+curl -X 'POST' \
+  'https://waltid.enterprise.mdoc-test.waltid.cloud/v1/waltid.test.wallet/wallet-service-api/credentials/present' \
+  -H 'accept: */*' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "requestUrl": "openid4vp://authorize?client_id=my-client-id&request_uri=https%3A%2F%2Fwaltid.enterprise.mdoc-test.waltid.cloud%2Fv1%2Fwaltid.v2%2Fverifier2-service-api%2F4ec07883-f1d0-4346-8013-cad30e862b56%2Frequest",
+  "keyReference": "waltid.test.kms.wallet_key"
+}'
+```
+
+Response:
+
+```json
+{
+  "transmission_success": true,
+  "verifier_response": {
+    "status": "received",
+    "message": "Presentation received and is being processed."
+  }
+}
+```
+
+#### 1.2.3. View Verification Session Information
+
+`GET /v1/{target}/verifier2-service-api/verification-session/info`
+->
+
+```bash
+curl -X 'GET' \
+  'https://waltid.enterprise.mdoc-test.waltid.cloud/v1/waltid.v2.4ec07883-f1d0-4346-8013-cad30e862b56/verifier2-service-api/verification-session/info' \
+  -H 'accept: application/json'
+```
+
+Response:
+
+```json
+{
+  "_id": "waltid.v2.4ec07883-f1d0-4346-8013-cad30e862b56",
+  "session": {
+    "id": "4ec07883-f1d0-4346-8013-cad30e862b56",
+    "creationDate": "2025-09-19T15:22:42.779658776Z",
+    "expirationDate": "2025-09-19T15:27:42.779658776Z",
+    "retentionDate": "2035-09-19T15:22:42.779658776Z",
+    "status": "SUCCESSFUL",
+    "attempted": true,
+    "reattemptable": true,
+    "bootstrapAuthorizationRequest": {
+      "response_type": "vp_token",
+      "client_id": "my-client-id",
+      "request_uri": "https://waltid.enterprise.mdoc-test.waltid.cloud/v1/waltid.v2/verifier2-service-api/4ec07883-f1d0-4346-8013-cad30e862b56/request"
+    },
+    "bootstrapAuthorizationRequestUrl": "openid4vp://authorize?client_id=my-client-id&request_uri=https%3A%2F%2Fwaltid.enterprise.mdoc-test.waltid.cloud%2Fv1%2Fwaltid.v2%2Fverifier2-service-api%2F4ec07883-f1d0-4346-8013-cad30e862b56%2Frequest",
+    "authorizationRequest": {
+      "response_type": "vp_token",
+      "client_id": "my-client-id",
+      "state": "5c2c4802-be15-4441-9039-04bed76e3607",
+      "response_mode": "direct_post",
+      "nonce": "92698b40-f50d-4be1-97b4-dd1dba9bfe4a",
+      "response_uri": "https://waltid.enterprise.mdoc-test.waltid.cloud/v1/waltid.v2/verifier2-service-api/4ec07883-f1d0-4346-8013-cad30e862b56/response",
+      "dcql_query": {
+        "credentials": [
+          {
+            "id": "my_photoid",
+            "format": "mso_mdoc",
+            "multiple": false,
+            "meta": {
+              "doctype_value": "org.iso.23220.photoid.1"
+            },
+            "require_cryptographic_holder_binding": true,
+            "claims": [
+              {
+                "path": [
+                  "org.iso.18013.5.1",
+                  "family_name_unicode"
+                ]
+              },
+              {
+                "path": [
+                  "org.iso.18013.5.1",
+                  "given_name_unicode"
+                ]
+              },
+              {
+                "path": [
+                  "org.iso.18013.5.1",
+                  "issuing_authority_unicode"
+                ]
+              },
+              {
+                "path": [
+                  "org.iso.18013.5.1",
+                  "resident_postal_code"
+                ],
+                "values": [
+                  1180,
+                  1190,
+                  1200,
+                  1210
+                ]
+              },
+              {
+                "path": [
+                  "org.iso.18013.5.1",
+                  "issuing_country"
+                ],
+                "values": [
+                  "AT"
+                ]
+              },
+              {
+                "path": [
+                  "org.iso.23220.photoid.1",
+                  "person_id"
+                ]
+              },
+              {
+                "path": [
+                  "org.iso.23220.photoid.1",
+                  "resident_street"
+                ]
+              },
+              {
+                "path": [
+                  "org.iso.23220.photoid.1",
+                  "administrative_number"
+                ]
+              },
+              {
+                "path": [
+                  "org.iso.23220.photoid.1",
+                  "travel_document_number"
+                ]
+              },
+              {
+                "path": [
+                  "org.iso.23220.dtc.1",
+                  "dtc_version"
+                ]
+              },
+              {
+                "path": [
+                  "org.iso.23220.dtc.1",
+                  "dtc_dg1"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "client_metadata": {
+        "client_name": "Verifier2",
+        "logo_uri": "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
+      }
+    },
+    "authorizationRequestUrl": "openid4vp://authorize?response_type=vp_token&client_id=my-client-id&state=5c2c4802-be15-4441-9039-04bed76e3607&response_mode=direct_post&nonce=92698b40-f50d-4be1-97b4-dd1dba9bfe4a&response_uri=https%3A%2F%2Fwaltid.enterprise.mdoc-test.waltid.cloud%2Fv1%2Fwaltid.v2%2Fverifier2-service-api%2F4ec07883-f1d0-4346-8013-cad30e862b56%2Fresponse&dcql_query=%7B%22credentials%22%3A%5B%7B%22id%22%3A%22my_photoid%22%2C%22format%22%3A%22mso_mdoc%22%2C%22meta%22%3A%7B%22doctype_value%22%3A%22org.iso.23220.photoid.1%22%7D%2C%22claims%22%3A%5B%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22family_name_unicode%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22given_name_unicode%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22issuing_authority_unicode%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22resident_postal_code%22%5D%2C%22values%22%3A%5B1180%2C1190%2C1200%2C1210%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22issuing_country%22%5D%2C%22values%22%3A%5B%22AT%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22person_id%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22resident_street%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22administrative_number%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22travel_document_number%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.dtc.1%22%2C%22dtc_version%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.dtc.1%22%2C%22dtc_dg1%22%5D%7D%5D%7D%5D%7D&client_metadata=%7B%22client_name%22%3A%22Verifier2%22%2C%22logo_uri%22%3A%22https%3A%2F%2Fimages.squarespace-cdn.com%2Fcontent%2Fv1%2F609c0ddf94bcc0278a7cbdb4%2F4d493ccf-c893-4882-925f-fda3256c38f4%2FWalt.id_Logo_transparent.png%22%7D",
+    "policies": {
+      "vcPolicies": [
+        {
+          "policy": "signature",
+          "id": "signature"
+        },
+        {
+          "policy": "regex",
+          "path": "$.['org.iso.23220.dtc.1'].dtc_version",
+          "regex": "^(\"[0-9]+\"|-?[0-9]+(\\.[0-9]+)?)$",
+          "allowNull": false,
+          "id": "regex"
+        }
+      ],
+      "specificVcPolicies": {}
+    },
+    "policyResults": {
+      "vcPolicies": [
+        {
+          "policy": {
+            "policy": "signature",
+            "id": "signature"
+          },
+          "success": true,
+          "result": {
+            "verification_result": true,
+            "signed_credential": "o2d2ZXJzaW9uYzEuMGlkb2N1bWVudHOBo2dkb2NUeXBld29yZy5pc28uMjMyMjAucGhvdG9pZC4xbGlzc3VlclNpZ25lZKJqbmFtZVNwYWNlc6Nxb3JnLmlzby4xODAxMy41LjGF2BhYWqRoZGlnZXN0SUQAZnJhbmRvbVBXjrSPzTHh_3EpjZBMk3VzcWVsZW1lbnRJZGVudGlmaWVyc2ZhbWlseV9uYW1lX3VuaWNvZGVsZWxlbWVudFZhbHVlY0RvZdgYWFqkaGRpZ2VzdElEAWZyYW5kb21QUjRsAOzweOWZe4Pa7qdDeXFlbGVtZW50SWRlbnRpZmllcnJnaXZlbl9uYW1lX3VuaWNvZGVsZWxlbWVudFZhbHVlZEpvaG7YGFhppGhkaWdlc3RJRAVmcmFuZG9tUOeHfqfTlyUI23tPzklRyBhxZWxlbWVudElkZW50aWZpZXJ4GWlzc3VpbmdfYXV0aG9yaXR5X3VuaWNvZGVsZWxlbWVudFZhbHVla0xQRCBXaWVuIDIy2BhYWqRoZGlnZXN0SUQOZnJhbmRvbVAwinKsJb5yZAOwDgUs61drcWVsZW1lbnRJZGVudGlmaWVydHJlc2lkZW50X3Bvc3RhbF9jb2RlbGVsZW1lbnRWYWx1ZRkEptgYWFWkaGRpZ2VzdElEBmZyYW5kb21Q8FQtg_Xvk_6_ZO2on0J3ZnFlbGVtZW50SWRlbnRpZmllcm9pc3N1aW5nX2NvdW50cnlsZWxlbWVudFZhbHVlYkFUd29yZy5pc28uMjMyMjAucGhvdG9pZC4xhNgYWFSkaGRpZ2VzdElEAGZyYW5kb21QbrvMNdB9GrPeYqmr3_S3y3FlbGVtZW50SWRlbnRpZmllcmlwZXJzb25faWRsZWxlbWVudFZhbHVlZ0FUMTIzNDXYGFhepGhkaWdlc3RJRAVmcmFuZG9tUGkakmU3ilFxvy8fPrJm_0dxZWxlbWVudElkZW50aWZpZXJvcmVzaWRlbnRfc3RyZWV0bGVsZW1lbnRWYWx1ZWtQw7xjaGxnYXNzZdgYWGKkaGRpZ2VzdElEBGZyYW5kb21QTnK027UPJOcDdhTEtZF1l3FlbGVtZW50SWRlbnRpZmllcnVhZG1pbmlzdHJhdGl2ZV9udW1iZXJsZWxlbWVudFZhbHVlaUFUQVRBVDEyM9gYWF6kaGRpZ2VzdElEB2ZyYW5kb21Q38ynn5QTSgOntjBpVdGdm3FlbGVtZW50SWRlbnRpZmllcnZ0cmF2ZWxfZG9jdW1lbnRfbnVtYmVybGVsZW1lbnRWYWx1ZRoAESAec29yZy5pc28uMjMyMjAuZHRjLjGC2BhYT6RoZGlnZXN0SUQAZnJhbmRvbVCt1yWTaOG0nFd3oM_z2pfMcWVsZW1lbnRJZGVudGlmaWVya2R0Y192ZXJzaW9ubGVsZW1lbnRWYWx1ZQHYGFikpGhkaWdlc3RJRAFmcmFuZG9tUF9zKHM5dwwm3Ndfe4_fUZFxZWxlbWVudElkZW50aWZpZXJnZHRjX2RnMWxlbGVtZW50VmFsdWV4WFA8QVVURE9FPDxKT0hOPDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8MDAxMTIyMzM0MEFVVDIwMDEyMDdNMzAwOTEyOTw8PDw8PDw8PDw8PDw8MDZqaXNzdWVyQXV0aIRDoQEmoRghWQINMIICCTCCAbCgAwIBAgIUfqyiArJZoX7M61_473UAVi2_UpgwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDY0MTEzWhcNMjYwOTAyMDY0MTEzWjAzMQswCQYDVQQGEwJBVDEkMCIGA1UEAwwbV2FsdGlkIFRlc3QgRG9jdW1lbnQgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5Xp3CFQDMrMpR_SQ0jt_jTOqExk1PRzjQ79aKpIsJM1mqOBrDCBqTAfBgNVHSMEGDAWgBTxCn2nWMrE70qXb614U14BweY2azAdBgNVHQ4EFgQUx5qkOLC4lpl1xpYZGmF9HLxtp0gwDgYDVR0PAQH_BAQDAgeAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCQGA1UdHwQdMBswGaAXoBWGE2h0dHBzOi8vd2FsdC5pZC9jcmwwCgYIKoZIzj0EAwIDRwAwRAIgHTap3c6yCUNhDVfZWBPMKj9dCWZbrME03kh9NJTbw1ECIAvVvuGll9O21eR16SkJHHAA1pPcovhcTvF9fz9cc66MWQXq2BhZBeWmZ3ZlcnNpb25jMS4wb2RpZ2VzdEFsZ29yaXRobWdTSEEtMjU2bHZhbHVlRGlnZXN0c6Nxb3JnLmlzby4xODAxMy41LjG1AFggHs4Zw8M_FMp07jxll3RTDAqE6JB7kBmWMhfwfjzGzA4BWCD7yPCQZjqaFcrt_WgR9sAdW2ziDPlrCVsfd8iVmIMDLwJYIK-PQcwmRZoKgS3c3IdV597v6AwuVAOYyy1EZfpUQ2tMA1ggCpSg-11_W6RBAXi4gDwR4nI_vI9cpONJHOZACftxhz8EWCDdWVmvr6DvTnfdtqyddWLpb0GQXX3Z5uSLetB2PN6IOwVYIENvxy_Rs2-9cEdx0tdKmbttvDX-Qv7cidtK7WK0saTSBlggHKehanNLWPv3eJ1uNQVAFk1uSGde43X1JyiLAHSWBQQHWCD265uI2ZWphi_9k27J4o0lW8OPsqkV45RoYH_ectHJ4AhYICqCl2fLlZI9znzy6rIrjxfNgMc7DarZnJJjwJryy1pICVgg-aOmuuYUuiMyjkd5Yl2vy4AzJwmnWph4D6Y-uyV59F0KWCBuP2YIrjiQzCbtwdMAtZz7pTrYhFPxTp5Pxz8722sXMAtYIDDh0_Xi3IBjAp3bLcgq-vC1L5I7Ejwh3WkPr1vwLAe-DFgg7OY8BWy_rJQUzFTEjb5-j-dbjTjl0EkA8jh14YSnLfYNWCCkCJXa0v5pEivv-blgQSmDRa0DHzV6zI3QStC8OErfmQ5YILLRZQ79eqIz5W3UHghJlvV2IVAP66A-3qPw7-ld_OveD1ggIxyc21FE6g7U5E1eJ9f1UquonrAdgAyxTOtPFcM5zpcQWCDQ0IQ0YH4q4GXD8cm_JRcXW35QcgpEDDoBPJzGBs1J3BFYIHHlgsipbxe9uaOnD_znrWeGRXZP7sxm7b99_9Uz8nLSElgg0sgZa6JS-1cNL89KiUzK2-jo_uyiOB_q0keS7K065qETWCAtVlbSSlnHrAw5a7TPWIOQB6lZi5kswOCEZ20mjSnT2hRYIOmF49LL1MdFIgyA97jAHeyoJwb_K_NbxoLTVvQhxQmad29yZy5pc28uMjMyMjAucGhvdG9pZC4xqQBYIK1J0RHnaeau55mdOkQ4M4af2kRqAaMH2fUbOOOKH9DDAVgg7p6iC2dyZsdPD-8pqMxFwiE8Tt1TAk1xxuiCCD-yUD4CWCBTlFrzS4d6QsRSX8Js-TTPXH1SzSAVRKWVbpDYe3bmrgNYIP8fC75sQEyNKdAePELhjjs7qHmxyxKMvsqmCD6L7nGGBFgguRVw8MChW9Ew9HXF8RmxSYNhhJ3Jq3klB0Q4YkoH4t4FWCAboi49bkOTF_c4mmc2Xh_aM9F9fQCmyhQXWScfuAPFRQZYIFlvy0ZCmJvsFbgvz2GvZ9U9pYaWrQcUvv_-EqQ1oW0OB1ggiFZXrFWAlLCxg-1SeekRM84wNu0OElwiQude8Uig4lcIWCC717fM_6E4FqW7VHYb_yiXk9FAUIfvB683jO8WtRFRdHNvcmcuaXNvLjIzMjIwLmR0Yy4xogBYINyUeDNgw_arfmhacW8ooRNcnAMj9jqesw9SWmUG9hv5AVggbZpw6lp_qcoA-CLSaBXqg0wyjOurK_bgVfU3DCOh0hhtZGV2aWNlS2V5SW5mb6FpZGV2aWNlS2V5pAECIAEhWCDIy6N-quKCA3W-Ih8b71tpKN2T0ynFm4GQrJqmsArkliJYIJn1Gz3hE_ZxjNfQVtC-KI77qfaJ8W70Fu5kyV8lEqJVZ2RvY1R5cGV3b3JnLmlzby4yMzIyMC5waG90b2lkLjFsdmFsaWRpdHlJbmZvo2ZzaWduZWTAeB4yMDI1LTA5LTE5VDEzOjIyOjE2Ljk2ODEzOTExMFppdmFsaWRGcm9twHgeMjAyNS0wOS0xOVQxMzoyMjoxNi45NjgxNDAxMTBaanZhbGlkVW50aWzAeB4yMDI2LTA5LTE5VDEzOjIyOjE2Ljk2ODE0MjMxMFpYQBM4mbEoq9v8gigaoX_gkyBQEaWDrhauPv6ny4AfrVifa0-CtX0EQ7UHYd5bzF8mMB_EvKzNHFZeeTFhRifZ-v9sZGV2aWNlU2lnbmVkompuYW1lU3BhY2Vz2BhBoGpkZXZpY2VBdXRooW9kZXZpY2VTaWduYXR1cmWEQ6EBJqD2WED6bx4FebKf7alDsr5gXyBSFKOgpqliZnv6Rk7NpDoGae1FiSl-mY1vtDTfeO2cIN52zbN8dx-PwYrLrwpm6cAAZnN0YXR1cwA",
+            "verified_data": {
+              "org.iso.18013.5.1": {
+                "family_name_unicode": "Doe",
+                "given_name_unicode": "John",
+                "issuing_authority_unicode": "LPD Wien 22",
+                "resident_postal_code": 1190,
+                "issuing_country": "AT"
+              },
+              "org.iso.23220.photoid.1": {
+                "person_id": "AT12345",
+                "resident_street": "Püchlgasse",
+                "administrative_number": "ATATAT123",
+                "travel_document_number": 1122334
+              },
+              "org.iso.23220.dtc.1": {
+                "dtc_version": 1,
+                "dtc_dg1": "P<AUTDOE<<JOHN<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<0011223340AUT2001207M3009129<<<<<<<<<<<<<<06"
+              }
+            },
+            "successful_issuer_public_key": {
+              "kty": "EC",
+              "crv": "P-256",
+              "x": "Pzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5U",
+              "y": "6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo"
+            },
+            "successful_issuer_public_key_id": "sW5yv0UmZ3S0dQuUrwlR9I3foREBHHFwXhGJGqGEVf0"
+          }
+        },
+        {
+          "policy": {
+            "policy": "regex",
+            "path": "$.['org.iso.23220.dtc.1'].dtc_version",
+            "regex": "^(\"[0-9]+\"|-?[0-9]+(\\.[0-9]+)?)$",
+            "allowNull": false,
+            "id": "regex"
+          },
+          "success": true,
+          "result": {
+            "value": "1",
+            "groups": [
+              "1",
+              "1",
+              ""
+            ]
+          }
+        }
+      ],
+      "specificVcPolicies": {},
+      "overallSuccess": true
+    },
+    "presentedRawData": {
+      "vpToken": {
+        "my_photoid": [
+          "o2d2ZXJzaW9uYzEuMGlkb2N1bWVudHOBo2dkb2NUeXBld29yZy5pc28uMjMyMjAucGhvdG9pZC4xbGlzc3VlclNpZ25lZKJqbmFtZVNwYWNlc6Nxb3JnLmlzby4xODAxMy41LjGF2BhYWqRoZGlnZXN0SUQAZnJhbmRvbVBXjrSPzTHh_3EpjZBMk3VzcWVsZW1lbnRJZGVudGlmaWVyc2ZhbWlseV9uYW1lX3VuaWNvZGVsZWxlbWVudFZhbHVlY0RvZdgYWFqkaGRpZ2VzdElEAWZyYW5kb21QUjRsAOzweOWZe4Pa7qdDeXFlbGVtZW50SWRlbnRpZmllcnJnaXZlbl9uYW1lX3VuaWNvZGVsZWxlbWVudFZhbHVlZEpvaG7YGFhppGhkaWdlc3RJRAVmcmFuZG9tUOeHfqfTlyUI23tPzklRyBhxZWxlbWVudElkZW50aWZpZXJ4GWlzc3VpbmdfYXV0aG9yaXR5X3VuaWNvZGVsZWxlbWVudFZhbHVla0xQRCBXaWVuIDIy2BhYWqRoZGlnZXN0SUQOZnJhbmRvbVAwinKsJb5yZAOwDgUs61drcWVsZW1lbnRJZGVudGlmaWVydHJlc2lkZW50X3Bvc3RhbF9jb2RlbGVsZW1lbnRWYWx1ZRkEptgYWFWkaGRpZ2VzdElEBmZyYW5kb21Q8FQtg_Xvk_6_ZO2on0J3ZnFlbGVtZW50SWRlbnRpZmllcm9pc3N1aW5nX2NvdW50cnlsZWxlbWVudFZhbHVlYkFUd29yZy5pc28uMjMyMjAucGhvdG9pZC4xhNgYWFSkaGRpZ2VzdElEAGZyYW5kb21QbrvMNdB9GrPeYqmr3_S3y3FlbGVtZW50SWRlbnRpZmllcmlwZXJzb25faWRsZWxlbWVudFZhbHVlZ0FUMTIzNDXYGFhepGhkaWdlc3RJRAVmcmFuZG9tUGkakmU3ilFxvy8fPrJm_0dxZWxlbWVudElkZW50aWZpZXJvcmVzaWRlbnRfc3RyZWV0bGVsZW1lbnRWYWx1ZWtQw7xjaGxnYXNzZdgYWGKkaGRpZ2VzdElEBGZyYW5kb21QTnK027UPJOcDdhTEtZF1l3FlbGVtZW50SWRlbnRpZmllcnVhZG1pbmlzdHJhdGl2ZV9udW1iZXJsZWxlbWVudFZhbHVlaUFUQVRBVDEyM9gYWF6kaGRpZ2VzdElEB2ZyYW5kb21Q38ynn5QTSgOntjBpVdGdm3FlbGVtZW50SWRlbnRpZmllcnZ0cmF2ZWxfZG9jdW1lbnRfbnVtYmVybGVsZW1lbnRWYWx1ZRoAESAec29yZy5pc28uMjMyMjAuZHRjLjGC2BhYT6RoZGlnZXN0SUQAZnJhbmRvbVCt1yWTaOG0nFd3oM_z2pfMcWVsZW1lbnRJZGVudGlmaWVya2R0Y192ZXJzaW9ubGVsZW1lbnRWYWx1ZQHYGFikpGhkaWdlc3RJRAFmcmFuZG9tUF9zKHM5dwwm3Ndfe4_fUZFxZWxlbWVudElkZW50aWZpZXJnZHRjX2RnMWxlbGVtZW50VmFsdWV4WFA8QVVURE9FPDxKT0hOPDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8MDAxMTIyMzM0MEFVVDIwMDEyMDdNMzAwOTEyOTw8PDw8PDw8PDw8PDw8MDZqaXNzdWVyQXV0aIRDoQEmoRghWQINMIICCTCCAbCgAwIBAgIUfqyiArJZoX7M61_473UAVi2_UpgwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDY0MTEzWhcNMjYwOTAyMDY0MTEzWjAzMQswCQYDVQQGEwJBVDEkMCIGA1UEAwwbV2FsdGlkIFRlc3QgRG9jdW1lbnQgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5Xp3CFQDMrMpR_SQ0jt_jTOqExk1PRzjQ79aKpIsJM1mqOBrDCBqTAfBgNVHSMEGDAWgBTxCn2nWMrE70qXb614U14BweY2azAdBgNVHQ4EFgQUx5qkOLC4lpl1xpYZGmF9HLxtp0gwDgYDVR0PAQH_BAQDAgeAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCQGA1UdHwQdMBswGaAXoBWGE2h0dHBzOi8vd2FsdC5pZC9jcmwwCgYIKoZIzj0EAwIDRwAwRAIgHTap3c6yCUNhDVfZWBPMKj9dCWZbrME03kh9NJTbw1ECIAvVvuGll9O21eR16SkJHHAA1pPcovhcTvF9fz9cc66MWQXq2BhZBeWmZ3ZlcnNpb25jMS4wb2RpZ2VzdEFsZ29yaXRobWdTSEEtMjU2bHZhbHVlRGlnZXN0c6Nxb3JnLmlzby4xODAxMy41LjG1AFggHs4Zw8M_FMp07jxll3RTDAqE6JB7kBmWMhfwfjzGzA4BWCD7yPCQZjqaFcrt_WgR9sAdW2ziDPlrCVsfd8iVmIMDLwJYIK-PQcwmRZoKgS3c3IdV597v6AwuVAOYyy1EZfpUQ2tMA1ggCpSg-11_W6RBAXi4gDwR4nI_vI9cpONJHOZACftxhz8EWCDdWVmvr6DvTnfdtqyddWLpb0GQXX3Z5uSLetB2PN6IOwVYIENvxy_Rs2-9cEdx0tdKmbttvDX-Qv7cidtK7WK0saTSBlggHKehanNLWPv3eJ1uNQVAFk1uSGde43X1JyiLAHSWBQQHWCD265uI2ZWphi_9k27J4o0lW8OPsqkV45RoYH_ectHJ4AhYICqCl2fLlZI9znzy6rIrjxfNgMc7DarZnJJjwJryy1pICVgg-aOmuuYUuiMyjkd5Yl2vy4AzJwmnWph4D6Y-uyV59F0KWCBuP2YIrjiQzCbtwdMAtZz7pTrYhFPxTp5Pxz8722sXMAtYIDDh0_Xi3IBjAp3bLcgq-vC1L5I7Ejwh3WkPr1vwLAe-DFgg7OY8BWy_rJQUzFTEjb5-j-dbjTjl0EkA8jh14YSnLfYNWCCkCJXa0v5pEivv-blgQSmDRa0DHzV6zI3QStC8OErfmQ5YILLRZQ79eqIz5W3UHghJlvV2IVAP66A-3qPw7-ld_OveD1ggIxyc21FE6g7U5E1eJ9f1UquonrAdgAyxTOtPFcM5zpcQWCDQ0IQ0YH4q4GXD8cm_JRcXW35QcgpEDDoBPJzGBs1J3BFYIHHlgsipbxe9uaOnD_znrWeGRXZP7sxm7b99_9Uz8nLSElgg0sgZa6JS-1cNL89KiUzK2-jo_uyiOB_q0keS7K065qETWCAtVlbSSlnHrAw5a7TPWIOQB6lZi5kswOCEZ20mjSnT2hRYIOmF49LL1MdFIgyA97jAHeyoJwb_K_NbxoLTVvQhxQmad29yZy5pc28uMjMyMjAucGhvdG9pZC4xqQBYIK1J0RHnaeau55mdOkQ4M4af2kRqAaMH2fUbOOOKH9DDAVgg7p6iC2dyZsdPD-8pqMxFwiE8Tt1TAk1xxuiCCD-yUD4CWCBTlFrzS4d6QsRSX8Js-TTPXH1SzSAVRKWVbpDYe3bmrgNYIP8fC75sQEyNKdAePELhjjs7qHmxyxKMvsqmCD6L7nGGBFgguRVw8MChW9Ew9HXF8RmxSYNhhJ3Jq3klB0Q4YkoH4t4FWCAboi49bkOTF_c4mmc2Xh_aM9F9fQCmyhQXWScfuAPFRQZYIFlvy0ZCmJvsFbgvz2GvZ9U9pYaWrQcUvv_-EqQ1oW0OB1ggiFZXrFWAlLCxg-1SeekRM84wNu0OElwiQude8Uig4lcIWCC717fM_6E4FqW7VHYb_yiXk9FAUIfvB683jO8WtRFRdHNvcmcuaXNvLjIzMjIwLmR0Yy4xogBYINyUeDNgw_arfmhacW8ooRNcnAMj9jqesw9SWmUG9hv5AVggbZpw6lp_qcoA-CLSaBXqg0wyjOurK_bgVfU3DCOh0hhtZGV2aWNlS2V5SW5mb6FpZGV2aWNlS2V5pAECIAEhWCDIy6N-quKCA3W-Ih8b71tpKN2T0ynFm4GQrJqmsArkliJYIJn1Gz3hE_ZxjNfQVtC-KI77qfaJ8W70Fu5kyV8lEqJVZ2RvY1R5cGV3b3JnLmlzby4yMzIyMC5waG90b2lkLjFsdmFsaWRpdHlJbmZvo2ZzaWduZWTAeB4yMDI1LTA5LTE5VDEzOjIyOjE2Ljk2ODEzOTExMFppdmFsaWRGcm9twHgeMjAyNS0wOS0xOVQxMzoyMjoxNi45NjgxNDAxMTBaanZhbGlkVW50aWzAeB4yMDI2LTA5LTE5VDEzOjIyOjE2Ljk2ODE0MjMxMFpYQBM4mbEoq9v8gigaoX_gkyBQEaWDrhauPv6ny4AfrVifa0-CtX0EQ7UHYd5bzF8mMB_EvKzNHFZeeTFhRifZ-v9sZGV2aWNlU2lnbmVkompuYW1lU3BhY2Vz2BhBoGpkZXZpY2VBdXRooW9kZXZpY2VTaWduYXR1cmWEQ6EBJqD2WED6bx4FebKf7alDsr5gXyBSFKOgpqliZnv6Rk7NpDoGae1FiSl-mY1vtDTfeO2cIN52zbN8dx-PwYrLrwpm6cAAZnN0YXR1cwA"
+        ]
+      },
+      "state": "5c2c4802-be15-4441-9039-04bed76e3607"
+    },
+    "presentedCredentials": {
+      "my_photoid": [
+        {
+          "type": "vc-mdocs",
+          "credentialData": {
+            "org.iso.18013.5.1": {
+              "family_name_unicode": "Doe",
+              "given_name_unicode": "John",
+              "issuing_authority_unicode": "LPD Wien 22",
+              "resident_postal_code": 1190,
+              "issuing_country": "AT"
+            },
+            "org.iso.23220.photoid.1": {
+              "person_id": "AT12345",
+              "resident_street": "Püchlgasse",
+              "administrative_number": "ATATAT123",
+              "travel_document_number": 1122334
+            },
+            "org.iso.23220.dtc.1": {
+              "dtc_version": 1,
+              "dtc_dg1": "P<AUTDOE<<JOHN<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<0011223340AUT2001207M3009129<<<<<<<<<<<<<<06"
+            }
+          },
+          "signed": "o2d2ZXJzaW9uYzEuMGlkb2N1bWVudHOBo2dkb2NUeXBld29yZy5pc28uMjMyMjAucGhvdG9pZC4xbGlzc3VlclNpZ25lZKJqbmFtZVNwYWNlc6Nxb3JnLmlzby4xODAxMy41LjGF2BhYWqRoZGlnZXN0SUQAZnJhbmRvbVBXjrSPzTHh_3EpjZBMk3VzcWVsZW1lbnRJZGVudGlmaWVyc2ZhbWlseV9uYW1lX3VuaWNvZGVsZWxlbWVudFZhbHVlY0RvZdgYWFqkaGRpZ2VzdElEAWZyYW5kb21QUjRsAOzweOWZe4Pa7qdDeXFlbGVtZW50SWRlbnRpZmllcnJnaXZlbl9uYW1lX3VuaWNvZGVsZWxlbWVudFZhbHVlZEpvaG7YGFhppGhkaWdlc3RJRAVmcmFuZG9tUOeHfqfTlyUI23tPzklRyBhxZWxlbWVudElkZW50aWZpZXJ4GWlzc3VpbmdfYXV0aG9yaXR5X3VuaWNvZGVsZWxlbWVudFZhbHVla0xQRCBXaWVuIDIy2BhYWqRoZGlnZXN0SUQOZnJhbmRvbVAwinKsJb5yZAOwDgUs61drcWVsZW1lbnRJZGVudGlmaWVydHJlc2lkZW50X3Bvc3RhbF9jb2RlbGVsZW1lbnRWYWx1ZRkEptgYWFWkaGRpZ2VzdElEBmZyYW5kb21Q8FQtg_Xvk_6_ZO2on0J3ZnFlbGVtZW50SWRlbnRpZmllcm9pc3N1aW5nX2NvdW50cnlsZWxlbWVudFZhbHVlYkFUd29yZy5pc28uMjMyMjAucGhvdG9pZC4xhNgYWFSkaGRpZ2VzdElEAGZyYW5kb21QbrvMNdB9GrPeYqmr3_S3y3FlbGVtZW50SWRlbnRpZmllcmlwZXJzb25faWRsZWxlbWVudFZhbHVlZ0FUMTIzNDXYGFhepGhkaWdlc3RJRAVmcmFuZG9tUGkakmU3ilFxvy8fPrJm_0dxZWxlbWVudElkZW50aWZpZXJvcmVzaWRlbnRfc3RyZWV0bGVsZW1lbnRWYWx1ZWtQw7xjaGxnYXNzZdgYWGKkaGRpZ2VzdElEBGZyYW5kb21QTnK027UPJOcDdhTEtZF1l3FlbGVtZW50SWRlbnRpZmllcnVhZG1pbmlzdHJhdGl2ZV9udW1iZXJsZWxlbWVudFZhbHVlaUFUQVRBVDEyM9gYWF6kaGRpZ2VzdElEB2ZyYW5kb21Q38ynn5QTSgOntjBpVdGdm3FlbGVtZW50SWRlbnRpZmllcnZ0cmF2ZWxfZG9jdW1lbnRfbnVtYmVybGVsZW1lbnRWYWx1ZRoAESAec29yZy5pc28uMjMyMjAuZHRjLjGC2BhYT6RoZGlnZXN0SUQAZnJhbmRvbVCt1yWTaOG0nFd3oM_z2pfMcWVsZW1lbnRJZGVudGlmaWVya2R0Y192ZXJzaW9ubGVsZW1lbnRWYWx1ZQHYGFikpGhkaWdlc3RJRAFmcmFuZG9tUF9zKHM5dwwm3Ndfe4_fUZFxZWxlbWVudElkZW50aWZpZXJnZHRjX2RnMWxlbGVtZW50VmFsdWV4WFA8QVVURE9FPDxKT0hOPDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8MDAxMTIyMzM0MEFVVDIwMDEyMDdNMzAwOTEyOTw8PDw8PDw8PDw8PDw8MDZqaXNzdWVyQXV0aIRDoQEmoRghWQINMIICCTCCAbCgAwIBAgIUfqyiArJZoX7M61_473UAVi2_UpgwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDY0MTEzWhcNMjYwOTAyMDY0MTEzWjAzMQswCQYDVQQGEwJBVDEkMCIGA1UEAwwbV2FsdGlkIFRlc3QgRG9jdW1lbnQgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5Xp3CFQDMrMpR_SQ0jt_jTOqExk1PRzjQ79aKpIsJM1mqOBrDCBqTAfBgNVHSMEGDAWgBTxCn2nWMrE70qXb614U14BweY2azAdBgNVHQ4EFgQUx5qkOLC4lpl1xpYZGmF9HLxtp0gwDgYDVR0PAQH_BAQDAgeAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCQGA1UdHwQdMBswGaAXoBWGE2h0dHBzOi8vd2FsdC5pZC9jcmwwCgYIKoZIzj0EAwIDRwAwRAIgHTap3c6yCUNhDVfZWBPMKj9dCWZbrME03kh9NJTbw1ECIAvVvuGll9O21eR16SkJHHAA1pPcovhcTvF9fz9cc66MWQXq2BhZBeWmZ3ZlcnNpb25jMS4wb2RpZ2VzdEFsZ29yaXRobWdTSEEtMjU2bHZhbHVlRGlnZXN0c6Nxb3JnLmlzby4xODAxMy41LjG1AFggHs4Zw8M_FMp07jxll3RTDAqE6JB7kBmWMhfwfjzGzA4BWCD7yPCQZjqaFcrt_WgR9sAdW2ziDPlrCVsfd8iVmIMDLwJYIK-PQcwmRZoKgS3c3IdV597v6AwuVAOYyy1EZfpUQ2tMA1ggCpSg-11_W6RBAXi4gDwR4nI_vI9cpONJHOZACftxhz8EWCDdWVmvr6DvTnfdtqyddWLpb0GQXX3Z5uSLetB2PN6IOwVYIENvxy_Rs2-9cEdx0tdKmbttvDX-Qv7cidtK7WK0saTSBlggHKehanNLWPv3eJ1uNQVAFk1uSGde43X1JyiLAHSWBQQHWCD265uI2ZWphi_9k27J4o0lW8OPsqkV45RoYH_ectHJ4AhYICqCl2fLlZI9znzy6rIrjxfNgMc7DarZnJJjwJryy1pICVgg-aOmuuYUuiMyjkd5Yl2vy4AzJwmnWph4D6Y-uyV59F0KWCBuP2YIrjiQzCbtwdMAtZz7pTrYhFPxTp5Pxz8722sXMAtYIDDh0_Xi3IBjAp3bLcgq-vC1L5I7Ejwh3WkPr1vwLAe-DFgg7OY8BWy_rJQUzFTEjb5-j-dbjTjl0EkA8jh14YSnLfYNWCCkCJXa0v5pEivv-blgQSmDRa0DHzV6zI3QStC8OErfmQ5YILLRZQ79eqIz5W3UHghJlvV2IVAP66A-3qPw7-ld_OveD1ggIxyc21FE6g7U5E1eJ9f1UquonrAdgAyxTOtPFcM5zpcQWCDQ0IQ0YH4q4GXD8cm_JRcXW35QcgpEDDoBPJzGBs1J3BFYIHHlgsipbxe9uaOnD_znrWeGRXZP7sxm7b99_9Uz8nLSElgg0sgZa6JS-1cNL89KiUzK2-jo_uyiOB_q0keS7K065qETWCAtVlbSSlnHrAw5a7TPWIOQB6lZi5kswOCEZ20mjSnT2hRYIOmF49LL1MdFIgyA97jAHeyoJwb_K_NbxoLTVvQhxQmad29yZy5pc28uMjMyMjAucGhvdG9pZC4xqQBYIK1J0RHnaeau55mdOkQ4M4af2kRqAaMH2fUbOOOKH9DDAVgg7p6iC2dyZsdPD-8pqMxFwiE8Tt1TAk1xxuiCCD-yUD4CWCBTlFrzS4d6QsRSX8Js-TTPXH1SzSAVRKWVbpDYe3bmrgNYIP8fC75sQEyNKdAePELhjjs7qHmxyxKMvsqmCD6L7nGGBFgguRVw8MChW9Ew9HXF8RmxSYNhhJ3Jq3klB0Q4YkoH4t4FWCAboi49bkOTF_c4mmc2Xh_aM9F9fQCmyhQXWScfuAPFRQZYIFlvy0ZCmJvsFbgvz2GvZ9U9pYaWrQcUvv_-EqQ1oW0OB1ggiFZXrFWAlLCxg-1SeekRM84wNu0OElwiQude8Uig4lcIWCC717fM_6E4FqW7VHYb_yiXk9FAUIfvB683jO8WtRFRdHNvcmcuaXNvLjIzMjIwLmR0Yy4xogBYINyUeDNgw_arfmhacW8ooRNcnAMj9jqesw9SWmUG9hv5AVggbZpw6lp_qcoA-CLSaBXqg0wyjOurK_bgVfU3DCOh0hhtZGV2aWNlS2V5SW5mb6FpZGV2aWNlS2V5pAECIAEhWCDIy6N-quKCA3W-Ih8b71tpKN2T0ynFm4GQrJqmsArkliJYIJn1Gz3hE_ZxjNfQVtC-KI77qfaJ8W70Fu5kyV8lEqJVZ2RvY1R5cGV3b3JnLmlzby4yMzIyMC5waG90b2lkLjFsdmFsaWRpdHlJbmZvo2ZzaWduZWTAeB4yMDI1LTA5LTE5VDEzOjIyOjE2Ljk2ODEzOTExMFppdmFsaWRGcm9twHgeMjAyNS0wOS0xOVQxMzoyMjoxNi45NjgxNDAxMTBaanZhbGlkVW50aWzAeB4yMDI2LTA5LTE5VDEzOjIyOjE2Ljk2ODE0MjMxMFpYQBM4mbEoq9v8gigaoX_gkyBQEaWDrhauPv6ny4AfrVifa0-CtX0EQ7UHYd5bzF8mMB_EvKzNHFZeeTFhRifZ-v9sZGV2aWNlU2lnbmVkompuYW1lU3BhY2Vz2BhBoGpkZXZpY2VBdXRooW9kZXZpY2VTaWduYXR1cmWEQ6EBJqD2WED6bx4FebKf7alDsr5gXyBSFKOgpqliZnv6Rk7NpDoGae1FiSl-mY1vtDTfeO2cIN52zbN8dx-PwYrLrwpm6cAAZnN0YXR1cwA",
+          "docType": "org.iso.23220.photoid.1",
+          "issuer": "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6IlB6cDZlVlNBZFhFUnFBcDhxOE91REVobDJJTEdBYW9hUVhUSjJzRDJnNVUiLCJ5IjoiNmR3aFVBekt6S1VmMGtOSTdmNDB6cWhNWk5UMGM0ME9fV2lxU0xDVE5abyJ9",
+          "format": "mso_mdoc"
+        }
+      ]
+    }
+  },
+  "parent": "waltid.v2"
+}
+```
