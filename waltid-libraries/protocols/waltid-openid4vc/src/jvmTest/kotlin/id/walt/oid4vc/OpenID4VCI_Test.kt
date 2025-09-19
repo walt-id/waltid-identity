@@ -40,8 +40,6 @@ import kotlinx.serialization.json.*
 import org.junit.jupiter.api.BeforeAll
 import kotlin.test.*
 
-//TODO enable tests
-@Ignore
 class OpenID4VCI_Test {
     val CREDENTIAL_OFFER_BASE_URL = "openid-credential-offer://test"
 
