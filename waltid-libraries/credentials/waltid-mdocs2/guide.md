@@ -36,7 +36,7 @@ And use the `/openid4vc/mdoc/issue` endpoint:
 
 ```shell
 curl -X 'POST' \
-  'http://issuer.local:7002/openid4vc/mdoc/issue' \
+  'https://issuer.mdoc-test.waltid.cloud/openid4vc/mdoc/issue' \
   -H 'accept: */*' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -99,16 +99,19 @@ curl -X 'POST' \
 '
 ```
 
-As you can see, in the JSON body you can set the namespaces and the namespac element that shall be issued into the ISO credential.
+As you can see, in the JSON body you can set the namespaces and the namespace element that shall be issued into the ISO credential.
 This request will return an issuance offer URL. Enter this into the "offerUrl" in the wallets `/v1/{wallet}/wallet-service-api/credentials/receive` endpoint:
+
+For authentication, in development mode, use this user: "user@walt.id 123456". Alternatively you can create another account.
 
 ```shell
 curl -X 'POST' \
-  'http://waltid.enterprise.localhost:3000/v1/waltid.test.wallet/wallet-service-api/credentials/receive' \
+  'https://waltid.enterprise.mdoc-test.waltid.cloud/v1/waltid.test.wallet/wallet-service-api/credentials/receive' \
   -H 'accept: application/json' \
+  -H 'Authorization: Bearer eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0wMDAwMDAwMDAwMDAiLCJzZXNzaW9uIjoiMDM0YzgwYWUtZGI5Zi00ODJjLWI1YTgtOTk5MjhiZmI4ZDkwIiwiZXhwIjoxNzU4ODk1MDI0fQ.5GeGe2ogixj50gqZOMjLOfTCoaig_814cLkhF82-cyMzFYb16Jqz6WMgFAkFWUaG9MXmNcg8mp4P_IrbMzi_Bw' \
   -H 'Content-Type: application/json' \
   -d '{
-  "offerUrl": "openid-credential-offer://issuer.local:7002/draft13/?credential_offer_uri=http%3A%2F%2Flocalhost%3A7002%2Fdraft13%2FcredentialOffer%3Fid%3D632e9333-fb8d-4100-a3fe-d211bc0317f5",
+  "offerUrl": "openid-credential-offer://issuer.mdoc-test.waltid.cloud/draft13/?credential_offer_uri=https%3A%2F%2Fissuer.mdoc-test.waltid.cloud%2Fdraft13%2FcredentialOffer%3Fid%3D868b434c-b8aa-4daa-8921-065fbb48f410",
   "keyReference": "waltid.test.kms.wallet_key"
 }'
 ```
