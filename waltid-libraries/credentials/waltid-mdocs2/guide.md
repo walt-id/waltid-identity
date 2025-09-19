@@ -193,6 +193,23 @@ curl -X 'POST' \
   -d '{ "type": "kms" }'
 
 curl -X 'POST' \
+  'https://waltid.enterprise.mdoc-test.waltid.cloud/v1/issuerkms.key1/kms-service-api/keys/store' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "type": "jwk",
+    "jwk": {
+      "kty": "EC",
+      "d": "-wSIL_tMH7-mO2NAfHn03I8ZWUHNXVzckTTb96Wsc1s",
+      "crv": "P-256",
+      "kid": "sW5yv0UmZ3S0dQuUrwlR9I3foREBHHFwXhGJGqGEVf0",
+      "x": "Pzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5U",
+      "y": "6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo"
+    }
+  }'
+
+# Or generate yourself (also create x5cchain then):
+curl -X 'POST' \
   'https://waltid.enterprise.mdoc-test.waltid.cloud/v1/issuerkms.key1/kms-service-api/keys/generate' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
