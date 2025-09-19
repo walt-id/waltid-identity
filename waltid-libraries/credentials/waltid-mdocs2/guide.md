@@ -531,7 +531,7 @@ about the verification status with the `GET /verification-session/{session}/info
 
 ```shell
 curl -X 'GET' \
-  'https://waltid.enterprise.mdoc-test.waltid.cloud/v1/waltid.v2/8939646d-6eb4-4fcc-bb19-6ac3346de241/info' \
+  'https://verifier.mdoc-test.waltid.cloud/verification-session/8939646d-6eb4-4fcc-bb19-6ac3346de241/info' \
   -H 'accept: application/json'
 ```
 
