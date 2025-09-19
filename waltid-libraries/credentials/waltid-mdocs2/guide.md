@@ -428,7 +428,8 @@ Use the verification request URL generated with the Verifier to call the `/v1/{w
 
 ```shell
 curl -X 'POST' \
-  'http://https://waltid.enterprise.test.waltid.cloud/v1/waltid.test.wallet/wallet-service-api/credentials/present' \
+  'https://waltid.enterprise.test.waltid.cloud/v1/waltid.test.wallet/wallet-service-api/credentials/present' \
+  -H 'Authorization: Bearer eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0wMDAwMDAwMDAwMDAiLCJzZXNzaW9uIjoiMDM0YzgwYWUtZGI5Zi00ODJjLWI1YTgtOTk5MjhiZmI4ZDkwIiwiZXhwIjoxNzU4ODk1MDI0fQ.5GeGe2ogixj50gqZOMjLOfTCoaig_814cLkhF82-cyMzFYb16Jqz6WMgFAkFWUaG9MXmNcg8mp4P_IrbMzi_Bw' \
   -H 'accept: */*' \
   -H 'Content-Type: application/json' \
   -d '{
