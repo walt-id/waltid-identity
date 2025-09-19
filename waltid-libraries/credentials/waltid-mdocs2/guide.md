@@ -15,6 +15,25 @@ ISO credential stack, and as such is not yet officially supported.
 The new Issuer for the new ISO credential stack based on OpenID4VCI 1.0 will be released in the near future.
 
 Below, a simple Photo ID is issued.
+
+Add the supported credential type to the issuer (for the open source issuer, edit the config file `credential-issuer-metadata.conf`):
+```ini
+# config/credential-issuer-metadata.conf
+supportedCredentialTypes = {
+    ...
+    "org.iso.23220.photoid.1" = {
+         format = mso_mdoc
+         cryptographic_binding_methods_supported = ["cose_key"]
+         credential_signing_alg_values_supported = ["ES256"]
+         proof_types_supported = { cwt = { proof_signing_alg_values_supported = ["ES256"] } }
+         types = ["org.iso.23220.photoid.1"]
+         doctype = "org.iso.23220.photoid.1"
+     }
+}
+```
+
+And use the `/openid4vc/mdoc/issue` endpoint:
+
 ```shell
 curl -X 'POST' \
   'http://issuer.local:7002/openid4vc/mdoc/issue' \
