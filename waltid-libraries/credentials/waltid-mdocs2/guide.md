@@ -365,49 +365,51 @@ certain policies.
 
 ```shell
 curl -X 'POST' \
-  'http://localhost:7003/verification-session/create' \
+  'https://waltid.enterprise.test.waltid.cloud/v1/waltid.dcqltest.v2/verifier2-service-api/verification-session/create' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0wMDAwMDAwMDAwMDAiLCJzZXNzaW9uIjoiMDM0YzgwYWUtZGI5Zi00ODJjLWI1YTgtOTk5MjhiZmI4ZDkwIiwiZXhwIjoxNzU4ODk1MDI0fQ.5GeGe2ogixj50gqZOMjLOfTCoaig_814cLkhF82-cyMzFYb16Jqz6WMgFAkFWUaG9MXmNcg8mp4P_IrbMzi_Bw' \
   -d '{
   "dcql_query": {
     "credentials": [
       {
-        "id": "my_photoid",
-        "format": "mso_mdoc",
+        "id": "pid",
+        "format": "dc+sd-jwt",
         "meta": {
-          "doctype_value": "org.iso.23220.photoid.1"
+          "vct_values": [
+            "http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential"
+          ]
         },
         "claims": [
-          { "path": [ "org.iso.18013.5.1", "family_name_unicode" ] },
-          { "path": [ "org.iso.18013.5.1", "given_name_unicode" ] },
-          { "path": [ "org.iso.18013.5.1", "issuing_authority_unicode" ] },
-          { 
-            "path": [ "org.iso.18013.5.1", "resident_postal_code" ],
-            "values": [ 1180, 1190, 1200, 1210 ]
+          {
+            "path": [
+              "given_name"
+            ]
           },
           {
-            "path": [ "org.iso.18013.5.1", "issuing_country" ],
-            "values": [ "AT" ]
+            "path": [
+              "family_name"
+            ]
           },
-          
-          { "path": [ "org.iso.23220.photoid.1", "person_id" ] },
-          { "path": [ "org.iso.23220.photoid.1", "resident_street" ] },
-          { "path": [ "org.iso.23220.photoid.1", "administrative_number" ] },
-          { "path": [ "org.iso.23220.photoid.1", "travel_document_number" ] },
-          
-          { "path": [ "org.iso.23220.dtc.1", "dtc_version" ] },
-          { "path": [ "org.iso.23220.dtc.1", "dtc_dg1" ] }
+          {
+            "path": [
+              "address",
+              "street_address"
+            ]
+          }
         ]
       }
     ]
   },
   "policies": {
     "vcPolicies": [
-      { "policy": "signature" },
-      { "policy": "regex", "path": "$.['\''org.iso.23220.dtc.1'\''].dtc_version", "regex": "^(\"[0-9]+\"|-?[0-9]+(\\.[0-9]+)?)$" }
+      {
+        "policy": "signature"
+      }
     ]
   }
 }'
+
 ```
 
 Response:
@@ -426,7 +428,7 @@ Use the verification request URL generated with the Verifier to call the `/v1/{w
 
 ```shell
 curl -X 'POST' \
-  'http://waltid.enterprise.localhost:3000/v1/waltid.test.wallet/wallet-service-api/credentials/present' \
+  'http://https://waltid.enterprise.test.waltid.cloud/v1/waltid.test.wallet/wallet-service-api/credentials/present' \
   -H 'accept: */*' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -463,7 +465,7 @@ about the verification status with the `GET /verification-session/{session}/info
 
 ```shell
 curl -X 'GET' \
-  'http://localhost:7003/verification-session/8939646d-6eb4-4fcc-bb19-6ac3346de241/info' \
+  'https://waltid.enterprise.test.waltid.cloud/v1/waltid.dcqltest.v2/8939646d-6eb4-4fcc-bb19-6ac3346de241/info' \
   -H 'accept: application/json'
 ```
 
