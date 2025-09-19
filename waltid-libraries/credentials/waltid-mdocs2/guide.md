@@ -181,6 +181,114 @@ process them correctly.
 
 Alternatively, one can also manually store such credential into the wallet with the `/v1/{target}/credential-store-service-api/credentials/store` endpoint.
 
+## 0.1. Alternative - Enterprise Issuer
+
+Besides the OSS issue, the Enterprise Issuer can be used (with a slightly different API):
+
+```shell
+curl -X 'POST' \
+  'https://waltid.enterprise.mdoc-test.waltid.cloud/v1/issuerkms/resource-api/services/create' \
+  -H 'accept: */*' \
+  -H 'Content-Type: application/json' \
+  -d '{ "type": "kms" }'
+
+curl -X 'POST' \
+  'https://waltid.enterprise.mdoc-test.waltid.cloud/v1/issuerkms.key1/kms-service-api/keys/generate' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{ "keyType": "secp256r1" }'
+
+curl -X 'POST' \
+  'https://waltid.enterprise.mdoc-test.waltid.cloud/v1/issuer/resource-api/services/create' \
+  -H 'accept: */*' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "type": "issuer",
+  "supportedCredentialTypes": {
+    "org.iso.23220.photoid.1": {
+      "format": "mso_mdoc",
+      "cryptographic_binding_methods_supported": [
+        "cose_key"
+      ],
+      "credential_signing_alg_values_supported": [
+        "ES256"
+      ],
+      "credential_definition": {
+        "type": [
+          "org.iso.23220.photoid.1"
+        ]
+      },
+      "doctype": "org.iso.23220.photoid.1"
+    }
+  },
+  "tokenKeyId": "waltid.issuerkms.key1",
+  "kms": "waltid.issuerkms"
+}'
+
+curl -X 'POST' \
+  'https://issuer.mdoc-test.waltid.cloud/openid4vc/mdoc/issue' \
+  -H 'accept: */*' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "issuerKey": {
+    "type": "jwk",
+    "jwk": {
+      "kty": "EC",
+      "d": "-wSIL_tMH7-mO2NAfHn03I8ZWUHNXVzckTTb96Wsc1s",
+      "crv": "P-256",
+      "kid": "sW5yv0UmZ3S0dQuUrwlR9I3foREBHHFwXhGJGqGEVf0",
+      "x": "Pzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5U",
+      "y": "6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo"
+    }
+  },
+  "credentialConfigurationId": "org.iso.23220.photoid.1",
+  "mdocData": {
+    "org.iso.18013.5.1": {
+      "family_name_unicode": "Doe",
+      "given_name_unicode": "John",
+      "birth_date": "2000-01-20",
+      "issue_date": "2025-09-12",
+      "expiry_date": "2030-09-12",
+      "issuing_authority_unicode": "LPD Wien 22",
+      "issuing_country": "AT",
+      "sex": 1,
+      "nationality": "AT",
+      "document_number": "1234567890",
+      "name_at_birth": "Max Mustermann",
+      "birthplace": "Baden bei Wien",
+      "resident_address_unicode": "Püchlgasse 1D, 4.4.4.",
+      "resident_city_unicode": "Vienna",
+      "resident_postal_code": "1190",
+      "resident_country": "AT",
+      "age_over_18": true,
+      "age_in_years": 25,
+      "age_birth_year": 2000,
+      "family_name_latin1": "Mustermann",
+      "given_name_latin1": "Max"
+    },
+    "org.iso.23220.photoid.1": {
+      "person_id": "AT12345",
+      "birth_country": "AT",
+      "birth_state": "LOWER AUSTRIA",
+      "birth_city": "Baden bei Wien",
+      "administrative_number": "ATATAT123",
+      "resident_street": "Püchlgasse",
+      "resident_house_number": "1D, 4.4.4.",
+      "travel_document_number": "001122334",
+      "resident_state": "VIENNA"
+    },
+    "org.iso.23220.dtc.1": {
+      "dtc_version": "01",
+      "dtc_dg1": "P<AUTDOE<<JOHN<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<0011223340AUT2001207M3009129<<<<<<<<<<<<<<06"
+    }
+  },
+  "x5Chain": [
+    "-----BEGIN CERTIFICATE-----\nMIICCTCCAbCgAwIBAgIUfqyiArJZoX7M61/473UAVi2/UpgwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDY0MTEzWhcNMjYwOTAyMDY0MTEzWjAzMQswCQYDVQQGEwJBVDEkMCIGA1UEAwwbV2FsdGlkIFRlc3QgRG9jdW1lbnQgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5Xp3CFQDMrMpR/SQ0jt/jTOqExk1PRzjQ79aKpIsJM1mqOBrDCBqTAfBgNVHSMEGDAWgBTxCn2nWMrE70qXb614U14BweY2azAdBgNVHQ4EFgQUx5qkOLC4lpl1xpYZGmF9HLxtp0gwDgYDVR0PAQH/BAQDAgeAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCQGA1UdHwQdMBswGaAXoBWGE2h0dHBzOi8vd2FsdC5pZC9jcmwwCgYIKoZIzj0EAwIDRwAwRAIgHTap3c6yCUNhDVfZWBPMKj9dCWZbrME03kh9NJTbw1ECIAvVvuGll9O21eR16SkJHHAA1pPcovhcTvF9fz9cc66M\n-----END CERTIFICATE-----\n"
+  ]
+}'
+```
+(make sure x5Chain fits to the generated key)
+
 ## 1. Create Verification session with Verifier2
 
 Use the Verifier2 interface (OSS or Enterprise) for OpenID4VP 1.0 presentation flows.
