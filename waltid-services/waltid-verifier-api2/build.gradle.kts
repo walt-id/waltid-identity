@@ -223,7 +223,7 @@ ktor {
 
     jib {
         container {
-            mainClass = "id.walt.verifier.MainKt"
+            mainClass = "id.walt.openid4vp.verifier.MainKt"
             workingDirectory = "/waltid-verifier-api"
         }
         from {
