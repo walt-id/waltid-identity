@@ -52,7 +52,7 @@ kotlin {
             dependencies {
                 // JSON
                 implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 implementation("io.github.optimumcode:json-schema-validator:0.4.0")
 
                 implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
@@ -71,7 +71,7 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 implementation("org.slf4j:slf4j-simple:2.0.16")
             }
         }

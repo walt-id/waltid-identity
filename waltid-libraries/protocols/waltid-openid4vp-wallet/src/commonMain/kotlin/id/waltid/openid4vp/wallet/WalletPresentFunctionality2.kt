@@ -1,76 +1,54 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.waltid.openid4vp.wallet
 
-import id.walt.cose.CoseHeaders
-import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
-import id.walt.cose.toCoseAlgorithm
-import id.walt.cose.toCoseSigner
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
-import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.ShaUtils.calculateSha256Base64Url
-import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
 import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
-import id.walt.isocred.DeviceAuth
-import id.walt.isocred.DeviceAuthentication
 import id.walt.isocred.DeviceNameSpaces
 import id.walt.isocred.DeviceResponse
 import id.walt.isocred.DeviceSigned
 import id.walt.isocred.Document
-import id.walt.isocred.SessionTranscript
-import id.walt.isocred.handover.OpenID4VPHandover
-import id.walt.isocred.handover.OpenID4VPHandoverInfo
-import id.walt.isocred.sha256
-import id.walt.isocred.wrapInCborTag
+import id.walt.isocred.IssuerSigned
+import id.walt.isocred.IssuerSignedList
 import id.walt.mdoc.utils.ByteStringWrapper
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
-import id.walt.w3c.PresentationBuilder
+import id.waltid.openid4vp.wallet.presentation.LDPPresenter
+import id.waltid.openid4vp.wallet.presentation.MdocPresenter
+import id.waltid.openid4vp.wallet.presentation.SdJwtVcPresenter
+import id.waltid.openid4vp.wallet.presentation.W3CPresenter
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.forms.submitForm
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.ParametersBuilder
-import io.ktor.http.URLBuilder
-import io.ktor.http.Url
-import io.ktor.http.contentType
-import io.ktor.http.encodeURLParameter
-import io.ktor.http.formUrlEncode
-import io.ktor.http.isSuccess
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.util.escapeHTML
-import io.ktor.util.flattenEntries
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.util.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.map
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.encodeToByteArray
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.*
+import kotlin.time.ExperimentalTime
 
 object WalletPresentFunctionality2 {
 
-    private val log = KotlinLogging.logger {  }
+    private val log = KotlinLogging.logger { }
 
     private val http = HttpClient {
         install(ContentNegotiation) {
@@ -93,115 +71,36 @@ object WalletPresentFunctionality2 {
         for ((queryId, matchedCredsWithClaimsList) in matchedData) {
             log.trace { "Query ID: $queryId, matched credentials: $matchedCredsWithClaimsList" }
             val presentationsForThisQueryId = buildJsonArray {
-                for (matchedResult in matchedCredsWithClaimsList) {
-                    val digitalCredential = (matchedResult.credential as RawDcqlCredential).originalCredential as DigitalCredential
-                    val selectedClaimsMap = matchedResult.selectedDisclosures // This is Map<String, Any>?
+                for (matchResult in matchedCredsWithClaimsList) {
+                    val digitalCredential = (matchResult.credential as RawDcqlCredential).originalCredential as DigitalCredential
 
-                    val presentationStringOrObject: JsonElement = when { // Assuming format is on DigitalCredential
-                        digitalCredential.format == "jwt_vc_json" -> {
-                            if (digitalCredential is SelectivelyDisclosableVerifiableCredential && digitalCredential.disclosables != null && digitalCredential.disclosables?.isNotEmpty() == true) {
-                                // This W3C JWT VC uses SD-JWT mechanism internally
-                                val disclosuresToPresent =
-                                    selectedClaimsMap?.values?.mapNotNull {
-                                        when (it) {
-                                            is SdJwtSelectiveDisclosure -> it
-                                            is DcqlDisclosure -> digitalCredential.disclosures?.find { sdJwtDisclosure -> sdJwtDisclosure.name == it.name }
-                                            else -> null
-                                        }
-                                    } ?: emptyList()
-                                log.debug { "Handling W3C JWT VC (${digitalCredential} with claims $disclosuresToPresent) with SD mechanism for query $queryId" }
+                    val presentationStringOrObject: JsonElement = when (digitalCredential.format) {
+                        "jwt_vc_json" -> W3CPresenter.presentW3C(
+                            digitalCredential = digitalCredential,
+                            matchResult = matchResult,
+                            authorizationRequest = authorizationRequest,
+                            holderKey = holderKey,
+                            holderDid = holderDid
+                        )
 
-                                // Construct the Key Binding JWT for SD-JWT mechanism
-                                val kbJwtString = createKeyBindingJwt(
-                                    nonce = authorizationRequest.nonce!!,
-                                    audience = authorizationRequest.clientId,
-                                    selectedDisclosures = disclosuresToPresent, // Pass the actual disclosures for sd_hash
-                                    holderKey = holderKey
-                                )
-                                // Use the disclose method, appending the KB-JWT
-                                val sdPresentationString =
-                                    digitalCredential.disclose(digitalCredential, disclosuresToPresent) + "~" + kbJwtString
-                                JsonPrimitive(sdPresentationString)
-                            } else {
-                                // Standard W3C VP JWT wrapping this non-SD W3C VC JWT
-                                log.debug { "Handling standard W3C JWT VC (${digitalCredential}) for query $queryId" }
-                                val w3cPresentationJwt = PresentationBuilder().apply {
-                                    this.did = holderDid
-                                    this.nonce = authorizationRequest.nonce!!
-                                    this.audience = authorizationRequest.clientId
-                                    addCredential(
-                                        JsonPrimitive(
-                                            digitalCredential.signed ?: error("Signed W3C VC JWT missing for $digitalCredential")
-                                        )
-                                    )
-                                    //addVerifiableCredentialJwt()
-                                }.buildAndSign(holderKey)
-                                JsonPrimitive(w3cPresentationJwt)
-                            }
-                        }
+                        "ldp_vc" -> LDPPresenter.presentLdpTodo()
 
-                        digitalCredential.format == "ldp_vc" -> {
-                            TODO("Data Integrity Proof signed credentials are not supported yet")
-                            // Construct a W3C VP LDP (JSON-LD with Data Integrity proof)
-                            // This is more complex as it involves JSON-LD processing and DI proofs.
-                            // The 'originalCredential.credentialData' would be the LDP VC.
-                            // The proof needs 'challenge' (nonce) and 'domain' (client_id).
-                            /*val ldpPresentationObject = buildLdpPresentation(
-                                originalCredential.credentialData,
-                                holderDid,
-                                authorizationRequest.nonce!!,
-                                authorizationRequest.clientId,
-                                holderKey
-                            )
-                            ldpPresentationObject*/ // This would be a JsonObject
-                        }
+                        "dc+sd-jwt" -> SdJwtVcPresenter.presentSdJwtVc(
+                            digitalCredential = digitalCredential,
+                            matchResult = matchResult,
+                            authorizationRequest = authorizationRequest,
+                            holderKey = holderKey,
+                            holderDid = holderDid
+                        )
 
-                        digitalCredential.format == "dc+sd-jwt" -> {
-                            val sdJwtCredential = digitalCredential as? SelectivelyDisclosableVerifiableCredential
-                                ?: error("Mismatch: Expected SelectivelyDisclosableVerifiableCredential for DC_SD_JWT format for ${digitalCredential}")
-
-                            log.trace { "Selected claims: ${selectedClaimsMap?.values?.map { it.toString() + " (${it::class.simpleName})" }}" }
-                            val disclosuresToPresent =
-                                selectedClaimsMap?.values?.mapNotNull {
-                                    when (it) {
-                                        is SdJwtSelectiveDisclosure -> it
-                                        is DcqlDisclosure -> {
-                                            sdJwtCredential.disclosures?.find { sdJwtDisclosure -> sdJwtDisclosure.name == it.name }
-                                        }
-
-                                        else -> null
-                                    }
-                                } ?: emptyList()
-
-                            log.debug { "Handling IETF SD-JWT VC (${digitalCredential} with disclosures $disclosuresToPresent) for query $queryId" }
-
-                            // Construct the Key Binding JWT
-                            val kbJwtString = createKeyBindingJwt(
-                                nonce = authorizationRequest.nonce!!,
-                                audience = authorizationRequest.clientId,
-                                selectedDisclosures = disclosuresToPresent,
+                        "mso_mdoc" -> {
+                            /*MdocPresenter.presentMdoc(
+                                digitalCredential = digitalCredential,
+                                matchResult = matchedResult,
+                                authorizationRequest = authorizationRequest,
                                 holderKey = holderKey
-                            )
-
-                            // Use the disclose method from the interface, then append the KB-JWT
-                            val finalPresentationString =
-                                sdJwtCredential.disclose(digitalCredential, disclosuresToPresent) + "~" + kbJwtString
-                            log.trace { "Final presentation string for dc+sd-jwt is: $finalPresentationString" }
-                            JsonPrimitive(finalPresentationString)
-                        }
-
-                        digitalCredential.format == "mso_mdoc" -> {
+                            )*/
                             // Construct DeviceResponse CBOR, then base64url encode it.
-                            // This needs access to mdoc specific data and device keys.
-                            // The 'selectedClaimsMap' would guide which data elements to include.
-                            /*val mdocPresentationString = buildMdocDeviceResponse(
-                                digitalCredential, // Contains the mdoc data
-                                selectedClaimsMap, // Guides which elements to include
-                                authorizationRequest.nonce!!,
-                                authorizationRequest.clientId, // Or derived elements for SessionTranscript
-                                holderKey // Or specific device key for mdoc
-                            )
-                            JsonPrimitive(mdocPresentationString)*/
 
                             log.debug { "Handling mso_mdoc credential for query $queryId" }
 
@@ -209,44 +108,62 @@ object WalletPresentFunctionality2 {
                             val responseUri = authorizationRequest.responseUri
                                 ?: throw IllegalArgumentException("response_uri is required for mso_mdoc presentation")
 
-                            val document = mdocsCredential.parseToDocument()
-                            val issuerSigned = document.issuerSigned
+                            val document: id.walt.isocred.Document = mdocsCredential.parseToDocument()
+                            val issuerSigned: id.walt.isocred.IssuerSigned = document.issuerSigned
 
-                            // 1. Build OpenID4VPHandover (OID4VP Appendix B.2.6.1) without ISO-specific wallet nonce
-                            val handoverInfo = OpenID4VPHandoverInfo(
-                                clientId = authorizationRequest.clientId,
-                                nonce = authorizationRequest.nonce!!,
-                                jwkThumbprint = null, // Not using JWE in DIRECT_POST
-                                responseUri = responseUri
-                            )
-                            val handoverInfoHash = coseCompliantCbor.encodeToByteArray(handoverInfo).sha256()
-                            val handover = OpenID4VPHandover(infoHash = handoverInfoHash)
-                            val sessionTranscript = SessionTranscript.forOpenId(handover)
+                            // Build OpenID4VPHandover (OID4VP Appendix B.2.6.1) without ISO-specific wallet nonce
+                            val sessionTranscript = MdocPresenter.buildSessionTranscript(authorizationRequest, responseUri)
 
-                            // 2. Determine which namespaces and elements to disclose based on the DCQL match
-                            //                            // This is a simplified example; a full implementation would iterate through selectedClaimsMap
+                            // Determine which namespaces and elements to disclose based on the DCQL match
                             val disclosedDeviceNamespaces = DeviceNameSpaces(emptyMap()) // Assuming selective disclosure for device data
 
-                            // 3. Create the DeviceAuthentication structure to be signed
-                            val deviceAuthentication = DeviceAuthentication(
-                                type = "DeviceAuthentication",
+                            val deviceAuth = MdocPresenter.buildDeviceAuth(
                                 sessionTranscript = sessionTranscript,
-                                docType = mdocsCredential.docType,
-                                namespaces = ByteStringWrapper(disclosedDeviceNamespaces)
+                                credential = mdocsCredential,
+                                disclosedDeviceNamespaces = disclosedDeviceNamespaces,
+                                holderKey = holderKey
                             )
 
-                            // 4. Sign using the new detached payload function
-                            val detachedPayload = coseCompliantCbor.encodeToByteArray(deviceAuthentication).wrapInCborTag(24)
-                            val deviceSignature = CoseSign1.createAndSignDetached(
-                                protectedHeaders = CoseHeaders(algorithm = holderKey.keyType.toCoseAlgorithm()),
-                                detachedPayload = detachedPayload,
-                                signer = holderKey.toCoseSigner()
-                            )
-                            val deviceAuth = DeviceAuth(deviceSignature = deviceSignature)
-
+                            val dcqlQueryClaims = matchResult.originalQuery.claims
+                            requireNotNull(dcqlQueryClaims) { "Missing claims for DCQL credential query: ${matchResult.originalQuery}" }
 
                             //--- SD START
-                            issuerSigned
+                            val selectedIssuerSignedItems = dcqlQueryClaims
+                                .groupBy { it.path.first() }
+                                .mapValues { (sdNamespace2, claimQueries) ->
+                                    claimQueries.map { claimsQuery ->
+                                        val path = claimsQuery.path
+                                        require(path.size == 2) { "Invalid state: Expected DCQL claim path two have only two elements (namespace + elementIdentifier)?" }
+
+                                        val (sdNamespace, sdElementIdentifier) = path
+                                        check(sdNamespace == sdNamespace2) { "??? $sdNamespace != $sdNamespace2" }
+
+                                        val issuerSignedNamespaces: Map<String, IssuerSignedList>? = issuerSigned.namespaces
+                                        // todo: in theory, all items could be device-provided data too
+                                        requireNotNull(issuerSignedNamespaces) { "No issuer-signed namespaces to choose from for DCQL query claims!" }
+
+                                        val selectedNamespace: IssuerSignedList = issuerSignedNamespaces[sdNamespace]
+                                            ?: throw IllegalArgumentException("Namespace does not exist in issuer-signed namespaces for DCQL query claim: $sdNamespace")
+
+                                        val matchedIssuerSignedItem =
+                                            selectedNamespace.entries.find { it.value.elementIdentifier == sdElementIdentifier }?.value
+                                                ?: throw IllegalArgumentException("Could not find item for DCQL query: namespace = $sdNamespace, element = $sdElementIdentifier")
+
+                                        log.trace { "Mapped sd claim $claimsQuery to $matchedIssuerSignedItem of namespace $sdNamespace" }
+
+                                        matchedIssuerSignedItem
+                                    }
+                                }
+                            log.trace { "Selected disc:" + matchResult.selectedDisclosures }
+                            log.trace { "DCQL claims:  " + authorizationRequest.dcqlQuery!!.credentials.first().claims!! }
+                            //log.trace {  }
+
+
+                            val issuerSignedWithSelectedNamespaceItems =
+                                IssuerSigned.fromIssuerSignedItems(
+                                    namespacedItems = selectedIssuerSignedItems,
+                                    issuerAuth = issuerSigned.issuerAuth
+                                )
 
                             //--- SD END
 
@@ -256,7 +173,8 @@ object WalletPresentFunctionality2 {
                                 documents = arrayOf(
                                     Document(
                                         docType = mdocsCredential.docType,
-                                        issuerSigned = issuerSigned,
+                                        issuerSigned = issuerSignedWithSelectedNamespaceItems,
+                                        //issuerSigned = issuerSigned,
                                         deviceSigned = DeviceSigned(ByteStringWrapper(disclosedDeviceNamespaces), deviceAuth)
                                     )
                                 ),
@@ -268,13 +186,12 @@ object WalletPresentFunctionality2 {
                             JsonPrimitive(deviceResponseBytes.encodeToBase64Url())
                         }
 
-                        else -> {
+                        else ->
                             // Fallback for other formats or if it's a simple signed string
                             JsonPrimitive(
                                 digitalCredential.signed
                                     ?: error("Credential for query $queryId is not signed and no specific presentation logic found for format ${digitalCredential.format}")
                             )
-                        }
                     }
                     add(presentationStringOrObject)
                 }
@@ -384,30 +301,30 @@ object WalletPresentFunctionality2 {
         if (holderPoliciesToRun != null) {
             // TODO: ----------------- Handle disclosures from DcqlMatchResult
 
-                val relevantHolderPolicies = holderPoliciesToRun
-                    .filter { it.direction == null || it.direction == HolderPolicy.HolderPolicyDirection.PRESENT }
-                val credentialsToEvaluate = credentials.values.flatMap {
-                    it.map {
-                        // TODO: handle it.selectedDisclosures
-                        (it.credential as RawDcqlCredential).originalCredential as DigitalCredential
-                    }
+            val relevantHolderPolicies = holderPoliciesToRun
+                .filter { it.direction == null || it.direction == HolderPolicy.HolderPolicyDirection.PRESENT }
+            val credentialsToEvaluate = credentials.values.flatMap {
+                it.map {
+                    // TODO: handle it.selectedDisclosures
+                    (it.credential as RawDcqlCredential).originalCredential as DigitalCredential
+                }
+            }
+
+            val evalResult = HolderPolicyEngine.evaluate(relevantHolderPolicies, credentialsToEvaluate.asFlow())
+            when {
+                runPolicies == null && evalResult == null -> {
+                    // ok
                 }
 
-                val evalResult = HolderPolicyEngine.evaluate(relevantHolderPolicies, credentialsToEvaluate.asFlow())
-                when {
-                    runPolicies == null && evalResult == null -> {
-                        // ok
+                runPolicies == true -> {
+                    if (evalResult == HolderPolicy.HolderPolicyAction.BLOCK) {
+                        throw IllegalArgumentException("Presentation execution was blocked by Holder Policy.")
                     }
-
-                    runPolicies == true -> {
-                        if (evalResult == HolderPolicy.HolderPolicyAction.BLOCK) {
-                            throw IllegalArgumentException("Presentation execution was blocked by Holder Policy.")
-                        }
-                        if (evalResult == null) {
-                            throw IllegalArgumentException("Presentation execution was not allowed by any Holder Policy.")
-                        }
+                    if (evalResult == null) {
+                        throw IllegalArgumentException("Presentation execution was not allowed by any Holder Policy.")
                     }
                 }
+            }
 
             //-----
         }
@@ -562,13 +479,13 @@ object WalletPresentFunctionality2 {
     /**
      * Creates a Key Binding JWT for SD-JWT presentations.
      */
-    private suspend fun createKeyBindingJwt(
+    internal suspend fun createKeyBindingJwt(
         nonce: String,
         audience: String,
         selectedDisclosures: List<SdJwtSelectiveDisclosure>,
         holderKey: Key
     ): String {
-        val disclosureStringsForHash = selectedDisclosures.map { it.asEncoded() }
+        selectedDisclosures.map { it.asEncoded() }
         log.trace { "Creating KB+JWT for disclosures: $selectedDisclosures" }
         // The spec for _sd_hash in KB-JWT sometimes implies hashing the concatenated disclosures
         // as they would appear in the final presentation string (with ~).

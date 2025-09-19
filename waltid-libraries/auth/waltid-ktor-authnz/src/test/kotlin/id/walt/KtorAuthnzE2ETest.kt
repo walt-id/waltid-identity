@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt
 
 import com.atlassian.onetime.core.TOTPGenerator
@@ -18,10 +20,11 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
 
 class KtorAuthnzE2ETest {
 

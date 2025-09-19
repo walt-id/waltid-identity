@@ -1,5 +1,5 @@
 @file:Suppress("SERIALIZER_TYPE_INCOMPATIBLE", "UNCHECKED_CAST")
-@file:OptIn(ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalTime::class)
 
 package id.walt.mdoc.dataelement
 
@@ -10,13 +10,14 @@ import cbor.internal.decoding.decodeTag
 import cbor.internal.decoding.peek
 import cbor.internal.encoding.encodeByteString
 import cbor.internal.encoding.encodeTag
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlin.time.ExperimentalTime
 
 /** Data Element Type,
  * see also:
@@ -194,7 +195,7 @@ internal object DataElementSerializer : KSerializer<DataElement> {
 
             DEFullDateMode.full_date_int -> {
                 encoder.encodeTag(FULL_DATE_INT.toULong())
-                encoder.encodeInt(date.value.toEpochDays())
+                encoder.encodeLong(date.value.toEpochDays())
             }
         }
     }

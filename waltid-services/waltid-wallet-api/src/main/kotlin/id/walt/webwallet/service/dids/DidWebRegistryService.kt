@@ -5,8 +5,9 @@ import id.walt.webwallet.db.models.WalletDids
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.like
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 
 /**
  * DID Web Registry hosts Decentralized Identifiers according to https://w3c-ccg.github.io/did-method-web/

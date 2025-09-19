@@ -3,6 +3,7 @@ package id.walt.dcql
 import id.walt.dcql.models.*
 import id.walt.dcql.models.meta.*
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
 object DcqlMatcher {
@@ -20,7 +21,8 @@ object DcqlMatcher {
          * - emptyMap(): If the format supports SD, but no queried claims were selected.
          * - non-emptyMap(): If claims were selected.
          */
-        val selectedDisclosures: Map<String, Any>? // JsonElement or DcqlDisclosure
+        val selectedDisclosures: Map<String, Any>?, // JsonElement or DcqlDisclosure
+        val originalQuery: CredentialQuery
     )
 
     /**
@@ -41,52 +43,52 @@ object DcqlMatcher {
         val individualMatches = mutableMapOf<String, MutableList<DcqlMatchResult>>()
 
         // Find matches for each individual CredentialQuery
-        for (credQuery in query.credentials) {
-            log.trace { "Processing CredentialQuery: ${credQuery.id} (format: ${credQuery.format})" }
-            val potentialMatchesByFormat = availableCredentials.filter { it.format in credQuery.format.id }
-            log.trace { "Potential matches for ${credQuery.id} based on format: ${potentialMatchesByFormat.map { it.id + "(${it.format})" }}" }
+        for (credentialQuery in query.credentials) {
+            log.trace { "Processing CredentialQuery: ${credentialQuery.id} (format: ${credentialQuery.format})" }
+            val potentialMatchesByFormat = availableCredentials.filter { it.format in credentialQuery.format.id }
+            log.trace { "Potential matches for ${credentialQuery.id} based on format: ${potentialMatchesByFormat.map { it.id + "(${it.format})" }}" }
 
             val successfullyMatchedCredentialsForThisQuery = mutableListOf<DcqlMatchResult>()
 
             for (credential in potentialMatchesByFormat) {
-                val metaCheck = matchesMeta(credential, credQuery.meta ?: NoMeta, credQuery.format)
+                val metaCheck = matchesMeta(credential, credentialQuery.meta ?: NoMeta, credentialQuery.format)
                 if (!metaCheck) {
-                    log.trace { "Credential ${credential.id} failed meta check for query ${credQuery.id}" }
+                    log.trace { "Credential ${credential.id} failed meta check for query ${credentialQuery.id}" }
                     continue
                 }
 
-                val authoritiesCheck = matchesTrustedAuthorities(credential, credQuery.trustedAuthorities)
+                val authoritiesCheck = matchesTrustedAuthorities(credential, credentialQuery.trustedAuthorities)
                 if (!authoritiesCheck) {
-                    log.trace { "Credential ${credential.id} failed trusted authorities check for query ${credQuery.id}" }
+                    log.trace { "Credential ${credential.id} failed trusted authorities check for query ${credentialQuery.id}" }
                     continue
                 }
 
-                val claimsMatchResult = matchesClaimsAndGetSelected(credential, credQuery.claims, credQuery.claimSets)
+                val claimsMatchResult = matchesClaimsAndGetSelected(credential, credentialQuery.claims, credentialQuery.claimSets)
 
                 if (claimsMatchResult.isSuccess) {
                     // claimsMatchResult.getOrThrow() is Map<String, Any>?
                     // This map itself can be null if the credential is not selectively disclosable
                     // or empty if no claims were selected from a disclosable one.
                     successfullyMatchedCredentialsForThisQuery.add(
-                        DcqlMatchResult(credential, claimsMatchResult.getOrThrow())
+                        DcqlMatchResult(credential, claimsMatchResult.getOrThrow(), originalQuery = credentialQuery)
                     )
-                    log.trace { "Credential ${credential.id} processed for claims for query ${credQuery.id}. Selected: ${claimsMatchResult.getOrThrow()}" }
+                    log.trace { "Credential ${credential.id} processed for claims for query ${credentialQuery.id}. Selected: ${claimsMatchResult.getOrThrow()}" }
                 } else {
-                    log.trace { "Credential ${credential.id} failed claims processing for query ${credQuery.id}: ${claimsMatchResult.exceptionOrNull()?.message}" }
+                    log.trace { "Credential ${credential.id} failed claims processing for query ${credentialQuery.id}: ${claimsMatchResult.exceptionOrNull()?.message}" }
                 }
             }
 
             if (successfullyMatchedCredentialsForThisQuery.isNotEmpty()) {
-                if (!credQuery.multiple && successfullyMatchedCredentialsForThisQuery.size > 1) {
-                    log.warn { "Multiple credentials matched query '${credQuery.id}' but 'multiple' is false. Selecting the first: ${successfullyMatchedCredentialsForThisQuery.first().credential.id}" }
-                    individualMatches.getOrPut(credQuery.id) { mutableListOf() }
+                if (!credentialQuery.multiple && successfullyMatchedCredentialsForThisQuery.size > 1) {
+                    log.warn { "Multiple credentials matched query '${credentialQuery.id}' but 'multiple' is false. Selecting the first: ${successfullyMatchedCredentialsForThisQuery.first().credential.id}" }
+                    individualMatches.getOrPut(credentialQuery.id) { mutableListOf() }
                         .add(successfullyMatchedCredentialsForThisQuery.first())
                 } else {
-                    individualMatches.getOrPut(credQuery.id) { mutableListOf() }
+                    individualMatches.getOrPut(credentialQuery.id) { mutableListOf() }
                         .addAll(successfullyMatchedCredentialsForThisQuery)
                 }
             } else {
-                log.debug { "No credentials found matching query: ${credQuery.id}" }
+                log.debug { "No credentials found matching query: ${credentialQuery.id}" }
             }
         }
         val finalIndividualMatches: Map<String, List<DcqlMatchResult>> =

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.oid4vc
 
 import com.nimbusds.jose.JWSAlgorithm
@@ -50,9 +52,10 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.json.*
 import kotlin.time.Duration
+import kotlin.time.ExperimentalTime
 
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:${WALLET_PORT}"

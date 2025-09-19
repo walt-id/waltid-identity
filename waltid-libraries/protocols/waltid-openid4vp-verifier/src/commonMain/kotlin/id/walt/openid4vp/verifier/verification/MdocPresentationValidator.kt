@@ -29,6 +29,7 @@ object MdocPresentationValidator {
     @OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
     suspend fun validateMsoMdocPresentation(
         mdocBase64UrlString: String,
+        // These three (expectedNonce, expectedAudience, responseUri) are required to reconstruct the SessionTranscript
         expectedNonce: String,
         expectedAudience: String, // This is the client_id
         responseUri: String?
@@ -187,7 +188,7 @@ object MdocPresentationValidator {
             log.trace { "No holder-verified data in this mdoc (no namespaces in DeviceSigned)." }
         } else {
             if (deviceSignedNamespaces.isEmpty()) {
-                log.warn { "Namespace list in DeviceSigned exists, but is empty." }
+                log.trace { "Namespace list in DeviceSigned exists, but is empty." }
             } else {
                 val keyAuthorization = mso.deviceKeyInfo.keyAuthorizations
                     ?: throw IllegalArgumentException("Found holder-verified data, but KeyAuthorization is fully missing")
@@ -228,7 +229,7 @@ object MdocPresentationValidator {
             MdocSignedMerger.merge(issuerSignedNamespacesJson, deviceSignedNamespacesJson, strategy = MdocDuplicatesMergeStrategy.CLASH)
         }
 
-        log.trace { "Mdoc validation - Successful: wrap verified data in generic credential objects" }
+        log.trace { "Mdoc validation - Successful: wrap verified data in generic credential objects..." }
         val mdocsCredential = MdocsCredential(
             credentialData = mdocCredentialData,
             signed = mdocBase64UrlString,
@@ -236,6 +237,8 @@ object MdocPresentationValidator {
             issuer = issuerVirtualDid
         )
         log.trace { "Mdoc credential: $mdocsCredential" }
+
+
 
         PresentationValidationResult(
             presentation = MsoMdocPresentation(mdocsCredential),

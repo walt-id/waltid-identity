@@ -6,7 +6,7 @@ package id.walt.mdoc.dataelement
 //import cbor.internal.decoding.peek
 //import cbor.internal.encoding.encodeByteString
 //import cbor.internal.encoding.encodeTag
-//import kotlinx.datetime.Instant
+//import kotlin.time.Instant
 //import kotlinx.datetime.LocalDate
 //import kotlinx.serialization.*
 //import kotlinx.serialization.builtins.ListSerializer

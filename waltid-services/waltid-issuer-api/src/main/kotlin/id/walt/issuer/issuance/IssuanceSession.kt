@@ -1,12 +1,15 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.issuer.issuance
 
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.TxCode
 import id.walt.oid4vc.providers.AuthorizationSession
 import id.walt.oid4vc.requests.AuthorizationRequest
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlin.time.ExperimentalTime
 
 @Serializable
 data class IssuanceSession(

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.entrawallet.core.service.oidc4vc
 
 import org.cose.java.AlgorithmID
@@ -50,11 +52,12 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.json.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.ExperimentalTime
 
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:$WALLET_PORT"

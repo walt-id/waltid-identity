@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.oid4vc
 
 import com.nimbusds.jose.JWSAlgorithm
@@ -39,9 +41,10 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.json.*
 import kotlin.time.Duration
+import kotlin.time.ExperimentalTime
 
 const val EBSI_WALLET_PORT = 8011
 const val EBSI_WALLET_BASE_URL = "http://localhost:${EBSI_WALLET_PORT}"

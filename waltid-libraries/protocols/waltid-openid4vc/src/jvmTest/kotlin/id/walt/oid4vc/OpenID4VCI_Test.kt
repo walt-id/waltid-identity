@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.oid4vc
 
 import id.walt.w3c.CredentialBuilder
@@ -35,10 +37,11 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.reflect.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.BeforeAll
 import kotlin.test.*
+import kotlin.time.ExperimentalTime
 
 class OpenID4VCI_Test {
     val CREDENTIAL_OFFER_BASE_URL = "openid-credential-offer://test"

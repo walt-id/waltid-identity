@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.issuer.issuance
 
 import id.walt.issuer.issuance.openapi.oidcapi.getCredentialOfferUriDocs
@@ -38,9 +40,10 @@ import io.ktor.server.routing.*
 import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.ExperimentalTime
 
 object OidcApi : CIProvider() {
 

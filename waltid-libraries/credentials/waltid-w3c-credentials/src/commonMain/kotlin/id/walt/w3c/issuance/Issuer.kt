@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.w3c.issuance
 
 import id.walt.crypto.keys.Key
@@ -10,13 +12,14 @@ import id.walt.w3c.utils.CredentialDataMergeUtils.mergeWithMapping
 import id.walt.w3c.utils.W3CVcUtils.overwrite
 import id.walt.w3c.utils.W3CVcUtils.update
 import id.walt.w3c.vc.vcs.W3CVC
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport

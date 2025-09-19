@@ -1,6 +1,6 @@
 package id.walt.webwallet.db.models
 
-import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.v1.core.Table
 
 object WalletSettings : Table("wallet_settings") {
     val wallet = reference("wallet", Wallets)

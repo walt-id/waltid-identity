@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.oid4vc
 
 import id.walt.crypto.keys.jwk.JWKKey
@@ -25,8 +27,8 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
 import java.security.cert.X509Certificate
@@ -37,6 +39,7 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.time.ExperimentalTime
 
 const val ISSUER_MOCK_PORT = 7018
 const val ISSUER_MOCK_URL = "http://localhost:$ISSUER_MOCK_PORT"

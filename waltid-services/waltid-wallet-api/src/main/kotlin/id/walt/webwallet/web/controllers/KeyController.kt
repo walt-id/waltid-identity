@@ -16,7 +16,7 @@ import io.ktor.server.response.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.keys() = walletRoute {

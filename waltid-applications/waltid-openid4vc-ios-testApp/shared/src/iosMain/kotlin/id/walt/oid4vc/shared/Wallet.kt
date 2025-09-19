@@ -47,7 +47,7 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.util.encodeBase64
 import io.ktor.utils.io.core.toByteArray
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject

@@ -1,4 +1,5 @@
 @file:Suppress("ExtractKtorModule")
+@file:OptIn(ExperimentalTime::class)
 
 package id.walt.verifier.oidc
 
@@ -48,6 +49,7 @@ import java.security.cert.X509Certificate
 import java.util.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.ExperimentalTime
 
 /**
  * OIDC for Verifiable Presentations service provider, implementing abstract base provider from OIDC4VC library.

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.policies2.policies
 
 import com.nfeld.jsonpathkt.JsonPath
@@ -7,8 +9,8 @@ import id.walt.policies2.PolicyClaimChecker
 import id.walt.w3c.Claims
 import id.walt.w3c.JwtClaims
 import id.walt.w3c.VcClaims
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -16,6 +18,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.long
 import kotlinx.serialization.json.longOrNull
 import kotlin.time.Duration
+import kotlin.time.ExperimentalTime
 
 @Serializable
 @SerialName("not-before")

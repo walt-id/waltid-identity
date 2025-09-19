@@ -98,10 +98,10 @@ dependencies {
     /* -- Kotlin -- */
 
     // Kotlinx.serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
     // Date
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
@@ -157,11 +157,12 @@ dependencies {
     }*/ // Not implemented right now
 
     // DB
-    implementation("org.jetbrains.exposed:exposed-core:0.59.0")
-    implementation("org.jetbrains.exposed:exposed-jdbc:0.59.0")
-    implementation("org.jetbrains.exposed:exposed-dao:0.59.0")
-    implementation("org.jetbrains.exposed:exposed-java-time:0.59.0")
-    implementation("org.jetbrains.exposed:exposed-json:0.59.0")
+    val exposedVersion = "1.0.0-rc-1"
+    implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-dao:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-json:$exposedVersion")
     // drivers
     implementation("org.xerial:sqlite-jdbc:3.49.0.0")
     implementation("org.postgresql:postgresql:42.7.5")
@@ -182,8 +183,8 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.5")
     implementation("org.slf4j:jul-to-slf4j:2.0.16")
-    implementation("io.klogging:klogging-jvm:0.9.4")
-    implementation("io.klogging:slf4j-klogging:0.9.4")
+    implementation("io.klogging:klogging-jvm:0.11.6")
+    implementation("io.klogging:slf4j-klogging:0.11.6")
 
     // Test
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
@@ -192,7 +193,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
     testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
     testImplementation("io.mockk:mockk:1.13.16")
-    testImplementation("io.klogging:klogging-jvm:0.9.4")
+    testImplementation("io.klogging:klogging-jvm:0.11.6")
 }
 
 // Define publication to allow publishing to local maven repo with the command:  ./gradlew publishToMavenLocal

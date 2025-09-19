@@ -1,10 +1,13 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.idp.oidc
 
 import id.walt.idp.oidc.json.InstantAsEpochSecondsSerializer
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalSerializationApi::class)
 @Suppress("PropertyName")

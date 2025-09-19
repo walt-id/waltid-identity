@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.mdoc
 
 import cbor.Cbor
@@ -14,7 +16,7 @@ import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
 import id.walt.mdoc.readerauth.ReaderAuthentication
 import korlibs.crypto.encoding.Hex
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
@@ -43,6 +45,7 @@ import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.*
 import kotlin.test.*
+import kotlin.time.ExperimentalTime
 
 class JVMMdocTest {
 

@@ -15,7 +15,7 @@ import kotlinx.serialization.json.buildJsonArray
 
 object IssuanceExamples {
 
-    private inline fun <reified T> typedValueExampleDescriptorDsl(content: String): ValueExampleDescriptorConfig.() -> Unit =
+    private inline fun <reified T> typedValueExampleDescriptorDsl(content: String): ValueExampleDescriptorConfig<T>.() -> Unit =
         {
             value = Json.decodeFromString<T>(content)
         }

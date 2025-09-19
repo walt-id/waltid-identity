@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.webwallet.service.account
 
 import de.mkammerer.argon2.Argon2Factory
@@ -6,14 +8,16 @@ import id.walt.commons.web.UnauthorizedException
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.web.controllers.auth.ByteLoginRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
-import kotlinx.datetime.Clock
-import kotlinx.datetime.toJavaInstant
+import kotlin.time.Clock
+import kotlin.time.toJavaInstant
 
 
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 

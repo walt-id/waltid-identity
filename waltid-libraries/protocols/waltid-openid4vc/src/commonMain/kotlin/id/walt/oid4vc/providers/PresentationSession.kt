@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
@@ -5,9 +7,10 @@ import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlin.time.ExperimentalTime
 
 @Serializable
 data class PresentationSession(

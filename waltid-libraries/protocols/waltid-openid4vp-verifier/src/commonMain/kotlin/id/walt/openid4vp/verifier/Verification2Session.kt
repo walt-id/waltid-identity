@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.openid4vp.verifier
 
 import id.walt.credentials.formats.DigitalCredential
@@ -10,6 +12,9 @@ import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionCreationRe
 import io.ktor.http.*
 import kotlinx.datetime.*
 import kotlinx.serialization.Serializable
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 

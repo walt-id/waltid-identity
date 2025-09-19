@@ -95,7 +95,7 @@ kotlin {
                 implementation("org.kotlincrypto.hash:sha2")
 
                 // Date
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
                 // Cache
                 implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")

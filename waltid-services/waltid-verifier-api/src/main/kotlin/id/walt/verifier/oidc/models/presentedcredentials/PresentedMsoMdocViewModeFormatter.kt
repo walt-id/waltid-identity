@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.verifier.oidc.models.presentedcredentials
 
 import com.nimbusds.jose.util.X509CertUtils
@@ -18,6 +20,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import org.cose.java.OneKey
+import kotlin.time.ExperimentalTime
 
 object PresentedMsoMdocViewModeFormatter {
 

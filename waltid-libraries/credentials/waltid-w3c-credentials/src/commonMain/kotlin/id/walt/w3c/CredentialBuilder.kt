@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.w3c
 
 import id.walt.crypto.utils.UuidUtils.randomUUID
@@ -7,8 +9,8 @@ import id.walt.w3c.vc.vcs.W3CBaseDataModels
 import id.walt.w3c.vc.vcs.W3CV11DataModel
 import id.walt.w3c.vc.vcs.W3CV2DataModel
 import id.walt.w3c.vc.vcs.W3CVC
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -16,6 +18,7 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.js.JsName
 import kotlin.time.Duration
+import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalJsExport::class)

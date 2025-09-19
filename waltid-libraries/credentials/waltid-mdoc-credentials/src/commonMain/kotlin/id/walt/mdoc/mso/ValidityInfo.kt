@@ -1,9 +1,12 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.mdoc.mso
 
 import id.walt.mdoc.dataelement.TDateElement
 import id.walt.mdoc.dataelement.toDataElement
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
+import kotlin.time.ExperimentalTime
 
 /**
  * Time-wise validity information for a mobile security object

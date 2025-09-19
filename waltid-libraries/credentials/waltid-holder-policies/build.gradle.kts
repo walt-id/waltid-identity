@@ -87,7 +87,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
 //                // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 implementation("io.github.optimumcode:json-schema-validator:0.4.0")
                 implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
@@ -95,7 +95,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 //
 //                // Kotlinx
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 //                implementation("app.softwork:kotlinx-uuid-core:0.1.6")
 //
 //                // Logging

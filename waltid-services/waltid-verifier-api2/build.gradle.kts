@@ -68,7 +68,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:${Versions.KTOR_VERSION}")
 
     // Date
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES_VERSION}")
@@ -85,8 +85,8 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.5")
     implementation("org.slf4j:jul-to-slf4j:2.0.16")
-    implementation("io.klogging:klogging-jvm:0.9.4")
-    implementation("io.klogging:slf4j-klogging:0.9.4")
+    implementation("io.klogging:klogging-jvm:0.11.6")
+    implementation("io.klogging:slf4j-klogging:0.11.6")
 
     // Test
     testImplementation(kotlin("test"))

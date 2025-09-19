@@ -1,10 +1,12 @@
+@file:OptIn(ExperimentalTime::class)
+
 import WaltidServicesE2ETests.Companion.testHttpClient
 import id.walt.commons.testing.E2ETest
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.issuer.services.onboarding.models.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -20,6 +22,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.DurationUnit
+import kotlin.time.ExperimentalTime
 import kotlin.time.toDuration
 
 class IssuerIsoMdlOnboardingServiceTests(private val e2e: E2ETest) {

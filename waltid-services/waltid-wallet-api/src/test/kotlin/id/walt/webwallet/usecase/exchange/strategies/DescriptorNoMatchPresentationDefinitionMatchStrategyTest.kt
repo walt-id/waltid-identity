@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
 
 package id.walt.webwallet.usecase.exchange.strategies
 
@@ -9,11 +9,12 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.usecase.exchange.TypeFilter
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.json.Json
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalUuidApi::class)

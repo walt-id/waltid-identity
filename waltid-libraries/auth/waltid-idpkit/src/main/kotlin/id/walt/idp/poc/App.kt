@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.idp.poc
 
 import com.nimbusds.jose.JWSAlgorithm
@@ -33,12 +35,13 @@ import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.io.File
 import kotlin.time.Duration.Companion.days
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -147,7 +150,8 @@ fun Application.test() {
     routing {
 
         get("/jwks") {
-            call.respond(mapOf(
+            call.respond(
+                mapOf(
                 "keys" to listOf(key).map { it.toPublicJWK().toJSONObject() }
             ))
         }
@@ -344,8 +348,8 @@ fun Application.test() {
                         iss = config.issuer,
                         sub = "x",
                         aud = listOf("my-client-id"), // TODO: OIDC client id
-                        exp = Clock.System.now().plus(365.days),
-                        iat = Clock.System.now(),
+                        exp = kotlin.time.Clock.System.now().plus(365.days),
+                        iat = kotlin.time.Clock.System.now(),
                         nonce = req.nonce,
                     )
                 ).jsonObject

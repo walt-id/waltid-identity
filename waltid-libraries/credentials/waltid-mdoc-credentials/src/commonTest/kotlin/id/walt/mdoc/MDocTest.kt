@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalTime::class)
 
 package id.walt.mdoc
 
@@ -18,14 +18,15 @@ import id.walt.mdoc.issuersigned.IssuerSignedItem
 import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.mdoc.mso.ValidityInfo
 import korlibs.crypto.encoding.Hex
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.decodeFromHexString
 import kotlinx.serialization.encodeToHexString
 import kotlin.test.*
+import kotlin.time.ExperimentalTime
 
 class MDocTest {
 

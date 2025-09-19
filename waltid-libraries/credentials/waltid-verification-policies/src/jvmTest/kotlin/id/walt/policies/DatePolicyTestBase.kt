@@ -1,14 +1,17 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.policies
 
 import id.walt.w3c.Claims
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import kotlin.time.ExperimentalTime
 
 abstract class DatePolicyTestBase {
 

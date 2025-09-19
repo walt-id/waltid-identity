@@ -96,7 +96,7 @@ kotlin {
                 implementation("io.github.oshai:kotlin-logging:7.0.5")
 
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
                 // walt.id
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -111,7 +111,7 @@ kotlin {
                 implementation("app.softwork:kotlinx-uuid-core:0.1.6")
 
                 // Multiplatform / Date & time
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
                 // Multiplatform / Hashes
                 implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))

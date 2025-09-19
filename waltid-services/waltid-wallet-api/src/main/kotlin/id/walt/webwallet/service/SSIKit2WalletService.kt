@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.webwallet.service
 
 import com.nimbusds.jose.JOSEObjectType
@@ -35,11 +37,7 @@ import id.walt.oid4vc.responses.TokenResponse
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
-import id.walt.webwallet.db.models.WalletCategoryData
-import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.db.models.WalletDid
-import id.walt.webwallet.db.models.WalletOperationHistories
-import id.walt.webwallet.db.models.WalletOperationHistory
+import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.category.CategoryService
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -72,16 +70,17 @@ import io.ktor.http.*
 import io.ktor.server.plugins.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
-import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
-import java.nio.charset.StandardCharsets
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.util.Base64
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
+import kotlin.time.toJavaInstant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid

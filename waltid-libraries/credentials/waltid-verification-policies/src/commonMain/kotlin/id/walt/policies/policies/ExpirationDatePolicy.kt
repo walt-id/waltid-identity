@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.policies.policies
 
 import id.walt.w3c.Claims
@@ -9,8 +11,8 @@ import id.walt.policies.DatePolicyUtils.checkVc
 import id.walt.policies.DatePolicyUtils.policyUnavailable
 import id.walt.policies.ExpirationDatePolicyException
 import id.walt.w3c.VcClaims
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -20,6 +22,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport

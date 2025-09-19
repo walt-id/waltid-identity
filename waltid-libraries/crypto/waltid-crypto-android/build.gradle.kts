@@ -70,7 +70,7 @@ kotlin {
             dependencies {
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 implementation("io.github.oshai:kotlin-logging:7.0.5")
             }
         }

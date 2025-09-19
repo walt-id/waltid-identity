@@ -1,12 +1,15 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.idp.oidc.json
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlin.time.ExperimentalTime
 
 object InstantAsEpochSecondsSerializer : KSerializer<Instant> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("InstantAsEpochSeconds", PrimitiveKind.LONG)

@@ -9,7 +9,7 @@ import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.history() = walletRoute {

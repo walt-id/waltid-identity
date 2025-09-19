@@ -1,9 +1,12 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.issuer.services.onboarding.models
 
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlin.time.DurationUnit
+import kotlin.time.ExperimentalTime
 import kotlin.time.toDuration
 
 @Serializable

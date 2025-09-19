@@ -19,7 +19,7 @@ import kotlinx.serialization.json.JsonObject
 data class MdocsCredential(
     override val credentialData: JsonObject,
 
-    /** raw, base64url-encoded DeviceResponse string */
+    /** raw, base64url-encoded DeviceResponse / Document string */
     override val signed: String?,
 
     /** The document type, e.g., "org.iso.18013.5.1.mDL". */
@@ -38,6 +38,11 @@ data class MdocsCredential(
 
     companion object {
         private val log = KotlinLogging.logger { }
+
+        fun createFromDeviceResponse() {
+
+        }
+
     }
 
     fun parseToDocument(): Document {

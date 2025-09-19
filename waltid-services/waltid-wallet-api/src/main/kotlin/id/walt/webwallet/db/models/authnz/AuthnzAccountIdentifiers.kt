@@ -1,6 +1,6 @@
 package id.walt.webwallet.db.models.authnz
 
-import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.v1.core.Table
 
 object AuthnzAccountIdentifiers : Table() {
     val id = uuid("id").autoGenerate()

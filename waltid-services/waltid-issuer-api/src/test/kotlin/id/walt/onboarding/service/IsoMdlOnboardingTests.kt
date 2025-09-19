@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.onboarding.service
 
 import id.walt.issuer.services.onboarding.OnboardingService
@@ -15,6 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.ExperimentalTime
 
 class IsoMdlOnboardingTests {
 
