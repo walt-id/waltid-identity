@@ -15,7 +15,7 @@ import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSECryptoProvider
 import id.walt.mdoc.dataelement.*
-import id.walt.mdoc.dataelement.toJsonElement
+import id.walt.mdoc.dataelement.json.toJsonElement
 import id.walt.mdoc.dataretrieval.DeviceResponse
 import id.walt.mdoc.dataretrieval.DeviceResponseStatus
 import id.walt.mdoc.doc.MDoc
