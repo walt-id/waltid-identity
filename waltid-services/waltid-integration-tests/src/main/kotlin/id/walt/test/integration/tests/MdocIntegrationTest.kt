@@ -15,7 +15,7 @@ import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSECryptoProvider
 import id.walt.mdoc.dataelement.*
-import id.walt.mdoc.dataelement.toJsonElement
+import id.walt.mdoc.dataelement.json.toJsonElement
 import id.walt.mdoc.dataretrieval.DeviceResponse
 import id.walt.mdoc.dataretrieval.DeviceResponseStatus
 import id.walt.mdoc.doc.MDoc
@@ -392,12 +392,12 @@ class MdocIntegrationTest : AbstractIntegrationTest() {
             }
         }
 
-        assertNotNull(dsAKI.keyIdentifier)
+        assertNotNull(dsAKI.keyIdentifierOctets)
 
 
         assertContentEquals(
             expected = iacaSKI.keyIdentifier,
-            actual = dsAKI.keyIdentifier,
+            actual = dsAKI.keyIdentifierOctets,
         )
 
 
