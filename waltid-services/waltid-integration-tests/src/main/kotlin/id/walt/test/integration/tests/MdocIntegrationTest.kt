@@ -392,12 +392,12 @@ class MdocIntegrationTest : AbstractIntegrationTest() {
             }
         }
 
-        assertNotNull(dsAKI.keyIdentifier)
+        assertNotNull(dsAKI.keyIdentifierOctets)
 
 
         assertContentEquals(
             expected = iacaSKI.keyIdentifier,
-            actual = dsAKI.keyIdentifier,
+            actual = dsAKI.keyIdentifierOctets,
         )
 
 

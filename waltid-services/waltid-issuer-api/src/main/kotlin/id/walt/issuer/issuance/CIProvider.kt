@@ -377,7 +377,7 @@ open class CIProvider(
 
         val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
 
-        val issuerKey = JWK.parse(runBlocking { resolvedIssuerKey.exportJWK() }).toECKey()
+        val issuerKey = JWK.parse(resolvedIssuerKey.exportJWK()).toECKey()
 
         val keyID = resolvedIssuerKey.getKeyId()
 
