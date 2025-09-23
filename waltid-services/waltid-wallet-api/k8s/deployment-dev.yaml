@@ -53,6 +53,21 @@ data:
       configurationEndpoint = "https://issuer.demo.walt.id/.well-known/openid-credential-issuer",
       authorized = false,
     }
+  ktor-authnz.conf: |
+    requireHttps = false
+    signingKey = {"type": "jwk", "jwk": {"kty": "OKP", "d": "z8Lk85rAtfv2RJN_cD_-9nqHHwKTlTQ5_I53LcsHjC4", "use": "sig", "crv": "Ed25519", "x": "Ew76rQJ9gPHCOBOwJlf__Il5IjgSAc3bQ_a8psd-F3E", "alg": "EdDSA"}}
+    verificationKey = {"type": "jwk", "jwk": {"kty": "OKP", "d": "z8Lk85rAtfv2RJN_cD_-9nqHHwKTlTQ5_I53LcsHjC4", "use": "sig", "crv": "Ed25519", "x": "Ew76rQJ9gPHCOBOwJlf__Il5IjgSAc3bQ_a8psd-F3E", "alg": "EdDSA"}}
+    pepper = "waltid"
+    hashAlgorithm = ARGON2
+    authFlow = {
+        method: web3
+        expiration: "7d"
+        ok: true
+    }
+    cookieDomain = null
+    hashMigrations = {
+        MESSAGE_DIGEST: ARGON2
+    }
 #  rejectionreason.conf: |
 #    reasons = [
 #        "Unknown sender",
@@ -132,6 +147,10 @@ spec:
               mountPath: /waltid-wallet-api/config/registration-defaults.conf
               readOnly: true
               subPath: registration-defaults.conf
+            - name: wallet-config
+              mountPath: /waltid-wallet-api/config/ktor-authnz.conf
+              readOnly: true
+              subPath: ktor-authnz.conf
             - name: wallet-auth-secret
               mountPath: /waltid-wallet-api/config/auth.conf
               readOnly: true
