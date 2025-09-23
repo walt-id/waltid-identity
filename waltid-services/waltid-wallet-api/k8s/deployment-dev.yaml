@@ -4,12 +4,8 @@ metadata:
   name: wallet-config
 data:
   _features.conf: |
-    enabledFeatures = [
-      ktor-authnz
-    ]
-    disabledFeatures = [
-      auth 
-    ]
+    enabledFeatures = ["ktor-authnz"]
+    disabledFeatures = ["auth"]
   db.conf: |
     dataSource {
         jdbcUrl = "jdbc:sqlite:/waltid-wallet-api/data/data.db"
@@ -116,6 +112,10 @@ spec:
 
           imagePullPolicy: Always
           volumeMounts:
+            - name: wallet-config
+              mountPath: /waltid-wallet-api/config/_features.conf
+              readOnly: true
+              subPath: _features.conf
             - name: wallet-config
               mountPath: /waltid-wallet-api/config/db.conf
               readOnly: true
