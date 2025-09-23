@@ -5,6 +5,10 @@ metadata:
 data:
   _features.conf: |
     enabledFeatures = [
+      ktor-authnz
+    ]
+    disabledFeatures = [
+      auth 
     ]
   db.conf: |
     dataSource {
