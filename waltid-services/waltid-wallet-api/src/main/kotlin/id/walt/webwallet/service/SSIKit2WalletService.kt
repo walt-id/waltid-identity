@@ -596,7 +596,8 @@ class SSIKit2WalletService(
                 algorithm = key.keyType.name,
                 cryptoProvider = key.toString(),
                 keyPair = JsonObject(emptyMap()),
-                keysetHandle = JsonNull
+                keysetHandle = JsonNull,
+                name = it.name
             )
         }
 
@@ -610,7 +611,7 @@ class SSIKit2WalletService(
         KeyManager.createKey(request)
             .also {
                 logger.trace { "Generated key: $it" }
-                KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
+                KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it), request.name)
                 eventUseCase.log(
                     action = EventType.Key.Create,
                     originator = "wallet",

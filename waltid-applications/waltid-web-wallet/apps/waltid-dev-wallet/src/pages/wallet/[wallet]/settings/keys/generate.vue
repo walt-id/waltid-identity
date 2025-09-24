@@ -6,7 +6,18 @@
         <div
             class="mt-1 space-y-8 border-gray-900/10 pb-12 sm:space-y-0 sm:divide-y sm:divide-gray-900/10 sm:border-t sm:pb-0">
           <div>
-            <!-- Key Generation Request -->
+              <div class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-4">
+                  <label class="block text-sm font-medium leading-6 text-gray-900 sm:pt-1.5" for="name">
+                      Name (optional)
+                  </label>
+                  <div class="mt-2 sm:col-span-2 sm:mt-0">
+                      <input id="name" v-model="data.name"
+                             class="px-2 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:max-w-xs sm:text-sm sm:leading-6"
+                             type="text" placeholder="e.g., My signing key"/>
+                  </div>
+              </div>
+
+              <!-- Key Generation Request -->
             <div class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-4">
               <label class="block text-sm font-medium leading-6 text-gray-900 sm:pt-1.5" for="keyGenerationRequest">
                 KMS
@@ -108,8 +119,8 @@
 
 <script lang="ts" setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import { ArrowUturnLeftIcon, CheckIcon, KeyIcon } from "@heroicons/vue/24/outline";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {ArrowUturnLeftIcon, CheckIcon, KeyIcon} from "@heroicons/vue/24/outline";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 import InlineLoadingCircle from "@waltid-web-wallet/components/loading/InlineLoadingCircle.vue";
 
 const loading = ref(false);
@@ -184,9 +195,11 @@ const options = ref([
 ]);
 
 const data = reactive<{
+    name?: string;
   keyGenerationRequest: { type: string; config: Record<string, string> };
   type: string;
 }>({
+    name: '',
   keyGenerationRequest: {
     type: options.value[0].keyGenerationRequest[1],
     config: {},
@@ -207,6 +220,9 @@ async function generateKey() {
     keyType: data.type,
     config: {},
   };
+    if (data.name && data.name.trim() !== '') {
+        body.name = data.name.trim();
+    }
 
   // Configure the 'config' object depending on the type (AWS, Azure, etc.)
   if (type === "aws-access-key") {

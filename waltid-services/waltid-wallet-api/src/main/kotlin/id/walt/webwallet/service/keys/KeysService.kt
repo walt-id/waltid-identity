@@ -30,11 +30,12 @@ object KeysService {
     fun list(wallet: Uuid): List<WalletKey> =
         WalletKeys.selectAll().where { WalletKeys.wallet eq wallet.toJavaUuid() }.map { WalletKey(it) }
 
-    fun add(wallet: Uuid, keyId: String, document: String) = transaction {
+    fun add(wallet: Uuid, keyId: String, document: String, name: String? = null) = transaction {
         WalletKeys.insert {
             it[WalletKeys.wallet] = wallet.toJavaUuid()
             it[WalletKeys.keyId] = keyId
             it[WalletKeys.document] = document
+            it[WalletKeys.name] = name
             it[createdOn] = Clock.System.now().toJavaInstant()
         }.insertedCount
     }

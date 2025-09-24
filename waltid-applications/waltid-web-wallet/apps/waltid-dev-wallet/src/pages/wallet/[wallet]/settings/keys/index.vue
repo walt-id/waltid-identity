@@ -54,7 +54,7 @@
             <p
               class="mx-2 overflow-x-auto text-base font-normal leading-6 text-gray-500"
             >
-              {{ key.keyId.id }}
+                {{ key.name ? key.name : key.keyId.id }}
             </p>
           </div>
         </div>
@@ -101,8 +101,8 @@
 
 <script lang="ts" setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
-import { ArrowUturnLeftIcon, CheckIcon, HashtagIcon, InboxArrowDownIcon, KeyIcon } from "@heroicons/vue/24/outline";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
+import {ArrowUturnLeftIcon, CheckIcon, HashtagIcon, InboxArrowDownIcon, KeyIcon} from "@heroicons/vue/24/outline";
 
 const currentWallet = useCurrentWallet();
 
