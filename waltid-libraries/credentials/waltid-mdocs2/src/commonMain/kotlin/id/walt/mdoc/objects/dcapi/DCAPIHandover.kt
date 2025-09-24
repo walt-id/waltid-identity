@@ -14,7 +14,7 @@ import kotlinx.serialization.cbor.CborArray
  * CBOR array.
  *
  * @param type The type of handover, indicating the protocol context.
- * @param dcapiInfoHash The SHA-256 hash of the CBOR-encoded `DCAPIInfo` or `OpenID4VPDCAPIHandoverInfo` structure. [cite_start]This binds the session to the specific request parameters like origin, nonce, and public keys. [cite: 4880, 5128]
+ * @param dcapiInfoHash The SHA-256 hash of the CBOR-encoded `DCAPIInfo` or `OpenID4VPDCAPIHandoverInfo` structure. This binds the session to the specific request parameters like origin, nonce, and public keys.
  */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
