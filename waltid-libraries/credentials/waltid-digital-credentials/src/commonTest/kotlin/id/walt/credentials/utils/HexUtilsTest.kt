@@ -1,6 +1,6 @@
 package id.walt.credentials.utils
 
-import id.walt.credentials.utils.HexUtils.matchesHex
+import id.walt.crypto.utils.HexUtils.matchesHex
 import kotlin.test.Test
 
 class HexUtilsTest {

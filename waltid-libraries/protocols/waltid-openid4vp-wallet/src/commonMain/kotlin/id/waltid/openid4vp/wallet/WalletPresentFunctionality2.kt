@@ -14,13 +14,13 @@ import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
 import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
-import id.walt.isocred.DeviceNameSpaces
-import id.walt.isocred.DeviceResponse
-import id.walt.isocred.DeviceSigned
-import id.walt.isocred.Document
-import id.walt.isocred.IssuerSigned
-import id.walt.isocred.IssuerSignedList
-import id.walt.mdoc.utils.ByteStringWrapper
+import id.walt.mdoc.objects.elements.DeviceNameSpaces
+import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
+import id.walt.mdoc.objects.DeviceSigned
+import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.document.IssuerSigned
+import id.walt.mdoc.objects.elements.IssuerSignedList
+import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
@@ -108,8 +108,8 @@ object WalletPresentFunctionality2 {
                             val responseUri = authorizationRequest.responseUri
                                 ?: throw IllegalArgumentException("response_uri is required for mso_mdoc presentation")
 
-                            val document: id.walt.isocred.Document = mdocsCredential.parseToDocument()
-                            val issuerSigned: id.walt.isocred.IssuerSigned = document.issuerSigned
+                            val document: Document = mdocsCredential.parseToDocument()
+                            val issuerSigned: IssuerSigned = document.issuerSigned
 
                             // Build OpenID4VPHandover (OID4VP Appendix B.2.6.1) without ISO-specific wallet nonce
                             val sessionTranscript = MdocPresenter.buildSessionTranscript(authorizationRequest, responseUri)

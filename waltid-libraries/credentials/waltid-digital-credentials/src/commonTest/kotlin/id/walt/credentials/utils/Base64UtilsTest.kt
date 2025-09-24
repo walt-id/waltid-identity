@@ -1,6 +1,6 @@
 package id.walt.credentials.utils
 
-import id.walt.credentials.utils.Base64Utils.matchesBase64Url
+import id.walt.crypto.utils.Base64Utils.matchesBase64Url
 import kotlin.test.Test
 
 class Base64UtilsTest {

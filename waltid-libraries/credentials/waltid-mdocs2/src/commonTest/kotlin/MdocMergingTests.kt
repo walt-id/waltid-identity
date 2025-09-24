@@ -1,4 +1,4 @@
-import id.walt.mdoc.MdocSignedMerger
+import id.walt.mdoc.namespaces.MdocSignedMerger
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test

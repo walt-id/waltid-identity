@@ -1,5 +1,7 @@
 package id.walt.mdoc.crypto
 
+//import id.walt.mdoc.credsdata.DeviceNameSpaces
+//import id.walt.mdoc.credsdata.IssuerSignedItem
 import id.walt.cose.CoseKey
 import id.walt.cose.CoseMac0
 import id.walt.cose.CoseSign1
@@ -7,13 +9,10 @@ import id.walt.cose.toCoseVerifier
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
-import id.walt.mdoc.MdocCbor
-import id.walt.mdoc.credsdata.DeviceNameSpaces
-import id.walt.mdoc.credsdata.IssuerSignedItem
-import id.walt.mdoc.utils.startsWith
-import kotlinx.serialization.Serializable
+import id.walt.mdoc.encoding.MdocCbor
+import id.walt.mdoc.objects.SessionTranscript
+import id.walt.mdoc.encoding.startsWith
 import kotlinx.serialization.cbor.Cbor
-import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import org.kotlincrypto.hash.sha2.SHA256
@@ -26,48 +25,24 @@ import org.kotlincrypto.macs.hmac.sha2.HmacSHA256
  */
 object MdocCrypto {
 
-    /**
-     * Computes the digest of an issuer-signed item.
-     * It first wraps the item in a tagged CBOR bytestring (`#6.24`) and then computes the hash.
-     *
-     * @param item The issuer-signed item to digest.
-     * @param algorithm The digest algorithm to use (e.g., "SHA-256").
-     * @return The computed digest as a ByteArray.
-     */
-    fun digest(item: IssuerSignedItem, algorithm: String): ByteArray {
-        val cborDataItem = MdocCbor.encodeToByteArray(item)
-        val taggedBytes = wrapInTaggedCbor(24, cborDataItem)
+    private val sha256 = SHA256()
+    private val sha384 = SHA384()
+    private val sha512 = SHA512()
+    val mdocDigestTable = mapOf(
+        "SHA-256" to sha256,
+        "SHA-384" to sha384,
+        "SHA-512" to sha512
+    )
+    fun isSupportedDigest(mdocDigestAlgorithm: String) = mdocDigestTable.containsKey(mdocDigestAlgorithm)
 
-        val digest = when (algorithm) {
-            "SHA-256" -> SHA256()
-            "SHA-384" -> SHA384()
-            "SHA-512" -> SHA512()
-            else -> throw IllegalArgumentException("Unsupported digest algorithm: $algorithm")
+    fun ByteArray.digest(digestAlgorithm: String): ByteArray {
+        val digest = when (digestAlgorithm) {
+            "SHA-256" -> sha256
+            "SHA-384" -> sha384
+            "SHA-512" -> sha512
+            else -> throw IllegalArgumentException("Unsupported digest algorithm: $digestAlgorithm")
         }
-        return digest.digest(taggedBytes)
-    }
-
-    /**
-     * Constructs and serializes the `DeviceAuthentication` structure.
-     *
-     * @param sessionTranscript The session transcript from the engagement.
-     * @param docType The document type.
-     * @param deviceNameSpaces The device-signed namespaces.
-     * @return The tagged and CBOR-encoded `DeviceAuthenticationBytes`.
-     */
-    fun buildDeviceAuthenticationBytes(
-        sessionTranscript: ByteArray,
-        docType: String,
-        deviceNameSpaces: DeviceNameSpaces
-    ): ByteArray {
-        val deviceNameSpacesBytes = MdocCbor.encodeToByteArray(deviceNameSpaces)
-        val deviceAuth = DeviceAuthentication(
-            sessionTranscriptBytes = sessionTranscript,
-            docType = docType,
-            deviceNameSpacesBytes = deviceNameSpacesBytes
-        )
-        val cborDeviceAuth = MdocCbor.encodeToByteArray(deviceAuth)
-        return wrapInTaggedCbor(24, cborDeviceAuth)
+        return digest.digest(this)
     }
 
     /**
@@ -79,14 +54,14 @@ object MdocCrypto {
      * @return True if the signature is valid, false otherwise.
      */
     suspend fun verifyDeviceSignature(
-        deviceAuthBytes: ByteArray,
+        payloadToVerify: ByteArray,
         deviceSignature: CoseSign1,
         sDevicePublicKey: Key
     ): Boolean {
-        // We cannot use CoseSign1.verify() here because the signed data (`deviceAuthBytes`)
-        // is detached content, not the payload of the COSE object itself.
-        // We use the toCoseVerifier adapter which correctly handles signature format conversion (P1363->DER).
-        return sDevicePublicKey.toCoseVerifier().verify(deviceAuthBytes, deviceSignature.signature)
+        return deviceSignature.verifyDetached(
+            verifier = sDevicePublicKey.toCoseVerifier(),
+            detachedPayload = payloadToVerify
+        )
     }
 
     // stub as waltid-crypto does not yet do ECDH
@@ -224,31 +199,4 @@ object MdocCrypto {
         }
         return MdocCbor.decodeFromByteArray<SessionTranscript>(untaggedCbor)
     }
-
-    // --- Internal Data Classes for Serialization ---
-
-    /**
-     * Internal structure for the data that gets authenticated by the device.
-     * `DeviceAuthentication = [ "DeviceAuthentication", SessionTranscript, DocType, DeviceNameSpacesBytes ]`
-     */
-    @Serializable
-    @CborArray
-    internal data class DeviceAuthentication(
-        val context: String = "DeviceAuthentication",
-        val sessionTranscriptBytes: ByteArray,
-        val docType: String,
-        val deviceNameSpacesBytes: ByteArray
-    )
-
-    /**
-     * Internal structure for parsing the SessionTranscript.
-     * `SessionTranscript = [ DeviceEngagementBytes, EReaderKeyBytes, Handover ]`
-     */
-    @Serializable
-    @CborArray
-    data class SessionTranscript(
-        val deviceEngagementBytes: ByteArray,
-        val eReaderKeyBytes: ByteArray,
-        val handover: ByteArray // Assuming handover is just bytes for now
-    )
 }

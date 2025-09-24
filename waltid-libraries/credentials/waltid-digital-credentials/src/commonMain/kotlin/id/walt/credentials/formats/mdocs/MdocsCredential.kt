@@ -3,13 +3,13 @@ package id.walt.credentials.formats
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseVerifier
 import id.walt.credentials.signatures.CredentialSignature
-import id.walt.credentials.utils.Base64Utils.matchesBase64Url
-import id.walt.credentials.utils.HexUtils.matchesHex
+import id.walt.crypto.utils.HexUtils.matchesHex
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.matchesBase64Url
 import id.walt.did.dids.resolver.local.DidJwkResolver
-import id.walt.isocred.DeviceResponse
-import id.walt.isocred.Document
+import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
+import id.walt.mdoc.objects.document.Document
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.*
 import kotlinx.serialization.json.JsonElement

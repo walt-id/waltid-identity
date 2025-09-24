@@ -7,27 +7,17 @@ import id.walt.cose.toCoseAlgorithm
 import id.walt.cose.toCoseSigner
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.Key
-import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
-import id.walt.isocred.DeviceAuth
-import id.walt.isocred.DeviceAuthentication
-import id.walt.isocred.DeviceNameSpaces
-import id.walt.isocred.DeviceResponse
-import id.walt.isocred.DeviceSigned
-import id.walt.isocred.Document
-import id.walt.isocred.IssuerSigned
-import id.walt.isocred.IssuerSignedList
-import id.walt.isocred.SessionTranscript
-import id.walt.isocred.handover.OpenID4VPHandover
-import id.walt.isocred.handover.OpenID4VPHandoverInfo
-import id.walt.isocred.sha256
-import id.walt.isocred.wrapInCborTag
-import id.walt.mdoc.utils.ByteStringWrapper
+import id.walt.mdoc.objects.document.DeviceAuth
+import id.walt.mdoc.objects.document.DeviceAuthentication
+import id.walt.mdoc.objects.elements.DeviceNameSpaces
+import id.walt.mdoc.objects.SessionTranscript
+import id.walt.mdoc.objects.handover.OpenID4VPHandover
+import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
+import id.walt.mdoc.objects.sha256
+import id.walt.mdoc.objects.wrapInCborTag
+import id.walt.mdoc.encoding.ByteStringWrapper
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.encodeToByteArray
-import kotlinx.serialization.json.JsonPrimitive
-import kotlin.collections.component1
-import kotlin.collections.component2
 
 object MdocPresenter {
 

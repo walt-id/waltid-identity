@@ -13,19 +13,19 @@ import id.walt.credentials.signatures.DataIntegrityProofCredentialSignature
 import id.walt.credentials.signatures.JwtCredentialSignature
 import id.walt.credentials.signatures.SdJwtCredentialSignature
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
-import id.walt.credentials.utils.Base64Utils.base64Url
-import id.walt.credentials.utils.Base64Utils.matchesBase64Url
-import id.walt.credentials.utils.HexUtils.matchesHex
+import id.walt.crypto.utils.HexUtils.matchesHex
 import id.walt.credentials.utils.JwtUtils
 import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.credentials.utils.SdJwtUtils.getSdArrays
 import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
+import id.walt.crypto.utils.Base64Utils.base64Url
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.matchesBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.isocred.CborCredentialSerializer
-import id.walt.isocred.DeviceResponse
-import id.walt.isocred.Document
-import id.walt.isocred.IssuerSignedItem
+import id.walt.mdoc.objects.MdocsCborSerializer
+import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
+import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.MapKey
 import id.walt.mdoc.doc.MDoc
@@ -114,7 +114,7 @@ object CredentialParser {
                     x.forEach { item: IssuerSignedItem ->
                         println("$namespace - ${item.elementIdentifier} -> ${item.elementValue} (${item.elementValue::class.simpleName})")
 
-                        val serialized: JsonElement = CborCredentialSerializer.lookupSerializer(namespace, item.elementIdentifier)
+                        val serialized: JsonElement = MdocsCborSerializer.lookupSerializer(namespace, item.elementIdentifier)
                             ?.runCatching {
                                 Json.encodeToJsonElement(this as KSerializer<Any?>, item.elementValue)
                             }?.getOrElse { println("Error encoding with custom serializer: ${it.stackTraceToString()}"); null }
