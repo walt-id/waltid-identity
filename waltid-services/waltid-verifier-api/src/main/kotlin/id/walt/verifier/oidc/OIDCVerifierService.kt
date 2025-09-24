@@ -29,10 +29,7 @@ import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest
 import id.walt.policies.models.PresentationVerificationResponseSurrogate
 import id.walt.policies.policies.*
-import id.walt.policies.policies.vp.HolderBindingPolicy
-import id.walt.policies.policies.vp.MaximumCredentialsPolicy
-import id.walt.policies.policies.vp.MinimumCredentialsPolicy
-import id.walt.policies.policies.vp.PresentationDefinitionPolicy
+import id.walt.policies.policies.vp.*
 import id.walt.verifier.config.OIDCVerifierServiceConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.plugins.*
@@ -105,6 +102,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
             subclass(RevocationPolicy::class)
             subclass(WebhookPolicy::class)
             subclass(PresentationDefinitionPolicy::class)
+            subclass(ExternalEVPForwardPolicy::class)
         }
     }
 
@@ -155,25 +153,36 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         val policies = sessionVerificationInfos[session.id]
             ?: throw NotFoundException("Policy listing for session: ${session.id} is missing. Please ensure that the session ID is correct and that the policies have been properly configured.")
 
+        val presentationFormat = tokenResponse.presentationSubmission?.descriptorMap?.firstOrNull()?.format
+            ?: tokenResponse.presentationSubmission?.descriptorMap?.firstOrNull()?.pathNested?.format
+            ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
+
         val vpToken = when (tokenResponse.idToken) {
-            null -> when (tokenResponse.vpToken) {
-                is JsonObject -> tokenResponse.vpToken.toString()
-                is JsonPrimitive -> tokenResponse.vpToken!!.jsonPrimitive.content
+            null -> when (val vp = tokenResponse.vpToken) {
+                is JsonObject -> vp.toString()
+                is JsonPrimitive -> vp.jsonPrimitive.content
+                is JsonArray -> {
+                    val candidates = vp.mapNotNull { it.jsonPrimitive.contentOrNull }
+                    val normalVp = candidates.firstOrNull { token ->
+                        runCatching { id.walt.oid4vc.util.JwtUtils.parseJWTPayload(token) }.getOrNull()
+                            ?.let { payload ->
+                                val vcs = payload["vp"]?.jsonObject?.get("verifiableCredential")
+                                (vcs as? JsonArray)?.firstOrNull()?.jsonPrimitive?.contentOrNull != null
+                            } ?: false
+                    }
+                    normalVp ?: candidates.firstOrNull()
+                    ?: throw IllegalArgumentException("vp_token array did not contain any usable presentation")
+                }
                 null -> {
                     logger.debug { "Null in tokenResponse.vpToken!" }
                     return false
                 }
-
                 else -> throw IllegalArgumentException("Illegal tokenResponse.vpToken: ${tokenResponse.vpToken}")
             }
-
             else -> tokenResponse.idToken.toString()
         }
 
         if (tokenResponse.vpToken is JsonObject) TODO("Token response is jsonobject - not yet handled")
-        val presentationFormat = tokenResponse.presentationSubmission?.descriptorMap?.firstOrNull()?.format
-            ?: tokenResponse.presentationSubmission?.descriptorMap?.firstOrNull()?.pathNested?.format
-            ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
 
         logger.debug { "VP token: $vpToken" }
         logger.info { "OpenID4VP profile: ${session.openId4VPProfile}" }
@@ -195,7 +204,9 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
                             tokenResponse.presentationSubmission?.toJSON()?.let { "presentationSubmission" to it },
                             "challenge" to (session.authorizationRequest?.nonce ?: ""),
                             "clientId" to (session.authorizationRequest?.clientId ?: ""),
-                            "responseUri" to (session.authorizationRequest?.responseUri ?: "")
+                            "responseUri" to (session.authorizationRequest?.responseUri ?: ""),
+                            tokenResponse.customParameters?.let { "tokenResponseCustomParameters" to JsonObject(it) },
+                            tokenResponse.vpToken?.let { "vp_token" to it }
                         ).toMap()
                     )
                 }

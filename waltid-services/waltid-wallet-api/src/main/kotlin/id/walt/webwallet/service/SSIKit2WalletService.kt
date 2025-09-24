@@ -230,10 +230,23 @@ class SSIKit2WalletService(
 
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
 
-        if (tokenResponse.vpToken!!.jsonPrimitive.content.contains("~"))
-            require(tokenResponse.vpToken!!.jsonPrimitive.content.last() != '~') {
-                "SD-JWT VC Presentations with Key Binding must not end with '~'"
+        tokenResponse.vpToken?.let { vpEl ->
+            fun checkSdJwtString(str: String) {
+                if (str.contains("~")) {
+                    require(str.last() != '~') {
+                        "SD-JWT VC Presentations with Key Binding must not end with '~'"
+                    }
+                }
             }
+            when (vpEl) {
+                is JsonPrimitive -> vpEl.contentOrNull?.let { checkSdJwtString(it) }
+                is JsonArray -> vpEl.forEach { item ->
+                    item.jsonPrimitive.contentOrNull?.let { checkSdJwtString(it) }
+                }
+
+                else -> {}
+            }
+        }
 
         val submitFormParams = getFormParameters(
             authorizationRequest = presentationSession.authorizationRequest,
