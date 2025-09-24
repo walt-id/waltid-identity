@@ -61,6 +61,7 @@ fun Application.presentations() = walletRoute {
                 "P-384" -> "ES384"
                 "P-521" -> "ES512"
                 "RSA" -> "RS256"
+                "RSA4096" -> "RS256"
                 else -> throw BadRequestException("Unsupported key curve: $crv")
             }
 
