@@ -1,7 +1,7 @@
 import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 
 allprojects {
-    version = "dcql-2025-09-19"
+    version = "1.0.0-SNAPSHOT"
 
     repositories {
         google()
