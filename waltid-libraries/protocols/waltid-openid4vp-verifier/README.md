@@ -28,7 +28,7 @@ the key ideas:
 
 -----
 
-## ✨ Key Features
+## Key Features
 
 This module is packed with features that make implementing a Verifier simple and robust.
 
@@ -56,17 +56,17 @@ This module is packed with features that make implementing a Verifier simple and
 
 -----
 
-## 🛠️ Core Abstractions
+## Core Abstractions
 
 Your application will primarily interact with these key components:
 
-| Class/Object                      | Description                                                                                                                                                             | Source File                      |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| `Verifier2Manager`                | The main entry point for creating and managing verification sessions. Use this to start a new verification flow.                                                          | `Verifier2Manager.kt`            |
-| `Verification2Session`            | The central state object for a single verification flow. It holds the session ID, status, authorization request, policies, and the final results.                         | `Verification2Session.kt`        |
-| `DcqlQuery`                       | A data class representing the DCQL query you send to the Wallet to define your credential requirements.                                                                 | `DcqlFulfillmentChecker.kt`      |
-| `Verifier2PresentationValidator`  | The core validation engine. It dispatches the raw presentation string to the appropriate format-specific validator (`SdJwt...`, `Mdoc...`, etc.).                           | `Verifier2PresentationValidator.kt` |
-| `DcqlFulfillmentChecker`          | A utility that checks if the set of successfully validated presentations satisfies the rules defined in the original `DcqlQuery`, especially when using `credential_sets`. | `DcqlFulfillmentChecker.kt`      |
+| Class/Object                     | Description                                                                                                                                                                | Source File                         |
+|----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------|
+| `Verifier2Manager`               | The main entry point for creating and managing verification sessions. Use this to start a new verification flow.                                                           | `Verifier2Manager.kt`               |
+| `Verification2Session`           | The central state object for a single verification flow. It holds the session ID, status, authorization request, policies, and the final results.                          | `Verification2Session.kt`           |
+| `DcqlQuery`                      | A data class representing the DCQL query you send to the Wallet to define your credential requirements.                                                                    | `DcqlFulfillmentChecker.kt`         |
+| `Verifier2PresentationValidator` | The core validation engine. It dispatches the raw presentation string to the appropriate format-specific validator (`SdJwt...`, `Mdoc...`, etc.).                          | `Verifier2PresentationValidator.kt` |
+| `DcqlFulfillmentChecker`         | A utility that checks if the set of successfully validated presentations satisfies the rules defined in the original `DcqlQuery`, especially when using `credential_sets`. | `DcqlFulfillmentChecker.kt`         |
 
 -----
 
