@@ -734,10 +734,8 @@ class SSIKit2WalletService(
         // For JWS+Json we take the header as given
         val signature = if (jwsObj != null) {
             val headers = jwsObj.header.toJSONObject().toMutableMap()
-            headers["kid"]?.toJsonPrimitive()?.content?.also { kid ->
-                if (kid != alias) throw IllegalArgumentException("JWT headers.kid must match alias: $alias")
-            }
-            headers["kid"] = JsonPrimitive(alias)
+            headers["kid"]?.toJsonPrimitive()?.content
+            // headers["kid"] = JsonPrimitive(alias)
             val dataBytes = jwsObj.payload.toString().toByteArray(Charsets.UTF_8)
             key.signJws(dataBytes, headers.toJsonObject())
         }

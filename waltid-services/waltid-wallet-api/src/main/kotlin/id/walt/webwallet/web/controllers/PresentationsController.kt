@@ -1,5 +1,7 @@
 package id.walt.webwallet.web.controllers
 
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.web.controllers.auth.getWalletService
@@ -7,6 +9,7 @@ import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import kotlinx.datetime.Clock
@@ -33,6 +36,34 @@ fun Application.presentations() = walletRoute {
             val did = req.did
                 ?: wallet.listDids().firstOrNull { it.default }?.did
                 ?: throw IllegalArgumentException("No DID to use supplied and no default DID found")
+
+
+            val didDoc = DidService.resolve(did).getOrElse { ex ->
+                throw BadRequestException("Failed to resolve DID: ${ex.message}")
+            }
+            val vm = didDoc["verificationMethod"]?.jsonArray?.firstOrNull()?.jsonObject
+                ?: throw BadRequestException("No verification method found for DID $did")
+
+            val didDocPubJwk = vm["publicKeyJwk"]?.jsonObject.toString()
+
+            println(JWKKey.importJWK(didDocPubJwk).getOrNull()?.keyType)
+
+            val vmId = vm["id"]?.jsonPrimitive?.contentOrNull
+            println("VM ID: $vmId")
+            val crv = JWKKey.importJWK(didDocPubJwk).getOrNull()?.keyType.toString()
+
+            val keyAlg = when (crv) {
+                "Ed25519" -> "EdDSA"
+                "secp256k1" -> "ES256K"
+                "secp256r1" -> "ES256"
+                "P-256K" -> "ES256K"
+                "P-256" -> "ES256"
+                "P-384" -> "ES384"
+                "P-521" -> "ES512"
+                "RSA" -> "RS256"
+                else -> throw BadRequestException("Unsupported key curve: $crv")
+            }
+
 
             val selected = wallet.getCredentialsByIds(req.credentialIds)
 
@@ -81,11 +112,11 @@ fun Application.presentations() = walletRoute {
 
 
             val header = buildJsonObject {
-                put("alg", JsonPrimitive("RS256"))
+                put("alg", JsonPrimitive(keyAlg))
                 put("cty", JsonPrimitive("vp"))
                 put("typ", JsonPrimitive("vp+jwt"))
                 put("iss", JsonPrimitive(did))
-                put("kid", JsonPrimitive(did))
+                put("kid", JsonPrimitive(vmId))
             }
 
             val protectedB64 =
