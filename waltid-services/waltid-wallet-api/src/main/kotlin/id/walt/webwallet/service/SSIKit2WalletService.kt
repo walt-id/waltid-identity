@@ -660,6 +660,24 @@ class SSIKit2WalletService(
                 throw ConflictException("Key with ID $keyId already exists in the database")
             }
 
+            val alias: String? = runCatching {
+                val trimmed = jwkOrPem.trim()
+                if (trimmed.startsWith("{")) {
+                    val json = Json.parseToJsonElement(trimmed).jsonObject
+                    when {
+                        json["alias"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true -> json["alias"]!!.jsonPrimitive.content
+                        json["name"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true -> json["name"]!!.jsonPrimitive.content
+                        json["jwk"] is JsonObject -> {
+                            val jwkObj = json["jwk"] as JsonObject
+                            jwkObj["alias"]?.jsonPrimitive?.contentOrNull
+                                ?: jwkObj["name"]?.jsonPrimitive?.contentOrNull
+                        }
+
+                        else -> null
+                    }
+                } else null
+            }.getOrNull()
+
             runBlocking {
                 eventUseCase.log(
                     action = EventType.Key.Import,
@@ -671,7 +689,7 @@ class SSIKit2WalletService(
                 )
             }
 
-            KeysService.add(walletId, keyId, KeySerialization.serializeKey(key))
+            KeysService.add(walletId, keyId, KeySerialization.serializeKey(key), alias)
             keyId
         }.getOrElse { throwable ->
             when (throwable) {
