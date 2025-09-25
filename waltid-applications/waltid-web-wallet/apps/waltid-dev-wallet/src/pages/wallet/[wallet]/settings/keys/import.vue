@@ -11,11 +11,26 @@
           v-model="keyText"
           class="block w-full px-3 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
           name="key"
-          rows="4"
+          rows="6"
         />
       </div>
 
-      <div class="mt-2 flex justify-end">
+        <div class="mt-4">
+            <label for="alias" class="block text-sm font-medium text-gray-700">Alias (optional)</label>
+            <input
+                id="alias"
+                v-model="alias"
+                type="text"
+                placeholder="e.g. Signing key"
+                class="mt-1 block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+            />
+            <p class="mt-1 text-xs text-gray-500">
+                If your JWK doesn't include an alias/name, we'll attach this alias. For PEM keys, alias cannot be
+                embedded and may be ignored.
+            </p>
+        </div>
+
+        <div class="mt-4 flex justify-end">
         <button
           class="inline-flex items-center bg-blue-500 hover:bg-blue-600 focus-visible:outline-blue-600 rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           @click="importKey"
@@ -32,17 +47,36 @@
 </template>
 
 <script lang="ts" setup>
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import { DocumentPlusIcon } from "@heroicons/vue/24/outline";
+import {DocumentPlusIcon} from "@heroicons/vue/24/outline";
 
 const keyText = ref("");
+const alias = ref("");
 const currentWallet = useCurrentWallet();
 
+function tryInjectAliasIntoJwk(text: string, alias?: string): string {
+    if (!text) return text;
+    const trimmed = text.trim();
+    if (!trimmed.startsWith("{")) return text; // not JSON -> likely PEM
+    try {
+        const obj = JSON.parse(trimmed);
+        const hasAlias = typeof obj.alias === "string" && obj.alias.length > 0;
+        const hasName = typeof obj.name === "string" && obj.name.length > 0;
+        if ((!hasAlias && !hasName) && alias && alias.trim().length > 0) {
+            obj.alias = alias.trim();
+        }
+        return JSON.stringify(obj);
+    } catch (_) {
+        return text;
+    }
+}
+
 async function importKey() {
+    const bodyText = tryInjectAliasIntoJwk(keyText.value, alias.value);
   await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys/import`, {
     method: "POST",
-    body: keyText.value,
+      body: bodyText,
   });
   navigateTo(`/wallet/${currentWallet.value}/settings/keys`);
 }
