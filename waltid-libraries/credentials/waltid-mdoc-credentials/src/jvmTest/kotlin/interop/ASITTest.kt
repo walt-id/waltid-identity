@@ -2,14 +2,17 @@
 
 package interop
 
+import at.asitplus.signum.indispensable.cosef.io.coseCompliantSerializer
 import at.asitplus.wallet.lib.iso.MobileSecurityObject
-import at.asitplus.wallet.lib.iso.vckCborSerializer
+import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.dataretrieval.DeviceResponse
+import id.walt.mdoc.issuersigned.IssuerSignedItem
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromHexString
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.assertDoesNotThrow
+import kotlin.test.*
 
 class ASITTest {
 
@@ -21,7 +24,7 @@ class ASITTest {
 
         val deviceResponse = DeviceResponse.fromCBORHex(isoSpecExampleSignedDeviceResponse)
 
-        val asitDeviceResponse = vckCborSerializer.decodeFromHexString<at.asitplus.wallet.lib.iso.DeviceResponse>(
+        val asitDeviceResponse = coseCompliantSerializer.decodeFromHexString<at.asitplus.wallet.lib.iso.DeviceResponse>(
             isoSpecExampleSignedDeviceResponse
         )
 
@@ -53,9 +56,139 @@ class ASITTest {
                 waltMDoc.issuerSigned.nameSpaces!!.keys.containsAll(asitMDoc.issuerSigned.namespaces!!.keys)
             }
 
-            assertTrue {
-                waltMDoc.deviceSigned!!.toMapElement().toCBOR().contentEquals(asitMDoc.deviceSigned.serialize())
+            val waltMdlNamespace = assertNotNull(waltMDoc.issuerSigned.nameSpaces).run {
+                assertNotNull(this[MDL_NAMESPACE_ID])
             }
+
+            val waltMdlNamespaceIssuerSignedItemMap = waltMdlNamespace.map { waltMdlNamespaceEncodedEntry ->
+                IssuerSignedItem.fromMapElement(waltMdlNamespaceEncodedEntry.decodeDataElement<MapElement>())
+            }.associateBy { issuerSignedItem ->
+                issuerSignedItem.elementIdentifier.value
+            }
+
+            val asitMdlNamespace = assertNotNull(asitMDoc.issuerSigned.namespaces).run {
+                assertNotNull(this[MDL_NAMESPACE_ID])
+            }
+
+            val asitMdlNamespaceIssuerSignedItemMap = asitMdlNamespace.entries.map { asitMdlNamespaceEncodedEntry ->
+                asitMdlNamespaceEncodedEntry
+            }.associateBy { issuerSignedItem ->
+                issuerSignedItem.value.elementIdentifier
+            }
+
+            println("A SIT mDL NAMESPACE STUFF")
+            asitMdlNamespaceIssuerSignedItemMap["portrait"]?.let {
+                println("${it.value.elementIdentifier} -> " + it.serialized.toHexString())
+            }
+//            asitMdlNamespace.entries.forEach { asitMdlNamespaceEncodedEntry ->
+//                println("${asitMdlNamespaceEncodedEntry.value.elementIdentifier} -> " +
+//                        asitMdlNamespaceEncodedEntry.serialized.toHexString()
+//                )
+//            }
+
+            println("WALT mDL NAMESPACE STUFF")
+            waltMdlNamespaceIssuerSignedItemMap["portrait"]?.let {
+                println("${it.elementIdentifier.value} -> " + it.toMapElement().toCBORHex())
+            }
+
+            val expectedElementIdentifiers = setOf(
+                "family_name",
+                "issue_date",
+                "expiry_date",
+                "document_number",
+                "portrait",
+                "driving_privileges",
+            )
+
+            assertEquals(
+                expected = expectedElementIdentifiers,
+                actual = waltMdlNamespaceIssuerSignedItemMap.keys
+            )
+
+
+            assertEquals(
+                expected = waltMdlNamespaceIssuerSignedItemMap.keys,
+                actual = asitMdlNamespaceIssuerSignedItemMap.keys,
+            )
+
+            //check that all serialized issuer signed items have the same byte array contents
+            expectedElementIdentifiers.forEach { expectedElementId ->
+                assertContentEquals(
+                    expected = asitMdlNamespaceIssuerSignedItemMap[expectedElementId]!!.serialized,
+                    actual = waltMdlNamespaceIssuerSignedItemMap[expectedElementId]!!.toMapElement().toCBOR(),
+                )
+            }
+
+            assertEquals(
+                expected = (waltMdlNamespaceIssuerSignedItemMap["family_name"]!!.elementValue as StringElement).value,
+                actual = (asitMdlNamespaceIssuerSignedItemMap["family_name"]!!.value.elementValue as String)
+            )
+
+            val asitIssueDate = assertDoesNotThrow {
+                (asitMdlNamespaceIssuerSignedItemMap["issue_date"]!!.value.elementValue as LocalDate).run {
+                    assertEquals(
+                        expected = "2019-10-20",
+                        actual = this.toString(),
+                    )
+                    this
+                }
+            }
+
+            val waltIssueDate = waltMdlNamespaceIssuerSignedItemMap["issue_date"]?.let {
+                (it.elementValue as FullDateElement).value
+            }
+
+            assertEquals(
+                expected = asitIssueDate,
+                actual = waltIssueDate,
+            )
+
+            val asitExpiryDate = assertDoesNotThrow {
+                (asitMdlNamespaceIssuerSignedItemMap["expiry_date"]!!.value.elementValue as LocalDate).run {
+                    assertEquals(
+                        expected = "2024-10-20",
+                        actual = this.toString(),
+                    )
+                    this
+                }
+            }
+
+            val waltExpiryDate = waltMdlNamespaceIssuerSignedItemMap["expiry_date"]?.let {
+                (it.elementValue as FullDateElement).value
+            }
+
+            assertEquals(
+                expected = asitExpiryDate,
+                actual = waltExpiryDate,
+            )
+
+            assertEquals(
+                expected = (waltMdlNamespaceIssuerSignedItemMap["document_number"]!!.elementValue as StringElement).value,
+                actual = (asitMdlNamespaceIssuerSignedItemMap["document_number"]!!.value.elementValue as String)
+            )
+
+            assertContentEquals(
+                expected = (waltMdlNamespaceIssuerSignedItemMap["portrait"]!!.elementValue as ByteStringElement).value,
+                actual = asitMdlNamespaceIssuerSignedItemMap["portrait"]!!.value.elementValue as ByteArray
+            )
+
+            //TODO: CONTINUE WITH ALL THE ASSERTIONS HERE
+            //FIXME: CONTINUE WITH ALL THE ASSERTIONS HERE
+
+            val asitDrivingPrivilegeArray = assertDoesNotThrow {
+                asitMdlNamespaceIssuerSignedItemMap["driving_privileges"]!!.value.elementValue as Array<at.asitplus.wallet.mdl.DrivingPrivilege>
+            }
+
+            assertDoesNotThrow {
+                waltMdlNamespaceIssuerSignedItemMap["driving_privileges"]!!.elementValue as ListElement
+            }
+
+            //done with issuer signed namespace contents
+
+
+//            assertTrue {
+//                waltMDoc.deviceSigned!!.toMapElement().toCBOR().contentEquals(asitMDoc.deviceSigned.serialize())
+//            }
 
             assertTrue {
                 waltMDoc.issuerSigned.issuerAuth!!.toCBOR().contentEquals(asitMDoc.issuerSigned.issuerAuth.serialize(
@@ -82,6 +215,17 @@ class ASITTest {
                 actual = asitMSO.docType,
             )
 
+        }
+    }
+
+    companion object {
+
+        private const val MDL_NAMESPACE_ID = "org.iso.18013.5.1"
+
+        @JvmStatic
+        @BeforeAll
+        fun initializeVck() {
+            at.asitplus.wallet.mdl.Initializer.initWithVCK()
         }
 
     }
