@@ -31,6 +31,14 @@ class MDocBuilder(val docType: String) {
         return this
     }
 
+    fun addItemToSign(
+        unsignedItem: ItemToBeSigned,
+    ) = addItemToSign(
+        nameSpace = unsignedItem.nameSpace,
+        elementIdentifier = unsignedItem.elementIdentifier,
+        elementValue = unsignedItem.elementValue,
+    )
+
     /**
      * Convenience method to create issuer signed item, with random salt and auto-detection of next digest ID
      * @param nameSpace The namespace in which this item gets created
