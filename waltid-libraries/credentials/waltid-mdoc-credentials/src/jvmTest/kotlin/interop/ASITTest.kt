@@ -4,12 +4,14 @@ package interop
 
 import at.asitplus.signum.indispensable.cosef.io.coseCompliantSerializer
 import at.asitplus.wallet.lib.iso.MobileSecurityObject
+import at.asitplus.wallet.mdl.DrivingPrivilege
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.dataretrieval.DeviceResponse
 import id.walt.mdoc.issuersigned.IssuerSignedItem
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromHexString
+import kotlinx.serialization.encodeToByteArray
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.*
@@ -74,21 +76,6 @@ class ASITTest {
                 asitMdlNamespaceEncodedEntry
             }.associateBy { issuerSignedItem ->
                 issuerSignedItem.value.elementIdentifier
-            }
-
-            println("A SIT mDL NAMESPACE STUFF")
-            asitMdlNamespaceIssuerSignedItemMap["portrait"]?.let {
-                println("${it.value.elementIdentifier} -> " + it.serialized.toHexString())
-            }
-//            asitMdlNamespace.entries.forEach { asitMdlNamespaceEncodedEntry ->
-//                println("${asitMdlNamespaceEncodedEntry.value.elementIdentifier} -> " +
-//                        asitMdlNamespaceEncodedEntry.serialized.toHexString()
-//                )
-//            }
-
-            println("WALT mDL NAMESPACE STUFF")
-            waltMdlNamespaceIssuerSignedItemMap["portrait"]?.let {
-                println("${it.elementIdentifier.value} -> " + it.toMapElement().toCBORHex())
             }
 
             val expectedElementIdentifiers = setOf(
@@ -172,28 +159,54 @@ class ASITTest {
                 actual = asitMdlNamespaceIssuerSignedItemMap["portrait"]!!.value.elementValue as ByteArray
             )
 
-            //TODO: CONTINUE WITH ALL THE ASSERTIONS HERE
-            //FIXME: CONTINUE WITH ALL THE ASSERTIONS HERE
+            val asitDrivingPrivilegeList = assertDoesNotThrow {
+                asitMdlNamespaceIssuerSignedItemMap["driving_privileges"]!!.value.elementValue as Array<*>
+            }.run {
+                assertIs<Array<DrivingPrivilege>>(this)
+            }.toList()
 
-            val asitDrivingPrivilegeArray = assertDoesNotThrow {
-                asitMdlNamespaceIssuerSignedItemMap["driving_privileges"]!!.value.elementValue as Array<at.asitplus.wallet.mdl.DrivingPrivilege>
+            val waltDrivingPrivilegeList = assertDoesNotThrow {
+                waltMdlNamespaceIssuerSignedItemMap["driving_privileges"]!!.elementValue as ListElement
+            }.value.map {
+                it as MapElement
             }
 
-            assertDoesNotThrow {
-                waltMdlNamespaceIssuerSignedItemMap["driving_privileges"]!!.elementValue as ListElement
+            assertEquals(
+                expected = asitDrivingPrivilegeList.size,
+                actual = waltDrivingPrivilegeList.size,
+            )
+
+            asitDrivingPrivilegeList.zip(waltDrivingPrivilegeList) { asitDrivingPrivilege, waltDrivingPrivilege ->
+
+                assertEquals(
+                    expected = asitDrivingPrivilege.vehicleCategoryCode,
+                    actual = (waltDrivingPrivilege.value[MapKey("vehicle_category_code")] as StringElement).value,
+                )
+
+                assertEquals(
+                    expected = asitDrivingPrivilege.issueDate,
+                    actual = (waltDrivingPrivilege.value[MapKey("issue_date")] as FullDateElement).value,
+                )
+
+                assertEquals(
+                    expected = asitDrivingPrivilege.expiryDate,
+                    actual = (waltDrivingPrivilege.value[MapKey("expiry_date")] as FullDateElement).value,
+                )
             }
 
             //done with issuer signed namespace contents
 
-
-//            assertTrue {
-//                waltMDoc.deviceSigned!!.toMapElement().toCBOR().contentEquals(asitMDoc.deviceSigned.serialize())
-//            }
+            assertTrue {
+                waltMDoc.deviceSigned!!.toMapElement().toCBOR()
+                    .contentEquals(coseCompliantSerializer.encodeToByteArray(asitMDoc.deviceSigned))
+            }
 
             assertTrue {
-                waltMDoc.issuerSigned.issuerAuth!!.toCBOR().contentEquals(asitMDoc.issuerSigned.issuerAuth.serialize(
-                    MobileSecurityObject.serializer()
-                ))
+                waltMDoc.issuerSigned.issuerAuth!!.toCBOR().contentEquals(
+                    asitMDoc.issuerSigned.issuerAuth.serialize(
+                        MobileSecurityObject.serializer()
+                    )
+                )
             }
 
             val mso = waltMDoc.MSO!!
