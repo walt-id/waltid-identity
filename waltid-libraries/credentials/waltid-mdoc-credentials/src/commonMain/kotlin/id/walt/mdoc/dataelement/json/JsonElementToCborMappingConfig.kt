@@ -25,7 +25,8 @@ data class JsonStringToCborMappingConfig(
         json: JsonElement,
     ): DataElement {
         require(json is JsonPrimitive && json.isString) {
-            "this is not a json string"
+            "Expected to execute $conversionType from json string, but " +
+                    "input $json is not a string primitive"
         }
         return StringToCborElementConverter.convert(
             s = json.jsonPrimitive.content,
@@ -44,10 +45,11 @@ data class JsonObjectToCborMappingConfig(
         json: JsonElement,
     ): MapElement {
         require(json is JsonObject) {
-            "this is not a json object"
+            "Expected to execute conversion from json object, but " +
+                    "input $json is not a json object"
         }
         require(json.jsonObject.keys.containsAll(entriesConfigMap.keys)) {
-            "did not find all keys"
+            "Json keys specified in JSON object config map must all exist in input JSON object"
         }
         val claimsMap = mutableMapOf<MapKey, DataElement>()
         json.jsonObject.forEach { (key, value) ->
@@ -67,10 +69,11 @@ data class JsonArrayToCborMappingConfig(
         json: JsonElement,
     ): DataElement {
         require(json is JsonArray){
-            "this is not a json array"
+            "Expected to execute conversion from json array, but " +
+                    "input $json is not a json array"
         }
         require(json.jsonArray.size == arrayConfig.size) {
-            "arrays are not of the same size!"
+            "Json array sizes (input & config) are not equal"
         }
         arrayConfig.zip(json.jsonArray).map { pair ->
             pair.first.executeMapping(pair.second)
