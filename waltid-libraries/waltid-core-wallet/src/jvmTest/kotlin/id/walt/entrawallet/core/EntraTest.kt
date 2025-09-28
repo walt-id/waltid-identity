@@ -8,7 +8,6 @@ import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.test.Test
 import kotlin.time.Duration.Companion.minutes
 
 class EntraTest : BaseTest() {
@@ -49,7 +48,7 @@ class EntraTest : BaseTest() {
         println("Verification: $verification")
     }
 
-    @Test // FIXME: Entra Issuer deployment at https://entra-demo.walt.id/entra/issue is unavailable
+    //@Test // FIXME: Entra Issuer deployment at https://entra-demo.walt.id/entra/issue is unavailable
     fun testEntraFlow() = runTest(timeout = 3.minutes) {
         val receivedCredentials = entraFlowIssuance()
         entraFlowVerification(receivedCredentials)
