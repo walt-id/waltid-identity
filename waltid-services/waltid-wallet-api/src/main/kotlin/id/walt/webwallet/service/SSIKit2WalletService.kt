@@ -35,11 +35,7 @@ import id.walt.oid4vc.responses.TokenResponse
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
-import id.walt.webwallet.db.models.WalletCategoryData
-import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.db.models.WalletDid
-import id.walt.webwallet.db.models.WalletOperationHistories
-import id.walt.webwallet.db.models.WalletOperationHistory
+import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.category.CategoryService
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -79,7 +75,7 @@ import kotlinx.serialization.json.*
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.util.Base64
+import java.util.*
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -599,7 +595,8 @@ class SSIKit2WalletService(
                 algorithm = key.keyType.name,
                 cryptoProvider = key.toString(),
                 keyPair = JsonObject(emptyMap()),
-                keysetHandle = JsonNull
+                keysetHandle = JsonNull,
+                name = it.name
             )
         }
 
@@ -613,7 +610,7 @@ class SSIKit2WalletService(
         KeyManager.createKey(request)
             .also {
                 logger.trace { "Generated key: $it" }
-                KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
+                KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it), request.name)
                 eventUseCase.log(
                     action = EventType.Key.Create,
                     originator = "wallet",
@@ -649,6 +646,24 @@ class SSIKit2WalletService(
                 throw ConflictException("Key with ID $keyId already exists in the database")
             }
 
+            val alias: String? = runCatching {
+                val trimmed = jwkOrPem.trim()
+                if (trimmed.startsWith("{")) {
+                    val json = Json.parseToJsonElement(trimmed).jsonObject
+                    when {
+                        json["alias"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true -> json["alias"]!!.jsonPrimitive.content
+                        json["name"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true -> json["name"]!!.jsonPrimitive.content
+                        json["jwk"] is JsonObject -> {
+                            val jwkObj = json["jwk"] as JsonObject
+                            jwkObj["alias"]?.jsonPrimitive?.contentOrNull
+                                ?: jwkObj["name"]?.jsonPrimitive?.contentOrNull
+                        }
+
+                        else -> null
+                    }
+                } else null
+            }.getOrNull()
+
             runBlocking {
                 eventUseCase.log(
                     action = EventType.Key.Import,
@@ -660,7 +675,7 @@ class SSIKit2WalletService(
                 )
             }
 
-            KeysService.add(walletId, keyId, KeySerialization.serializeKey(key))
+            KeysService.add(walletId, keyId, KeySerialization.serializeKey(key), alias)
             keyId
         }.getOrElse { throwable ->
             when (throwable) {
