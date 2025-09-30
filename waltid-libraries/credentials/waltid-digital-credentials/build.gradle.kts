@@ -63,21 +63,21 @@ kotlin {
             useJUnitPlatform()
         }
     }
-    js(IR) {
+    /*js(IR) {
         outputModuleName.set("digital-credentials")
         useEsModules()
-        /*browser {
-            commonWebpackConfig {
-                cssSupport {
-                    enabled.set(true)
-                }
-            }
-        }*/
+//        browser {
+//            commonWebpackConfig {
+//                cssSupport {
+//                    enabled.set(true)
+//                }
+//            }
+//        }
         nodejs {
             generateTypeScriptDefinitions()
         }
         binaries.library()
-    }
+    }*/
 
     if (enableIosBuild) {
         iosArm64()
