@@ -65,6 +65,7 @@ kotlin {
     }
     js(IR) {
         outputModuleName.set("holder-policies")
+        useEsModules()
         /*browser {
             commonWebpackConfig {
                 cssSupport {

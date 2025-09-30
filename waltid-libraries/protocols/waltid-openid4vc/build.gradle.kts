@@ -167,8 +167,7 @@ kotlin {
         }
         val jsMain by getting {
             dependencies {
-                // implementation(npm("jose", "~4.14.4"))
-                implementation(npm("jose", "5.2.3"))
+                implementation(npm("jose", "5.10.0"))
                 implementation("io.ktor:ktor-client-js:$ktor_version")
             }
         }

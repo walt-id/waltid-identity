@@ -105,14 +105,14 @@ object IssuanceService : IssuanceServiceBase() {
 
         logger.debug { "Using issuer URL: ${credentialOffer.credentialIssuer}" }
         val credReqs = offeredCredentials.map { offeredCredential ->
-            logger.info("Offered credential format: ${offeredCredential.format.name}")
-            logger.info(
+            logger.info { "Offered credential format: ${offeredCredential.format.name}" }
+            logger.info {
                 "Offered credential cryptographic binding methods: ${
-                    offeredCredential.cryptographicBindingMethodsSupported?.joinToString(
-                        ", "
-                    ) ?: ""
-                }"
-            )
+                            offeredCredential.cryptographicBindingMethodsSupported?.joinToString(
+                                ", "
+                            ) ?: ""
+                        }"
+            }
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
                 proof = ProofOfPossessionFactory.new(

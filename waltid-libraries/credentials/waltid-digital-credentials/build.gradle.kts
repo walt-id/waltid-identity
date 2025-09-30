@@ -65,6 +65,7 @@ kotlin {
     }
     js(IR) {
         outputModuleName.set("digital-credentials")
+        useEsModules()
         /*browser {
             commonWebpackConfig {
                 cssSupport {

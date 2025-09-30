@@ -62,6 +62,7 @@ kotlin {
     }
     js(IR) {
         outputModuleName.set("w3c-credentials")
+        useEsModules()
         /*browser {
             commonWebpackConfig {
                 cssSupport {

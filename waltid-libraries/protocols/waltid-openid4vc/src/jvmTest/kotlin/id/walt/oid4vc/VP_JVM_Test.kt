@@ -252,6 +252,8 @@ class VP_JVM_Test {
         }
     }
 
+    private val prettyPrintJson = Json { prettyPrint = true }
+
     //@Test
     suspend fun testMattrLaunchpadVerificationRequest() {
 
@@ -307,7 +309,7 @@ class VP_JVM_Test {
         val debugPresentingPresentationSubmission =
             tokenResponse.toHttpParameters()["presentation_submission"]!!.first()
         val decoded = Json.parseToJsonElement(debugPresentingPresentationSubmission).jsonObject
-        val encoded = Json { prettyPrint = true }.encodeToString(decoded)
+        val encoded = prettyPrintJson.encodeToString(decoded)
         println(encoded)
 
         println("Submitting...")
@@ -358,7 +360,7 @@ class VP_JVM_Test {
         val debugPresentingPresentationSubmission =
             tokenResponse.toHttpParameters()["presentation_submission"]!!.first()
         val decoded = Json.parseToJsonElement(debugPresentingPresentationSubmission).jsonObject
-        val encoded = Json { prettyPrint = true }.encodeToString(decoded)
+        val encoded = prettyPrintJson.encodeToString(decoded)
         println(encoded)
 
         println("Submitting...")
@@ -504,7 +506,7 @@ class VP_JVM_Test {
         val debugPresentingPresentationSubmission =
             tokenResponse.toHttpParameters()["presentation_submission"]!!.first()
         val decoded = Json.parseToJsonElement(debugPresentingPresentationSubmission).jsonObject
-        val encoded = Json { prettyPrint = true }.encodeToString(decoded)
+        val encoded = prettyPrintJson.encodeToString(decoded)
         println(encoded)
 
         println("Submitting...")

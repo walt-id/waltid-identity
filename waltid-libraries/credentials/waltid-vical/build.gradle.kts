@@ -49,6 +49,7 @@ kotlin {
     }
     js(IR) {
         outputModuleName = "vical"
+        useEsModules()
         nodejs {
             generateTypeScriptDefinitions()
             testTask {

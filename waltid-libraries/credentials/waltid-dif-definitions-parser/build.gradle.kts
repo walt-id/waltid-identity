@@ -36,6 +36,7 @@ kotlin {
 
     js(IR) {
         outputModuleName = "definitions-parser"
+        useEsModules()
         nodejs {
             generateTypeScriptDefinitions()
         }

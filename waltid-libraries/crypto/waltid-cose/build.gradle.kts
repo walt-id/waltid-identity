@@ -49,6 +49,7 @@ kotlin {
     }
     js(IR) {
         outputModuleName = "cose"
+        useEsModules()
         nodejs {
             generateTypeScriptDefinitions()
             testTask {

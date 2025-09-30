@@ -25,9 +25,7 @@ kotlin {
     jvm()
 
     js(IR) {
-        browser {
-
-        }
+        useEsModules()
         nodejs {
             generateTypeScriptDefinitions()
         }

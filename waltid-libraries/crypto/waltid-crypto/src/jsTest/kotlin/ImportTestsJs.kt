@@ -52,9 +52,13 @@ class ImportTestsJs {
     @Test
     fun importJwk() = runTest {
         // Private
+        println("JWK: $privateKeyJsonString")
+
         println("Importing private JWK...")
         val privateKeyResult = JWKKey.importJWK(privateKeyJsonString)
-        assertTrue { privateKeyResult.isSuccess }
+
+        assertTrue("Error importing private JWK: ${privateKeyResult.exceptionOrNull()?.stackTraceToString()}") { privateKeyResult.isSuccess }
+
         println("  Getting private key...")
         val privateKey = privateKeyResult.getOrThrow()
 
@@ -75,7 +79,9 @@ class ImportTestsJs {
         println("Importing public JWK...")
         val publicKeyResult = JWKKey.importJWK(publicKeyJwkString)
         println("  Checking import success...")
-        assertTrue { publicKeyResult.isSuccess }
+
+        assertTrue("Error importing public JWK: ${publicKeyResult.exceptionOrNull()?.stackTraceToString()}") { privateKeyResult.isSuccess }
+
         println("  Getting public key...")
         val publicKey = publicKeyResult.getOrThrow()
 
@@ -97,10 +103,13 @@ class ImportTestsJs {
     @Test
     fun importPem() = runTest {
         // Private
+        println("PEM: $privateKeyPem")
+
         println("Importing private PEM...")
         val privateKeyResult = JWKKey.importPEM(privateKeyPem)
         println("  Checking import success...${privateKeyResult.exceptionOrNull() ?: ""}")
-        assertTrue { privateKeyResult.isSuccess }
+
+        assertTrue("Error importing private PEM: ${privateKeyResult.exceptionOrNull()?.stackTraceToString()}") { privateKeyResult.isSuccess }
 
         println("  Getting private key...")
         val privateKey = privateKeyResult.getOrThrow()
@@ -119,7 +128,7 @@ class ImportTestsJs {
         println("Importing public PEM...")
         val publicKeyResult = JWKKey.importPEM(publicKeyPem)
         println("  Checking import success...${privateKeyResult.exceptionOrNull() ?: ""}")
-        assertTrue { publicKeyResult.isSuccess }
+        assertTrue("Error importing public PEM: ${publicKeyResult.exceptionOrNull()?.stackTraceToString()}") { privateKeyResult.isSuccess }
 
         println("  Getting public key...")
         val publicKey = publicKeyResult.getOrThrow()

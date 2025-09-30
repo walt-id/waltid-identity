@@ -69,6 +69,7 @@ kotlin {
     }
     js(IR) {
         outputModuleName = "crypto"
+        useEsModules()
         nodejs {
             generateTypeScriptDefinitions()
             testTask {
@@ -169,7 +170,7 @@ kotlin {
         val jsMain by getting {
             dependencies {
                 // JOSE
-                implementation(npm("jose", "5.2.3"))
+                implementation(npm("jose", "5.10.0"))
 
             }
         }
