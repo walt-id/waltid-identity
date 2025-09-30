@@ -9,7 +9,7 @@ standard.
 ## Features
 
 * **Parsing**: Parses binary mdoc data (from Hex or Base64Url strings) into
-  structured, easy-to-use Kotlin data classes like `Document`.
+  structured Kotlin data classes like `Document`.
 * **Verification**: Implements a multi-step verification process as specified by ISO/IEC
   18013-5:
     * **Issuer Authentication**: Verifies the `issuerAuth` COSE signature with the public key material of the issuer.

@@ -114,7 +114,7 @@ object WalletPresentFunctionality2 {
             // "...There MUST NOT be any entry in the JSON-encoded object for optional Credential Queries when there are no matching Credentials..."
             // So, if all queries were effectively optional and none matched, an empty vp_token is possible.
             // If required queries didn't match, DcqlMatcher should have failed earlier.
-            log.warn("No presentations generated for any query ID. Returning empty vp_token object.")
+            log.warn { "No presentations generated for any query ID. Returning empty vp_token object." }
         }
 
         log.trace { "Generated VP Token Map Contents: $vpTokenMapContents" }
@@ -208,10 +208,10 @@ object WalletPresentFunctionality2 {
 
             val relevantHolderPolicies = holderPoliciesToRun
                 .filter { it.direction == null || it.direction == HolderPolicy.HolderPolicyDirection.PRESENT }
-            val credentialsToEvaluate = credentials.values.flatMap {
-                it.map {
+            val credentialsToEvaluate = credentials.values.flatMap { matchResults ->
+                matchResults.map { matchResult ->
                     // TODO: handle it.selectedDisclosures
-                    (it.credential as RawDcqlCredential).originalCredential as DigitalCredential
+                    (matchResult.credential as RawDcqlCredential).originalCredential as DigitalCredential
                 }
             }
 

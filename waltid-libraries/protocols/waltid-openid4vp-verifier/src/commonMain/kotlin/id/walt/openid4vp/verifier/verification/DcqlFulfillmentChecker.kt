@@ -16,7 +16,7 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
      *                                      at least one valid presentation was received.
      * @return True if all DCQL requirements are met, false otherwise.
      */
-    suspend fun checkOverallDcqlFulfillment(
+    fun checkOverallDcqlFulfillment(
         dcqlQuery: DcqlQuery,
         successfullyValidatedQueryIds: Set<String>
     ): Boolean {

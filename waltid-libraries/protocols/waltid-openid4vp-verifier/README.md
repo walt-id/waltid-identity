@@ -82,7 +82,7 @@ you want to verify.
 
 ```kotlin
 import id.walt.dcql.models.*
-import id.walt.openid4vp.verifier.Verifier2Manager
+import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionSetup
 
 // 1. Define your credential requirements using DCQL
@@ -91,9 +91,7 @@ val dcqlQuery = DcqlQuery(
         CredentialQuery(
             id = "eu-pid", // An ID to reference this query
             format = CredentialFormat.DC_SD_JWT,
-            meta = mapOf(
-                "vct_values" to listOf("https://credentials.example.com/identity_credential")
-            ),
+            meta = MsoMdocMeta("my.doctype.here"),
             claims = listOf(
                 ClaimsQuery(path = listOf("given_name")),
                 ClaimsQuery(path = listOf("family_name")),
@@ -211,7 +209,8 @@ for ((queryId, presentations) in vpToken) {
             // Decide how to handle partial failures. For now, we'll fail the whole session.
             session.status = Verification2Session.VerificationSessionStatus.FAILED
             // sessionCache.put(session.id, session)
-            return@post call.respond(Verifier2Response.PRESENTATION_VALIDATION_FAILED)
+            Verifier2Response.Verifier2Error.PRESENTATION_VALIDATION_FAILED.throwAsError()
+            // or: return@post call.respond("...")
         }
     }
 }
@@ -236,7 +235,8 @@ if (!overallFulfillment) {
     log.warn { "DCQL fulfillment check failed for session ${session.id}." }
     session.status = Verification2Session.VerificationSessionStatus.FAILED
     // sessionCache.put(session.id, session)
-    return@post call.respond(Verifier2Response.REQUIRED_CREDENTIALS_NOT_PROVIDED)
+    Verifier2Response.Verifier2Error.REQUIRED_CREDENTIALS_NOT_PROVIDED.throwAsError()
+    // or: return@post call.respond("...")
 }
 ```
 

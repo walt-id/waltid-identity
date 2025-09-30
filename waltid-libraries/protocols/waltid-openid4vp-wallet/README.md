@@ -109,7 +109,7 @@ val holderKey: Key = // ... load holder's private key
 val holderDid: String = "did:key:z6M..." // ... holder's DID
 
 // 2. receive a presentation request URL (e.g., from a QR code)
-val presentationRequestUrl = "openid4vp://?request_uri=https://verifier.com/request/123".toUrl()
+val presentationRequestUrl = Url("openid4vp://?request_uri=https://verifier.com/request/123")
 
 // 3. Implement the credential selection logic
 // This lambda connects the module to WALLET-SPECIFIC credential storage.

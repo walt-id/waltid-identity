@@ -25,7 +25,7 @@ object SdJwtVcPresenter {
         val selectedClaimsMap = matchResult.selectedDisclosures
 
         val sdJwtCredential = digitalCredential as? SelectivelyDisclosableVerifiableCredential
-            ?: error("Mismatch: Expected SelectivelyDisclosableVerifiableCredential for DC_SD_JWT format for ${digitalCredential}")
+            ?: error("Mismatch: Expected SelectivelyDisclosableVerifiableCredential for DC_SD_JWT format for $digitalCredential")
 
         log.trace { "Selected claims: ${selectedClaimsMap?.values?.map { it.toString() + " (${it::class.simpleName})" }}" }
         val disclosuresToPresent =
