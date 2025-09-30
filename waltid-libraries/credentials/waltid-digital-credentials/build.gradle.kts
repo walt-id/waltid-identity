@@ -115,7 +115,7 @@ kotlin {
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
                 api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
                 api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
-                api(project(":waltid-libraries:credentials:waltid-mdocs2"))
+                api(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
                 api(project(":waltid-libraries:credentials:waltid-dcql"))
                 api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
                 api(project(":waltid-libraries:waltid-did"))

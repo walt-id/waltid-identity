@@ -1,4 +1,4 @@
-# waltid-mdocs2 Library
+# waltid-mdoc-credentials2 Library
 
 waltid-mdocs is a Kotlin Multiplatform library for creating, parsing, and verifying mobile
 documents (mdocs) that conform to the respective standards (e.g. ISO/IEC 18013, 23220).
