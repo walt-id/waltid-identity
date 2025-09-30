@@ -49,6 +49,6 @@ data class SdJwtCredential(
             }
             is CoseCredentialSignature -> TODO("Not implemented yet: verify SD-JWT with COSE")
             is DataIntegrityProofCredentialSignature -> TODO("Not implemented yet: verify SD-JWT with DIP")
-            null -> TODO()
+            null -> throw IllegalArgumentException("Credential contains no signature, cannot verify")
         }
 }

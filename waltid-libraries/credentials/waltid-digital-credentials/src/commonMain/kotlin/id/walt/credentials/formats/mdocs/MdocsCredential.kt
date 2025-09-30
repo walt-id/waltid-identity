@@ -43,23 +43,6 @@ data class MdocsCredential(
         private val issuerDidResolver = DidJwkResolver()
 
         suspend fun verifyMdocSignature(document: Document, issuerKey: Key) {
-            /*requireNotNull(document.deviceSigned) { "Mdoc DeviceSigned is missing in document" }
-
-            log.trace { "Mdoc validation - 2. Decode the MSO from the issuerAuth payload" }
-            val mso = document.issuerSigned.issuerAuth.decodeIsoPayload<MobileSecurityObject>()
-            log.trace { "MSO: $mso" }
-
-            log.trace { "Mdoc validation - 2.1. Verify MSO (IssuerAuth)" }
-
-            val signerCertificate = document.issuerSigned.issuerAuth.unprotected.x5chain?.first()?.rawBytes
-            requireNotNull(signerCertificate) { "Missing signer certificate" }
-            val signerPem = convertDerCertificateToPemCertificate(signerCertificate)
-            log.trace { "Signer PEM: $signerPem" }
-
-            log.trace { "Reading signer key from signer certificate..." }
-            val issuerKey = JWKKey.importFromDerCertificate(signerCertificate).getOrThrow()
-            log.trace { "Signer key to be used: $issuerKey" }*/
-
             log.trace { "Verifying issuerAuth signature with issuer key..." }
             val issuerAuthSignatureValid = document.issuerSigned.issuerAuth.verify(issuerKey.toCoseVerifier())
 

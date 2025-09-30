@@ -6,6 +6,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
+/**
+ * Representation of a Digital Credential
+ */
 @Serializable
 sealed class DigitalCredential {
     abstract val format: String
