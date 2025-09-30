@@ -221,7 +221,7 @@ object CredentialParser {
             availableDisclosures = mappedDisclosures
         }
 
-        val fullCredentialData = if (availableDisclosures?.isNotEmpty() == true) {
+        val fullCredentialData = if (availableDisclosures?.isNotEmpty() == true || header.getValue("typ").jsonPrimitive.content == "vc+sd-jwt" ) {
             SDJwt.parse(credential).fullPayload
         } else payload
 

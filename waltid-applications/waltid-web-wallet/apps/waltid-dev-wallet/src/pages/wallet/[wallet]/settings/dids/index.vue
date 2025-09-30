@@ -2,13 +2,19 @@
   <CenterMain>
     <div class="mb-5 flex items-center justify-between border-b">
       <h1 class="py-3 text-2xl font-normal">DIDs</h1>
-      <div class="flex">
+      <div class="flex gap-2">
         <button
           class="inline-flex items-center rounded-lg bg-blue-500 px-9 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
           @click="createDid"
         >
           <!-- <KeyIcon aria-hidden="true" class="mr-1 h-5 w-5 text-white" /> -->
           <span>New</span>
+        </button>
+        <button
+            class="inline-flex items-center rounded-lg bg-blue-500 px-9 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            @click="importDid"
+        >
+          <span>Import</span>
         </button>
       </div>
     </div>
@@ -47,7 +53,7 @@
 
         <div class="flex flex-none items-center gap-x-4">
           <NuxtLink
-            :to="`/wallet/${currentWallet}/settings/dids/${did.did}`"
+            :to="`/wallet/${currentWallet}/settings/dids/${encodeURIComponent(did.did)}`"
             class="hidden rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:block"
           >
             View DID
@@ -79,6 +85,10 @@ console.log(dids);
 
 function createDid() {
   navigateTo("dids/create");
+}
+
+function importDid() {
+  navigateTo("dids/import");
 }
 
 useHead({

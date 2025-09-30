@@ -262,22 +262,21 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
     }
 
     open fun processImplicitFlowAuthorization(authorizationRequest: AuthorizationRequest): TokenResponse {
-        if (!authorizationRequest.responseType.contains(ResponseType.Token) && !authorizationRequest.responseType.contains(
-                ResponseType.VpToken
-            )
-            && !authorizationRequest.responseType.contains(ResponseType.IdToken)
+        if (
+            !authorizationRequest.responseType.contains(ResponseType.Token) &&
+            !authorizationRequest.responseType.contains(ResponseType.VpToken) &&
+            !authorizationRequest.responseType.contains(ResponseType.IdToken)
+        ) throw AuthorizationError(
+            authorizationRequest = authorizationRequest,
+            errorCode = AuthorizationErrorCode.invalid_request,
+            message = "Invalid response type ${authorizationRequest.responseType}, for implicit authorization flow."
         )
-            throw AuthorizationError(
-                authorizationRequest,
-                AuthorizationErrorCode.invalid_request,
-                message = "Invalid response type ${authorizationRequest.responseType}, for implicit authorization flow."
-            )
 
         val authorizationSession = getOrInitAuthorizationSession(authorizationRequest)
 
         return generateTokenResponse(
-            authorizationSession,
-            TokenRequest.AuthorizationCode(
+            session = authorizationSession,
+            tokenRequest = TokenRequest.AuthorizationCode(
                 clientId = authorizationRequest.clientId,
                 code = "the-code",
             )
@@ -289,8 +288,9 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
         val currentTime = Clock.System.now().epochSeconds
         val expirationTime = (currentTime + 864000L) // ten days in milliseconds
         return TokenResponse.success(
-            generateToken(session.id, TokenTarget.ACCESS),
-            "bearer", state = session.authorizationRequest?.state,
+            accessToken = generateToken(session.id, TokenTarget.ACCESS),
+            tokenType = "bearer",
+            state = session.authorizationRequest?.state,
             expiresIn = expirationTime
         )
     }

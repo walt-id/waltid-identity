@@ -1,0 +1,30 @@
+{
+  "fields": {
+    "name": {
+      "sd": true
+    },
+    "credentialSubject": {
+      "sd": false,
+      "children": {
+        "fields": {
+          "achievement": {
+            "sd": false,
+            "children": {
+              "fields": {
+                "name": {
+                  "sd": true
+                }
+              },
+              "decoyMode": "NONE",
+              "decoys": 0
+            }
+          }
+        },
+        "decoyMode": "NONE",
+        "decoys": 0
+      }
+    }
+  },
+  "decoyMode": "NONE",
+  "decoys": 0
+}

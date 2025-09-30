@@ -3,7 +3,7 @@
 package id.walt.webwallet.db.models
 
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.mdoc.dataelement.toJsonElement
+import id.walt.mdoc.dataelement.json.toJsonElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.sdjwt.SDJwt

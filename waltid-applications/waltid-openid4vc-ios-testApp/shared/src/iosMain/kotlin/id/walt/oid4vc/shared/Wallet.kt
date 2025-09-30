@@ -5,7 +5,6 @@ import id.walt.crypto.IosKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.crypto.utils.JwsUtils.jwsAlg
 import id.walt.did.dids.DidService
 import id.walt.mdoc.dataelement.MapElement
 import id.walt.oid4vc.data.CredentialOffer
@@ -58,6 +57,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.js.ExperimentalJsExport
 
+import kotlin.time.Duration
+
 //const val WALLET_BASE_URL = "https://waltid-issuer.internal.dev.udisp8.di-uisp-accenture.com"
 const val WALLET_BASE_URL = "https://issuer.portal.walt.id"
 
@@ -107,7 +108,7 @@ internal class TestCredentialWallet(
 
                 val header = buildJsonObject {
                     put("typ", typ)
-                    put("alg", key.keyType.jwsAlg())
+                    put("alg", key.keyType.jwsAlg)
                 }
 
                 return runBlocking {
@@ -137,7 +138,7 @@ internal class TestCredentialWallet(
         id: String, authorizationRequest: AuthorizationRequest?, expirationTimestamp: Instant
     ) = SIOPSession(id, authorizationRequest, expirationTimestamp)
 
-    fun executePreAuthorizedCodeFlow(
+    suspend fun executePreAuthorizedCodeFlow(
         credentialOffer: CredentialOffer, client: OpenIDClientConfig, userPIN: String?
     ): List<CredentialResponse> {
         val did = didMethod.resolveDid()
@@ -164,11 +165,9 @@ internal class TestCredentialWallet(
 
                         val headerWithAlg = header?.let {
                             JsonObject(it.toMutableMap().apply {
-                                put("alg", JsonPrimitive(keyType.jwsAlg()))
+                                put("alg", JsonPrimitive(keyType.jwsAlg))
                             })
-
                         } ?: buildJsonObject { }
-
                         runBlocking {
                             signJws(plaintext = payload.toString().toByteArray(),
                                 headers = headerWithAlg.jsonObject.mapValues { it.value })
@@ -176,7 +175,6 @@ internal class TestCredentialWallet(
                     }
                 }
             }
-
             else -> TODO("signToken $target not implemented yet")
         }
     }
@@ -188,10 +186,9 @@ internal class TestCredentialWallet(
     }
 
     fun acceptOpenId4VPAuthorize(offerUri: String, kid: String) =
-        credentialWallet.executeVpTokenAuthorization(
+        executeVpTokenAuthorization(
             Url(offerUri), didMethod.resolveDid(), testCIClientConfig
         )
-
 
 //    override fun signToken(
 //        target: TokenTarget,
@@ -282,7 +279,6 @@ internal class TestCredentialWallet(
             }.firstOrNull()
         val presentationBuilder = PresentationBuilder()
 
-
         val signKey = requireNotNull(
             IosKey.load(
                 IosKey.Options(
@@ -338,7 +334,6 @@ internal class TestCredentialWallet(
         )
     }
 
-
     override fun resolveDID(did: String): String {
         val didObj = runBlocking { DidService.resolve(did) }.getOrThrow()
 
@@ -357,19 +352,20 @@ internal class TestCredentialWallet(
         return true
     }
 
-    override val metadata: OpenIDProviderMetadata
+    override val metadata: OpenIDProviderMetadata.Draft13
         get() = createDefaultProviderMetadata() as OpenIDProviderMetadata.Draft13
 
     override fun getSession(id: String) = sessionCache[id]
+
     override fun getSessionByAuthServerState(authServerState: String): SIOPSession? {
         TODO("Not yet implemented")
     }
 
-    override fun putSession(id: String, session: SIOPSession): Unit {
+    override fun putSession(id: String, session: SIOPSession, ttl: Duration?) {
         sessionCache[id] = session
     }
 
-    override fun removeSession(id: String): Unit {
+    override fun removeSession(id: String) {
         sessionCache.remove(id)
     }
 

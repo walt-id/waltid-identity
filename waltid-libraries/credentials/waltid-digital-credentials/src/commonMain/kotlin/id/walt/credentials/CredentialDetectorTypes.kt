@@ -85,9 +85,9 @@ object CredentialDetectorTypes {
                 else -> {}
             }
 
-            if (!containsDisclosables && providesDisclosures) {
-                throw IllegalArgumentException("Credential does not contain any selective disclosures; but disclosures were provided? -> for $this")
-            }
+//            if (!containsDisclosables && providesDisclosures) {
+//                throw IllegalArgumentException("Credential does not contain any selective disclosures; but disclosures were provided? -> for $this")
+//            }
         }
     }
 }

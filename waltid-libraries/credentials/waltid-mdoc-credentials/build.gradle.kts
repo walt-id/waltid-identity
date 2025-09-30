@@ -74,14 +74,15 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.bouncycastle:bcprov-lts8on:2.73.7")
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.7")
+                implementation("org.bouncycastle:bcprov-lts8on:2.73.8")
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
                 implementation("io.mockk:mockk:1.13.16")
 
                 implementation(kotlin("reflect"))
 
                 //Interoperability test support with A-SIT's implementation
-                implementation("at.asitplus.wallet:vck:5.8.0")
+                implementation("at.asitplus.wallet:vck:5.4.4")
+                implementation("at.asitplus.wallet:mobiledrivinglicence:1.2.0")
             }
         }
         val jsMain by getting {

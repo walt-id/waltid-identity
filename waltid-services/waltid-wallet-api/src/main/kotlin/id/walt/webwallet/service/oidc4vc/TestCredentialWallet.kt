@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.webwallet.service.oidc4vc
 
 import com.nimbusds.jose.jwk.ECKey
@@ -51,13 +49,12 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlin.time.Clock
-import kotlin.time.Instant
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
 import org.cose.java.AlgorithmID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.ExperimentalTime
 
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:$WALLET_PORT"
@@ -239,16 +236,29 @@ class TestCredentialWallet(
                 } else {
                     it.document
                 }
+                val sdJwtVC = SDJwtVC.parse(documentWithDisclosures)
 
-                SDJwtVC.parse(documentWithDisclosures).present(
-                    true, audience = session.authorizationRequest.clientId, nonce = session.nonce ?: "",
-                    WaltIdJWTCryptoProvider(mapOf(key.getKeyId() to key)), key.getKeyId()
+                val finalSDJwtVC = sdJwtVC.present(
+                    discloseAll = true,
+                    audience = session.authorizationRequest.clientId,
+                    nonce = session.nonce ?: "",
+                    kbCryptoProvider = WaltIdJWTCryptoProvider(
+                        keys = mapOf(key.getKeyId() to key)
+                    ),
+                    kbKeyId = key.getKeyId()
                 )
+
+                finalSDJwtVC
             }
-        }.map { it.toString(true, true) }
+        }.map {
+            it.toString(
+                formatForPresentation = true,
+                withKBJwt = true
+            )
+        }
         println("sdJwtVCsPresented: $sdJwtVCsPresented")
 
-        val mdocsPresented = runBlocking {
+        val mDocsPresented = runBlocking {
             val matchingMDocs = matchedCredentials.filter { it.format == CredentialFormat.mso_mdoc }
             if (matchingMDocs.isNotEmpty()) {
                 val mdocHandover = OpenID4VP.generateMDocOID4VPHandover(session.authorizationRequest, session.nonce!!)
@@ -286,7 +296,7 @@ class TestCredentialWallet(
                 }
             } else listOf()
         }
-        println("mdocsPresented: $mdocsPresented")
+        println("mDocsPresented: $mDocsPresented")
 
         val presentationId = (session.presentationDefinition?.id ?: "urn:uuid:${randomUUIDString().lowercase()}")
 
@@ -309,7 +319,7 @@ class TestCredentialWallet(
         } else null
 
         val deviceResponse =
-            if (mdocsPresented.isNotEmpty()) mdocsPresented.let { DeviceResponse(it).toCBORBase64URL() } else null
+            if (mDocsPresented.isNotEmpty()) mDocsPresented.let { DeviceResponse(it).toCBORBase64URL() } else null
 
         println("GENERATED VP: $signedJwtVP")
 
@@ -337,7 +347,6 @@ class TestCredentialWallet(
 
                         CredentialFormat.sd_jwt_vc -> buildDescriptorMappingSDJwtVC(
                             session.presentationDefinition,
-                            index,
                             credential.document,
                             "$",
                         )
@@ -494,7 +503,6 @@ class TestCredentialWallet(
 
     fun buildDescriptorMappingSDJwtVC(
         presentationDefinition: PresentationDefinition?,
-        index: Int,
         vcJwsStr: String,
         rootPath: String = "$",
     ) = let {

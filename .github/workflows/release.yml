@@ -9,18 +9,18 @@ on:
 
 jobs:
   version:
-    uses: walt-id/waltid-identity/.github/workflows/version.yml@266f5c09359450c39019a6da38f2b331e7122918
+    uses: walt-id/waltid-identity/.github/workflows/version.yml@5eed6553d3d796a4230c0e662d631f428c2c7717
     with:
       preferred: ${{ inputs.release_version }}
   gradle:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@3c360ff47f15ed48833e75df5fc39c6a22356912
+    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@82cfef8abfc585a741406a1275a533e9db6619ed
     secrets: inherit
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
       publish: true
   docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@927c4233610e90dd8a57418662fad7293b7b29a4
+    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@70e59bbea44de0b3511bb6bd72faa553e92f7bcf
     with:
       jsonpath: ".github/workflows/data/docker-matrix.json"
   docker:
@@ -33,7 +33,7 @@ jobs:
       tag: latest
       publish: true
   api-docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@927c4233610e90dd8a57418662fad7293b7b29a4
+    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@70e59bbea44de0b3511bb6bd72faa553e92f7bcf
     with:
       jsonpath: ".github/workflows/data/api-docker-matrix.json"
   api-docker:
@@ -45,7 +45,7 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       publish: true
   deploy:
-    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@3c360ff47f15ed48833e75df5fc39c6a22356912
+    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@15a7b93ea2349d29459f4c280dcbcabcda1e5a28
     secrets: inherit
     needs: [ version, gradle, docker, api-docker ]
     with:
@@ -54,12 +54,12 @@ jobs:
       oss: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-identity-main' || 'identity-main' }}
       enterprise: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-enterprise-main' || 'enterprise-main' }}
   tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@266f5c09359450c39019a6da38f2b331e7122918
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@70e59bbea44de0b3511bb6bd72faa553e92f7bcf
     needs: [ version, deploy ]
     with:
       version: ${{ needs.version.outputs.release_version }}
   enterprise-tag:
-    uses: walt-id/waltid-identity/.github/workflows/enterprise-tag.yml@cf46ed618f9b296fd9b63c7207ca288855bb5343
+    uses: walt-id/waltid-identity/.github/workflows/enterprise-tag.yml@70e59bbea44de0b3511bb6bd72faa553e92f7bcf
     secrets: inherit
     needs: [ version, deploy ]
     with:

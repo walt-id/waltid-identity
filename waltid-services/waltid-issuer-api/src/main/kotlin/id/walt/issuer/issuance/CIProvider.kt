@@ -20,7 +20,7 @@ import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.DataElement
-import id.walt.mdoc.dataelement.toDataElement
+import id.walt.mdoc.dataelement.json.toDataElement
 import id.walt.mdoc.doc.MDocBuilder
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
@@ -379,7 +379,7 @@ open class CIProvider(
 
         val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
 
-        val issuerKey = JWK.parse(runBlocking { resolvedIssuerKey.exportJWK() }).toECKey()
+        val issuerKey = JWK.parse(resolvedIssuerKey.exportJWK()).toECKey()
 
         val keyID = resolvedIssuerKey.getKeyId()
 
@@ -409,7 +409,7 @@ open class CIProvider(
                     addItemToSign(
                         nameSpace = namespace.key,
                         elementIdentifier = property.key,
-                        elementValue = property.value.toDataElement()
+                        elementValue = property.value.toDataElement(),
                     )
                 }
             }

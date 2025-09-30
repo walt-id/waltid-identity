@@ -1,7 +1,7 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.mdoc.dataelement.DataElement
-import id.walt.mdoc.dataelement.toJsonElement
+import id.walt.mdoc.dataelement.json.toJsonElement
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route

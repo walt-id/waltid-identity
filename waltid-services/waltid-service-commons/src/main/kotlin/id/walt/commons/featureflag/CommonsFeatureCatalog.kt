@@ -15,10 +15,11 @@ object CommonsFeatureCatalog : ServiceFeatureCatalog {
         default = true
     )
     val healthChecksFeature = OptionalFeature("healthchecks", "Enables healthcheck endpoints", default = true)
+
     val debugEndpointsFeature = OptionalFeature(
         "debug-endpoints",
         "Enables various debug endpoints",
-        default = true,
+        default = false,
         config = ServiceHealthChecksDebugModule.ServiceDebugModuleConfiguration::class
     )
     val openApiFeature = OptionalFeature("openapi", "Enables openapi endpoints", default = true)

@@ -7,8 +7,12 @@ import com.upokecenter.cbor.CBORObject
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.mdoc.dataelement.*
-import id.walt.mdoc.dataelement.toJsonElement
+import id.walt.mdoc.dataelement.DataElement
+import id.walt.mdoc.dataelement.EncodedCBORElement
+import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.MapKey
+import id.walt.mdoc.dataelement.json.toJsonElement
+import id.walt.mdoc.dataelement.json.toUIJson
 import id.walt.mdoc.dataretrieval.DeviceResponse
 import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.mdoc.mso.MSO

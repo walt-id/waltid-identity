@@ -2,6 +2,7 @@ package id.walt.mdoc.issuersigned
 
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.*
+import id.walt.mdoc.dataelement.json.toUIJson
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 
@@ -13,7 +14,7 @@ import kotlinx.serialization.json.buildJsonObject
  */
 @Serializable
 data class IssuerSigned(
-    val nameSpaces: Map<String, List<EncodedCBORElement>>?,
+    @Suppress("SERIALIZER_TYPE_INCOMPATIBLE") val nameSpaces: Map<String, List<EncodedCBORElement>>?,
     val issuerAuth: COSESign1?
 ) {
     /**

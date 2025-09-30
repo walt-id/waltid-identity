@@ -301,7 +301,7 @@ class MDoc_Test: AnnotationSpec() {
     val encKey = parsedPresReq.clientMetadata?.jwks?.get("keys")?.jsonArray?.first {
       jwk -> JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false }?.jsonObject ?: throw Exception("No ephemeral reader key found")
 
-    val formParams = oid4vpResponse.toDirecPostJWTParameters(encKey,
+    val formParams = oid4vpResponse.toDirectPostJWTParameters(encKey,
       alg = parsedPresReq.clientMetadata?.authorizationEncryptedResponseAlg ?: "ECDH-ES",
       enc = parsedPresReq.clientMetadata?.authorizationEncryptedResponseEnc ?: "A256GCM",
       mapOf(

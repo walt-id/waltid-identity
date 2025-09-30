@@ -630,7 +630,7 @@ object OidcApi : CIProvider() {
                 }
 
                 get("/callback") {
-                    // currentPrincipal contains the Access/ID/Refresh tokens from the Authorization Server
+                    // The currentPrincipal contains the Access/ID/Refresh tokens from the Authorization Server
                     val currentPrincipal: OAuthAccessTokenResponse.OAuth2? = call.principal()
 
                     // should redirect to authorization request redirect uri with the code

@@ -100,7 +100,7 @@ kotlin {
                 implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
 
                 // BouncyCastle for PEM import
-                implementation("org.bouncycastle:bcpkix-lts8on:2.73.7")
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
             }
         }
         val jvmTest by getting {

@@ -1,17 +1,27 @@
-//@file:OptIn(ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package interop
 
-//import at.asitplus.wallet.lib.iso.MobileSecurityObject // API changed
-//import at.asitplus.wallet.lib.iso.vckCborSerializer // API changed
-/*import id.walt.mdoc.dataretrieval.DeviceResponse
+import at.asitplus.signum.indispensable.cosef.io.coseCompliantSerializer
+import at.asitplus.wallet.lib.iso.IssuerSigned
+import at.asitplus.wallet.lib.iso.MobileSecurityObject
+import at.asitplus.wallet.mdl.DrivingPrivilege
+import id.walt.mdoc.dataelement.*
+import id.walt.mdoc.dataretrieval.DeviceResponse
+import id.walt.mdoc.issuersigned.IssuerSignedItem
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.decodeFromHexString
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue*/
+import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.assertDoesNotThrow
+import kotlin.io.encoding.Base64
+import kotlin.test.*
 
-/*
 class ASITTest {
 
     @Test
@@ -22,8 +32,7 @@ class ASITTest {
 
         val deviceResponse = DeviceResponse.fromCBORHex(isoSpecExampleSignedDeviceResponse)
 
-        // API changed
-        val asitDeviceResponse = vckCborSerializer.decodeFromHexString<at.asitplus.wallet.lib.iso.DeviceResponse>(
+        val asitDeviceResponse = coseCompliantSerializer.decodeFromHexString<at.asitplus.wallet.lib.iso.DeviceResponse>(
             isoSpecExampleSignedDeviceResponse
         )
 
@@ -55,19 +64,156 @@ class ASITTest {
                 waltMDoc.issuerSigned.nameSpaces!!.keys.containsAll(asitMDoc.issuerSigned.namespaces!!.keys)
             }
 
-            // API changed:
-            assertTrue {
-                waltMDoc.deviceSigned!!.toMapElement().toCBOR().contentEquals(asitMDoc.deviceSigned.serialize())
+            val waltMdlNamespace = assertNotNull(waltMDoc.issuerSigned.nameSpaces).run {
+                assertNotNull(this[MDL_NAMESPACE_ID])
             }
 
-
-            // API changed:
-            assertTrue {
-                waltMDoc.issuerSigned.issuerAuth!!.toCBOR().contentEquals(asitMDoc.issuerSigned.issuerAuth.serialize(
-                    MobileSecurityObject.serializer()
-                ))
+            val waltMdlNamespaceIssuerSignedItemMap = waltMdlNamespace.map { waltMdlNamespaceEncodedEntry ->
+                IssuerSignedItem.fromMapElement(waltMdlNamespaceEncodedEntry.decodeDataElement<MapElement>())
+            }.associateBy { issuerSignedItem ->
+                issuerSignedItem.elementIdentifier.value
             }
 
+            val asitMdlNamespace = assertNotNull(asitMDoc.issuerSigned.namespaces).run {
+                assertNotNull(this[MDL_NAMESPACE_ID])
+            }
+
+            val asitMdlNamespaceIssuerSignedItemMap = asitMdlNamespace.entries.map { asitMdlNamespaceEncodedEntry ->
+                asitMdlNamespaceEncodedEntry
+            }.associateBy { issuerSignedItem ->
+                issuerSignedItem.value.elementIdentifier
+            }
+
+            val expectedElementIdentifiers = setOf(
+                "family_name",
+                "issue_date",
+                "expiry_date",
+                "document_number",
+                "portrait",
+                "driving_privileges",
+            )
+
+            assertEquals(
+                expected = expectedElementIdentifiers,
+                actual = waltMdlNamespaceIssuerSignedItemMap.keys
+            )
+
+
+            assertEquals(
+                expected = waltMdlNamespaceIssuerSignedItemMap.keys,
+                actual = asitMdlNamespaceIssuerSignedItemMap.keys,
+            )
+
+            //check that all serialized issuer signed items have the same byte array contents
+            expectedElementIdentifiers.forEach { expectedElementId ->
+                assertContentEquals(
+                    expected = asitMdlNamespaceIssuerSignedItemMap[expectedElementId]!!.serialized,
+                    actual = waltMdlNamespaceIssuerSignedItemMap[expectedElementId]!!.toMapElement().toCBOR(),
+                )
+            }
+
+            assertEquals(
+                expected = (waltMdlNamespaceIssuerSignedItemMap["family_name"]!!.elementValue as StringElement).value,
+                actual = (asitMdlNamespaceIssuerSignedItemMap["family_name"]!!.value.elementValue as String)
+            )
+
+            val asitIssueDate = assertDoesNotThrow {
+                (asitMdlNamespaceIssuerSignedItemMap["issue_date"]!!.value.elementValue as LocalDate).run {
+                    assertEquals(
+                        expected = "2019-10-20",
+                        actual = this.toString(),
+                    )
+                    this
+                }
+            }
+
+            val waltIssueDate = waltMdlNamespaceIssuerSignedItemMap["issue_date"]?.let {
+                (it.elementValue as FullDateElement).value
+            }
+
+            assertEquals(
+                expected = asitIssueDate,
+                actual = waltIssueDate,
+            )
+
+            val asitExpiryDate = assertDoesNotThrow {
+                (asitMdlNamespaceIssuerSignedItemMap["expiry_date"]!!.value.elementValue as LocalDate).run {
+                    assertEquals(
+                        expected = "2024-10-20",
+                        actual = this.toString(),
+                    )
+                    this
+                }
+            }
+
+            val waltExpiryDate = waltMdlNamespaceIssuerSignedItemMap["expiry_date"]?.let {
+                (it.elementValue as FullDateElement).value
+            }
+
+            assertEquals(
+                expected = asitExpiryDate,
+                actual = waltExpiryDate,
+            )
+
+            assertEquals(
+                expected = (waltMdlNamespaceIssuerSignedItemMap["document_number"]!!.elementValue as StringElement).value,
+                actual = (asitMdlNamespaceIssuerSignedItemMap["document_number"]!!.value.elementValue as String)
+            )
+
+            assertContentEquals(
+                expected = (waltMdlNamespaceIssuerSignedItemMap["portrait"]!!.elementValue as ByteStringElement).value,
+                actual = asitMdlNamespaceIssuerSignedItemMap["portrait"]!!.value.elementValue as ByteArray
+            )
+
+            val asitDrivingPrivilegeList = assertDoesNotThrow {
+                asitMdlNamespaceIssuerSignedItemMap["driving_privileges"]!!.value.elementValue as Array<*>
+            }.run {
+                assertIs<Array<DrivingPrivilege>>(this)
+            }.toList()
+
+            val waltDrivingPrivilegeList = assertDoesNotThrow {
+                waltMdlNamespaceIssuerSignedItemMap["driving_privileges"]!!.elementValue as ListElement
+            }.value.map {
+                it as MapElement
+            }
+
+            assertEquals(
+                expected = asitDrivingPrivilegeList.size,
+                actual = waltDrivingPrivilegeList.size,
+            )
+
+            asitDrivingPrivilegeList.zip(waltDrivingPrivilegeList) { asitDrivingPrivilege, waltDrivingPrivilege ->
+
+                assertEquals(
+                    expected = asitDrivingPrivilege.vehicleCategoryCode,
+                    actual = (waltDrivingPrivilege.value[MapKey("vehicle_category_code")] as StringElement).value,
+                )
+
+                assertEquals(
+                    expected = asitDrivingPrivilege.issueDate,
+                    actual = (waltDrivingPrivilege.value[MapKey("issue_date")] as FullDateElement).value,
+                )
+
+                assertEquals(
+                    expected = asitDrivingPrivilege.expiryDate,
+                    actual = (waltDrivingPrivilege.value[MapKey("expiry_date")] as FullDateElement).value,
+                )
+            }
+
+            //done with issuer signed namespace contents
+
+            assertTrue {
+                waltMDoc.deviceSigned!!.toMapElement().toCBOR()
+                    .contentEquals(coseCompliantSerializer.encodeToByteArray(asitMDoc.deviceSigned))
+            }
+
+            assertTrue {
+                waltMDoc.issuerSigned.issuerAuth!!.toCBOR().contentEquals(
+                    asitMDoc.issuerSigned.issuerAuth.serialize(
+                        MobileSecurityObject.serializer()
+                    )
+                )
+            }
 
             val mso = waltMDoc.MSO!!
 
@@ -89,7 +235,123 @@ class ASITTest {
             )
 
         }
+    }
+
+    @Test
+    fun testWaltIdGeneratedIssuerSigned() {
+
+        val waltIdIssuerSignedBase64Url =
+            "ompuYW1lU3BhY2VzoXFvcmcuaXNvLjE4MDEzLjUuMYvYGFhSpGhkaWdlc3RJRABmcmFuZG9tUNSPxfJM5NP_qY1vTZYAp6NxZWxlbWVudElkZW50aWZpZXJrZmFtaWx5X25hbWVsZWxlbWVudFZhbHVlY0RvZdgYWFKkaGRpZ2VzdElEAWZyYW5kb21QMCqA9Utiwo7ih10IM_8k9nFlbGVtZW50SWRlbnRpZmllcmpnaXZlbl9uYW1lbGVsZW1lbnRWYWx1ZWRKb2hu2BhYW6RoZGlnZXN0SUQCZnJhbmRvbVASJnpHaI7WheaRvKm_HZ9jcWVsZW1lbnRJZGVudGlmaWVyamJpcnRoX2RhdGVsZWxlbWVudFZhbHVl2QPsajE5ODYtMDMtMjLYGFhbpGhkaWdlc3RJRANmcmFuZG9tUG5gTOxIdzwhjxoH6w23y_JxZWxlbWVudElkZW50aWZpZXJqaXNzdWVfZGF0ZWxlbGVtZW50VmFsdWXZA-xqMjAxOS0xMC0yMNgYWFykaGRpZ2VzdElEBGZyYW5kb21QpX-4BVI1LMvXTYlihGgjdHFlbGVtZW50SWRlbnRpZmllcmtleHBpcnlfZGF0ZWxlbGVtZW50VmFsdWXZA-xqMjAyNC0xMC0yMNgYWFWkaGRpZ2VzdElEBWZyYW5kb21Q1bG1e_F-iBc60MXMdaLWN3FlbGVtZW50SWRlbnRpZmllcm9pc3N1aW5nX2NvdW50cnlsZWxlbWVudFZhbHVlYkFU2BhYW6RoZGlnZXN0SUQGZnJhbmRvbVD9g0Ky4OKbbULWZHSHaKwRcWVsZW1lbnRJZGVudGlmaWVycWlzc3VpbmdfYXV0aG9yaXR5bGVsZW1lbnRWYWx1ZWZBVCBETVbYGFhcpGhkaWdlc3RJRAdmcmFuZG9tUA_vix4PGecnkA8a7ItC7stxZWxlbWVudElkZW50aWZpZXJvZG9jdW1lbnRfbnVtYmVybGVsZW1lbnRWYWx1ZWkxMjM0NTY3ODnYGFkEYKRoZGlnZXN0SUQIZnJhbmRvbVCu1IwIzCp2SlOJg1N9lqjjcWVsZW1lbnRJZGVudGlmaWVyaHBvcnRyYWl0bGVsZW1lbnRWYWx1ZVkEEv_Y_-AAEEpGSUYAAQEBAJAAkAAA_9sAQwATDQ4RDgwTEQ8RFRQTFx0wHx0aGh06KiwjMEU9SUdEPUNBTFZtXUxRaFJBQ1-CYGhxdXt8e0pchpCFd49teHt2_9sAQwEUFRUdGR04Hx84dk9DT3Z2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2_8AAEQgAGABkAwEiAAIRAQMRAf_EABsAAAMBAAMBAAAAAAAAAAAAAAAFBgQBAgMH_8QAMhAAAQMDAwIFAgMJAAAAAAAAAQIDBAAFEQYSIRMxFBVRYXEiQQeBoRY1QlJzkbLB8f_EABUBAQEAAAAAAAAAAAAAAAAAAAAB_8QAGhEBAQEAAwEAAAAAAAAAAAAAAAFBESExYf_aAAwDAQACEQMRAD8ApbveItojKcfWkrx9DQP1LPsP9156fvPncJcjodDa4Ubd-7PAOc4HrSvUen4y27jdHVLW70soT2SkgAZ9-1H4f_uV_wDrn_FNIV3mavCJzkS3296ctokKKDjt3xgHj3rdYtQR7025sQpl1rlaFHOB6g1JW5Mydf5runXBFBBKi6QQQT6YPf8AT1r100tLTN5jLQvx_RWSvdkcZBHzk0wvpq9rVJddEG3PSmWuVuhWAB68A8fOKd2e7x7xD8RH3J2natKu6TU3obp-T3Ddjv8AV8bf-14aGYVKg3WOVFKHUJRuxnBIUM0De86wi219LMdtMxf8e1zAT7ZwcmnFxuDFtgrlSSQhI7Dkk_YCoHVVnjWZcNmNuJUlRWtRyVHIr6E-qOmOPFloNng9XGP1phqZ_bcpCHXbS-iKs4S7u7_HGD_eqmM-iVHbfaOW3EhST7GovWEaWqKiQy8wq0IKem0yQMcYzwMfqe9MmtVQIFqgKVHfSh1shCGwFbdp24ySKYN-or6LGw050OupxRSE79uMDv2NJY2vPESWmfLtvUWE56-cZOP5a5vrKNSsQJMeZHjI52okqCVElQHYZ9Kx3N666ZucdSrk7Nbd5KF5wcHkYJOPkUnvZV5RXAORmiics9yiePt78Xf0-qgp3Yzj8qyafs3kkJcfr9fc4V7tm3HAGMZPpRRRSyTo5PjFybdcHoJXncEjPf7Agjj2rdYtORrMHFJWp55wbVLUMcegFFFAuf0UnrOmDcXojLvC2gkkEenccfOad2a0R7NE6EfcrJ3LWruo0UUGHUOm_PHmXPFdDpAjHT3Zz-YplcbcxcoSoskEoV9x3SfUUUU-CdGiFFCWHLs-qKlWQzt4HxzjPf7VTw4rUKK3HYTtbbGAKKKBdfdPxr2hBcUpp5HCXE88ehH3FYYmj0pmtybjPenqbxtSsYHHYHJOR7UUUgpaKKKD_9nYGFjupGhkaWdlc3RJRAlmcmFuZG9tUA9pPjTau2jTwZl7J225julxZWxlbWVudElkZW50aWZpZXJyZHJpdmluZ19wcml2aWxlZ2VzbGVsZW1lbnRWYWx1ZYKjdXZlaGljbGVfY2F0ZWdvcnlfY29kZWFBamlzc3VlX2RhdGXZA-xqMjAxOC0wOC0wOWtleHBpcnlfZGF0ZdkD7GoyMDI0LTEwLTIwo3V2ZWhpY2xlX2NhdGVnb3J5X2NvZGVhQmppc3N1ZV9kYXRl2QPsajIwMTctMDItMjNrZXhwaXJ5X2RhdGXZA-xqMjAyNC0xMC0yMNgYWFykaGRpZ2VzdElECmZyYW5kb21Qpq1JLa96_7Bswf38gTD7n3FlbGVtZW50SWRlbnRpZmllcnZ1bl9kaXN0aW5ndWlzaGluZ19zaWdubGVsZW1lbnRWYWx1ZWJBVGppc3N1ZXJBdXRohEOhASahGCFZAgwwggIIMIIBraADAgECAhQOjySvX3i3qy223oovdhycy1xphjAKBggqhkjOPQQDAjAkMQswCQYDVQQGEwJVUzEVMBMGA1UEAwwMRXhhbXBsZSBJQUNBMB4XDTI1MDUyOTA3MTgzOVoXDTI2MDgyOTA3MTgzOVowIjELMAkGA1UEBhMCVVMxEzARBgNVBAMMCkV4YW1wbGUgRFMwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQZYql0veM-g8nnAqBID6PFLaOCn5lQMTqwhBt4Hzq8XRd8QMB_ev8VXIle5hULJVP3kUID_uaUmYjX_G4zKBn6o4G-MIG7MB8GA1UdIwQYMBaAFIwjEbH6JU3iuQ7OjKjlo-TcdNQUMB0GA1UdDgQWBBTtLj0tJ6D97Sid9PjgVVsv-tIqezAOBgNVHQ8BAf8EBAMCB4AwIwYDVR0SBBwwGoYYaHR0cHM6Ly9pYWNhLmV4YW1wbGUuY29tMBUGA1UdJQEB_wQLMAkGByiBjF0FAQIwLQYDVR0fBCYwJDAioCCgHoYcaHR0cHM6Ly9pYWNhLmV4YW1wbGUuY29tL2NybDAKBggqhkjOPQQDAgNJADBGAiEAy5KrvkE8FdcFYa0gx3nt-FGqkp_djOXeV0N2hCwrbEQCIQD92ZYswuIk9XdTOZBLkxQe2frXXPRWUv-TdgB1pUnnV1kC29gYWQLWpmd2ZXJzaW9uYzEuMG9kaWdlc3RBbGdvcml0aG1nU0hBLTI1Nmx2YWx1ZURpZ2VzdHOhcW9yZy5pc28uMTgwMTMuNS4xqwBYIHNVC6DPAq0mroo2WRpzXtDfN5vW3QXIQTvR3SjhfeDqAVggdKUFkM0VCZ7SkY3bLaw3G2cGNdD1rPGoK8FCXl2b8DoCWCCdz6pzn6BUMsu5yxbrG32P7OORp2rvdtRV6IBYSqOOnANYIInPiBX5NuwhKgTDkp17k8zvYzKA08AdhWOebvTLh0IfBFgg05q7rsPiq3k6HV9Wc6Q6sUQ0-_nE9_mbeLvwp0rzzKUFWCDlyPC7lWH2fEVZmsViJHVjq-Q_LQA2rOmetCUZCcxLOQZYIMEfa5Lgyu19AlNcLzt-tXNqZ6UAjvtv-kIusfl0mCIuB1ggImkauCi-JHHO7JAYoA-_tkd0k1qImBg6fTXmo5Zmt8sIWCC_Su75k89yMCqb6AeoMJXSmJbPX5NpPeidOkFcvNLYAAlYIDhCQ42G0AwL6-DKrqQGt0UmRmUoRQlJi3sr-BH5egPUClggnnddhrZlVyEgwqXPJx1SYYj-4c43FFUK5h4Uh3C4aPltZGV2aWNlS2V5SW5mb6FpZGV2aWNlS2V5pAECIAEhWCCmvCVFxH5inATuotKI8ILoMZLu_F6DTkaGT2ReoU2XfCJYIHEghj2QuqD8U5dUdj_XAicEWxqq1AbAjjxgXTpBQCAbZ2RvY1R5cGV1b3JnLmlzby4xODAxMy41LjEubURMbHZhbGlkaXR5SW5mb6Nmc2lnbmVkwHgeMjAyNS0wOS0yNlQwOTo1MzowNi4wMjE4NDg2MDFaaXZhbGlkRnJvbcB4HjIwMjUtMDktMjZUMDk6NTM6MDYuMDIxODQ5MDY3Wmp2YWxpZFVudGlswHgeMjAyNi0wOS0yNlQwOTo1MzowNi4wMjE4NTEyMTdaWEDA9_-9cApvU_wIlTnPXFzfy_ybJTR0anluG0AFaSucXqkbMAFtsBkxe1MRvDQ2sAnX6vIE8UWVrc1ubcow0VhC"
+
+        val expectedMdlNamespaceData = Json.decodeFromString<JsonObject>(
+            """
+            {
+      "family_name": "Doe",
+      "given_name": "John",
+      "birth_date": "1986-03-22",
+      "issue_date": "2019-10-20",
+      "expiry_date": "2024-10-20",
+      "issuing_country": "AT",
+      "issuing_authority": "AT DMV",
+      "document_number": "123456789",
+      "portrait": "/9j/4AAQSkZJRgABAQEAkACQAAD/2wBDABMNDhEODBMRDxEVFBMXHTAfHRoaHToqLCMwRT1JR0Q9Q0FMVm1dTFFoUkFDX4JgaHF1e3x7SlyGkIV3j214e3b/2wBDARQVFR0ZHTgfHzh2T0NPdnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnb/wAARCAAYAGQDASIAAhEBAxEB/8QAGwAAAwEAAwEAAAAAAAAAAAAAAAUGBAECAwf/xAAyEAABAwMDAgUCAwkAAAAAAAABAgMEAAURBhIhEzEUFVFhcSJBB4GhFjVCUnORssHx/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAH/xAAaEQEBAQADAQAAAAAAAAAAAAAAAUERITFh/9oADAMBAAIRAxEAPwClu94i2iMpx9aSvH0NA/Us+w/3Xnp+8+dwlyOh0NrhRt37s8A5zgetK9R6fjLbuN0dUtbvSyhPZKSABn37Ufh/+5X/AOuf8U0hXeZq8InORLfb3py2iQooOO3fGAePet1i1BHvTbmxCmXWuVoUc4HqDUlbkzJ1/mu6dcEUEEqLpBBBPpg9/wBPWvXTS0tM3mMtC/H9FZK92RxkEfOTTC+mr2tUl10Qbc9KZa5W6FYAHrwDx84p3Z7vHvEPxEfcnadq0q7pNTehun5PcN2O/wBXxt/7XhoZhUqDdY5UUodQlG7GcEhQzQN7zrCLbX0sx20zF/x7XMBPtnByacXG4MW2CuVJJCEjsOST9gKgdVWeNZlw2Y24lSVFa1HJUcivoT6o6Y48WWg2eD1cY/WmGpn9tykIddtL6IqzhLu7v8cYP96qYz6JUdt9o5bcSFJPsai9YRpaoqJDLzCrQgp6bTJAxxjPAx+p70ya1VAgWqApUd9KHWyEIbAVt2nbjJIpg36ivosbDTnQ66nFFITv24wO/Y0lja88RJaZ8u29RYTnr5xk4/lrm+so1KxAkx5keMjnaiSoJUSVAdhn0rHc3rrpm5x1KuTs1t3koXnBweRgk4+RSe9lXlFcA5GaKJyz3KJ4+3vxd/T6qCndjOPyrJp+zeSQlx+v19zhXu2bccAYxk+lFFFLJOjk+MXJt1wegledwSM9/sCCOPat1i05GswcUlannnBtUtQxx6AUUUC5/RSes6YNxeiMu8LaCSQR6dxx85p3ZrRHs0ToR9ysnctau6jRRQYdQ6b88eZc8V0OkCMdPdnP5imVxtzFyhKiyQShX3HdJ9RRRT4J0aIUUJYcuz6oqVZDO3gfHOM9/tVPDitQorcdhO1tsYAoooF190/GvaEFxSmnkcJcTzx6EfcVhiaPSma3JuM96epvG1Kxgcdgck5HtRRSClooooP/2Q==",
+      "driving_privileges": [
+        {
+          "vehicle_category_code": "A",
+          "issue_date": "2018-08-09",
+          "expiry_date": "2024-10-20"
+        },
+        {
+          "vehicle_category_code": "B",
+          "issue_date": "2017-02-23",
+          "expiry_date": "2024-10-20"
+        }
+      ],
+      "un_distinguishing_sign": "AT"
+    }
+        """.trimIndent()
+        )
+
+        val asitIssuerSigned =
+            coseCompliantSerializer.decodeFromByteArray<IssuerSigned>(Base64.UrlSafe.decode(waltIdIssuerSignedBase64Url))
+
+        val asitNamespaces = assertNotNull(asitIssuerSigned.namespaces)
+
+        val asitMdlNamespace = assertNotNull(asitNamespaces[MDL_NAMESPACE_ID])
+
+        val asitMdlNamespaceElementMap = asitMdlNamespace.entries.map { encodedItem ->
+            encodedItem
+        }.associateBy {
+            it.value.elementIdentifier
+        }
+
+        assertEquals(
+            expected = expectedMdlNamespaceData.keys,
+            actual = asitMdlNamespaceElementMap.keys,
+        )
+
+        assertEquals(
+            expected = expectedMdlNamespaceData["family_name"]!!.jsonPrimitive.content,
+            actual = asitMdlNamespaceElementMap["family_name"]!!.value.elementValue as String,
+        )
+
+        assertEquals(
+            expected = expectedMdlNamespaceData["given_name"]!!.jsonPrimitive.content,
+            actual = asitMdlNamespaceElementMap["given_name"]!!.value.elementValue as String,
+        )
+
+        assertEquals(
+            expected = LocalDate.parse(expectedMdlNamespaceData["birth_date"]!!.jsonPrimitive.content),
+            actual = asitMdlNamespaceElementMap["birth_date"]!!.value.elementValue as LocalDate,
+        )
+
+        assertEquals(
+            expected = LocalDate.parse(expectedMdlNamespaceData["issue_date"]!!.jsonPrimitive.content),
+            actual = asitMdlNamespaceElementMap["issue_date"]!!.value.elementValue as LocalDate,
+        )
+
+        assertEquals(
+            expected = LocalDate.parse(expectedMdlNamespaceData["expiry_date"]!!.jsonPrimitive.content),
+            actual = asitMdlNamespaceElementMap["expiry_date"]!!.value.elementValue as LocalDate,
+        )
+
+        assertEquals(
+            expected = expectedMdlNamespaceData["issuing_country"]!!.jsonPrimitive.content,
+            actual = asitMdlNamespaceElementMap["issuing_country"]!!.value.elementValue as String,
+        )
+
+        assertEquals(
+            expected = expectedMdlNamespaceData["issuing_authority"]!!.jsonPrimitive.content,
+            actual = asitMdlNamespaceElementMap["issuing_authority"]!!.value.elementValue as String,
+        )
+
+        assertEquals(
+            expected = expectedMdlNamespaceData["document_number"]!!.jsonPrimitive.content,
+            actual = asitMdlNamespaceElementMap["document_number"]!!.value.elementValue as String,
+        )
+
+        assertEquals(
+            expected = expectedMdlNamespaceData["un_distinguishing_sign"]!!.jsonPrimitive.content,
+            actual = asitMdlNamespaceElementMap["un_distinguishing_sign"]!!.value.elementValue as String,
+        )
+
+        assertEquals(
+            expected = expectedMdlNamespaceData["portrait"]!!.jsonPrimitive.content,
+            actual = Base64.encode(asitMdlNamespaceElementMap["portrait"]!!.value.elementValue as ByteArray),
+        )
+
+
+    }
+
+    companion object {
+
+        private const val MDL_NAMESPACE_ID = "org.iso.18013.5.1"
+
+        @JvmStatic
+        @BeforeAll
+        fun initializeVck() {
+            at.asitplus.wallet.mdl.Initializer.initWithVCK()
+        }
 
     }
 }
-*/

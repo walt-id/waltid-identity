@@ -3,10 +3,10 @@
 package id.walt.entrawallet.core.utils
 
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.mdoc.dataelement.toJsonElement
+import id.walt.entrawallet.core.manifest.provider.ManifestProvider
+import id.walt.mdoc.dataelement.json.toJsonElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.oid4vc.data.CredentialFormat
-import id.walt.entrawallet.core.manifest.provider.ManifestProvider
 import id.walt.webwallet.utils.JsonUtils
 import kotlin.time.Instant
 import kotlinx.serialization.SerialName
