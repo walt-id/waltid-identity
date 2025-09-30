@@ -30,6 +30,8 @@ object Verifier2Service {
 
     private val log = logger("Verifier2Service")
 
+    private const val VERIFICATION_SESSION = "verification-session"
+
     private val config = ConfigManager.getConfig<OSSVerifier2ServiceConfig>()
 
     val sessions = HashMap<String, Verification2Session>()
@@ -76,7 +78,7 @@ object Verifier2Service {
     }
 
     fun Route.registerRoute() {
-        route("verification-session") {
+        route(VERIFICATION_SESSION) {
             route("", {
                 tags("Verification Session Management")
             }) {
@@ -113,16 +115,16 @@ object Verifier2Service {
                     call.respond(creationResponse)
                 }
 
-                route("{verification-session}") {
+                route("{$VERIFICATION_SESSION}") {
 
                     get("info", {
                             summary = "View data of existing verification session"
-                            request { pathParameter<String>("verification-session") }
+                            request { pathParameter<String>(VERIFICATION_SESSION) }
                             response { HttpStatusCode.OK to { body<Verification2Session>() } }
                         }
                     ) {
                         val verifierSession =
-                            sessions[call.parameters.getOrFail("verification-session")]
+                            sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
                                 ?: throw IllegalArgumentException("Unknown session id")
                         call.respond(verifierSession)
                     }
@@ -130,7 +132,7 @@ object Verifier2Service {
                     route({
                         summary = "Receive update events via SSE about the verification session"
                     }) {
-                        sse("verification-session/events", serialize = { typeInfo, it ->
+                        sse("$VERIFICATION_SESSION/events", serialize = { typeInfo, it ->
                             val serializer = Json.serializersModule.serializer(typeInfo.kotlinType!!)
                             Json.encodeToString(serializer, it)
                         }) {
@@ -138,7 +140,7 @@ object Verifier2Service {
                                 sessions[call.parameters.getOrFail("sessionId")] ?: throw IllegalArgumentException("Unknown session id")
 
                             // Get the flow for this specific target.
-                            val sseFlow = SseNotifier.getSseFlow(verifierSession.id.toString())
+                            val sseFlow = SseNotifier.getSseFlow(verifierSession.id)
 
                             // This will suspend until the client disconnects.
                             send(JsonObject(emptyMap()))
@@ -147,18 +149,18 @@ object Verifier2Service {
                     }
                 }
             }
-            route("{verification-session}", {
+            route("{$VERIFICATION_SESSION}", {
                 tags("Client endpoints")
             }) {
                 get(
                     "request",
                     {
                         summary = "Wallets lookup the AuthorizationRequest here"
-                        request { pathParameter<String>("verification-session") }
+                        request { pathParameter<String>(VERIFICATION_SESSION) }
                         response { HttpStatusCode.OK to { body<AuthorizationRequest>() } }
                     }) {
                     val verificationSession =
-                        sessions[call.parameters.getOrFail("verification-session")] ?: throw IllegalArgumentException("Unknown session id")
+                        sessions[call.parameters.getOrFail(VERIFICATION_SESSION)] ?: throw IllegalArgumentException("Unknown session id")
 
                     // TODO: JAR
 
@@ -173,11 +175,11 @@ object Verifier2Service {
                         {
                             summary = "Wallets respond to an AuthorizationRequest here"
                             request {
-                                pathParameter<String>("verification-session")
+                                pathParameter<String>(VERIFICATION_SESSION)
                                 body<String> { description = "" /* TODO */ }
                             }
                         }) { body ->
-                        val sessionId = call.parameters.getOrFail("verification-session")
+                        val sessionId = call.parameters.getOrFail(VERIFICATION_SESSION)
                         log.trace { "Received verification session response to session: $sessionId" }
                         val verificationSession = sessions[sessionId]
 
