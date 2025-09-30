@@ -1,7 +1,10 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.mdoc.dataelement
 
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
+import kotlin.time.ExperimentalTime
 
 /**
  * Convert to CBOR data element

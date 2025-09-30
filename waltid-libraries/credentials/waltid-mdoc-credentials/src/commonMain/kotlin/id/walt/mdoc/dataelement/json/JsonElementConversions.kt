@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.mdoc.dataelement.json
 
 import id.walt.mdoc.dataelement.AnyDataElement
@@ -29,6 +31,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.longOrNull
 import kotlin.collections.component1
 import kotlin.collections.component2
+import kotlin.time.ExperimentalTime
 
 fun JsonElement.toDataElement(): AnyDataElement = when (this) {
     is JsonObject -> this.mapValues { it.value.toDataElement() }.toDataElement()

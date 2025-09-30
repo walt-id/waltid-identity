@@ -81,7 +81,7 @@ kotlin {
                 implementation(kotlin("reflect"))
 
                 //Interoperability test support with A-SIT's implementation
-                implementation("at.asitplus.wallet:vck:5.4.4")
+                implementation("at.asitplus.wallet:vck:5.8.0")
                 implementation("at.asitplus.wallet:mobiledrivinglicence:1.2.0")
             }
         }

@@ -1,10 +1,11 @@
+@file:OptIn(ExperimentalTime::class)
+
 import WaltidServicesIntegrationTests.Companion.testHttpClient
 import id.walt.commons.testing.E2ETest
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.issuer.services.onboarding.models.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -23,6 +24,8 @@ import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 import id.walt.test.integration.expectSuccess
 import id.walt.test.integration.expectFailure
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 
 //TODO: needs to be ported to JUnit test
