@@ -1,7 +1,5 @@
 package id.walt.verifier.openid
 
-import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-
 /*data class VerificationSession(
     val id: String,
     val authorizationRequest: AuthorizationRequest,

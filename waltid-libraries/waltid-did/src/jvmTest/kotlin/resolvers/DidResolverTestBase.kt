@@ -13,7 +13,9 @@ import kotlinx.serialization.json.*
 import resolvers.DidResolverTestBase.Companion.didDocAssertions
 import resolvers.DidResolverTestBase.Companion.ed25519DidAssertions
 import resolvers.DidResolverTestBase.Companion.ed25519KeyAssertions
+import resolvers.DidResolverTestBase.Companion.ed25519KeysSetAssertions
 import resolvers.DidResolverTestBase.Companion.keyAssertions
+import resolvers.DidResolverTestBase.Companion.keysSetAssertions
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 

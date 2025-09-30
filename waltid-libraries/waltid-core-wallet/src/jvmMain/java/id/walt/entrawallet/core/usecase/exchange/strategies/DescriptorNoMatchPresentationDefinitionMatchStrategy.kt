@@ -1,8 +1,8 @@
 package id.walt.webwallet.usecase.exchange.strategies
 
+import id.walt.entrawallet.core.utils.WalletCredential
 import id.walt.oid4vc.data.dif.InputDescriptor
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.entrawallet.core.utils.WalletCredential
 import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.usecase.exchange.TypeFilter
 import id.walt.webwallet.utils.JsonUtils

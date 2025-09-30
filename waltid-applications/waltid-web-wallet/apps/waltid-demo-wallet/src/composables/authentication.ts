@@ -1,5 +1,5 @@
-import { useUserStore } from "@waltid-web-wallet/stores/user.ts";
-import { storeToRefs } from "pinia";
+import {useUserStore} from "@waltid-web-wallet/stores/user.ts";
+import {storeToRefs} from "pinia";
 
 export async function logout() {
 

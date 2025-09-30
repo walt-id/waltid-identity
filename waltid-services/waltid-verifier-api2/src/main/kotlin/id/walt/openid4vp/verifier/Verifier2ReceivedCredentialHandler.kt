@@ -2,15 +2,14 @@ package id.walt.openid4vp.verifier
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.dcql.models.CredentialFormat
-import id.walt.policies2.PolicyResult
-import id.walt.policies2.PolicyResults
 import id.walt.openid4vp.verifier.Verification2Session.VerificationSessionStatus
-import id.walt.openid4vp.verifier.Verifier2Response.*
+import id.walt.openid4vp.verifier.Verifier2Response.Verifier2Error
 import id.walt.openid4vp.verifier.verification.DcqlFulfillmentChecker
 import id.walt.openid4vp.verifier.verification.Verifier2PresentationValidator
+import id.walt.policies2.PolicyResult
+import id.walt.policies2.PolicyResults
 import io.klogging.logger
 import kotlinx.serialization.json.Json
-import kotlin.collections.iterator
 
 /**
  * Here the receiving of credentials through the Verifiers endpoints
@@ -241,7 +240,7 @@ object Verifier2ReceivedCredentialHandler {
                     // break // Decide if one failed presentation invalidates the whole vp_token
                 }
             } // End loop over presentationJsonElements for a queryId
-            if (!allPresentationsValid && /* strict mode */ true) break // If one queryId fails, stop processing others
+            if (!allPresentationsValid) break // If one queryId fails, stop processing others
         } // End loop over vpTokenContents
 
         session.updateSession(SessionEvent.attempted_presentation) {
@@ -329,10 +328,10 @@ object Verifier2ReceivedCredentialHandler {
 
         val willRedirect = session.redirects != null
 
-        if (willRedirect) {
-            return mapOf("redirect_uri" to session.redirects!!.successRedirectUri)
+        return if (willRedirect) {
+            mapOf("redirect_uri" to session.redirects!!.successRedirectUri)
         } else {
-            return mapOf(
+            mapOf(
                 "status" to "received",
                 "message" to "Presentation received and is being processed."
             )

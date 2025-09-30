@@ -10,9 +10,9 @@ import id.walt.oid4vc.util.JwtUtils
 import id.walt.sdjwt.JWTCryptoProvider
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import kotlin.time.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.ExperimentalTime

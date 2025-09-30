@@ -1,9 +1,9 @@
 package id.walt.mdoc.objects
 
 import id.walt.mdoc.objects.dcapi.DCAPIHandover
-import id.walt.mdoc.objects.handover.isooid4vp.IsoOID4VPHandover
 import id.walt.mdoc.objects.handover.NFCHandover
 import id.walt.mdoc.objects.handover.OpenID4VPHandover
+import id.walt.mdoc.objects.handover.isooid4vp.IsoOID4VPHandover
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString

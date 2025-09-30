@@ -2,16 +2,14 @@
 
 package id.walt.cose
 
-import kotlinx.serialization.*
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
 import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborLabel
 import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 
 /** A base interface for all top-level COSE messages. */

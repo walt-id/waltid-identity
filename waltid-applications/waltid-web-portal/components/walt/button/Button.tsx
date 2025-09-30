@@ -1,5 +1,5 @@
-import { ReactNode } from "react";
-import { AiOutlineLoading3Quarters } from "react-icons/ai";
+import {ReactNode} from "react";
+import {AiOutlineLoading3Quarters} from "react-icons/ai";
 
 type ButtonSize = 'sm' | 'md' | 'lg' | 'xl';
 

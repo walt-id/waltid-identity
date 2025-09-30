@@ -2,8 +2,7 @@ package id.walt.webwallet.service.category
 
 import id.walt.webwallet.db.models.WalletCategory
 import id.walt.webwallet.db.models.WalletCategoryData
-
-import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert

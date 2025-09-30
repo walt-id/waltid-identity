@@ -1,11 +1,7 @@
 package id.walt.policies.policies.status.validator
 
 import id.walt.policies.policies.status.CredentialFetcher
-import id.walt.policies.policies.status.model.StatusPolicyAttribute
-import id.walt.policies.policies.status.model.StatusContent
-import id.walt.policies.policies.status.model.StatusEntry
-import id.walt.policies.policies.status.model.StatusRetrievalError
-import id.walt.policies.policies.status.model.StatusVerificationError
+import id.walt.policies.policies.status.model.*
 import id.walt.policies.policies.status.reader.StatusValueReader
 import io.github.oshai.kotlinlogging.KotlinLogging
 

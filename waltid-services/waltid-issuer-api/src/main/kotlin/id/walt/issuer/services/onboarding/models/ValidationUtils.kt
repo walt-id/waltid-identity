@@ -1,6 +1,6 @@
 package id.walt.issuer.services.onboarding.models
 
-import java.util.*
+import java.util.Locale
 
 internal object ValidationUtils {
 

@@ -1,12 +1,5 @@
 package id.walt.verifier.openid
 
-import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.verifier.openid.models.authorization.ClientMetadata
-import id.walt.verifier.openid.models.credentials.CredentialFormat
-import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
-import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
-import kotlinx.serialization.json.*
-
 /*object WaltidVerifier {
 
     fun createVerificationSession() {

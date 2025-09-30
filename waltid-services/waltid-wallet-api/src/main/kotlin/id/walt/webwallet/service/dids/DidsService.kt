@@ -5,17 +5,16 @@ package id.walt.webwallet.service.dids
 import id.walt.commons.web.ConflictException
 import id.walt.webwallet.db.models.WalletDid
 import id.walt.webwallet.db.models.WalletDids
-import kotlin.time.Clock
-import kotlin.time.toJavaInstant
-
-import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlin.time.toJavaInstant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid

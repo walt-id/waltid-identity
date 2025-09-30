@@ -12,7 +12,6 @@ import id.walt.w3c.utils.CredentialDataMergeUtils.mergeWithMapping
 import id.walt.w3c.utils.W3CVcUtils.overwrite
 import id.walt.w3c.utils.W3CVcUtils.update
 import id.walt.w3c.vc.vcs.W3CVC
-import kotlin.time.Instant
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -20,6 +19,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport

@@ -4,10 +4,10 @@ package id.walt.onboarding.models
 
 import id.walt.issuer.services.onboarding.models.IACACertificateData
 import id.walt.issuer.services.onboarding.models.IssuerAlternativeNameConfiguration
-import kotlin.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime

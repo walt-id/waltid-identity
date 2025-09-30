@@ -2,14 +2,11 @@
 
 package id.walt.oid4vc
 
-import org.cose.java.AlgorithmID
-import org.cose.java.OneKey
 import cbor.Cbor
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64
 import com.nimbusds.jose.util.Base64URL
-import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -31,9 +28,9 @@ import id.walt.oid4vc.data.dif.*
 import id.walt.oid4vc.interfaces.PresentationResult
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
+import id.walt.w3c.utils.VCFormat
 import io.kotest.core.spec.style.AnnotationSpec
 import kotlinx.coroutines.runBlocking
-import kotlin.time.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
@@ -49,6 +46,8 @@ import org.bouncycastle.cert.X509v3CertificateBuilder
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
+import org.cose.java.AlgorithmID
+import org.cose.java.OneKey
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileWriter
@@ -63,6 +62,7 @@ import java.util.Date
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 class MDoc_Test: AnnotationSpec() {

@@ -1,10 +1,10 @@
 package id.walt.ktornotifications
 
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import ktornotifications.KtorSessionUpdate
+import java.util.concurrent.ConcurrentHashMap
 
 object SseNotifier {
     private val flows =

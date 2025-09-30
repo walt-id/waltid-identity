@@ -1,8 +1,8 @@
 package id.walt.webwallet.db.models
 
 import kotlinx.serialization.Serializable
-import org.jetbrains.exposed.v1.core.dao.id.IntIdTable
 import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.dao.id.IntIdTable
 
 object WalletCategory : IntIdTable("category") {
     val wallet = reference("wallet", Wallets)

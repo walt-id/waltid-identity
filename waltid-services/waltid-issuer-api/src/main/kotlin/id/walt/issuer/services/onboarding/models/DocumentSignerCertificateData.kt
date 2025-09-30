@@ -2,12 +2,8 @@
 
 package id.walt.issuer.services.onboarding.models
 
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlinx.serialization.Serializable
-import kotlin.time.DurationUnit
-import kotlin.time.ExperimentalTime
-import kotlin.time.toDuration
+import kotlin.time.*
 
 @Serializable
 data class DocumentSignerCertificateData(

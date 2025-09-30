@@ -2,9 +2,9 @@
 
 package id.walt.mdoc.objects.elements
 
-import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.credsdata.CredentialManager
 import id.walt.mdoc.encoding.TransformingSerializerTemplate
+import id.walt.mdoc.objects.MdocsCborSerializer
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ByteArraySerializer

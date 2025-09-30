@@ -6,10 +6,10 @@ import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.TxCode
 import id.walt.oid4vc.providers.AuthorizationSession
 import id.walt.oid4vc.requests.AuthorizationRequest
-import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 @Serializable
 data class IssuanceSession(

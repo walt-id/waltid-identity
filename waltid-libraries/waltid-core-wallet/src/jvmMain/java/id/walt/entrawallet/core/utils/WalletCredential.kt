@@ -8,12 +8,12 @@ import id.walt.mdoc.dataelement.json.toJsonElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.webwallet.utils.JsonUtils
-import kotlin.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 

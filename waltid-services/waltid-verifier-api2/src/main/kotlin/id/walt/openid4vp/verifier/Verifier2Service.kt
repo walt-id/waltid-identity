@@ -5,11 +5,11 @@ package id.walt.openid4vp.verifier
 import id.walt.commons.config.ConfigManager
 import id.walt.ktornotifications.SseNotifier
 import id.walt.ktornotifications.WebhookNotifier
-import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.openid4vp.verifier.Verification2Session.VerificationSessionStatus
 import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionCreationResponse
 import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionSetup
 import id.walt.openid4vp.verifier.Verifier2OpenApiExamples.exampleOf
+import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -39,10 +39,9 @@ object Verifier2Service {
 
         SseNotifier.notify(session.id, update)
 
-        if (session.notifications != null) {
-            if (session.notifications!!.webhook != null) {
-                WebhookNotifier.notify(update = update, config = session.notifications!!.webhook!!)
-            }
+        val notifications = session.notifications
+        if (notifications != null && notifications.webhook != null) {
+            WebhookNotifier.notify(update = update, config = notifications.webhook!!)
         }
     }
 

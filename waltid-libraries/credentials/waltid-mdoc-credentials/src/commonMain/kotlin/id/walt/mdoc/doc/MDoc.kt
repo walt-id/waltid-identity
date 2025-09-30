@@ -13,10 +13,10 @@ import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.mdoc.issuersigned.IssuerSignedItem
 import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.mdoc.mso.MSO
-import kotlin.time.Clock
 import kotlinx.serialization.*
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 /**

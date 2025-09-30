@@ -45,8 +45,7 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import io.ktor.client.request.*
-import io.ktor.client.request.forms.submitForm
-import io.ktor.client.request.headers
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*

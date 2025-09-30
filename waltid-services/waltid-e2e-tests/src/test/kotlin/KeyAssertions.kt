@@ -5,7 +5,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions.assertTrue
 import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 fun assertKeyComponents(document: JsonElement, keyId: String, type: KeyType, isPrivate: Boolean = false) {
     assertNotNull(document.tryGetData("kid")?.jsonPrimitive?.content) { "Missing _kid_ component!" }

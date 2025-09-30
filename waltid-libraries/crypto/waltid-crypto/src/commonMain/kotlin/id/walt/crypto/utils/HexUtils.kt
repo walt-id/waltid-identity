@@ -1,7 +1,5 @@
 package id.walt.crypto.utils
 
-import kotlin.text.iterator
-
 object HexUtils {
 
     /**

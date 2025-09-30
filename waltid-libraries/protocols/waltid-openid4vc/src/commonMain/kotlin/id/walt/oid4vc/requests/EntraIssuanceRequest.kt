@@ -2,17 +2,17 @@
 
 package id.walt.oid4vc.requests
 
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.http
-import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.utils.io.core.*
-import kotlin.time.Clock
 import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 data class EntraIssuanceRequest(

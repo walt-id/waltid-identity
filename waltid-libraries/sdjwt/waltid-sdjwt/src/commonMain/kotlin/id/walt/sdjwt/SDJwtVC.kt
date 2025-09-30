@@ -2,8 +2,8 @@
 
 package id.walt.sdjwt
 
-import kotlin.time.Clock
 import kotlinx.serialization.json.*
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 class SDJwtVC(sdJwt: SDJwt) :

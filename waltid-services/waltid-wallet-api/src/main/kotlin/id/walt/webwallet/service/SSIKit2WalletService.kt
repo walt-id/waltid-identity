@@ -37,11 +37,7 @@ import id.walt.oid4vc.responses.TokenResponse
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
-import id.walt.webwallet.db.models.WalletCategoryData
-import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.db.models.WalletDid
-import id.walt.webwallet.db.models.WalletOperationHistories
-import id.walt.webwallet.db.models.WalletOperationHistory
+import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.category.CategoryService
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService

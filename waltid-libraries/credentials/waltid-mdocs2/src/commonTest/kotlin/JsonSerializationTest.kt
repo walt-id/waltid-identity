@@ -1,9 +1,9 @@
-import id.walt.mdoc.objects.serverretrieval.ServerResponse
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.mdoc.objects.serverretrieval.ServerRequest
 import id.walt.mdoc.credsdata.DrivingPrivilege
 import id.walt.mdoc.credsdata.Mdl
 import id.walt.mdoc.credsdata.MobileDrivingLicenceJws
+import id.walt.mdoc.objects.serverretrieval.ServerRequest
+import id.walt.mdoc.objects.serverretrieval.ServerResponse
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.Json
 import kotlin.random.Random

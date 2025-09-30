@@ -4,6 +4,8 @@ import WaltidServicesIntegrationTests.Companion.testHttpClient
 import id.walt.commons.testing.E2ETest
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.issuer.services.onboarding.models.*
+import id.walt.test.integration.expectFailure
+import id.walt.test.integration.expectSuccess
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.serialization.json.Json
@@ -15,17 +17,15 @@ import java.io.ByteArrayInputStream
 import java.math.BigInteger
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
-import java.util.*
+import java.util.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.time.DurationUnit
-import kotlin.time.toDuration
-import id.walt.test.integration.expectSuccess
-import id.walt.test.integration.expectFailure
 import kotlin.time.Clock
+import kotlin.time.DurationUnit
 import kotlin.time.ExperimentalTime
+import kotlin.time.toDuration
 
 
 //TODO: needs to be ported to JUnit test

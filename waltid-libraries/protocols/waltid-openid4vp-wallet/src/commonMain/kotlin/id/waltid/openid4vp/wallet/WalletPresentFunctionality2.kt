@@ -2,25 +2,15 @@
 
 package id.waltid.openid4vp.wallet
 
-import id.walt.cose.coseCompliantCbor
 import id.walt.credentials.formats.DigitalCredential
-import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.crypto.keys.Key
-import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.ShaUtils.calculateSha256Base64Url
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
 import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
-import id.walt.mdoc.objects.elements.DeviceNameSpaces
-import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
-import id.walt.mdoc.objects.DeviceSigned
-import id.walt.mdoc.objects.document.Document
-import id.walt.mdoc.objects.document.IssuerSigned
-import id.walt.mdoc.objects.elements.IssuerSignedList
-import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
@@ -41,9 +31,8 @@ import io.ktor.util.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.filter
-import kotlin.time.Clock
-import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 object WalletPresentFunctionality2 {

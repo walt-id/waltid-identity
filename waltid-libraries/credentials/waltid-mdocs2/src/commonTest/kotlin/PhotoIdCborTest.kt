@@ -1,6 +1,8 @@
 import id.walt.cose.*
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.mdoc.credsdata.PhotoId
+import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.DeviceSigned
 import id.walt.mdoc.objects.digest.ValueDigest
 import id.walt.mdoc.objects.digest.ValueDigestList
@@ -12,8 +14,6 @@ import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.mso.DeviceKeyInfo
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.objects.mso.ValidityInfo
-import id.walt.mdoc.credsdata.PhotoId
-import id.walt.mdoc.encoding.ByteStringWrapper
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi

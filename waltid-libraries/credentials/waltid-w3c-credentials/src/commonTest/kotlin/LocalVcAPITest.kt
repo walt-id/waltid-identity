@@ -1,9 +1,9 @@
-import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.sdjwt.SDMap
+import id.walt.w3c.vc.vcs.W3CVC
 import kotlinx.serialization.json.JsonElement
 import kotlin.test.assertContains
 import kotlin.test.assertNotNull

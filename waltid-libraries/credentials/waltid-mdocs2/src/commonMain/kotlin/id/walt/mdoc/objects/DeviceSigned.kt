@@ -1,11 +1,11 @@
 package id.walt.mdoc.objects
 
 import id.walt.cose.CoseSign1
+import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.document.DeviceAuth
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.elements.DeviceSignedItem
 import id.walt.mdoc.objects.elements.DeviceSignedItemList
-import id.walt.mdoc.encoding.ByteStringWrapper
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

@@ -1,8 +1,8 @@
 package id.walt.mdoc.objects.elements
 
 import id.walt.cose.coseCompliantCbor
-import id.walt.mdoc.objects.wrapInCborTag
 import id.walt.mdoc.encoding.ByteStringWrapper
+import id.walt.mdoc.objects.wrapInCborTag
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
 

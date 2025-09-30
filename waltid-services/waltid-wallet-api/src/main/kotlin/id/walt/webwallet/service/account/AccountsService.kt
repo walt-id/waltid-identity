@@ -15,7 +15,6 @@ import id.walt.webwallet.service.events.AccountEventData
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
 import id.walt.webwallet.web.model.*
-import kotlin.time.toKotlinInstant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
@@ -25,6 +24,7 @@ import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.time.ExperimentalTime
+import kotlin.time.toKotlinInstant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid

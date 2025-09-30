@@ -1,4 +1,4 @@
-import { ref } from "vue";
+import {ref} from "vue";
 
 /**
  * Extracts the NFT media url, or returns a default image url

@@ -147,12 +147,12 @@
 
 <script lang="ts" setup>
 import VerifiableCredentialCard from "@waltid-web-wallet/components/credentials/VerifiableCredentialCard.vue";
-import { useCredential, type WalletCredential } from "@waltid-web-wallet/composables/credential.ts";
+import {useCredential, type WalletCredential} from "@waltid-web-wallet/composables/credential.ts";
 import LoadingIndicator from "@waltid-web-wallet/components/loading/LoadingIndicator.vue";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import { JSONPath } from "jsonpath-plus";
-import { ref } from "vue";
+import {JSONPath} from "jsonpath-plus";
+import {ref} from "vue";
 
 const route = useRoute();
 const runtimeConfig = useRuntimeConfig();

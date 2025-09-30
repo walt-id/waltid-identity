@@ -1,8 +1,4 @@
-import love.forte.plugin.suspendtrans.configuration.ClassInfo
-import love.forte.plugin.suspendtrans.configuration.SuspendTransformConfiguration
-import love.forte.plugin.suspendtrans.configuration.TargetPlatform
 import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
-import love.forte.plugin.suspendtrans.gradle.SuspendTransformPluginExtension
 
 plugins {
     kotlin("multiplatform")

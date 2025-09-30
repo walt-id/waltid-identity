@@ -2,8 +2,8 @@
 
 package id.walt.mdoc.objects.elements
 
-import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.credsdata.CredentialManager
+import id.walt.mdoc.objects.MdocsCborSerializer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi

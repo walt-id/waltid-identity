@@ -1,6 +1,7 @@
 package id.walt.mdoc.crypto
 
 import id.walt.cose.coseCompliantCbor
+import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.document.DeviceAuthentication
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
@@ -8,7 +9,6 @@ import id.walt.mdoc.objects.handover.OpenID4VPHandover
 import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
 import id.walt.mdoc.objects.wrapInCborTag
-import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.verification.VerificationContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray

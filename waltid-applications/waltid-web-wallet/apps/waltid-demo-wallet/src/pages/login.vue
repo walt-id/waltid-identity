@@ -464,13 +464,13 @@
 </template>
 
 <script lang="ts" setup>
-import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from "@headlessui/vue";
-import { ExclamationCircleIcon, XMarkIcon } from "@heroicons/vue/24/outline";
-import { usePageLeave, useParallax } from "@vueuse/core";
-import { useTenant } from "@waltid-web-wallet/composables/tenants.ts";
-import { listWallets, setWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
-import { useUserStore } from "@waltid-web-wallet/stores/user.ts";
-import { storeToRefs } from "pinia";
+import {Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot} from "@headlessui/vue";
+import {ExclamationCircleIcon, XMarkIcon} from "@heroicons/vue/24/outline";
+import {usePageLeave, useParallax} from "@vueuse/core";
+import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
+import {listWallets, setWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
+import {useUserStore} from "@waltid-web-wallet/stores/user.ts";
+import {storeToRefs} from "pinia";
 
 const signInRedirectUrl = ref("/");
 const route = useRoute();

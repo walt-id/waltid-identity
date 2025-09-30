@@ -17,7 +17,6 @@ import net.orandja.obor.codec.Cbor
 import net.orandja.obor.data.CborMap
 import net.orandja.obor.data.CborObject
 import net.orandja.obor.data.CborText
-import kotlin.collections.plusAssign
 
 /**
  * Custom serializer for the `IssuerSignedList` class.

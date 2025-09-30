@@ -15,7 +15,7 @@ import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.forwardedheaders.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
-import io.ktor.server.sse.SSE
+import io.ktor.server.sse.*
 import org.slf4j.event.Level
 
 suspend fun main(args: Array<String>) {

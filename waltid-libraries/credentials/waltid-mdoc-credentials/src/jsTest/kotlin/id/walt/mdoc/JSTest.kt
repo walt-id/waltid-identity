@@ -12,12 +12,12 @@ import korlibs.crypto.encoding.Hex
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.promise
-import kotlin.time.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToHexString
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 class JSTest {

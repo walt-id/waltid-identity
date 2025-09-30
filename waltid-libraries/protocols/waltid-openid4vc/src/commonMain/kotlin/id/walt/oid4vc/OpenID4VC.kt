@@ -29,8 +29,8 @@ import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.COSESign1Utils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.utils.io.core.*
-import kotlin.time.Clock
 import kotlinx.serialization.json.*
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 object OpenID4VC {

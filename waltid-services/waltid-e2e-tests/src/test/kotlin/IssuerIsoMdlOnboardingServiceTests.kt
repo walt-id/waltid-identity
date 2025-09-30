@@ -6,7 +6,6 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.issuer.services.onboarding.models.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import kotlin.time.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -16,11 +15,12 @@ import java.io.ByteArrayInputStream
 import java.math.BigInteger
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
-import java.util.*
+import java.util.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.DurationUnit
 import kotlin.time.ExperimentalTime
 import kotlin.time.toDuration

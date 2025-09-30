@@ -1,13 +1,10 @@
 package id.walt.ktornotifications
 
 import id.walt.ktornotifications.KtorSessionNotifications.VerificationSessionWebhookNotification
-import io.ktor.client.HttpClient
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.basicAuth
-import io.ktor.client.request.bearerAuth
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.serialization.kotlinx.json.json
+import io.ktor.client.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
+import io.ktor.serialization.kotlinx.json.*
 import ktornotifications.KtorSessionUpdate
 
 object WebhookNotifier {

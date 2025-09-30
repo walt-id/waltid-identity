@@ -1,6 +1,5 @@
 package id.walt.webwallet.service.exchange
 
-import org.cose.java.OneKey
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.CredentialOffer
@@ -9,6 +8,7 @@ import id.walt.oid4vc.data.ProofOfPossession
 import id.walt.oid4vc.data.ProofType
 import id.walt.oid4vc.providers.OpenIDClientConfig
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
+import org.cose.java.OneKey
 
 object ProofOfPossessionFactory {
     suspend fun new(

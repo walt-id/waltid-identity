@@ -13,8 +13,8 @@
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import WalletListing from "@waltid-web-wallet/components/wallets/WalletListing.vue";
 import LoadingIndicator from "@waltid-web-wallet/components/loading/LoadingIndicator.vue";
-import { encodeRequest, fixRequest } from "@waltid-web-wallet/composables/siop-requests.ts";
-import { listWallets, setWallet, type WalletListing as WalletListingType } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {encodeRequest, fixRequest} from "@waltid-web-wallet/composables/siop-requests.ts";
+import {listWallets, setWallet, type WalletListing as WalletListingType} from "@waltid-web-wallet/composables/accountWallet.ts";
 
 const queryRequest = new URL("http://example.invalid" + useRoute().fullPath)
   .search; // new URL(window.location.href).search

@@ -1,5 +1,3 @@
-import org.gradle.kotlin.dsl.project
-
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")

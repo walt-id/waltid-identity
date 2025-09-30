@@ -10,7 +10,6 @@ import cbor.internal.decoding.decodeTag
 import cbor.internal.decoding.peek
 import cbor.internal.encoding.encodeByteString
 import cbor.internal.encoding.encodeTag
-import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
@@ -18,6 +17,7 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /** Data Element Type,
  * see also:

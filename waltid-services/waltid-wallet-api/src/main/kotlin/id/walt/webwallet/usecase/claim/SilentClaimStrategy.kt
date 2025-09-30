@@ -19,8 +19,8 @@ import id.walt.webwallet.usecase.event.EventLogUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCase
 import id.walt.webwallet.usecase.notification.NotificationDispatchUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
-import kotlin.time.Clock
 import kotlinx.serialization.json.JsonObject
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid

@@ -3,18 +3,19 @@
 package id.walt.openid4vp.verifier
 
 import id.walt.dcql.models.DcqlQuery
+import id.walt.openid4vp.verifier.Verification2Session.DefinedVerificationPolicies
+import id.walt.openid4vp.verifier.Verification2Session.VerificationSessionStatus
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
-import id.walt.openid4vp.verifier.Verification2Session.*
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlin.time.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid

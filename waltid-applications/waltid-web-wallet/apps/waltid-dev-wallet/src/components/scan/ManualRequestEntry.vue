@@ -37,7 +37,7 @@
 </template>
 
 <script setup>
-import { getSiopRequestType, isSiopRequest, SiopRequestType } from "@waltid-web-wallet/composables/siop-requests.ts";
+import {getSiopRequestType, isSiopRequest, SiopRequestType} from "@waltid-web-wallet/composables/siop-requests.ts";
 
 const emit = defineEmits(["request"]);
 

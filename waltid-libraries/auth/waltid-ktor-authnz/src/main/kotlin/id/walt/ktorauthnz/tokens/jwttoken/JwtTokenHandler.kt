@@ -7,10 +7,10 @@ import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.tokens.TokenHandler
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlinx.serialization.json.*
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 class JwtTokenHandler : TokenHandler {
 

@@ -1,7 +1,7 @@
 package id.walt.mdoc.objects.mso
 
-import id.walt.mdoc.objects.digest.ValueDigestList
 import id.walt.mdoc.encoding.TransformingSerializerTemplate
+import id.walt.mdoc.objects.digest.ValueDigestList
 import io.ktor.http.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName

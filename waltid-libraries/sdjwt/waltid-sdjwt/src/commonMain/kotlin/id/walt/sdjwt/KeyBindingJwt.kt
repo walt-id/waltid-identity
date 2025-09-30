@@ -4,10 +4,9 @@ package id.walt.sdjwt
 
 import korlibs.crypto.SHA256
 import korlibs.crypto.encoding.ASCII
-import kotlin.time.Clock
 import kotlinx.serialization.json.*
 import kotlin.js.ExperimentalJsExport
-import kotlin.js.JsExport
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 @Suppress("NON_EXPORTABLE_TYPE")

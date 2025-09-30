@@ -84,10 +84,10 @@
 </template>
 
 <script lang="ts" setup>
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import { DocumentPlusIcon } from "@heroicons/vue/24/outline";
-import { onMounted, ref } from "vue";
+import {DocumentPlusIcon} from "@heroicons/vue/24/outline";
+import {onMounted, ref} from "vue";
 
 const currentWallet = useCurrentWallet();
 const keys = ref<any[]>([]);

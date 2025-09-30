@@ -1,7 +1,5 @@
 package id.walt.mdoc.credsdata
 
-import id.walt.mdoc.credsdata.Mdl
-
 object CredentialManager {
 
 

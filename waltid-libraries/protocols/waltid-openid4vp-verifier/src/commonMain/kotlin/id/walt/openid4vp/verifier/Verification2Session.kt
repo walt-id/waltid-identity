@@ -4,13 +4,15 @@ package id.walt.openid4vp.verifier
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.ktornotifications.KtorSessionNotifications
-import id.walt.policies2.policies.CredentialSignaturePolicy
+import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionCreationResponse
 import id.walt.policies2.PolicyList
 import id.walt.policies2.PolicyResults
+import id.walt.policies2.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionCreationResponse
 import io.ktor.http.*
-import kotlinx.datetime.*
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.plus
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime

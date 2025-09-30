@@ -1,8 +1,8 @@
 import React from "react";
 import axios from "axios";
 import "@/styles/globals.css";
-import type { AppProps } from "next/app";
-import { AvailableCredential } from "@/types/credentials";
+import type {AppProps} from "next/app";
+import {AvailableCredential} from "@/types/credentials";
 
 export const EnvContext = React.createContext({} as { [key: string]: string });
 export const CredentialsContext = React.createContext([

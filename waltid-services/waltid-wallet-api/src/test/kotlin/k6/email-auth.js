@@ -1,6 +1,6 @@
 import http from "k6/http";
-import { check } from "k6";
-import { Counter } from "k6/metrics";
+import {check} from "k6";
+import {Counter} from "k6/metrics";
 
 export const options = {
     stages: [

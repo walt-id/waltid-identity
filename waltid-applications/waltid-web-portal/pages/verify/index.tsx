@@ -1,16 +1,16 @@
-import { useContext, useEffect, useState } from "react";
+import {useContext, useEffect, useState} from "react";
 import WaltIcon from "@/components/walt/logo/WaltIcon";
 import Button from "@/components/walt/button/Button";
-import { CredentialsContext, EnvContext } from "@/pages/_app";
+import {CredentialsContext, EnvContext} from "@/pages/_app";
 import Icon from "@/components/walt/logo/Icon";
-import { useRouter } from "next/router";
+import {useRouter} from "next/router";
 import QRCode from "react-qr-code";
 import axios from "axios";
-import { sendToWebWallet } from "@/utils/sendToWebWallet";
+import {sendToWebWallet} from "@/utils/sendToWebWallet";
 import nextConfig from "@/next.config";
 import BackButton from "@/components/walt/button/BackButton";
-import { CredentialFormats, mapFormat } from "@/types/credentials";
-import { checkVerificationResult, getStateFromUrl } from "@/utils/checkVerificationResult";
+import {CredentialFormats, mapFormat} from "@/types/credentials";
+import {checkVerificationResult, getStateFromUrl} from "@/utils/checkVerificationResult";
 
 const BUTTON_COPY_TEXT_DEFAULT = 'Copy offer URL';
 const BUTTON_COPY_TEXT_COPIED = 'Copied';

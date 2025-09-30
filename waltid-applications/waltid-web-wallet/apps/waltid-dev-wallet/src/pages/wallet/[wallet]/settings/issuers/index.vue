@@ -52,7 +52,7 @@
 </template>
 
 <script lang="ts" setup>
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 
 const currentWallet = useCurrentWallet();

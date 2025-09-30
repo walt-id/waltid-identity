@@ -1,7 +1,3 @@
-import love.forte.plugin.suspendtrans.configuration.ClassInfo
-import love.forte.plugin.suspendtrans.configuration.SuspendTransformConfiguration
-import love.forte.plugin.suspendtrans.configuration.TargetPlatform
-import love.forte.plugin.suspendtrans.gradle.SuspendTransformPluginExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {

@@ -1,6 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import java.util.*
+import java.util.Properties
 
 object Versions {
     const val KTOR_VERSION = "3.2.2" // also change 1 plugin

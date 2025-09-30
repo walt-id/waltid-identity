@@ -19,16 +19,16 @@ import id.walt.oid4vc.util.JwtUtils
 import io.ktor.http.*
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * Base object for a self-issued OpenID provider, providing identity information by presenting verifiable credentials,

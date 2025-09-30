@@ -1,12 +1,12 @@
 import CustomCredentialModal from "@/components/walt/modal/CustomCredentialModal";
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import {MagnifyingGlassIcon} from "@heroicons/react/24/outline";
 import Credential from "@/components/walt/credential/Credential";
-import { AvailableCredential } from "@/types/credentials";
+import {AvailableCredential} from "@/types/credentials";
 import Button from "@/components/walt/button/Button";
-import { CredentialsContext } from "@/pages/_app";
-import { Inter } from "next/font/google";
-import React, { useState } from "react";
-import { useRouter } from "next/router";
+import {CredentialsContext} from "@/pages/_app";
+import {Inter} from "next/font/google";
+import React, {useState} from "react";
+import {useRouter} from "next/router";
 
 const inter = Inter({ subsets: ['latin'] });
 

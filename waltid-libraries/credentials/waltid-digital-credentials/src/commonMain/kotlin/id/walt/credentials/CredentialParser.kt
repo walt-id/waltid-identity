@@ -13,7 +13,6 @@ import id.walt.credentials.signatures.DataIntegrityProofCredentialSignature
 import id.walt.credentials.signatures.JwtCredentialSignature
 import id.walt.credentials.signatures.SdJwtCredentialSignature
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
-import id.walt.crypto.utils.HexUtils.matchesHex
 import id.walt.credentials.utils.JwtUtils
 import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.credentials.utils.SdJwtUtils.getSdArrays
@@ -21,14 +20,15 @@ import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
 import id.walt.crypto.utils.Base64Utils.base64Url
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.matchesBase64Url
+import id.walt.crypto.utils.HexUtils.matchesHex
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.MapKey
+import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.elements.IssuerSignedItem
-import id.walt.mdoc.dataelement.MapElement
-import id.walt.mdoc.dataelement.MapKey
-import id.walt.mdoc.doc.MDoc
 import id.walt.sdjwt.SDJwt
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.KSerializer

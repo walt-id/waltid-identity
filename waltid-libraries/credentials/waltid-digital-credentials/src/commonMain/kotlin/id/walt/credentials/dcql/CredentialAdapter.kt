@@ -1,10 +1,5 @@
 package id.walt.credentials.dcql
 
-import id.walt.credentials.CredentialDetectorTypes
-import id.walt.credentials.formats.DigitalCredential
-import id.walt.dcql.DcqlCredential
-import kotlinx.serialization.json.JsonObject
-
 //object CredentialAdapter {
 //
 //    /**

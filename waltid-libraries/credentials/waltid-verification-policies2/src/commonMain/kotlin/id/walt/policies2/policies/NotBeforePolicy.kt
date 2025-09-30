@@ -9,16 +9,16 @@ import id.walt.policies2.PolicyClaimChecker
 import id.walt.w3c.Claims
 import id.walt.w3c.JwtClaims
 import id.walt.w3c.VcClaims
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.long
 import kotlinx.serialization.json.longOrNull
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 @Serializable
 @SerialName("not-before")

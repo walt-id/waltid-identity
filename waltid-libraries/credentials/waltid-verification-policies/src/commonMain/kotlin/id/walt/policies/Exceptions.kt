@@ -3,7 +3,6 @@
 package id.walt.policies
 
 import id.walt.policies.policies.JsonSchemaPolicy
-import kotlin.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -11,6 +10,7 @@ import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 @JsExport
 @Serializable

@@ -2,16 +2,16 @@
 
 import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
-import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
+import id.walt.mdoc.credsdata.DrivingPrivilege
+import id.walt.mdoc.credsdata.Mdl
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
+import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.deviceretrieval.ItemsRequestList
 import id.walt.mdoc.objects.digest.ValueDigestList
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.elements.IssuerSignedItemSerializer
 import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.mso.MobileSecurityObject
-import id.walt.mdoc.credsdata.DrivingPrivilege
-import id.walt.mdoc.credsdata.Mdl
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray

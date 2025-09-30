@@ -493,9 +493,9 @@
 </template>
 
 <script lang="ts" setup>
-import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from "@headlessui/vue";
-import { ExclamationCircleIcon, XMarkIcon } from "@heroicons/vue/24/outline";
-import { useTenant } from "@waltid-web-wallet/composables/tenants.ts";
+import {Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot} from "@headlessui/vue";
+import {ExclamationCircleIcon, XMarkIcon} from "@heroicons/vue/24/outline";
+import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
 
 const tenant = (await useTenant().value) as any;
 const { logoImage } = tenant;

@@ -10,7 +10,7 @@
 </template>
 
 <script lang="ts" setup>
-import { XMarkIcon } from "@heroicons/vue/24/outline";
+import {XMarkIcon} from "@heroicons/vue/24/outline";
 import useModalStore from "../../stores/useModalStore.ts";
 
 const store = useModalStore();

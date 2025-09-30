@@ -4,14 +4,14 @@ import id.walt.cose.toCoseVerifier
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.jwk.JWKKey.Companion.convertDerCertificateToPemCertificate
+import id.walt.mdoc.crypto.MdocCrypto
+import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.namespaces.MdocSignedMerger
 import id.walt.mdoc.namespaces.MdocSignedMerger.MdocDuplicatesMergeStrategy
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.digest.ValueDigest
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
-import id.walt.mdoc.crypto.MdocCrypto
-import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.parser.MdocParser
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonObject

@@ -1,8 +1,8 @@
 package id.walt.mdoc.objects.document
 
-import id.walt.mdoc.objects.elements.DeviceNameSpaces
-import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.encoding.ByteStringWrapper
+import id.walt.mdoc.objects.SessionTranscript
+import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.CborArray

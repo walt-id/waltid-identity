@@ -12,7 +12,7 @@
 
 <script lang="ts" setup>
 import useModalStore from "../../stores/useModalStore.ts";
-import { onMounted, onUnmounted } from "vue";
+import {onMounted, onUnmounted} from "vue";
 
 const store = useModalStore();
 

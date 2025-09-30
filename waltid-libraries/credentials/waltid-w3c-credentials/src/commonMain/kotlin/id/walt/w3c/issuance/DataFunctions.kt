@@ -7,13 +7,13 @@ import id.walt.w3c.utils.CredentialDataMergeUtils
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlinx.serialization.json.*
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalJsExport::class, ExperimentalUuidApi::class)

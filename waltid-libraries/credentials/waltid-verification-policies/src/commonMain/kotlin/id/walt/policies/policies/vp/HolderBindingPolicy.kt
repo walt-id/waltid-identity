@@ -1,9 +1,9 @@
 package id.walt.policies.policies.vp
 
-import id.walt.w3c.schemes.JwsSignatureScheme.JwsOption
-import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.policies.CredentialWrapperValidatorPolicy
+import id.walt.w3c.schemes.JwsSignatureScheme.JwsOption
+import id.walt.w3c.utils.VCFormat
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray

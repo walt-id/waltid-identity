@@ -3,7 +3,6 @@ package id.walt.dcql
 import id.walt.dcql.models.DcqlQuery
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.Json
-import kotlin.Result
 
 object DcqlParser {
 

@@ -10,8 +10,8 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.mdoc.encoding.MdocCbor
-import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.encoding.startsWith
+import id.walt.mdoc.objects.SessionTranscript
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray

@@ -98,9 +98,9 @@
 import LoadingIndicator from "@waltid-web-wallet/components/loading/LoadingIndicator.vue";
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import BackButton from "@waltid-web-wallet/components/buttons/BackButton.vue";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 import nftArt from "@waltid-web-wallet/components/nfts/nft-art.vue";
-import { isNotNullOrEmpty } from "@waltid-web-wallet/composables/useNftMedia.ts";
+import {isNotNullOrEmpty} from "@waltid-web-wallet/composables/useNftMedia.ts";
 
 const route = useRoute();
 
