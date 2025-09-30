@@ -73,7 +73,6 @@ fun createCredentialOfferUri(
     logger.debug { "offerRequest: $offerRequest" }
 
     val offerUri = buildOfferUri(
-        standardVersion = overwrittenIssuanceRequests.first().standardVersion!!,
         offerRequest = offerRequest
     )
 
