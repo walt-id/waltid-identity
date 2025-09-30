@@ -747,8 +747,41 @@ class SSIKit2WalletService(
                 }
                 headers.containsKey("jwk") -> {
                     val jwk = headers.getValue("jwk").jsonObject
-                    val kid = jwk.getValue("kid").jsonPrimitive.content
-                    if (kid != alias) throw IllegalArgumentException("JWT headers.kid must match alias: $alias")
+                    val kidInJwk = jwk["kid"]?.jsonPrimitive?.content
+                    if (kidInJwk != null) {
+                        if (kidInJwk != alias) throw IllegalArgumentException("JWT headers.kid must match alias: $alias")
+                    } else {
+                        // RFC 7517: kid is optional. If not present, ensure provided JWK matches the alias key's public JWK
+                        val pubJwk = runCatching { key.getPublicKey().exportJWKObject() }.getOrNull()
+                        val jwkMatches = pubJwk?.let { provided ->
+                            fun comparable(j: JsonObject): Map<String, String> {
+                                val kty = j["kty"]?.jsonPrimitive?.content
+                                return when (kty) {
+                                    "OKP" -> mapOf(
+                                        "kty" to (kty ?: ""),
+                                        "crv" to (j["crv"]?.jsonPrimitive?.content ?: ""),
+                                        "x" to (j["x"]?.jsonPrimitive?.content ?: "")
+                                    )
+                                    "EC" -> mapOf(
+                                        "kty" to (kty ?: ""),
+                                        "crv" to (j["crv"]?.jsonPrimitive?.content ?: ""),
+                                        "x" to (j["x"]?.jsonPrimitive?.content ?: ""),
+                                        "y" to (j["y"]?.jsonPrimitive?.content ?: "")
+                                    )
+                                    "RSA" -> mapOf(
+                                        "kty" to (kty ?: ""),
+                                        "n" to (j["n"]?.jsonPrimitive?.content ?: ""),
+                                        "e" to (j["e"]?.jsonPrimitive?.content ?: "")
+                                    )
+                                    else -> j.mapValues { it.value.jsonPrimitive.contentOrNull ?: it.value.toString() }
+                                }
+                            }
+                            comparable(jwk) == comparable(provided)
+                        } ?: false
+                        if (!jwkMatches) {
+                            throw IllegalArgumentException("JWT headers.jwk must match alias key or include kid")
+                        }
+                    }
                 }
                 else -> {
                     headers = JsonObject(headers + ("kid" to JsonPrimitive(alias)))
