@@ -1,4 +1,4 @@
-package id.walt.credentials.utils
+package credentials.utils
 
 import id.walt.crypto.utils.Base64Utils.matchesBase64Url
 import kotlin.test.Test

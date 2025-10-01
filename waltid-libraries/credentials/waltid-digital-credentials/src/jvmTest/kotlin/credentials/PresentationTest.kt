@@ -1,4 +1,4 @@
-package id.walt.credentials
+package credentials
 
 		import id.walt.credentials.presentations.formats.DcSdJwtPresentation
 		import id.walt.credentials.presentations.formats.JwtVcJsonPresentation

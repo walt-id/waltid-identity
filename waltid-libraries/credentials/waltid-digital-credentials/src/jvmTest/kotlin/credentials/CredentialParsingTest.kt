@@ -1,6 +1,7 @@
-package id.walt.credentials
+package credentials
 
 import id.walt.credentials.CredentialDetectorTypes.CredentialDetectionResult
+import id.walt.credentials.CredentialParser
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject

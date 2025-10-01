@@ -1,5 +1,6 @@
-package id.walt.credentials
+package credentials
 
+import id.walt.credentials.CredentialParser
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import kotlinx.serialization.json.Json

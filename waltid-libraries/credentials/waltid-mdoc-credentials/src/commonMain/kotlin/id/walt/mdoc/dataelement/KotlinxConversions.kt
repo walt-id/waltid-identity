@@ -2,9 +2,9 @@
 
 package id.walt.mdoc.dataelement
 
-import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * Convert to CBOR data element

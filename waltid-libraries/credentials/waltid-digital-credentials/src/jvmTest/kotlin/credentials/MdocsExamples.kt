@@ -1,5 +1,6 @@
-package id.walt.credentials
+package credentials
 
+import id.walt.credentials.CredentialDetectorTypes
 import id.walt.credentials.CredentialDetectorTypes.CredentialDetectionResult
 import id.walt.credentials.CredentialDetectorTypes.CredentialPrimaryDataType
 import id.walt.credentials.CredentialDetectorTypes.MdocsSubType

@@ -1,4 +1,4 @@
-package id.walt.credentials
+package credentials
 
 class MdocsCredentialTest {
 

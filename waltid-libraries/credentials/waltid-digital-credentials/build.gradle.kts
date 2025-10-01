@@ -63,7 +63,7 @@ kotlin {
             useJUnitPlatform()
         }
     }
-    /*js(IR) {
+    js(IR) {
         outputModuleName.set("digital-credentials")
         useEsModules()
 //        browser {
@@ -77,7 +77,7 @@ kotlin {
             generateTypeScriptDefinitions()
         }
         binaries.library()
-    }*/
+    }
 
     if (enableIosBuild) {
         iosArm64()
@@ -146,9 +146,9 @@ kotlin {
                 implementation("org.slf4j:slf4j-simple:2.0.17")
             }
         }
-        /*val jsMain by getting {
+        val jsMain by getting {
 
-        }*/
+        }
 
         if (enableIosBuild) {
             val iosArm64Main by getting

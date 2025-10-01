@@ -1,5 +1,6 @@
-package id.walt.credentials
+package credentials
 
+import id.walt.credentials.CredentialParser
 import kotlin.test.Test
 
 class W3CCredentialTest {
