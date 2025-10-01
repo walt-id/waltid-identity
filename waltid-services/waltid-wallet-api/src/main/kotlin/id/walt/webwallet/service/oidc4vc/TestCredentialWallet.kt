@@ -43,8 +43,7 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import io.ktor.client.request.*
-import io.ktor.client.request.forms.submitForm
-import io.ktor.client.request.headers
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
@@ -308,6 +307,7 @@ class TestCredentialWallet(
         ) else null
 
         val signedJwtVP = if (!vp.isNullOrEmpty()) runBlocking {
+
             val authKeyId = resolveDidAuthentication(this@TestCredentialWallet.did)
 
             key.signJws(
@@ -318,6 +318,49 @@ class TestCredentialWallet(
             )
         } else null
 
+        val envelopedVpJwt: String? = runCatching {
+            if (jwtsPresented.isEmpty()) null else runBlocking {
+                val authKeyId = resolveDidAuthentication(this@TestCredentialWallet.did)
+
+                val envelopedVCs = JsonArray(jwtsPresented.map { jwt ->
+                    buildJsonObject {
+                        put("@context", JsonPrimitive("https://www.w3.org/ns/credentials/v2"))
+                        put("id", JsonPrimitive("data:application/vc+jwt,$jwt"))
+                        put("type", JsonPrimitive("EnvelopedVerifiableCredential"))
+                    }
+                })
+
+                val vpEnv = buildJsonObject {
+                    putJsonArray("@context") {
+                        add(JsonPrimitive("https://www.w3.org/ns/credentials/v2"))
+                        add(JsonPrimitive("https://www.w3.org/ns/credentials/examples/v2"))
+                    }
+                    putJsonArray("type") { add(JsonPrimitive("VerifiablePresentation")) }
+                    put("verifiableCredential", envelopedVCs)
+                }
+
+                val now = Clock.System.now().epochSeconds
+                val claims = buildJsonObject {
+                    put("issuer", JsonPrimitive(this@TestCredentialWallet.did))
+                    put("validFrom", JsonPrimitive(now))
+                    put("validUntil", JsonPrimitive(now))
+                    vpEnv.forEach { (k, v) -> put(k, v) }
+                }
+
+                val jwsHeader = mapOf(
+                    "kid" to authKeyId.toJsonElement(),
+                    "typ" to JsonPrimitive("vp+jwt"),
+                    "cty" to JsonPrimitive("vp"),
+                    "iss" to JsonPrimitive(this@TestCredentialWallet.did)
+                )
+
+                key.signJws(Json.encodeToString(claims).encodeToByteArray(), jwsHeader)
+            }
+        }.getOrElse { null }
+        if (envelopedVpJwt != null) {
+            println("Generated Enveloped VP (vp+jwt): $envelopedVpJwt")
+        }
+
         val deviceResponse =
             if (mDocsPresented.isNotEmpty()) mDocsPresented.let { DeviceResponse(it).toCBORBase64URL() } else null
 
@@ -327,7 +370,8 @@ class TestCredentialWallet(
         // DONE: generate descriptor mappings based on type (vp or mdoc device response)
         // DONE: set root path of descriptor mapping based on whether there are multiple presentations or just one ("$" or "$[idx]")
         val presentations =
-            listOf(signedJwtVP, deviceResponse).filterNotNull().plus(sdJwtVCsPresented).map { JsonPrimitive(it) }
+            listOf(signedJwtVP, deviceResponse, envelopedVpJwt).filterNotNull().plus(sdJwtVCsPresented)
+                .map { JsonPrimitive(it) }
         println("presentations: $presentations")
 
         val rootPathVP = "$" + (if (presentations.size == 2) "[0]" else "")

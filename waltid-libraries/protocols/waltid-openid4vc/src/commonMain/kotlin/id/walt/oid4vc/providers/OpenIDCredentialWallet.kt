@@ -262,7 +262,7 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
             )
         } else null
 
-        return if (result.presentations.size == 1) {
+        val baseResponse = if (result.presentations.size == 1) {
             TokenResponse.success(
                 vpToken = result.presentations.first().let { VpTokenParameter.fromJsonElement(it) },
                 presentationSubmission = if (idToken == null) result.presentationSubmission else null,
@@ -277,6 +277,21 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
                 state = session.authorizationRequest?.state
             )
         }
+        val evpJwt = run {
+            val candidates = result.presentations.mapNotNull { it.jsonPrimitive.contentOrNull }
+            candidates.firstOrNull { token ->
+                runCatching {
+                    val headerB64 = token.substringBefore('.')
+                    val headerJson =
+                        Json.parseToJsonElement(Base64.UrlSafe.decode(headerB64).decodeToString()).jsonObject
+                    headerJson["typ"]?.jsonPrimitive?.contentOrNull?.equals("vp+jwt", ignoreCase = true) == true
+                }.getOrElse { false }
+            }
+        }
+        return if (!evpJwt.isNullOrBlank()) baseResponse.copy(
+            customParameters = baseResponse.customParameters.orEmpty() + mapOf("evp_jwt" to JsonPrimitive(evpJwt))
+        ) else baseResponse
+
     }
 
     // ==========================================================

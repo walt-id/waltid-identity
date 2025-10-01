@@ -23,6 +23,7 @@ import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.did.utils.EnumUtils.enumValueIgnoreCase
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.errors.AuthorizationError
@@ -35,11 +36,7 @@ import id.walt.oid4vc.responses.TokenResponse
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
-import id.walt.webwallet.db.models.WalletCategoryData
-import id.walt.webwallet.db.models.WalletCredential
-import id.walt.webwallet.db.models.WalletDid
-import id.walt.webwallet.db.models.WalletOperationHistories
-import id.walt.webwallet.db.models.WalletOperationHistory
+import id.walt.webwallet.db.models.*
 import id.walt.webwallet.service.category.CategoryService
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -79,7 +76,7 @@ import kotlinx.serialization.json.*
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.util.Base64
+import java.util.*
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -233,10 +230,23 @@ class SSIKit2WalletService(
 
         val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
 
-        if (tokenResponse.vpToken!!.jsonPrimitive.content.contains("~"))
-            require(tokenResponse.vpToken!!.jsonPrimitive.content.last() != '~') {
-                "SD-JWT VC Presentations with Key Binding must not end with '~'"
+        tokenResponse.vpToken?.let { vpEl ->
+            fun checkSdJwtString(str: String) {
+                if (str.contains("~")) {
+                    require(str.last() != '~') {
+                        "SD-JWT VC Presentations with Key Binding must not end with '~'"
+                    }
+                }
             }
+            when (vpEl) {
+                is JsonPrimitive -> vpEl.contentOrNull?.let { checkSdJwtString(it) }
+                is JsonArray -> vpEl.forEach { item ->
+                    item.jsonPrimitive.contentOrNull?.let { checkSdJwtString(it) }
+                }
+
+                else -> {}
+            }
+        }
 
         val submitFormParams = getFormParameters(
             authorizationRequest = presentationSession.authorizationRequest,
@@ -599,7 +609,8 @@ class SSIKit2WalletService(
                 algorithm = key.keyType.name,
                 cryptoProvider = key.toString(),
                 keyPair = JsonObject(emptyMap()),
-                keysetHandle = JsonNull
+                keysetHandle = JsonNull,
+                name = it.name
             )
         }
 
@@ -613,7 +624,7 @@ class SSIKit2WalletService(
         KeyManager.createKey(request)
             .also {
                 logger.trace { "Generated key: $it" }
-                KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
+                KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it), request.name)
                 eventUseCase.log(
                     action = EventType.Key.Create,
                     originator = "wallet",
@@ -649,6 +660,24 @@ class SSIKit2WalletService(
                 throw ConflictException("Key with ID $keyId already exists in the database")
             }
 
+            val alias: String? = runCatching {
+                val trimmed = jwkOrPem.trim()
+                if (trimmed.startsWith("{")) {
+                    val json = Json.parseToJsonElement(trimmed).jsonObject
+                    when {
+                        json["alias"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true -> json["alias"]!!.jsonPrimitive.content
+                        json["name"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true -> json["name"]!!.jsonPrimitive.content
+                        json["jwk"] is JsonObject -> {
+                            val jwkObj = json["jwk"] as JsonObject
+                            jwkObj["alias"]?.jsonPrimitive?.contentOrNull
+                                ?: jwkObj["name"]?.jsonPrimitive?.contentOrNull
+                        }
+
+                        else -> null
+                    }
+                } else null
+            }.getOrNull()
+
             runBlocking {
                 eventUseCase.log(
                     action = EventType.Key.Import,
@@ -660,7 +689,7 @@ class SSIKit2WalletService(
                 )
             }
 
-            KeysService.add(walletId, keyId, KeySerialization.serializeKey(key))
+            KeysService.add(walletId, keyId, KeySerialization.serializeKey(key), alias)
             keyId
         }.getOrElse { throwable ->
             when (throwable) {
@@ -736,10 +765,8 @@ class SSIKit2WalletService(
         // For JWS+Json we take the header as given
         val signature = if (jwsObj != null) {
             val headers = jwsObj.header.toJSONObject().toMutableMap()
-            headers["kid"]?.toJsonPrimitive()?.content?.also { kid ->
-                if (kid != alias) throw IllegalArgumentException("JWT headers.kid must match alias: $alias")
-            }
-            headers["kid"] = JsonPrimitive(alias)
+            headers["kid"]?.toJsonPrimitive()?.content
+            // headers["kid"] = JsonPrimitive(alias)
             val dataBytes = jwsObj.payload.toString().toByteArray(Charsets.UTF_8)
             key.signJws(dataBytes, headers.toJsonObject())
         }
@@ -829,6 +856,98 @@ class SSIKit2WalletService(
         // todo: select by SQL
         return listCredentials(CredentialFilterObject.default).filter { it.id in credentialIds }
     }
+
+
+    override suspend fun importCredential(jwt: String, associatedDid: String): WalletCredential {
+        if (jwt.split('.').size != 3) {
+            throw BadRequestException("Invalid JWT format: must contain 3 segments")
+        }
+
+        val jws = runCatching { JWSObject.parse(jwt) }
+            .getOrElse { throw BadRequestException("Invalid JWT: ${it.message}") }
+
+        val payloadJson = runCatching {
+            Json.parseToJsonElement(jws.payload.toString()).jsonObject
+        }.getOrElse { throw BadRequestException("JWT payload is not valid JSON") }
+
+
+        val vc = payloadJson["vc"]?.jsonObject ?: payloadJson
+
+        val hasCredentialSubject = vc["credentialSubject"] != null
+        val hasType = vc["type"] != null
+        if (!(hasCredentialSubject && hasType)) {
+            throw BadRequestException("JWT VC payload must contain vc.credentialSubject and vc.type (or top-level).")
+        }
+
+        val candidateId = payloadJson["jti"]?.jsonPrimitive?.content
+            ?: vc["id"]?.jsonPrimitive?.content
+            ?: computeHash(jwt)
+
+
+        if (credentialService.get(walletId, candidateId) != null) {
+            throw ConflictException("Credential with id: $candidateId already exists in this wallet")
+        }
+
+        DidsService.get(walletId, associatedDid)
+            ?: throw NotFoundException("Associated DID not found in this wallet: $associatedDid")
+
+        payloadJson["nbf"]?.jsonPrimitive?.longOrNull?.let { nbf ->
+            if (nbf > System.currentTimeMillis() / 1000) {
+                throw BadRequestException("Credential not yet valid (nbf=$nbf)")
+            }
+        }
+        payloadJson["exp"]?.jsonPrimitive?.longOrNull?.let { exp ->
+            if (exp < System.currentTimeMillis() / 1000) {
+                throw BadRequestException("Credential expired (exp=$exp)")
+            }
+        }
+
+        runCatching {
+            val issuer = payloadJson["iss"]?.jsonPrimitive?.content
+            println("the issuer: $issuer")
+            if (issuer != null && issuer.startsWith("did:")) {
+
+                val key = DidService.resolveToKey(issuer).getOrNull()
+                    ?: throw BadRequestException("Cannot resolve issuer DID to a key: $issuer")
+
+                val verifyResult = key.verifyJws(jwt)
+
+                if (verifyResult.isSuccess) {
+                    logger.info { "Issuer DID verified: $issuer" }
+                } else {
+                    //TODO : throw and excpetion when signature verification fails
+                    logger.warn { "Signature verification failed for issuer DID $issuer: ${verifyResult.exceptionOrNull()?.message}" }
+                }
+
+            } else {
+                throw BadRequestException("Issuer (iss) claim missing or not a DID: $issuer")
+            }
+        }.onFailure {
+            logger.warn(it) { "Signature verification attempt failed: ${it.message}" }
+        }
+
+        val walletCredential = WalletCredential(
+            wallet = walletId,
+            id = candidateId,
+            document = jwt,
+            disclosures = null,
+            addedOn = Clock.System.now(),
+            manifest = null,
+            deletedOn = null,
+            pending = false,
+            format = CredentialFormat.jwt_vc_json,
+        )
+
+        credentialService.add(walletId, walletCredential)
+        return walletCredential
+    }
+
+    private fun computeHash(data: String): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        val digest = md.digest(data.toByteArray(Charsets.UTF_8))
+        return digest.joinToString("") { "%02x".format(it) }
+    }
+
 
     override suspend fun listCategories(): List<WalletCategoryData> = categoryService.list(walletId)
 

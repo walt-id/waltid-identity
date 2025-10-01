@@ -23,14 +23,11 @@ import id.walt.verifier.oidc.models.presentedcredentials.PresentedCredentialsVie
 import id.walt.w3c.utils.VCFormat
 import io.klogging.logger
 import io.ktor.client.*
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.logging.LogLevel
-import io.ktor.client.plugins.logging.Logger
-import io.ktor.client.plugins.logging.Logging
-import io.ktor.client.plugins.logging.SIMPLE
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.json
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
@@ -282,7 +279,6 @@ object VerifierService {
         val tokenResponse = checkNotNull(session.tokenResponse) {
             "It should be impossible to have a null token response and a successful verification result - bug!"
         }
-
         val vpTokenStringified = checkNotNull(tokenResponse.vpToken) {
             "It should be impossible to have a null vp_token response and a successful verification result - bug!"
         }.jsonPrimitive.content

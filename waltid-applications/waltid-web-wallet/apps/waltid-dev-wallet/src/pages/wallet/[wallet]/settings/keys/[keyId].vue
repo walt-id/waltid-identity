@@ -3,7 +3,7 @@
     <BackButton />
     <div>
       <h2 class="text-lg font-semibold leading-7 text-gray-900">
-        Key: {{ keyId }}
+          Key: {{ displayKid }}
       </h2>
       <p class="mt-1 max-w-2xl text-sm leading-6 text-gray-600">
         We allow you to export your keypair, however, make sure you keep it
@@ -17,30 +17,45 @@
       <p class="text-base font-semibold">Key information</p>
       <div>
         <div
-          class="mt-1 space-y-8 border-gray-900/10 pb-12 sm:space-y-0 sm:divide-y sm:divide-gray-900/10 sm:border-t sm:pb-0"
+            class="mt-3 space-y-4 border-gray-900/10 pb-2 sm:space-y-0 sm:divide-y sm:divide-gray-900/10 sm:border-t sm:pb-0"
         >
           <div class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-2">
-            <label class="block font-medium text-gray-900">Key id</label>
-            <!-- <div class="mt-1 sm:col-span-2 sm:mt-0">{{ key.keyId.id }}</div> -->
+              <label class="block font-medium text-gray-900">Alias</label>
+              <div class="mt-1 sm:col-span-2 sm:mt-0">{{ aliasName || jwk?.alias || jwk?.name || '—' }}</div>
           </div>
-
+            <div class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-2">
+                <label class="block font-medium text-gray-900">Key ID (kid)</label>
+                <div class="mt-1 sm:col-span-2 sm:mt-0 break-all">{{ displayKid }}</div>
+          </div>
           <div class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-2">
             <label class="block font-medium text-gray-900">Algorithm</label>
-            <!-- <div class="mt-1 sm:col-span-2 sm:mt-0">{{ key.algorithm }}</div> -->
+              <div class="mt-1 sm:col-span-2 sm:mt-0">{{ meta?.algorithm || jwk?.alg || '—' }}</div>
           </div>
-
-          <div class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:pt-2">
-            <label class="block font-medium text-gray-900"
-              >Crypto provider
-            </label>
-            <div class="mt-1 sm:col-span-2 sm:mt-0">
-              <!-- {{ key.cryptoProvider }} -->
+            <div class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-2">
+                <label class="block font-medium text-gray-900">Key type (kty)</label>
+                <div class="mt-1 sm:col-span-2 sm:mt-0">{{ jwk?.kty || '—' }}</div>
+          </div>
+            <div class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-2">
+                <label class="block font-medium text-gray-900">Curve (crv)</label>
+                <div class="mt-1 sm:col-span-2 sm:mt-0">{{ jwk?.crv || '—' }}</div>
             </div>
+          <div class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:pt-2">
+              <label class="block font-medium text-gray-900">Use</label>
+              <div class="mt-1 sm:col-span-2 sm:mt-0">{{ jwk?.use || '—' }}</div>
+          </div>
+            <div class="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:pt-2">
+                <label class="block font-medium text-gray-900">Crypto provider</label>
+                <div class="mt-1 sm:col-span-2 sm:mt-0">{{ meta?.cryptoProvider || '—' }}</div>
           </div>
         </div>
       </div>
 
-      <div class="mt-2 flex items-center justify-end gap-x-6">
+        <div class="mt-4">
+            <label class="block font-medium text-gray-900 mb-1">Public JWK</label>
+            <pre class="text-xs bg-gray-50 p-3 rounded border overflow-auto">{{ formattedJwk }}</pre>
+        </div>
+
+        <div class="mt-4 flex items-center justify-end gap-x-6">
         <button
           class="inline-flex justify-center bg-red-600 hover:bg-red-500 focus-visible:outline-red-700 rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           @click="deleteKey"
@@ -151,22 +166,48 @@
 <script lang="ts" setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import BackButton from "@waltid-web-wallet/components/buttons/BackButton.vue";
-import { ArrowUpOnSquareIcon, ExclamationTriangleIcon, TrashIcon } from "@heroicons/vue/24/outline";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
-import { ref } from "vue";
-import { Switch, SwitchGroup, SwitchLabel } from "@headlessui/vue";
+import {ArrowUpOnSquareIcon, ExclamationTriangleIcon, TrashIcon} from "@heroicons/vue/24/outline";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
+import {computed, onMounted, ref} from "vue";
+import {Switch, SwitchGroup, SwitchLabel} from "@headlessui/vue";
 
 const route = useRoute();
 
-const keyId = route.params.keyId;
+const keyId = route.params.keyId as string;
 
 const format = ref("JWK");
 const enableLoadPrivateKey = ref(false);
 
 const currentWallet = useCurrentWallet();
 
-// const key = await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys/${keyId}/load`);
-refreshNuxtData();
+const jwk = ref<any | null>(null);
+const meta = ref<any | null>(null);
+const aliasName = ref<string | null>(null);
+
+const displayKid = computed(() => jwk.value?.kid || keyId);
+const formattedJwk = computed(() => (jwk.value ? JSON.stringify(jwk.value, null, 2) : "Loading…"));
+
+async function loadData() {
+    try {
+        jwk.value = await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys/${keyId}/load`);
+    } catch (e) {
+        jwk.value = null;
+    }
+    try {
+        meta.value = await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys/${keyId}/meta`);
+    } catch (e) {
+        meta.value = null;
+    }
+    try {
+        const list: any[] = await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys`);
+        const found = list.find((k: any) => k?.keyId?.id === keyId || k?.keyId?.id === jwk.value?.kid);
+        aliasName.value = found?.name || null;
+    } catch (e) {
+        aliasName.value = null;
+    }
+}
+
+onMounted(loadData);
 
 function exportKey() {
   navigateTo(

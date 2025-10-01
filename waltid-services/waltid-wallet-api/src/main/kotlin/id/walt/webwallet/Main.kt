@@ -91,6 +91,7 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
     dids()
     credentials()
     exchange();
+    presentations();
     { exchangeExternalSignatures() } whenFeature FeatureCatalog.externalSignatureEndpointsFeature
     history();
     { web3accounts() } whenFeature FeatureCatalog.web3
