@@ -383,8 +383,6 @@ let passwordInput = "";
 const userStore = useUserStore();
 const { user } = storeToRefs(userStore);
 
-const { status, data, signIn } = useAuth();
-
 const signInRedirectUrl = ref("/");
 
 async function connectOidc() {
@@ -397,14 +395,15 @@ async function login() {
 
     const userData = {
         email: emailInput,
-        password: passwordInput
+        password: passwordInput,
+        type: "email",
     };
 
     // try {
-    await signIn(
-        { email: emailInput, password: passwordInput, type: "email" },
-        { callbackUrl: signInRedirectUrl.value }
-    )
+    await $fetch("/wallet-api/auth/login", {
+        method: "POST",
+        body: userData,
+    })
         .then(() => {
             user.value = {
                 id: "",

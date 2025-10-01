@@ -12,7 +12,6 @@ export default defineNuxtConfig({
         "@nuxtjs/i18n",
         "@nuxtjs/color-mode",
         "@vite-pwa/nuxt",
-        "@sidebase/nuxt-auth",
         "@nuxt/content",
         "@pinia/nuxt",
         "nuxt-icon"
@@ -20,25 +19,6 @@ export default defineNuxtConfig({
 
     build: {
         transpile: ["@headlessui/vue"]
-    },
-
-    auth: {
-        baseURL: "/wallet-api/auth",
-
-        provider: {
-            type: "local",
-            token: {
-                maxAgeInSeconds: 60 * 60 * 24 * 30 // 30 days
-            },
-
-            pages: {
-                login: "/login"
-            }
-        },
-
-        globalAppMiddleware: {
-            isEnabled: true
-        }
     },
 
     pwa: {

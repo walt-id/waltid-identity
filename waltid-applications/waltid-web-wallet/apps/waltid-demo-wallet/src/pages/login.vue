@@ -493,19 +493,18 @@ const isLoggingIn = ref(false);
 const error = ref({ isError: false, message: "" });
 const success = ref(false);
 
-const { status, data, signIn } = useAuth();
-
 async function login() {
   isLoggingIn.value = true;
 
   const userData = {
     email: emailInput,
     password: passwordInput,
+    type: "email",
   };
-  await signIn(
-    { email: emailInput, password: passwordInput, type: "email" },
-    { redirect: false },
-  )
+  await $fetch("/wallet-api/auth/login", {
+    method: "POST",
+    body: userData,
+  })
     .then(async (data) => {
       const wallets = (await listWallets())?.value?.wallets;
 
