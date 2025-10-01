@@ -9,7 +9,7 @@ data class PolicyResult(
     val policy: VerificationPolicy2,
     val success: Boolean,
     val result: JsonElement?,
-    val error: String?
+    val error: String? = null
 )
 
 @Serializable

@@ -48,7 +48,7 @@ object Verifier2Manager {
         val sessionId: String,
         val bootstrapAuthorizationRequestUrl: String,
         val fullAuthorizationRequestUrl: String,
-        val creationTarget: String?
+        val creationTarget: String? = null
     )
 
     suspend fun createVerificationSession(

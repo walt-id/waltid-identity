@@ -92,6 +92,8 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
     testImplementation(project(":waltid-services:waltid-service-commons-test"))
+    testApi(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
+    testImplementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
 
     api(project(":waltid-libraries:credentials:waltid-dcql"))
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
@@ -127,13 +129,13 @@ tasks.withType<ProcessResources> {
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
 
 tasks.withType<KotlinCompile> {
     compilerOptions {
-        jvmTarget = JvmTarget.JVM_17
+        jvmTarget = JvmTarget.JVM_21
     }
 }
 
@@ -146,7 +148,7 @@ tasks.named<CreateStartScripts>("startScripts") {
 }
 
 application {
-    mainClass.set("id.walt.verifier.MainKt")
+    mainClass.set("id.walt.openid4vp.verifier.MainKt")
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
 }

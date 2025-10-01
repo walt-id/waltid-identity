@@ -4,7 +4,7 @@ import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature
 import id.walt.commons.featureflag.ServiceFeatureCatalog
 
-object FeatureCatalog : ServiceFeatureCatalog {
+object Verifier2FeatureCatalog : ServiceFeatureCatalog {
 
     private val verifierService =
         BaseFeature("verifier-service", "Verifier Service Implementation", OSSVerifier2ServiceConfig::class)
