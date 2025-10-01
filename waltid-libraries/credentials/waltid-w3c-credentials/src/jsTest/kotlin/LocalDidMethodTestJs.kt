@@ -22,6 +22,7 @@ class JWKKeyAndDidManagementTest {
     /* Generating/Signing with large RSA keys is taking too long on slow CI:
     @Test
     fun testDidJwkRsaKeys() = runTest { testDidMethodsAndKeys(didJwk, rsaKeys) }
+     */
     @Test
     fun testDidWebRsaKeys() = runTest { testDidMethodsAndKeys(didWeb, rsaKeys) }
      */
