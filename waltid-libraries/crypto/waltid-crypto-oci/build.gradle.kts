@@ -68,6 +68,10 @@ kotlin {
         }
     }
 
+// No JS implementation
+//    js(IR) {
+//    }
+
 //    androidTarget()
 
     sourceSets {
