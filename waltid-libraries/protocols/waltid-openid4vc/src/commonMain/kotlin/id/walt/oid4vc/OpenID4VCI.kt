@@ -76,24 +76,7 @@ object OpenID4VCI {
                     ).toHttpParameters()
                 )
             )
-        }.buildString()
-    }
-
-    fun getCredentialOfferRequestUrl(
-        credOfferUrl: String,
-        credentialOfferEndpoint: String = CROSS_DEVICE_CREDENTIAL_OFFER_URL,
-        customReqParams: Map<String, List<String>> = mapOf()
-    ): String {
-        return URLBuilder(credentialOfferEndpoint).apply {
-            parameters.appendAll(
-                parametersOf(
-                    CredentialOfferRequest(
-                        credentialOfferUri = credOfferUrl,
-                        customParameters = customReqParams
-                    ).toHttpParameters()
-                )
-            )
-        }.buildString()
+        }.buildString().replace("localhost/", "")
     }
 
     fun getCredentialOfferRequestUrl(
@@ -102,7 +85,7 @@ object OpenID4VCI {
     ): String {
         return URLBuilder(credentialOfferEndpoint).apply {
             parameters.appendAll(parametersOf(credOfferReq.toHttpParameters()))
-        }.buildString()
+        }.buildString().replace("localhost/", "")
     }
 
     fun parseCredentialOfferRequestUrl(credOfferReqUrl: String): CredentialOfferRequest {
