@@ -66,7 +66,7 @@ fun Application.configureSecurity() {
                 // cookie.httpOnly = true
                 cookie.httpOnly = false // FIXME
                 // TODO cookie.secure = true
-                cookie.maxAge = tokenLifetime.days
+                cookie.maxAge = AuthKeys.refreshTokenLifetimeDuration
                 cookie.extensions["SameSite"] = "Strict"
                 transform(SessionTransportTransformerEncrypt(AuthKeys.encryptionKey, AuthKeys.signKey))
             }
@@ -76,7 +76,14 @@ fun Application.configureSecurity() {
                 // cookie.httpOnly = true
                 cookie.httpOnly = false // FIXME
                 // TODO cookie.secure = true
-                cookie.maxAge = tokenLifetime.days
+                cookie.maxAge = AuthKeys.refreshTokenLifetimeDuration
+                cookie.extensions["SameSite"] = "Strict"
+                transform(SessionTransportTransformerEncrypt(AuthKeys.encryptionKey, AuthKeys.signKey))
+            }
+            cookie<RefreshTokenSession>("refresh-token") {
+                cookie.httpOnly = true
+                cookie.secure = !FeatureManager.isFeatureEnabled(FeatureCatalog.devModeFeature)
+                cookie.maxAge = AuthKeys.refreshTokenLifetimeDuration
                 cookie.extensions["SameSite"] = "Strict"
                 transform(SessionTransportTransformerEncrypt(AuthKeys.encryptionKey, AuthKeys.signKey))
             }

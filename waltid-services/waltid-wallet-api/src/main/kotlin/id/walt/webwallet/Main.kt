@@ -10,6 +10,7 @@ import id.walt.crypto.keys.aws.WaltCryptoAws
 import id.walt.crypto.keys.oci.WaltCryptoOci
 import id.walt.did.helpers.WaltidServices
 import id.walt.webwallet.db.Db
+import id.walt.webwallet.service.TokenCleanupService
 import id.walt.webwallet.web.Administration.configureAdministration
 import id.walt.webwallet.web.controllers.*
 import id.walt.webwallet.web.controllers.NotificationController.notifications
@@ -44,6 +45,7 @@ suspend fun main(args: Array<String>) {
                 WaltCryptoOci.init()
                 WaltCryptoAws.init()
                 Db.start()
+                TokenCleanupService.start()
             },
             run = WebService(Application::webWalletModule).run()
         )
