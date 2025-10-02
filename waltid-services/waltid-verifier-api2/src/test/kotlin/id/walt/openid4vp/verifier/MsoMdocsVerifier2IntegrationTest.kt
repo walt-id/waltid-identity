@@ -251,7 +251,6 @@ class MsoMdocsVerifier2IntegrationTest {
             val bootstrapUrl = Url(verificationSessionResponse.bootstrapAuthorizationRequestUrl)
 
             val holderKey = holderKeyFun()
-            val holderDid = "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17"
 
             val selectCallback: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>> = { query ->
                 selectCredentialsForQuery(
@@ -262,7 +261,7 @@ class MsoMdocsVerifier2IntegrationTest {
             val presentationResult = testAndReturn("Present with wallet") {
                 WalletPresentFunctionality2.walletPresentHandling(
                     holderKey = holderKey,
-                    holderDid = holderDid,
+                    holderDid = null, // No DID required for mso_mdocs
                     presentationRequestUrl = bootstrapUrl,
                     selectCredentialsForQuery = selectCallback,
                     holderPoliciesToRun = null,
