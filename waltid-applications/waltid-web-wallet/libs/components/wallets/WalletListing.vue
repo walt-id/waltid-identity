@@ -42,9 +42,9 @@
 </template>
 
 <script lang="ts" setup>
-import { setWallet, type WalletListing } from "../../composables/accountWallet.ts";
+import {setWallet, type WalletListing} from "../../composables/accountWallet.ts";
 import LoadingIndicator from "../../components/loading/LoadingIndicator.vue";
-import { navigateTo } from "nuxt/app";
+import {navigateTo} from "nuxt/app";
 
 const props = defineProps<{
     useUrl: (wallet: WalletListing) => string;

@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
 
 package id.walt.webwallet.usecase.exchange
 
@@ -12,12 +12,12 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.usecase.exchange.strategies.PresentationDefinitionMatchStrategy
 import io.mockk.every
 import io.mockk.mockk
-import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 
 class NoMatchPresentationDefinitionCredentialsUseCaseTest {

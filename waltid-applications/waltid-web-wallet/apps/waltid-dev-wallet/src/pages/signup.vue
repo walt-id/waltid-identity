@@ -184,10 +184,10 @@
 </template>
 
 <script lang="ts" setup>
-import { ArrowRightStartOnRectangleIcon, EnvelopeIcon, IdentificationIcon, KeyIcon } from "@heroicons/vue/20/solid";
+import {ArrowRightStartOnRectangleIcon, EnvelopeIcon, IdentificationIcon, KeyIcon} from "@heroicons/vue/20/solid";
 import ActionResultModal from "@waltid-web-wallet/components/modals/ActionResultModal.vue";
 import useModalStore from "@waltid-web-wallet/stores/useModalStore.ts";
-import { useTenant } from "@waltid-web-wallet/composables/tenants.ts";
+import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
 
 const tenant = await useTenant().value;
 const bgImg = tenant?.bgImage;

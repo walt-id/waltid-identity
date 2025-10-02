@@ -69,7 +69,7 @@ data class AuthorizationRequest(
      *
      * Also used to establish holder binding.
      */
-    val nonce: String?,
+    val nonce: String? = null,
 
     // JAR (RFC 9101) Parameters (Section 5)
     /**

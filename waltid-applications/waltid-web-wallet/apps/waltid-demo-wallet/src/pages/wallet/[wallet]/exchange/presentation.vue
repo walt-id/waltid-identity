@@ -98,10 +98,10 @@
 </template>
 
 <script lang="ts" setup>
-import { useTitle } from "@vueuse/core";
-import { parseJwt } from "@waltid-web-wallet/utils/jwt.ts";
+import {useTitle} from "@vueuse/core";
+import {parseJwt} from "@waltid-web-wallet/utils/jwt.ts";
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import { usePresentation } from "@waltid-web-wallet/composables/presentation.ts";
+import {usePresentation} from "@waltid-web-wallet/composables/presentation.ts";
 import LoadingIndicator from "@waltid-web-wallet/components/loading/LoadingIndicator.vue";
 import VerifiableCredentialCard from "@waltid-web-wallet/components/credentials/VerifiableCredentialCard.vue";
 

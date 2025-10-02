@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.ktorauthnz.sessions
 
 import id.walt.ktorauthnz.KtorAuthnzManager
@@ -5,7 +7,6 @@ import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.flows.methods
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
-import kotlinx.datetime.Instant
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -13,6 +14,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlin.reflect.jvm.jvmName
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 enum class AuthSessionStatus(val value: String) {
     INIT("init"),

@@ -28,7 +28,7 @@
 </template>
 
 <script setup>
-import { getSiopRequestType, isSiopRequest, SiopRequestType } from "@waltid-web-wallet/composables/siop-requests.ts";
+import {getSiopRequestType, isSiopRequest, SiopRequestType} from "@waltid-web-wallet/composables/siop-requests.ts";
 
 const isMobileView = ref(window.innerWidth < 650);
 

@@ -14,12 +14,12 @@ import id.walt.cli.presexch.strategies.FilterPresentationDefinitionMatchStrategy
 import id.walt.cli.util.KeyUtil
 import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
-import id.walt.w3c.PresentationBuilder
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
 import id.walt.oid4vc.data.dif.PresentationDefinition
+import id.walt.w3c.PresentationBuilder
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject

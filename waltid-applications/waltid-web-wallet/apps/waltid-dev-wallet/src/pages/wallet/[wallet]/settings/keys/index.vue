@@ -101,8 +101,8 @@
 
 <script lang="ts" setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
-import { ArrowUturnLeftIcon, CheckIcon, HashtagIcon, InboxArrowDownIcon, KeyIcon } from "@heroicons/vue/24/outline";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
+import {ArrowUturnLeftIcon, CheckIcon, HashtagIcon, InboxArrowDownIcon, KeyIcon} from "@heroicons/vue/24/outline";
 
 const currentWallet = useCurrentWallet();
 

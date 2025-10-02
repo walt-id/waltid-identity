@@ -151,10 +151,10 @@
 <script lang="ts" setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import BackButton from "@waltid-web-wallet/components/buttons/BackButton.vue";
-import { ArrowUpOnSquareIcon, ExclamationTriangleIcon, TrashIcon } from "@heroicons/vue/24/outline";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
-import { ref } from "vue";
-import { Switch, SwitchGroup, SwitchLabel } from "@headlessui/vue";
+import {ArrowUpOnSquareIcon, ExclamationTriangleIcon, TrashIcon} from "@heroicons/vue/24/outline";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
+import {ref} from "vue";
+import {Switch, SwitchGroup, SwitchLabel} from "@headlessui/vue";
 
 const route = useRoute();
 

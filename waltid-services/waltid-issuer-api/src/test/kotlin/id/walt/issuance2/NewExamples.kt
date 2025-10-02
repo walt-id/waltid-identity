@@ -1,11 +1,11 @@
 package id.walt.issuance2
 
-import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.issuer.issuance.IssuanceConfiguration
 import id.walt.issuer.issuance.IssuerConfiguration
 import id.walt.issuer.issuance.NewIssuanceRequest
 import id.walt.issuer.issuance.NewSingleCredentialIssuanceRequest
 import id.walt.oid4vc.data.GrantType
+import id.walt.w3c.vc.vcs.W3CVC
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 

@@ -1,7 +1,7 @@
 package id.walt.policies.policies.status.reader
 
-import id.walt.policies.policies.status.model.StatusContent
 import id.walt.policies.policies.status.content.ContentParser
+import id.walt.policies.policies.status.model.StatusContent
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject

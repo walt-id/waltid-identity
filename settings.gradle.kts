@@ -33,13 +33,18 @@ val modules = listOfNotNull(
         "waltid-dif-definitions-parser",
         "waltid-dcql",
         "waltid-verification-policies",
+        "waltid-verification-policies2",
         "waltid-holder-policies",
-        "waltid-vical"
+        "waltid-vical",
+        "waltid-mdoc-credentials2"
     ),
 
     * "$libraries:protocols".group(
         "waltid-openid4vc",
+
         "waltid-openid4vp",
+        "waltid-openid4vp-verifier",
+        "waltid-openid4vp-wallet"
     ),
 
     * "$libraries:sdjwt".group(
@@ -51,6 +56,11 @@ val modules = listOfNotNull(
         "waltid-ktor-authnz",
         "waltid-permissions",
         "waltid-idpkit"
+    ),
+
+    * "$libraries:web".group(
+        "waltid-ktor-notifications",
+        "waltid-ktor-notifications-core"
     ),
 
     "$libraries:waltid-core-wallet",
@@ -72,6 +82,7 @@ val modules = listOfNotNull(
     // Services based on libs
     "$services:waltid-issuer-api",
     "$services:waltid-verifier-api",
+    "$services:waltid-verifier-api2",
     "$services:waltid-wallet-api",
 
     // Service tests

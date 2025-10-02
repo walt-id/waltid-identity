@@ -1,6 +1,6 @@
 import axios from "axios";
-import { v4 as uuidv4 } from "uuid";
-import { AvailableCredential, CredentialFormats, DIDMethods, DIDMethodsConfig } from "@/types/credentials";
+import {v4 as uuidv4} from "uuid";
+import {AvailableCredential, CredentialFormats, DIDMethods, DIDMethodsConfig} from "@/types/credentials";
 
 const getOfferUrl = async (
   credentials: Array<AvailableCredential>,

@@ -32,9 +32,9 @@
 </template>
 
 <script lang="ts" setup>
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import { DocumentPlusIcon } from "@heroicons/vue/24/outline";
+import {DocumentPlusIcon} from "@heroicons/vue/24/outline";
 
 const keyText = ref("");
 const currentWallet = useCurrentWallet();

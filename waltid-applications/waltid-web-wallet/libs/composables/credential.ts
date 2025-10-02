@@ -1,8 +1,8 @@
-import { parseDisclosures } from "../composables/disclosures.ts";
-import { computedAsync } from "@vueuse/core";
-import { parseJwt } from "../utils/jwt.ts";
-import { computed, type Ref, ref, watchEffect } from "vue";
-import { useCurrentWallet } from "./accountWallet";
+import {parseDisclosures} from "../composables/disclosures.ts";
+import {computedAsync} from "@vueuse/core";
+import {parseJwt} from "../utils/jwt.ts";
+import {computed, type Ref, ref, watchEffect} from "vue";
+import {useCurrentWallet} from "./accountWallet";
 
 export type WalletCredential = {
     wallet: string;

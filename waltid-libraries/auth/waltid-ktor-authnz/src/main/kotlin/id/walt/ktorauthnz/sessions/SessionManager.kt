@@ -1,9 +1,12 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.ktorauthnz.sessions
 
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.flows.AuthFlow
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 object SessionManager {
 

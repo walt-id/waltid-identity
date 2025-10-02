@@ -207,14 +207,14 @@
 </template>
 
 <script lang="ts" setup>
-import { CheckIcon, ChevronUpDownIcon, PlusIcon } from "@heroicons/vue/20/solid";
+import {CheckIcon, ChevronUpDownIcon, PlusIcon} from "@heroicons/vue/20/solid";
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import Web3WalletIcon from "@waltid-web-wallet/components/Web3WalletIcon.vue";
 import AddWalletModal from "@waltid-web-wallet/components/modals/AddWalletModal.vue";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 import useModalStore from "@waltid-web-wallet/stores/useModalStore.ts";
 import tile from "@waltid-web-wallet/components/nfts/list/tile.vue";
-import { Listbox, ListboxButton, ListboxLabel, ListboxOption, ListboxOptions } from "@headlessui/vue";
+import {Listbox, ListboxButton, ListboxLabel, ListboxOption, ListboxOptions} from "@headlessui/vue";
 
 const store = useModalStore();
 const selectedAccount = ref({});

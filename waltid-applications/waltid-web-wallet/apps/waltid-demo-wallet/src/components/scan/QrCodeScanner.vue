@@ -31,8 +31,8 @@
 <script setup>
 import QrScanner from "qr-scanner";
 import LoadingIndicator from "@waltid-web-wallet/components/loading/LoadingIndicator.vue";
-import { VideoCameraIcon, VideoCameraSlashIcon } from "@heroicons/vue/24/outline";
-import { isSiopRequest } from "@waltid-web-wallet/composables/siop-requests.ts";
+import {VideoCameraIcon, VideoCameraSlashIcon} from "@heroicons/vue/24/outline";
+import {isSiopRequest} from "@waltid-web-wallet/composables/siop-requests.ts";
 
 const emit = defineEmits(["request"]);
 

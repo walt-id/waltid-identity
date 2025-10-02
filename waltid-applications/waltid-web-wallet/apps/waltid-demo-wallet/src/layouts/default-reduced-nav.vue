@@ -300,8 +300,8 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from "vue";
-import { Dialog, DialogPanel, Menu, MenuButton, MenuItem, MenuItems, TransitionChild, TransitionRoot } from "@headlessui/vue";
+import {ref} from "vue";
+import {Dialog, DialogPanel, Menu, MenuButton, MenuItem, MenuItems, TransitionChild, TransitionRoot} from "@headlessui/vue";
 import {
     ArrowPathIcon,
     Bars3CenterLeftIcon,
@@ -312,11 +312,11 @@ import {
     ShieldCheckIcon,
     XMarkIcon
 } from "@heroicons/vue/24/outline";
-import { ChevronDownIcon, MagnifyingGlassIcon } from "@heroicons/vue/20/solid";
-import { useUserStore } from "@waltid-web-wallet/stores/user.ts";
-import { storeToRefs } from "pinia";
-import { useTenant } from "@waltid-web-wallet/composables/tenants.ts";
-import { logout } from "~/composables/authentication";
+import {ChevronDownIcon, MagnifyingGlassIcon} from "@heroicons/vue/20/solid";
+import {useUserStore} from "@waltid-web-wallet/stores/user.ts";
+import {storeToRefs} from "pinia";
+import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
+import {logout} from "~/composables/authentication";
 
 const runtimeConfig = useRuntimeConfig();
 const demoWalletUrl = runtimeConfig.public.demoWalletUrl as string;

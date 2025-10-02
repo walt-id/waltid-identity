@@ -1,8 +1,8 @@
 import http from "k6/http";
-import { check, sleep } from "k6";
-import { Counter } from "k6/metrics";
-import { SharedArray } from "k6/data";
-import { scenario } from "k6/execution";
+import {check, sleep} from "k6";
+import {Counter} from "k6/metrics";
+import {SharedArray} from "k6/data";
+import {scenario} from "k6/execution";
 
 /**
  * This test registers 10k users whereas the test will fail if more than 5% of the requests will take more than 1s.

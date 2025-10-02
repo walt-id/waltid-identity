@@ -69,13 +69,13 @@
 </template>
 
 <script lang="ts" setup>
-import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/vue";
-import { ChevronDownIcon, MagnifyingGlassIcon } from "@heroicons/vue/20/solid";
-import { useUserStore } from "@waltid-web-wallet/stores/user.ts";
-import { storeToRefs } from "pinia";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
-import { useTenant } from "@waltid-web-wallet/composables/tenants.ts";
-import { logout } from "~/composables/authentication";
+import {Menu, MenuButton, MenuItem, MenuItems} from "@headlessui/vue";
+import {ChevronDownIcon, MagnifyingGlassIcon} from "@heroicons/vue/20/solid";
+import {useUserStore} from "@waltid-web-wallet/stores/user.ts";
+import {storeToRefs} from "pinia";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
+import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
+import {logout} from "~/composables/authentication";
 
 const tenant = await (useTenant()).value
 const name = tenant?.name

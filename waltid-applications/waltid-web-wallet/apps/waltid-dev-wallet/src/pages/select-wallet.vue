@@ -19,7 +19,7 @@
 </template>
 
 <script lang="ts" setup>
-import { InboxArrowDownIcon } from "@heroicons/vue/24/outline";
+import {InboxArrowDownIcon} from "@heroicons/vue/24/outline";
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import WalletListing from "@waltid-web-wallet/components/wallets/WalletListing.vue";
 

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.ktorauthnz.tokens.jwttoken
 
 import id.walt.crypto.keys.Key
@@ -5,9 +7,10 @@ import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.tokens.TokenHandler
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 class JwtTokenHandler : TokenHandler {
 

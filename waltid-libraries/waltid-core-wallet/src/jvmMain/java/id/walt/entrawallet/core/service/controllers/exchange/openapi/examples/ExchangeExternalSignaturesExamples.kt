@@ -1,8 +1,8 @@
 package id.walt.webwallet.web.controllers.exchange.openapi.examples
 
-import id.walt.w3c.utils.VCFormat
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationSubmission
+import id.walt.w3c.utils.VCFormat
 import id.walt.webwallet.web.controllers.exchange.models.oid4vp.IETFSdJwtVpProofParameters
 import id.walt.webwallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPRequest
 import id.walt.webwallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPResponse

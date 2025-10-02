@@ -60,8 +60,8 @@
 <script lang="ts" setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import BackButton from "@waltid-web-wallet/components/buttons/BackButton.vue";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
-import { ExclamationTriangleIcon } from "@heroicons/vue/24/outline";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
+import {ExclamationTriangleIcon} from "@heroicons/vue/24/outline";
 import QrcodeVue from "qrcode.vue";
 
 const route = useRoute();

@@ -50,6 +50,7 @@ kotlin {
     }
     js(IR) {
         outputModuleName = "cose"
+        useEsModules()
         nodejs {
             generateTypeScriptDefinitions()
             testTask {
@@ -73,6 +74,9 @@ kotlin {
         }
         val commonMain by getting {
             dependencies {
+                // JSON
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+
                 // CBOR
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
 
@@ -93,7 +97,7 @@ kotlin {
                 implementation("org.kotlincrypto.hash:sha2")
 
                 // Date
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
                 // Cache
                 implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")
@@ -106,9 +110,9 @@ kotlin {
 
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
 
-
-                implementation(project.dependencies.platform("org.kotlincrypto.macs:bom:0.6.1"))
-                implementation("org.kotlincrypto.macs:hmac-sha2")*/
+                */
+                implementation(project.dependencies.platform("org.kotlincrypto.macs:bom:0.7.1"))
+                implementation("org.kotlincrypto.macs:hmac-sha2")
 
             }
         }

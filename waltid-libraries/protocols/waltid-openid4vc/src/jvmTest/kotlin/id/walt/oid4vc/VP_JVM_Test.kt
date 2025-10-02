@@ -1,6 +1,5 @@
 package id.walt.oid4vc
 
-import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
@@ -11,6 +10,7 @@ import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.policies.policies.JwtSignaturePolicy
+import id.walt.w3c.utils.VCFormat
 import io.kotest.matchers.collections.shouldContain
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -252,6 +252,8 @@ class VP_JVM_Test {
         }
     }
 
+    private val prettyPrintJson = Json { prettyPrint = true }
+
     //@Test
     suspend fun testMattrLaunchpadVerificationRequest() {
 
@@ -307,7 +309,7 @@ class VP_JVM_Test {
         val debugPresentingPresentationSubmission =
             tokenResponse.toHttpParameters()["presentation_submission"]!!.first()
         val decoded = Json.parseToJsonElement(debugPresentingPresentationSubmission).jsonObject
-        val encoded = Json { prettyPrint = true }.encodeToString(decoded)
+        val encoded = prettyPrintJson.encodeToString(decoded)
         println(encoded)
 
         println("Submitting...")
@@ -358,7 +360,7 @@ class VP_JVM_Test {
         val debugPresentingPresentationSubmission =
             tokenResponse.toHttpParameters()["presentation_submission"]!!.first()
         val decoded = Json.parseToJsonElement(debugPresentingPresentationSubmission).jsonObject
-        val encoded = Json { prettyPrint = true }.encodeToString(decoded)
+        val encoded = prettyPrintJson.encodeToString(decoded)
         println(encoded)
 
         println("Submitting...")
@@ -504,7 +506,7 @@ class VP_JVM_Test {
         val debugPresentingPresentationSubmission =
             tokenResponse.toHttpParameters()["presentation_submission"]!!.first()
         val decoded = Json.parseToJsonElement(debugPresentingPresentationSubmission).jsonObject
-        val encoded = Json { prettyPrint = true }.encodeToString(decoded)
+        val encoded = prettyPrintJson.encodeToString(decoded)
         println(encoded)
 
         println("Submitting...")

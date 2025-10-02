@@ -4,11 +4,7 @@ import aws.sdk.kotlin.services.kms.KmsClient
 import aws.sdk.kotlin.services.kms.model.*
 import id.walt.crypto.exceptions.KeyTypeNotSupportedException
 import id.walt.crypto.exceptions.SigningException
-import id.walt.crypto.keys.EccUtils
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyMeta
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.KeyTypes
+import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64

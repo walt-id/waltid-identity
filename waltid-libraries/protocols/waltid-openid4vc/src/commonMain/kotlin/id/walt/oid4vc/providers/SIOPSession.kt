@@ -1,7 +1,10 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.oid4vc.providers
 
 import id.walt.oid4vc.requests.AuthorizationRequest
-import kotlinx.datetime.Instant
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 open class SIOPSession(
     override val id: String,

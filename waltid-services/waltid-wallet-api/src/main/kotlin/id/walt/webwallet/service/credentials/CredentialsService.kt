@@ -1,19 +1,20 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.webwallet.service.credentials
 
 import id.walt.webwallet.db.models.WalletCategory
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletCredentialCategoryMap
 import id.walt.webwallet.db.models.WalletCredentials
-import kotlinx.datetime.Clock
-import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.Serializable
-
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
-import org.jetbrains.exposed.sql.statements.UpdateStatement
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.core.statements.UpdateStatement
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.toJavaInstant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid
@@ -22,8 +23,8 @@ import kotlin.uuid.toJavaUuid
 class CredentialsService {
     val categoryService = CategoryService()
 
-    private val notDeletedItemsCondition = Op.build { WalletCredentials.deletedOn eq null }
-    private val deletedItemsCondition = Op.build { WalletCredentials.deletedOn neq null }
+    private val notDeletedItemsCondition = WalletCredentials.deletedOn eq null
+    private val deletedItemsCondition = WalletCredentials.deletedOn neq null
 
     /**
      * Returns a credential identifier by [credentialId]

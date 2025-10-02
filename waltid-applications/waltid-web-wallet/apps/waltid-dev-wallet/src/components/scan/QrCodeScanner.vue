@@ -57,7 +57,7 @@ import {
     XMarkIcon
 } from "@heroicons/vue/24/outline";
 import WaltButton from "@waltid-web-wallet/components/buttons/WaltButton.vue";
-import { isSiopRequest } from "@waltid-web-wallet/composables/siop-requests.ts";
+import {isSiopRequest} from "@waltid-web-wallet/composables/siop-requests.ts";
 
 const emit = defineEmits(["request"]);
 

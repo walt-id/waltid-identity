@@ -16,7 +16,6 @@ import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
-import kotlin.test.assertTrue
 
 class DidWebResolverTest : DidResolverTestBase() {
     override val resolver: LocalResolverMethod = DidWebResolver(TestClient.http)

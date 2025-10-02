@@ -1,15 +1,16 @@
-@file:OptIn(ExperimentalJsExport::class)
+@file:OptIn(ExperimentalJsExport::class, ExperimentalTime::class)
 
 package id.walt.policies
 
 import id.walt.policies.policies.JsonSchemaPolicy
-import kotlinx.datetime.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Duration
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 @JsExport
 @Serializable
@@ -24,7 +25,6 @@ data class JsonSchemaVerificationException(
     val validationErrors: List<JsonSchemaPolicy.SerializableValidationError>
 ) : SerializableRuntimeException()
 
-@JsExport
 @Serializable
 @SerialName("NotBeforePolicyException")
 data class NotBeforePolicyException(
@@ -37,7 +37,6 @@ data class NotBeforePolicyException(
     @SerialName("policy_available") val policyAvailable: Boolean = true,
 ) : SerializableRuntimeException()
 
-@JsExport
 @Serializable
 @SerialName("ExpirationDatePolicyException")
 data class ExpirationDatePolicyException(

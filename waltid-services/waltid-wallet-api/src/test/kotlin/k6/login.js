@@ -1,8 +1,8 @@
 import http from "k6/http";
-import { check } from "k6";
-import { Counter } from "k6/metrics";
-import { SharedArray } from "k6/data";
-import { scenario } from "k6/execution";
+import {check} from "k6";
+import {Counter} from "k6/metrics";
+import {SharedArray} from "k6/data";
+import {scenario} from "k6/execution";
 
 /**
  * This test case assumes that the database is pre-populated with 10k user accounts, where each will be used for running

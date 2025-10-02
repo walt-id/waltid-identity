@@ -1,6 +1,6 @@
 package id.walt.webwallet.db.models
 
-import org.jetbrains.exposed.dao.id.UUIDTable
+import org.jetbrains.exposed.v1.core.dao.id.UUIDTable
 
 object WalletIssuers : UUIDTable("wallet_issuers") {
     val wallet = reference("wallet", Wallets)

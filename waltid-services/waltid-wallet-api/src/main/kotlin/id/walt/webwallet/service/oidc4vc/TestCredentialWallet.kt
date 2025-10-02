@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.webwallet.service.oidc4vc
 
 import com.nimbusds.jose.jwk.ECKey
@@ -43,18 +45,18 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import io.ktor.client.request.*
-import io.ktor.client.request.forms.submitForm
-import io.ktor.client.request.headers
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
 import org.cose.java.AlgorithmID
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:$WALLET_PORT"

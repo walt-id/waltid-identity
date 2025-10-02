@@ -12,7 +12,7 @@ import kotlinx.serialization.json.*
 object VerifierApiExamples {
 
     //todo: remove line when ktor-swagger-ui#107 is fixed
-    private fun jsonObjectValueExampleDescriptorDsl(content: String): ValueExampleDescriptorConfig.() -> Unit = {
+    private fun jsonObjectValueExampleDescriptorDsl(content: String): ValueExampleDescriptorConfig<JsonObject>.() -> Unit = {
         value = Json.decodeFromString<JsonObject>(content)
     }
 

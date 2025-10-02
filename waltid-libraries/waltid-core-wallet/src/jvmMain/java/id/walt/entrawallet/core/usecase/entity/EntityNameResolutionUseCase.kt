@@ -4,8 +4,8 @@ package id.walt.webwallet.usecase.entity
 import id.walt.webwallet.db.models.EntityNameResolutionData
 import id.walt.webwallet.service.cache.EntityNameResolutionCacheService
 import id.walt.webwallet.service.entity.EntityNameResolutionService
-import kotlinx.datetime.Clock.System.now
-import kotlinx.datetime.Instant
+import kotlin.time.Clock.System.now
+import kotlin.time.Instant
 
 class EntityNameResolutionUseCase(
     private val cacheService: EntityNameResolutionCacheService,

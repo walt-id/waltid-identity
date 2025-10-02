@@ -1,8 +1,6 @@
 package id.walt.wallet
 
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyManager
-import id.walt.did.helpers.WaltidServices
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.requests.CredentialRequest

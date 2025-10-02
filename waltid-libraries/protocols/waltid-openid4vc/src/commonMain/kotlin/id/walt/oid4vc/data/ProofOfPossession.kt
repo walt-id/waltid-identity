@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
 
 package id.walt.oid4vc.data
 
@@ -10,9 +10,10 @@ import id.walt.mdoc.dataelement.*
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.util.JwtUtils
 import io.ktor.utils.io.core.*
-import kotlinx.datetime.Clock
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalSerializationApi::class)

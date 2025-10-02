@@ -70,11 +70,11 @@
 </template>
 
 <script setup>
-import { PlusIcon } from "@heroicons/vue/24/outline";
+import {PlusIcon} from "@heroicons/vue/24/outline";
 import WalletPageHeader from "@waltid-web-wallet/components/WalletPageHeader.vue";
 import LoadingIndicator from "@waltid-web-wallet/components/loading/LoadingIndicator.vue";
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 import VerifiableCredentialCard from "@waltid-web-wallet/components/credentials/VerifiableCredentialCard.vue";
 
 const config = useRuntimeConfig();

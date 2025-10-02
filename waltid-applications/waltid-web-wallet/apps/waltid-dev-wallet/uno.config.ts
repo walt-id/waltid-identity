@@ -1,5 +1,5 @@
-import { defineConfig, presetTypography, presetUno } from "unocss";
-import { presetForms } from "@julr/unocss-preset-forms";
+import {defineConfig, presetTypography, presetUno} from "unocss";
+import {presetForms} from "@julr/unocss-preset-forms";
 import transformerDirectives from "@unocss/transformer-directives";
 import transformerVariantGroup from "@unocss/transformer-variant-group";
 

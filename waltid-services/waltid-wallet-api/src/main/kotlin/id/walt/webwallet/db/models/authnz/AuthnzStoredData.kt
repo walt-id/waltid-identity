@@ -2,8 +2,8 @@ package id.walt.webwallet.db.models.authnz
 
 import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
 import kotlinx.serialization.json.Json
-import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.json.json
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.json.json
 
 object AuthnzStoredData : Table() {
     val id = uuid("id").autoGenerate()

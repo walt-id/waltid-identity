@@ -1,8 +1,8 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.entrawallet.core.service.oidc4vc
 
-import org.cose.java.AlgorithmID
 import com.nimbusds.jose.jwk.ECKey
-import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.base64UrlToBase64
@@ -11,6 +11,8 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
+import id.walt.entrawallet.core.service.exchange.CredentialDataResult
+import id.walt.entrawallet.core.utils.SessionAttributes
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.EncodedCBORElement
@@ -41,8 +43,7 @@ import id.walt.oid4vc.responses.TokenErrorCode
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.WaltIdJWTCryptoProvider
-import id.walt.entrawallet.core.service.exchange.CredentialDataResult
-import id.walt.entrawallet.core.utils.SessionAttributes
+import id.walt.w3c.utils.VCFormat
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -50,11 +51,13 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
+import org.cose.java.AlgorithmID
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:$WALLET_PORT"

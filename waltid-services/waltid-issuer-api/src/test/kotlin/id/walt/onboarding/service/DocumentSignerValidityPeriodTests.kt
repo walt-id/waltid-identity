@@ -1,15 +1,14 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.onboarding.service
 
 import id.walt.issuer.services.onboarding.OnboardingService
 import id.walt.issuer.services.onboarding.models.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
-import kotlin.time.DurationUnit
-import kotlin.time.toDuration
+import kotlin.time.*
 
 class DocumentSignerValidityPeriodTest {
 

@@ -1,8 +1,8 @@
-import { createError, navigateTo, useLazyAsyncData } from "nuxt/app";
-import { useCurrentWallet } from "./accountWallet.ts";
-import { decodeRequest } from "./siop-requests.ts";
-import { type Ref, ref, watch } from "vue";
-import { groupBy } from "./groupings.ts";
+import {createError, navigateTo, useLazyAsyncData} from "nuxt/app";
+import {useCurrentWallet} from "./accountWallet.ts";
+import {decodeRequest} from "./siop-requests.ts";
+import {type Ref, ref, watch} from "vue";
+import {groupBy} from "./groupings.ts";
 
 export async function useIssuance(query: any) {
     const currentWallet = useCurrentWallet()

@@ -39,11 +39,11 @@
 </template>
 
 <script setup>
-import { logout } from "~/composables/authentication";
+import {logout} from "~/composables/authentication";
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
-import { useUserStore } from "@waltid-web-wallet/stores/user.ts";
-import { storeToRefs } from "pinia";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
+import {useUserStore} from "@waltid-web-wallet/stores/user.ts";
+import {storeToRefs} from "pinia";
 
 const userStore = useUserStore();
 const { user } = storeToRefs(userStore);

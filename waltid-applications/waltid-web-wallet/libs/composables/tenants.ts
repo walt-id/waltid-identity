@@ -1,4 +1,4 @@
-import { createError, useAppConfig, useFetch, useRequestURL, useState } from "nuxt/app";
+import {createError, useAppConfig, useFetch, useRequestURL, useState} from "nuxt/app";
 
 export function useTenant() {
     return useState("tenant-config", async () => {

@@ -22,7 +22,7 @@ import kotlin.time.Instant
 private value class CborTaggedDateTimeString(@CborLabel(0) val rfc3339String: String)
 
 /**
- * Custom serializer for kotlinx.datetime.Instant to handle CBOR tag 0 (tdate).
+ * Custom serializer for kotlin.time.Instant to handle CBOR tag 0 (tdate).
  * ISO/IEC 18013-5 specifies that 'tdate' elements are encoded as a text string
  * (RFC 3339 format) with CBOR tag 0.
  *

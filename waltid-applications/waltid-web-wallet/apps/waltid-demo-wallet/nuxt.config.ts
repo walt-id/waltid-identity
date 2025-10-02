@@ -1,4 +1,4 @@
-import { defineNuxtConfig } from "nuxt/config";
+import {defineNuxtConfig} from "nuxt/config";
 import presetIcons from "@unocss/preset-icons";
 import path from "path";
 
