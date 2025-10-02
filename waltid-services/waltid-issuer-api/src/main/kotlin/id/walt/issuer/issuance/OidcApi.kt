@@ -462,7 +462,7 @@ object OidcApi : CIProvider() {
                     logger.info { "/token tokenResp: $tokenResp" }
                     call.respond(tokenResp.toJSON())
                 } catch (exc: TokenError) {
-                    logger.error(exc) { "Token error: " }
+                    logger.error(exc) { "Token error" }
                     call.respond(
                         status = HttpStatusCode.BadRequest,
                         message = exc.toAuthorizationErrorResponse().toJSON()

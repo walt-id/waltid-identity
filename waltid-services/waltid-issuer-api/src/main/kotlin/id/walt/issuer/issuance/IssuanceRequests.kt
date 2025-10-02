@@ -96,6 +96,8 @@ data class IssuanceRequest(
     val display: List<DisplayProperties>? = null,
     val draft11EncodeOfferedCredentialsByReference: Boolean? = true, //if set to false and only for standard version DRAFT11, offered credentials will be encoded by value, not by reference - required by EBSI Vector
     val issuanceType: String? = null, // IN_TIME, DEFERRED
+    val txCode: TxCode? = null,
+    val txCodeValue: String? = null,
 ) {
 
     init {
