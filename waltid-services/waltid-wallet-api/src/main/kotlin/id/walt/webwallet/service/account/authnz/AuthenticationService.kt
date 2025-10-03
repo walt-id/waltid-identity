@@ -4,17 +4,15 @@ import id.walt.ktorauthnz.accounts.EditableAccountStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
-import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers.userId
 import id.walt.webwallet.db.models.authnz.AuthnzStoredData
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.jdbc.insert
-import org.jetbrains.exposed.v1.jdbc.select
-import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.util.UUID
 import kotlin.uuid.ExperimentalUuidApi
@@ -30,7 +28,7 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
             transaction {
                 AuthnzAccountIdentifiers.insert {
                     it[userId] = UUID.fromString(accountId)
-                    it[identifier] = newAccountIdentifier.accountIdentifierName
+                    it[identifier] = newAccountIdentifier.toDataString()
                     //it[AuthnzAccountIdentifiers.method] =
                 }
                 Unit // Explicitly return Unit
@@ -38,8 +36,16 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
         }
 
         override suspend fun removeAccountIdentifierFromAccount(accountIdentifier: AccountIdentifier) {
-            throw NotImplementedError("removeAccountIdentifierFromAccount")
+            transaction {
+                AuthnzAccountIdentifiers
+                    .deleteWhere { AuthnzAccountIdentifiers.identifier eq accountIdentifier.toDataString() }
+            }
         }
+
+        private fun getAccountIdByAccountIdentifier(accountIdentifier: AccountIdentifier) = AuthnzAccountIdentifiers
+            .select(userId)
+            .where { AuthnzAccountIdentifiers.identifier eq accountIdentifier.toDataString() }
+            .singleOrNull()?.get(userId)
 
         override suspend fun addAccountIdentifierStoredData(
             accountIdentifier: AccountIdentifier,
@@ -48,11 +54,8 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
         ): Unit = withContext(dispatcher) {
             val savableStoredData = data.transformSavable()
             transaction {
-                val userId = AuthnzAccountIdentifiers
-                    .select(userId)
-                    .where { AuthnzAccountIdentifiers.identifier eq accountIdentifier.accountIdentifierName }
-                    .singleOrNull()?.get(userId)
-                    ?: throw IllegalStateException("Account not found")
+                val userId = getAccountIdByAccountIdentifier(accountIdentifier)
+                    ?: throw IllegalArgumentException("Cannot add data by account identifier: No account for for account identifier: $accountIdentifier")
 
                 AuthnzStoredData.insert {
                     it[accountId] = userId
@@ -91,7 +94,14 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
             method: String,
             data: AuthMethodStoredData
         ) {
-            throw NotImplementedError("updateAccountStoredData")
+            val savableStoredData = data.transformSavable()
+            transaction {
+                AuthnzStoredData.update(
+                    where = { (AuthnzStoredData.accountId eq UUID.fromString(accountId)) and (AuthnzStoredData.method eq method) }
+                ) {
+                    it[AuthnzStoredData.data] = savableStoredData
+                }
+            }
         }
 
         override suspend fun deleteAccountIdentifierStoredData(
@@ -109,7 +119,15 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
             accountId: String,
             method: AuthenticationMethod
         ): AuthMethodStoredData? {
-            throw NotImplementedError("lookupStoredDataForAccount")
+            val data = transaction {
+                val accountId = UUID.fromString(accountId)
+
+                AuthnzStoredData.select(AuthnzStoredData.data)
+                    .where { (AuthnzStoredData.accountId eq accountId) and (AuthnzStoredData.method eq method.id) }
+                    .singleOrNull()?.get(AuthnzStoredData.data)
+                //?: throw IllegalStateException("Could not find ")
+            }
+            return data
         }
 
 
@@ -117,10 +135,19 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
             identifier: AccountIdentifier,
             method: AuthenticationMethod
         ): AuthMethodStoredData? {
-            throw NotImplementedError("lookupStoredDataForAccountIdentifier")
+            val data = transaction {
+                val accountId = getAccountIdByAccountIdentifier(identifier)
+                    ?: throw IllegalArgumentException("No stored data for account identifier $identifier found")
+
+                AuthnzStoredData.select(AuthnzStoredData.data)
+                    .where { (AuthnzStoredData.accountId eq accountId) and (AuthnzStoredData.method eq method.id) }
+                    .singleOrNull()?.get(AuthnzStoredData.data)
+                //?: throw IllegalStateException("Could not find ")
+            }
+            return data
         }
 
-        override suspend fun lookupAccountUuid(identifier: AccountIdentifier): String? =
+        /*override suspend fun lookupAccountUuid(identifier: AccountIdentifier): String? =
             withContext(dispatcher) {
                 transaction {
                     val existingAccount = Accounts
@@ -128,6 +155,18 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
                         .where { Accounts.name eq identifier.toDataString() }
                         .map { it[Accounts.id] }
                         .firstOrNull()
+
+                    if (existingAccount != null) {
+                        return@transaction existingAccount.toString()
+                    }
+                    return@transaction null
+                }
+            }*/
+
+        override suspend fun lookupAccountUuid(identifier: AccountIdentifier): String? =
+            withContext(dispatcher) {
+                transaction {
+                    val existingAccount = getAccountIdByAccountIdentifier(identifier)
 
                     if (existingAccount != null) {
                         return@transaction existingAccount.toString()

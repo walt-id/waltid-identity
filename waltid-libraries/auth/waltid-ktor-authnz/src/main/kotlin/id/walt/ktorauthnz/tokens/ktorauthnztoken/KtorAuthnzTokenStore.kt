@@ -2,16 +2,18 @@ package id.walt.ktorauthnz.tokens.ktorauthnztoken
 
 interface KtorAuthnzTokenStore {
 
+    val name: String
+
     /**
      * Return session id
      */
-    fun mapToken(token: String, sessionId: String)
+    suspend fun mapToken(token: String, sessionId: String)
 
-    fun getTokenSessionId(token: String): String
+    suspend fun getTokenSessionId(token: String): String
 
-    fun validateToken(token: String): Boolean
+    suspend fun validateToken(token: String): Boolean
 
-    fun dropToken(token: String)
+    suspend fun dropToken(token: String)
 
 
 }

@@ -35,6 +35,14 @@ export default defineNuxtConfig({
         maxAgeInSeconds: 60 * 60 * 24 * 30, // 30 days
       },
 
+        endpoints: {
+          //signIn: { path: '/login', method: 'post' },
+            signIn: { path: '/account/emailpass', method: 'post' },
+            signOut: { path: '/logout', method: 'post' },
+            signUp: { path: '/register', method: 'post' },
+            getSession: { path: '/session', method: 'get' },
+        },
+
       pages: {
         login: "/login",
       },

@@ -6,8 +6,13 @@ import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.auth.ktorAuthnz
+import id.walt.ktorauthnz.sessions.InMemorySessionStore
 import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
+import id.walt.ktorauthnz.sessions.ValkeySessionStore
 import id.walt.ktorauthnz.tokens.jwttoken.JwtTokenHandler
+import id.walt.ktorauthnz.tokens.ktorauthnztoken.InMemoryKtorAuthNzTokenStore
+import id.walt.ktorauthnz.tokens.ktorauthnztoken.KtorAuthNzTokenHandler
+import id.walt.ktorauthnz.tokens.ktorauthnztoken.ValkeyAuthnzTokenStore
 import id.walt.oid4vc.util.http
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.AuthConfig
@@ -37,6 +42,7 @@ import io.ktor.server.sessions.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 
@@ -107,14 +113,41 @@ val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
         KtorAuthnzManager.accountStore = AuthenticationService().editableAccountStore
 
         val config = ConfigManager.getConfig<KtorAuthnzConfig>()
-        val configSigningKey = config.configuredSigningKey
-        val configVerificationKey = config.configuredVerificationKey
 
-        KtorAuthnzManager.tokenHandler = JwtTokenHandler().apply {
-            if (configSigningKey != null) {
-                signingKey = configSigningKey
+        KtorAuthnzManager.tokenHandler = when (config.tokenType) {
+            KtorAuthnzConfig.AuthnzTokens.STORE_IN_MEMORY -> {
+                KtorAuthNzTokenHandler().apply { tokenStore = InMemoryKtorAuthNzTokenStore() }
             }
-            verificationKey = configVerificationKey
+            KtorAuthnzConfig.AuthnzTokens.STORE_VALKEY ->{
+                KtorAuthNzTokenHandler().apply { tokenStore = ValkeyAuthnzTokenStore(
+                    unixsocket = config.valkeyUnixSocket,
+                    host = config.valkeyHost,
+                    port = config.valkeyPort,
+                    expiration = Duration.parse(config.valkeyRetention),
+                    username = config.valkeyAuthUsername,
+                    password = config.valkeyAuthPassword,
+                ).also { it.tryConnect() } }
+            }
+            KtorAuthnzConfig.AuthnzTokens.JWT -> {
+                JwtTokenHandler().apply {
+                    val configSigningKey = config.configuredSigningKey
+                    val configVerificationKey = config.configuredVerificationKey
+
+                    if (configSigningKey != null) {
+                        signingKey = configSigningKey
+                    }
+                    verificationKey = configVerificationKey
+                }
+            }
+        }
+
+        KtorAuthnzManager.sessionStore = when {
+            config.valkeyUnixSocket != null || config.valkeyHost != null -> {
+                ValkeySessionStore(
+                    config.valkeyUnixSocket, config.valkeyHost, config.valkeyPort, config.valkeyAuthUsername, config.valkeyAuthPassword, Duration.parse(config.valkeyRetention)
+                ).also { it.tryConnect() }
+            }
+            else -> InMemorySessionStore()
         }
 
         val webConfig = ConfigManager.getConfig<WebConfig>()
