@@ -12,6 +12,7 @@ enum class CredentialFormat(val value: String) {
     jwt_vc_json("jwt_vc_json"),
     jwt_vc_json_ld("jwt_vc_json-ld"),
     ldp_vc("ldp_vc"),
+    sd_jwt_dc("dc+sd-jwt"),
     sd_jwt_vc("vc+sd-jwt"),
     mso_mdoc("mso_mdoc"),
     jwt_vp_json("jwt_vp_json"),
@@ -39,6 +40,8 @@ object CredentialFormatSerializer : KSerializer<CredentialFormat> {
     }
 
     override fun deserialize(decoder: Decoder): CredentialFormat {
-        return CredentialFormat.fromValue(decoder.decodeString())!!
+        val value = decoder.decodeString()
+        val format = CredentialFormat.fromValue(value)
+        return format ?: throw IllegalArgumentException("Unsupported format: $value")
     }
 }
