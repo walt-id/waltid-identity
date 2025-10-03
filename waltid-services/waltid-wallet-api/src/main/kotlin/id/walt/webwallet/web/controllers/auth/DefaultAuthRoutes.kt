@@ -51,4 +51,5 @@ fun Application.defaultAuthRoutes() = webWalletRoute {
     object : RegisterControllerBase() {}.routes("register")(this)
     object : LoginControllerBase() {}.routes("login")(this)
     object : LogoutControllerBase() {}.routes("logout")(this)
+    object : RefreshTokenController() {}.routes("refresh")(this)
 }

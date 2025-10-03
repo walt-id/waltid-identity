@@ -23,7 +23,9 @@ import id.walt.webwallet.config.AuthConfig
 import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.service.WalletServiceManager
+import id.walt.webwallet.service.TokenBlacklistService
 import id.walt.webwallet.service.account.*
+import id.walt.webwallet.utils.TimeUtils
 import id.walt.webwallet.web.InsufficientPermissionsException
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
@@ -63,10 +65,13 @@ data class ByteLoginRequest(val username: String, val password: ByteArray) {
 }
 
 @Serializable
-data class LoginTokenSession(val token: String)
+data class LoginTokenSession(val token: String, val refreshToken: String? = null)
 
 @Serializable
-data class OidcTokenSession(val token: String)
+data class OidcTokenSession(val token: String, val refreshToken: String? = null)
+
+@Serializable
+data class RefreshTokenSession(val refreshToken: String)
 
 /*
 Use this data class for login response data, so schema generator can generate
@@ -76,33 +81,47 @@ openapi schema from it.
 data class LoginResponseData(
     @Serializable(with = UuidSerializer::class) val id: Uuid,
     val token: String,
+    val refreshToken: String? = null,
+    val expiresIn: Long? = null,
+    val tokenType: String = "Bearer",
     val username: String? = null,
     val address: String? = null,
     val keycloakUserId: String? = null,
 ) {
 
     companion object {
-        fun of(authenticatedUser: AuthenticatedUser, token: String): LoginResponseData {
+        fun of(authenticatedUser: AuthenticatedUser, token: String, refreshToken: String? = null, expiresIn: Long? = null): LoginResponseData {
             return when (authenticatedUser) {
                 is UsernameAuthenticatedUser -> LoginResponseData(
                     id = authenticatedUser.id,
                     token = token,
+                    refreshToken = refreshToken,
+                    expiresIn = expiresIn,
                     username = authenticatedUser.username
                 )
 
                 is AddressAuthenticatedUser -> LoginResponseData(
                     id = authenticatedUser.id,
                     token = token,
+                    refreshToken = refreshToken,
+                    expiresIn = expiresIn,
                     address = authenticatedUser.address
                 )
 
                 is KeycloakAuthenticatedUser -> LoginResponseData(
                     id = authenticatedUser.id,
                     token = token,
+                    refreshToken = refreshToken,
+                    expiresIn = expiresIn,
                     keycloakUserId = authenticatedUser.keycloakUserId
                 )
 
-                is X5CAuthenticatedUser -> LoginResponseData(authenticatedUser.id, token)
+                is X5CAuthenticatedUser -> LoginResponseData(
+                    id = authenticatedUser.id, 
+                    token = token,
+                    refreshToken = refreshToken,
+                    expiresIn = expiresIn
+                )
             }
         }
     }
@@ -116,8 +135,19 @@ object AuthKeys {
     val tokenKey: ByteArray = config.tokenKey.encodeToByteArray()
     val issTokenClaim: String = config.issTokenClaim
     val audTokenClaim: String? = config.audTokenClaim
-    val tokenLifetime: Long = config.tokenLifetime.toLongOrNull() ?: 1
-
+    
+    // Parse token lifetime with flexible format support
+    val tokenLifetimeDuration: java.time.Duration = TimeUtils.parseDuration(config.tokenLifetime)
+    val tokenLifetime: Long = TimeUtils.toSeconds(tokenLifetimeDuration)
+    
+    // Parse refresh token lifetime (defaults to 7 days if not specified)
+    val refreshTokenLifetimeDuration: java.time.Duration = 
+        config.refreshTokenLifetime?.let { TimeUtils.parseDuration(it) } 
+        ?: java.time.Duration.ofDays(7)
+    val refreshTokenLifetime: Long = TimeUtils.toSeconds(refreshTokenLifetimeDuration)
+    
+    // Idle timeout in minutes (defaults to 30 minutes if not specified)
+    val idleTimeoutMinutes: Int = config.idleTimeoutMinutes ?: 30
 }
 
 /**
@@ -125,6 +155,11 @@ object AuthKeys {
  * @return user/account ID if token is valid
  */
 suspend fun verifyToken(token: String): Result<String> {
+    // First check if token is blacklisted
+    if (TokenBlacklistService.isTokenBlacklisted(token)) {
+        return Result.failure(IllegalArgumentException("Token has been revoked."))
+    }
+    
     val jwsObject = JWSObject.parse(token)
 
     val key = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrNull()
@@ -170,7 +205,9 @@ suspend fun RoutingContext.doLogin() {
     val reqBody = call.getLoginRequest()
     val authenticatedUser = AccountsService.authenticate("", reqBody).getOrThrow()
     val now = Clock.System.now().toJavaInstant()
-    val tokenPayload = Json.encodeToString(
+    
+    // Create access token with proper expiration
+    val accessTokenPayload = Json.encodeToString(
         AuthTokenPayload(
             jti = Uuid.random().toString(),
             sub = authenticatedUser.id.toString(),
@@ -179,16 +216,40 @@ suspend fun RoutingContext.doLogin() {
                 ?: let { call.request.headers["Origin"] ?: "n/a" },
             iat = now.epochSecond,
             nbf = now.epochSecond,
-            exp = now.plus(AuthKeys.tokenLifetime, ChronoUnit.DAYS).epochSecond,
+            exp = now.plus(AuthKeys.tokenLifetimeDuration).epochSecond,
         )
     )
 
-    val token = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrNull()?.let {
-        createRsaToken(it, tokenPayload)
-    } ?: createHS256Token(tokenPayload)
-    call.sessions.set(LoginTokenSession(token))
+    val accessToken = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrNull()?.let {
+        createRsaToken(it, accessTokenPayload)
+    } ?: createHS256Token(accessTokenPayload)
+    
+    // Create refresh token
+    val refreshTokenPayload = Json.encodeToString(
+        AuthTokenPayload(
+            jti = Uuid.random().toString(),
+            sub = authenticatedUser.id.toString(),
+            iss = AuthKeys.issTokenClaim,
+            aud = AuthKeys.audTokenClaim.takeIf { !it.isNullOrEmpty() }
+                ?: let { call.request.headers["Origin"] ?: "n/a" },
+            iat = now.epochSecond,
+            nbf = now.epochSecond,
+            exp = now.plus(AuthKeys.refreshTokenLifetimeDuration).epochSecond,
+        )
+    )
+
+    val refreshToken = JWKKey.importJWK(AuthKeys.tokenKey.decodeToString()).getOrNull()?.let {
+        createRsaToken(it, refreshTokenPayload)
+    } ?: createHS256Token(refreshTokenPayload)
+    
+    call.sessions.set(LoginTokenSession(accessToken, refreshToken))
     call.response.status(HttpStatusCode.OK)
-    call.respond(LoginResponseData.of(authenticatedUser, token))
+    call.respond(LoginResponseData.of(
+        authenticatedUser, 
+        accessToken, 
+        refreshToken, 
+        AuthKeys.tokenLifetime
+    ))
 }
 
 fun ApplicationCall.getUserId() =

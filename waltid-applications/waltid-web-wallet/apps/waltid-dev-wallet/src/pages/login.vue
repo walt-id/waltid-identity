@@ -364,6 +364,7 @@ import {storeToRefs} from "pinia";
 import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
 import {decodeJwt} from "jose";
 import {MetaMaskSDK} from "@metamask/sdk";
+import { tokenManager } from "~/composables/tokenManager";
 
 const store = useModalStore();
 
@@ -400,26 +401,49 @@ async function login() {
         password: passwordInput
     };
 
-    // try {
-    await signIn(
-        { email: emailInput, password: passwordInput, type: "email" },
-        { callbackUrl: signInRedirectUrl.value }
-    )
-        .then(() => {
-            user.value = {
-                id: "",
-                friendlyName: userData.email
-            };
-        })
-        .catch((err) => {
-            console.log("Could not sign in", err);
-            error.value = {
-                isError: true,
-                message:
-                    "Please check that you have entered your correct email address and password!" //(await response.text())
-            };
-            isLoggingIn.value = false;
+    try {
+        const response = await fetch('/wallet-api/auth/account/email', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email: emailInput,
+                password: passwordInput,
+                type: "email"
+            }),
         });
+
+        if (!response.ok) {
+            throw new Error('Login failed');
+        }
+
+        const loginData = await response.json();
+        
+        // Store tokens using token manager
+        tokenManager.storeTokens({
+            accessToken: loginData.token,
+            refreshToken: loginData.refreshToken,
+            expiresIn: loginData.expiresIn,
+            tokenType: loginData.tokenType || "Bearer"
+        });
+
+        user.value = {
+            id: loginData.id,
+            friendlyName: userData.email
+        };
+
+        // Navigate to the redirect URL
+        await navigateTo(signInRedirectUrl.value);
+        
+    } catch (err) {
+        console.log("Could not sign in", err);
+        error.value = {
+            isError: true,
+            message: "Please check that you have entered your correct email address and password!"
+        };
+        isLoggingIn.value = false;
+    }
 }
 
 function closeModal() {
