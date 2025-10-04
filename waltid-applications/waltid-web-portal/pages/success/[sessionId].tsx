@@ -1,11 +1,11 @@
 import WaltIcon from "@/components/walt/logo/WaltIcon";
-import { CheckCircleIcon } from "@heroicons/react/24/outline";
-import { useContext, useEffect, useState } from "react";
-import { useRouter } from "next/router";
+import {CheckCircleIcon} from "@heroicons/react/24/outline";
+import {useContext, useEffect, useState} from "react";
+import {useRouter} from "next/router";
 import axios from "axios";
 import nextConfig from "@/next.config";
 import Modal from "@/components/walt/modal/BaseModal";
-import { EnvContext } from "@/pages/_app";
+import {EnvContext} from "@/pages/_app";
 
 export default function Success() {
   const env = useContext(EnvContext);

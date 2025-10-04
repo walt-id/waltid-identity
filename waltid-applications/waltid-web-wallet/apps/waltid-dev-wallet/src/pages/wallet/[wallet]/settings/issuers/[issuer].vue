@@ -70,7 +70,7 @@
 <script lang="ts" setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import BackButton from "@waltid-web-wallet/components/buttons/BackButton.vue";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 
 const config = useRuntimeConfig();
 const route = useRoute();

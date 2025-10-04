@@ -3,10 +3,10 @@
 package id.walt.webwallet.db
 
 import app.softwork.uuid.isValidUuidString
-import org.jetbrains.exposed.sql.Column
-import org.jetbrains.exposed.sql.ColumnType
-import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.vendors.currentDialect
+import org.jetbrains.exposed.v1.core.Column
+import org.jetbrains.exposed.v1.core.ColumnType
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.core.vendors.currentDialect
 import java.nio.ByteBuffer
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid

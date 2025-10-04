@@ -1,4 +1,4 @@
-import Spacer, { SpacerProps } from "@/components/walt/spacer/Spacer";
+import Spacer, {SpacerProps} from "@/components/walt/spacer/Spacer";
 
 type Props = Pick<SpacerProps, 'size'>;
 

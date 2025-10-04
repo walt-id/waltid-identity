@@ -1,15 +1,18 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.webwallet.service.trust
 
 import id.walt.webwallet.config.TrustConfig
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 class DefaultTrustValidationService(
     private val http: HttpClient,

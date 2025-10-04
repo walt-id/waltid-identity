@@ -1,14 +1,12 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.crypto.keys.aws
 
 import id.walt.crypto.exceptions.KeyNotFoundException
 import id.walt.crypto.exceptions.KeyTypeNotSupportedException
 import id.walt.crypto.exceptions.SigningException
 import id.walt.crypto.exceptions.VerificationException
-import id.walt.crypto.keys.AwsKeyMeta
-import id.walt.crypto.keys.EccUtils
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.KeyTypes
+import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -21,7 +19,9 @@ import io.ktor.http.*
 import io.ktor.util.*
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
-import kotlinx.datetime.*
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -34,7 +34,10 @@ import org.kotlincrypto.macs.hmac.sha2.HmacSHA256
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 private val logger = KotlinLogging.logger { }
 
@@ -128,7 +131,7 @@ class AWSKeyRestAPI(
         if (!awsSigningAlgorithm.endsWith("_SHA_256")){
             throw SigningException("failed to sign - unsupported hashing algorithm: $awsSigningAlgorithm")
         }
-        val digestedMessage = AWSKeyRestAPI.sha256(plaintext)
+        val digestedMessage = sha256(plaintext)
 
         val body = """
 {
@@ -198,7 +201,7 @@ class AWSKeyRestAPI(
         val messageToVerify = detachedPlaintext ?: return Result.failure(IllegalArgumentException("Detached plaintext is required for verification"))
 
         // Calculate SHA-256 hash to handle payloads larger than 4KB
-        val digestedMessage = AWSKeyRestAPI.sha256(messageToVerify)
+        val digestedMessage = sha256(messageToVerify)
 
         val body = """
 {

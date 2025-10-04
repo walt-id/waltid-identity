@@ -1,14 +1,17 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.onboarding.models
 
 import id.walt.issuer.services.onboarding.models.*
-import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.DurationUnit
+import kotlin.time.ExperimentalTime
 import kotlin.time.toDuration
 
 class DocumentSignerOnboardingRequestTest {
@@ -26,13 +29,13 @@ class DocumentSignerOnboardingRequestTest {
             }
         }
     """.trimIndent())
-    
+
     private val validDSCertData = DocumentSignerCertificateData(
             country = "US",
             commonName = "Example Document Signer",
             crlDistributionPointUri = "https://ca.example.com/crl"
         )
-    
+
     private val validIACASignerData = IACASignerData(
         iacaKey = iacaKey,
         certificateData = IACACertificateData(
@@ -41,7 +44,7 @@ class DocumentSignerOnboardingRequestTest {
             issuerAlternativeNameConf = IssuerAlternativeNameConfiguration(uri = "https://ca.example.com")
         )
     )
-    
+
     @Test
     fun `valid onboarding request does not throw`() {
         val request = DocumentSignerOnboardingRequest(

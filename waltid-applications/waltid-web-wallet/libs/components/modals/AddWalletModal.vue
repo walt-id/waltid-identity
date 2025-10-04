@@ -54,12 +54,12 @@
 </template>
 
 <script lang="ts" setup>
-import { CubeTransparentIcon, PlusIcon, Square3Stack3DIcon } from "@heroicons/vue/20/solid";
+import {CubeTransparentIcon, PlusIcon, Square3Stack3DIcon} from "@heroicons/vue/20/solid";
 import ActionResultModal from "../../components/modals/ActionResultModal.vue";
-import { useCurrentWallet } from "../../composables/accountWallet.ts";
+import {useCurrentWallet} from "../../composables/accountWallet.ts";
 import CloseButton from "../../components/modals/CloseButton.vue";
 import useModalStore from "../../stores/useModalStore.ts";
-import { ref, toRefs } from "vue";
+import {ref, toRefs} from "vue";
 
 const props = defineProps<{
     callback: any;

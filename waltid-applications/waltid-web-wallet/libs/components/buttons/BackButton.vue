@@ -7,8 +7,8 @@
 </template>
 
 <script setup>
-import { ArrowUturnLeftIcon } from "@heroicons/vue/24/outline";
-import { useRouter } from "vue-router";
+import {ArrowUturnLeftIcon} from "@heroicons/vue/24/outline";
+import {useRouter} from "vue-router";
 
 const router = useRouter();
 </script>

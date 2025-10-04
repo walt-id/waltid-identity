@@ -24,7 +24,7 @@ sealed class AbstractW3C(
             }
             is CoseCredentialSignature -> TODO("Not implemented yet: verify W3C with COSE")
             is DataIntegrityProofCredentialSignature -> TODO("Not implemented yet: verify W3C with DIP")
-            null -> TODO()
+            null -> throw IllegalArgumentException("Credential contains no signature, cannot verify")
         }
 }
 

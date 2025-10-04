@@ -1,18 +1,21 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.w3c
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport

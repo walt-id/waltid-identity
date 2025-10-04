@@ -2,6 +2,8 @@ package id.walt.entrawallet.core.service.exchange
 
 import id.walt.crypto.keys.Key
 import id.walt.did.dids.DidService
+import id.walt.entrawallet.core.manifest.extractor.EntraManifestExtractor
+import id.walt.entrawallet.core.service.oidc4vc.TestCredentialWallet
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialOffer
@@ -12,8 +14,6 @@ import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.EntraIssuanceCompletionCode
 import id.walt.oid4vc.responses.EntraIssuanceCompletionErrorDetails
 import id.walt.oid4vc.responses.EntraIssuanceCompletionResponse
-import id.walt.entrawallet.core.manifest.extractor.EntraManifestExtractor
-import id.walt.entrawallet.core.service.oidc4vc.TestCredentialWallet
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -105,14 +105,14 @@ object IssuanceService : IssuanceServiceBase() {
 
         logger.debug { "Using issuer URL: ${credentialOffer.credentialIssuer}" }
         val credReqs = offeredCredentials.map { offeredCredential ->
-            logger.info("Offered credential format: ${offeredCredential.format.name}")
-            logger.info(
+            logger.info { "Offered credential format: ${offeredCredential.format.name}" }
+            logger.info {
                 "Offered credential cryptographic binding methods: ${
-                    offeredCredential.cryptographicBindingMethodsSupported?.joinToString(
-                        ", "
-                    ) ?: ""
-                }"
-            )
+                            offeredCredential.cryptographicBindingMethodsSupported?.joinToString(
+                                ", "
+                            ) ?: ""
+                        }"
+            }
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,
                 proof = ProofOfPossessionFactory.new(

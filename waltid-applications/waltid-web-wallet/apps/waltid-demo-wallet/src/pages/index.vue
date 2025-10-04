@@ -59,7 +59,7 @@
 import WalletPageHeader from "@waltid-web-wallet/components/WalletPageHeader.vue";
 import LoadingIndicator from "@waltid-web-wallet/components/loading/LoadingIndicator.vue";
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import { listWallets, setWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {listWallets, setWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 
 const wallets = (await listWallets())?.value?.wallets;
 if (wallets) {

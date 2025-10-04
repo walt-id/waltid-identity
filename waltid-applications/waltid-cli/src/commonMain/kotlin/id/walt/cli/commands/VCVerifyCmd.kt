@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.cli.commands
 
 import com.github.ajalt.clikt.core.*
@@ -19,6 +21,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import java.io.File
+import kotlin.time.ExperimentalTime
 
 class VCVerifyCmd : CliktCommand(
     name = "verify"

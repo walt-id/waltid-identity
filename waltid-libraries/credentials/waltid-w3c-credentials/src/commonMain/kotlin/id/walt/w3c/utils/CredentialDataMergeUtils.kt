@@ -1,7 +1,7 @@
 package id.walt.w3c.utils
 
-import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.crypto.utils.JsonUtils.toJsonObject
+import id.walt.w3c.vc.vcs.W3CVC
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise

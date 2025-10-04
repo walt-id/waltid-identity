@@ -1,9 +1,9 @@
 package id.walt.policies.policies
 
-import id.walt.w3c.schemes.JwsSignatureScheme
-import id.walt.w3c.utils.VCFormat
 import id.walt.policies.JwtVerificationPolicy
 import id.walt.sdjwt.SDJwt
+import id.walt.w3c.schemes.JwsSignatureScheme
+import id.walt.w3c.utils.VCFormat
 import kotlinx.serialization.Serializable
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync

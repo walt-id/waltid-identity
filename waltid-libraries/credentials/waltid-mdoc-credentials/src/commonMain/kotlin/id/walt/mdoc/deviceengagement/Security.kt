@@ -2,7 +2,6 @@ package id.walt.mdoc.deviceengagement
 
 import cbor.Cbor
 import id.walt.mdoc.dataelement.*
-import id.walt.mdoc.dataelement.DataElementSerializer
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder

@@ -61,3 +61,36 @@ internal fun buildSignatureStructure(
     )
     return cborForSigStructure.encodeToByteArray(tbs)
 }
+
+/**
+ * Internal structure for the data that gets MACed/verified.
+ * Per RFC 8152, Section 6.3:
+ * MAC_structure = [ context, body_protected, external_aad, payload ]
+ */
+@Serializable
+@CborArray
+@OptIn(ExperimentalSerializationApi::class)
+internal data class Mac0ToBeMaced(
+    val context: String = "MAC0", // [cite: 1047]
+    @ByteString val protected: ByteArray,
+    @ByteString val externalAad: ByteArray,
+    @ByteString val payload: ByteArray,
+)
+
+/**
+ * Helper to build the canonical CBOR byte array to be MACed or verified.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+internal fun buildMacStructure(
+    protectedBytes: ByteArray,
+    payload: ByteArray?,
+    externalAad: ByteArray
+): ByteArray {
+    val tbm = Mac0ToBeMaced(
+        protected = protectedBytes,
+        externalAad = externalAad,
+        payload = payload ?: byteArrayOf()
+    )
+    // Use the same canonical Cbor instance as for signing
+    return cborForSigStructure.encodeToByteArray(tbm)
+}

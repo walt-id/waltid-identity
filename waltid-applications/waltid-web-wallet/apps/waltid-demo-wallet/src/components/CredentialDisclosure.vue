@@ -70,8 +70,8 @@
 </template>
 
 <script setup lang="ts">
-import { parseJwt } from "@waltid-web-wallet/utils/jwt.ts";
-import { parseDisclosures } from "@waltid-web-wallet/composables/disclosures.ts";
+import {parseJwt} from "@waltid-web-wallet/utils/jwt.ts";
+import {parseDisclosures} from "@waltid-web-wallet/composables/disclosures.ts";
 
 const props = defineProps<{
     credential: {

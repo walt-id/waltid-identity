@@ -1,4 +1,4 @@
-import { useRouter } from "next/router";
+import {useRouter} from "next/router";
 
 export default function BackButton() {
   const router = useRouter();

@@ -8,7 +8,6 @@ import id.walt.test.integration.environment.api.verifier.VerifierApi
 import id.walt.test.integration.environment.api.wallet.WalletApi
 import id.walt.test.integration.environment.api.wallet.WalletContainerApi
 import id.walt.test.integration.junit.LogTestStartExtension
-import id.walt.webwallet.db.models.AccountWalletListing.WalletListing
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterAll

@@ -58,7 +58,7 @@
 <script setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import WalletPageHeader from "@waltid-web-wallet/components/WalletPageHeader.vue";
-import { listWallets, setWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {listWallets, setWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 import LoadingIndicator from "@waltid-web-wallet/components/loading/LoadingIndicator.vue";
 
 const config = useRuntimeConfig();

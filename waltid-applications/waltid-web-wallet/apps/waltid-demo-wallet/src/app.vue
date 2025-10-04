@@ -25,7 +25,7 @@
 <script lang="ts" setup>
 import "@unocss/reset/tailwind-compat.css";
 import "uno.css";
-import { useTenant } from "@waltid-web-wallet/composables/tenants.ts";
+import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
 import ModalBase from "@waltid-web-wallet/components/modals/ModalBase.vue";
 
 const locale = useState<string>("locale.i18n");

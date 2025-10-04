@@ -361,9 +361,9 @@
 import LoginMethodView from "@waltid-web-wallet/components/login/LoginMethodView.vue";
 import InlineLoadingCircle from "@waltid-web-wallet/components/loading/InlineLoadingCircle.vue";
 
-import { useElementHover } from "@vueuse/core";
-import { create, parseCreationOptionsFromJSON } from "@github/webauthn-json/browser-ponyfill";
-import { IdentificationIcon } from "@heroicons/vue/20/solid";
+import {useElementHover} from "@vueuse/core";
+import {create, parseCreationOptionsFromJSON} from "@github/webauthn-json/browser-ponyfill";
+import {IdentificationIcon} from "@heroicons/vue/20/solid";
 
 const emailPasswordSection = ref();
 const isEmailPasswordSectionHovered = useElementHover(emailPasswordSection);

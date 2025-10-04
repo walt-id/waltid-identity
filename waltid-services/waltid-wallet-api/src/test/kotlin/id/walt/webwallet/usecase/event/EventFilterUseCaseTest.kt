@@ -18,9 +18,10 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 
-@OptIn(ExperimentalUuidApi::class)
+@OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
 class EventFilterUseCaseTest {
     private val eventServiceMock = mockk<EventService>()
     private val issuerNameResolutionMock = mockk<EntityNameResolutionUseCase>()

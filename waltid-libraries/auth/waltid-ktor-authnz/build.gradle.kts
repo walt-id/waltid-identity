@@ -92,13 +92,13 @@ dependencies {
     implementation("io.github.smiley4:ktor-redoc:5.0.2")
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
     implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
     // Logging
-    implementation("io.klogging:klogging-jvm:0.9.4")
-    implementation("io.klogging:slf4j-klogging:0.9.4")
+    implementation("io.klogging:klogging-jvm:0.11.6")
+    implementation("io.klogging:slf4j-klogging:0.11.6")
 
     /* --- Testing --- */
     testImplementation("io.ktor:ktor-client-logging")

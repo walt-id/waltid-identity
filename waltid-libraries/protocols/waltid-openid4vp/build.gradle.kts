@@ -58,7 +58,7 @@ kotlin {
                 implementation("io.github.oshai:kotlin-logging:7.0.5")
 
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
                 /*
                  * walt.id:
@@ -93,8 +93,8 @@ publishing {
         create<MavenPublication>("maven") {
             from(components["kotlin"])
             pom {
-                name.set("walt.id Verifier SDK - OpenID4VP version")
-                description.set("walt.id Kotlin/Java Verifier for OpenID4VP")
+                name.set("walt.id OpenID4VP library")
+                description.set("walt.id OpenID4VP library for Kotlin/Java")
                 url.set("https://walt.id")
 
                 licenses {

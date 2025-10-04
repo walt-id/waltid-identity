@@ -32,8 +32,8 @@ dependencies {
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
 
     // Logging
-    api("io.klogging:klogging-jvm:0.9.4") // JVM + ~JS
-    implementation("io.klogging:slf4j-klogging:0.9.4")
+    api("io.klogging:klogging-jvm:0.11.6") // JVM + ~JS
+    implementation("io.klogging:slf4j-klogging:0.11.6")
     implementation("org.slf4j:jul-to-slf4j:2.0.17")
 
     // CLI
@@ -45,24 +45,24 @@ dependencies {
     api("com.sksamuel.hoplite:hoplite-hikaricp:2.9.0")
 
     // Kotlinx.serialization
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
     // Health checks
     api("com.sksamuel.cohort:cohort-ktor:2.6.2")
 
     // OpenAPI
-    api("io.github.smiley4:ktor-openapi:5.0.2")
-    implementation("io.github.smiley4:ktor-swagger-ui:5.0.2")
-    implementation("io.github.smiley4:ktor-redoc:5.0.2")
+    api("io.github.smiley4:ktor-openapi:5.3.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:5.3.0")
+    implementation("io.github.smiley4:ktor-redoc:5.3.0")
 
-    implementation("io.github.smiley4:schema-kenerator-core:2.2.0")
-    implementation("io.github.smiley4:schema-kenerator-swagger:2.2.0")
-    implementation("io.github.smiley4:schema-kenerator-serialization:2.2.0")
-    implementation("io.github.smiley4:schema-kenerator-reflection:2.2.0")
+    implementation("io.github.smiley4:schema-kenerator-core:2.4.0")
+    implementation("io.github.smiley4:schema-kenerator-swagger:2.4.0")
+    implementation("io.github.smiley4:schema-kenerator-serialization:2.4.0")
+    implementation("io.github.smiley4:schema-kenerator-reflection:2.4.0")
 
     // Persistence
     api("io.github.reactivecircus.cache4k:cache4k:0.14.0")
-    api("app.softwork:kotlinx-uuid-core:0.1.4")
+    api("app.softwork:kotlinx-uuid-core:0.1.6")
     api("redis.clients:jedis:5.2.0")
 
     // Testing

@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
 
 package id.walt.webwallet.db.models
 
@@ -9,16 +9,17 @@ import id.walt.oid4vc.data.CredentialFormat
 import id.walt.sdjwt.SDJwt
 import id.walt.webwallet.manifest.provider.ManifestProvider
 import id.walt.webwallet.utils.JsonUtils
-import kotlinx.datetime.Instant
-import kotlinx.datetime.toKotlinInstant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
-import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.javatime.timestamp
+import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.javatime.timestamp
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlin.time.toKotlinInstant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toKotlinUuid

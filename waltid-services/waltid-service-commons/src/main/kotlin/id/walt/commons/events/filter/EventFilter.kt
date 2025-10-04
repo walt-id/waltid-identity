@@ -1,6 +1,5 @@
 package id.walt.commons.events.filter
 
-import id.walt.commons.events.EventStatus
 import id.walt.commons.events.EventType
 import kotlinx.serialization.Serializable
 

@@ -349,11 +349,11 @@
 
 <script lang="ts" setup>
 import {
-  ArrowRightOnRectangleIcon,
-  BookmarkSquareIcon,
-  EnvelopeIcon,
-  IdentificationIcon,
-  QuestionMarkCircleIcon
+    ArrowRightOnRectangleIcon,
+    BookmarkSquareIcon,
+    EnvelopeIcon,
+    IdentificationIcon,
+    QuestionMarkCircleIcon
 } from "@heroicons/vue/20/solid";
 import {Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot} from "@headlessui/vue";
 import {ExclamationCircleIcon, XMarkIcon} from "@heroicons/vue/24/outline";

@@ -107,8 +107,8 @@
 
 <script setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import { groupBy } from "@waltid-web-wallet/composables/groupings.ts";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {groupBy} from "@waltid-web-wallet/composables/groupings.ts";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 import LoadingIndicator from "@waltid-web-wallet/components/loading/LoadingIndicator.vue";
 
 const groupedHistoryElements = ref({});

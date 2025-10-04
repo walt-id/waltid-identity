@@ -1,13 +1,13 @@
 package id.walt.cli.util
 
-import id.walt.w3c.issuance.Issuer.mergingJwtIssue
-import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.policies.PolicyManager
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest
 import id.walt.policies.models.PolicyResult
+import id.walt.w3c.issuance.Issuer.mergingJwtIssue
+import id.walt.w3c.vc.vcs.W3CVC
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement

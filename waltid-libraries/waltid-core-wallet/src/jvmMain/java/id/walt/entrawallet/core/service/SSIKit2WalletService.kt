@@ -9,6 +9,11 @@ import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.LocalRegistrar
 import id.walt.did.dids.resolver.LocalResolver
+import id.walt.entrawallet.core.service.exchange.IssuanceService
+import id.walt.entrawallet.core.service.exchange.PresentationRequestParameter
+import id.walt.entrawallet.core.service.oidc4vc.TestCredentialWallet
+import id.walt.entrawallet.core.service.oidc4vc.VPresentationSession
+import id.walt.entrawallet.core.utils.SessionAttributes
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.errors.AuthorizationError
@@ -18,11 +23,6 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.entrawallet.core.service.exchange.IssuanceService
-import id.walt.entrawallet.core.service.exchange.PresentationRequestParameter
-import id.walt.entrawallet.core.service.oidc4vc.TestCredentialWallet
-import id.walt.entrawallet.core.service.oidc4vc.VPresentationSession
-import id.walt.entrawallet.core.utils.SessionAttributes
 import id.walt.webwallet.utils.StringUtils.couldBeJsonObject
 import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
 import io.github.oshai.kotlinlogging.KotlinLogging

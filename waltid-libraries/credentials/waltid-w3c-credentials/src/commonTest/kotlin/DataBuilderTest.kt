@@ -1,6 +1,6 @@
+import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.w3c.CredentialBuilder
 import id.walt.w3c.CredentialBuilderType.W3CV2CredentialBuilder
-import id.walt.crypto.utils.JsonUtils.toJsonObject
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.days
 

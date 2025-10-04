@@ -53,7 +53,7 @@
 import nftArt from "../nft-art.vue";
 import Web3WalletIcon from "../../Web3WalletIcon.vue";
 import cryptoAddress from "../cryptoAddress.vue";
-import { DocumentTextIcon } from "@heroicons/vue/20/solid";
+import {DocumentTextIcon} from "@heroicons/vue/20/solid";
 
 const emit = defineEmits(["nftDetail"]);
 

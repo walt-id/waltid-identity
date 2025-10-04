@@ -1,7 +1,5 @@
 package id.walt.oid4vc.util
 
-import org.cose.java.AlgorithmID
-import org.cose.java.OneKey
 import cbor.Cbor
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
@@ -15,6 +13,8 @@ import id.walt.mdoc.dataelement.MapKey
 import id.walt.oid4vc.data.ProofOfPossession
 import id.walt.oid4vc.providers.TokenTarget
 import kotlinx.serialization.decodeFromByteArray
+import org.cose.java.AlgorithmID
+import org.cose.java.OneKey
 
 actual object COSESign1Utils {
   actual fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean {

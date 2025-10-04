@@ -1,9 +1,9 @@
 package id.walt.credentials
 
 import cbor.Cbor
+import id.walt.cose.coseCompliantCbor
 import id.walt.credentials.CredentialDetectorTypes.CredentialDetectionResult
 import id.walt.credentials.CredentialDetectorTypes.CredentialPrimaryDataType
-import id.walt.credentials.CredentialDetectorTypes.MdocsSubType
 import id.walt.credentials.CredentialDetectorTypes.SDJWTVCSubType
 import id.walt.credentials.CredentialDetectorTypes.SignaturePrimaryType
 import id.walt.credentials.CredentialDetectorTypes.W3CSubType
@@ -13,17 +13,25 @@ import id.walt.credentials.signatures.DataIntegrityProofCredentialSignature
 import id.walt.credentials.signatures.JwtCredentialSignature
 import id.walt.credentials.signatures.SdJwtCredentialSignature
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
-import id.walt.credentials.utils.Base64Utils.base64Url
-import id.walt.credentials.utils.Base64Utils.matchesBase64Url
-import id.walt.credentials.utils.HexUtils.matchesHex
 import id.walt.credentials.utils.JwtUtils
 import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.credentials.utils.SdJwtUtils.getSdArrays
 import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
+import id.walt.crypto.utils.Base64Utils.base64Url
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.matchesBase64Url
+import id.walt.crypto.utils.HexUtils.matchesHex
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.MapKey
 import id.walt.mdoc.doc.MDoc
+import id.walt.mdoc.objects.MdocsCborSerializer
+import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
+import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.sdjwt.SDJwt
+import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.decodeFromHexString
 import kotlinx.serialization.json.*
@@ -31,6 +39,8 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 @OptIn(ExperimentalEncodingApi::class)
 object CredentialParser {
+
+    private val log = KotlinLogging.logger { }
 
     val DM_1_1_CONTEXT_INDICATORS = listOf(
         "https://www.w3.org/2018/credentials/v1", "https://w3id.org/credentials/v1"
@@ -73,6 +83,57 @@ object CredentialParser {
     fun getJwtHeaderOrDataSubject(data: JsonObject) = data.getString("sub") ?: getCredentialDataSubject(data)
 
     private fun handleMdocs(credential: String, base64: Boolean = false): Pair<CredentialDetectionResult, MdocsCredential> {
+        log.trace { "Handle mdocs, string: $credential" }
+
+        // --- New mdocs handling ---
+        val deviceResponseBytes = if (base64) credential.decodeFromBase64Url() else credential.hexToByteArray()
+
+        // Parse DeviceResponse or Document into Document
+        val document = runCatching {
+            val deviceResponse = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(deviceResponseBytes)
+            val document =
+                deviceResponse.documents?.firstOrNull() ?: throw IllegalArgumentException("Mdoc document not found in DeviceResponse")
+            log.trace { "Mdoc parsed (from device response)" }
+            document
+        }.recoverCatching {
+            log.trace { "Mdoc could not be parsed as device response, trying as document" }
+            val document = coseCompliantCbor.decodeFromByteArray<Document>(deviceResponseBytes)
+            log.trace { "Mdoc parsed (from document)" }
+            document
+        }.getOrThrow()
+
+
+        // Build a JSON object that includes the docType for the DcqlMatcher
+        val credentialData = buildJsonObject {
+            put("docType", JsonPrimitive(document.docType))
+            // You can add other top-level metadata here if needed
+
+            document.issuerSigned.namespaces?.forEach { (namespace, issuerSignedList) ->
+                putJsonObject(namespace) {
+                    val x = issuerSignedList.entries.map { it.value }
+                    x.forEach { item: IssuerSignedItem ->
+                        println("$namespace - ${item.elementIdentifier} -> ${item.elementValue} (${item.elementValue::class.simpleName})")
+
+                        val serialized: JsonElement = MdocsCborSerializer.lookupSerializer(namespace, item.elementIdentifier)
+                            ?.runCatching {
+                                Json.encodeToJsonElement(this as KSerializer<Any?>, item.elementValue)
+                            }?.getOrElse { println("Error encoding with custom serializer: ${it.stackTraceToString()}"); null }
+                            ?: item.elementValue.toJsonElement()
+
+                        println("as JsonElement: $serialized")
+                        put(item.elementIdentifier, serialized)
+                    }
+
+                }
+            }
+            //put(namespace, Json.encodeToJsonElement(issuerSignedList))
+        }
+
+        // TODO: Issuer currently issues incorrect Mdocs, so old mdocs lib is used.
+        // TODO: When issuer is updated, remove the old mdocs lib usage below.
+
+        // --- Old mdocs handling ---
+
         val mapElement =
             if (base64) Cbor.decodeFromByteArray<MapElement>(base64Url.decode(credential)) else Cbor.decodeFromHexString<MapElement>(
                 credential
@@ -82,12 +143,27 @@ object CredentialParser {
             throw NotImplementedError("Invalid mdoc structure: $credential, only full mdocs are currently supported. If this is an issuer signed structure, like returned by an OpenID4VCI issuer, the doc type is additionally required to restore the full mdoc.")
         val mdoc = MDoc.fromMapElement(mapElement)
         val hasSd = !(mdoc.issuerSigned.nameSpaces?.values?.flatten().isNullOrEmpty())
-        return CredentialDetectionResult(CredentialPrimaryDataType.MDOCS, MdocsSubType.mdocs, SignaturePrimaryType.COSE, hasSd, hasSd) to
-                MdocsCredential(
-                    signature = CoseCredentialSignature(), signed = credential,
-                    credentialData = mdoc.issuerSigned.toUIJson(),
-                    docType = mdoc.docType.value
-                )
+
+
+        // --- Return ---
+
+        return CredentialDetectionResult(
+            credentialPrimaryType = CredentialPrimaryDataType.MDOCS,
+            credentialSubType = CredentialDetectorTypes.MdocsSubType.mdocs,
+            signaturePrimary = SignaturePrimaryType.COSE,
+            containsDisclosables = hasSd, providesDisclosures = hasSd
+        ) to MdocsCredential(
+            signature = CoseCredentialSignature(),
+            //credentialData = credentialData,
+            //credentialDataOld = mdoc.issuerSigned.toUIJson(),
+            credentialData = JsonObject(
+                mdoc.issuerSigned.toUIJson().toMutableMap().apply {
+                    put("docType", JsonPrimitive(document.docType))
+                }
+            ),
+            signed = credential,
+            docType = document.docType
+        )
     }
 
     private fun parseSdJwt(

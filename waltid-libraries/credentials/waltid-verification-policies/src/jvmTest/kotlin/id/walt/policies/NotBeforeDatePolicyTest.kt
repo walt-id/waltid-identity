@@ -1,11 +1,11 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.policies
 
+import id.walt.policies.policies.NotBeforeDatePolicy
 import id.walt.w3c.Claims
 import id.walt.w3c.JwtClaims
 import id.walt.w3c.VcClaims
-import id.walt.policies.policies.NotBeforeDatePolicy
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonPrimitive
@@ -14,7 +14,10 @@ import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import java.util.stream.Stream
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 class NotBeforeDatePolicyTest : DatePolicyTestBase() {
 

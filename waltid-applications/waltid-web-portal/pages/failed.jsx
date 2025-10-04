@@ -1,6 +1,6 @@
 import WaltIcon from "@/components/walt/logo/WaltIcon";
-import { XCircleIcon } from "@heroicons/react/24/outline";
-import { useState } from "react";
+import {XCircleIcon} from "@heroicons/react/24/outline";
+import {useState} from "react";
 
 export default function Failed() {
   const [verificationPolicies, setVerificationPolicies] = useState([

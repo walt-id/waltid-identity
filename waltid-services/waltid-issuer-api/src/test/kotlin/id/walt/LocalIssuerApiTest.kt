@@ -10,12 +10,14 @@ import id.walt.issuer.issuance.createCredentialOfferUri
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.sdjwt.SDMapBuilder
 import id.walt.w3c.vc.vcs.W3CVC
+import io.ktor.http.Url
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import org.intellij.lang.annotations.Language
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class IssuerApiTest {
 companion object {
@@ -164,7 +166,9 @@ companion object {
         ConfigManager.testWithConfigs(testConfigs)
         val offerUri = createCredentialOfferUri(listOf(issueRequest), CredentialFormat.jwt_vc_json)
 
-        assertEquals(true, offerUri.contains("//localhost:7002/draft13/?credential_offer"))
+        assertTrue {
+            Url(offerUri).parameters["credential_offer_uri"]!!.contains("draft13")
+        }
     }
 
     @Test
@@ -181,7 +185,9 @@ companion object {
         ConfigManager.testWithConfigs(testConfigs)
         val offerUri = createCredentialOfferUri(listOf(issueRequest), CredentialFormat.jwt_vc_json)
 
-        assertEquals(true, offerUri.contains("//localhost:7002/draft13/?credential_offer"))
+        assertTrue {
+            Url(offerUri).parameters["credential_offer_uri"]!!.contains("draft13")
+        }
     }
 
 
@@ -204,7 +210,9 @@ companion object {
         ConfigManager.testWithConfigs(testConfigs)
         val offerUri = createCredentialOfferUri(listOf(issueRequest), CredentialFormat.jwt_vc_json)
 
-        assertEquals(true, offerUri.contains("//localhost:7002/draft13/?credential_offer"))
+        assertTrue {
+            Url(offerUri).parameters["credential_offer_uri"]!!.contains("draft13")
+        }
     }
 
     @Test
@@ -250,7 +258,9 @@ companion object {
         ConfigManager.loadConfigs(emptyArray())
         val offerUri = createCredentialOfferUri(issuanceRequests, CredentialFormat.jwt_vc_json)
 
-        assertEquals(true, offerUri.contains("//localhost:7002/draft13/?credential_offer"))
+        assertTrue {
+            Url(offerUri).parameters["credential_offer_uri"]!!.contains("draft13")
+        }
 
     }
 

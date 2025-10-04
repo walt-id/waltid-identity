@@ -1,11 +1,7 @@
 package id.walt.credentials.formats
 
 import id.walt.credentials.CredentialDetectorTypes
-import id.walt.credentials.signatures.CoseCredentialSignature
-import id.walt.credentials.signatures.CredentialSignature
-import id.walt.credentials.signatures.DataIntegrityProofCredentialSignature
-import id.walt.credentials.signatures.JwtCredentialSignature
-import id.walt.credentials.signatures.SdJwtCredentialSignature
+import id.walt.credentials.signatures.*
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.Key
@@ -53,6 +49,6 @@ data class SdJwtCredential(
             }
             is CoseCredentialSignature -> TODO("Not implemented yet: verify SD-JWT with COSE")
             is DataIntegrityProofCredentialSignature -> TODO("Not implemented yet: verify SD-JWT with DIP")
-            null -> TODO()
+            null -> throw IllegalArgumentException("Credential contains no signature, cannot verify")
         }
 }

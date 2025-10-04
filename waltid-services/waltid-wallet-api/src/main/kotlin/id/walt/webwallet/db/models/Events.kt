@@ -1,8 +1,8 @@
 package id.walt.webwallet.db.models
 
 import id.walt.webwallet.db.kotlinxUuid
-import org.jetbrains.exposed.dao.id.IntIdTable
-import org.jetbrains.exposed.sql.javatime.timestamp
+import org.jetbrains.exposed.v1.core.dao.id.IntIdTable
+import org.jetbrains.exposed.v1.javatime.timestamp
 import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalUuidApi::class)

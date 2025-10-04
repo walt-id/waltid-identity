@@ -1,10 +1,9 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.issuer.services.onboarding.models
 
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
-import kotlin.time.DurationUnit
-import kotlin.time.toDuration
+import kotlin.time.*
 
 @Serializable
 data class DocumentSignerCertificateData(

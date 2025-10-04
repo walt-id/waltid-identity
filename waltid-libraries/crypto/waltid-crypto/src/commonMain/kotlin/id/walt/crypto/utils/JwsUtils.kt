@@ -16,7 +16,9 @@ import kotlin.js.JsExport
 object JwsUtils {
 
     private fun String.decodeJwsPart(): JsonObject =
-        Json.parseToJsonElement(this.base64toBase64Url().decodeFromBase64Url().decodeToString()).jsonObject
+        Json.parseToJsonElement(
+            this.lines().joinToString(separator = "") { it.trim() }.base64toBase64Url().decodeFromBase64Url().decodeToString()
+        ).jsonObject
 
     @Serializable
     data class JwsParts(val header: JsonObject, val payload: JsonObject, val signature: String) {

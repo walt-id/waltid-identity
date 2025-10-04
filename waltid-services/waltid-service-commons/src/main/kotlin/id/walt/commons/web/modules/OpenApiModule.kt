@@ -1,4 +1,4 @@
-@file:OptIn(SealedSerializationApi::class, kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(SealedSerializationApi::class, ExperimentalSerializationApi::class, ExperimentalTime::class)
 
 package id.walt.commons.web.modules
 
@@ -25,11 +25,13 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.swagger.v3.oas.models.media.Discriminator
 import io.swagger.v3.oas.models.media.Schema
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SealedSerializationApi
 import kotlinx.serialization.descriptors.*
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 
 object OpenApiModule {

@@ -63,7 +63,7 @@ kotlin {
             dependencies {
                 implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 implementation("io.github.optimumcode:json-schema-validator:0.4.0")
 
                 implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
@@ -71,7 +71,7 @@ kotlin {
                 implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
                 // Kotlinx
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -99,7 +99,7 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 implementation("org.slf4j:slf4j-simple:2.0.16")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
                 implementation("io.ktor:ktor-server-test-host:$ktor_version")

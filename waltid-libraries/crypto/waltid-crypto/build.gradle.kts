@@ -69,6 +69,7 @@ kotlin {
     }
     js(IR) {
         outputModuleName = "crypto"
+        useEsModules()
         nodejs {
             generateTypeScriptDefinitions()
             testTask {
@@ -95,7 +96,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
                 // Ktor client
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -109,7 +110,7 @@ kotlin {
                 implementation("org.kotlincrypto.hash:sha2")
 
                 // Date
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
                 // Cache
                 implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")
@@ -162,14 +163,14 @@ kotlin {
                 implementation(kotlin("test"))
 
                 implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
             }
         }
         val jsMain by getting {
             dependencies {
                 // JOSE
-                implementation(npm("jose", "5.2.3"))
+                implementation(npm("jose", "5.10.0"))
 
             }
         }

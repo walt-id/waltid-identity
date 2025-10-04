@@ -1,7 +1,7 @@
 package id.walt.policies.policies.vp
 
-import id.walt.w3c.utils.VCFormat
 import id.walt.policies.CredentialWrapperValidatorPolicy
+import id.walt.w3c.utils.VCFormat
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise

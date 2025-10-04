@@ -4,7 +4,7 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.issuer.issuance.OidcApi.metadataDraft11
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.CredentialOffer
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.buildJsonObject
 
 object OidcIssuance {
 
