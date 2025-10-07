@@ -16,11 +16,11 @@
 
 Available for Kotlin/Java and JavaScript environments.
 
-- **Crypto** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-keys/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto)) -
+- **Crypto** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto)) -
   create and use keys based on different algorithms and KMS backends (in-memory, AWS, Hashicorp TSE, OCI)
-- **DID** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-dids/overview) | [GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-did/README.md)) -
+- **DID** ([GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-did/README.md)) -
   create, register, and resolve DIDs on different ecosystems.
-- **W3C Credentials** ([Docs](https://docs.oss.walt.id/issuer/sdks/manage-credentials/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-w3c-credentials)) -
+- **W3C Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-w3c-credentials)) -
   issue and verify W3C credentials as JWTs and SD-JWTs.
 - **mdoc Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-mdoc-credentials)) -
   issue and verify mdoc credentials (mDL ISO/IEC 18013-5).
@@ -35,11 +35,11 @@ Available for Kotlin/Java and JavaScript environments.
 
 A set of APIs to build issuer, verifier, and wallet capabilities into any app.
 
-- **Issuer API** ([Docs](https://docs.walt.id/issuer/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-issuer-api)) -
+- **Issuer API** ([Docs](https://docs.walt.id/community-stack/issuer/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-issuer-api)) -
   enable apps to issue credentials (W3C JWTs and SD-JWTs) via OID4VC.
-- **Verifier API**  ([Docs](https://docs.walt.id/verifier/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-verifier-api)) -
+- **Verifier API**  ([Docs](https://docs.walt.id/community-stack/verifier/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-verifier-api)) -
   enable apps to verify credentials (W3C JWTs and SD-JWTs) via OID4VP/SIOPv2.
-- **Wallet API** ([Docs](https://docs.oss.walt.id/wallet/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-wallet-api)) -
+- **Wallet API** ([Docs](https://docs.walt.id/community-stack/wallet/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-wallet-api)) -
   extend apps with wallet capabilities to collect, store, manage and share identity credentials and tokens.
 
 ### Apps
@@ -91,11 +91,11 @@ cd waltid-applications/waltid-cli && ./waltid-cli.sh
 The walt.id identity repo is part of The Community Stack, walt.id's collection of open-source products to build identity and wallet
 solutions. Learn more [here](https://walt.id/blog/p/community-stack).
 
-![waltid-identity-architecture](https://github.com/user-attachments/assets/98c020fe-dc37-46fd-9886-613ee8fc8760)
+![waltid-identity-architecture](https://github.com/user-attachments/assets/56a69598-c9f0-4f4a-a071-05fb98d247ba)
 
 ## Join the community
 
-* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [Twitter](https://mobile.twitter.com/walt_id)
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [X](https://x.com/walt_id)
 * Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
 
 ## License
