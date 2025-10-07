@@ -336,7 +336,16 @@
 
 <script lang="ts" setup>
 import {ref} from "vue";
-import {Dialog, DialogPanel, Menu, MenuButton, MenuItem, MenuItems, TransitionChild, TransitionRoot} from "@headlessui/vue";
+import {
+    Dialog,
+    DialogPanel,
+    Menu,
+    MenuButton,
+    MenuItem,
+    MenuItems,
+    TransitionChild,
+    TransitionRoot
+} from "@headlessui/vue";
 import {
     ArrowPathIcon,
     Bars3CenterLeftIcon,
@@ -393,6 +402,11 @@ const navigation = [
         icon: HomeIcon,
       },
       {
+          name: "Enveloped VP",
+          href: `/wallet/${currentWallet.value}/presentations/enveloped`,
+          icon: ClipboardDocumentListIcon,
+      },
+        {
         name: "Tokens",
         href: `/wallet/${currentWallet.value}/settings/tokens`,
         icon: GlobeAltIcon,

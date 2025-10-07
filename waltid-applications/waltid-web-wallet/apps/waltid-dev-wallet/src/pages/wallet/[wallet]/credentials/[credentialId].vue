@@ -493,7 +493,7 @@ const {
 
 async function deleteCredential() {
   await $fetch(
-    `/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}`,
+      `/wallet-api/wallet/${currentWallet.value}/credentials/${encodeURIComponent(credentialId)}?permanent=true`,
     {
       method: "DELETE",
     },

@@ -11,6 +11,7 @@ data class SingleKeyResponse(
     val keyId: KeyId,
     val keyPair: JsonObject,
     val keysetHandle: JsonElement,
+    val name: String? = null,
 ) {
     @Serializable
     data class KeyId(val id: String)

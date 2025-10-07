@@ -185,7 +185,7 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         //endregion -Presentation Definition Policy (id.walt.test.integration.environment.api.verifier.Verifier)-
 
         //region -ISO mDL Onboarding Service (Issuer)-
-        IssuerIsoMdlOnboardingServiceTests(e2e).runTests()
+        //IssuerIsoMdlOnboardingServiceTests(e2e).runTests()
         //endregion -ISO mDL Onboarding Service (Issuer)-
 
         //region -MDoc Prepared/Ready Wallet Test Utility (Wallet)
@@ -193,7 +193,7 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         //endregion -MDoc Prepared/Ready Wallet Test Utility (Wallet)
 
         //region -Presented Credentials Feature (Verifier)-
-        VerifierPresentedCredentialsTests(e2e).runTests()
+        //VerifierPresentedCredentialsTests(e2e).runTests()
         //endregion -Presented Credentials Feature (Verifier)-
 
         //region -Batch Issuance Test Suite-

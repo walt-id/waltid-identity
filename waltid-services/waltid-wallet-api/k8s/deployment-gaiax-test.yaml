@@ -24,7 +24,7 @@ data:
     webHost = "0.0.0.0"
     webPort = 4545
   oidc.conf: |
-    publicBaseUrl = "https://wallet-dev.test.waltid.cloud"
+    publicBaseUrl = "https://wallet-dev.gaiax-test.waltid.cloud"
     providerName = keycloak
     oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
     oidcJwks = "${oidcRealm}/protocol/openid-connect/certs"
@@ -123,7 +123,7 @@ spec:
               name: wallet-data
       containers:
         - name: wallet-api
-          image: waltid/wallet-api:__DEFAULT_IMAGE_TAG__
+          image: waltid/wallet-api:gaiax-test
 
           imagePullPolicy: Always
           volumeMounts:
@@ -202,47 +202,47 @@ spec:
     spec:
       containers:
         - name: waltid-dev-wallet
-          image: waltid/waltid-dev-wallet:__DEFAULT_IMAGE_TAG__
+          image: waltid/waltid-dev-wallet:gaiax-test
           imagePullPolicy: Always
           env:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
-              value: "https://wallet-dev.test.waltid.cloud"
+              value: "https://wallet-dev.gaiax-test.waltid.cloud"
             - name: NUXT_PUBLIC_DEMO_WALLET_URL
               value: "https://wallet.test.waltid.cloud"
           ports:
             - containerPort: 7104
               name: http-api
----
-kind: Deployment
-apiVersion: apps/v1
-metadata:
-  name: waltid-demo-wallet
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: waltid-demo-wallet
-  template:
-    metadata:
-      labels:
-        app: waltid-demo-wallet
-      annotations:
-        deployment/id: "_DEFAULT_DEPLOYMENT_"
-    spec:
-      containers:
-        - name: waltid-demo-wallet
-          image: waltid/waltid-demo-wallet:__DEFAULT_IMAGE_TAG__
-          imagePullPolicy: Always
-          env:
-            - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
-              value: "https://wallet.test.waltid.cloud"
-            - name: NUXT_PUBLIC_DEV_WALLET_URL
-              value: "https://wallet-dev.test.waltid.cloud"
-            - name: NUXT_PUBLIC_CREDENTIALS_REPOSITORY_URL
-              value: "https://credentials.test.waltid.cloud"
-          ports:
-            - containerPort: 7101
-              name: http-api
+#---
+#kind: Deployment
+#apiVersion: apps/v1
+#metadata:
+#  name: waltid-demo-wallet
+#spec:
+#  replicas: 1
+#  selector:
+#    matchLabels:
+#      app: waltid-demo-wallet
+#  template:
+#    metadata:
+#      labels:
+#        app: waltid-demo-wallet
+#      annotations:
+#        deployment/id: "_DEFAULT_DEPLOYMENT_"
+#    spec:
+#      containers:
+#        - name: waltid-demo-wallet
+#          image: waltid/waltid-demo-wallet:__DEFAULT_IMAGE_TAG__
+#          imagePullPolicy: Always
+#          env:
+#            - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
+#              value: "https://wallet.test.waltid.cloud"
+#            - name: NUXT_PUBLIC_DEV_WALLET_URL
+#              value: "https://wallet-dev.test.waltid.cloud"
+#            - name: NUXT_PUBLIC_CREDENTIALS_REPOSITORY_URL
+#              value: "https://credentials.test.waltid.cloud"
+#          ports:
+#            - containerPort: 7101
+#              name: http-api
 ---
 kind: Service
 apiVersion: v1
@@ -256,19 +256,19 @@ spec:
       protocol: TCP
   selector:
     app: waltid-dev-wallet
----
-kind: Service
-apiVersion: v1
-metadata:
-  name: waltid-demo-wallet
-spec:
-  ports:
-    - name: http
-      port: 80
-      targetPort: http-api
-      protocol: TCP
-  selector:
-    app: waltid-demo-wallet
+#---
+#kind: Service
+#apiVersion: v1
+#metadata:
+#  name: waltid-demo-wallet
+#spec:
+#  ports:
+#    - name: http
+#      port: 80
+#      targetPort: http-api
+#      protocol: TCP
+#  selector:
+#    app: waltid-demo-wallet
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -283,14 +283,14 @@ metadata:
       }
 spec:
   tls:
+#    - hosts:
+#        - wallet.test.waltid.cloud
+#      secretName: wallet-demo-tls-secret
     - hosts:
-        - wallet.test.waltid.cloud
-      secretName: wallet-demo-tls-secret
-    - hosts:
-        - wallet-dev.test.waltid.cloud
+        - wallet-dev.gaiax-test.waltid.cloud
       secretName: wallet-dev-tls-secret
   rules:
-    - host: wallet-dev.test.waltid.cloud
+    - host: wallet-dev.gaiax-test.waltid.cloud
       http:
         paths:
           - path: /wallet-api/
@@ -342,55 +342,55 @@ spec:
                 name: waltid-dev-wallet
                 port:
                   name: http
-    - host: wallet.test.waltid.cloud
-      http:
-        paths:
-          - path: /wallet-api/
-            pathType: Prefix
-            backend:
-              service:
-                name: wallet-api
-                port:
-                  name: http
-          - path: /swagger
-            pathType: Prefix
-            backend:
-              service:
-                name: wallet-api
-                port:
-                  name: http
-          - path: /api.json
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: wallet-api
-                port:
-                  name: http
-          - path: /livez
-            pathType: Prefix
-            backend:
-              service:
-                name: wallet-api
-                port:
-                  name: http
-          - path: /features/
-            pathType: Prefix
-            backend:
-              service:
-                name: wallet-api
-                port:
-                  name: http
-          - path: /debug/
-            pathType: Prefix
-            backend:
-              service:
-                name: wallet-api
-                port:
-                  name: http
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: waltid-demo-wallet
-                port:
-                  name: http
+#    - host: wallet.test.waltid.cloud
+#      http:
+#        paths:
+#          - path: /wallet-api/
+#            pathType: Prefix
+#            backend:
+#              service:
+#                name: wallet-api
+#                port:
+#                  name: http
+#          - path: /swagger
+#            pathType: Prefix
+#            backend:
+#              service:
+#                name: wallet-api
+#                port:
+#                  name: http
+#          - path: /api.json
+#            pathType: ImplementationSpecific
+#            backend:
+#              service:
+#                name: wallet-api
+#                port:
+#                  name: http
+#          - path: /livez
+#            pathType: Prefix
+#            backend:
+#              service:
+#                name: wallet-api
+#                port:
+#                  name: http
+#          - path: /features/
+#            pathType: Prefix
+#            backend:
+#              service:
+#                name: wallet-api
+#                port:
+#                  name: http
+#          - path: /debug/
+#            pathType: Prefix
+#            backend:
+#              service:
+#                name: wallet-api
+#                port:
+#                  name: http
+#          - path: /
+#            pathType: Prefix
+#            backend:
+#              service:
+#                name: waltid-demo-wallet
+#                port:
+#                  name: http

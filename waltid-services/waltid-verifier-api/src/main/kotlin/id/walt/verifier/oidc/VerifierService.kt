@@ -279,7 +279,6 @@ object VerifierService {
         val tokenResponse = checkNotNull(session.tokenResponse) {
             "It should be impossible to have a null token response and a successful verification result - bug!"
         }
-
         val vpTokenStringified = checkNotNull(tokenResponse.vpToken) {
             "It should be impossible to have a null vp_token response and a successful verification result - bug!"
         }.jsonPrimitive.content
