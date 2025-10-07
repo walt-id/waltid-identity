@@ -412,7 +412,7 @@ Arguments:
 ```
 
 Before signing a VC, we need
-to [create a VC](https://docs.oss.walt.id/issuer/sdks/manage-credentials/sign/w3c-credential), which can be done
+to [create a VC](https://docs.walt.id/community-stack/issuer/sdks/manage-credentials/sign/w3c-credential), which can be done
 manually or programmatically.
 
 Since our focus here is on the CLI and not the Walt.id API, let's see what it's like to manually create a VC.
@@ -420,7 +420,7 @@ Since our focus here is on the CLI and not the Walt.id API, let's see what it's 
 #### 1. Create a VC
 
 Walt.id
-provides [a repository of VCs](https://docs.oss.walt.id/issuer/sdks/manage-credentials/sign/w3c-credential#manual-create-credential)
+provides [a repository of VCs](https://docs.walt.id/community-stack/issuer/sdks/manage-credentials/sign/w3c-credential#manual-create-credential)
 that can be used as templates for creating your own. Choose the one that best suits your needs.
 
 Let's choose the [OpenBadgeCredential](https://github.com/walt-id/waltid-identity/blob/main/waltid-applications/waltid-cli/src/jvmTest/resources/vc/openbadgecredential_sample.json), adjust it

@@ -14,7 +14,7 @@ protocol.<p>
 </div>
 
 Refer to the
-[walt.id documentation](https://docs.oss.walt.id/issuer/api/getting-started)
+[walt.id documentation](https://docs.walt.id/community-stack/issuer/api/getting-started)
 for a detailed view on using the issuer service.
 
 ## What it provides

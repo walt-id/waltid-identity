@@ -14,7 +14,7 @@
 </div>
 
 Watch the [Intro Video](https://www.youtube.com/watch?v=ILaSAxjoHbw&t=1s) to learn about features and see a demo.
-The [documentation](https://docs.oss.walt.id/wallet/api/getting-started) explains how to create and manage identity
+The [documentation](https://docs.walt.id/community-stack/wallet/api/getting-started) explains how to create and manage identity
 wallets.
 
 # What it provides
