@@ -76,7 +76,7 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
-import java.util.Base64
+import java.util.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
@@ -267,6 +267,36 @@ class SSIKit2WalletService(
         }
         logger.debug { "HTTP Response: $resp, body: $httpResponseBody" }
 
+        var redirectFromBody: String? = null
+        var errorUriFromBody: String? = null
+        if (httpResponseBody != null && httpResponseBody.couldBeJsonObject()) {
+            val bodyJson = httpResponseBody.parseAsJsonObject().getOrNull()
+            val bodyRedirect = bodyJson?.get("redirect_uri")?.jsonPrimitive?.contentOrNull
+            val bodyError = bodyJson?.get("error_uri")?.jsonPrimitive?.contentOrNull
+            @Suppress("HttpUrlsUsage")
+            if (bodyRedirect != null && (bodyRedirect.startsWith("http://") || bodyRedirect.startsWith("https://"))) {
+                redirectFromBody = bodyRedirect
+            }
+            @Suppress("HttpUrlsUsage")
+            if (bodyError != null && (bodyError.startsWith("http://") || bodyError.startsWith("https://"))) {
+                errorUriFromBody = bodyError
+            }
+        } else if (isResponseRedirectUrl) {
+            redirectFromBody = httpResponseBody
+        }
+
+        if (redirectFromBody != null) {
+            return Result.success(redirectFromBody)
+        }
+        if (errorUriFromBody != null) {
+            return Result.failure(
+                PresentationError(
+                    message = "Presentation failed - redirecting to error page",
+                    redirectUri = errorUriFromBody
+                )
+            )
+        }
+
         parameter.selectedCredentials.forEach {
             credentialService.get(walletId, it)?.run {
                 eventUseCase.log(
@@ -293,19 +323,10 @@ class SSIKit2WalletService(
         val isSuccess = resp.status.isSuccess()
 
         if ((isRedirect && !isErrorInLocationHeader) || isSuccess) {
-            return Result.success(if (isResponseRedirectUrl) httpResponseBody else null)
+            return Result.success(null)
         }
 
         logger.debug { "Presentation failed, return = $httpResponseBody" }
-        if (isResponseRedirectUrl) {
-            return Result.failure(
-                exception = PresentationError(
-                    message = "Presentation failed - redirecting to error page",
-                    redirectUri = httpResponseBody
-                )
-            )
-        }
-
         return Result.failure(
             exception = PresentationError(
                 message =
