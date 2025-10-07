@@ -149,12 +149,12 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from "vue";
-import { useTitle } from "@vueuse/core";
+import {ref} from "vue";
+import {useTitle} from "@vueuse/core";
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import LoadingIndicator from "@waltid-web-wallet/components/loading/LoadingIndicator.vue";
 import VerifiableCredentialCard from "@waltid-web-wallet/components/credentials/VerifiableCredentialCard.vue";
-import { useIssuance } from "@waltid-web-wallet/composables/issuance.ts";
+import {useIssuance} from "@waltid-web-wallet/composables/issuance.ts";
 
 const query = useRoute().query;
 const immediateAccept = ref(false);

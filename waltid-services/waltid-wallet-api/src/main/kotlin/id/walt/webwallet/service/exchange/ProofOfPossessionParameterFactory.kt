@@ -1,6 +1,5 @@
 package id.walt.webwallet.service.exchange
 
-import org.cose.java.OneKey
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
@@ -13,6 +12,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.encodeToJsonElement
+import org.cose.java.OneKey
 
 object ProofOfPossessionParameterFactory {
     suspend fun new(

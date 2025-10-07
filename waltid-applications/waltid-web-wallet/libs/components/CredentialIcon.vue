@@ -8,7 +8,7 @@
 </template>
 
 <script setup>
-import { AcademicCapIcon, CheckBadgeIcon, EyeDropperIcon, HomeIcon, IdentificationIcon, UserGroupIcon } from "@heroicons/vue/24/outline";
+import {AcademicCapIcon, CheckBadgeIcon, EyeDropperIcon, HomeIcon, IdentificationIcon, UserGroupIcon} from "@heroicons/vue/24/outline";
 
 const props = defineProps(["credentialType"]);
 </script>

@@ -1,4 +1,4 @@
-import { decodeBase64ToUtf8, encodeUtf8ToBase64 } from "./base64";
+import {decodeBase64ToUtf8, encodeUtf8ToBase64} from "./base64";
 
 export function parseDisclosures(disclosureString: string) {
     try {

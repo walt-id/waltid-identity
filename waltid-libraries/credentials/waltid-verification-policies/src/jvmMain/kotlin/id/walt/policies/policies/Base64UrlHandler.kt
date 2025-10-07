@@ -1,6 +1,6 @@
 package id.walt.policies.policies
 
-import java.util.*
+import java.util.Base64
 
 private const val MULTIBASE_BASE64_URL_PREFIX = 'u'
 

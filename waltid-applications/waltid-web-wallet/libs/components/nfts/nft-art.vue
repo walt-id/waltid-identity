@@ -16,7 +16,7 @@
 </template>
 
 <script setup>
-import { useIsVideo, useMediaUrl } from "../../composables/useNftMedia.ts";
+import {useIsVideo, useMediaUrl} from "../../composables/useNftMedia.ts";
 
 const props = defineProps({
     art: {

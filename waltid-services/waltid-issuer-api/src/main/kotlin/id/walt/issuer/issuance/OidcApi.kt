@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.issuer.issuance
 
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.issuer.issuance.openapi.oidcapi.getCredentialOfferUriDocs
 import id.walt.issuer.issuance.openapi.oidcapi.getStandardVersionDocs
 import id.walt.issuer.issuance.openapi.oidcapi.standardVersionPathParameter
@@ -23,7 +26,6 @@ import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.sdjwt.JWTVCIssuerMetadata
 import id.walt.sdjwt.SDJWTVCTypeMetadata
-import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
@@ -38,9 +40,10 @@ import io.ktor.server.routing.*
 import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.ExperimentalTime
 
 object OidcApi : CIProvider() {
 

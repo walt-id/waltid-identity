@@ -65,13 +65,14 @@ kotlin {
     }
     js(IR) {
         outputModuleName.set("digital-credentials")
-        /*browser {
-            commonWebpackConfig {
-                cssSupport {
-                    enabled.set(true)
-                }
-            }
-        }*/
+        useEsModules()
+//        browser {
+//            commonWebpackConfig {
+//                cssSupport {
+//                    enabled.set(true)
+//                }
+//            }
+//        }
         nodejs {
             generateTypeScriptDefinitions()
         }
@@ -88,8 +89,8 @@ kotlin {
         val commonMain by getting {
             dependencies {
 //                // JSON
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
 //                implementation("io.github.optimumcode:json-schema-validator:0.4.0")
 //
 //                // Ktor client
@@ -104,16 +105,17 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 //
 //                // Kotlinx
-//                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
-//                implementation("app.softwork:kotlinx-uuid-core:0.1.4")
+//                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+//                implementation("app.softwork:kotlinx-uuid-core:0.1.6")
 //
-//                // Loggin
-//                implementation("io.github.oshai:kotlin-logging:7.0.5")
+                // Logging
+                implementation("io.github.oshai:kotlin-logging:7.0.5")
 //
 //                // walt.id
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
                 api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
                 api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
+                api(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
                 api(project(":waltid-libraries:credentials:waltid-dcql"))
                 api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
                 api(project(":waltid-libraries:waltid-did"))
@@ -235,10 +237,18 @@ publishing {
 
     repositories {
         maven {
-            url = uri(if (version.toString().endsWith("SNAPSHOT")) uri("https://maven.waltid.dev/snapshots") else uri("https://maven.waltid.dev/releases"))
+            url = uri(
+                if (version.toString()
+                        .endsWith("SNAPSHOT")
+                ) uri("https://maven.waltid.dev/snapshots") else uri("https://maven.waltid.dev/releases")
+            )
             credentials {
-                username = System.getenv("MAVEN_USERNAME") ?: File("$rootDir/secret_maven_username.txt").let { if (it.isFile) it.readLines().first() else "" }
-                password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let { if (it.isFile) it.readLines().first() else "" }
+                username = System.getenv("MAVEN_USERNAME") ?: File("$rootDir/secret_maven_username.txt").let {
+                    if (it.isFile) it.readLines().first() else ""
+                }
+                password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let {
+                    if (it.isFile) it.readLines().first() else ""
+                }
             }
         }
     }

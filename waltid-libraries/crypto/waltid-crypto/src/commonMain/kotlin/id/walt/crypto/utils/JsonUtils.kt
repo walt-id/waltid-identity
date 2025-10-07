@@ -1,5 +1,6 @@
 package id.walt.crypto.utils
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.*
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
@@ -12,6 +13,7 @@ object JsonUtils {
 
     internal val prettyJson by lazy { Json { prettyPrint = true } }
 
+    @OptIn(ExperimentalSerializationApi::class)
     fun Any?.toJsonElement(): JsonElement =
         when (this) {
             is JsonElement -> this
@@ -19,12 +21,12 @@ object JsonUtils {
             is String -> JsonPrimitive(this)
             is Boolean -> JsonPrimitive(this)
             is Number -> JsonPrimitive(this)
-            /*
+
             is UByte -> JsonPrimitive(this)
             is UInt -> JsonPrimitive(this)
             is ULong -> JsonPrimitive(this)
             is UShort -> JsonPrimitive(this)
-            */
+
             is Map<*, *> -> JsonObject(map { Pair(it.key.toString(), it.value.toJsonElement()) }.toMap())
             is List<*> -> JsonArray(map { it.toJsonElement() })
             is Array<*> -> JsonArray(map { it.toJsonElement() })

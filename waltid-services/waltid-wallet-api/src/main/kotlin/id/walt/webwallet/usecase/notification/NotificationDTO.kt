@@ -1,9 +1,12 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.webwallet.usecase.notification
 
 import id.walt.webwallet.db.models.Notification
-import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 //TODO: refactor the notification flow to listen to events,
 // create notification for the subscribed ones

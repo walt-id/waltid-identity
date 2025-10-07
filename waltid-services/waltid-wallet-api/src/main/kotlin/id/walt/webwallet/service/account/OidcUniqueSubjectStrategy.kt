@@ -1,15 +1,17 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.webwallet.service.account
+
 
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.db.models.OidcLogins
 import id.walt.webwallet.utils.JwkUtils.verifyToken
 import id.walt.webwallet.web.model.OidcUniqueSubjectRequest
-import kotlinx.datetime.Clock
-import kotlinx.datetime.toJavaInstant
-
-
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.toJavaInstant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 

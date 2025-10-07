@@ -73,13 +73,13 @@
 </template>
 
 <script lang="ts" setup>
-import { useHead } from "nuxt/app";
-import { defineProps, ref } from "vue";
+import {useHead} from "nuxt/app";
+import {defineProps, ref} from "vue";
 import CenterMain from "../../components/CenterMain.vue";
-import { CheckIcon, KeyIcon } from "@heroicons/vue/24/solid";
-import { ArrowUturnLeftIcon } from "@heroicons/vue/24/outline";
+import {CheckIcon, KeyIcon} from "@heroicons/vue/24/solid";
+import {ArrowUturnLeftIcon} from "@heroicons/vue/24/outline";
 import BackButton from "../../components/buttons/BackButton.vue";
-import { useCurrentWallet } from "../../composables/accountWallet.ts";
+import {useCurrentWallet} from "../../composables/accountWallet.ts";
 import InlineLoadingCircle from "../../components/loading/InlineLoadingCircle.vue";
 
 const props = defineProps({

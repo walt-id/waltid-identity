@@ -26,10 +26,10 @@ class W3CStatusValidator(
         )
 
     override fun customValidations(statusList: W3CStatusContent, attribute: W3CStatusPolicyAttribute) {
-        if (statusList.type != attribute.type) {
+        if (!statusList.type.equals(attribute.type, ignoreCase = true)) {
             throw StatusVerificationError("Type validation failed: expected ${attribute.type}, but got ${statusList.type}")
         }
-        if (statusList.purpose != attribute.purpose) {
+        if (!statusList.purpose.equals(attribute.purpose, ignoreCase = true)) {
             throw StatusVerificationError("Purpose validation failed: expected ${attribute.purpose}, but got ${statusList.purpose}")
         }
     }

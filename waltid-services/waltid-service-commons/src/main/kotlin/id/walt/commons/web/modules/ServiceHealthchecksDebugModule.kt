@@ -41,12 +41,12 @@ object ServiceHealthChecksDebugModule {
             }
 
         fun Application.init() {
-            environment.monitor.subscribe(ApplicationStarting) { ktorStatus = KtorStatus.ApplicationStarting }
-            environment.monitor.subscribe(ApplicationStarted) { ktorStatus = KtorStatus.ApplicationStarted }
-            environment.monitor.subscribe(ServerReady) { ktorStatus = KtorStatus.ServerReady }
-            environment.monitor.subscribe(ApplicationStopPreparing) { ktorStatus = KtorStatus.ApplicationStopPreparing }
-            environment.monitor.subscribe(ApplicationStopping) { ktorStatus = KtorStatus.ApplicationStopping }
-            environment.monitor.subscribe(ApplicationStopped) { ktorStatus = KtorStatus.ApplicationStopped }
+            monitor.subscribe(ApplicationStarting) { ktorStatus = KtorStatus.ApplicationStarting }
+            monitor.subscribe(ApplicationStarted) { ktorStatus = KtorStatus.ApplicationStarted }
+            monitor.subscribe(ServerReady) { ktorStatus = KtorStatus.ServerReady }
+            monitor.subscribe(ApplicationStopPreparing) { ktorStatus = KtorStatus.ApplicationStopPreparing }
+            monitor.subscribe(ApplicationStopping) { ktorStatus = KtorStatus.ApplicationStopping }
+            monitor.subscribe(ApplicationStopped) { ktorStatus = KtorStatus.ApplicationStopped }
         }
     }
 

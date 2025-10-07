@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
 
 package id.walt.webwallet.usecase.claim
 
@@ -19,8 +19,9 @@ import id.walt.webwallet.usecase.event.EventLogUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCase
 import id.walt.webwallet.usecase.notification.NotificationDispatchUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
-import kotlinx.datetime.Clock
 import kotlinx.serialization.json.JsonObject
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 

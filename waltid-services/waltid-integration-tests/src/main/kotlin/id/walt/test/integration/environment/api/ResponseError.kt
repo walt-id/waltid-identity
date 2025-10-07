@@ -1,8 +1,8 @@
 package id.walt.test.integration.environment.api
 
-import io.ktor.client.call.body
-import io.ktor.client.statement.HttpResponse
-import io.ktor.http.HttpStatusCode
+import io.ktor.client.call.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 

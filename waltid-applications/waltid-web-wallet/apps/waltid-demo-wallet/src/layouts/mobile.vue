@@ -34,9 +34,9 @@
 </template>
 
 <script lang="ts" setup>
-import { CogIcon, ListBulletIcon, QuestionMarkCircleIcon, ShieldCheckIcon } from "@heroicons/vue/24/outline";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
-import { useTenant } from "@waltid-web-wallet/composables/tenants.ts";
+import {CogIcon, ListBulletIcon, QuestionMarkCircleIcon, ShieldCheckIcon} from "@heroicons/vue/24/outline";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
+import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
 
 const tenant = (await useTenant().value) as any;
 

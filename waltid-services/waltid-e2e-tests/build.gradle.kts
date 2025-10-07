@@ -35,7 +35,7 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-verifier-api"))
     testImplementation(project(":waltid-services:waltid-wallet-api"))
 
-    testImplementation("app.softwork:kotlinx-uuid-core:0.1.4")
+    testImplementation("app.softwork:kotlinx-uuid-core:0.1.6")
     testImplementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
     testImplementation("org.bouncycastle:bcpkix-lts8on:2.73.8")

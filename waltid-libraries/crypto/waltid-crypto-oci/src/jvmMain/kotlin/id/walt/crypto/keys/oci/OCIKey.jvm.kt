@@ -10,11 +10,8 @@ import com.oracle.bmc.keymanagement.KmsManagementClient
 import com.oracle.bmc.keymanagement.KmsVaultClient
 import com.oracle.bmc.keymanagement.model.*
 import com.oracle.bmc.keymanagement.requests.*
-import id.walt.crypto.keys.EccUtils
+import id.walt.crypto.keys.*
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.KeyTypes
-import id.walt.crypto.keys.OciKeyMeta
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url

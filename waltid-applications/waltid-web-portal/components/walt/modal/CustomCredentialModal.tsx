@@ -1,7 +1,7 @@
 import BaseModal from "@/components/walt/modal/BaseModal";
-import { CredentialsContext } from "@/pages/_app";
+import {CredentialsContext} from "@/pages/_app";
 import Button from "../button/Button";
-import React, { useState } from "react";
+import React, {useState} from "react";
 
 type Props = {
   show: boolean;

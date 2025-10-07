@@ -169,6 +169,7 @@ import BackButton from "@waltid-web-wallet/components/buttons/BackButton.vue";
 import {ArrowUpOnSquareIcon, ExclamationTriangleIcon, TrashIcon} from "@heroicons/vue/24/outline";
 import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 import {computed, onMounted, ref} from "vue";
+
 import {Switch, SwitchGroup, SwitchLabel} from "@headlessui/vue";
 
 const route = useRoute();

@@ -1,4 +1,5 @@
 @file:Suppress("ExtractKtorModule")
+@file:OptIn(ExperimentalTime::class)
 
 package id.walt.issuer.issuance
 
@@ -27,7 +28,6 @@ import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.*
-import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.definitions.OPENID_CREDENTIAL_AUTHORIZATION_TYPE
 import id.walt.oid4vc.errors.AuthorizationError
@@ -50,7 +50,6 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -59,8 +58,10 @@ import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
 import org.cose.java.AlgorithmID
 import org.cose.java.OneKey
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.ExperimentalTime
 
 /**
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
@@ -844,16 +845,10 @@ open class CIProvider(
     }
 
     fun buildOfferUri(
-        standardVersion: OpenID4VCIVersion,
         offerRequest: CredentialOfferRequest
-    ): String {
-        val baseUrl = resolveBaseUrl(standardVersion)
-        val sanitizedBaseUrl = baseUrl.removePrefix("https://").removePrefix("http://")
-        return OpenID4VCI.getCredentialOfferRequestUrl(
-            credOfferReq = offerRequest,
-            credentialOfferEndpoint = "$CROSS_DEVICE_CREDENTIAL_OFFER_URL$sanitizedBaseUrl/"
-        )
-    }
+    ) = OpenID4VCI.getCredentialOfferRequestUrl(
+        credOfferReq = offerRequest,
+    )
 
     fun getMetadataByVersion(
         standardVersion: String?,

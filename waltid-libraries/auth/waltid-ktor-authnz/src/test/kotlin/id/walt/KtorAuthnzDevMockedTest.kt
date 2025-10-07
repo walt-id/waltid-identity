@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt
 
 import id.walt.ktorauthnz.KtorAuthnzManager
@@ -15,6 +17,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import kotlin.test.Test
+import kotlin.time.ExperimentalTime
 
 class KtorAuthnzDevMockedTest {
 

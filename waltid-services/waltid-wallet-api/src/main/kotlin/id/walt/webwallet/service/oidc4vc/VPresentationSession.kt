@@ -1,8 +1,11 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.webwallet.service.oidc4vc
 
 import id.walt.oid4vc.providers.SIOPSession
 import id.walt.oid4vc.requests.AuthorizationRequest
-import kotlinx.datetime.Instant
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 data class VPresentationSession(
     override val id: String,

@@ -5,10 +5,12 @@ package id.walt.webwallet.usecase.event
 import id.walt.webwallet.service.events.*
 import id.walt.webwallet.usecase.entity.EntityNameResolutionUseCase
 import kotlinx.serialization.json.*
+import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 
+@OptIn(ExperimentalTime::class)
 class EventFilterUseCase(
     private val service: EventService,
     private val issuerNameResolutionUseCase: EntityNameResolutionUseCase,

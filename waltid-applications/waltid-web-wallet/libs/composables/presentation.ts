@@ -1,8 +1,8 @@
-import { encodeDisclosure } from "./disclosures.ts";
-import { useCurrentWallet } from "./accountWallet.ts";
-import { computed, type Ref, ref, watch } from "vue";
-import { decodeRequest } from "./siop-requests.ts";
-import { navigateTo } from "nuxt/app";
+import {encodeDisclosure} from "./disclosures.ts";
+import {useCurrentWallet} from "./accountWallet.ts";
+import {computed, type Ref, ref, watch} from "vue";
+import {decodeRequest} from "./siop-requests.ts";
+import {navigateTo} from "nuxt/app";
 
 export async function usePresentation(query: any) {
   const index = ref(0);

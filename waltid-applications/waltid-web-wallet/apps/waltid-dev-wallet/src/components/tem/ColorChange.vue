@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { Listbox, ListboxButton, ListboxLabel, ListboxOption, ListboxOptions } from "@headlessui/vue";
+import {Listbox, ListboxButton, ListboxLabel, ListboxOption, ListboxOptions} from "@headlessui/vue";
 
 const colorMode = useColorMode();
 const availableColor = ref([

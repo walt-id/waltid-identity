@@ -29,11 +29,11 @@
 </template>
 
 <script lang="ts" setup>
-import { CheckCircleIcon, ExclamationCircleIcon } from "@heroicons/vue/24/outline";
+import {CheckCircleIcon, ExclamationCircleIcon} from "@heroicons/vue/24/outline";
 import useModalStore from "../../stores/useModalStore.ts";
 import CloseButton from "./CloseButton.vue";
 import OkButton from "./OkButton.vue";
-import { TransitionRoot } from "@headlessui/vue";
+import {TransitionRoot} from "@headlessui/vue";
 
 const store = useModalStore();
 

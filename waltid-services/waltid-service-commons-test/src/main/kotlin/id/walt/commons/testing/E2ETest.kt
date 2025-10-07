@@ -133,7 +133,12 @@ class E2ETest(
         TextColors.red("❌ FAILURE$res")
     }
 
-    suspend fun test(name: String, function: suspend () -> Any?) {
+    suspend fun <T> testAndReturn(name: String, function: suspend () -> T): T {
+        val res = test(name, function)
+        return (res as Result<T>).getOrThrow()
+    }
+
+    suspend fun test(name: String, function: suspend () -> Any?): Result<Any?> {
         val id = numTests++
         testNames[id] = name
 
@@ -163,6 +168,8 @@ class E2ETest(
         val failed = testResults.size - overallSuccess
         val failedStr = if (failed == 0) "none failed ✅" else TextColors.red("$failed failed")
         t.println(TextColors.magenta("Current test stats: ${testResults.size} overall | $overallSuccess succeeded | $failedStr\n"))
+
+        return result
     }
 
 }

@@ -1,10 +1,12 @@
-import id.walt.w3c.schemes.JwsSignatureScheme
-import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
 import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.test.integration.environment.api.issuer.IssuerApi
 import id.walt.test.integration.environment.api.verifier.Verifier
 import id.walt.test.integration.environment.api.wallet.ExchangeApi
+import id.walt.test.integration.expectFailure
+import id.walt.test.integration.expectSuccess
+import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.ktor.http.*
@@ -14,8 +16,6 @@ import kotlinx.serialization.json.*
 import kotlin.test.assertContains
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
-import id.walt.test.integration.expectSuccess
-import id.walt.test.integration.expectFailure
 
 //TODO: needs to be ported to JUnit test
 class InputDescriptorMatchingTest(

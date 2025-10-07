@@ -1,7 +1,5 @@
 import com.nimbusds.jose.JWSAlgorithm
 import id.walt.commons.testing.E2ETest
-import id.walt.w3c.schemes.JwsSignatureScheme
-import id.walt.w3c.utils.VCFormat
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -13,6 +11,8 @@ import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.util.JwtUtils
+import id.walt.w3c.schemes.JwsSignatureScheme
+import id.walt.w3c.utils.VCFormat
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*

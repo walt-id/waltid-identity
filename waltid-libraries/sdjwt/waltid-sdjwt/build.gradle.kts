@@ -22,6 +22,7 @@ kotlin {
             compileTaskProvider.configure {
                 compilerOptions {
                     freeCompilerArgs.add("-Xexpect-actual-classes")
+                    freeCompilerArgs.add("-Xes-long-as-bigint ")
                 }
             }
         }
@@ -36,6 +37,9 @@ kotlin {
     }
 
     js(IR) {
+        compilerOptions {
+            target.set("es2015")
+        }
         browser {
             commonWebpackConfig {
                 cssSupport {
@@ -103,10 +107,10 @@ kotlin {
 
         val commonMain by getting {
             dependencies {
-                implementation("dev.whyoleg.cryptography:cryptography-random:0.4.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("dev.whyoleg.cryptography:cryptography-random:0.5.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
                 implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
                 implementation("io.github.oshai:kotlin-logging:7.0.5")
             }
@@ -130,8 +134,7 @@ kotlin {
         }
         val jsMain by getting {
             dependencies {
-                // implementation(npm("jose", "~4.14.4"))
-                implementation(npm("jose", "5.2.3"))
+                implementation(npm("jose", "5.10.0"))
             }
         }
         val jsTest by getting {

@@ -1,12 +1,12 @@
-import { useRouter } from "next/router";
-import { ViewfinderCircleIcon } from "@heroicons/react/24/outline";
+import {useRouter} from "next/router";
+import {ViewfinderCircleIcon} from "@heroicons/react/24/outline";
 import WaltIcon from "@/components/walt/logo/WaltIcon";
-import { useEffect, useState } from "react";
+import {useEffect, useState} from "react";
 import SelectButton from "@/components/walt/forms/SelectButton";
-import { TbRubberStamp } from "react-icons/tb";
+import {TbRubberStamp} from "react-icons/tb";
 import IssueSection from "@/components/sections/IssueSection";
 import VerificationSection from "@/components/sections/VerificationSection";
-import { addQueryParamToCurrentURL } from "@/lib/helper/addQueryParamToCurrentURL";
+import {addQueryParamToCurrentURL} from "@/lib/helper/addQueryParamToCurrentURL";
 
 const ISSUE_MODE = 'issuance';
 const VERIFY_MODE = 'verification';

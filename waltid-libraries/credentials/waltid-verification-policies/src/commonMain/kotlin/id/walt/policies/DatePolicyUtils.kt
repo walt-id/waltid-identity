@@ -1,11 +1,14 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.policies
 
 import id.walt.w3c.Claims
-import kotlinx.datetime.Instant
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 object DatePolicyUtils {
 

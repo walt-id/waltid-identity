@@ -1,8 +1,4 @@
-import love.forte.plugin.suspendtrans.configuration.ClassInfo
-import love.forte.plugin.suspendtrans.configuration.SuspendTransformConfiguration
-import love.forte.plugin.suspendtrans.configuration.TargetPlatform
 import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
-import love.forte.plugin.suspendtrans.gradle.SuspendTransformPluginExtension
 
 plugins {
     kotlin("multiplatform")
@@ -65,7 +61,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
             }

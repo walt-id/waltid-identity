@@ -69,13 +69,13 @@
 
 <script setup>
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import { PlusIcon } from "@heroicons/vue/20/solid";
+import {PlusIcon} from "@heroicons/vue/20/solid";
 import Web3WalletIcon from "@waltid-web-wallet/components/Web3WalletIcon.vue";
 import AddWalletModal from "@waltid-web-wallet/components/modals/AddWalletModal.vue";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 import useModalStore from "@waltid-web-wallet/stores/useModalStore.ts";
-import { useUserStore } from "@waltid-web-wallet/stores/user.ts";
-import { storeToRefs } from "pinia";
+import {useUserStore} from "@waltid-web-wallet/stores/user.ts";
+import {storeToRefs} from "pinia";
 
 const modalStore = useModalStore();
 const userStore = useUserStore();

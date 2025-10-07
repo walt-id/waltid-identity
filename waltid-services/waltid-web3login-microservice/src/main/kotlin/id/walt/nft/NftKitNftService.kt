@@ -9,9 +9,9 @@ import id.walt.webwallet.service.dto.*
 import id.walt.webwallet.service.nft.fetchers.DataFetcher
 import id.walt.webwallet.service.nft.fetchers.parameters.*
 
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 
 class NftKitNftService : NftService {
 

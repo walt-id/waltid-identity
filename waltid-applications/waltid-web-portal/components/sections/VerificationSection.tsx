@@ -1,12 +1,12 @@
 import RowCredential from "@/components/walt/credential/RowCredential";
 import PolicyListItem from "@/components/walt/policy/PolicyListItem";
-import { AvailableCredential } from "@/types/credentials";
+import {AvailableCredential} from "@/types/credentials";
 import WaltIcon from "@/components/walt/logo/WaltIcon";
 import InputField from "@/components/walt/forms/Input";
 import Button from "@/components/walt/button/Button";
-import React, { useContext, useState } from "react";
-import { CredentialsContext } from "@/pages/_app";
-import { useRouter } from "next/router";
+import React, {useContext, useState} from "react";
+import {CredentialsContext} from "@/pages/_app";
+import {useRouter} from "next/router";
 
 export default function VerificationSection() {
   const router = useRouter();

@@ -8,29 +8,24 @@ import id.walt.did.dids.resolver.local.DidKeyResolver
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
+import id.walt.oid4vc.util.http
+import id.walt.sdjwt.SDJWTVCTypeMetadata
 import id.walt.sdjwt.SDJwtVC
 import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
+import io.ktor.client.call.*
+import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.jsonPrimitive
-import kotlin.test.assertTrue
+import kotlinx.serialization.json.*
 import kotlin.test.assertContains
-import kotlin.test.assertNotNull
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
-import id.walt.oid4vc.util.http
-import id.walt.sdjwt.SDJWTVCTypeMetadata
-import io.ktor.client.call.body
-import io.ktor.client.request.get
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.jsonObject
 
 @OptIn(ExperimentalUuidApi::class)
 class E2ESdJwtTest(

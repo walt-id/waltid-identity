@@ -1,9 +1,10 @@
-@file:OptIn(ExperimentalTime::class)
+@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
 
 package id.walt.vical
 
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.vical.serializers.VicalInstantSerializer
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString

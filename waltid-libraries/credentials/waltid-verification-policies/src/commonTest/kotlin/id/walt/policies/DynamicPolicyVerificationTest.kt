@@ -1,9 +1,9 @@
 package id.walt.policies
 
-import id.walt.w3c.utils.VCFormat
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
+import id.walt.w3c.utils.VCFormat
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*

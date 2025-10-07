@@ -1,14 +1,14 @@
 package id.walt.w3c.vc.vcs
 
-import id.walt.w3c.schemes.JwsSignatureScheme
-import id.walt.w3c.schemes.JwsSignatureScheme.JwsHeader
-import id.walt.w3c.schemes.JwsSignatureScheme.JwsOption
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDMapBuilder
 import id.walt.sdjwt.SDPayload
+import id.walt.w3c.schemes.JwsSignatureScheme
+import id.walt.w3c.schemes.JwsSignatureScheme.JwsHeader
+import id.walt.w3c.schemes.JwsSignatureScheme.JwsOption
 import io.ktor.utils.io.core.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable

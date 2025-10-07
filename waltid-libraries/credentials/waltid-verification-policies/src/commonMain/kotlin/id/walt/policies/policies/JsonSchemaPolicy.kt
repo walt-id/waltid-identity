@@ -1,7 +1,7 @@
 package id.walt.policies.policies
 
-import id.walt.w3c.utils.VCFormat
 import id.walt.policies.CredentialDataValidatorPolicy
+import id.walt.w3c.utils.VCFormat
 import io.github.optimumcode.json.schema.JsonSchema
 import io.github.optimumcode.json.schema.ValidationError
 import kotlinx.serialization.Serializable

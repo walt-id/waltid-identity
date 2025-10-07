@@ -178,7 +178,7 @@ import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import LoadingIndicator from "@waltid-web-wallet/components/loading/LoadingIndicator.vue";
 import useModalStore from "@waltid-web-wallet/stores/useModalStore.ts";
 import ViewEventDataModal from "@waltid-web-wallet/components/modals/ViewEventDataModal.vue";
-import { useCurrentWallet } from "@waltid-web-wallet/composables/accountWallet.ts";
+import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
 
 const store = useModalStore();
 

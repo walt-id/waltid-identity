@@ -2,7 +2,7 @@ package id.walt.webwallet.db.models
 
 import id.walt.webwallet.db.autoGenerate
 import id.walt.webwallet.db.kotlinxUuid
-import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.v1.core.Table
 import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalUuidApi::class)

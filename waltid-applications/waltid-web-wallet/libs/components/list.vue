@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ILink } from "../types";
+import {ILink} from "../types";
 
 defineProps({
     link: {

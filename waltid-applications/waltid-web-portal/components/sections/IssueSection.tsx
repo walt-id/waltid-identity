@@ -1,17 +1,17 @@
 import RowCredential from "@/components/walt/credential/RowCredential";
 import Dropdown from "@/components/walt/forms/Dropdown";
-import { AuthenticationMethods, AvailableCredential, VpProfiles } from "@/types/credentials";
+import {AuthenticationMethods, AvailableCredential, VpProfiles} from "@/types/credentials";
 import Checkbox from "@/components/walt/forms/Checkbox";
 import InputField from "@/components/walt/forms/Input";
 import Button from "@/components/walt/button/Button";
 import WaltIcon from "@/components/walt/logo/WaltIcon";
-import { CredentialsContext, EnvContext } from "@/pages/_app";
-import React, { useState } from "react";
-import { useRouter } from "next/router";
-import { getOfferUrl } from "@/utils/getOfferUrl";
-import { sendToWebWallet } from "@/utils/sendToWebWallet";
+import {CredentialsContext, EnvContext} from "@/pages/_app";
+import React, {useState} from "react";
+import {useRouter} from "next/router";
+import {getOfferUrl} from "@/utils/getOfferUrl";
+import {sendToWebWallet} from "@/utils/sendToWebWallet";
 import nextConfig from "@/next.config";
-import { LockClosedIcon } from "@heroicons/react/24/outline";
+import {LockClosedIcon} from "@heroicons/react/24/outline";
 
 export default function IssueSection() {
   const env = React.useContext(EnvContext);

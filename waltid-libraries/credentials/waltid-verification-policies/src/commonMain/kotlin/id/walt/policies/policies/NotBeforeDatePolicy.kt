@@ -1,16 +1,16 @@
+@file:OptIn(ExperimentalTime::class)
+
 package id.walt.policies.policies
 
-import id.walt.w3c.Claims
-import id.walt.w3c.JwtClaims
-import id.walt.w3c.VcClaims
-import id.walt.w3c.utils.VCFormat
 import id.walt.policies.CredentialWrapperValidatorPolicy
 import id.walt.policies.DatePolicyUtils.checkJwt
 import id.walt.policies.DatePolicyUtils.checkVc
 import id.walt.policies.DatePolicyUtils.policyUnavailable
 import id.walt.policies.NotBeforePolicyException
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import id.walt.w3c.Claims
+import id.walt.w3c.JwtClaims
+import id.walt.w3c.VcClaims
+import id.walt.w3c.utils.VCFormat
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -20,7 +20,10 @@ import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport

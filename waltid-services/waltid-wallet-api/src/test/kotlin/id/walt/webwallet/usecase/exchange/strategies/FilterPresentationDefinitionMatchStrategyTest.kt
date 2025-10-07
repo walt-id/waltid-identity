@@ -13,16 +13,17 @@ import id.walt.webwallet.usecase.exchange.PresentationDefinitionFilterParser
 import id.walt.webwallet.utils.JsonUtils
 import io.mockk.every
 import io.mockk.mockk
-import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
-
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 
+@OptIn(ExperimentalTime::class)
 class FilterPresentationDefinitionMatchStrategyTest {
 
     private val filterParserMock = mockk<PresentationDefinitionFilterParser>()
