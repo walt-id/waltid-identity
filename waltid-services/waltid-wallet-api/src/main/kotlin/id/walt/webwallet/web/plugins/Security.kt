@@ -114,6 +114,8 @@ val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
 
         val config = ConfigManager.getConfig<KtorAuthnzConfig>()
 
+        val configuredExpiration = Duration.parse(config.valkeyRetention ?: config.authFlow.expiration ?: "1d")
+
         KtorAuthnzManager.tokenHandler = when (config.tokenType) {
             KtorAuthnzConfig.AuthnzTokens.STORE_IN_MEMORY -> {
                 KtorAuthNzTokenHandler().apply { tokenStore = InMemoryKtorAuthNzTokenStore() }
@@ -123,7 +125,7 @@ val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
                     unixsocket = config.valkeyUnixSocket,
                     host = config.valkeyHost,
                     port = config.valkeyPort,
-                    expiration = Duration.parse(config.valkeyRetention),
+                    expiration = configuredExpiration,
                     username = config.valkeyAuthUsername,
                     password = config.valkeyAuthPassword,
                 ).also { it.tryConnect() } }
@@ -144,7 +146,12 @@ val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
         KtorAuthnzManager.sessionStore = when {
             config.valkeyUnixSocket != null || config.valkeyHost != null -> {
                 ValkeySessionStore(
-                    config.valkeyUnixSocket, config.valkeyHost, config.valkeyPort, config.valkeyAuthUsername, config.valkeyAuthPassword, Duration.parse(config.valkeyRetention)
+                    unixsocket = config.valkeyUnixSocket,
+                    host = config.valkeyHost,
+                    port = config.valkeyPort,
+                    username = config.valkeyAuthUsername,
+                    password = config.valkeyAuthPassword,
+                    expiration = configuredExpiration
                 ).also { it.tryConnect() }
             }
             else -> InMemorySessionStore()
