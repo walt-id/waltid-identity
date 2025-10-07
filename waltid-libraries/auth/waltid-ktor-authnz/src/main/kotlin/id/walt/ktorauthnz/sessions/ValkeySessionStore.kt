@@ -44,8 +44,6 @@ class ValkeySessionStore(
         }
 
         connectTimeout = 250.milliseconds
-        keepAlive = true // optional, true is the default
-        databaseIndex = 1 // optional, 0 is the default
     }
 
     val option = SetOptions(expire = SetOptions.ExpireOption.ExpiresInSeconds(expiration.inWholeSeconds))

@@ -48,7 +48,7 @@ data class KtorAuthnzConfig(
     val valkeyUnixSocket: String? = null,
     val valkeyHost: String? = "127.0.0.1",
     val valkeyPort: Int? = 6379,
-    val valkeyRetention: String = "7d",
+    val valkeyRetention: String? = "7d",
 
     val valkeyAuthUsername: String? = null,
     val valkeyAuthPassword: String? = null,

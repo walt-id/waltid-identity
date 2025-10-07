@@ -45,12 +45,8 @@ class ValkeyAuthnzTokenStore(
         }
 
         connectTimeout = 250.milliseconds
-        keepAlive = true // optional, true is the default
-        databaseIndex = 1 // optional, 0 is the default
     }
     val option = SetOptions(expire = SetOptions.ExpireOption.ExpiresInSeconds(expiration.inWholeSeconds))
-
-    //private val redis by lazy {  ReThis(host = host, port = port) }
 
     override suspend fun mapToken(token: String, sessionId: String) {
         redis.execute(
