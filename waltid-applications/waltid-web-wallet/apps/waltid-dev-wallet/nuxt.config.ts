@@ -39,7 +39,9 @@ export default defineNuxtConfig({
             signIn: {
                 // Legacy auth system: POST /login
                 // ktor-authnz system: POST /account/emailpass
-                path: process.env.NUXT_PUBLIC_AUTH_USE_KTORAUTHNZ === 'true' ? '/account/emailpass' : '/login',
+                path: process.env.NUXT_PUBLIC_AUTH_USE_KTORAUTHNZ === 'true'
+                    ? '/account/emailpass'
+                    : '/login',
                 method: 'post'
             },
 
