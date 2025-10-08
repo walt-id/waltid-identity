@@ -9,6 +9,7 @@ import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.ktorauthnz.auth.getAuthenticatedSession
 import id.walt.ktorauthnz.auth.getEffectiveRequestAuthToken
 import id.walt.ktorauthnz.methods.data.EmailPassStoredData
+import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
 import id.walt.webwallet.db.models.Account
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.service.account.AccountsService
@@ -133,7 +134,8 @@ fun Application.ktorAuthnzFrontendRoutes() {
                     KtorAuthnzManager.tokenHandler.dropToken(token)
                 }
 
-                call.response.cookies.append("ktor-authnz-auth", "", CookieEncoding.URI_ENCODING, 0L, GMTDate())
+                // Delete cookies
+                SessionTokenCookieHandler.run { call.deleteCookie() }
                 call.response.cookies.append("auth.token", "", CookieEncoding.URI_ENCODING, 0L, GMTDate())
 
                 call.respond(HttpStatusCode.OK)
