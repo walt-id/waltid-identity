@@ -36,26 +36,26 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+                implementation(libs.kotlinx.serialization.json)
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+                implementation(libs.kotlinx.coroutines.test)
             }
         }
         val jvmMain by getting {
             dependencies {
-                implementation("org.bouncycastle:bcprov-lts8on:2.73.8")
+                implementation(libs.bcprov.lts8on)
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
-                runtimeOnly("org.junit.jupiter:junit-jupiter-engine:5.11.4")
+                implementation(libs.junit.jupiter.api)
+                runtimeOnly(libs.junit.jupiter.engine)
             }
         }
     }
