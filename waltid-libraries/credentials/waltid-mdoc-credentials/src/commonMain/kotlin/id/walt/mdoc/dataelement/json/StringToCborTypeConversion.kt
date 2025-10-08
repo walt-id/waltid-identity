@@ -12,5 +12,9 @@ enum class StringToCborTypeConversion {
     @SerialName("base64StringToByteString")
     BASE64_STRING_TO_BYTE_STRING,
     @SerialName("base64UrlStringToByteString")
-    BASE64URL_STRING_TO_BYTE_STRING
+    BASE64URL_STRING_TO_BYTE_STRING,
+    @SerialName("stringToString")
+    STRING_TO_STRING,
+    @SerialName("stringToInt")
+    STRING_TO_INT,
 }
