@@ -50,11 +50,6 @@ kotlin {
                     freeCompilerArgs.add("-Xexpect-actual-classes")
                 }
             }
-            compileTaskProvider.configure {
-                compilerOptions {
-                    freeCompilerArgs.add("-Xexpect-actual-classes")
-                }
-            }
         }
     }
 
