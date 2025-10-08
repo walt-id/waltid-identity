@@ -76,6 +76,10 @@ object Db {
         WalletSettings,
         WalletNotifications,
         EntityNameResolutionCache,
+
+        AuthnzUsers,
+        AuthnzAccountIdentifiers,
+        AuthnzStoredData
     ).toTypedArray()
 
     @OptIn(ExperimentalUuidApi::class)
