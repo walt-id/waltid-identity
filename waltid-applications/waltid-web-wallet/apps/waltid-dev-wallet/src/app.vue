@@ -28,6 +28,21 @@ import "uno.css";
 import {useTenant} from "@waltid-web-wallet/composables/tenants.ts";
 import ModalBase from "@waltid-web-wallet/components/modals/ModalBase.vue";
 
+const { status } = useAuth();
+const route = useRoute()
+
+watch(status, (newStatus, oldStatus) => {
+    console.log("Auth status change: " + oldStatus + " -> " + newStatus)
+
+    if (oldStatus == "loading" && newStatus == "unauthenticated") {
+        const path = route.fullPath
+        const toUrl = "/login?redirect=" + path
+        console.log("Redirecting to: " + toUrl)
+
+        navigateTo(toUrl)
+    }
+})
+
 const locale = useState<string>("locale.i18n");
 
 const tenant = await useTenant().value;
