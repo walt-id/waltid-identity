@@ -21,19 +21,19 @@ data models.<p>
   using the JWS signature scheme
     - static properties
     - dynamically configurable properties
-      (using [data-functions](https://docs.oss.walt.id/issuer/api/data-functions))
+      (using [data-functions](https://docs.walt.id/community-stack/issuer/api/credential-issuance/data-functions))
 - perform policy validation for verifiable credentials and presentations
-    - [static policies](https://docs.oss.walt.id/verifier/api/policies#static-verification-policies)
-    - [parameterized policies](https://docs.oss.walt.id/verifier/api/policies#parameterized-verification-policies)
+    - [static policies](https://docs.walt.id/community-stack/verifier/api/credential-verification/policies/static-verification-policies)
+    - [parameterized policies](https://docs.walt.id/community-stack/verifier/api/credential-verification/policies/parameterized-verification-policies)
 - policy management
 
 Verifiable Credentials library relies on the following walt.id libraries:
 
-- [waltid-sd-jwt library](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-sdjwt)
+- [waltid-sd-jwt library](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/sdjwt)
   for sd-jwt related processing
 - [waltid-did library](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-did)
   for DID related operations
-- [waltid-crypto library](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/waltid-crypto)
+- [waltid-crypto library](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto)
   for key related operations
 
 
