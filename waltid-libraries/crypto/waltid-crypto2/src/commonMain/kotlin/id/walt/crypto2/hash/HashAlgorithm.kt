@@ -1,5 +1,8 @@
 package id.walt.crypto2.hash
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 enum class HashAlgorithm {
     SHA256,
     SHA384,
