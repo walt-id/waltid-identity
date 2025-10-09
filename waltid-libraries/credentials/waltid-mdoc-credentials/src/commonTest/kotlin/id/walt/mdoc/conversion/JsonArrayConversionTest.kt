@@ -5,6 +5,8 @@ package id.walt.mdoc.conversion
 import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.FullDateElement
 import id.walt.mdoc.dataelement.ListElement
+import id.walt.mdoc.dataelement.NumberElement
+import id.walt.mdoc.dataelement.StringElement
 import id.walt.mdoc.dataelement.TDateElement
 import id.walt.mdoc.dataelement.json.JsonArrayToCborMappingConfig
 import id.walt.mdoc.dataelement.json.JsonStringToCborMappingConfig
@@ -26,6 +28,8 @@ class JsonArrayConversionTest {
         val byteArray = byteArrayOf(0x00, 0x7F, 0x10, 0x20, 0xFF.toByte())
         val base64Str = "AH8QIP8="
         val base64UrlStr = "AH8QIP8"
+        val numberInput = 101
+        val inputString = numberInput.toString()
         val mappingConfig = JsonArrayToCborMappingConfig(
             arrayConfig = listOf(
                 JsonStringToCborMappingConfig(
@@ -39,13 +43,19 @@ class JsonArrayConversionTest {
                 ),
                 JsonStringToCborMappingConfig(
                     conversionType = StringToCborTypeConversion.BASE64URL_STRING_TO_BYTE_STRING
-                )
+                ),
+                JsonStringToCborMappingConfig(
+                    conversionType = StringToCborTypeConversion.STRING_TO_STRING
+                ),
+                JsonStringToCborMappingConfig(
+                    conversionType = StringToCborTypeConversion.STRING_TO_INT
+                ),
             )
         )
         val dataElement = mappingConfig.executeMapping(
             Json.encodeToJsonElement(
                 listOf(
-                    fullDateStr, tDateStr, base64Str, base64UrlStr
+                    fullDateStr, tDateStr, base64Str, base64UrlStr, inputString, inputString
                 )
             )
         )
@@ -68,5 +78,9 @@ class JsonArrayConversionTest {
         assertTrue {
             byteArray.contentEquals(byteStringElement.value)
         }
+        val stringElement = assertIs<StringElement>(listElement.value[4])
+        assertEquals(inputString, stringElement.value)
+        val numberElement = assertIs<NumberElement>(listElement.value[5])
+        assertEquals(numberInput, numberElement.value)
     }
 }
