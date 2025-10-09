@@ -16,6 +16,7 @@ import java.security.KeyStore
 import java.security.cert.*
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
+import io.github.oshai.kotlinlogging.KotlinLogging
 
 /**
  * Create simple COSE crypto provider for the given private and public key pairs. For verification only, private key can be omitted.
@@ -24,6 +25,7 @@ import javax.net.ssl.X509TrustManager
 class SimpleCOSECryptoProvider(keys: List<COSECryptoProviderKeyInfo>) : COSECryptoProvider {
 
     private val keyMap: Map<String, COSECryptoProviderKeyInfo> = keys.associateBy { it.keyID }
+    private val logger = KotlinLogging.logger {}
 
     @OptIn(ExperimentalSerializationApi::class)
     override fun sign1(
@@ -90,15 +92,44 @@ class SimpleCOSECryptoProvider(keys: List<COSECryptoProviderKeyInfo>) : COSECryp
     }
 
     private fun findRootCA(cert: X509Certificate, additionalTrustedRootCAs: List<X509Certificate>): X509Certificate? {
-        val tm = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-        tm.init(null as? KeyStore)
-        return tm.trustManagers
-            .filterIsInstance<X509TrustManager>()
-            .flatMap { it.acceptedIssuers.toList() }
-            .plus(additionalTrustedRootCAs)
-            .firstOrNull {
-                cert.issuerX500Principal.name.equals(it.subjectX500Principal.name)
+        return try {
+            val issuerDn = cert.issuerX500Principal.name
+            val tm = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+            tm.init(null as? KeyStore)
+            val defaultIssuers = tm.trustManagers
+                .filterIsInstance<X509TrustManager>()
+                .flatMap { it.acceptedIssuers.toList() }
+
+            logger.info { "findRootCA: searching for issuer='$issuerDn' in defaultIssuers=${defaultIssuers.size} + additional=${additionalTrustedRootCAs.size}" }
+
+            // Combine and iterate with diagnostics
+            val combined = (defaultIssuers + additionalTrustedRootCAs)
+            combined.forEachIndexed { idx, candidate ->
+                try {
+                    logger.debug { "findRootCA: candidate[$idx] subject='${candidate.subjectX500Principal.name}' issuer='${candidate.issuerX500Principal.name}'" }
+                } catch (e: Exception) {
+                    logger.warn(e) { "findRootCA: failed to read principal for candidate[$idx]" }
+                }
             }
+
+            val match = combined.firstOrNull { c ->
+                try {
+                    issuerDn == c.subjectX500Principal.name
+                } catch (e: Exception) {
+                    logger.warn(e) { "findRootCA: exception comparing issuerDn with candidate subject" }
+                    false
+                }
+            }
+            if (match == null) {
+                logger.warn { "findRootCA: no matching trust anchor found for issuer='$issuerDn'" }
+            } else {
+                logger.info { "findRootCA: matched trust anchor subject='${match.subjectX500Principal.name}'" }
+            }
+            match
+        } catch (e: Exception) {
+            logger.error(e) { "findRootCA: unexpected error while searching for root CA" }
+            null
+        }
     }
 
     private fun validateCertificateChain(
