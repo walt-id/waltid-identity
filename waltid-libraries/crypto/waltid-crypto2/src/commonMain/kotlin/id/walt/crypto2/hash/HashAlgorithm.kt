@@ -8,3 +8,6 @@ enum class HashAlgorithm {
     SHA3_384,
     SHA3_512,
 }
+
+expect fun HashAlgorithm.createHasher(): Hasher
+expect fun HashAlgorithm.createDigest(): Digest
