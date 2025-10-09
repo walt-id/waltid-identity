@@ -75,9 +75,9 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import java.net.URI
 import java.util.*
 import kotlin.time.Clock
-import kotlin.collections.plus
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.toJavaInstant
@@ -274,11 +274,11 @@ class SSIKit2WalletService(
             val bodyRedirect = bodyJson?.get("redirect_uri")?.jsonPrimitive?.contentOrNull
             val bodyError = bodyJson?.get("error_uri")?.jsonPrimitive?.contentOrNull
             @Suppress("HttpUrlsUsage")
-            if (bodyRedirect != null && (bodyRedirect.startsWith("http://") || bodyRedirect.startsWith("https://"))) {
+            if (bodyRedirect != null && (bodyRedirect.isUrl() || bodyRedirect.isUrl())) {
                 redirectFromBody = bodyRedirect
             }
             @Suppress("HttpUrlsUsage")
-            if (bodyError != null && (bodyError.startsWith("http://") || bodyError.startsWith("https://"))) {
+            if (bodyError != null && (bodyError.isUrl() || bodyError.isUrl())) {
                 errorUriFromBody = bodyError
             }
         } else if (isResponseRedirectUrl) {
@@ -340,6 +340,11 @@ class SSIKit2WalletService(
             )
         )
     }
+
+    fun String.isUrl() = runCatching {
+        val url = URI.create(this).toURL()
+        url.protocol in listOf("http", "https") && url.host.isNotEmpty()
+    }.getOrDefault(false)
 
     override suspend fun resolvePresentationRequest(request: String): String {
         val credentialWallet = getAnyCredentialWallet()
