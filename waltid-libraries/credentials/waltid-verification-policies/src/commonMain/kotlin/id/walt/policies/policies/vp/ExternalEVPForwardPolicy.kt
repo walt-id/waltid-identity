@@ -51,6 +51,7 @@ class ExternalEVPForwardPolicy : CredentialWrapperValidatorPolicy() {
         val vpTokenArray = context["vp_token"] as? JsonArray
         val evpJwt = vpTokenArray?.getOrNull(1)?.jsonPrimitive?.content
 
+        println("the evp jwt being sent is $evpJwt")
         val client = http
 
         logger.debug {
