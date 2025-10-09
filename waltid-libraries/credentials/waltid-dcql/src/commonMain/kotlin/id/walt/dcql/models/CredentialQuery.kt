@@ -85,4 +85,11 @@ data class CredentialQuery(
      */
     @SerialName("claim_sets")
     val claimSets: List<List<String>>? = null,
-)
+) {
+    init {
+        val metaFormat = meta.format
+        if (metaFormat != null) {
+            require(metaFormat == format) { "Invalid query \"meta\" for this format. Credential format is set to \"$format\", but query meta is for \"$metaFormat\"." }
+        }
+    }
+}
