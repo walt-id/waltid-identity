@@ -4,6 +4,8 @@ package id.walt.mdoc.conversion
 
 import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.FullDateElement
+import id.walt.mdoc.dataelement.NumberElement
+import id.walt.mdoc.dataelement.StringElement
 import id.walt.mdoc.dataelement.TDateElement
 import id.walt.mdoc.dataelement.json.JsonStringToCborMappingConfig
 import id.walt.mdoc.dataelement.json.StringToCborTypeConversion
@@ -90,6 +92,41 @@ class JsonStringConversionTest {
             assertFails {
                 base64UrlMappingConfig.executeMapping(JsonPrimitive(it))
             }
+        }
+    }
+
+    @Test
+    fun testStringToStringConversions() {
+        val mappingConfig = JsonStringToCborMappingConfig(
+            conversionType = StringToCborTypeConversion.STRING_TO_STRING
+        )
+        val inputString = "101"
+        val dataElement = mappingConfig.executeMapping(JsonPrimitive(inputString))
+        val stringElement = assertIs<StringElement>(dataElement)
+        assertEquals(inputString, stringElement.value)
+    }
+
+    @Test
+    fun testValidStringToIntConversions() {
+        val mappingConfig = JsonStringToCborMappingConfig(
+            conversionType = StringToCborTypeConversion.STRING_TO_INT
+        )
+        val input = 101
+        val inputString = input.toString()
+        val dataElement = mappingConfig.executeMapping(JsonPrimitive(inputString))
+        val stringElement = assertIs<NumberElement>(dataElement)
+        assertEquals(input, stringElement.value)
+    }
+
+    @Test
+    fun testInvalidStringToIntConversions() {
+        val mappingConfig = JsonStringToCborMappingConfig(
+            conversionType = StringToCborTypeConversion.STRING_TO_INT
+        )
+        val input = 101.101
+        val inputString = input.toString()
+        assertFailsWith(NumberFormatException::class){
+            mappingConfig.executeMapping(JsonPrimitive(inputString))
         }
     }
 }

@@ -4,6 +4,8 @@ package id.walt.mdoc.dataelement.json
 
 import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.FullDateElement
+import id.walt.mdoc.dataelement.NumberElement
+import id.walt.mdoc.dataelement.StringElement
 import id.walt.mdoc.dataelement.TDateElement
 import kotlinx.datetime.LocalDate
 import kotlin.io.encoding.Base64
@@ -33,6 +35,13 @@ internal object StringToCborElementConverter {
         StringToCborTypeConversion.BASE64URL_STRING_TO_BYTE_STRING -> {
             base64UrlStringToByteString(s)
         }
+
+        StringToCborTypeConversion.STRING_TO_STRING -> {
+            stringToString(s)
+        }
+        StringToCborTypeConversion.STRING_TO_INT -> {
+            stringToInt(s)
+        }
     }
 
     private fun stringToTDate(s: String) = TDateElement(Instant.parse(s))
@@ -42,5 +51,9 @@ internal object StringToCborElementConverter {
     private fun base64StringToByteString(s: String) = ByteStringElement(Base64.decode(s))
 
     private fun base64UrlStringToByteString(s: String) = ByteStringElement(base64Url.decode(s))
+
+    private fun stringToString(s: String) = StringElement(s)
+
+    private fun stringToInt(s: String) = NumberElement(s.toInt())
 
 }
