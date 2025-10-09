@@ -74,7 +74,7 @@ function tryInjectAliasIntoJwk(text: string, alias?: string): string {
 
 async function importKey() {
     const bodyText = tryInjectAliasIntoJwk(keyText.value, alias.value);
-    await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys/import`, {
+    await $fetch(`/wallet-api/wallet/${currentWallet.value}/keys/import?alias=${encodeURIComponent(alias.value)}`, {
         method: "POST",
         body: bodyText,
     });
