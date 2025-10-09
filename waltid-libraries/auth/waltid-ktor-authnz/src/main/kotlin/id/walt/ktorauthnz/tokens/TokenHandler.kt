@@ -5,6 +5,8 @@ import id.walt.ktorauthnz.sessions.AuthSession
 
 interface TokenHandler {
 
+    val name: String
+
     suspend fun generateToken(session: AuthSession): String
     suspend fun validateToken(token: String): Boolean
     suspend fun getTokenSessionId(token: String): String

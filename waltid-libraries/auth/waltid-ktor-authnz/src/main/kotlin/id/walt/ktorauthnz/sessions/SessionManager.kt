@@ -46,7 +46,7 @@ object SessionManager {
         KtorAuthnzManager.sessionStore.store(updatedAuthSession)
     }
 
-    fun removeSession(authSession: AuthSession) {
+    suspend fun removeSession(authSession: AuthSession) {
         KtorAuthnzManager.sessionStore.dropSession(authSession.id)
     }
 

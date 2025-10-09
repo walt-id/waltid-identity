@@ -3,12 +3,12 @@ import presetIcons from "@unocss/preset-icons";
 import path from "path";
 
 export default defineNuxtConfig({
-    devtools: { enabled: true },
+    devtools: {enabled: true},
     srcDir: "src",
 
     modules: [
         "@vueuse/nuxt",
-        ["@unocss/nuxt", { autoImport: false }],
+        ["@unocss/nuxt", {autoImport: false}],
         "@nuxtjs/i18n",
         "@nuxtjs/color-mode",
         "@vite-pwa/nuxt",
@@ -28,17 +28,34 @@ export default defineNuxtConfig({
         provider: {
             type: "local",
             token: {
-                maxAgeInSeconds: 60 * 60 * 24 * 30 // 30 days
+                maxAgeInSeconds: 60 * 60 * 24 * 30, // 30 days
+                cookieName: 'auth.token',
+                sameSiteAttribute: 'strict'
+            },
+
+            endpoints: {
+                signIn: {
+                    // Legacy auth system: POST /login
+                    // ktor-authnz system: POST /account/emailpass
+                    path: process.env.NUXT_PUBLIC_AUTH_USE_KTORAUTHNZ === 'true'
+                        ? '/account/emailpass'
+                        : '/login',
+                    method: 'post'
+                },
+
+                signOut: {path: '/logout', method: 'post'},
+                signUp: {path: '/register', method: 'post'},
+                getSession: {path: '/session', method: 'get'},
             },
 
             pages: {
-                login: "/login"
-            }
+                login: "/login",
+            },
         },
 
         globalAppMiddleware: {
-            isEnabled: true
-        }
+            isEnabled: true,
+        },
     },
 
     pwa: {
@@ -49,7 +66,7 @@ export default defineNuxtConfig({
 
         strategies: "injectManifest",
         injectRegister: "script",
-        injectManifest: { injectionPoint: undefined },
+        injectManifest: {injectionPoint: undefined},
         registerType: "autoUpdate",
         // notification-worker.js
         manifest: {

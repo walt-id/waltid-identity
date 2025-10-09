@@ -8,6 +8,8 @@ import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.ktorauthnz.auth.ktorAuthnz
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionStatus
+import id.walt.ktorauthnz.sessions.InMemorySessionStore
+import id.walt.ktorauthnz.tokens.ktorauthnztoken.InMemoryKtorAuthNzTokenStore
 import id.walt.ktorauthnz.tokens.ktorauthnztoken.KtorAuthNzTokenHandler
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -48,13 +50,16 @@ class KtorAuthnzDevMockedTest {
             }
         }
 
-        KtorAuthnzManager.sessionStore.wip_sessions["dev-session"] = AuthSession(
+        val sessionStore = KtorAuthnzManager.sessionStore as InMemorySessionStore
+        sessionStore.wip_sessions["dev-session"] = AuthSession(
             id = "dev-session",
             status = AuthSessionStatus.OK,
             token = "dev-token",
             accountId = "11111111-1111-1111-1111-000000000000"
         )
-        (KtorAuthnzManager.tokenHandler as KtorAuthNzTokenHandler).tokenStore.tokens["dev-token"] = "dev-session"
+        val tokenHandler = KtorAuthnzManager.tokenHandler as KtorAuthNzTokenHandler
+        val tokenStore = tokenHandler.tokenStore as InMemoryKtorAuthNzTokenStore
+        tokenStore.tokens["dev-token"] = "dev-session"
 
         routing {
             authenticate("dev-auth") {
