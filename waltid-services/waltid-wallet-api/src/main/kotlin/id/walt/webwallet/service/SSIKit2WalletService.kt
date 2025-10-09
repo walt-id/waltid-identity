@@ -274,11 +274,11 @@ class SSIKit2WalletService(
             val bodyRedirect = bodyJson?.get("redirect_uri")?.jsonPrimitive?.contentOrNull
             val bodyError = bodyJson?.get("error_uri")?.jsonPrimitive?.contentOrNull
             @Suppress("HttpUrlsUsage")
-            if (bodyRedirect != null && (bodyRedirect.isUrl() || bodyRedirect.isUrl())) {
+            if (bodyRedirect != null && bodyRedirect.isUrl()) {
                 redirectFromBody = bodyRedirect
             }
             @Suppress("HttpUrlsUsage")
-            if (bodyError != null && (bodyError.isUrl() || bodyError.isUrl())) {
+            if (bodyError != null && bodyError.isUrl()) {
                 errorUriFromBody = bodyError
             }
         } else if (isResponseRedirectUrl) {
