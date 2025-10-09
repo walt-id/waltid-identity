@@ -163,6 +163,12 @@ fun Application.keys() = walletRoute {
         post("import", {
             summary = "Import an existing key"
             request {
+                queryParameter<String>("alias") {
+                    description = "the alias/name of the key"
+                    example("Example") {
+                        value = "myKeyAlias"
+                    }
+                }
                 body<String> {
                     required = true
                     description = "Key in JWK or PEM format"
@@ -170,9 +176,10 @@ fun Application.keys() = walletRoute {
             }
         }) {
             val body = call.receiveText()
+            val alias = call.request.queryParameters["alias"]
 
             runCatching {
-                call.getWalletService().importKey(body)
+                call.getWalletService().importKey(body, alias)
             }
 
                 .onSuccess { key ->
