@@ -488,7 +488,7 @@ class SSIKit2WalletService(
         }
 
         val keyId: String = try {
-            importKey(providedKeyString)
+            importKey(providedKeyString, alias)
         } catch (e: ConflictException) {
             val candidateKid = runCatching {
                 if (providedKeyString.trim().startsWith("{"))
@@ -625,7 +625,8 @@ class SSIKit2WalletService(
                 algorithm = key.keyType.name,
                 cryptoProvider = key.toString(),
                 keyPair = JsonObject(emptyMap()),
-                keysetHandle = JsonNull
+                keysetHandle = JsonNull,
+                name = it.name
             )
         }
 
@@ -639,7 +640,7 @@ class SSIKit2WalletService(
         KeyManager.createKey(request)
             .also {
                 logger.trace { "Generated key: $it" }
-                KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it))
+                KeysService.add(walletId, it.getKeyId(), KeySerialization.serializeKey(it), request.name)
                 eventUseCase.log(
                     action = EventType.Key.Create,
                     originator = "wallet",
@@ -660,7 +661,7 @@ class SSIKit2WalletService(
     }
 
 
-    override suspend fun importKey(jwkOrPem: String): String {
+    override suspend fun importKey(jwkOrPem: String, alias: String?): String {
         return runCatching {
             val keyType = getKeyType(jwkOrPem)
             val key = when (keyType) {
@@ -686,7 +687,7 @@ class SSIKit2WalletService(
                 )
             }
 
-            KeysService.add(walletId, keyId, KeySerialization.serializeKey(key))
+            KeysService.add(walletId, keyId, KeySerialization.serializeKey(key), alias)
             keyId
         }.getOrElse { throwable ->
             when (throwable) {
