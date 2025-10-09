@@ -33,6 +33,7 @@ class ExternalEVPForwardPolicy : CredentialWrapperValidatorPolicy() {
     @OptIn(ExperimentalEncodingApi::class)
     override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
 
+        println("verification data is $data args is $args context is $context")
         logger.debug {
             "verification data is $data args is $args context is $context"
         }
@@ -43,6 +44,7 @@ class ExternalEVPForwardPolicy : CredentialWrapperValidatorPolicy() {
         }
             ?: return Result.failure(IllegalArgumentException("external-evp-forward policy requires args as string (target URL)"))
 
+        println("the external evp url is $url")
         logger.debug {
             "the external evp url is $url"
         }
@@ -54,6 +56,7 @@ class ExternalEVPForwardPolicy : CredentialWrapperValidatorPolicy() {
         logger.debug {
             "the client is $client"
         }
+        println("the client is $client")
 
         return try {
             val response = client.post(url) {
@@ -62,6 +65,7 @@ class ExternalEVPForwardPolicy : CredentialWrapperValidatorPolicy() {
             }
 
             logger.debug { "External EVP Forward Policy: response status: ${response.status}" }
+            println("External EVP Forward Policy: response status: ${response.status}")
             val body =
                 runCatching { response.body<JsonObject>() }.getOrElse { JsonObject(mapOf("raw" to JsonPrimitive(response.toString()))) }
             if (response.status.isSuccess()) Result.success(body) else Result.failure(Exception(body.toString()))
