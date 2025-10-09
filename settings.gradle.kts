@@ -23,7 +23,7 @@ val modules = listOfNotNull(
         "waltid-crypto-ios" whenEnabled enableIosBuild,
         "waltid-target-ios" whenEnabled enableIosBuild,
         "waltid-target-ios:implementation" whenEnabled enableIosBuild,
-        "waltid-crypto2",
+        //"waltid-crypto2",
         "waltid-cose",
     ),
 
@@ -45,6 +45,7 @@ val modules = listOfNotNull(
 
         "waltid-openid4vp",
         "waltid-openid4vp-verifier",
+        "waltid-openid4vp-verifier-openapi",
         "waltid-openid4vp-wallet"
     ),
 
