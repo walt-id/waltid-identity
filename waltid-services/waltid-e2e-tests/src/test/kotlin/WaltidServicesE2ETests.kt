@@ -440,20 +440,6 @@ class WaltidServicesE2ETests {
         )
         batchIssuance.runTests()
         //endregion -Batch Issuance Test Suite-
-
-
-        val testCredentialWallet = TestOpenIdCredentialWallet(e2e, client)
-
-        val preAuthFlowIssuanceReqDraft13 =
-            Json.decodeFromString<IssuanceRequest>(loadResource("issuance/openbadgecredential-issuance-request.json"))
-                .copy(
-                    standardVersion = OpenID4VCIVersion.DRAFT13,
-                )
-
-        testCredentialWallet.testCredentialWallet(
-            issuanceReq = preAuthFlowIssuanceReqDraft13,
-            did = did
-        )
     }
 }
 

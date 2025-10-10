@@ -33,16 +33,21 @@ class CredentialsService {
      * @return [WalletCredential] or null, it not found
      */
     fun get(wallet: Uuid, credentialId: String): WalletCredential? =
-        transaction { getCredentialsQuery(wallet, true, credentialId).singleOrNull()?.let { WalletCredential(it) } }
+        transaction {
+            getCredentialsQuery(wallet, true, listOf(credentialId)).singleOrNull()?.let { WalletCredential(it) }
+        }
 
     /**
      * Returns a list of credentials identified by the [credentialIdList]
      * @param credentialIdList the list of credential ids
      * @return list of [WalletCredential] that could match the specified [credentialIdList]
      */
-    fun get(credentialIdList: List<String>): List<WalletCredential> = transaction {
-        WalletCredentials.selectAll().where { (WalletCredentials.id inList credentialIdList) }.distinct().map {
-            WalletCredential(it)
+    fun get(wallet: Uuid, credentialIdList: List<String>): List<WalletCredential> = transaction {
+        transaction {
+            getCredentialsQuery(wallet, false, credentialIdList)
+                .map {
+                    WalletCredential(it)
+                }
         }
     }
 
@@ -111,7 +116,7 @@ class CredentialsService {
         }.map { it[WalletCredentials.id] }
     }
 
-    private fun getCredentialsQuery(wallet: Uuid, includeDeleted: Boolean, vararg credentialId: String) =
+    private fun getCredentialsQuery(wallet: Uuid, includeDeleted: Boolean, credentialId: List<String>) =
         WalletCredentials.selectAll().where {
             (WalletCredentials.wallet eq wallet.toJavaUuid()) and (WalletCredentials.id inList credentialId.toList() and (notDeletedItemsCondition or (includeDeleted.takeIf { it }
                 ?.let { Op.TRUE } ?: Op.FALSE)))

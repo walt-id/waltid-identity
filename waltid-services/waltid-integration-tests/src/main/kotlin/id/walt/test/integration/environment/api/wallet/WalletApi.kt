@@ -107,8 +107,14 @@ class WalletApi(
     ) =
         exchangeApi.claimCredential(walletId, offerUrl, didString, requireUserInput, pinOrTxCode)
 
+    suspend fun resolvePresentationRequestRaw(verificationUrl: String) =
+        exchangeApi.resolvePresentationRequestRaw(walletId, verificationUrl)
+
     suspend fun resolvePresentationRequest(verificationUrl: String) =
         exchangeApi.resolvePresentationRequest(walletId, verificationUrl)
+
+    suspend fun matchCredentialsForPresentationDefinitionRaw(presentationDefinition: String) =
+        exchangeApi.matchCredentialsForPresentationDefinitionRaw(walletId, presentationDefinition)
 
     suspend fun matchCredentialsForPresentationDefinition(presentationDefinition: String) =
         exchangeApi.matchCredentialsForPresentationDefinition(walletId, presentationDefinition)
@@ -131,6 +137,10 @@ class WalletApi(
 
     suspend fun getCredentialStatus(credentialId: String) =
         credentialApi.getCredentialStatus(walletId, credentialId)
+
+    suspend fun listCredentialsRaw(
+        filter: CredentialFilterObject = CredentialFilterObject.default
+    ) = credentialApi.listCredentialsRaw(walletId, filter)
 
     suspend fun listCredentials(
         filter: CredentialFilterObject = CredentialFilterObject.default
