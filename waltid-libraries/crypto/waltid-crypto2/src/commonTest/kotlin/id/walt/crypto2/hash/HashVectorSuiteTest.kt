@@ -48,9 +48,9 @@ class HashVectorSuiteTest {
                 // Verify ByteString overload mirrors byte[] behaviour
                 val byteStringResult = hasher.hash(vector.messageByteString)
                 assertContentEquals(
-                    vector.digestByteString.toByteArray(),
-                    byteStringResult.toByteArray(),
-                    "Hasher ByteString mismatch for ${manifest.algorithm} (${vector.name})",
+                    expected = vector.digestByteString.toByteArray(),
+                    actual = byteStringResult.toByteArray(),
+                    message = "Hasher ByteString mismatch for ${manifest.algorithm} (${vector.name})",
                 )
             }
         }
@@ -82,9 +82,9 @@ class HashVectorSuiteTest {
                 // Ensure digest() reset works by re-using the instance.
                 digest.update(message)
                 assertContentEquals(
-                    vector.digestBytes,
-                    digest.digest(),
-                    "Digest reuse mismatch for ${manifest.algorithm} (${vector.name})",
+                    expected = vector.digestBytes,
+                    actual = digest.digest(),
+                    message = "Digest reuse mismatch for ${manifest.algorithm} (${vector.name})",
                 )
             }
         }
@@ -100,17 +100,17 @@ class HashVectorSuiteTest {
 
             val asyncHash = hasher.hashAsync(vector.messageBytes)
             assertContentEquals(
-                vector.digestBytes,
-                asyncHash,
-                "Async hasher mismatch for ${manifest.algorithm} (${vector.name})",
+                expected = vector.digestBytes,
+                actual = asyncHash,
+                message = "Async hasher mismatch for ${manifest.algorithm} (${vector.name})",
             )
 
             digest.update(vector.messageBytes)
             val asyncDigest = digest.digestAsync()
             assertContentEquals(
-                vector.digestBytes,
-                asyncDigest,
-                "Async digest mismatch for ${manifest.algorithm} (${vector.name})",
+                expected = vector.digestBytes,
+                actual = asyncDigest,
+                message = "Async digest mismatch for ${manifest.algorithm} (${vector.name})",
             )
         }
     }
