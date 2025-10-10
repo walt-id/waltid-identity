@@ -8,12 +8,30 @@ import kotlin.test.assertContentEquals
 class HashVectorSuiteTest {
 
     private val manifests = listOf(
-        HashManifest(HashAlgorithm.SHA256, "hash/SHA256.json"),
-        HashManifest(HashAlgorithm.SHA384, "hash/SHA384.json"),
-        HashManifest(HashAlgorithm.SHA512, "hash/SHA512.json"),
-        HashManifest(HashAlgorithm.SHA3_256, "hash/SHA3_256.json"),
-        HashManifest(HashAlgorithm.SHA3_384, "hash/SHA3_384.json"),
-        HashManifest(HashAlgorithm.SHA3_512, "hash/SHA3_512.json"),
+        HashManifest(
+            algorithm = HashAlgorithm.SHA256,
+            resourcePath = "hash/SHA256.json"
+        ),
+        HashManifest(
+            algorithm = HashAlgorithm.SHA384,
+            resourcePath = "hash/SHA384.json"
+        ),
+        HashManifest(
+            algorithm = HashAlgorithm.SHA512,
+            resourcePath = "hash/SHA512.json"
+        ),
+        HashManifest(
+            algorithm = HashAlgorithm.SHA3_256,
+            resourcePath = "hash/SHA3_256.json"
+        ),
+        HashManifest(
+            algorithm = HashAlgorithm.SHA3_384,
+            resourcePath = "hash/SHA3_384.json"
+        ),
+        HashManifest(
+            algorithm = HashAlgorithm.SHA3_512,
+            resourcePath = "hash/SHA3_512.json"
+        ),
     )
 
     @Test
