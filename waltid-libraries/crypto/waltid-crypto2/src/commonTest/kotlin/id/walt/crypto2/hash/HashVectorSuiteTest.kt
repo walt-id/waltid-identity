@@ -4,6 +4,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 
 class HashVectorSuiteTest {
 
@@ -45,7 +46,7 @@ class HashVectorSuiteTest {
                     message = "Hasher mismatch for ${manifest.algorithm} (${vector.name})",
                 )
 
-                // Verify ByteString overload mirrors byte[] behaviour
+                // Verify ByteString overload mirrors ByteArray behaviour
                 val byteStringResult = hasher.hash(vector.messageByteString)
                 assertContentEquals(
                     expected = vector.digestByteString.toByteArray(),
@@ -85,6 +86,27 @@ class HashVectorSuiteTest {
                     expected = vector.digestBytes,
                     actual = digest.digest(),
                     message = "Digest reuse mismatch for ${manifest.algorithm} (${vector.name})",
+                )
+
+                // Exercise ByteString update path.
+                val byteStringDigest = manifest.algorithm.createDigest()
+                val messageByteString = vector.messageByteString
+                byteStringDigest.update(messageByteString)
+                assertEquals(
+                    expected = vector.digestByteString,
+                    actual = byteStringDigest.digestByteString(),
+                    message = "Digest ByteString mismatch for ${manifest.algorithm} (${vector.name})",
+                )
+
+                // Verify reset() clears internal state even without calling digest().
+                val resetDigest = manifest.algorithm.createDigest()
+                resetDigest.update(message)
+                resetDigest.reset()
+                resetDigest.update(message)
+                assertContentEquals(
+                    expected = vector.digestBytes,
+                    actual = resetDigest.digest(),
+                    message = "Digest reset mismatch for ${manifest.algorithm} (${vector.name})",
                 )
             }
         }
