@@ -27,7 +27,7 @@ class ExplicitClaimStrategy(
     ): List<WalletCredential> =
         issuanceService.useOfferRequest(
             offer = offer,
-            credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
+            credentialWallet = SSIKit2WalletService.getCredentialWallet(account, wallet, did),
             pinOrTxCode = pinOrTxCode,
         ).map { credentialDataResult ->
             ClaimCommons.convertCredentialDataResultToWalletCredential(

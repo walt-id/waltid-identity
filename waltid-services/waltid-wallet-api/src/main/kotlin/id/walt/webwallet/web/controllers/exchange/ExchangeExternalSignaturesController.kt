@@ -135,7 +135,8 @@ fun Application.exchangeExternalSignatures() = walletRoute {
 
                 logger.debug { "Selected credentials for presentation request: ${req.selectedCredentialIdList}" }
 
-                val credentialWallet = getCredentialWallet(walletDID.did)
+                val credentialWallet =
+                    getCredentialWallet(walletService.accountId, walletService.walletId, walletDID.did)
                 val resolvedAuthReq = credentialWallet.resolveVPAuthorizationParameters(authReq)
                 logger.debug { "Resolved Auth req: $resolvedAuthReq" }
 

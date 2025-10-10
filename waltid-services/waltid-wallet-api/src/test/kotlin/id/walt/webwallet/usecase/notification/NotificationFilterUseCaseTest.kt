@@ -21,6 +21,7 @@ import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 
 class NotificationFilterUseCaseTest {
@@ -88,7 +89,7 @@ class NotificationFilterUseCaseTest {
     @BeforeTest
     fun setup() {
         every { notificationServiceMock.list(any(), any(), any(), any(), any()) } returns notifications
-        every { credentialServiceMock.get(any()) } returns credentials
+        every { credentialServiceMock.get(any<Uuid>(), any<List<String>>()) } returns credentials
         coEvery { notificationFormatterMock.format(notifications[0]) } returns notificationDTOs[0]
         coEvery { notificationFormatterMock.format(notifications[1]) } returns notificationDTOs[1]
     }

@@ -61,7 +61,7 @@ import id.walt.webwallet.utils.StringUtils.couldBeJsonObject
 import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
 import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
-import io.github.oshai.kotlinlogging.KotlinLogging
+import io.klogging.Klogging
 import io.ktor.client.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
@@ -72,6 +72,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
@@ -84,6 +85,7 @@ import kotlin.time.toJavaInstant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
 @OptIn(ExperimentalUuidApi::class)
 class SSIKit2WalletService(
@@ -94,8 +96,7 @@ class SSIKit2WalletService(
     private val settingsService: SettingsService,
     private val eventUseCase: EventLogUseCase,
     private val http: HttpClient,
-) : WalletService(tenant, accountId, walletId) {
-    private val logger = KotlinLogging.logger { }
+) : WalletService(tenant, accountId, walletId), Klogging {
     private val credentialService = CredentialsService()
     private val eventService = EventService()
     private val credentialReportsService = ReportService.Credentials(credentialService, eventService)
@@ -115,12 +116,21 @@ class SSIKit2WalletService(
         }
 
         val testCIClientConfig = OpenIDClientConfig("test-client", null, redirectUri = "http://blank")
-        private val credentialWallets = HashMap<String, TestCredentialWallet>()
-        fun getCredentialWallet(did: String) = credentialWallets.getOrPut(did) {
-            TestCredentialWallet(
-                CredentialWalletConfig("http://blank"), did
-            )
-        }
+
+        fun getCredentialWallet(account: Uuid, wallet: Uuid, did: String): TestCredentialWallet =
+            transaction {
+                AccountWalletMappings.selectAll()
+                    .andWhere { AccountWalletMappings.accountId eq account }
+                    .andWhere { AccountWalletMappings.wallet eq wallet.toJavaUuid() }
+                    .map { row ->
+                        TestCredentialWallet(
+                            row[AccountWalletMappings.accountId],
+                            row[AccountWalletMappings.wallet].value.toKotlinUuid(),
+                            CredentialWalletConfig("http://blank"),
+                            did
+                        )
+                    }.first()
+            }
     }
 
     override fun listCredentials(filter: CredentialFilterObject): List<WalletCredential> =
@@ -199,7 +209,7 @@ class SSIKit2WalletService(
      * @return redirect uri
      */
     override suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?> {
-        val credentialWallet = getCredentialWallet(parameter.did)
+        val credentialWallet = getCredentialWallet(accountId, walletId, parameter.did)
 
         val authorizationRequest =
             AuthorizationRequest.fromHttpParametersAuto(
@@ -231,7 +241,8 @@ class SSIKit2WalletService(
                 parameter.disclosures
         }
 
-        val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
+        val tokenResponse =
+            credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
 
         if (tokenResponse.vpToken!!.jsonPrimitive.content.contains("~"))
             require(tokenResponse.vpToken!!.jsonPrimitive.content.last() != '~') {
@@ -347,22 +358,22 @@ class SSIKit2WalletService(
     }.getOrDefault(false)
 
     override suspend fun resolvePresentationRequest(request: String): String {
-        val credentialWallet = getAnyCredentialWallet()
-
+        val credentialWallet = getCredentialWallet(accountId, walletId, "did:test:test")
         return Url(request)
             .protocolWithAuthority
             .plus("?")
             .plus(credentialWallet.parsePresentationRequest(request).toHttpQueryString())
     }
 
-    private fun getAnyCredentialWallet() =
-        credentialWallets.values.firstOrNull() ?: getCredentialWallet("did:test:test")
-
     suspend fun useOfferRequest(
         offer: String, did: String, requireUserInput: Boolean,
     ): List<WalletCredential> {
         val addableCredentials =
-            IssuanceService.useOfferRequest(offer, getCredentialWallet(did), testCIClientConfig.clientID).map {
+            IssuanceService.useOfferRequest(
+                offer,
+                getCredentialWallet(accountId, walletId, did),
+                testCIClientConfig.clientID
+            ).map {
                 WalletCredential(
                     wallet = walletId,
                     id = it.id,
@@ -396,7 +407,7 @@ class SSIKit2WalletService(
     override suspend fun resolveCredentialOffer(
         offerRequest: CredentialOfferRequest,
     ): CredentialOffer {
-        return getAnyCredentialWallet().resolveCredentialOffer(offerRequest)
+        return getCredentialWallet(accountId, walletId, "did:test:test").resolveCredentialOffer(offerRequest)
     }
 
     /* DIDs */
@@ -431,7 +442,7 @@ class SSIKit2WalletService(
     override suspend fun importDid(did: String, key: Any?, alias: String?): String {
         if (!did.startsWith("did:")) throw BadRequestException("Invalid DID: must start with 'did:'")
         val method = did.substringAfter("did:").substringBefore(":")
-        val supported = setOf("key", "web", "jwk" ,"cheqd")
+        val supported = setOf("key", "web", "jwk", "cheqd")
         if (method !in supported) throw BadRequestException("Unsupported DID method: did:$method")
 
         val didDoc = DidService.resolve(did).getOrElse { ex ->
