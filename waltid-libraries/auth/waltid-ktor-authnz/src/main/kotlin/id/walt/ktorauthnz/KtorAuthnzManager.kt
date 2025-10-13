@@ -3,6 +3,7 @@ package id.walt.ktorauthnz
 import id.walt.ktorauthnz.accounts.EditableAccountStore
 import id.walt.ktorauthnz.security.PasswordHashingConfiguration
 import id.walt.ktorauthnz.sessions.InMemorySessionStore
+import id.walt.ktorauthnz.sessions.SessionStore
 import id.walt.ktorauthnz.tokens.TokenHandler
 import id.walt.ktorauthnz.tokens.ktorauthnztoken.KtorAuthNzTokenHandler
 
@@ -10,7 +11,7 @@ object KtorAuthnzManager {
 
     var passwordHashingConfig = PasswordHashingConfiguration()
     lateinit var accountStore: EditableAccountStore
-    var sessionStore = InMemorySessionStore()
+    var sessionStore: SessionStore = InMemorySessionStore()
 
     var tokenHandler: TokenHandler = KtorAuthNzTokenHandler()
     /*var tokenHandler: TokenHandler = JwtTokenHandler().apply {

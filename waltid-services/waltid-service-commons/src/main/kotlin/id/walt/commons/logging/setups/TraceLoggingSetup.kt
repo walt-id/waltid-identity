@@ -43,6 +43,12 @@ data object TraceLoggingSetup : LoggingSetup("trace", {
             toSink("stdout")
         }
     }
+    /*logging {
+        fromLoggerBase("eu.vendeli.rethis", stopOnMatch = true)
+        fromMinLevel(Level.DEBUG) {
+            toSink("stdout")
+        }
+    }*/
     logging {
         fromMinLevel(Level.ERROR) {
             toSink("stderr")
