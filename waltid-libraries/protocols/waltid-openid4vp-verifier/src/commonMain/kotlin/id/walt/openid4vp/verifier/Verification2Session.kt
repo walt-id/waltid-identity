@@ -3,8 +3,8 @@
 package id.walt.openid4vp.verifier
 
 import id.walt.credentials.formats.DigitalCredential
-import id.walt.ktornotifications.KtorSessionNotifications
-import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionCreationResponse
+import id.walt.ktornotifications.core.KtorSessionNotifications
+import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionCreationResponse
 import id.walt.policies2.PolicyList
 import id.walt.policies2.PolicyResults
 import id.walt.policies2.policies.CredentialSignaturePolicy
@@ -38,7 +38,7 @@ data class Verification2Session(
      * **The Session is no longer eligible for expiry if it was used and presentation data was made available**
      * (no matter if successful or failed)
      */
-    val expirationDate: Instant = Clock.System.now().plus(10, DateTimeUnit.MINUTE, TimeZone.UTC),
+    val expirationDate: Instant? = Clock.System.now().plus(10, DateTimeUnit.MINUTE, TimeZone.UTC),
 
     /**
      * (Optional) Retention date.
