@@ -2,13 +2,11 @@
 
 package id.walt.openid4vp.verifier
 
-import id.walt.commons.config.ConfigManager
+import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
-import id.walt.ktornotifications.WebhookNotifier
 import id.walt.openid4vp.verifier.Verification2Session.VerificationSessionStatus
-import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionCreationResponse
-import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionSetup
-import id.walt.openid4vp.verifier.Verifier2OpenApiExamples.exampleOf
+import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
+import id.walt.openid4vp.verifier.openapi.VerificationSessionCreateOpenApi
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
@@ -26,13 +24,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
 import kotlin.uuid.ExperimentalUuidApi
 
+private val log = logger("Verifier2Service")
+private const val VERIFICATION_SESSION = "verification-session"
+
 object Verifier2Service {
-
-    private val log = logger("Verifier2Service")
-
-    private const val VERIFICATION_SESSION = "verification-session"
-
-    private val config = ConfigManager.getConfig<OSSVerifier2ServiceConfig>()
 
     val sessions = HashMap<String, Verification2Session>()
 
@@ -73,34 +68,8 @@ object Verifier2Service {
             route("", {
                 tags("Verification Session Management")
             }) {
-                post<VerificationSessionSetup>("create", {
-                    summary = "Create new verification session"
-                    request {
-                        body<VerificationSessionSetup> {
-                            example("Basic example") { value = Verifier2OpenApiExamples.basicExample }
-                            example("W3C + path") { value = exampleOf(Verifier2OpenApiExamples.w3cPlusPath) }
-                            example("Empty meta") { value = exampleOf(Verifier2OpenApiExamples.emptyMeta) }
-                            example("Nested presentation request") {
-                                value = exampleOf(Verifier2OpenApiExamples.nestedPresentationRequestW3C)
-                            }
-                            example("Nested presentation request + multiple claims") {
-                                value = exampleOf(Verifier2OpenApiExamples.nestedPresentationRequestWithMultipleClaims)
-                            }
-                            example("W3C type values") { value = exampleOf(Verifier2OpenApiExamples.w3cTypeValues) }
-                            example("W3C without claims") { value = exampleOf(Verifier2OpenApiExamples.W3CWithoutClaims) }
-                            example("W3C with claims and values") { value = exampleOf(Verifier2OpenApiExamples.W3CWithClaimsAndValues) }
-                        }
-                    }
-                    response {
-                        HttpStatusCode.Created to {
-                            body<VerificationSessionCreationResponse>()
-                        }
-                    }
-                }) { sessionSetup ->
-                    val newSession =
-                        Verifier2Manager.createVerificationSession(
-                            sessionSetup, config.clientId, config.clientMetadata, config.urlPrefix
-                        )
+                post<VerificationSessionSetup>("create", VerificationSessionCreateOpenApi.createDocs) { sessionSetup ->
+                    val newSession = OSSVerifier2Manager.createVerificationSession(sessionSetup)
                     sessions[newSession.id] = newSession
                     val creationResponse = newSession.toSessionCreationResponse()
                     call.respond(creationResponse)
@@ -109,10 +78,10 @@ object Verifier2Service {
                 route("{$VERIFICATION_SESSION}") {
 
                     get("info", {
-                            summary = "View data of existing verification session"
-                            request { pathParameter<String>(VERIFICATION_SESSION) }
-                            response { HttpStatusCode.OK to { body<Verification2Session>() } }
-                        }
+                        summary = "View data of existing verification session"
+                        request { pathParameter<String>(VERIFICATION_SESSION) }
+                        response { HttpStatusCode.OK to { body<Verification2Session>() } }
+                    }
                     ) {
                         val verifierSession =
                             sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
