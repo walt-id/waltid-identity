@@ -14,6 +14,8 @@ import kotlin.time.Instant
 
 class JwtTokenHandler : TokenHandler {
 
+    override val name = "token-jwt"
+
     lateinit var signingKey: Key
     lateinit var verificationKey: Key
 

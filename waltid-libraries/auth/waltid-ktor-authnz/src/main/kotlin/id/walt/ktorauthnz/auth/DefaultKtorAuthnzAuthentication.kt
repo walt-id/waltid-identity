@@ -32,11 +32,7 @@ class DefaultKtorAuthnzAuthentication internal constructor(
     override suspend fun onAuthenticate(context: AuthenticationContext) {
         val call = context.call
 
-        val ktorAuthnzHeader = call.request.headers.get("ktor-authnz-auth")
-        val cookie = call.request.cookies["ktor-authnz-auth"] ?: call.request.cookies["auth.token"]
-        val authHeader = call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")
-
-        val effectiveToken = ktorAuthnzHeader ?: cookie ?: authHeader
+        val effectiveToken = call.getEffectiveRequestAuthToken()
 
         if (effectiveToken == null) {
             fail(context, AuthenticationFailedCause.NoCredentials)

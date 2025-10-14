@@ -100,6 +100,10 @@ dependencies {
     implementation("io.klogging:klogging-jvm:0.11.6")
     implementation("io.klogging:slf4j-klogging:0.11.6")
 
+    // Redis
+    //implementation("eu.vendeli:rethis:0.3.3")
+    implementation("io.github.domgew:kedis:0.0.10")
+
     /* --- Testing --- */
     testImplementation("io.ktor:ktor-client-logging")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
