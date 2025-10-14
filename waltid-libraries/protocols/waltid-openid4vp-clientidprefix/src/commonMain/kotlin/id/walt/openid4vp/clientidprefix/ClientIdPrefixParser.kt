@@ -11,7 +11,7 @@ import id.walt.openid4vp.clientidprefix.prefixes.X509Hash
 import id.walt.openid4vp.clientidprefix.prefixes.X509SanDns
 import io.ktor.http.Url
 
-object ClientIdParser {
+object ClientIdPrefixParser {
     fun parse(clientIdString: String): Result<ClientId> {
         return runCatching {
             val parts = clientIdString.split(":", limit = 2)
