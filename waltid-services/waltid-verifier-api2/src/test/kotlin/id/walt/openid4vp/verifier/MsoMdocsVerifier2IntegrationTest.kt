@@ -17,8 +17,7 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
-import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionCreationResponse
-import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionSetup
+import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
 import id.walt.policies2.PolicyList
 import id.walt.policies2.policies.CredentialDataMatcherPolicy
 import id.walt.policies2.policies.CredentialSignaturePolicy
@@ -221,7 +220,7 @@ class MsoMdocsVerifier2IntegrationTest {
                             policies = mdocsPolicies
                         )
                     )
-                }.body<VerificationSessionCreationResponse>()
+                }.body<VerificationSessionCreator.VerificationSessionCreationResponse>()
             }
             println("Verification Session Response: $verificationSessionResponse")
 

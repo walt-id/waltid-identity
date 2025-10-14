@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
-import ktornotifications.KtorSessionUpdate
+import id.walt.ktornotifications.core.KtorSessionUpdate
 
 @Serializable
 data class Verifier2SessionUpdate(

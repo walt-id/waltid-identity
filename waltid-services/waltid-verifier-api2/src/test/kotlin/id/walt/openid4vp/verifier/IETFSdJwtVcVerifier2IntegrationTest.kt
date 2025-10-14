@@ -19,8 +19,8 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
-import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionCreationResponse
-import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionSetup
+import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionCreationResponse
+import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
 import id.walt.policies2.PolicyList
 import id.walt.policies2.policies.CredentialSignaturePolicy
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
