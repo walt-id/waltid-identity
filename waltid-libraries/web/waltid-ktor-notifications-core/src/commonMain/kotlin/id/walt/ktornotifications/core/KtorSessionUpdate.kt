@@ -1,4 +1,4 @@
-package ktornotifications
+package id.walt.ktornotifications.core
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject

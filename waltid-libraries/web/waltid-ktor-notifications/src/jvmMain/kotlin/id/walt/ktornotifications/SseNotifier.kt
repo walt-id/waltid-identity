@@ -3,7 +3,7 @@ package id.walt.ktornotifications
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import ktornotifications.KtorSessionUpdate
+import id.walt.ktornotifications.core.KtorSessionUpdate
 import java.util.concurrent.ConcurrentHashMap
 
 object SseNotifier {
