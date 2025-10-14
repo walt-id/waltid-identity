@@ -18,8 +18,19 @@ object FeatureManager {
 
     val featureAmendments = HashMap<AbstractFeature, suspend () -> Unit>()
 
+    fun preclear() {
+        enabledFeatures.clear()
+        disabledFeatures.clear()
+        registeredFeatures.clear()
+        failed.clear()
+        featureAmendments.clear()
+    }
+
     private val log = logger("FeatureManager")
 
+    suspend fun enableFeatureAndIfNotSucceededRun(feature: AbstractFeature, ifNotSucceeded: (AbstractFeature, Throwable) -> Unit = { _, _ -> }) {
+        enableFeature (feature).ifResultNotSucceeded(feature) { ex -> ifNotSucceeded.invoke(feature, ex) }
+    }
     suspend fun enableFeature(feature: AbstractFeature): Result<Boolean> {
         feature.dependsOn // todo: handle this
 
@@ -32,7 +43,12 @@ object FeatureManager {
             log.info { "↳ Loading config \"$name\" for feature \"${feature.name}\"..." }
             ConfigManager.registerConfig(name, config)
             ConfigManager.loadConfig(ConfigManager.ConfigData(name, config), RunConfiguration.configArgs).onFailure { ex ->
-                return Result.failure(ConfigurationException(ex as ConfigException))
+                return Result.failure(
+                    when (ex) {
+                        is ConfigException -> ConfigurationException(ex as ConfigException)
+                        else -> ex
+                    }
+                )
             }
         }
 
@@ -41,7 +57,10 @@ object FeatureManager {
             it.invoke()
         }
 
-        return if (enabledFeatures.add(feature.name)) Result.success(true) else Result.failure(IllegalStateException("Feature \"${feature.name}\" already enabled."))
+        return when {
+            enabledFeatures.add(feature.name) -> Result.success(true)
+            else -> Result.failure(IllegalStateException("Feature \"${feature.name}\" already enabled."))
+        }
     }
 
     fun disableFeature(feature: AbstractFeature) {
@@ -120,12 +139,12 @@ object FeatureManager {
     fun getDefaultedAbstractFeatures() = getDefaultedFeatures().map { registeredFeatures[it]!! }
 
 
-    private suspend fun Result<Boolean>.ifNotSucceeded(block: (Throwable) -> Unit) {
+    private suspend fun Result<Boolean>.ifResultNotSucceeded(feature: AbstractFeature, block: (Throwable) -> Unit) {
         if (isFailure) {
             val exception = exceptionOrNull()!!
 
             if (exception !is ConfigurationException) // already handled by ConfigManager
-                log.error("Did not succeed enabling feature:", exception)
+                log.error(exception, "Did not succeed enabling feature: ${feature.name}")
 
             block.invoke(exception)
         }
@@ -152,13 +171,13 @@ object FeatureManager {
         registeredFeatures.filterValues { it is BaseFeature }.forEach { (name, feature) ->
             log.info { "Enabling base feature \"${feature.name}\"..." }
 
-            enableFeature(feature).ifNotSucceeded { failed += feature to it }
+            enableFeatureAndIfNotSucceededRun(feature) { _, ex -> failed += feature to ex }
         }
 
         config.enabledFeatures.forEach { name ->
             registeredFeatures[name]?.let { feature ->
                 log.info { "Enabling feature \"${feature.name}\"..." }
-                enableFeature(feature).ifNotSucceeded { failed += feature to it }
+                enableFeatureAndIfNotSucceededRun(feature) { _, ex -> failed += feature to ex }
             }
                 ?: error("Could not enable feature \"$name\" as it's not loaded/registered by any catalog. Registered features are: ${registeredFeatures.keys}")
         }
@@ -168,7 +187,9 @@ object FeatureManager {
         getDefaultedAbstractFeatures().forEach { feature ->
             if ((feature is BaseFeature || (feature is OptionalFeature && feature.default)) && !failed.any { it.first == feature }) {
                 log.info { "Enabling default feature \"${feature.name}\"..." }
-                enableFeature(feature).ifNotSucceeded { failed += feature to it }
+                enableFeatureAndIfNotSucceededRun(feature) { _, ex ->
+                    failed += feature to ex
+                }
             }
         }
 

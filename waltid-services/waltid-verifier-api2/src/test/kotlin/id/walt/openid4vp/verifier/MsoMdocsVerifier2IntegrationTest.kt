@@ -2,6 +2,7 @@
 
 package id.walt.openid4vp.verifier
 
+import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.signatures.CoseCredentialSignature
@@ -21,10 +22,10 @@ import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSession
 import id.walt.policies2.PolicyList
 import id.walt.policies2.policies.CredentialDataMatcherPolicy
 import id.walt.policies2.policies.CredentialSignaturePolicy
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.http.*
 import io.ktor.server.application.*
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.assertNotNull
@@ -199,8 +200,24 @@ class MsoMdocsVerifier2IntegrationTest {
 
     @Test
     fun test() {
-        E2ETest("127.0.0.1", 7003, true).testBlock(
+        val host = "127.0.0.1"
+        val port = 17001
+
+        E2ETest(host, port, true).testBlock(
             features = listOf(Verifier2FeatureCatalog),
+            preload = {
+                ConfigManager.preloadConfig(
+                    "verifier-service", OSSVerifier2ServiceConfig(
+                        clientId = "verifier2",
+                        clientMetadata = ClientMetadata(
+                            clientName = "Verifier2",
+                            logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
+                        ),
+                        urlPrefix = "http://$host:$port/verification-session",
+                        urlHost = "openid4vp://authorize"
+                    )
+                )
+            },
             init = {
                 DidService.apply {
                     registerResolver(LocalResolver())
@@ -227,7 +244,7 @@ class MsoMdocsVerifier2IntegrationTest {
             // Check verification session
             test("Check Verification Session Response") {
                 assertTrue {
-                    verificationSessionResponse.bootstrapAuthorizationRequestUrl.length < verificationSessionResponse.fullAuthorizationRequestUrl.length
+                    verificationSessionResponse.bootstrapAuthorizationRequestUrl.toString().length < verificationSessionResponse.fullAuthorizationRequestUrl.toString().length
                 }
             }
 
@@ -247,7 +264,7 @@ class MsoMdocsVerifier2IntegrationTest {
             }
 
             // Present with wallet
-            val bootstrapUrl = Url(verificationSessionResponse.bootstrapAuthorizationRequestUrl)
+            val bootstrapUrl = verificationSessionResponse.bootstrapAuthorizationRequestUrl
 
             val holderKey = holderKeyFun()
 

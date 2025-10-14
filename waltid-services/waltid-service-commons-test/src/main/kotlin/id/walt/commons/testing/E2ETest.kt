@@ -7,7 +7,9 @@ import com.github.ajalt.mordant.terminal.Terminal
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
+import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.AbstractFeature
+import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.featureflag.ServiceFeatureCatalog
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
@@ -72,6 +74,7 @@ class E2ETest(
         features: List<ServiceFeatureCatalog>,
         featureAmendments: Map<AbstractFeature, suspend () -> Unit> = emptyMap(),
         init: suspend () -> Unit,
+        preload: suspend () -> Unit = {},
         module: Application.() -> Unit,
         host: String = "localhost",
         port: Int = this.port,
@@ -83,6 +86,11 @@ class E2ETest(
             init = ServiceInitialization(
                 features = features,
                 featureAmendments = featureAmendments,
+                pre = {
+                    ConfigManager.preclear()
+                    FeatureManager.preclear()
+                    preload.invoke()
+                },
                 init = init,
                 run = E2ETestWebService(module).runService(suspend { block.invoke(this) }, host, port)
             )

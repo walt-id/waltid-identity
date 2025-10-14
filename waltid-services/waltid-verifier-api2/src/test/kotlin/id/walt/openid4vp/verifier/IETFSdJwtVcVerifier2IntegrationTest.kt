@@ -2,10 +2,10 @@
 
 package id.walt.openid4vp.verifier
 
+import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
-import id.walt.credentials.formats.SdJwtCredential
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.KeyManager
@@ -23,12 +23,15 @@ import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSession
 import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
 import id.walt.policies2.PolicyList
 import id.walt.policies2.policies.CredentialSignaturePolicy
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.http.*
 import io.ktor.server.application.*
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.assertNotNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -287,8 +290,24 @@ class IETFSdJwtVcVerifier2IntegrationTest {
 
     @Test
     fun test() {
-        E2ETest("127.0.0.1", 7003, true).testBlock(
+        val host = "127.0.0.1"
+        val port = 17002
+
+        E2ETest(host, port, true).testBlock(
             features = listOf(Verifier2FeatureCatalog),
+            preload = {
+                ConfigManager.preloadConfig(
+                    "verifier-service", OSSVerifier2ServiceConfig(
+                        clientId = "verifier2",
+                        clientMetadata = ClientMetadata(
+                            clientName = "Verifier2",
+                            logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
+                        ),
+                        urlPrefix = "http://$host:$port/verification-session",
+                        urlHost = "openid4vp://authorize"
+                    )
+                )
+            },
             init = {
                 DidService.apply {
                     registerResolver(LocalResolver())
@@ -315,7 +334,7 @@ class IETFSdJwtVcVerifier2IntegrationTest {
             // Check verification session
             test("Check Verification Session Response") {
                 assertTrue {
-                    verificationSessionResponse.bootstrapAuthorizationRequestUrl.length < verificationSessionResponse.fullAuthorizationRequestUrl.length
+                    verificationSessionResponse.bootstrapAuthorizationRequestUrl.toString().length < verificationSessionResponse.fullAuthorizationRequestUrl.toString().length
                 }
             }
 
@@ -335,7 +354,7 @@ class IETFSdJwtVcVerifier2IntegrationTest {
             }
 
             // Present with wallet
-            val bootstrapUrl = Url(verificationSessionResponse.bootstrapAuthorizationRequestUrl)
+            val bootstrapUrl = verificationSessionResponse.bootstrapAuthorizationRequestUrl
 
             val holderKey = holderKeyFun()
 
