@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
-
 package id.walt.openid4vp.verifier
 
 import id.walt.dcql.models.DcqlQuery
@@ -9,7 +7,6 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
-import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
@@ -20,16 +17,18 @@ import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-object Verifier2Manager {
-
-    private val log = KotlinLogging.logger("Verifier2Service")
+@OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
+object VerificationSessionCreator {
 
     @Serializable
     data class VerificationSessionSetup(
         val preset: VerificationSessionSetupPreset? = null,
-        @SerialName("dcql_query")
 
+        @SerialName("dcql_query")
         val dcqlQuery: DcqlQuery,
+
+        val signedRequest: Boolean = false,
+        val encryptedResponse: Boolean = false,
 
         val policies: DefinedVerificationPolicies = DefinedVerificationPolicies()
     ) {
