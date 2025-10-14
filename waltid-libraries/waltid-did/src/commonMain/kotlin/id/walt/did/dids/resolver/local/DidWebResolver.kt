@@ -46,7 +46,7 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
         // For backward compatibility, return the first key
         return resolveToKeys(did).map { it.firstOrNull() ?: throw NoSuchElementException("No key could be imported") }
     }
-    
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -104,21 +104,21 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
         }
         return Result.failure(NoSuchElementException("No key could be imported"))
     }
-    
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
     suspend fun tryConvertPublicKeyJwksToKeys(publicKeyJwks: List<String>): Result<Set<JWKKey>> {
         val keys = mutableSetOf<JWKKey>()
-        
+
         for (publicKeyJwk in publicKeyJwks) {
             val result = JWKKey.importJWK(publicKeyJwk)
             if (result.isSuccess) {
                 keys.add(result.getOrThrow())
             }
         }
-        
+
         return if (keys.isNotEmpty()) {
             Result.success(keys)
         } else {
@@ -128,6 +128,6 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
 
     companion object {
         const val URL_PROTOCOL = "https"
-        val json = Json { ignoreUnknownKeys = true }
+        internal val json = Json { ignoreUnknownKeys = true }
     }
 }
