@@ -36,17 +36,6 @@ object Verifier2Service {
 
     val sessions = HashMap<String, Verification2Session>()
 
-    suspend fun notifySessionUpdate(session: Verification2Session, event: SessionEvent) {
-        val update = Verifier2SessionUpdate(session.id, event, session).toKtorSessionUpdate()
-
-        SseNotifier.notify(session.id, update)
-
-        val notifications = session.notifications
-        if (notifications != null && notifications.webhook != null) {
-            WebhookNotifier.notify(update = update, config = notifications.webhook!!)
-        }
-    }
-
     /**
      * Update data for this session and send session update notifications
      */
@@ -61,7 +50,9 @@ object Verifier2Service {
         }
         sessions[newSession.id] = newSession
 
-        notifySessionUpdate(session, event)
+        Verifier2SessionUpdate(session.id, event, session)
+            .toKtorSessionUpdate()
+            .notifySessionUpdate(session.id, session.notifications)
     }
 
     /**
