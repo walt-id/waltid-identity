@@ -1,40 +1,57 @@
 package id.walt.openid4vp.clientidprefix.prefixes
 
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
-import id.walt.openid4vp.clientidprefix.ClientMetadata
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
+import id.walt.verifier.openid.models.authorization.ClientMetadata
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
+import org.kotlincrypto.hash.sha2.SHA256
 
 /**
  * Handles `x509_hash` prefix per OpenID4VP 1.0, Section 5.9.3.
  */
-class X509Hash(override val context: RequestContext, private val hash: String) : ClientId {
-    override suspend fun validate(): ClientValidationResult {
-        // The request MUST be signed.
-        val jws = context.requestObjectJws ?: return ClientValidationResult.Failure(ClientIdError.MissingRequestObject)
+@Serializable
+data class X509Hash(val hash: String, override val rawValue: String) : ClientId {
+    init {
+        // Check if it's a valid Base64URL string, common for hashes.
+        val b64UrlRegex = "^[A-Za-z0-9_-]+$".toRegex()
+        require(b64UrlRegex.matches(hash)) { "Hash must be a valid Base64URL string." }
+    }
 
-        // TODO: Use a JOSE/JWT library to parse the 'x5c' header and get the leaf certificate.
-        // val x5c: List<String> = parseJwsHeader(jws, "x5c")
-        // val leafCertDerBytes = Base64.decode(x5c.first())
-        val leafCertDerBytes = ByteArray(0) // Stub for the DER-encoded certificate bytes
+    suspend fun authenticateX509Hash(clientId: X509Hash, context: RequestContext): ClientValidationResult {
+        val jws = context.requestObjectJws
+            ?: return ClientValidationResult.Failure(ClientIdError.MissingRequestObject)
 
-        // TODO: Use a cryptography library to validate the signature of the JWS using the certificate.
-        // if (!verifyJwsSignature(jws, leafCertDerBytes.toPublicKey())) {
-        //    return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
-        // }
+        return runCatching {
+            val x5cHeader = jws.decodeJws().header["x5c"]?.jsonArray
+                ?: throw IllegalStateException("Missing 'x5c' header in JWS.")
 
-        // TODO: Use a cryptography library to calculate the SHA-256 hash of the certificate.
-        // val calculatedHash = sha256(leafCertDerBytes).toBase64Url()
-        val calculatedHash = "Uvo3HtuIxuhC92rShpgqcT3YXwrqRxWEviRiA0OZszk" // Stub value from spec example
+            val leafCertDer = x5cHeader.first().jsonPrimitive.content.decodeFromBase64()
 
-        // The value MUST match the base64url-encoded SHA-256 hash of the DER-encoded certificate.
-        if (hash != calculatedHash) {
-            return ClientValidationResult.Failure(ClientIdError.X509HashMismatch)
-        }
+            // 1. Verify JWS signature.
+            JWKKey.importFromDerCertificate(leafCertDer).getOrThrow().verifyJws(jws).getOrThrow()
 
-        // All Verifier metadata other than the public key MUST be obtained from client_metadata.
-        return context.clientMetadataJson?.let {
-            ClientValidationResult.Success(ClientMetadata(it))
-        } ?: ClientValidationResult.Failure(ClientIdError.MissingClientMetadata)
+            // 2. Calculate the certificate hash using the isolated JCA utility function.
+            val calculatedHash = SHA256().digest(leafCertDer).encodeToBase64Url()
+
+            // 3. Compare with the hash from the client_id.
+            if (clientId.hash != calculatedHash) {
+                throw IllegalArgumentException("Provided hash does not match certificate hash.")
+            }
+
+            val metadataJson = context.clientMetadataJson
+                ?: throw IllegalStateException("client_metadata parameter is required.")
+
+            ClientMetadata.fromJson(metadataJson).getOrThrow()
+        }.fold(
+            onSuccess = { ClientValidationResult.Success(it) },
+            onFailure = { ClientValidationResult.Failure(ClientIdError.X509HashMismatch) }
+        )
     }
 }
