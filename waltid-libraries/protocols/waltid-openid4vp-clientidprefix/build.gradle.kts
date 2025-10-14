@@ -61,8 +61,9 @@ kotlin {
                 // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
-                implementation("io.github.optimumcode:json-schema-validator:0.5.2")
-                implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
+                // Crypto
+                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.8.0"))
+                implementation("org.kotlincrypto.hash:sha2")
 
                 // CBOR
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
