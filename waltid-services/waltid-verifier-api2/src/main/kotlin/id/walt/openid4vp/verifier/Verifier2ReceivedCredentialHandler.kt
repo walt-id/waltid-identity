@@ -45,7 +45,6 @@ object Verifier2ReceivedCredentialHandler {
         }
 
 
-
         require(receivedState == session.authorizationRequest.state) { "State does not match" }
 
         // 2. Parse vp_token
@@ -326,10 +325,14 @@ object Verifier2ReceivedCredentialHandler {
             this.status = if (policyResults.overallSuccess) VerificationSessionStatus.SUCCESSFUL else VerificationSessionStatus.FAILED
         }
 
-        val willRedirect = session.redirects != null
+        val optionalSuccessRedirectUrl = session.redirects?.successRedirectUri
+        val willRedirect = optionalSuccessRedirectUrl != null
 
         return if (willRedirect) {
-            mapOf("redirect_uri" to session.redirects!!.successRedirectUri)
+            mapOf("redirect_uri" to optionalSuccessRedirectUrl)
+
+            // TODO: error redirect url !!!
+
         } else {
             mapOf(
                 "status" to "received",

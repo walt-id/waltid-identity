@@ -122,9 +122,13 @@ object Verifier2Service {
                     val verificationSession =
                         sessions[call.parameters.getOrFail(VERIFICATION_SESSION)] ?: throw IllegalArgumentException("Unknown session id")
 
-                    // TODO: JAR
-
-                    call.respond(verificationSession.authorizationRequest)
+                    if (verificationSession.signedAuthorizationRequestJwt != null) {
+                        // JAR (Signed)
+                        call.respond(verificationSession.signedAuthorizationRequestJwt!!)
+                    } else {
+                        // Unsigned
+                        call.respond(verificationSession.authorizationRequest)
+                    }
                 }
 
                 route("") {
