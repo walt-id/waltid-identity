@@ -27,6 +27,7 @@ import id.walt.webwallet.utils.StringUtils.couldBeJsonObject
 import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -131,7 +132,11 @@ class SSIKit2WalletService(
                 submitFormParams.forEach { entry ->
                     entry.value.forEach { append(entry.key, it) }
                 }
-            })
+            }){
+            timeout {
+                requestTimeoutMillis = 20 * 1000
+            }
+        }
         val httpResponseBody = runCatching { resp.bodyAsText() }.getOrNull()
         val isResponseRedirectUrl = httpResponseBody != null && httpResponseBody.take(10).lowercase().let {
             @Suppress("HttpUrlsUsage")
