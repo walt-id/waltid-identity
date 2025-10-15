@@ -5,12 +5,12 @@ This service is built to work with the [OpenID Conformance Suite](https://gitlab
 Test plans (TODO):
 
 - OpenID Compliance - OpenID4VP 1.0
-    - Verifier
+    - **Verifier**
         - sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post
         - sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post.jwt
         - iso_mdl + x509_san_dns + request_uri_signed + direct_post
         - iso_mdl + x509_san_dns + request_uri_signed + direct_post.jwt
-    - Wallet
+    - **Wallet**
         - FOR ALL:
             - request_uri_unsigned + direct_post
             - request_uri_signed + direct_post
