@@ -2,6 +2,7 @@
 
 package id.walt.cose
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
@@ -28,6 +29,7 @@ val coseCompliantCbor by lazy {
     Cbor(from = Cbor.CoseCompliant) {
         ignoreUnknownKeys = true
         alwaysUseByteString = true
+        // encodeDefaults = true // DO NOT SET!
     }
 }
 
@@ -59,6 +61,8 @@ internal fun buildSignatureStructure(
         externalAad = externalAad,
         payload = payload ?: byteArrayOf()
     )
+    log.trace { "Signature1ToBeSigned: $tbs" }
+
     return cborForSigStructure.encodeToByteArray(tbs)
 }
 
