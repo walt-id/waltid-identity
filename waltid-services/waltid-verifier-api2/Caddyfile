@@ -1,0 +1,3 @@
+verifier2.localhost {
+    reverse_proxy localhost:7003
+}
