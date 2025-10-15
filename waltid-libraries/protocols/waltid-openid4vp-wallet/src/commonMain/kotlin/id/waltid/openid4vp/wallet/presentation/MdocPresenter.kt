@@ -6,12 +6,12 @@ import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.dcql.DcqlMatcher
+import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.DeviceSigned
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.document.DeviceAuth
-import id.walt.mdoc.objects.document.DeviceAuthentication
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
@@ -19,7 +19,6 @@ import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.handover.OpenID4VPHandover
 import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
-import id.walt.mdoc.objects.wrapInCborTag
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.encodeToByteArray
@@ -40,7 +39,10 @@ object MdocPresenter {
             responseUri = responseUri
         )
         val handoverInfoHash = coseCompliantCbor.encodeToByteArray(handoverInfo).sha256()
-        val handover = OpenID4VPHandover(infoHash = handoverInfoHash)
+        val handover = OpenID4VPHandover(
+            identifier = "OpenID4VPHandover",
+            infoHash = handoverInfoHash
+        )
         val sessionTranscript = SessionTranscript.forOpenId(handover)
 
         return sessionTranscript
@@ -53,18 +55,14 @@ object MdocPresenter {
         holderKey: Key
     ): DeviceAuth {
         // Create the DeviceAuthentication structure to be signed
-        val deviceAuthentication = DeviceAuthentication(
-            type = "DeviceAuthentication",
-            sessionTranscript = sessionTranscript,
-            docType = credential.docType,
-            namespaces = ByteStringWrapper(disclosedDeviceNamespaces)
+        val deviceAuthBytes = MdocCryptoHelper.buildDeviceAuthenticationBytes(
+            sessionTranscript, credential.docType, ByteStringWrapper(disclosedDeviceNamespaces)
         )
 
-        // Sign using the new detached payload function
-        val detachedPayload = coseCompliantCbor.encodeToByteArray(deviceAuthentication).wrapInCborTag(24)
+        // Sign using the detached payload function
         val deviceSignature = CoseSign1.createAndSignDetached(
             protectedHeaders = CoseHeaders(algorithm = holderKey.keyType.toCoseAlgorithm()),
-            detachedPayload = detachedPayload,
+            detachedPayload = deviceAuthBytes,
             signer = holderKey.toCoseSigner()
         )
         val deviceAuth = DeviceAuth(deviceSignature = deviceSignature)
