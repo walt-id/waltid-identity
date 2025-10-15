@@ -1,7 +1,5 @@
 package id.walt.mdoc.crypto
 
-//import id.walt.mdoc.credsdata.DeviceNameSpaces
-//import id.walt.mdoc.credsdata.IssuerSignedItem
 import id.walt.cose.CoseKey
 import id.walt.cose.CoseMac0
 import id.walt.cose.CoseSign1
@@ -12,6 +10,7 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.mdoc.encoding.MdocCbor
 import id.walt.mdoc.encoding.startsWith
 import id.walt.mdoc.objects.SessionTranscript
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
@@ -24,6 +23,8 @@ import org.kotlincrypto.macs.hmac.sha2.HmacSHA256
  * Provides cryptographic functions required for mdoc verification, such as hashing and signature validation.
  */
 object MdocCrypto {
+
+    private val log = KotlinLogging.logger {  }
 
     private val sha256 = SHA256()
     private val sha384 = SHA384()
@@ -48,7 +49,7 @@ object MdocCrypto {
     /**
      * Verifies the device's signature (`COSE_Sign1`).
      *
-     * @param deviceAuthBytes The data that was signed.
+     * @param payloadToVerify (deviceAuthBytes) The data that was signed.
      * @param deviceSignature The COSE_Sign1 signature object.
      * @param sDevicePublicKey The public key from the MSO to verify the signature.
      * @return True if the signature is valid, false otherwise.
@@ -58,6 +59,11 @@ object MdocCrypto {
         deviceSignature: CoseSign1,
         sDevicePublicKey: Key
     ): Boolean {
+        log.trace { "-- Verifying device signature --" }
+        log.trace { "> Payload to verify (hex): ${payloadToVerify.toHexString()}" }
+        log.trace { "> Device signature: $deviceSignature" }
+        val tmpJwk = sDevicePublicKey.exportJWK()
+        log.trace { "> sDevicePublicKey: $sDevicePublicKey: $tmpJwk" }
         return deviceSignature.verifyDetached(
             verifier = sDevicePublicKey.toCoseVerifier(),
             detachedPayload = payloadToVerify
