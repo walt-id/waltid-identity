@@ -1,17 +1,24 @@
 package id.walt.openid4vp.verifier
 
+import id.walt.crypto.keys.Key
 import id.walt.dcql.models.DcqlQuery
-import id.walt.openid4vp.verifier.Verification2Session.DefinedVerificationPolicies
-import id.walt.openid4vp.verifier.Verification2Session.VerificationSessionStatus
+import id.walt.ktornotifications.core.KtorSessionNotifications
+import id.walt.openid4vp.verifier.Verification2Session.*
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
+import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
@@ -19,6 +26,8 @@ import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
 object VerificationSessionCreator {
+
+    private val log = KotlinLogging.logger {  }
 
     @Serializable
     data class VerificationSessionSetup(
@@ -29,6 +38,8 @@ object VerificationSessionCreator {
 
         val signedRequest: Boolean = false,
         val encryptedResponse: Boolean = false,
+        val notifications: KtorSessionNotifications? = null,
+        val redirects: VerificationSessionRedirects? = null,
 
         val policies: DefinedVerificationPolicies = DefinedVerificationPolicies()
     ) {
@@ -45,8 +56,8 @@ object VerificationSessionCreator {
     @Serializable
     data class VerificationSessionCreationResponse(
         val sessionId: String,
-        val bootstrapAuthorizationRequestUrl: String,
-        val fullAuthorizationRequestUrl: String,
+        val bootstrapAuthorizationRequestUrl: Url,
+        val fullAuthorizationRequestUrl: Url,
         val creationTarget: String? = null
     )
 
@@ -56,8 +67,20 @@ object VerificationSessionCreator {
         clientId: String,
         clientMetadata: ClientMetadata? = null,
         uriPrefix: String,
+        uriHost: String = "openid4vp://authorize",
+
+        key: Key? = null,
+        x5c: List<String>? = null,
     ): Verification2Session {
         setup.dcqlQuery.precheck()
+
+        val isSignedRequest = setup.signedRequest
+        if (isSignedRequest)
+            requireNotNull(key) { "Requested signed request, but did not provide a key (to sign request with)!" }
+
+        val isEncryptedResponse = setup.encryptedResponse
+        if (isEncryptedResponse)
+            requireNotNull(key) { "Requested encrypted response, but did not provide a key (to decrypt response with)!" }
 
         val sessionId = Uuid.random().toString()
         val nonce = Uuid.random().toString()
@@ -102,7 +125,7 @@ object VerificationSessionCreator {
             scope = null,//OPTIONAL. OAuth 2.0 Scope value. Can be used for pre-defined DCQL queries or OpenID Connect scopes (e.g., "openid").
             state = state, // Opaque value used by the Verifier to maintain state between the request and callback.
             nonce = nonce, // String value used to mitigate replay attacks. Also used to establish holder binding.
-            responseMode = OpenID4VPResponseMode.DIRECT_POST,
+            responseMode = if (setup.encryptedResponse) OpenID4VPResponseMode.DIRECT_POST_JWT else OpenID4VPResponseMode.DIRECT_POST,
             // JAR (RFC 9101) Parameters (Section 5)
             /*
              * OPTIONAL. The Authorization Request parameters are represented as a JWT [RFC7519].
@@ -143,23 +166,49 @@ object VerificationSessionCreator {
              */
             //val expectedOrigins: List<String>? = null,
         )
+        log.trace { "Constructed AuthorizationRequest: $authorizationRequest" }
+
+        val authorizationRequestUrl = authorizationRequest.toHttpUrl(URLBuilder(uriHost))
+        val bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequest.toHttpUrl(URLBuilder(uriHost))
 
         val now = Clock.System.now()
         val expiration = now.plus(5, DateTimeUnit.MINUTE, TimeZone.UTC)
         val retentionDate = now.plus(10, DateTimeUnit.YEAR, TimeZone.UTC)
 
+        val signedAuthorizationRequest = if (isSignedRequest) {
+            requireNotNull(key)
+
+            val headers = hashMapOf<String, JsonElement>("typ" to JsonPrimitive("oauth-authz-req+jwt"))
+            if (x5c != null) headers["x5c"] = JsonArray(x5c.map { JsonPrimitive(it) })
+            if (expiration != null) headers["exp"] = JsonPrimitive(expiration.epochSeconds)
+            headers["iat"] = JsonPrimitive(now.epochSeconds)
+
+            key.signJws(Json.encodeToString(authorizationRequest).encodeToByteArray(), headers)
+        } else null
+
         val newSession = Verification2Session(
             id = sessionId,
+
             creationDate = now,
             expirationDate = expiration,
             retentionDate = retentionDate,
+
             status = if (expiration != null) VerificationSessionStatus.UNUSED else VerificationSessionStatus.ACTIVE,
+
             bootstrapAuthorizationRequest = bootstrapAuthorizationRequest,
-            bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequest.toHttpUrl(),
+            bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequestUrl,
+
             authorizationRequest = authorizationRequest,
-            authorizationRequestUrl = authorizationRequest.toHttpUrl(),
-            policies = setup.policies
+            authorizationRequestUrl = authorizationRequestUrl,
+            signedAuthorizationRequestJwt = signedAuthorizationRequest,
+
+            requestMode = if (setup.signedRequest) RequestMode.REQUEST_URI_SIGNED else RequestMode.REQUEST_URI,
+
+            policies = setup.policies,
+            notifications = setup.notifications,
+            redirects = setup.redirects
         )
+        log.trace { "New Verification2Session: $newSession" }
 
         return newSession
     }

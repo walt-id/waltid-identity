@@ -71,11 +71,24 @@ data class Verification2Session(
     val authorizationRequest: AuthorizationRequest,
     val authorizationRequestUrl: Url,
 
+    val signedAuthorizationRequestJwt: String? = null,
+
+    /**
+     * OpenID4VP configuration for this Verification Session
+     */
+    val requestMode: RequestMode,
+
+    /**
+     * Policies
+     */
     val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
     var policyResults: PolicyResults? = null,
 
     val redirects: VerificationSessionRedirects? = null,
 
+    /**
+     * Presented data
+     */
     var presentedRawData: PresentedRawData? = null,
     var presentedCredentials: Map<String, List<DigitalCredential>>? = null
 ) {
@@ -108,8 +121,8 @@ data class Verification2Session(
 
     @Serializable
     data class VerificationSessionRedirects(
-        val successRedirectUri: String,
-        val errorRedirectUri: String
+        val successRedirectUri: String? = null,
+        val errorRedirectUri: String? = null
     )
 
 
@@ -131,9 +144,39 @@ data class Verification2Session(
     fun toSessionCreationResponse(): VerificationSessionCreationResponse {
         return VerificationSessionCreationResponse(
             sessionId = id,
-            bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequest.toHttpUrl().toString(),
-            fullAuthorizationRequestUrl = authorizationRequest.toHttpUrl().toString(),
+            bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequestUrl,
+            fullAuthorizationRequestUrl = authorizationRequestUrl,
             creationTarget = null
         )
+    }
+
+    enum class RequestMode {
+        /**
+         * All parameters in the query string, unsigned.
+         * Use only for simple, same-device flows (or not at all)
+         */
+        URL_ENCODED,
+
+        /**
+         * Signed Request by Value (can Authenticate the Verifier).
+         */
+        URL_ENCODED_SIGNED,
+
+        /**
+         * Unsigned Request by Reference
+         * Always use for cross-device flows (QR codes), large requests
+         */
+        REQUEST_URI,
+
+        /**
+         * Signed Request by Reference
+         * Always use for cross-device flows (QR codes), large requests
+         */
+        REQUEST_URI_SIGNED,
+
+        /**
+         * Data object passed to a platform API (optionally signed)
+         */
+        DC_API
     }
 }
