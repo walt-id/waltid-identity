@@ -24,7 +24,7 @@ import org.kotlincrypto.macs.hmac.sha2.HmacSHA256
  */
 object MdocCrypto {
 
-    private val log = KotlinLogging.logger {  }
+    private val log = KotlinLogging.logger { }
 
     private val sha256 = SHA256()
     private val sha384 = SHA384()
@@ -34,6 +34,7 @@ object MdocCrypto {
         "SHA-384" to sha384,
         "SHA-512" to sha512
     )
+
     fun isSupportedDigest(mdocDigestAlgorithm: String) = mdocDigestTable.containsKey(mdocDigestAlgorithm)
 
     fun ByteArray.digest(digestAlgorithm: String): ByteArray {

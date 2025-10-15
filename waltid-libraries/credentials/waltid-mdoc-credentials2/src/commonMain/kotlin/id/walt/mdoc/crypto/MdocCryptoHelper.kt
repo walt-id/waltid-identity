@@ -9,7 +9,6 @@ import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.handover.OpenID4VPHandover
 import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
-import id.walt.mdoc.objects.wrapInCborTag
 import id.walt.mdoc.verification.VerificationContext
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -73,8 +72,18 @@ object MdocCryptoHelper {
             docType = docType,
             namespaces = namespaces
         )
-        // This payload is itself wrapped in a CBOR tag for the signature process
-        return coseCompliantCbor.encodeToByteArray(deviceAuth).wrapInCborTag(24)
+        log.trace { "Built DeviceAuthentication: $deviceAuth" }
+
+        // 1. Encode the DeviceAuthentication object into its raw CBOR array bytes.
+        // This produces the bytes starting with 0x84...
+        val deviceAuthCborArrayBytes = coseCompliantCbor.encodeToByteArray(deviceAuth)
+
+        // 2. Wrap the resulting array bytes inside a CBOR byte string.
+        // kotlinx.serialization does this automatically when encoding a ByteArray.
+        val cborByteString = coseCompliantCbor.encodeToByteArray(deviceAuthCborArrayBytes)
+
+        // 3. Prepend the CBOR Tag for #6.24 (which is 0xd8 0x18).
+        return byteArrayOf(0xd8.toByte(), 24.toByte()) + cborByteString
     }
 
     /**

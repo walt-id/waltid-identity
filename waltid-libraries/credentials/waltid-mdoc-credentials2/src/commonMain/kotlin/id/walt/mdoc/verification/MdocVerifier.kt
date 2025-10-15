@@ -1,5 +1,6 @@
 package id.walt.mdoc.verification
 
+import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseVerifier
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.jwk.JWKKey
@@ -14,6 +15,7 @@ import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.parser.MdocParser
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.ExperimentalTime
 
@@ -34,6 +36,7 @@ object MdocVerifier {
         val document = MdocParser.parseToDocument(mdocString)
         val sessionTranscript = MdocCryptoHelper.reconstructOid4vpSessionTranscript(context)
         log.trace { "SessionTranscript: $sessionTranscript" }
+        log.trace { "SessionTranscript (hex): ${coseCompliantCbor.encodeToHexString(sessionTranscript)}" }
         return verify(document, sessionTranscript)
     }
 
