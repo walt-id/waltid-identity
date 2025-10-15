@@ -242,7 +242,7 @@ object Verifier2ReceivedCredentialHandler {
             if (!allPresentationsValid) break // If one queryId fails, stop processing others
         } // End loop over vpTokenContents
 
-        session.updateSession(SessionEvent.attempted_presentation) {
+        session.updateSession(SessionEvent.validated_credentials_available) {
             presentedCredentials = allSuccessfullyValidatedAndProcessedData
         }
 
