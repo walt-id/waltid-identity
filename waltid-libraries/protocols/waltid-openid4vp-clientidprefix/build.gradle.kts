@@ -65,8 +65,12 @@ kotlin {
                 implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.8.0"))
                 implementation("org.kotlincrypto.hash:sha2")
 
-                // CBOR
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
+                // Temp
+                // Bouncy Castle
+                implementation("org.bouncycastle:bcprov-lts8on:2.73.8")
+                implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
+                // JOSE
+                implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
 
                 /*
                  * walt.id:
@@ -76,6 +80,19 @@ kotlin {
                 implementation(project(":waltid-libraries:credentials:waltid-verification-policies2"))
                 implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
                 implementation(project(":waltid-libraries:web:waltid-ktor-notifications-core"))
+                implementation(project(":waltid-libraries:waltid-did"))
+            }
+        }
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+            }
+        }
+        val jvmTest by getting {
+            dependencies {
+                // Logging
+                implementation("org.slf4j:slf4j-simple:2.0.16")
             }
         }
     }
