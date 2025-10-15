@@ -59,7 +59,9 @@ class E2ETest(
     var numTests = 0
     val testResults = ArrayList<Result<Any?>>()
     val testNames = HashMap<Int, String>()
-    val t = Terminal(ansiLevel = AnsiLevel.TRUECOLOR)
+    companion object {
+        val t = Terminal(ansiLevel = AnsiLevel.TRUECOLOR)
+    }
 
     fun getBaseURL() = "http://$host:$port"
 
