@@ -6,6 +6,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging.logger
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -63,6 +64,9 @@ class ExternalEVPForwardPolicy : CredentialWrapperValidatorPolicy() {
             val response = client.post(url) {
                 header(HttpHeaders.ContentType, ContentType.Application.Any)
                 setBody(evpJwt)
+                timeout {
+                    requestTimeoutMillis = 30 * 1000
+                }
             }
 
             logger.debug { "External EVP Forward Policy: response status: ${response.status}" }
