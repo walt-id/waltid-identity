@@ -24,6 +24,10 @@ object JwtDocs {
                     IssuanceExamples.universityDegreeIssuanceCredentialExample
                 )
                 example(
+                    "OpenBadgeCredential example - PreAuthIssuance With TxCode",
+                    IssuanceExamples.openBadgeCredentialIssuanceExampleWithTxCode
+                )
+                example(
                     "OpenBadgeCredential example with Authorization Code Flow and Id Token",
                     IssuanceExamples.openBadgeCredentialIssuanceExampleWithIdToken
                 )
