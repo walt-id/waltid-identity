@@ -1,0 +1,84 @@
+name: Deploy Helm Chart to K8s
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "release version"
+        required: true
+        type: string
+      namespace:
+        description: "namespace"
+        required: true
+        type: string
+      kubeconfig_secret:
+        description: "The name of the kubeconfig secret to use (defaults to 'AKS_KUBE_CONFIG')"
+        required: false
+        type: string
+        default: "AKS_KUBE_CONFIG"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout waltid-identity
+        uses: actions/checkout@v4
+        with:
+          repository: walt-id/waltid-identity
+          ref: ${{ github.ref_name }}
+      - name: Checkout waltid-helm-charts
+        uses: actions/checkout@v4
+        with:
+          repository: walt-id/waltid-helm-charts
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          path: "waltid-helm-charts"
+
+      - name: Create namespace if not exists
+        uses: actions-hub/kubectl@master
+        continue-on-error: true
+        env:
+          KUBE_CONFIG: ${{ secrets[inputs.kubeconfig_secret] }}
+        with:
+          args: create namespace ${{ inputs.namespace }}
+
+      - name: Update domains and image name in helm-values.json
+        run: |
+          IMAGE_NAME="${{ inputs.version }}"
+          NAMESPACE="${{ inputs.namespace }}"
+
+          # Locate the helm-values.json from the checked-out waltid-identity repo
+          HELM_VALUES_PATH="./.github/workflows/data/helm-values.json"
+
+          # Check if the file exists
+          if [ ! -f "$HELM_VALUES_PATH" ]; then
+            echo "Error: helm-values.json not found at path $HELM_VALUES_PATH"
+            exit 1
+          fi
+
+          # Copy the file to modify it
+          cp $HELM_VALUES_PATH helm-values.json
+
+          sed -i 's#"authConf": .*#"authConf": ${{ secrets.WALLET_AUTH_SECRET }}#g' helm-values.json
+
+          # Update domain names in the file
+          sed -i "s/issuer\.portal\.test\.waltid\.cloud/issuer.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
+          sed -i "s/verifier\.portal\.test\.waltid\.cloud/verifier.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
+          sed -i "s/wallet\.test\.waltid\.cloud/wallet.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
+          sed -i "s/portal\.test\.waltid\.cloud/portal.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
+          sed -i "s/wallet-dev\.test\.waltid\.cloud/wallet-dev.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
+
+          # Update image name in helm-values.json
+          sed -i "s|\"latest\"|\"${IMAGE_NAME}\"|g" helm-values.json
+      - uses: azure/setup-helm@v4.3.0
+      - name: Create kubeconfig file
+        run: echo "${{ secrets[inputs.kubeconfig_secret] }}" | base64 --decode > ${{ github.workspace }}/kubeconfig
+      - name: Helm Dependency Build
+        run: |
+          helm dependency build waltid-helm-charts/waltid
+      - name: Helm Deploy
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+        run: |
+          helm upgrade --install waltid-helm-release waltid-helm-charts/waltid \
+            --namespace ${{ inputs.namespace }} \
+            -f helm-values.json
