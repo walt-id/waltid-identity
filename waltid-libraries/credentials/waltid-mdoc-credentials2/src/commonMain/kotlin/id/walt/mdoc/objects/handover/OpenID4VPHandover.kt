@@ -21,7 +21,7 @@ import kotlinx.serialization.cbor.CborArray
 @Serializable
 @CborArray
 data class OpenID4VPHandover(
-    val identifier: String = "OpenID4VPHandover",
+    val identifier: String, // "OpenID4VPHandover"
     @ByteString
     val infoHash: ByteArray
 ) {
@@ -73,6 +73,7 @@ data class OpenID4VPHandover(
 @CborArray
 data class OpenID4VPHandoverInfo(
     val clientId: String,
+
     val nonce: String,
     @ByteString
     val jwkThumbprint: ByteArray?, // Null if response is not encrypted

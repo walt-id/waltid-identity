@@ -32,6 +32,17 @@ import kotlinx.serialization.cbor.ValueTags
 @CborArray
 @ConsistentCopyVisibility
 data class SessionTranscript private constructor(
+    // WORKAROUND: These nullable Int properties are a hack to correctly serialize null
+    // for the ByteArray properties above in OID4VP/DCAPI flows when using `encodeDefaults = false`.
+    // The factory methods correctly set them to null when the corresponding ByteArray should be omitted.
+    @ByteString
+    @ValueTags(CBOR_ENCODED_DATA)
+    val deviceEngagementBytes: ByteArray? = null,
+
+    @ByteString
+    @ValueTags(CBOR_ENCODED_DATA)
+    val eReaderKeyBytes: ByteArray? = null,
+
     /** null -> for OID4VP with ISO/IEC 18013-7 or for QR Handover */
     val deviceEngagementBytesOid: Int? = 42,
 
@@ -45,17 +56,6 @@ data class SessionTranscript private constructor(
     /** null this or [oid4VPHandover] or deviceEngagementBytesOid -> for QR engagement */
     val nfcHandover: NFCHandover? = null,
     val dcapiHandover: DCAPIHandover? = null,
-
-    // WORKAROUND: These nullable Int properties are a hack to correctly serialize null
-    // for the ByteArray properties above in OID4VP/DCAPI flows when using `encodeDefaults = false`.
-    // The factory methods correctly set them to null when the corresponding ByteArray should be omitted.
-    @ByteString
-    @ValueTags(CBOR_ENCODED_DATA)
-    val deviceEngagementBytes: ByteArray? = null,
-
-    @ByteString
-    @ValueTags(CBOR_ENCODED_DATA)
-    val eReaderKeyBytes: ByteArray? = null,
 ) {
     init {
         // This check validates that only one type of handover is present, or none for QR.

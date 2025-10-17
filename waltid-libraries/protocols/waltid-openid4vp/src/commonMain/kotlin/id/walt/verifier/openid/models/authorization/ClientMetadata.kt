@@ -2,6 +2,7 @@ package id.walt.verifier.openid.models.authorization
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -14,7 +15,7 @@ data class ClientMetadata(
      * OPTIONAL. A JSON Web Key Set [RFC7517] that contains one or more public keys,
      * such as those used by the Wallet for response encryption.
      */
-    val jwks: JsonObject? = null, // Representing a JWKSet as a JsonObject for flexibility
+    val jwks: Jwks? = null, // Representing a JWKSet as a JsonObject for flexibility
 
     /**
      * REQUIRED when not available to the Wallet via another mechanism.
@@ -44,4 +45,18 @@ data class ClientMetadata(
     @SerialName("logo_uri")
     val logoUri: String? = null,
     // ... etc.
-)
+) {
+    /** keys are JWK */
+    @Serializable
+    data class Jwks(val keys: List<JsonObject>)
+
+    companion object {
+        private val jsonParser = Json { ignoreUnknownKeys = true }
+        fun fromJson(jsonString: String): Result<ClientMetadata> {
+            return runCatching {
+                jsonParser.decodeFromString<ClientMetadata>(jsonString)
+            }
+        }
+    }
+
+}

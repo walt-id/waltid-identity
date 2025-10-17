@@ -26,6 +26,7 @@ object MdocPresentationValidator {
         requireNotNull(responseUri) { "Response uri is required for mdoc presentation validation" }
 
         val verificationContext = VerificationContext(expectedNonce, expectedAudience, responseUri)
+        log.trace { "Validating Mdoc presentation, with verification context: $verificationContext" }
 
         val verificationResult = MdocVerifier.verify(mdocBase64UrlString, verificationContext)
 

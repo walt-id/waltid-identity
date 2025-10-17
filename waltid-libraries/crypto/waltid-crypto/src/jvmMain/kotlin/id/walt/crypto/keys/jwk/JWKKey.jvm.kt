@@ -54,7 +54,7 @@ actual class JWKKey actual constructor(
 ) : Key() {
 
     @Transient
-    private lateinit var _internalJwk: JWK
+    lateinit var _internalJwk: JWK
 
     init {
         if (jwk != null) {

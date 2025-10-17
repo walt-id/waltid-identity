@@ -29,7 +29,7 @@ import kotlinx.serialization.cbor.ValueTags
 @CborArray
 data class DeviceAuthentication(
     /** `DeviceAuthentication` */
-    val type: String,
+    val type: String, // Normal text string (not bytestring)
 
     val sessionTranscript: SessionTranscript,
     /** Same as in [Document.docType] */
@@ -39,4 +39,10 @@ data class DeviceAuthentication(
 
     @ValueTags(24U)
     val namespaces: ByteStringWrapper<DeviceNameSpaces>,
-)
+) {
+
+    companion object {
+        val DEVICE_AUTHENTICATION_TYPE = "DeviceAuthentication" // Not a bytestring
+    }
+
+}

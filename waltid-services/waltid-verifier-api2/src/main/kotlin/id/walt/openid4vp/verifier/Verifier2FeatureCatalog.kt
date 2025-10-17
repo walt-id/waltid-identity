@@ -6,7 +6,7 @@ import id.walt.commons.featureflag.ServiceFeatureCatalog
 
 object Verifier2FeatureCatalog : ServiceFeatureCatalog {
 
-    private val verifierService =
+    val verifierService =
         BaseFeature("verifier-service", "Verifier Service Implementation", OSSVerifier2ServiceConfig::class)
 
     //val entra = OptionalFeature("entra", "Enable Microsoft Entra support", EntraConfig::class, false)

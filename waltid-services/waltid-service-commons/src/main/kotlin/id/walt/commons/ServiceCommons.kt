@@ -25,6 +25,7 @@ data class ServiceInitialization(
     val featureAmendments: Map<AbstractFeature, suspend () -> Unit> = emptyMap(),
     val init: suspend () -> Unit,
     val run: suspend () -> Unit,
+    val pre: (suspend () -> Unit)? = null
 ) {
     constructor(
         features: ServiceFeatureCatalog,
@@ -54,6 +55,19 @@ object ServiceCommons {
             FeatureManager.load(init.featureAmendments)
         }.also {
             log.info { "Feature initialization completed ($it)." }
+        }
+    }
+
+    private suspend fun preloadService(init: ServiceInitialization) {
+        if (init.pre != null) {
+            val log = logger("Service-Preload")
+            log.info { "Preloading $serviceString..." }
+
+            measureTime {
+                init.pre.invoke()
+            }.also {
+                log.info { "Service preloading completed ($it)." }
+            }
         }
     }
 
@@ -91,6 +105,7 @@ object ServiceCommons {
         log.debug { debugLineString() }
 
         measureTime {
+            preloadService(init)
             initFeatures(init)
             initService(init)
             runService(init)

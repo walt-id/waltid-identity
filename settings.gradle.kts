@@ -23,7 +23,7 @@ val modules = listOfNotNull(
         "waltid-crypto-ios" whenEnabled enableIosBuild,
         "waltid-target-ios" whenEnabled enableIosBuild,
         "waltid-target-ios:implementation" whenEnabled enableIosBuild,
-        "waltid-crypto2",
+        //"waltid-crypto2",
         "waltid-cose",
     ),
 
@@ -45,6 +45,8 @@ val modules = listOfNotNull(
 
         "waltid-openid4vp",
         "waltid-openid4vp-verifier",
+        "waltid-openid4vp-verifier-openapi",
+        "waltid-openid4vp-clientidprefix",
         "waltid-openid4vp-wallet"
     ),
 
@@ -89,6 +91,7 @@ val modules = listOfNotNull(
     // Service tests
     "$services:waltid-e2e-tests",
     "$services:waltid-integration-tests",
+    "$services:waltid-openid4vp-conformance-runners",
 
     // CLI
     "$applications:waltid-cli",

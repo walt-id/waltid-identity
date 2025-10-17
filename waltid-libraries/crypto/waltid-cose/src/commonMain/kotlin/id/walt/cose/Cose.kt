@@ -2,6 +2,7 @@
 
 package id.walt.cose
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
@@ -23,6 +24,10 @@ data class CoseSign1(
     @ByteString val payload: ByteArray?,
     @ByteString val signature: ByteArray,
 ) : CoseMessage {
+
+    override fun toString(): String {
+        return "[CoseSign1: protected(hex)=${protected.toHexString()}, unprotected=$unprotected, payload(hex)=${payload?.toHexString()}, signature(hex)=${signature.toHexString()}]"
+    }
 
     inline fun <reified T> decodePayload(): T {
         return coseCompliantCbor.decodeFromByteArray<T>(payload!!)
@@ -57,6 +62,7 @@ data class CoseSign1(
      */
     suspend fun verify(verifier: CoseVerifier, externalAad: ByteArray = byteArrayOf()): Boolean {
         val dataToVerify = buildSignatureStructure(protected, payload, externalAad)
+        log.trace { "COSE_Sign1 - Verify: Data to verify [signature structure] (hex): ${dataToVerify.toHexString()}" }
         return verifier.verify(dataToVerify, signature)
     }
 
@@ -67,6 +73,8 @@ data class CoseSign1(
     suspend fun verifyDetached(verifier: CoseVerifier, detachedPayload: ByteArray, externalAad: ByteArray = byteArrayOf()): Boolean {
         require(payload == null) { "COSE_Sign1 payload must be null for detached signature verification." }
         val dataToVerify = buildSignatureStructure(protected, detachedPayload, externalAad)
+        log.trace { "COSE_Sign1 - Verify detached: Data to verify [signature structure] (hex): ${dataToVerify.toHexString()}" }
+
         return verifier.verify(dataToVerify, signature)
     }
 
@@ -84,6 +92,8 @@ data class CoseSign1(
     }
 
     companion object {
+        private val log = KotlinLogging.logger { }
+
         /**
          * Decodes a CoseSign1 object from its tagged CBOR representation.
          * The CBOR tag for a COSE Single Signer Data Object is 18.
