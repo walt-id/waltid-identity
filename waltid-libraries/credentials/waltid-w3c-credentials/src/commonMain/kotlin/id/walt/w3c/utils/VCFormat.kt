@@ -14,5 +14,8 @@ enum class VCFormat(val value: String) {
   jwt_vc_json("jwt_vc_json"),
   jwt_vp_json("jwt_vp_json"),
   mso_mdoc("mso_mdoc"),
-  @SerialName("vc+sd-jwt") sd_jwt_vc("vc+sd-jwt")
+  @SerialName("dc+sd-jwt")
+  sd_jwt_dc("dc+sd-jwt"),
+  @SerialName("vc+sd-jwt")
+  sd_jwt_vc("vc+sd-jwt")
 }
