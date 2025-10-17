@@ -583,7 +583,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         val openBadgeNoDisclosuresWalletCredentialId =
             defaultWalletApi.claimCredential(offerUrl).first().id
 
-        val sessionId = Uuid.Companion.random().toString()
+        val sessionId = Uuid.random().toString()
         val presentationUrl = verifierApi.verify(openBadgeNoDisclosurePresentationRequest, sessionId)
             .assertContainsPresentationDefinitionUri()
         defaultWalletApi.usePresentationRequest(
