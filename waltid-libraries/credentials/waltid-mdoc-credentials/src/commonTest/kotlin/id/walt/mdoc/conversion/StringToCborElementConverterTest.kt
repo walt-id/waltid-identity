@@ -4,6 +4,8 @@ package id.walt.mdoc.conversion
 
 import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.FullDateElement
+import id.walt.mdoc.dataelement.NumberElement
+import id.walt.mdoc.dataelement.StringElement
 import id.walt.mdoc.dataelement.TDateElement
 import id.walt.mdoc.dataelement.json.StringToCborElementConverter
 import id.walt.mdoc.dataelement.json.StringToCborTypeConversion
@@ -89,6 +91,47 @@ class StringToCborElementConverterTest {
                     conversionHint = StringToCborTypeConversion.BASE64URL_STRING_TO_BYTE_STRING,
                 )
             }
+        }
+    }
+
+    @Test
+    fun testStringToStringConversion() {
+        val inputString = "101"
+        val dataElement = StringToCborElementConverter.convert(
+            s = inputString,
+            conversionHint = StringToCborTypeConversion.STRING_TO_STRING,
+        )
+        val fullDateElement = assertIs<StringElement>(dataElement)
+        assertEquals(
+            expected = inputString,
+            actual = fullDateElement.value,
+        )
+    }
+
+    @Test
+    fun testValidStringToIntConversion() {
+        val input = 101
+        val inputString = input.toString()
+        val dataElement = StringToCborElementConverter.convert(
+            s = inputString,
+            conversionHint = StringToCborTypeConversion.STRING_TO_INT,
+        )
+        val fullDateElement = assertIs<NumberElement>(dataElement)
+        assertEquals(
+            expected = input,
+            actual = fullDateElement.value,
+        )
+    }
+
+    @Test
+    fun testInvalidStringToIntConversion() {
+        val input = 101.101
+        val inputString = input.toString()
+        assertFailsWith(NumberFormatException::class) {
+            StringToCborElementConverter.convert(
+                s = inputString,
+                conversionHint = StringToCborTypeConversion.STRING_TO_INT,
+            )
         }
     }
 }
