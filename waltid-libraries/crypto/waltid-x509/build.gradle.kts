@@ -48,7 +48,7 @@ kotlin {
         }
     }
     js(IR) {
-        outputModuleName = "vical"
+        outputModuleName = "x509"
         useEsModules()
         nodejs {
             generateTypeScriptDefinitions()
@@ -78,39 +78,40 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
                 // Waltid
-                implementation(project(":waltid-libraries:crypto:waltid-crypto"))
-                implementation(project(":waltid-libraries:crypto:waltid-cose"))
-
                 /*
-
-                // Ktor client
-                implementation("io.ktor:ktor-client-core:$ktor_version")
-                implementation("io.ktor:ktor-client-serialization:$ktor_version")
-                implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
-                implementation("io.ktor:ktor-client-json:$ktor_version")
-                implementation("io.ktor:ktor-client-logging:$ktor_version")
-
-                implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
-                implementation("org.kotlincrypto.hash:sha2")
-
-                // Date
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-
-                // Cache
-                implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")
-
-                // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
-
-                // Logging
-                implementation("io.github.oshai:kotlin-logging:7.0.5")
-
-                implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
+implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+implementation(project(":waltid-libraries:crypto:waltid-cose"))
 
 
-                implementation(project.dependencies.platform("org.kotlincrypto.macs:bom:0.6.1"))
-                implementation("org.kotlincrypto.macs:hmac-sha2")*/
+
+// Ktor client
+implementation("io.ktor:ktor-client-core:$ktor_version")
+implementation("io.ktor:ktor-client-serialization:$ktor_version")
+implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
+implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
+implementation("io.ktor:ktor-client-json:$ktor_version")
+implementation("io.ktor:ktor-client-logging:$ktor_version")
+
+implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
+implementation("org.kotlincrypto.hash:sha2")
+
+// Date
+implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+
+// Cache
+implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")
+
+// Coroutines
+implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+
+// Logging
+implementation("io.github.oshai:kotlin-logging:7.0.5")
+
+implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
+
+
+implementation(project.dependencies.platform("org.kotlincrypto.macs:bom:0.6.1"))
+implementation("org.kotlincrypto.macs:hmac-sha2")*/
 
             }
         }
@@ -138,6 +139,9 @@ kotlin {
 
                 implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
+
+                // Bouncy Castle
+                implementation("org.bouncycastle:bcpkix-jdk18on:1.81")
             }
         }
         val jsMain by getting {
@@ -216,8 +220,8 @@ publishing {
         create<MavenPublication>("maven") {
             from(components["kotlin"])
             pom {
-                name.set("walt.id VICAL")
-                description.set("walt.id Kotlin/Java library for VICAL")
+                name.set("walt.id X.509")
+                description.set("walt.id Kotlin/Java library X.509")
                 url.set("https://walt.id")
 
                 licenses {
