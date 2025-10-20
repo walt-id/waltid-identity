@@ -1,4 +1,4 @@
-package id.walt.openid4vp.conformance.testplans.http
+package id.walt.openid4vp.conformance.testplans.httpdata
 
 import kotlinx.serialization.Serializable
 
