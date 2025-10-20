@@ -32,7 +32,7 @@ class ExpirationDatePolicy : VerificationPolicy2() {
     }
 
     @Serializable
-    data class NotBeforePolicyClaimCheckResult(
+    data class ExpirationDateClaimCheckResult(
         val date: Instant,
 
         @SerialName("date_seconds")
@@ -71,7 +71,7 @@ class ExpirationDatePolicy : VerificationPolicy2() {
                 val expiresIn = storedDate - now
 
                 Result.success(
-                    NotBeforePolicyClaimCheckResult(
+                    ExpirationDateClaimCheckResult(
                         date = storedDate,
                         dateSeconds = storedDate.epochSeconds,
                         expiresIn = expiresIn,
