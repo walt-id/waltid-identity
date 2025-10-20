@@ -1,5 +1,6 @@
 package id.walt.openid4vp.verifier
 
+import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import id.walt.dcql.models.DcqlQuery
 import id.walt.ktornotifications.core.KtorSessionNotifications
@@ -27,7 +28,7 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
 object VerificationSessionCreator {
 
-    private val log = KotlinLogging.logger {  }
+    private val log = KotlinLogging.logger { }
 
     @Serializable
     data class VerificationSessionSetup(
@@ -41,7 +42,14 @@ object VerificationSessionCreator {
         val notifications: KtorSessionNotifications? = null,
         val redirects: VerificationSessionRedirects? = null,
 
-        val policies: DefinedVerificationPolicies = DefinedVerificationPolicies()
+        val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
+
+        val clientMetadata: ClientMetadata? = null,
+        val clientId: String? = null,
+        val urlPrefix: String? = null,
+        val urlHost: String? = null,
+        val key: DirectSerializedKey? = null,
+        val x5c: List<String>? = null
     ) {
         @Serializable
         enum class VerificationSessionSetupPreset {
@@ -66,8 +74,8 @@ object VerificationSessionCreator {
 
         clientId: String,
         clientMetadata: ClientMetadata? = null,
-        uriPrefix: String,
-        uriHost: String = "openid4vp://authorize",
+        urlPrefix: String,
+        urlHost: String = "openid4vp://authorize",
 
         key: Key? = null,
         x5c: List<String>? = null,
@@ -101,7 +109,7 @@ object VerificationSessionCreator {
 
         val bootstrapAuthorizationRequest = AuthorizationRequest(
             // TODO: url building (handle host alias)
-            requestUri = "$uriPrefix/$sessionId/request",
+            requestUri = "$urlPrefix/$sessionId/request",
 
             /*
              * OPTIONAL. A string determining the HTTP method to be used when 'request_uri' is present.
@@ -121,7 +129,7 @@ object VerificationSessionCreator {
             clientId = clientId,
             redirectUri = null, // For Same-Device flow (fragment/query/after code exchange etc)
             // TODO: url building (handle host alias)
-            responseUri = "$uriPrefix/$sessionId/response", // For Cross-Device flow (direct_post, direct_post.jwt)
+            responseUri = "$urlPrefix/$sessionId/response", // For Cross-Device flow (direct_post, direct_post.jwt)
             scope = null,//OPTIONAL. OAuth 2.0 Scope value. Can be used for pre-defined DCQL queries or OpenID Connect scopes (e.g., "openid").
             state = state, // Opaque value used by the Verifier to maintain state between the request and callback.
             nonce = nonce, // String value used to mitigate replay attacks. Also used to establish holder binding.
@@ -168,8 +176,8 @@ object VerificationSessionCreator {
         )
         log.trace { "Constructed AuthorizationRequest: $authorizationRequest" }
 
-        val authorizationRequestUrl = authorizationRequest.toHttpUrl(URLBuilder(uriHost))
-        val bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequest.toHttpUrl(URLBuilder(uriHost))
+        val authorizationRequestUrl = authorizationRequest.toHttpUrl(URLBuilder(urlHost))
+        val bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequest.toHttpUrl(URLBuilder(urlHost))
 
         val now = Clock.System.now()
         val expiration = now.plus(5, DateTimeUnit.MINUTE, TimeZone.UTC)

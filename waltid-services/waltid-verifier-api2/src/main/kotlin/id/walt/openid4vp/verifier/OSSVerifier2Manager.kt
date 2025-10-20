@@ -18,12 +18,12 @@ object OSSVerifier2Manager {
     ): Verification2Session {
         val newSession = VerificationSessionCreator.createVerificationSession(
             setup = setup,
-            clientId = clientId ?: config.clientId,
-            clientMetadata = clientMetadata ?: config.clientMetadata,
-            uriPrefix = uriPrefix ?: config.urlPrefix,
-            uriHost = config.urlHost,
-            key = config.key?.let { KeyManager.resolveSerializedKey(it) },
-            x5c = config.x5c?.let { listOf(it) }
+            clientId = clientId ?: setup.clientId ?: config.clientId,
+            clientMetadata = clientMetadata ?: setup.clientMetadata ?: config.clientMetadata,
+            urlPrefix = uriPrefix ?: setup.urlPrefix ?: config.urlPrefix,
+            urlHost = setup.urlHost ?: config.urlHost,
+            key = setup.key?.key ?: config.key?.let { KeyManager.resolveSerializedKey(it) },
+            x5c = setup.x5c ?: config.x5c?.let { listOf(it) }
         )
 
         return newSession
