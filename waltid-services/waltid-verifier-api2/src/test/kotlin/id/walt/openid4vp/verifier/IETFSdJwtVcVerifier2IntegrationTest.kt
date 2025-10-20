@@ -382,7 +382,7 @@ class IETFSdJwtVcVerifier2IntegrationTest {
                 assertTrue { presentationResult.isSuccess }
 
                 val resp = presentationResult.getOrThrow().jsonObject
-                assertTrue { resp["transmission_success"]!!.jsonPrimitive.boolean }
+                assertTrue("Transmission success is false") { resp["transmission_success"]!!.jsonPrimitive.boolean }
                 assertTrue { resp["verifier_response"]!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
             }
 
