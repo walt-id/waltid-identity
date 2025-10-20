@@ -18,8 +18,10 @@ sealed class DigitalCredential {
     abstract val signed: String?
 
     abstract var issuer: String?
+
     abstract var subject: String?
 
+    abstract suspend fun getIssuerKey(): Key?
     abstract suspend fun verify(publicKey: Key): Result<JsonElement>
     //fun sign()
 }

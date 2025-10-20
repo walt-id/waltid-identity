@@ -37,6 +37,11 @@ data class MdocsCredential(
     override var subject: String? = null,
 ) : DigitalCredential() {
     override val format: String = "mso_mdoc"
+    override suspend fun getIssuerKey(): Key? {
+        val issuerVirtualDid = issuer ?: throw IllegalArgumentException("Missing virtual issuer DID")
+        val issuerKey = issuerDidResolver.resolveToKey(issuerVirtualDid).getOrThrow()
+        return issuerKey
+    }
 
     companion object {
         private val log = KotlinLogging.logger { }
