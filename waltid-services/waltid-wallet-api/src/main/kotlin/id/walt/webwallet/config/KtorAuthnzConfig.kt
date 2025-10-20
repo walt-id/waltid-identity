@@ -36,13 +36,29 @@ data class KtorAuthnzConfig(
      * */
     val hashMigrations: Map<PasswordHashingAlgorithm?, PasswordHashingAlgorithm> = emptyMap(),
 
-    /** (waltid-crypto) Key for signing the login token */
-    val signingKey: JsonObject?,
-    /** (waltid-crypto) Key for verifying received login tokens */
-    val verificationKey: JsonObject,
+    val tokenType: AuthnzTokens = AuthnzTokens.STORE_IN_MEMORY,
 
-    val cookieDomain: String?
+    /** (waltid-crypto) Key for signing the login token */
+    val signingKey: JsonObject? = null,
+    /** (waltid-crypto) Key for verifying received login tokens */
+    val verificationKey: JsonObject? = null,
+
+    val cookieDomain: String?,
+
+    val valkeyUnixSocket: String? = null,
+    val valkeyHost: String? = "127.0.0.1",
+    val valkeyPort: Int? = 6379,
+    val valkeyRetention: String? = "7d",
+
+    val valkeyAuthUsername: String? = null,
+    val valkeyAuthPassword: String? = null,
 ) {
     val configuredSigningKey by lazy { signingKey?.let { KeyManager.resolveSerializedKeyBlocking(it.toString()) } }
     val configuredVerificationKey by lazy { KeyManager.resolveSerializedKeyBlocking(verificationKey.toString()) }
+
+    enum class AuthnzTokens {
+        JWT,
+        STORE_IN_MEMORY,
+        STORE_VALKEY
+    }
 }

@@ -75,6 +75,7 @@ data class CredentialTypeConfig(
         ),
         "Visa" to vc("VerifiableCredential", "VerifiableAttestation", "Visa"),
         "eID" to vc("VerifiableCredential", "VerifiableAttestation", "eID"),
+        "TaxCredential" to vc("VerifiableCredential", "TaxCredential"),
         "NaturalPersonVerifiableID" to vc("VerifiableCredential", "VerifiableAttestation", "NaturalPersonVerifiableID"),
         "BoardingPass" to vc("VerifiableCredential", "VerifiableAttestation", "BoardingPass"),
         "LegalPerson" to vc("VerifiableCredential", "LegalPerson"),

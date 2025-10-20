@@ -8,7 +8,9 @@ import kotlin.uuid.Uuid
 
 class KtorAuthNzTokenHandler : TokenHandler {
 
-    var tokenStore = InMemoryKtorAuthNzTokenStore()
+    override val name = "token-authnz"
+
+    var tokenStore: KtorAuthnzTokenStore = InMemoryKtorAuthNzTokenStore()
 
     @OptIn(ExperimentalUuidApi::class)
     override suspend fun generateToken(session: AuthSession): String {
