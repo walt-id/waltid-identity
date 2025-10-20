@@ -151,7 +151,7 @@ class TwoWalletsIssueCredentialIntegrationTest : AbstractIntegrationTest() {
 
     @Test
     @Order(4)
-    fun shouldNotBeAbleToTakeForignWallet() = runTest {
+    fun shouldNotBeAbleToTakeForeignWallet() = runTest {
         val evilWallet = walletContainerA.selectWallet(walletB.walletId)
         evilWallet.listCredentialsRaw().also { response ->
             response.expectError()
