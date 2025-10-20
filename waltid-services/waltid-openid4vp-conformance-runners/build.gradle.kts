@@ -10,6 +10,7 @@ object Versions {
 
 plugins {
     kotlin("jvm")
+    kotlin("plugin.power-assert")
     kotlin("plugin.serialization")
 
     id("io.ktor.plugin") version "3.2.2" // Versions.KTOR_VERSION
@@ -95,9 +96,11 @@ dependencies {
 
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
-    testImplementation(project(":waltid-services:waltid-service-commons-test"))
     testApi(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
     testImplementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
+
+    implementation(project(":waltid-services:waltid-service-commons-test"))
+    implementation(project(":waltid-services:waltid-verifier-api2"))
 
     api(project(":waltid-libraries:credentials:waltid-dcql"))
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
@@ -246,4 +249,16 @@ ktor {
             }
         }
     }
+}
+
+
+powerAssert {
+    includedSourceSets = listOf("main", "test")
+    functions = listOf(
+        // kotlin.test
+        "kotlin.assert", "kotlin.test.assertEquals", "kotlin.test.assertNull", "kotlin.test.assertTrue", "kotlin.test.assertFalse",
+
+        // checks
+        "kotlin.require", "kotlin.check"
+    )
 }
