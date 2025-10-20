@@ -1,4 +1,3 @@
-// jvmMain/kotlin/com/example/x509/X509ChainJvm.kt
 package id.walt.x509
 
 import java.io.ByteArrayInputStream
@@ -14,6 +13,7 @@ fun CertificateDer.toX509(): X509Certificate =
 actual fun parseX5cBase64(x5cBase64: List<String>): List<CertificateDer> =
     x5cBase64.map { CertificateDer(Base64.getDecoder().decode(it)) }
 
+@Throws(X509ValidationException::class)
 actual fun validateCertificateChain(
     leaf: CertificateDer,
     chain: List<CertificateDer>,
@@ -47,13 +47,12 @@ actual fun validateCertificateChain(
 
         val params = PKIXBuilderParameters(anchors, selector).apply {
             addCertStore(store)
-            isRevocationEnabled = enableRevocation // requires JVM flags for OCSP/CRL, see notes.
+            isRevocationEnabled = enableRevocation // requires JVM flags for OCSP/CRL.
         }
 
         val builder = CertPathBuilder.getInstance("PKIX")
         val result = builder.build(params) as PKIXCertPathBuilderResult
 
-        // Validate (catches policy/name constraints, etc.)
         val validator = CertPathValidator.getInstance("PKIX")
         validator.validate(result.certPath, params)
     } catch (e: CertPathBuilderException) {
