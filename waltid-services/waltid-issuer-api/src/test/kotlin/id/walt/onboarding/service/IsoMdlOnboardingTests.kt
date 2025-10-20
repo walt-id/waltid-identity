@@ -66,11 +66,11 @@ class IsoMdlOnboardingTests {
 
         assertEquals("US", cert.issuerX500Principal.name.substringAfter("C=").take(2))
         assertEquals(cert.subjectX500Principal, cert.issuerX500Principal) // self-signed
-        assertTrue(cert.basicConstraints == 0) // Is a CA
+        assertEquals(cert.basicConstraints, 0) // Is a CA
         assertTrue(cert.keyUsage[5]) // keyCertSign
         assertTrue(cert.keyUsage[6]) // cRLSign
         assertNotNull(cert.issuerAlternativeNames)
-        assertTrue(cert.issuerAlternativeNames.size == 1)
+        assertEquals(cert.issuerAlternativeNames.size, 1)
         assertTrue(cert.issuerAlternativeNames.any { it[1] == iacaOnboardingRequest.certificateData.issuerAlternativeNameConf.uri })
 
         // === CRL Distribution Point URI check ===
@@ -82,7 +82,7 @@ class IsoMdlOnboardingTests {
             actual = distPoints.isNotEmpty(),
             message = "CRL distribution point must be present",
         )
-        assertTrue(distPoints.size == 1)
+        assertEquals(distPoints.size, 1)
         val uri = distPoints[0].distributionPoint.name as GeneralNames
         val uriName = uri.names!!.find { it.tagNo == GeneralName.uniformResourceIdentifier }
         val crlUriValue = (uriName!!.name as DERIA5String).string
@@ -130,7 +130,7 @@ class IsoMdlOnboardingTests {
         assertTrue(cert.serialNumber.bitLength() >= 71, "Serial number should contain at least 71 bits of entropy")
 
         assertEquals("US", cert.subjectX500Principal.name.substringAfter("C=").take(2))
-        assertTrue(cert.basicConstraints == -1) // not a CA
+        assertEquals(cert.basicConstraints, -1) // not a CA
         assertTrue(cert.keyUsage[0]) // digitalSignature
         assertFalse(cert.keyUsage[5]) // Not a cert signer
 
@@ -150,7 +150,7 @@ class IsoMdlOnboardingTests {
             actual = distPoints.isNotEmpty(),
             message = "CRL distribution point must be present",
         )
-        assertTrue(distPoints.size == 1)
+        assertEquals(distPoints.size, 1)
         val uri = distPoints[0].distributionPoint.name as GeneralNames
         val uriName = uri.names!!.find { it.tagNo == GeneralName.uniformResourceIdentifier }
         val crlUriValue = (uriName!!.name as DERIA5String).string
