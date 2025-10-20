@@ -8,6 +8,9 @@ import id.walt.credentials.presentations.PresentationFormat
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequire
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequireNotNull
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequireSuccess
+import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationThrowError
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.ShaUtils
 import id.walt.dcql.DcqlMatcher.resolveClaimPath
@@ -16,6 +19,7 @@ import id.walt.did.dids.DidService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -42,11 +46,13 @@ data class DcSdJwtPresentation(
     val credential: DigitalCredential,
 
     // claims:
-    val holderKid: String?,
+    val cnf: JsonObject?,
+    //val holderKid: String?,
     val audience: String?,
     val nonce: String?,
     val sdHash: String?,
-    val presentationStringHashable: String
+    val presentationStringHashable: String, // If only the single hash variant is allowed
+    //val hashablePresentationStringVariants: List<String> // If multiple hash variants would be allowed
 ) : VerifiablePresentation(format = PresentationFormat.`dc+sd-jwt`) {
 
     suspend fun presentationVerification(
@@ -56,9 +62,31 @@ data class DcSdJwtPresentation(
     ) {
         // Validate Key Binding JWT
 
+        presentationRequireNotNull(cnf, DcSdJwtPresentationValidationError.MISSING_CNF)
+
         // Resolve holder's public key
-        presentationRequireNotNull(holderKid, DcSdJwtPresentationValidationError.MISSING_CNF_KID)
-        val holderKey = DidService.resolveToKey(holderKid).getOrThrow()
+        val holderKey: Key = when {
+            cnf.contains("jwk") -> {
+                val cnfJwk = cnf["jwk"]!!.jsonObject
+                val jwkKeyImportRes = JWKKey.importJWK(cnfJwk.toString())
+                val jwkKey = presentationRequireSuccess(jwkKeyImportRes, DcSdJwtPresentationValidationError.CNF_JWK_CANNOT_PARSE_JWK)
+                jwkKey
+            }
+
+            cnf.contains("kid") -> {
+                val holderKidRes = runCatching { cnf!!["kid"]!!.jsonPrimitive.content }
+                val holderKid = presentationRequireSuccess(holderKidRes, DcSdJwtPresentationValidationError.INVALID_CNF_KID)
+                val resolvedKey = presentationRequireSuccess(
+                    DidService.resolveToKey(holderKid),
+                    DcSdJwtPresentationValidationError.CNF_KID_CANNOT_RESOLVE_DID
+                )
+                resolvedKey
+            }
+
+            else -> {
+                presentationThrowError(DcSdJwtPresentationValidationError.MISSING_CNF_METHOD)
+            }
+        }
 
         // Verify the KB-JWT's signature with the holder's key
         val kbJwtVerificationResult = holderKey.verifyJws(keyBindingJwt)
@@ -80,11 +108,32 @@ data class DcSdJwtPresentation(
             DcSdJwtPresentationValidationError.MISSING_SD_HASH
         )
 
+
+        /*
+        // NOTE: This code allows for matching multiple hash variants
+        var foundHashMatch = false
+        for ((variantIdx, hashableString) in hashablePresentationStringVariants.withIndex()) {
+            val recalculatedSdHash = ShaUtils.calculateSha256Base64Url(hashableString)
+            if (sdHash == recalculatedSdHash) {
+                foundHashMatch = true
+                log.trace { "SD-JWT matches hash variant $variantIdx" }
+                break
+            } else {
+                log.trace { "Failed to match hash variant $variantIdx: recalculated $recalculatedSdHash != original $hashableString" }
+            }
+        }
+        log.trace { "Found hash match: $foundHashMatch" }
+        presentationRequire(foundHashMatch, DcSdJwtPresentationValidationError.SD_HASH_MISMATCH)
+        */
+
         // Reconstruct and verify sd_hash
         // The hash must be calculated over the presented disclosures in the exact same way the Wallet did.
-        val recalculatedSdHash = ShaUtils.calculateSha256Base64Url(presentationStringHashable)
 
+        log.trace { "Verifier received presentation: Recalculating hash for SD-JWT kb from: $presentationStringHashable" }
+        val recalculatedSdHash = ShaUtils.calculateSha256Base64Url(presentationStringHashable)
         presentationRequire(sdHash == recalculatedSdHash, DcSdJwtPresentationValidationError.SD_HASH_MISMATCH)
+
+
         log.trace { "KB-JWT validated successfully. sd_hash matches." }
 
 
@@ -116,7 +165,7 @@ data class DcSdJwtPresentation(
             // 2.1 Parse the SD-JWT core (without verifying signature yet) to get the holder's public key reference (`cnf` claim)
             val sdJwtCorePayload = sdJwtCore.decodeJws().payload
             val cnfClaim = sdJwtCorePayload["cnf"]?.jsonObject
-            val holderKid = cnfClaim?.get("kid")?.jsonPrimitive?.contentOrNull
+            //val holderKid = cnfClaim?.get("kid")?.jsonPrimitive?.contentOrNull
 
             val kbJwtPayload = kbJwt.decodeJws().payload
 
@@ -125,11 +174,36 @@ data class DcSdJwtPresentation(
             val nonce = kbJwtPayload["nonce"]?.jsonPrimitive?.contentOrNull
             val sdHash = kbJwtPayload["sd_hash"]?.jsonPrimitive?.contentOrNull
 
-            val presentationStringHashable = if (presentedDisclosures.isNotEmpty()) presentedDisclosures.joinToString("~") else ""
+            val presentedDisclosureString =
+                if (presentedDisclosures.isNotEmpty())
+                    presentedDisclosures.joinToString("~") + "~"
+                else ""
+
+            val hashablePresentationStringVariants = if (presentedDisclosures.isNotEmpty())
+                listOf(
+                    "$sdJwtCore~$presentedDisclosureString", // Valid
+                    /*
+                    // NOTE: We could enable matching other (invalid) variants here too,
+                    // e.g. if a non-compliant client was sorting the disclosures.
+                    sdJwtCore + "~" + presentedDisclosures.joinToString("~"), // Missing tilde at end
+                    sdJwtCore + "~" + presentedDisclosures.sorted().joinToString("~"), // Sorted (should not be the case)
+                    sdJwtCore + "~" + presentedDisclosures.sorted().joinToString("~") + "~", // Sorted + end suffix (should not be the case)
+                    */
+                ) else listOf("")
+
+            /*
+            // NOTE: Log the allowed hash variants
+            hashablePresentationStringVariants.forEachIndexed { index, string ->
+                log.trace { "#$index: Presentation string hashable variant allowed: $string" }
+            }
+             */
+
+            // NOTE: Right now, we only allow the "correct" hash variant
+            val hashableString = hashablePresentationStringVariants.first().replace("~~", "~")
 
             // CredentialParser needs to handle this reconstruction and validation.
             // It should verify that the digests in the `_sd` array of the core match the hashes of the provided disclosures.
-            val (_, reconstructedCredential) = CredentialParser.detectAndParse("$sdJwtCore~$presentationStringHashable")
+            val (_, reconstructedCredential) = CredentialParser.detectAndParse(hashableString)
                 ?: return Result.failure(IllegalArgumentException("Failed to parse/reconstruct credential from SD-JWT core and disclosures."))
 
             return Result.success(
@@ -138,11 +212,12 @@ data class DcSdJwtPresentation(
                     disclosures = presentedDisclosures,
                     keyBindingJwt = kbJwt,
                     credential = reconstructedCredential,
-                    holderKid = holderKid,
+                    cnf = cnfClaim,
                     audience = aud,
                     nonce = nonce,
                     sdHash = sdHash,
-                    presentationStringHashable = presentationStringHashable
+                    //hashablePresentationStringVariants = hashablePresentationStringVariants
+                    presentationStringHashable = hashableString
                 )
             )
         }
