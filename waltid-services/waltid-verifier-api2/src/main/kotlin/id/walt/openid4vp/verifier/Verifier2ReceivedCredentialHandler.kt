@@ -36,6 +36,8 @@ object Verifier2ReceivedCredentialHandler {
             Verifier2Error.MISSING_STATE_PARAMETER.throwAsError()
         }
 
+        log.debug("Received vp_token string for state $receivedState: $vpTokenString")
+
         // 1. Retrieve session data based on state (or verificationSessionId if it maps to state)
         // This session data contains the original nonce, dcql_query, and client_id, ...
         val session = verificationSession
@@ -55,7 +57,7 @@ object Verifier2ReceivedCredentialHandler {
             Verifier2Error.MALFORMED_VP_TOKEN.throwAsError()
         }
 
-        log.debug("Received vp_token for state $receivedState: $vpTokenContents")
+        log.debug("Parsed vp_token for state $receivedState: $vpTokenContents")
 
         session.updateSession(SessionEvent.attempted_presentation) {
             attempted = true
