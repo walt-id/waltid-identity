@@ -63,9 +63,7 @@ class TwoWalletsIssueCredentialIntegrationTest : AbstractIntegrationTest() {
         walletContainerApi.register(accountA)
         walletContainerApi.register(accountB)
         walletContainerA = walletContainerApi.login(accountA)
-        walletContainerA.listAccountWallets().let {
-            assertEquals(1, it.wallets.size)
-        }
+        assertEquals(1, walletContainerA.listAccountWallets().wallets.size)
         walletA = walletContainerA.selectDefaultWallet()
         walletContainerB = walletContainerApi.login(accountB)
         walletB = walletContainerB.selectDefaultWallet()
@@ -78,11 +76,11 @@ class TwoWalletsIssueCredentialIntegrationTest : AbstractIntegrationTest() {
     @Test
     @Order(1)
     fun shouldClaimCredentials() = runTest {
-        val credentialData = loadJsonResource("issuance/openbadgecredential.json").let {
-            it.toMutableMap().apply {
+        val credentialData = loadJsonResource("issuance/openbadgecredential.json")
+            .toMutableMap()
+            .apply {
                 put("id", "TEST".toJsonElement())
             }.toJsonElement().jsonObject
-        }
 
         val offerUrlA = issuerApi.issueJwtCredential(
             IssuanceRequest(
@@ -90,7 +88,7 @@ class TwoWalletsIssueCredentialIntegrationTest : AbstractIntegrationTest() {
                 issuerDid = issuerDid,
                 credentialConfigurationId = "OpenBadgeCredential_jwt_vc_json",
                 credentialData = credentialData,
-                mapping = loadJsonResource("issuance/mapping.json")
+                mapping = loadJsonResource("issuance/mapping-without-id.json")
             )
         )
         walletA.claimCredential(offerUrlA)
@@ -102,8 +100,8 @@ class TwoWalletsIssueCredentialIntegrationTest : AbstractIntegrationTest() {
                 issuerKey = issuerKey,
                 issuerDid = issuerDid,
                 credentialConfigurationId = "OpenBadgeCredential_jwt_vc_json",
-                credentialData = loadJsonResource("issuance/openbadgecredential.json"),
-                mapping = loadJsonResource("issuance/mapping.json")
+                credentialData = credentialData,
+                mapping = loadJsonResource("issuance/mapping-without-id.json")
             )
         )
         walletB.claimCredential(offerUrlB)
