@@ -457,7 +457,7 @@ object CredentialParser {
             credential.matchesHex() -> handleMdocs(credential, base64 = false)
             credential.matchesBase64Url() -> handleMdocs(credential, base64 = true)
 
-            else -> throw NotImplementedError("unknown: $credential")
+            else -> throw NotImplementedError("CredentialParser - Unknown credential, cannot parse: $credential")
         }
     }
 }
