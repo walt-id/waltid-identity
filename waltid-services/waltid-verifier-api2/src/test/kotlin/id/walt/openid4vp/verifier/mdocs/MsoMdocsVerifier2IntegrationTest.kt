@@ -90,7 +90,7 @@ class MsoMdocsVerifier2IntegrationTest {
 
     private val walletCredentials = listOf(
         MdocsCredential(
-            credentialData = Json.Default.decodeFromString(
+            credentialData = Json.decodeFromString(
                 """
                 {
                     "org.iso.18013.5.1": {
@@ -113,7 +113,7 @@ class MsoMdocsVerifier2IntegrationTest {
             signature = CoseCredentialSignature(),
         ),
         MdocsCredential(
-            credentialData = Json.Default.decodeFromString(
+            credentialData = Json.decodeFromString(
                 """
                 {
                     "org.iso.18013.5.1": {

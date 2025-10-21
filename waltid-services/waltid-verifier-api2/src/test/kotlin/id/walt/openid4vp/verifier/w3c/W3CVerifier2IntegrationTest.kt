@@ -83,7 +83,7 @@ class W3CVerifier2IntegrationTest {
     )
 
     private val walletCredentials = listOf(
-        Json.Default.decodeFromString<DigitalCredential>(
+        Json.decodeFromString<DigitalCredential>(
             """
             {
       "type": "vc-w3c_1_1",
@@ -150,7 +150,7 @@ class W3CVerifier2IntegrationTest {
         """.trimIndent()
         ),
 
-        Json.Default.decodeFromString<DigitalCredential>(
+        Json.decodeFromString<DigitalCredential>(
             """
             {
       "type": "vc-w3c_1_1",

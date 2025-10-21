@@ -29,7 +29,7 @@ object PolicyClaimChecker {
         override val claimChecked = false
 
         companion object {
-            val CLAIM_NOT_FOUND = Json.Default.encodeToJsonElement(ClaimNotFoundClaimCheckResult()).jsonObject
+            val CLAIM_NOT_FOUND = Json.encodeToJsonElement(ClaimNotFoundClaimCheckResult()).jsonObject
         }
     }
 
@@ -50,7 +50,7 @@ object PolicyClaimChecker {
         val data = credentialData.resolveOrNull(foundClaim)
             ?: throw IllegalStateException("This should not happen: claim could not be resolved the second time")
 
-        return block.invoke(data, foundClaim).map { Json.Default.encodeToJsonElement(it).jsonObject }
+        return block.invoke(data, foundClaim).map { Json.encodeToJsonElement(it).jsonObject }
     }
 
 }
