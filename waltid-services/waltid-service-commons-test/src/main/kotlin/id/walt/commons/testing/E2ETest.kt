@@ -60,7 +60,7 @@ class E2ETest(
     val testResults = ArrayList<Result<Any?>>()
     val testNames = HashMap<Int, String>()
     companion object {
-        val t = Terminal(ansiLevel = AnsiLevel.TRUECOLOR)
+        val term = Terminal(ansiLevel = AnsiLevel.TRUECOLOR)
     }
 
     fun getBaseURL() = "http://$host:$port"
@@ -119,10 +119,10 @@ class E2ETest(
         )*/
         service.main(arrayOf("-l", "trace"))
 
-        t.println("\n" + TextColors.magenta("Test results:"))
+        term.println("\n" + TextColors.magenta("Test results:"))
         testResults.forEachIndexed { index, result ->
             val name = testNames[index]!!
-            t.println(TextColors.magenta("$index. $name: ${result.toSuccessString()}"))
+            term.println(TextColors.magenta("$index. $name: ${result.toSuccessString()}"))
         }
 
         val testStats = getTestStats()
@@ -152,32 +152,32 @@ class E2ETest(
         val id = numTests++
         testNames[id] = name
 
-        t.println("\n${TextColors.cyan(TextStyles.bold("---=== Start $id. test: $name === ---"))}")
+        term.println("\n${TextColors.cyan(TextStyles.bold("---=== Start $id. test: $name === ---"))}")
 
         val result = runCatching { function.invoke() }
         if (failEarly && result.isFailure) {
-            t.println("\n${TextColors.brightRed("Fail early called for $id. test: $name")}")
+            term.println("\n${TextColors.brightRed("Fail early called for $id. test: $name")}")
             val err = result.exceptionOrNull()!!
-            t.println("Error causing fail early: ${err.stackTraceToString()}")
-            t.println()
+            term.println("Error causing fail early: ${err.stackTraceToString()}")
+            term.println()
             result.getOrThrow()
         }
 
         testResults.add(result)
 
-        t.println(TextColors.blue("End result of test \"$name\": $result"))
+        term.println(TextColors.blue("End result of test \"$name\": $result"))
 
 
         if (result.isFailure) {
             result.exceptionOrNull()!!.printStackTrace()
         }
 
-        t.println(TextStyles.bold(TextColors.cyan("---===  End  ${id}. test: $name === ---") + " " + result.toSuccessString()) + "\n")
+        term.println(TextStyles.bold(TextColors.cyan("---===  End  ${id}. test: $name === ---") + " " + result.toSuccessString()) + "\n")
 
         val overallSuccess = testResults.count { it.isSuccess }
         val failed = testResults.size - overallSuccess
         val failedStr = if (failed == 0) "none failed ✅" else TextColors.red("$failed failed")
-        t.println(TextColors.magenta("Current test stats: ${testResults.size} overall | $overallSuccess succeeded | $failedStr\n"))
+        term.println(TextColors.magenta("Current test stats: ${testResults.size} overall | $overallSuccess succeeded | $failedStr\n"))
 
         return result
     }

@@ -41,15 +41,16 @@ abstract class JWKKeyCreator {
     @JsExport.Ignore
     abstract suspend fun importPEM(pem: String): Result<JWKKey>
 
-    fun convertDerCertificateToPemCertificate(der: ByteArray): String =
+    fun wrapAsPem(data: ByteArray) =
         """-----BEGIN CERTIFICATE-----
-${Base64.Pem.encode(der)}
+${Base64.Pem.encode(data)}
 -----END CERTIFICATE-----"""
 
+    fun convertDerCertificateToPemCertificate(der: ByteArray): String =
+        wrapAsPem(der)
+
     fun convertX5cToPemCertificate(x5cElement: String): String =
-        """-----BEGIN CERTIFICATE-----
-${Base64.Pem.encode(Base64.decode(x5cElement))}
------END CERTIFICATE-----"""
+        wrapAsPem(Base64.decode(x5cElement))
 
     @JvmBlocking
     @JvmAsync
