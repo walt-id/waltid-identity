@@ -12,7 +12,7 @@ class CredentialSignaturePolicy : VerificationPolicy2() {
     override val id = "signature"
 
     companion object {
-        private val log = KotlinLogging.logger {  }
+        private val log = KotlinLogging.logger { }
     }
 
     override suspend fun verify(credential: DigitalCredential): Result<JsonObject> {
@@ -58,14 +58,14 @@ class CredentialSignaturePolicy : VerificationPolicy2() {
 
         val keys = possibleKeys.filter { it.isSuccess }.map { it.getOrThrow() }*/
 
-        val issuerKey = credential.getIssuerKey() ?: return Result.failure(
+        // Use new generic getSignerKey method:
+        val signerKey = credential.getSignerKey() ?: return Result.failure(
             IllegalArgumentException(
                 "Failed to retrieve issuer key to verify credential signature against, for credential: $credential",
             )
         )
 
-        val verificationResult =credential.verify(issuerKey)
-
+        val verificationResult = credential.verify(signerKey)
 
         if (verificationResult.isSuccess) {
             return Result.success(buildJsonObject {
@@ -74,9 +74,10 @@ class CredentialSignaturePolicy : VerificationPolicy2() {
                 put("signed_credential", JsonPrimitive(credential.signed))
                 put("credential_signature", Json.encodeToJsonElement(credential.signature))
                 put("verified_data", verificationResult.getOrNull() ?: JsonNull)
-                /*put("successful_issuer_public_key", issuerPublicKeyEntry.exportJWKObject())
-                put("successful_issuer_public_key_id", JsonPrimitive(issuerPublicKeyEntry.getKeyId()))
+                put("successful_issuer_public_key", signerKey.exportJWKObject())
+                put("successful_issuer_public_key_id", JsonPrimitive(signerKey.getKeyId()))
 
+                /*
                 if (failedVerificationResults.isNotEmpty()) {
                     val failedMap = failedVerificationResults.associate { (key, result) -> key.getKeyId() to result.message }
                     putJsonObject("previous_failed_verification_results") {
@@ -88,35 +89,35 @@ class CredentialSignaturePolicy : VerificationPolicy2() {
             })
         }
 
-/*
-        val failedVerificationResults = ArrayList<Pair<Key, Throwable>>()
+        /*
+                val failedVerificationResults = ArrayList<Pair<Key, Throwable>>()
 
-        keys.forEach { issuerPublicKeyEntry ->
-            val verificationResult = credential.verify(issuerPublicKeyEntry)
+                keys.forEach { issuerPublicKeyEntry ->
+                    val verificationResult = credential.verify(issuerPublicKeyEntry)
 
-            if (verificationResult.isSuccess) {
-                return Result.success(buildJsonObject {
-                    put("verification_result", JsonPrimitive(verificationResult.isSuccess))
-                    // Signed form that was verified
-                    put("signed_credential", JsonPrimitive(credential.signed))
-                    put("credential_signature", Json.encodeToJsonElement(credential.signature))
-                    put("verified_data", verificationResult.getOrNull() ?: JsonNull)
-                    put("successful_issuer_public_key", issuerPublicKeyEntry.exportJWKObject())
-                    put("successful_issuer_public_key_id", JsonPrimitive(issuerPublicKeyEntry.getKeyId()))
+                    if (verificationResult.isSuccess) {
+                        return Result.success(buildJsonObject {
+                            put("verification_result", JsonPrimitive(verificationResult.isSuccess))
+                            // Signed form that was verified
+                            put("signed_credential", JsonPrimitive(credential.signed))
+                            put("credential_signature", Json.encodeToJsonElement(credential.signature))
+                            put("verified_data", verificationResult.getOrNull() ?: JsonNull)
+                            put("successful_issuer_public_key", issuerPublicKeyEntry.exportJWKObject())
+                            put("successful_issuer_public_key_id", JsonPrimitive(issuerPublicKeyEntry.getKeyId()))
 
-                    if (failedVerificationResults.isNotEmpty()) {
-                        val failedMap = failedVerificationResults.associate { (key, result) -> key.getKeyId() to result.message }
-                        putJsonObject("previous_failed_verification_results") {
-                            failedMap.forEach { (keyId, errorMessage) ->
-                                put(keyId, JsonPrimitive(errorMessage))
+                            if (failedVerificationResults.isNotEmpty()) {
+                                val failedMap = failedVerificationResults.associate { (key, result) -> key.getKeyId() to result.message }
+                                putJsonObject("previous_failed_verification_results") {
+                                    failedMap.forEach { (keyId, errorMessage) ->
+                                        put(keyId, JsonPrimitive(errorMessage))
+                                    }
+                                }
                             }
-                        }
+                        })
                     }
-                })
-            }
 
-            failedVerificationResults += (issuerPublicKeyEntry to verificationResult.exceptionOrNull()!!)
-        }*/
+                    failedVerificationResults += (issuerPublicKeyEntry to verificationResult.exceptionOrNull()!!)
+                }*/
 
         // All keys failed:
         return Result.failure(
