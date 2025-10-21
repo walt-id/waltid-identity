@@ -154,7 +154,7 @@ object Verifier2Service {
                         log.trace { "Verification session data: state = $receivedState, vp_token = $vpTokenString" }
 
                         call.respond(
-                            Verifier2ReceivedCredentialHandler.handleDirectPost(
+                            Verifier2DirectPostHandler.handleDirectPost(
                                 verificationSession = verificationSession,
                                 vpTokenString = vpTokenString,
                                 receivedState = receivedState,
