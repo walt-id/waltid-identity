@@ -51,7 +51,7 @@ class TestPlanRunner(
         println("-- Conformane -- -> Setup")
 
         // Create test plan
-        val createTestPlanUrl = conformance.createTestPlanUrl(
+        val createTestPlanUrl = conformance.createTestPlanUrlWithConfig(
             config.testPlanCreationUrl
         )
 
@@ -67,7 +67,7 @@ class TestPlanRunner(
         println("Created test plan: $testPlanId")
 
         // Create test
-        val createTestUrl = conformance.buildTestUrl(testPlanId, testModule)
+        val createTestUrl = conformance.buildCreateTestUrl(testPlanId, testModule)
         println("Creating test... ($createTestUrl)")
         val createTestResponse = conformance.createTest(createTestUrl)
         println()

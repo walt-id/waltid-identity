@@ -22,9 +22,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration.Companion.seconds
 
-class ConformanceInterface(
-  //  val conformanceHttp: HttpClient
-) {
+class ConformanceInterface() {
 
     companion object {
         val conformanceHttp = HttpClient(OkHttp) {
@@ -44,12 +42,16 @@ class ConformanceInterface(
         }
     }
 
-    // Conformance
+    /** Get conformance suite version (mostly for healthcheck) */
     suspend fun getServerVersion() =
         conformanceHttp.get("/api/server")
             .body<JsonObject>()["version"]?.jsonPrimitive?.content
 
-    fun createTestPlanUrl(testPlanCreationUrl: ParametersBuilder.() -> Unit) =
+    /**
+     * To create a test plan, some parameters already have to be put into the URL
+     * This method allows for creation of said URL.
+     */
+    fun createTestPlanUrlWithConfig(testPlanCreationUrl: ParametersBuilder.() -> Unit) =
         URLBuilder("/api/plan").apply {
             baseUrlBuilderSetup()
             parameters.apply {
@@ -57,6 +59,11 @@ class ConformanceInterface(
             }
         }.build()
 
+    /**
+     * Create test plan with the configuration supplied in [testPlanCreationConfiguration]
+     * and the URL of the [createTestPlanUrlWithConfig] function supplied in [createTestPlanUrl]
+     * This method allows for creation of said URL.
+     */
     suspend fun createTestPlan(
         createTestPlanUrl: Url,
         testPlanCreationConfiguration: JsonObject
@@ -66,7 +73,11 @@ class ConformanceInterface(
             setBody(testPlanCreationConfiguration)
         }.bodyAsText().also { println(it) }.fromJson<CreateTestPlanResponse>()
 
-    fun buildTestUrl(testPlanId: String, testModule: String) =
+    /**
+     * To create a test, some parameters already have to be put into the URL
+     * This method allows for creation of said URL to create a test.
+     */
+    fun buildCreateTestUrl(testPlanId: String, testModule: String) =
         URLBuilder("/api/runner").apply {
             baseUrlBuilderSetup()
             parameters.apply {
@@ -76,16 +87,26 @@ class ConformanceInterface(
             }
         }.build()
 
+    /**
+     * Create a test with configuration URL created with [buildCreateTestUrl] supplied in [createTestUrl]
+     */
     suspend fun createTest(createTestUrl: Url): CreateTestResponse =
         conformanceHttp.post(createTestUrl).body<CreateTestResponse>()
 
+    /** Get [TestRunResult] for a test referenced by [testId] */
     suspend fun getTestRun(testId: String): TestRunResult =
         conformanceHttp.get("/api/runner/$testId").body<TestRunResult>()
 
-    suspend fun getTestRunInfo(testId: String) =
+    /** Get [TestRunInfo] for a test referenced by [testId] */
+    suspend fun getTestRunInfo(testId: String): TestRunInfo =
         conformanceHttp.get("/api/info/$testId").body<TestRunInfo>()
 
 
+    /**
+     * Wait ([delay]) until the test referenced by [testId] reached the defined status
+     * - [shouldBeWaiting] = true: wait until test is in "waiting" state
+     * - [shouldBeWaiting] = false: wait until test is no longer in "waiting" state
+     */
     suspend fun waitForTestStatus(testId: String, shouldBeWaiting: Boolean) {
         var counter = 0
         while (true) {

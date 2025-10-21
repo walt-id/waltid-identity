@@ -29,7 +29,7 @@ val coseCompliantCbor by lazy {
     Cbor(from = Cbor.CoseCompliant) {
         ignoreUnknownKeys = true
         alwaysUseByteString = true
-        // encodeDefaults = true // DO NOT SET!
+        // DO NOT SET "encodeDefaults = true"
     }
 }
 
