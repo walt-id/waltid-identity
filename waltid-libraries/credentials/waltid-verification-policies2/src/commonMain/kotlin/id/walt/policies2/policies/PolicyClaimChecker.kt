@@ -1,12 +1,9 @@
-@file:OptIn(ExperimentalSerializationApi::class)
-
-package id.walt.policies2
+package id.walt.policies2.policies
 
 import com.nfeld.jsonpathkt.JsonPath
 import com.nfeld.jsonpathkt.kotlinx.resolveOrNull
 import id.walt.credentials.formats.DigitalCredential
 import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -14,14 +11,14 @@ import kotlinx.serialization.json.*
 object PolicyClaimChecker {
 
     @Serializable
-    abstract class ClaimCheckResult {
+    sealed class ClaimCheckResult {
         @EncodeDefault
         @SerialName("claim_checked")
         open val claimChecked: Boolean = true
     }
 
     @Serializable
-    abstract class ClaimCheckResultSuccess() : ClaimCheckResult() {
+    sealed class ClaimCheckResultSuccess() : ClaimCheckResult() {
         abstract val claim: String
     }
 
@@ -32,7 +29,7 @@ object PolicyClaimChecker {
         override val claimChecked = false
 
         companion object {
-            val CLAIM_NOT_FOUND = Json.encodeToJsonElement(ClaimNotFoundClaimCheckResult()).jsonObject
+            val CLAIM_NOT_FOUND = Json.Default.encodeToJsonElement(ClaimNotFoundClaimCheckResult()).jsonObject
         }
     }
 
@@ -53,7 +50,7 @@ object PolicyClaimChecker {
         val data = credentialData.resolveOrNull(foundClaim)
             ?: throw IllegalStateException("This should not happen: claim could not be resolved the second time")
 
-        return block.invoke(data, foundClaim).map { Json.encodeToJsonElement(it).jsonObject }
+        return block.invoke(data, foundClaim).map { Json.Default.encodeToJsonElement(it).jsonObject }
     }
 
 }

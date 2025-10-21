@@ -11,6 +11,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 
 @Serializable
@@ -50,8 +51,12 @@ data class WebhookPolicy(
             }
         }
 
-        return if (response.status.isSuccess()) Result.success(response.body<JsonObject>())
-        else Result.failure(WebhookPolicyException(response.body<JsonObject>()))
+        val responseData = if (response.contentType() == ContentType.Application.Json) {
+            response.body<JsonObject>()
+        } else JsonNull
+
+        return if (response.status.isSuccess()) Result.success(responseData)
+        else Result.failure(WebhookPolicyException(responseData))
 
     }
 }
