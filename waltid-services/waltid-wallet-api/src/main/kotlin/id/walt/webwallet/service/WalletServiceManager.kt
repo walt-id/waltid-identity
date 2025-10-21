@@ -13,6 +13,7 @@ import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.Wallets
+import id.walt.webwallet.performance.Stopwatch
 import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.cache.EntityNameResolutionCacheService
@@ -237,11 +238,16 @@ object WalletServiceManager {
     ): List<WalletCredential> {
         val pd = Json.decodeFromJsonElement<id.walt.definitionparser.PresentationDefinition>(presentationDefinition.toJSON())
         val matches = credentialService.list(walletId, CredentialFilterObject.default).filter { cred ->
+            val timerId = Uuid.random().toString()
+            Stopwatch.startTimer(timerId)
             val fullDoc = WalletCredential.parseFullDocument(cred.document, cred.disclosures, cred.id, cred.format)
-            fullDoc != null &&
+            Stopwatch.addTiming(timerId, "parseCredential")
+            val result = fullDoc != null &&
                     pd.inputDescriptors.any { inputDesc ->
                         PresentationDefinitionParser.matchCredentialsForInputDescriptor(flowOf(fullDoc), inputDesc).toList().isNotEmpty()
                     }
+            Stopwatch.addTiming(timerId, "matched")
+            result
         }
         return matches
     }
