@@ -1,6 +1,4 @@
-@file:OptIn(ExperimentalTime::class)
-
-package id.walt.openid4vp.verifier
+package id.walt.openid4vp.verifier.w3c
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
@@ -17,15 +15,20 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.W3cCredentialMeta
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
-import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionCreationResponse
-import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
+import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
+import id.walt.openid4vp.verifier.Verification2Session
+import id.walt.openid4vp.verifier.VerificationSessionCreator
+import id.walt.openid4vp.verifier.Verifier2FeatureCatalog
+import id.walt.openid4vp.verifier.verifierModule
 import id.walt.policies2.PolicyList
 import id.walt.policies2.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.server.application.*
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.server.application.Application
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonObject
@@ -39,6 +42,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
+@OptIn(ExperimentalTime::class)
 class W3CVerifier2IntegrationTest {
 
     private val sdJwtVcDcqlQuery = DcqlQuery(
@@ -79,7 +83,7 @@ class W3CVerifier2IntegrationTest {
     )
 
     private val walletCredentials = listOf(
-        Json.decodeFromString<DigitalCredential>(
+        Json.Default.decodeFromString<DigitalCredential>(
             """
             {
       "type": "vc-w3c_1_1",
@@ -146,7 +150,7 @@ class W3CVerifier2IntegrationTest {
         """.trimIndent()
         ),
 
-        Json.decodeFromString<DigitalCredential>(
+        Json.Default.decodeFromString<DigitalCredential>(
             """
             {
       "type": "vc-w3c_1_1",
@@ -241,7 +245,7 @@ class W3CVerifier2IntegrationTest {
     @Test
     fun test() {
         val host = "127.0.0.1"
-        val port = 17003
+        val port = 17031
 
         E2ETest(host, port, true).testBlock(
             features = listOf(Verifier2FeatureCatalog),
@@ -272,12 +276,12 @@ class W3CVerifier2IntegrationTest {
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
                     setBody(
-                        VerificationSessionSetup(
+                        VerificationSessionCreator.VerificationSessionSetup(
                             dcqlQuery = sdJwtVcDcqlQuery,
                             policies = w3cPolicies
                         )
                     )
-                }.body<VerificationSessionCreationResponse>()
+                }.body<VerificationSessionCreator.VerificationSessionCreationResponse>()
             }
             println("Verification Session Response: $verificationSessionResponse")
 

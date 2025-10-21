@@ -1,6 +1,4 @@
-@file:OptIn(ExperimentalTime::class)
-
-package id.walt.openid4vp.verifier
+package id.walt.openid4vp.verifier.mdocs
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
@@ -18,16 +16,26 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
-import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
+import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
+import id.walt.openid4vp.verifier.Verification2Session
+import id.walt.openid4vp.verifier.VerificationSessionCreator
+import id.walt.openid4vp.verifier.Verifier2FeatureCatalog
+import id.walt.openid4vp.verifier.verifierModule
 import id.walt.policies2.PolicyList
 import id.walt.policies2.policies.CredentialDataMatcherPolicy
 import id.walt.policies2.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.server.application.*
-import kotlinx.serialization.json.*
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.server.application.Application
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.assertNotNull
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -36,6 +44,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
+@OptIn(ExperimentalTime::class)
 class MsoMdocsVerifier2IntegrationTest {
 
     private val mdocsDcqlQuery = DcqlQuery(
@@ -81,7 +90,7 @@ class MsoMdocsVerifier2IntegrationTest {
 
     private val walletCredentials = listOf(
         MdocsCredential(
-            credentialData = Json.decodeFromString(
+            credentialData = Json.Default.decodeFromString(
                 """
                 {
                     "org.iso.18013.5.1": {
@@ -104,7 +113,7 @@ class MsoMdocsVerifier2IntegrationTest {
             signature = CoseCredentialSignature(),
         ),
         MdocsCredential(
-            credentialData = Json.decodeFromString(
+            credentialData = Json.Default.decodeFromString(
                 """
                 {
                     "org.iso.18013.5.1": {
@@ -201,7 +210,7 @@ class MsoMdocsVerifier2IntegrationTest {
     @Test
     fun test() {
         val host = "127.0.0.1"
-        val port = 17001
+        val port = 17011
 
         E2ETest(host, port, true).testBlock(
             features = listOf(Verifier2FeatureCatalog),
@@ -232,7 +241,7 @@ class MsoMdocsVerifier2IntegrationTest {
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
                     setBody(
-                        VerificationSessionSetup(
+                        VerificationSessionCreator.VerificationSessionSetup(
                             dcqlQuery = mdocsDcqlQuery,
                             policies = mdocsPolicies
                         )

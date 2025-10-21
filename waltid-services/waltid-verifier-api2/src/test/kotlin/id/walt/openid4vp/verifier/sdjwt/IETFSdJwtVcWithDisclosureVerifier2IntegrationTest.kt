@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalTime::class)
 
-package id.walt.openid4vp.verifier
+package id.walt.openid4vp.verifier.sdjwt
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
@@ -19,8 +19,12 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
+import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
+import id.walt.openid4vp.verifier.Verification2Session
 import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionCreationResponse
 import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
+import id.walt.openid4vp.verifier.Verifier2FeatureCatalog
+import id.walt.openid4vp.verifier.verifierModule
 import id.walt.policies2.PolicyList
 import id.walt.policies2.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -41,7 +45,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-class IETFSdJwtVcVerifier2IntegrationTest {
+class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
 
     private val sdJwtVcDcqlQuery = DcqlQuery(
         credentials = listOf(
@@ -55,6 +59,9 @@ class IETFSdJwtVcVerifier2IntegrationTest {
                     ClaimsQuery(path = listOf("given_name")),
                     ClaimsQuery(path = listOf("family_name")),
                     ClaimsQuery(path = listOf("address", "street_address")),
+
+                    // Selective disclosure:
+                    ClaimsQuery(path = listOf("birthdate")),
                 )
             )
         )
@@ -291,7 +298,7 @@ class IETFSdJwtVcVerifier2IntegrationTest {
     @Test
     fun test() {
         val host = "127.0.0.1"
-        val port = 17002
+        val port = 17022
 
         E2ETest(host, port, true).testBlock(
             features = listOf(Verifier2FeatureCatalog),
