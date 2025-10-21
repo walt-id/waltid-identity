@@ -12,5 +12,5 @@ data class OSSVerifier2ServiceConfig(
     val urlPrefix: String,
     val urlHost: String,
     val key: JsonObject? = null,
-    val x5c: String? = null
+    val x5c: List<String>? = null
 ) : WaltConfig()

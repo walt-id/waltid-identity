@@ -23,7 +23,7 @@ object OSSVerifier2Manager {
             urlPrefix = uriPrefix ?: setup.urlPrefix ?: config.urlPrefix,
             urlHost = setup.urlHost ?: config.urlHost,
             key = setup.key?.key ?: config.key?.let { KeyManager.resolveSerializedKey(it) },
-            x5c = setup.x5c ?: config.x5c?.let { listOf(it) }
+            x5c = setup.x5c ?: config.x5c
         )
 
         return newSession
