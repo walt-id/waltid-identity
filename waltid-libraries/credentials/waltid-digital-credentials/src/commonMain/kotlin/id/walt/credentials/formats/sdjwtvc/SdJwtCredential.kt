@@ -17,7 +17,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.collections.contains
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
@@ -45,10 +44,12 @@ data class SdJwtCredential(
 ) : DigitalCredential(), SelectivelyDisclosableVerifiableCredential {
     override val format: String = "dc+sd-jwt"
 
-    override suspend fun getIssuerKey(): Key? {
-        val s = signature as JwtBasedSignature
-        return s.getJwtBasedIssuer(credentialData)
-    }
+    override suspend fun getSignerKey(): Key? =
+        when (signature) {
+            null -> null
+            is JwtBasedSignature -> signature.getJwtBasedIssuer(credentialData)
+            else -> throw NotImplementedError("Not yet implemented: Retrieve issuer key from SdJwtCredential with ${signature::class.simpleName} signature")
+        }
 
     suspend fun getHolderKey(): Key? {
         val cnf = credentialData["cnf"]?.jsonObject
@@ -90,6 +91,7 @@ data class SdJwtCredential(
                 require(signed != null) { "Cannot verify unsigned credential" }
                 publicKey.verifyJws(signed)
             }
+
             is CoseCredentialSignature -> TODO("Not implemented yet: verify SD-JWT with COSE")
             is DataIntegrityProofCredentialSignature -> TODO("Not implemented yet: verify SD-JWT with DIP")
             null -> throw IllegalArgumentException("Credential contains no signature, cannot verify")

@@ -37,7 +37,13 @@ data class MdocsCredential(
     override var subject: String? = null,
 ) : DigitalCredential() {
     override val format: String = "mso_mdoc"
-    override suspend fun getIssuerKey(): Key? {
+
+    /**
+     * This virtual DID is *virtual*: It does not exist in the mdocs credential.
+     * Instead, it is put there by the credential parser (parsing from mdocs issuer auth chain),
+     * so that it does not need to be reparsed every time.
+     */
+    override suspend fun getSignerKey(): Key {
         val issuerVirtualDid = issuer ?: throw IllegalArgumentException("Missing virtual issuer DID")
         val issuerKey = issuerDidResolver.resolveToKey(issuerVirtualDid).getOrThrow()
         return issuerKey

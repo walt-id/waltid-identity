@@ -21,7 +21,12 @@ sealed class DigitalCredential {
 
     abstract var subject: String?
 
-    abstract suspend fun getIssuerKey(): Key?
+    /**
+     * Get public key from signer (issuer) for signed credentials
+     */
+    abstract suspend fun getSignerKey(): Key?
+
     abstract suspend fun verify(publicKey: Key): Result<JsonElement>
+
     //fun sign()
 }
