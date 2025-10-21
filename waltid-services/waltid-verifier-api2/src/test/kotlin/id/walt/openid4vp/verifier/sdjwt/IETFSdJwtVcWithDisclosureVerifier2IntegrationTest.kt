@@ -23,7 +23,7 @@ import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
 import id.walt.openid4vp.verifier.Verification2Session
 import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionCreationResponse
 import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
-import id.walt.openid4vp.verifier.Verifier2FeatureCatalog
+import id.walt.openid4vp.verifier.OSSVerifier2FeatureCatalog
 import id.walt.openid4vp.verifier.verifierModule
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
@@ -343,7 +343,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
         val port = 17022
 
         E2ETest(host, port, true).testBlock(
-            features = listOf(Verifier2FeatureCatalog),
+            features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(

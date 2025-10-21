@@ -10,7 +10,7 @@ import id.walt.openid4vp.conformance.testplans.plans.SdJwtVcX509SanDnsRequestUri
 import id.walt.openid4vp.conformance.testplans.plans.TestPlan
 import id.walt.openid4vp.conformance.testplans.runner.TestPlanRunner
 import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
-import id.walt.openid4vp.verifier.Verifier2FeatureCatalog
+import id.walt.openid4vp.verifier.OSSVerifier2FeatureCatalog
 import id.walt.openid4vp.verifier.verifierModule
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import io.ktor.server.application.*
@@ -23,7 +23,7 @@ class ConformanceTestRunner {
         val port = 7003
 
         E2ETest(host, port, true).testBlock(
-            features = listOf(Verifier2FeatureCatalog),
+            features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(

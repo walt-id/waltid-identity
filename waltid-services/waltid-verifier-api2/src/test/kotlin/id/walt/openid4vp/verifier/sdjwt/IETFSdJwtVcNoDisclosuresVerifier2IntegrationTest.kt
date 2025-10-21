@@ -23,7 +23,7 @@ import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
 import id.walt.openid4vp.verifier.Verification2Session
 import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionCreationResponse
 import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
-import id.walt.openid4vp.verifier.Verifier2FeatureCatalog
+import id.walt.openid4vp.verifier.OSSVerifier2FeatureCatalog
 import id.walt.openid4vp.verifier.verifierModule
 import id.walt.policies2.PolicyList
 import id.walt.policies2.policies.CredentialSignaturePolicy
@@ -298,7 +298,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
         val port = 17021
 
         E2ETest(host, port, true).testBlock(
-            features = listOf(Verifier2FeatureCatalog),
+            features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(
