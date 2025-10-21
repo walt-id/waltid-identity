@@ -2,29 +2,25 @@ package id.walt.credentials.presentations.formats
 
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.formats.SdJwtCredential
 import id.walt.credentials.presentations.DcSdJwtPresentationValidationError
 import id.walt.credentials.presentations.DcqlValidationError
 import id.walt.credentials.presentations.PresentationFormat
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequire
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequireNotNull
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequireSuccess
-import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationThrowError
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.ShaUtils
 import id.walt.dcql.DcqlMatcher.resolveClaimPath
 import id.walt.dcql.models.ClaimsQuery
-import id.walt.did.dids.DidService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-private val log = KotlinLogging.logger { "DcSdJwtPresentationParser" }
+private val log = KotlinLogging.logger { }
 
 /**
  * Represents an IETF SD-JWT Verifiable Credential presentation.
@@ -46,8 +42,6 @@ data class DcSdJwtPresentation(
     val credential: DigitalCredential,
 
     // claims:
-    val cnf: JsonObject?,
-    //val holderKid: String?,
     val audience: String?,
     val nonce: String?,
     val sdHash: String?,
@@ -62,31 +56,10 @@ data class DcSdJwtPresentation(
     ) {
         // Validate Key Binding JWT
 
-        presentationRequireNotNull(cnf, DcSdJwtPresentationValidationError.MISSING_CNF)
-
         // Resolve holder's public key
-        val holderKey: Key = when {
-            cnf.contains("jwk") -> {
-                val cnfJwk = cnf["jwk"]!!.jsonObject
-                val jwkKeyImportRes = JWKKey.importJWK(cnfJwk.toString())
-                val jwkKey = presentationRequireSuccess(jwkKeyImportRes, DcSdJwtPresentationValidationError.CNF_JWK_CANNOT_PARSE_JWK)
-                jwkKey
-            }
+        val holderKey = (credential as SdJwtCredential).getHolderKey()
+        presentationRequireNotNull(holderKey, DcSdJwtPresentationValidationError.MISSING_CNF)
 
-            cnf.contains("kid") -> {
-                val holderKidRes = runCatching { cnf!!["kid"]!!.jsonPrimitive.content }
-                val holderKid = presentationRequireSuccess(holderKidRes, DcSdJwtPresentationValidationError.INVALID_CNF_KID)
-                val resolvedKey = presentationRequireSuccess(
-                    DidService.resolveToKey(holderKid),
-                    DcSdJwtPresentationValidationError.CNF_KID_CANNOT_RESOLVE_DID
-                )
-                resolvedKey
-            }
-
-            else -> {
-                presentationThrowError(DcSdJwtPresentationValidationError.MISSING_CNF_METHOD)
-            }
-        }
 
         // Verify the KB-JWT's signature with the holder's key
         val kbJwtVerificationResult = holderKey.verifyJws(keyBindingJwt)
@@ -212,7 +185,6 @@ data class DcSdJwtPresentation(
                     disclosures = presentedDisclosures,
                     keyBindingJwt = kbJwt,
                     credential = reconstructedCredential,
-                    cnf = cnfClaim,
                     audience = aud,
                     nonce = nonce,
                     sdHash = sdHash,
