@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
-
 package id.walt.test.integration.tests
 
 import id.walt.test.integration.environment.InMemoryCommunityStackEnvironment
@@ -7,15 +5,15 @@ import id.walt.test.integration.environment.api.issuer.IssuerApi
 import id.walt.test.integration.environment.api.verifier.VerifierApi
 import id.walt.test.integration.environment.api.wallet.WalletApi
 import id.walt.test.integration.environment.api.wallet.WalletContainerApi
+import id.walt.test.integration.junit.E2eTestReportExtension
 import id.walt.test.integration.junit.LogTestStartExtension
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.extension.ExtendWith
-import kotlin.uuid.ExperimentalUuidApi
 
-@ExtendWith(LogTestStartExtension::class)
+@ExtendWith(LogTestStartExtension::class, E2eTestReportExtension::class)
 abstract class AbstractIntegrationTest {
 
     companion object {

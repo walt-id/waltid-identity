@@ -8,12 +8,12 @@ import org.junit.jupiter.api.extension.ExtensionContext
 
 class LogTestStartExtension : BeforeTestExecutionCallback, AfterTestExecutionCallback, Klogging {
     override fun beforeTestExecution(context: ExtensionContext?) = runBlocking {
-        logger.info { "===============================================================" }
-        logger.info { "${context?.testClass?.orElse(null)?.name}::${context?.displayName}" }
-        logger.info { "===============================================================" }
+        logger.error { "===============================================================" }
+        logger.error { "${context?.testClass?.orElse(null)?.name}::${context?.displayName}" }
+        logger.error { "===============================================================" }
     }
 
     override fun afterTestExecution(context: ExtensionContext?) = runBlocking {
-        logger.info { "---------------------------------------------------------------" }
+        logger.error { "***************************************************************" }
     }
 }
