@@ -46,7 +46,7 @@ data class CredentialQuery(
      * placed on the metadata or validity of the requested Credential.
      */
     @Serializable(with = CredentialQueryMetaPolymorphicSerializer::class)
-    val meta: CredentialQueryMeta = NoMeta, // mandatory to be set since draft 29
+    val meta: CredentialQueryMeta, // = NoMeta // mandatory to be set since draft 29
 
     /* Issuer constraints */
     /**
