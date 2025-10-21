@@ -41,6 +41,11 @@ private object VoidStopwatch : StopwatchInterface {
     }
 }
 
+/**
+ * The stopwatch is not ready for production, restriction of maximum
+ * time marks is mission -> memory leak. Use the stopwatch only
+ * with integration tests
+ */
 private object DefaultStopwatch : StopwatchInterface {
 
     private val timings = mutableListOf<Timing>()

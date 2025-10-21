@@ -24,6 +24,7 @@ object LoggingManager {
             DebugLoggingSetup,
             TraceLoggingSetup,
             ErrorLoggingSetup,
+            ConfigFileLoggingSetup,
             // ..., extend here <---
         ).associateBy { it.name }
 
@@ -53,7 +54,6 @@ object LoggingManager {
 
     fun useLoggingSetup(logLevel: String, logType: RenderStrings?) {
         loggingSetup = loggingSetups[logLevel] ?: error("invalid log level supplied: $logLevel")
-
         logType?.let { LogStringManager.selectedRenderString = logType }
     }
 

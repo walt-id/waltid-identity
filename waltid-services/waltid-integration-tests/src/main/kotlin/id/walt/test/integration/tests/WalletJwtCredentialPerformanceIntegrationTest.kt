@@ -6,6 +6,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.test.integration.loadJsonResource
 import id.walt.w3c.schemes.JwsSignatureScheme
+import id.walt.webwallet.performance.Stopwatch
 import io.klogging.Klogging
 import io.ktor.http.*
 import io.ktor.server.util.*
@@ -13,6 +14,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
@@ -20,7 +22,6 @@ import org.junit.jupiter.api.TestMethodOrder
 import kotlin.test.*
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
-import id.walt.webwallet.performance.Stopwatch
 
 private const val testOrderCredentialIdErrorMessage = "Credential ID should be set - test order?"
 
@@ -35,9 +36,7 @@ private val jwtCredential = IssuanceRequest(
 private val simplePresentationRequestPayload =
     loadResource("presentation/openbadgecredential-presentation-request.json")
 
-// TODO: space in category name wrong handled -> needs a fix
-private val categoryNames = listOf("The-Category-A", "The-fancy-Category-B")
-
+@Disabled("Only for manual performance testing of the community stack wallet")
 @TestMethodOrder(OrderAnnotation::class)
 class WalletJwtCredentialPerformanceIntegrationTest : AbstractIntegrationTest(), Klogging {
     companion object {

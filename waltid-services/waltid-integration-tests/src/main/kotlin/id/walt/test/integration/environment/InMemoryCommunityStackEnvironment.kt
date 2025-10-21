@@ -73,6 +73,7 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
         scope.launch {
             e2e.testBlock(
                 config = ServiceConfiguration("e2e-test"),
+                logConfig = "config-file",
                 features = listOf(
                     id.walt.issuer.FeatureCatalog,
                     id.walt.verifier.FeatureCatalog,
