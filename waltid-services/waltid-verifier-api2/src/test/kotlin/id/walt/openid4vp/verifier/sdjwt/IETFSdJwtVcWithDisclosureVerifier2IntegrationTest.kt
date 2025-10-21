@@ -25,17 +25,12 @@ import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSession
 import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
 import id.walt.openid4vp.verifier.Verifier2FeatureCatalog
 import id.walt.openid4vp.verifier.verifierModule
-import id.walt.policies2.PolicyList
-import id.walt.policies2.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.server.application.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.boolean
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import org.junit.jupiter.api.assertNotNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -67,13 +62,60 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
         )
     )
 
-    private val sdjwtvcPolicies = Verification2Session.DefinedVerificationPolicies(
-        vcPolicies = PolicyList(
-            listOf(
-                CredentialSignaturePolicy()
-            )
-        )
-    )
+    private val additionalSdjwtvcPolicies =
+        Json.decodeFromString<Verification2Session.DefinedVerificationPolicies>("""
+  {
+    "vcPolicies": [
+      {
+        "policy": "allowed-issuer",
+        "allowed_issuer": [
+          "https://issuer.demo.walt.id/draft13"
+        ]
+      },
+      {
+        "policy": "regex",
+        "path": "birthdate",
+        "regex": "\\d{4}-\\d{2}-\\d{2}"
+      },
+      "signature",
+      "expiration",
+      "not-before",
+      {
+        "policy": "webhook",
+        "url": "https://webhook.site/2ac6171a-cce9-4b89-9fe0-55136da1e2fe"
+      },
+      {
+        "policy": "schema",
+        "schema": {
+          "given_name": "John",
+          "family_name": "Doe",
+          "email": "johndoe@example.com",
+          "phone_number": "+1-202-555-0101",
+          "address": {
+            "street_address": "123 Main St",
+            "locality": "Anytown",
+            "region": "Anystate",
+            "country": "US"
+          },
+          "is_over_18": true,
+          "is_over_21": true,
+          "is_over_65": true,
+          "id": "urn:uuid:15030989-e39f-4831-88ee-bf53dbe29f68",
+          "iat": 1759978870,
+          "nbf": 1759978870,
+          "exp": 1791514870,
+          "iss": "https://issuer.demo.walt.id/draft13",
+          "cnf": {
+            "kid": "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17"
+          },
+          "vct": "https://issuer.demo.walt.id/draft13/identity_credential",
+          "display": [ ],
+          "birthdate": "1940-01-01"
+        }
+      }
+    ]
+  }
+        """.trimIndent())
 
     private val walletCredentials = listOf(
         Json.decodeFromString< DigitalCredential>("""
@@ -270,7 +312,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
 
     private val holderDid = "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17"
 
-    private suspend fun selectCredentialsForQuery(
+    private fun selectCredentialsForQuery(
         query: DcqlQuery,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
         val storedCredentials = walletCredentials
@@ -331,7 +373,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                     setBody(
                         VerificationSessionSetup(
                             dcqlQuery = sdJwtVcDcqlQuery,
-                            policies = sdjwtvcPolicies
+                            policies = additionalSdjwtvcPolicies
                         )
                     )
                 }.body<VerificationSessionCreationResponse>()
@@ -395,10 +437,15 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
 
 
             // View session that was presented to
-            val info2 = testAndReturn("View presented session") {
+            val info2Json = testAndReturn("View presented session") {
                 http.get("/verification-session/$sessionId/info")
-                    .body<Verification2Session>()
+                    .body<JsonObject>()
             }
+            val info2 = Json.decodeFromJsonElement<Verification2Session>(info2Json)
+            println("Verification session information JSON: $info2Json")
+            println("Verification session information parsed: $info2")
+
+            println("JSON Policy results: ${info2Json["policyResults"]}")
 
             // Check created session
             test("Check Verification Session after presentation") {
@@ -410,9 +457,19 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                 assertNotNull(info2.presentedCredentials!!["my_pid"])
                 assertTrue { info2.presentedCredentials!!["my_pid"]!!.size == 1 }
 
+            }
+
+            test("Policy results") {
+                println("Parsed policy results: ${info2.policyResults}")
+
+                info2.policyResults?.vcPolicies?.forEach {
+                    println("${it.policy.id}: ${it.success}")
+                }
+
                 assertNotNull(info2.policyResults)
                 assertTrue { info2.policyResults!!.overallSuccess }
-                assertTrue { info2.policyResults!!.vcPolicies.size == 1 }
+
+                assertTrue { info2.policyResults!!.vcPolicies.size == additionalSdjwtvcPolicies.vcPolicies.policies.size }
             }
         }
     }
