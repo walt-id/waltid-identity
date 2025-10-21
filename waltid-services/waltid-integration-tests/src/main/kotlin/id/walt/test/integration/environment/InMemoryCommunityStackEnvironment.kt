@@ -90,7 +90,7 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
                 module = e2eTestModule,
                 timeout = defaultTestTimeout,
                 block = {
-                    logger.info { "================= Startup complete =============================" }
+                    logger.error { "================= Startup complete =============================" }
                     startupCompleted.complete(Unit)
                     logger.error("Wait for Shutting down InMemoryCommunityStackEnvironment")
                     shutdownInitialized.await()

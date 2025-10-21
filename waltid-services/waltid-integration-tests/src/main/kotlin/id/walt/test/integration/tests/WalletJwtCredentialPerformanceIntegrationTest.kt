@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
-
 package id.walt.test.integration.tests
 
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
@@ -8,7 +6,6 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.test.integration.loadJsonResource
 import id.walt.w3c.schemes.JwsSignatureScheme
-import id.walt.webwallet.performance.Stopwatch
 import io.klogging.Klogging
 import io.ktor.http.*
 import io.ktor.server.util.*
@@ -21,10 +18,10 @@ import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestMethodOrder
 import kotlin.test.*
-import kotlin.time.ExperimentalTime
-import kotlin.uuid.ExperimentalUuidApi
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
+import id.walt.webwallet.performance.Stopwatch
 
-private const val testOrderOfferUrlErrorMessage = "The offer URL should be set - test order?"
 private const val testOrderCredentialIdErrorMessage = "Credential ID should be set - test order?"
 
 private val jwtCredential = IssuanceRequest(
@@ -49,8 +46,8 @@ class WalletJwtCredentialPerformanceIntegrationTest : AbstractIntegrationTest(),
 
     @Order(0)
     @Test
-    fun shouldIssueCredential() = runTest {
-        for (i in 1..100) {
+    fun shouldIssueCredential() = runTest(timeout = 100.toDuration(DurationUnit.SECONDS)) {
+        for (i in 1..300) {
             val offerUrl = issuerApi.issueJwtCredential(jwtCredential).also { offerUrl ->
                 assertTrue(offerUrl.contains("draft13"))
                 assertFalse(offerUrl.contains("draft11"))
@@ -88,7 +85,7 @@ class WalletJwtCredentialPerformanceIntegrationTest : AbstractIntegrationTest(),
 
     @Order(10)
     @Test
-    fun shouldMatchCredential() = runTest {
+    fun shouldMatchCredential() = runTest(timeout = 100.toDuration(DurationUnit.SECONDS)) {
         assertNotNull(credentialId, testOrderCredentialIdErrorMessage)
         val verificationUrl = verifierApi.verify(simplePresentationRequestPayload)
         val verificationId = Url(verificationUrl).parameters.getOrFail("state")
@@ -116,8 +113,9 @@ class WalletJwtCredentialPerformanceIntegrationTest : AbstractIntegrationTest(),
         logger.error("==============================================================================================")
         report.forEach { rl ->
             logger.error(
-                "{mark}: total: {total} min: {min} max: {max} avg: {avg}",
+                "{mark}: count: {count} total: {total} min: {min} max: {max} avg: {avg}",
                 rl.key,
+                rl.value.count,
                 rl.value.total,
                 rl.value.min,
                 rl.value.max,

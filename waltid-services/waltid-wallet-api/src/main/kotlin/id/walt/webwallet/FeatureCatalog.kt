@@ -59,11 +59,18 @@ object FeatureCatalog : ServiceFeatureCatalog {
         default = false,
     )
 
+    val stopwatchFeature = OptionalFeature(
+        name = "stopwatch",
+        description = "Enables the stopwatch for certain requests - at the moment the stopwatch is only used in integration-tests",
+        default = false
+    )
+
     override val baseFeatures = listOf(
         databaseFeature
     )
     override val optionalFeatures = listOf(
         devModeFeature,
+        stopwatchFeature,
 
         legacyAuthenticationFeature,
         ktorAuthnzAuthenticationFeature,

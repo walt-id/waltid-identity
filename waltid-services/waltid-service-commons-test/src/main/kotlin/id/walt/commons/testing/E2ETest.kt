@@ -107,7 +107,7 @@ class E2ETest(
                 run = E2ETestWebService(Application::e2eTestModule).run(block)
             )
         )*/
-        service.main(arrayOf("-l", "trace"))
+        service.main(arrayOf("-l", "default"))
 
         t.println("\n" + TextColors.magenta("Test results:"))
         testResults.forEachIndexed { index, result ->
@@ -139,12 +139,15 @@ class E2ETest(
     }
 
     suspend fun test(name: String, function: suspend () -> Any?): Result<Any?> {
+        val id = numTests + 1
+        t.println("\n${TextColors.cyan(TextStyles.bold("---=== Start $id. test: $name === ---"))}")
+        val result = runCatching { function.invoke() }
+        return addTestResult(name, result)
+    }
+
+    fun <R>addTestResult(name: String,  result: Result<R>) : Result<R> {
         val id = numTests++
         testNames[id] = name
-
-        t.println("\n${TextColors.cyan(TextStyles.bold("---=== Start $id. test: $name === ---"))}")
-
-        val result = runCatching { function.invoke() }
         if (failEarly && result.isFailure) {
             t.println("\n${TextColors.brightRed("Fail early called for $id. test: $name")}")
             val err = result.exceptionOrNull()!!
@@ -168,7 +171,6 @@ class E2ETest(
         val failed = testResults.size - overallSuccess
         val failedStr = if (failed == 0) "none failed ✅" else TextColors.red("$failed failed")
         t.println(TextColors.magenta("Current test stats: ${testResults.size} overall | $overallSuccess succeeded | $failedStr\n"))
-
         return result
     }
 

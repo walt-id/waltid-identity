@@ -13,7 +13,6 @@ import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.Wallets
-import id.walt.webwallet.performance.Stopwatch
 import id.walt.webwallet.seeker.DefaultCredentialTypeSeeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.cache.EntityNameResolutionCacheService
@@ -73,6 +72,7 @@ import kotlin.time.toJavaInstant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toKotlinUuid
+import id.walt.webwallet.performance.Stopwatch
 
 @OptIn(ExperimentalUuidApi::class)
 object WalletServiceManager {
