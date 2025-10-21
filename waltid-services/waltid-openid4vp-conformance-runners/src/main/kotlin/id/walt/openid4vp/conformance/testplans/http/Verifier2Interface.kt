@@ -11,7 +11,7 @@ class Verifier2Interface(
     val http: HttpClient
 ) {
 
-    // Verifier2
+    /** Create verification session at Verifier2 */
     suspend fun createVerificationSession(
         authorizationEndpointToUse: String,
         verificationSessionSetup: VerificationSessionSetup
@@ -24,6 +24,7 @@ class Verifier2Interface(
             )
         }.body<VerificationSessionCreator.VerificationSessionCreationResponse>()
 
+    /** Create verification session information from Verifier2 */
     suspend fun getVerificationSessionInfo(sessionId: String) =
         http.get("/verification-session/$sessionId/info")
             .body<Verification2Session>()
