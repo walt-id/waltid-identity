@@ -1,13 +1,12 @@
 package id.walt.ktornotifications
 
 import id.walt.ktornotifications.core.KtorSessionNotifications.VerificationSessionWebhookNotification
+import id.walt.ktornotifications.core.KtorSessionUpdate
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import id.walt.ktornotifications.core.KtorSessionUpdate
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
 
 object WebhookNotifier {
 

@@ -1,15 +1,7 @@
 package id.walt.openid4vp.clientidprefix
 
-import id.walt.openid4vp.clientidprefix.prefixes.ClientId
-import id.walt.openid4vp.clientidprefix.prefixes.DecentralizedIdentifier
-import id.walt.openid4vp.clientidprefix.prefixes.OpenIdFederation
-import id.walt.openid4vp.clientidprefix.prefixes.PreRegistered
-import id.walt.openid4vp.clientidprefix.prefixes.RedirectUri
-import id.walt.openid4vp.clientidprefix.prefixes.Unsupported
-import id.walt.openid4vp.clientidprefix.prefixes.VerifierAttestation
-import id.walt.openid4vp.clientidprefix.prefixes.X509Hash
-import id.walt.openid4vp.clientidprefix.prefixes.X509SanDns
-import io.ktor.http.Url
+import id.walt.openid4vp.clientidprefix.prefixes.*
+import io.ktor.http.*
 
 object ClientIdPrefixParser {
     fun parse(clientIdString: String): Result<ClientId> {

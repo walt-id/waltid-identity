@@ -1,8 +1,4 @@
-import id.walt.openid4vp.clientidprefix.ClientIdError
-import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
-import id.walt.openid4vp.clientidprefix.ClientIdPrefixParser
-import id.walt.openid4vp.clientidprefix.ClientValidationResult
-import id.walt.openid4vp.clientidprefix.RequestContext
+import id.walt.openid4vp.clientidprefix.*
 import id.walt.openid4vp.clientidprefix.prefixes.X509SanDns
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test

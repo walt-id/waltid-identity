@@ -1,6 +1,5 @@
 package id.walt.dcql.models
 
-import id.walt.dcql.models.meta.NoMeta
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 

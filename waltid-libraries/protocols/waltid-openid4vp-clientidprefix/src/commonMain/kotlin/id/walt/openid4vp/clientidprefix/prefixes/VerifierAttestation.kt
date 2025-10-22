@@ -1,15 +1,6 @@
 package id.walt.openid4vp.clientidprefix.prefixes
 
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.openid4vp.clientidprefix.ClientIdError
-import id.walt.openid4vp.clientidprefix.ClientValidationResult
-import id.walt.openid4vp.clientidprefix.RequestContext
-import id.walt.verifier.openid.models.authorization.ClientMetadata
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Handles `verifier_attestation` prefix per OpenID4VP 1.0, Section 5.9.3 and 12.
