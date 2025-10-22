@@ -9,8 +9,8 @@ import id.walt.openid4vp.conformance.testplans.plans.MdlX509SanDnsRequestUriSign
 import id.walt.openid4vp.conformance.testplans.plans.SdJwtVcX509SanDnsRequestUriSignedDirectPost
 import id.walt.openid4vp.conformance.testplans.plans.TestPlan
 import id.walt.openid4vp.conformance.testplans.runner.TestPlanRunner
-import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
 import id.walt.openid4vp.verifier.OSSVerifier2FeatureCatalog
+import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
 import id.walt.openid4vp.verifier.verifierModule
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import io.ktor.server.application.*
@@ -18,6 +18,13 @@ import kotlin.reflect.jvm.jvmName
 import kotlin.test.assertNotNull
 
 class ConformanceTestRunner {
+
+    private val testPlans: List<TestPlan> = listOf(
+        MdlX509SanDnsRequestUriSignedDirectPost,
+        SdJwtVcX509SanDnsRequestUriSignedDirectPost
+    )
+
+
     fun run() {
         val host = "127.0.0.1"
         val port = 7003
@@ -57,12 +64,7 @@ class ConformanceTestRunner {
                 conformanceVersion
             }
 
-            val plans = listOf<TestPlan>(
-                MdlX509SanDnsRequestUriSignedDirectPost,
-                SdJwtVcX509SanDnsRequestUriSignedDirectPost
-            )
-
-            plans.forEach { plan ->
+            testPlans.forEach { plan ->
                 val planName = plan::class.simpleName ?: plan::class.jvmName
 
                 test(planName) {
