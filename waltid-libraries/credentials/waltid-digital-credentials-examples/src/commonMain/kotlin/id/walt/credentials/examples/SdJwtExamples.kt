@@ -1,9 +1,4 @@
-package credentials
-
-import id.walt.credentials.CredentialDetectorTypes
-import id.walt.credentials.CredentialDetectorTypes.CredentialDetectionResult
-import id.walt.credentials.CredentialDetectorTypes.CredentialPrimaryDataType
-import id.walt.credentials.CredentialDetectorTypes.SDJWTVCSubType
+package id.walt.credentials.examples
 
 object SdJwtExamples {
 
@@ -47,6 +42,66 @@ object SdJwtExamples {
           "iss": "https://example.com/issuer",
           "iat": 1683000000,
           "exp": 1883000000,
+          "vct": "https://credentials.example.com/identity_credential",
+          "_sd_alg": "sha-256",
+          "cnf": {
+            "jwk": {
+              "kty": "EC",
+              "crv": "P-256",
+              "x": "TCAER19Zvu3OHF4j4W4vfSVoHIP1ILilDls7vCeGemc",
+              "y": "ZxjiWWbZMQGHVWKVQ4hbSIirsVfuecCE6t4jT9F2HZQ"
+            }
+          }
+        }
+    """.trimIndent()
+
+    //language=JSON
+    val sdJwtVcExpiredExample = """
+        {
+          "_sd": [
+            "09vKrJMOlyTWM0sjpu_pdOBVBQ2M1y3KhpH515nXkpY",
+            "2rsjGbaC0ky8mT0pJrPioWTq0_daw1sX76poUlgCwbI",
+            "EkO8dhW0dHEJbvUHlE_VCeuC9uRELOieLZhh7XbUTtA",
+            "IlDzIKeiZdDwpqpK6ZfbyphFvz5FgnWa-sN6wqQXCiw",
+            "JzYjH4svliH0R3PyEMfeZu6Jt69u5qehZo7F7EPYlSE",
+            "PorFbpKuVu6xymJagvkFsFXAbRoc2JGlAUA2BA4o7cI",
+            "TGf4oLbgwd5JQaHyKVQZU9UdGE0w5rtDsrZzfUaomLo",
+            "jdrTE8YcbY4EifugihiAe_BPekxJQZICeiUQwY9QqxI",
+            "jsu9yVulwQQlhFlM_3JlzMaSFzglhQG0DpfayQwLUK4"
+          ],
+          "iss": "https://example.com/issuer",
+          "iat": 1683000000,
+          "exp": 1697958248,
+          "vct": "https://credentials.example.com/identity_credential",
+          "_sd_alg": "sha-256",
+          "cnf": {
+            "jwk": {
+              "kty": "EC",
+              "crv": "P-256",
+              "x": "TCAER19Zvu3OHF4j4W4vfSVoHIP1ILilDls7vCeGemc",
+              "y": "ZxjiWWbZMQGHVWKVQ4hbSIirsVfuecCE6t4jT9F2HZQ"
+            }
+          }
+        }
+    """.trimIndent()
+
+    //language=JSON
+    val sdJwtVcFutureExample = """
+        {
+          "_sd": [
+            "09vKrJMOlyTWM0sjpu_pdOBVBQ2M1y3KhpH515nXkpY",
+            "2rsjGbaC0ky8mT0pJrPioWTq0_daw1sX76poUlgCwbI",
+            "EkO8dhW0dHEJbvUHlE_VCeuC9uRELOieLZhh7XbUTtA",
+            "IlDzIKeiZdDwpqpK6ZfbyphFvz5FgnWa-sN6wqQXCiw",
+            "JzYjH4svliH0R3PyEMfeZu6Jt69u5qehZo7F7EPYlSE",
+            "PorFbpKuVu6xymJagvkFsFXAbRoc2JGlAUA2BA4o7cI",
+            "TGf4oLbgwd5JQaHyKVQZU9UdGE0w5rtDsrZzfUaomLo",
+            "jdrTE8YcbY4EifugihiAe_BPekxJQZICeiUQwY9QqxI",
+            "jsu9yVulwQQlhFlM_3JlzMaSFzglhQG0DpfayQwLUK4"
+          ],
+          "iss": "https://example.com/issuer",
+          "iat": 2076650025,
+          "exp": 2392269225,
           "vct": "https://credentials.example.com/identity_credential",
           "_sd_alg": "sha-256",
           "cnf": {
@@ -301,44 +356,5 @@ object SdJwtExamples {
     val sdJwtVcSignedExample2WithoutProvidedDisclosures = """
         eyJraWQiOiJKMUZ3SlA4N0M2LVFOX1dTSU9tSkFRYzZuNUNRX2JaZGFGSjVHRG5XMVJrIiwidHlwIjoidmMrc2Qtand0IiwiYWxnIjoiRVMyNTYifQ.eyJpc3MiOiJodHRwczovL3RyaWFsLmF1dGhsZXRlLm5ldCIsIl9zZCI6WyIwczNiazZYcC02ZW1rV3cxTFd2OWthaGk5YjNUV0c2NDJLV3dpZEZKeHlvIiwiM3BSUGNUUjItSkJySjhVRjVkZGhtcDhwbDA3MEpheWpoMWEzZVVWRDZNZyIsIjZ6UEtKS2pzc2Y0Q1JNNmhUeDZZVUdQdzRBbm1ZWHZocnFuZDlmdTZMcUkiLCJBVnFKdDdkcWNEVWZLNmJPSEg0UTFEODVfMVNmLXRwM0d0QlM1Mk1Bb3FVIiwiQldydzdVV2YzdjF4cjdOOXFoSFpXMHMwa0FERDVGbFgtUmNQV2dCZEFJOCIsIkhtcHVfdVo4dWo4b2ViMXIyaGg2YmdUY3dNbEJoVHNrUjIxR2tZZVd4TW8iLCJNQ1JpVkRYc3I3MTJ1WW9NRUtWeEJfMmFxX0oweENfa08yNTdwQ3N0RlB3IiwiTUc3WElRV1Y5RFE2dC12WDdmZERUblZ6bnpTZUwwY2gtX0NtNkkyM3ZDWSIsIlB5VEVrajdFdUhScGljdFk5Z1ZpQTVhcTBrYTd2SzJZdDRrX04wbzlTb3ciXSwiaWF0IjoxNzA1MDE4MjA1LCJ2Y3QiOiJodHRwczovL2NyZWRlbnRpYWxzLmV4YW1wbGUuY29tL2lkZW50aXR5X2NyZWRlbnRpYWwiLCJfc2RfYWxnIjoic2hhLTI1NiJ9.ll4JdW-ksNDyVGx-OTueQYojpUYXhUZ6J31fFKGall2SsT5LQt-I5w24AiYhDvxYWRGRCmJF5UI-_3SpNE83wQ
     """.trimIndent()
-
-    val allSdJwtVcCredentialExamples = listOf(
-        unsignedSdJwtVcNoDisclosablesExample to CredentialDetectionResult(
-            CredentialPrimaryDataType.SDJWTVC,
-            SDJWTVCSubType.sdjwtvc,
-            CredentialDetectorTypes.SignaturePrimaryType.UNSIGNED,
-        ),
-        sdJwtVcWithDisclosablesExample to CredentialDetectionResult(
-            CredentialPrimaryDataType.SDJWTVC,
-            SDJWTVCSubType.sdjwtvc,
-            CredentialDetectorTypes.SignaturePrimaryType.UNSIGNED,
-            containsDisclosables = true
-        ),
-        sdJwtVcDmExample to CredentialDetectionResult(
-            CredentialPrimaryDataType.SDJWTVC,
-            SDJWTVCSubType.sdjwtvcdm,
-            CredentialDetectorTypes.SignaturePrimaryType.UNSIGNED
-        ),
-        /*sdJwtVcSignedExample to CredentialDetectionResult(
-            CredentialPrimaryDataType.SDJWTVC,
-            SDJWTVCSubType.sdjwtvc,
-            CredentialDetectorTypes.SignaturePrimaryType.SDJWT,
-            containsDisclosables = true,
-            providesDisclosures = true
-        ),*/
-        sdJwtVcSignedExample2 to CredentialDetectionResult(
-            CredentialPrimaryDataType.SDJWTVC,
-            SDJWTVCSubType.sdjwtvc,
-            CredentialDetectorTypes.SignaturePrimaryType.SDJWT,
-            containsDisclosables = true,
-            providesDisclosures = true
-        ),
-        sdJwtVcSignedExample2WithoutProvidedDisclosures to CredentialDetectionResult(
-            CredentialPrimaryDataType.SDJWTVC,
-            SDJWTVCSubType.sdjwtvc,
-            CredentialDetectorTypes.SignaturePrimaryType.JWT,
-            containsDisclosables = true
-        )
-    )
 
 }

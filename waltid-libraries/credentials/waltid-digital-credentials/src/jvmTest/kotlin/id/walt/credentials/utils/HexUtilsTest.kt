@@ -1,4 +1,4 @@
-package credentials.utils
+package id.walt.credentials.utils
 
 import id.walt.crypto.utils.HexUtils.matchesHex
 import kotlin.test.Test

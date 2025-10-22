@@ -314,6 +314,8 @@ object CredentialParser {
         }
     }
 
+    suspend fun parseOnly(rawCredential: String) = detectAndParse(rawCredential).second
+
     @OptIn(ExperimentalEncodingApi::class)
     suspend fun detectAndParse(rawCredential: String): Pair<CredentialDetectionResult, DigitalCredential> {
         val credential = rawCredential.trim()

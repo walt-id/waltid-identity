@@ -70,7 +70,7 @@ kotlin {
         }
     }
     js(IR) {
-        outputModuleName.set("digital-credentials")
+        outputModuleName.set("digital-credentials-examples")
         useEsModules()
 //        browser {
 //            commonWebpackConfig {
@@ -220,8 +220,8 @@ publishing {
         create<MavenPublication>("maven") {
             from(components["kotlin"])
             pom {
-                name.set("walt.id Digital Credentials")
-                description.set("walt.id Kotlin/Java library for Digital Credentials")
+                name.set("walt.id Digital Credentials Examples")
+                description.set("walt.id Kotlin/Java library for Examples of Digital Credentials")
                 url.set("https://walt.id")
 
                 licenses {

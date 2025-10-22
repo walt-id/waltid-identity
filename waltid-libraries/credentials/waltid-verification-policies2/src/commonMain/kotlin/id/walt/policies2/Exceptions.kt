@@ -109,7 +109,7 @@ class HolderBindingException(
 @Serializable
 @SerialName("NotAllowedIssuerException")
 class NotAllowedIssuerException(
-    val issuer: String,
+    val issuer: String?,
     val allowedIssuers: List<String>,
 ) : SerializableRuntimeException()
 

@@ -1,4 +1,4 @@
-package credentials
+package id.walt.credentials
 
 import id.walt.credentials.CredentialParser
 import kotlinx.coroutines.test.runTest

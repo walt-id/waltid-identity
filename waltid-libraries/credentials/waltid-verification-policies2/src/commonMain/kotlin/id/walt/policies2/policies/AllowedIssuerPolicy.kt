@@ -37,18 +37,25 @@ data class AllowedIssuerPolicy(
 
     override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
         return PolicyClaimChecker.checkClaim(credential, claims) { claim ->
-            val issuer = this.getIssuerList().first()
+            val issuer = credential.issuer
             val allowedIssuers = getAllowedIssuers()
 
-            if (issuer in allowedIssuers) {
-                Result.success(
+            when (issuer) {
+                null -> Result.failure( // TODO: clearer exception
+                    NotAllowedIssuerException(
+                        issuer = issuer,
+                        allowedIssuers = allowedIssuers
+                    )
+                )
+
+                in allowedIssuers -> Result.success(
                     AllowedIssuerPolicyClaimCheckResult(
                         issuer = issuer,
                         claim = claim.toString()
                     )
                 )
-            } else {
-                Result.failure(
+
+                else -> Result.failure(
                     NotAllowedIssuerException(
                         issuer = issuer,
                         allowedIssuers = allowedIssuers

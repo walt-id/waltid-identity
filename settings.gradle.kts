@@ -30,6 +30,7 @@ val modules = listOfNotNull(
     * "$libraries:credentials".group(
         "waltid-w3c-credentials",
         "waltid-digital-credentials",
+        "waltid-digital-credentials-examples",
         "waltid-mdoc-credentials",
         "waltid-dif-definitions-parser",
         "waltid-dcql",

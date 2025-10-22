@@ -1,7 +1,6 @@
-package credentials
+package id.walt.credentials
 
 import id.walt.credentials.CredentialDetectorTypes.CredentialDetectionResult
-import id.walt.credentials.CredentialParser
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
@@ -34,15 +33,15 @@ class CredentialParsingTest {
             }
         }
 
-        W3CExamples.allW3CCredentialExamples.forEachIndexed { index, example ->
+        W3CExampleList.allW3CCredentialExamples.forEachIndexed { index, example ->
             val (credentialTest, expectedResult) = example
             val (inputCredential, expectedClaims) = credentialTest
             doCheck(index, inputCredential to expectedResult, "w3c", expectedClaims)
         }
-        SdJwtExamples.allSdJwtVcCredentialExamples.forEachIndexed { index, example ->
+        SdJwtExampleList.allSdJwtVcCredentialExamples.forEachIndexed { index, example ->
             doCheck(index, example, "sdjwtvc")
         }
-        MdocsExamples.allMdocsExamples.forEachIndexed { index, example ->
+        MdocsExampleList.allMdocsExamples.forEachIndexed { index, example ->
             doCheck(index, example, "mdoc")
         }
 

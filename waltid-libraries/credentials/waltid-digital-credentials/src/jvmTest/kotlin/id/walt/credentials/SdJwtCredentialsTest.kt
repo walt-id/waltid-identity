@@ -1,6 +1,6 @@
-package credentials
+package id.walt.credentials
 
-import id.walt.credentials.CredentialParser
+import id.walt.credentials.examples.SdJwtExamples
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import kotlinx.coroutines.test.runTest
