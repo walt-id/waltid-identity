@@ -3,6 +3,7 @@ package credentials
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -11,7 +12,7 @@ import kotlin.test.Test
 class SdJwtCredentialsTest {
 
     @Test
-    fun checkSdDisclosureParsing() {
+    fun checkSdDisclosureParsing() = runTest {
         val example = SdJwtExamples.sdJwtVcSignedExample2
 
         val (detection, vc) = CredentialParser.detectAndParse(example)

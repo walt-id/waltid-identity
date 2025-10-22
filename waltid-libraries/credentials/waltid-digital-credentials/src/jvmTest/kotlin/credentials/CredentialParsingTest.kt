@@ -2,6 +2,7 @@ package credentials
 
 import id.walt.credentials.CredentialDetectorTypes.CredentialDetectionResult
 import id.walt.credentials.CredentialParser
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -12,10 +13,10 @@ import kotlin.test.Test
 class CredentialParsingTest {
 
     @Test
-    fun credentialParsingTest() {
+    fun credentialParsingTest() = runTest {
         val results = ArrayList<Triple<CredentialDetectionResult, CredentialDetectionResult, String>>()
 
-        fun doCheck(index: Int, example: Pair<String, CredentialDetectionResult>, name: String, claims: Map<String, Any>? = null) {
+        suspend fun doCheck(index: Int, example: Pair<String, CredentialDetectionResult>, name: String, claims: Map<String, Any>? = null) {
             val (credentialExample, expected) = example
             println("$name $index (expecting ${expected})")
             val (detection, credential) = CredentialParser.detectAndParse(credentialExample)

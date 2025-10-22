@@ -26,6 +26,9 @@ sealed class DigitalCredential {
      */
     abstract suspend fun getSignerKey(): Key?
 
+    // TODO: Signer key should globally move into signature, as such "open" key word to be removed in the future
+    //open suspend fun getSignerKey(): Key? = signature?.signerKey
+
     abstract suspend fun verify(publicKey: Key): Result<JsonElement>
 
     //fun sign()

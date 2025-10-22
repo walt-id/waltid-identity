@@ -2,6 +2,7 @@ package id.walt.credentials.formats
 
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseVerifier
+import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.CredentialSignature
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
@@ -30,9 +31,9 @@ data class MdocsCredential(
     // The signature is implicit within the COSE structures of the mdoc.
     override val signature: CredentialSignature? = null,
 
-
-    @EncodeDefault
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
     override var issuer: String? = null,
+
     @EncodeDefault
     override var subject: String? = null,
 ) : DigitalCredential() {
@@ -43,10 +44,17 @@ data class MdocsCredential(
      * Instead, it is put there by the credential parser (parsing from mdocs issuer auth chain),
      * so that it does not need to be reparsed every time.
      */
+    /*override suspend fun getSignerKey(): Key {
+        requireNotNull(signature) { "Mdocs credential is not signed" }
+        require(signature is CoseCredentialSignature) { "Mdocs is signed with wrong signature" }
+
+        //val issuerVirtualDid = issuer ?: throw IllegalArgumentException("Missing virtual issuer DID")
+        //val issuerKey = issuerDidResolver.resolveToKey(issuerVirtualDid).getOrThrow()
+        return signature.signerKey
+    }*/
     override suspend fun getSignerKey(): Key {
-        val issuerVirtualDid = issuer ?: throw IllegalArgumentException("Missing virtual issuer DID")
-        val issuerKey = issuerDidResolver.resolveToKey(issuerVirtualDid).getOrThrow()
-        return issuerKey
+        require(signature is CoseCredentialSignature) { "Invalid signature for Mdocs credential" }
+        return signature.signerKey
     }
 
     companion object {
@@ -96,8 +104,7 @@ data class MdocsCredential(
     }
 
     suspend fun verify(): Result<JsonElement> {
-        val issuerVirtualDid = issuer ?: throw IllegalArgumentException("Missing virtual issuer DID")
-        val issuerKey = issuerDidResolver.resolveToKey(issuerVirtualDid).getOrThrow()
-        return verify(issuerKey)
+        val signerKey = getSignerKey() ?: throw IllegalArgumentException("Missing signer key for mdocs credential")
+        return verify(signerKey)
     }
 }

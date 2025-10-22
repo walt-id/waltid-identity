@@ -44,6 +44,7 @@ data class SdJwtCredential(
 ) : DigitalCredential(), SelectivelyDisclosableVerifiableCredential {
     override val format: String = "dc+sd-jwt"
 
+    // TODO: issuer should move into signature, just use credential.signerKey from superclass
     override suspend fun getSignerKey(): Key? =
         when (signature) {
             null -> null

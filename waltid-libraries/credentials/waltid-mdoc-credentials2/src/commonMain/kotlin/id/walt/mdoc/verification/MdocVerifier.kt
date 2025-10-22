@@ -1,5 +1,6 @@
 package id.walt.mdoc.verification
 
+import id.walt.cose.CoseCertificate
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseVerifier
 import id.walt.crypto.keys.DirectSerializedKey
@@ -17,6 +18,7 @@ import id.walt.mdoc.parser.MdocParser
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.json.JsonObject
+import kotlin.io.encoding.Base64
 import kotlin.time.ExperimentalTime
 
 /**
@@ -79,6 +81,11 @@ object MdocVerifier {
         val docType = document.docType
         val credentialData = mergeMdocDataToJson(document)
 
+        val issuerAuthOrNull = issuerAuthResult.getOrNull()
+        val x5c = issuerAuthOrNull?.first?.map { Base64.encode(it.rawBytes) }
+        val signerKey = issuerAuthOrNull?.second?.let { DirectSerializedKey(it) }
+
+
         return VerificationResult(
             valid = isValid,
             issuerSignatureValid = issuerAuthResult.isSuccess,
@@ -88,7 +95,8 @@ object MdocVerifier {
             deviceKeyAuthorized = keyAuthzResult.isSuccess,
 
             docType = docType,
-            issuerKey = DirectSerializedKey(issuerAuthResult.getOrThrow()),
+            x5c = x5c,
+            signerKey = signerKey,
             credentialData = credentialData,
 
             errors = errors
@@ -111,10 +119,13 @@ object MdocVerifier {
         return mdocCredentialData
     }
 
-    suspend fun verifyIssuerAuthentication(document: Document): JWKKey {
+    suspend fun verifyIssuerAuthentication(document: Document): Pair<List<CoseCertificate>, JWKKey> {
         log.trace { "--- Verifying issuer authentication ---" }
         val issuerAuth = document.issuerSigned.issuerAuth
-        val signerCertificateBytes = issuerAuth.unprotected.x5chain?.first()?.rawBytes
+        val x5c = issuerAuth.unprotected.x5chain
+        requireNotNull(x5c) { "Missing certificate chain in mdocs credential" }
+
+        val signerCertificateBytes = x5c.first()?.rawBytes
             ?: throw IllegalArgumentException("Missing signer certificate in x5chain.")
 
         log.trace {
@@ -129,7 +140,7 @@ object MdocVerifier {
         if (!issuerAuth.verify(issuerKey.toCoseVerifier())) {
             throw IllegalArgumentException("IssuerAuth COSE_Sign1 signature is invalid.")
         }
-        return issuerKey
+        return x5c to issuerKey
     }
 
     fun verifyMso(mso: MobileSecurityObject) {

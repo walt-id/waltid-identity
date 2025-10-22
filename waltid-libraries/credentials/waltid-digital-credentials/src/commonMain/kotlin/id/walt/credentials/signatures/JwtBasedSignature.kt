@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonObject
 
 interface JwtBasedSignature {
     val jwtHeader: JsonObject?
+    //val x5cList: X5CList?
 
     /**
      * Get issuer key from credential data or jwt header
