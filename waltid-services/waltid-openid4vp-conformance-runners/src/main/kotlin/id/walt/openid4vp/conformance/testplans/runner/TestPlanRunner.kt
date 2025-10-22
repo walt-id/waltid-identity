@@ -98,7 +98,7 @@ class TestPlanRunner(
         println("-- Conformance & Verifier 2 -- -> Present to Verifier2")
 
         // Present
-        val bootstrapRequestUrl = verificationSessionResponse.bootstrapAuthorizationRequestUrl
+        val bootstrapRequestUrl = verificationSessionResponse.bootstrapAuthorizationRequestUrl!!
         conformanceHttp.get(bootstrapRequestUrl) {
 
         }
