@@ -69,6 +69,7 @@ kotlin {
                 implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
                 implementation(project(":waltid-libraries:credentials:waltid-dif-definitions-parser"))
                 implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
+                implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
 
                 // Kotlinx
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
