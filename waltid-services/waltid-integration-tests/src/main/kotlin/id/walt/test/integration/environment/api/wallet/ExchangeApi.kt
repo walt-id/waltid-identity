@@ -224,6 +224,6 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
     ) = e2e.test("/wallet-api/wallet/{wallet}/exchange/usePresentationRequest - present credentials") {
         client.post("/wallet-api/wallet/$wallet/exchange/usePresentationRequest") {
             setBody(request)
-        }.also { println("usePresentationRequest result: ${it.bodyAsText()}") }.expectStatus()
+        }.expectStatus()
     }
 }

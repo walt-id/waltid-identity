@@ -76,6 +76,7 @@ class E2ETest(
         host: String = "localhost",
         port: Int = this.port,
         timeout: Duration = 5.minutes,
+        logConfig: String = "default",
         block: suspend E2ETest.() -> Unit,
     ) = testBlock(
         service = ServiceMain(
@@ -87,11 +88,12 @@ class E2ETest(
                 run = E2ETestWebService(module).runService(suspend { block.invoke(this) }, host, port)
             )
         ),
-        timeout = timeout
+        timeout = timeout,
+        logConfig = logConfig,
     )
 
 
-    fun testBlock(service: ServiceMain, timeout: Duration) = runTest(timeout = timeout) {
+    fun testBlock(service: ServiceMain, timeout: Duration, logConfig: String = "default") = runTest(timeout = timeout) {
         /*ServiceMain(
             ServiceConfiguration("e2e-test"), ServiceInitialization(
                 features = listOf(id.walt.issuer.FeatureCatalog, id.walt.verifier.FeatureCatalog, id.walt.webwallet.FeatureCatalog),
@@ -107,7 +109,7 @@ class E2ETest(
                 run = E2ETestWebService(Application::e2eTestModule).run(block)
             )
         )*/
-        service.main(arrayOf("-l", "trace"))
+        service.main(arrayOf("-l", "config-file"))
 
         t.println("\n" + TextColors.magenta("Test results:"))
         testResults.forEachIndexed { index, result ->
@@ -139,12 +141,15 @@ class E2ETest(
     }
 
     suspend fun test(name: String, function: suspend () -> Any?): Result<Any?> {
+        val id = numTests + 1
+        t.println("\n${TextColors.cyan(TextStyles.bold("---=== Start $id. test: $name === ---"))}")
+        val result = runCatching { function.invoke() }
+        return addTestResult(name, result)
+    }
+
+    fun <R>addTestResult(name: String,  result: Result<R>) : Result<R> {
         val id = numTests++
         testNames[id] = name
-
-        t.println("\n${TextColors.cyan(TextStyles.bold("---=== Start $id. test: $name === ---"))}")
-
-        val result = runCatching { function.invoke() }
         if (failEarly && result.isFailure) {
             t.println("\n${TextColors.brightRed("Fail early called for $id. test: $name")}")
             val err = result.exceptionOrNull()!!
@@ -168,7 +173,6 @@ class E2ETest(
         val failed = testResults.size - overallSuccess
         val failedStr = if (failed == 0) "none failed ✅" else TextColors.red("$failed failed")
         t.println(TextColors.magenta("Current test stats: ${testResults.size} overall | $overallSuccess succeeded | $failedStr\n"))
-
         return result
     }
 

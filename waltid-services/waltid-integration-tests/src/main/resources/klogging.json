@@ -1,0 +1,75 @@
+{
+  "sinks": {
+    "stdout": {
+      "renderWith": "RENDER_SIMPLE",
+      "sendTo": "STDOUT"
+    },
+    "stderr": {
+      "renderWith": "RENDER_SIMPLE",
+      "sendTo": "STDERR"
+    }
+  },
+  "logging": [
+    {
+      "comment": "Default loglevel: WARN",
+      "levelRanges": [
+        {
+          "fromMinLevel": "ERROR",
+          "toSinks": [
+            "stderr"
+          ]
+        },
+        {
+          "fromMinLevel": "WARN",
+          "toMaxLevel": "WARN",
+          "toSinks": [
+            "stdout"
+          ]
+        }
+      ]
+    },
+    {
+      "comment": "Loglevel for service request monitoring",
+      "exactLogger": "WebLog",
+      "levelRanges": [
+        {
+          "fromMinLevel": "WARN",
+          "toSinks": [
+            "stdout"
+          ]
+        }
+      ]
+    },
+    {
+      "comment": "Loglevel for http client requests",
+      "fromLoggerBase": "io.ktor.client",
+      "levelRanges": [
+        {
+          "fromMinLevel": "WARN",
+          "toSinks": [
+            "stdout"
+          ]
+        }
+      ]
+    },
+    {
+      "comment": "Default loglevel: WARN",
+      "fromLoggerBase": "id.walt",
+      "levelRanges": [
+        {
+          "fromMinLevel": "ERROR",
+          "toSinks": [
+            "stderr"
+          ]
+        },
+        {
+          "fromMinLevel": "INFO",
+          "toMaxLevel": "WARN",
+          "toSinks": [
+            "stdout"
+          ]
+        }
+      ]
+    }
+  ]
+}

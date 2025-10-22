@@ -20,6 +20,7 @@ import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeDocs.getUseOff
 import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeDocs.getUsePresentationRequestDocs
 import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeOpenApiCommons
 import id.walt.webwallet.web.controllers.walletRoute
+import io.github.oshai.kotlinlogging.withLoggingContext
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
