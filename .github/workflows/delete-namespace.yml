@@ -1,0 +1,21 @@
+name: Delete Kubernetes Namespace on Branch Deletion or Manual Trigger
+
+on:
+  delete:
+    branches:
+      - '*'
+  workflow_dispatch:
+
+jobs:
+  delete_namespace:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inject enhanced GitHub environment variables
+        uses: rlespinasse/github-slug-action@v5
+      - name: Delete namespace if not exists
+        uses: actions-hub/kubectl@master
+        continue-on-error: true
+        env:
+          KUBE_CONFIG: ${{ secrets[inputs.kubeconfig_secret] }}
+        with:
+          args: delete namespace ${GITHUB_REF_NAME}
