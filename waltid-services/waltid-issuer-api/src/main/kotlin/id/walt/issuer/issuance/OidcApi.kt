@@ -26,10 +26,10 @@ import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.sdjwt.JWTVCIssuerMetadata
 import id.walt.sdjwt.SDJWTVCTypeMetadata
-import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
+import io.klogging.Klogging
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -45,9 +45,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
 
-object OidcApi : CIProvider() {
-
-    private val logger = KotlinLogging.logger { }
+object OidcApi : CIProvider(), Klogging {
 
     private fun Application.oidcRoute(build: Route.() -> Unit) {
         routing {
@@ -324,7 +322,7 @@ object OidcApi : CIProvider() {
                         )
                     }
 
-                    logger.info { "Redirect Uri is: $redirectUri" }
+                    logger.debug { "Redirect Uri is: $redirectUri" }
 
                     call.response.apply {
 
@@ -372,7 +370,7 @@ object OidcApi : CIProvider() {
             }) {
 
                 val params = call.receiveParameters().toMap()
-                logger.info { "/direct_post params: $params" }
+                logger.debug { "/direct_post params: $params" }
 
                 if (params["state"]?.get(0) == null || (params[ResponseType.IdToken.value]?.get(0) == null && params[ResponseType.VpToken.value]?.get(0) == null)) {
                     call.respond(
@@ -452,14 +450,14 @@ object OidcApi : CIProvider() {
             }) {
                 val params = call.receiveParameters().toMap()
 
-                logger.info { "/token params: $params" }
+                logger.debug { "/token params: $params" }
 
                 val tokenReq = TokenRequest.fromHttpParameters(params)
-                logger.info { "/token tokenReq from params: $tokenReq" }
+                logger.debug { "/token tokenReq from params: $tokenReq" }
 
                 try {
                     val tokenResp = processTokenRequest(tokenReq)
-                    logger.info { "/token tokenResp: $tokenResp" }
+                    logger.debug { "/token tokenResp: $tokenResp" }
                     call.respond(tokenResp.toJSON())
                 } catch (exc: TokenError) {
                     logger.error(exc) { "Token error: " }
@@ -651,7 +649,7 @@ object OidcApi : CIProvider() {
                         "No redirect_uri found for this authorization request"
                     )
 
-                    logger.info { "Redirect Uri is: $redirectUri" }
+                    logger.debug { "Redirect Uri is: $redirectUri" }
 
                     call.response.apply {
                         status(HttpStatusCode.Found)

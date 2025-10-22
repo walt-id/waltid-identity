@@ -1,0 +1,47 @@
+name: Deploy manually to branch based environments
+
+on:
+  workflow_dispatch:
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      release_version: ${{ steps.set_version.outputs.release_version }}
+    steps:
+      - name: Inject enhanced GitHub environment variables
+        uses: rlespinasse/github-slug-action@v5
+      - name: Set release version
+        id: set_version
+        run: echo "release_version=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+  docker-matrix:
+    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@70e59bbea44de0b3511bb6bd72faa553e92f7bcf
+    with:
+      jsonpath: ".github/workflows/data/docker-matrix.json"
+  docker:
+    uses: walt-id/waltid-identity/.github/workflows/docker.yml@69b0349a4d83b3183475baf7cd512d54f5541af8
+    secrets: inherit
+    needs: [ version, docker-matrix ]
+    with:
+      images: ${{ needs.docker-matrix.outputs.json }}s
+      version: ${{ needs.version.outputs.release_version }}
+      publish: true
+  api-docker-matrix:
+    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@70e59bbea44de0b3511bb6bd72faa553e92f7bcf
+    with:
+      jsonpath: ".github/workflows/data/api-docker-matrix.json"
+  api-docker:
+    uses: walt-id/waltid-identity/.github/workflows/api-docker.yml@563c196ae5dcbfdbaa1cd5d9a08d94efc331fa34
+    secrets: inherit
+    needs: [ version, api-docker-matrix ]
+    with:
+      images: ${{ needs.api-docker-matrix.outputs.json }}
+      version: ${{ needs.version.outputs.release_version }}
+      publish: true
+  deploy:
+    uses: walt-id/waltid-identity/.github/workflows/helm-deployment.yml@82c7362df0b04e81d9eede712fc13c31f6009e50
+    secrets: inherit
+    needs: [ version, docker, api-docker]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      namespace: ${{ needs.version.outputs.release_version }}

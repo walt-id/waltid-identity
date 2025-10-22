@@ -5,6 +5,7 @@ package id.walt.webwallet.usecase.claim
 
 import TestUtils
 import id.walt.crypto.utils.UuidUtils.randomUUID
+import id.walt.oid4vc.providers.CredentialWalletConfig
 import id.walt.webwallet.seeker.Seeker
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -14,6 +15,7 @@ import id.walt.webwallet.service.events.CredentialEventDataActor
 import id.walt.webwallet.service.exchange.CredentialDataResult
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
+import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
 import id.walt.webwallet.service.trust.TrustValidationService
 import id.walt.webwallet.usecase.entity.EntityNameResolutionUseCase
 import id.walt.webwallet.usecase.event.EventLogUseCase
@@ -30,6 +32,16 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class SilentClaimStrategyTest {
+
+    companion object {
+        private val accountId = Uuid.random()
+        private val walletId = Uuid.random()
+
+        fun createTestWallet(account: Uuid, wallet: Uuid, did: String): TestCredentialWallet {
+            return TestCredentialWallet(account, wallet, CredentialWalletConfig(), did)
+        }
+    }
+
     private val json = Json { ignoreUnknownKeys = true }
     private val issuanceService = mockk<IssuanceService>()
     private val credentialService = mockk<CredentialsService>()
@@ -43,6 +55,7 @@ class SilentClaimStrategyTest {
     private val didService: DidsService = mockk<DidsService>()
     private val accountService: AccountsService = mockk<AccountsService>()
     private val sut = SilentClaimStrategy(
+        walletProvider = ::createTestWallet,
         issuanceService = issuanceService,
         credentialService = credentialService,
         issuerTrustValidationService = issuerTrustValidationService,
@@ -100,7 +113,7 @@ class SilentClaimStrategyTest {
         runTest {
             coEvery { issuerTrustValidationService.validate(any(), any(), any()) } returns true
 
-            val result = sut.claim(did, offer)
+            val result = sut.claim(accountId, walletId, did, offer)
 
             assertEquals(1, result.size)
             assertEquals(credentialId, result[0])

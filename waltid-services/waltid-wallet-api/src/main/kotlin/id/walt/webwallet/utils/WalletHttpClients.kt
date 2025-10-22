@@ -13,7 +13,7 @@ object WalletHttpClients {
                 json()
             }
             install(Logging) {
-                logger = Logger.SIMPLE
+                logger = Logger.DEFAULT
                 level = LogLevel.ALL
             }
             followRedirects = false

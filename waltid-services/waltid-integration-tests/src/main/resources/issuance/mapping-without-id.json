@@ -1,0 +1,12 @@
+{
+  "issuer":
+  {
+    "id": "<issuerDid>"
+  },
+  "credentialSubject":
+  {
+    "id": "<subjectDid>"
+  },
+  "issuanceDate": "<timestamp>",
+  "expirationDate": "<timestamp-in:365d>"
+}

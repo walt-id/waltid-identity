@@ -72,6 +72,7 @@ import kotlin.time.toJavaInstant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toKotlinUuid
+import id.walt.webwallet.performance.Stopwatch
 
 @OptIn(ExperimentalUuidApi::class)
 object WalletServiceManager {
@@ -141,6 +142,7 @@ object WalletServiceManager {
     )
     val silentClaimStrategy by lazy {
         SilentClaimStrategy(
+            walletProvider = SSIKit2WalletService::getCredentialWallet,
             issuanceService = IssuanceService,
             credentialService = credentialService,
             issuerTrustValidationService = issuerTrustValidationService,
@@ -237,11 +239,16 @@ object WalletServiceManager {
     ): List<WalletCredential> {
         val pd = Json.decodeFromJsonElement<id.walt.definitionparser.PresentationDefinition>(presentationDefinition.toJSON())
         val matches = credentialService.list(walletId, CredentialFilterObject.default).filter { cred ->
+            val timerId = Uuid.random().toString()
+            Stopwatch.startTimer(timerId)
             val fullDoc = WalletCredential.parseFullDocument(cred.document, cred.disclosures, cred.id, cred.format)
-            fullDoc != null &&
+            Stopwatch.addTiming(timerId, "parseCredential")
+            val result = fullDoc != null &&
                     pd.inputDescriptors.any { inputDesc ->
                         PresentationDefinitionParser.matchCredentialsForInputDescriptor(flowOf(fullDoc), inputDesc).toList().isNotEmpty()
                     }
+            Stopwatch.addTiming(timerId, "matched")
+            result
         }
         return matches
     }
