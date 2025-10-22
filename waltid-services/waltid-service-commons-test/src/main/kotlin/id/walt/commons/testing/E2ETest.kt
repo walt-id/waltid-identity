@@ -11,6 +11,8 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.AbstractFeature
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.featureflag.ServiceFeatureCatalog
+import id.walt.commons.logging.LoggingManager
+import id.walt.commons.logging.RenderStrings
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
@@ -29,6 +31,12 @@ class E2ETest(
     val port: Int = 22222,
     val failEarly: Boolean = false,
 ) {
+
+    init {
+        LoggingManager.useLoggingSetup("trace", RenderStrings.ANSI_LONG)
+        LoggingManager.setup()
+    }
+
     data class TestStats(
         val overall: Int,
         val success: Int,
@@ -38,27 +46,29 @@ class E2ETest(
     private val e2eHost = this.host
     private val e2ePort = this.port
 
-    fun testHttpClient(bearerToken: String? = null, doFollowRedirects: Boolean = true, block: HttpClientConfig<*>.() -> Unit = {}) = HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json()
-        }
-        install(DefaultRequest) {
-            contentType(ContentType.Application.Json)
-            host = e2eHost
-            port = e2ePort
+    fun testHttpClient(bearerToken: String? = null, doFollowRedirects: Boolean = true, block: HttpClientConfig<*>.() -> Unit = {}) =
+        HttpClient(CIO) {
+            install(ContentNegotiation) {
+                json()
+            }
+            install(DefaultRequest) {
+                contentType(ContentType.Application.Json)
+                host = e2eHost
+                port = e2ePort
 
-            if (bearerToken != null) bearerAuth(bearerToken)
+                if (bearerToken != null) bearerAuth(bearerToken)
+            }
+            install(Logging) {
+                level = LogLevel.ALL
+            }
+            followRedirects = doFollowRedirects
+            block.invoke(this)
         }
-        install(Logging) {
-            level = LogLevel.ALL
-        }
-        followRedirects = doFollowRedirects
-        block.invoke(this)
-    }
 
     var numTests = 0
     val testResults = ArrayList<Result<Any?>>()
     val testNames = HashMap<Int, String>()
+
     companion object {
         val term = Terminal(ansiLevel = AnsiLevel.TRUECOLOR)
     }
@@ -152,12 +162,12 @@ class E2ETest(
 
     suspend fun test(name: String, function: suspend () -> Any?): Result<Any?> {
         val id = numTests + 1
-        t.println("\n${TextColors.cyan(TextStyles.bold("---=== Start $id. test: $name === ---"))}")
+        term.println("\n${TextColors.cyan(TextStyles.bold("---=== Start $id. test: $name === ---"))}")
         val result = runCatching { function.invoke() }
         return addTestResult(name, result)
     }
 
-    fun <R>addTestResult(name: String,  result: Result<R>) : Result<R> {
+    fun <R> addTestResult(name: String, result: Result<R>): Result<R> {
         val id = numTests++
         testNames[id] = name
         if (failEarly && result.isFailure) {

@@ -7,6 +7,7 @@ import id.walt.credentials.representations.X5CCertificateString
 import id.walt.credentials.representations.X5CList
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
+import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.KeyManager
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
@@ -18,27 +19,17 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
-import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
-import id.walt.openid4vp.verifier.Verification2Session
-import id.walt.openid4vp.verifier.VerificationSessionCreator
-import id.walt.openid4vp.verifier.OSSVerifier2FeatureCatalog
-import id.walt.openid4vp.verifier.verifierModule
+import id.walt.openid4vp.verifier.*
 import id.walt.policies2.PolicyList
 import id.walt.policies2.policies.CredentialDataMatcherPolicy
 import id.walt.policies2.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
-import io.ktor.client.call.body
-import io.ktor.client.request.get
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.server.application.Application
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.server.application.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.boolean
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import org.junit.jupiter.api.assertNotNull
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -115,7 +106,7 @@ class MsoMdocsVerifier2IntegrationTest {
             docType = "org.iso.18013.5.1.mDL",
             signature = CoseCredentialSignature(
                 x5cList = X5CList(listOf(X5CCertificateString("MIICCTCCAbCgAwIBAgIUfqyiArJZoX7M61/473UAVi2/UpgwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDY0MTEzWhcNMjYwOTAyMDY0MTEzWjAzMQswCQYDVQQGEwJBVDEkMCIGA1UEAwwbV2FsdGlkIFRlc3QgRG9jdW1lbnQgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5Xp3CFQDMrMpR/SQ0jt/jTOqExk1PRzjQ79aKpIsJM1mqOBrDCBqTAfBgNVHSMEGDAWgBTxCn2nWMrE70qXb614U14BweY2azAdBgNVHQ4EFgQUx5qkOLC4lpl1xpYZGmF9HLxtp0gwDgYDVR0PAQH/BAQDAgeAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCQGA1UdHwQdMBswGaAXoBWGE2h0dHBzOi8vd2FsdC5pZC9jcmwwCgYIKoZIzj0EAwIDRwAwRAIgHTap3c6yCUNhDVfZWBPMKj9dCWZbrME03kh9NJTbw1ECIAvVvuGll9O21eR16SkJHHAA1pPcovhcTvF9fz9cc66M"))),
-                signerKey = runBlocking { KeyManager.resolveSerializedKey("""{"type":"jwk","jwk":{"kty":"EC","crv":"P-256","x":"Pzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5U","y":"6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo"}}""") }
+                signerKey = DirectSerializedKey(runBlocking { KeyManager.resolveSerializedKey("""{"type":"jwk","jwk":{"kty":"EC","crv":"P-256","x":"Pzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5U","y":"6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo"}}""") })
 
             ),
         ),
@@ -169,7 +160,7 @@ class MsoMdocsVerifier2IntegrationTest {
             docType = "org.iso.23220.photoid.1",
             signature = CoseCredentialSignature(
                 x5cList = X5CList(listOf(X5CCertificateString("MIICCTCCAbCgAwIBAgIUfqyiArJZoX7M61/473UAVi2/UpgwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDY0MTEzWhcNMjYwOTAyMDY0MTEzWjAzMQswCQYDVQQGEwJBVDEkMCIGA1UEAwwbV2FsdGlkIFRlc3QgRG9jdW1lbnQgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5Xp3CFQDMrMpR/SQ0jt/jTOqExk1PRzjQ79aKpIsJM1mqOBrDCBqTAfBgNVHSMEGDAWgBTxCn2nWMrE70qXb614U14BweY2azAdBgNVHQ4EFgQUx5qkOLC4lpl1xpYZGmF9HLxtp0gwDgYDVR0PAQH/BAQDAgeAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCQGA1UdHwQdMBswGaAXoBWGE2h0dHBzOi8vd2FsdC5pZC9jcmwwCgYIKoZIzj0EAwIDRwAwRAIgHTap3c6yCUNhDVfZWBPMKj9dCWZbrME03kh9NJTbw1ECIAvVvuGll9O21eR16SkJHHAA1pPcovhcTvF9fz9cc66M"))),
-                signerKey = runBlocking { KeyManager.resolveSerializedKey("""{"type":"jwk","jwk":{"kty":"EC","crv":"P-256","x":"Pzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5U","y":"6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo"}}""") }
+                signerKey = DirectSerializedKey(runBlocking { KeyManager.resolveSerializedKey("""{"type":"jwk","jwk":{"kty":"EC","crv":"P-256","x":"Pzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5U","y":"6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo"}}""") })
             ),
         )
     )
@@ -297,7 +288,7 @@ class MsoMdocsVerifier2IntegrationTest {
                 WalletPresentFunctionality2.walletPresentHandling(
                     holderKey = holderKey,
                     holderDid = null, // No DID required for mso_mdocs
-                    presentationRequestUrl = bootstrapUrl,
+                    presentationRequestUrl = bootstrapUrl!!,
                     selectCredentialsForQuery = selectCallback,
                     holderPoliciesToRun = null,
                     runPolicies = null

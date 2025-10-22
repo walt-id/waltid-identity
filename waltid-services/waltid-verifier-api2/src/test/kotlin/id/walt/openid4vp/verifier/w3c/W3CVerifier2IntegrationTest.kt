@@ -322,7 +322,7 @@ class W3CVerifier2IntegrationTest {
                 WalletPresentFunctionality2.walletPresentHandling(
                     holderKey = holderKey,
                     holderDid = holderDid,
-                    presentationRequestUrl = bootstrapUrl,
+                    presentationRequestUrl = bootstrapUrl!!,
                     selectCredentialsForQuery = selectCallback,
                     holderPoliciesToRun = null,
                     runPolicies = null

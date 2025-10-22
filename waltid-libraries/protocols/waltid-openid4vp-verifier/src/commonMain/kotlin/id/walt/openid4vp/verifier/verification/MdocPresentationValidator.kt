@@ -5,6 +5,7 @@ import id.walt.credentials.presentations.formats.MsoMdocPresentation
 import id.walt.credentials.representations.X5CCertificateString
 import id.walt.credentials.representations.X5CList
 import id.walt.credentials.signatures.CoseCredentialSignature
+import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.mdoc.verification.MdocVerifier
 import id.walt.mdoc.verification.VerificationContext
 import id.walt.openid4vp.verifier.verification.Verifier2PresentationValidator.PresentationValidationResult
@@ -49,7 +50,7 @@ object MdocPresentationValidator {
             docType = docType,
             issuer = null, //issuerVirtualDid,
             signature = CoseCredentialSignature(
-                signerKey = signerKey,
+                signerKey = DirectSerializedKey(signerKey),
                 x5cList = x5CList
             )
         )

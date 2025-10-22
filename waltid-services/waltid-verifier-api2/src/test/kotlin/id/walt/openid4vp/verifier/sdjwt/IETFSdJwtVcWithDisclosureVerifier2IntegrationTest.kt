@@ -10,6 +10,7 @@ import id.walt.credentials.representations.X5CCertificateString
 import id.walt.credentials.representations.X5CList
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
+import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.KeyManager
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
@@ -21,11 +22,11 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
+import id.walt.openid4vp.verifier.OSSVerifier2FeatureCatalog
 import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
 import id.walt.openid4vp.verifier.Verification2Session
 import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionCreationResponse
 import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
-import id.walt.openid4vp.verifier.OSSVerifier2FeatureCatalog
 import id.walt.openid4vp.verifier.verifierModule
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
@@ -66,7 +67,8 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
     )
 
     private val additionalSdjwtvcPolicies =
-        Json.decodeFromString<Verification2Session.DefinedVerificationPolicies>("""
+        Json.decodeFromString<Verification2Session.DefinedVerificationPolicies>(
+            """
   {
     "vcPolicies": [
       {
@@ -118,10 +120,12 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
       }
     ]
   }
-        """.trimIndent())
+        """.trimIndent()
+        )
 
     private val walletCredentials = listOf(
-        Json.decodeFromString< DigitalCredential>("""
+        Json.decodeFromString<DigitalCredential>(
+            """
             {
           "type": "vc-sd_jwt",
           "dmtype": "sdjwtvcdm",
@@ -219,7 +223,8 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
           "signed": "eyJ4NWMiOlsiLS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tXG5NSUlCZVRDQ0FSOENGSHJXZ3JHbDVLZGVmU3ZSUWhSK2FvcWRmNDgrTUFvR0NDcUdTTTQ5QkFNQ01CY3hGVEFUQmdOVkJBTU1ERTFFVDBNZ1VrOVBWQ0JEUVRBZ0Z3MHlOVEExTVRReE5EQTRNRGxhR0E4eU1EYzFNRFV3TWpFME1EZ3dPVm93WlRFTE1Ba0dBMVVFQmhNQ1FWUXhEekFOQmdOVkJBZ01CbFpwWlc1dVlURVBNQTBHQTFVRUJ3d0dWbWxsYm01aE1SQXdEZ1lEVlFRS0RBZDNZV3gwTG1sa01SQXdEZ1lEVlFRTERBZDNZV3gwTG1sa01SQXdEZ1lEVlFRRERBZDNZV3gwTG1sek1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRUcwUklOQmlGK29RVUQzZDVER25lZ1F1WGVuSTI5SkRhTUdvTXZpb0tSQk41M2Q0VWF6YWtTMnVudThCbnNFdHh1dFMya3FSaFlCUFlrOVJBcmlVM2dUQUtCZ2dxaGtqT1BRUURBZ05JQURCRkFpQU9Nd003aEg3cTlEaSttVDZxQ2k0THZCK2tIOE94TWhlSXJaMmVSUHh0RFFJaEFMSHpUeHd2TjhVZHQwWjJDcG84SkJpaHFhY2ZlWGtJeFZBTzhYa3htWGhCXG4tLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tIl0sImtpZCI6Ijl2dWFKeVV4Ung0S21IeW9aOWtqSnhNc19tanBubmYtbVBNOW5QTUc1MUEiLCJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFUzI1NiJ9.eyJnaXZlbl9uYW1lIjoiSm9obiIsImZhbWlseV9uYW1lIjoiRG9lIiwiZW1haWwiOiJqb2huZG9lQGV4YW1wbGUuY29tIiwicGhvbmVfbnVtYmVyIjoiKzEtMjAyLTU1NS0wMTAxIiwiYWRkcmVzcyI6eyJzdHJlZXRfYWRkcmVzcyI6IjEyMyBNYWluIFN0IiwibG9jYWxpdHkiOiJBbnl0b3duIiwicmVnaW9uIjoiQW55c3RhdGUiLCJjb3VudHJ5IjoiVVMifSwiaXNfb3Zlcl8xOCI6dHJ1ZSwiaXNfb3Zlcl8yMSI6dHJ1ZSwiaXNfb3Zlcl82NSI6dHJ1ZSwiaWQiOiJ1cm46dXVpZDoxNTAzMDk4OS1lMzlmLTQ4MzEtODhlZS1iZjUzZGJlMjlmNjgiLCJpYXQiOjE3NTk5Nzg4NzAsIm5iZiI6MTc1OTk3ODg3MCwiZXhwIjoxNzkxNTE0ODcwLCJpc3MiOiJodHRwczovL2lzc3Vlci5kZW1vLndhbHQuaWQvZHJhZnQxMyIsImNuZiI6eyJraWQiOiJkaWQ6a2V5OnpEbmFlWWI3RGFrUVdtWWtyTGttc1ZFUkFhekY1WWExRzVueGJTblFjTEpaOENyMTcifSwidmN0IjoiaHR0cHM6Ly9pc3N1ZXIuZGVtby53YWx0LmlkL2RyYWZ0MTMvaWRlbnRpdHlfY3JlZGVudGlhbCIsImRpc3BsYXkiOltdLCJfc2QiOlsibHlaZVlXckRkbEo5cVRmNFAwaVBKUUhZUFJocV9NVjRmX1lyTHVBMlBGOCJdfQ.FRi4y983m4c9u9VrmJDa7KY6o--7HPpHZW3nLGmv_yT5OTLszFn-nTlON9BeN3CzqDDvwDI9X41vm8h3m1fPSg",
           "format": "dc+sd-jwt"
         }
-        """.trimIndent()),
+        """.trimIndent()
+        ),
         MdocsCredential(
             credentialData = Json.decodeFromString(
                 """
@@ -243,7 +248,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
             docType = "org.iso.18013.5.1.mDL",
             signature = CoseCredentialSignature(
                 x5cList = X5CList(listOf(X5CCertificateString("MIICCTCCAbCgAwIBAgIUfqyiArJZoX7M61/473UAVi2/UpgwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDY0MTEzWhcNMjYwOTAyMDY0MTEzWjAzMQswCQYDVQQGEwJBVDEkMCIGA1UEAwwbV2FsdGlkIFRlc3QgRG9jdW1lbnQgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5Xp3CFQDMrMpR/SQ0jt/jTOqExk1PRzjQ79aKpIsJM1mqOBrDCBqTAfBgNVHSMEGDAWgBTxCn2nWMrE70qXb614U14BweY2azAdBgNVHQ4EFgQUx5qkOLC4lpl1xpYZGmF9HLxtp0gwDgYDVR0PAQH/BAQDAgeAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCQGA1UdHwQdMBswGaAXoBWGE2h0dHBzOi8vd2FsdC5pZC9jcmwwCgYIKoZIzj0EAwIDRwAwRAIgHTap3c6yCUNhDVfZWBPMKj9dCWZbrME03kh9NJTbw1ECIAvVvuGll9O21eR16SkJHHAA1pPcovhcTvF9fz9cc66M"))),
-                signerKey = runBlocking { KeyManager.resolveSerializedKey("""{"type":"jwk","jwk":{"kty":"EC","crv":"P-256","x":"Pzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5U","y":"6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo"}}""") }
+                signerKey = DirectSerializedKey(runBlocking { KeyManager.resolveSerializedKey("""{"type":"jwk","jwk":{"kty":"EC","crv":"P-256","x":"Pzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5U","y":"6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo"}}""") })
             ),
         ),
         MdocsCredential(
@@ -296,7 +301,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
             docType = "org.iso.23220.photoid.1",
             signature = CoseCredentialSignature(
                 x5cList = X5CList(listOf(X5CCertificateString("MIICCTCCAbCgAwIBAgIUfqyiArJZoX7M61/473UAVi2/UpgwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDY0MTEzWhcNMjYwOTAyMDY0MTEzWjAzMQswCQYDVQQGEwJBVDEkMCIGA1UEAwwbV2FsdGlkIFRlc3QgRG9jdW1lbnQgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5Xp3CFQDMrMpR/SQ0jt/jTOqExk1PRzjQ79aKpIsJM1mqOBrDCBqTAfBgNVHSMEGDAWgBTxCn2nWMrE70qXb614U14BweY2azAdBgNVHQ4EFgQUx5qkOLC4lpl1xpYZGmF9HLxtp0gwDgYDVR0PAQH/BAQDAgeAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCQGA1UdHwQdMBswGaAXoBWGE2h0dHBzOi8vd2FsdC5pZC9jcmwwCgYIKoZIzj0EAwIDRwAwRAIgHTap3c6yCUNhDVfZWBPMKj9dCWZbrME03kh9NJTbw1ECIAvVvuGll9O21eR16SkJHHAA1pPcovhcTvF9fz9cc66M"))),
-                signerKey = runBlocking { KeyManager.resolveSerializedKey("""{"type":"jwk","jwk":{"kty":"EC","crv":"P-256","x":"Pzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5U","y":"6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo"}}""") }
+                signerKey = DirectSerializedKey(runBlocking { KeyManager.resolveSerializedKey("""{"type":"jwk","jwk":{"kty":"EC","crv":"P-256","x":"Pzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5U","y":"6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo"}}""") })
             ),
         )
     )
@@ -426,7 +431,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                 WalletPresentFunctionality2.walletPresentHandling(
                     holderKey = holderKey,
                     holderDid = holderDid,
-                    presentationRequestUrl = bootstrapUrl,
+                    presentationRequestUrl = bootstrapUrl!!,
                     selectCredentialsForQuery = selectCallback,
                     holderPoliciesToRun = null,
                     runPolicies = null

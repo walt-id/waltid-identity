@@ -54,7 +54,7 @@ data class MdocsCredential(
     }*/
     override suspend fun getSignerKey(): Key {
         require(signature is CoseCredentialSignature) { "Invalid signature for Mdocs credential" }
-        return signature.signerKey
+        return signature.signerKey.key
     }
 
     companion object {

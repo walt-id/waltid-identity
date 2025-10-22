@@ -19,6 +19,7 @@ import id.walt.credentials.utils.JwtUtils
 import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.credentials.utils.SdJwtUtils.getSdArrays
 import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
+import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.utils.Base64Utils.base64Url
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.matchesBase64Url
@@ -159,7 +160,7 @@ object CredentialParser {
         ) to MdocsCredential(
             signature = CoseCredentialSignature(
                 x5cList = x5CList,
-                signerKey = parsedIssuerAuth.signerKey
+                signerKey = DirectSerializedKey(parsedIssuerAuth.signerKey)
             ),
             //credentialData = credentialData,
             //credentialDataOld = mdoc.issuerSigned.toUIJson(),
