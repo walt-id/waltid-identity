@@ -44,6 +44,7 @@ import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedDis
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
+import io.klogging.Klogging
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
@@ -64,7 +65,7 @@ const val WALLET_BASE_URL = "http://localhost:$WALLET_PORT"
 class TestCredentialWallet(
     config: CredentialWalletConfig,
     val did: String,
-) : OpenIDCredentialWallet<VPresentationSession>(WALLET_BASE_URL, config) {
+) : OpenIDCredentialWallet<VPresentationSession>(WALLET_BASE_URL, config), Klogging {
 
     private val sessionCache =
         mutableMapOf<String, VPresentationSession>() // TODO not stateless because of oidc4vc library
@@ -130,8 +131,8 @@ class TestCredentialWallet(
         return@runBlocking cryptoProvider.sign1(payload.toCBOR(), header, null, keyId).toCBOR().encodeToBase64Url()
     }
 
-    override fun verifyTokenSignature(target: TokenTarget, token: String): Boolean {
-        println("VERIFYING TOKEN: ($target) $token")
+    override fun verifyTokenSignature(target: TokenTarget, token: String): Boolean = runBlocking {
+        logger.debug("VERIFYING TOKEN: ({target}) {token}", target, token)
         val jwtHeader = runCatching {
             Json.parseToJsonElement(token.split(".")[0].base64UrlDecode().decodeToString()).jsonObject
         }.getOrElse {
@@ -148,7 +149,7 @@ class TestCredentialWallet(
             ?: throw IllegalStateException("Could not verify token signature, as Key with keyId $kid has not been mapped")
 
         val result = runBlocking { key.verifyJws(token) }
-        return result.isSuccess
+        result.isSuccess
     }
 
     override fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean {
@@ -161,7 +162,9 @@ class TestCredentialWallet(
                 headers {
                     headers?.forEach { s, strings -> headersOf(s, strings) }
                 }
-            }.let { SimpleHttpResponse(it.status, it.headers, it.bodyAsText()) }
+            }.let {
+                SimpleHttpResponse(it.status, it.headers, it.bodyAsText())
+            }
         }
     }
 
@@ -201,20 +204,20 @@ class TestCredentialWallet(
     override fun generatePresentationForVPToken(
         session: VPresentationSession,
         tokenRequest: TokenRequest
-    ): PresentationResult {
-        println("=== GENERATING PRESENTATION FOR VP TOKEN - Session: $session")
+    ): PresentationResult = runBlocking {
+        logger.debug("=== GENERATING PRESENTATION FOR VP TOKEN - Session: {session}", session)
 
         val selectedCredentials =
             HACK_outsideMappedSelectedCredentialsPerSession[session.authorizationRequest!!.state + session.authorizationRequest.presentationDefinition?.id]!!
         val selectedDisclosures =
             HACK_outsideMappedSelectedDisclosuresPerSession[session.authorizationRequest.state + session.authorizationRequest.presentationDefinition?.id]
 
-        println("Selected credentials: $selectedCredentials")
+        logger.debug("Selected credentials: {selectedCredentials}", selectedCredentials)
 //        val matchedCredentials = walletService.getCredentialsByIds(selectedCredentials)
         val matchedCredentials = credentialsService.get(selectedCredentials)
-        println("Matched credentials: $matchedCredentials")
+        logger.debug("Matched credentials: {matchedCredentials}", matchedCredentials)
 
-        println("Using disclosures: $selectedDisclosures")
+        logger.debug("Using disclosures: {selectedDisclosures}", selectedDisclosures)
         val key = runBlocking {
             runCatching {
                 DidService.resolveToKey(did).getOrThrow().let { KeysService.get(it.getKeyId()) }
@@ -228,7 +231,7 @@ class TestCredentialWallet(
         } ?: error("No key was resolved when trying to resolve key to sign JWS to generate presentation for vp_token")
 
         val jwtsPresented = CredentialFilterUtils.getJwtVcList(matchedCredentials, selectedDisclosures)
-        println("jwtsPresented: $jwtsPresented")
+        logger.debug("jwtsPresented: {jwtsPresented}", jwtsPresented)
 
         val sdJwtVCsPresented = runBlocking {
             matchedCredentials.filter { it.format == CredentialFormat.sd_jwt_vc }.map {
@@ -258,7 +261,7 @@ class TestCredentialWallet(
                 withKBJwt = true
             )
         }
-        println("sdJwtVCsPresented: $sdJwtVCsPresented")
+        logger.debug("sdJwtVCsPresented: {sdJwtVCsPresented}", sdJwtVCsPresented)
 
         val mDocsPresented = runBlocking {
             val matchingMDocs = matchedCredentials.filter { it.format == CredentialFormat.mso_mdoc }
@@ -298,7 +301,7 @@ class TestCredentialWallet(
                 }
             } else listOf()
         }
-        println("mDocsPresented: $mDocsPresented")
+        logger.debug("mDocsPresented: {mDocsPresented}", mDocsPresented)
 
         val presentationId = (session.presentationDefinition?.id ?: "urn:uuid:${randomUUIDString().lowercase()}")
 
@@ -323,18 +326,18 @@ class TestCredentialWallet(
         val deviceResponse =
             if (mDocsPresented.isNotEmpty()) mDocsPresented.let { DeviceResponse(it).toCBORBase64URL() } else null
 
-        println("GENERATED VP: $signedJwtVP")
+        logger.debug("GENERATED VP: {signedJwtVP}", signedJwtVP)
 
         // DONE: filter presentations if null
         // DONE: generate descriptor mappings based on type (vp or mdoc device response)
         // DONE: set root path of descriptor mapping based on whether there are multiple presentations or just one ("$" or "$[idx]")
         val presentations =
             listOf(signedJwtVP, deviceResponse).filterNotNull().plus(sdJwtVCsPresented).map { JsonPrimitive(it) }
-        println("presentations: $presentations")
+        logger.debug("presentations: {presentations}", presentations)
 
         val rootPathVP = "$" + (if (presentations.size == 2) "[0]" else "")
         val rootPathMDoc = "$" + (if (presentations.size == 2) "[1]" else "")
-        return PresentationResult(
+        PresentationResult(
             presentations, PresentationSubmission(
                 id = presentationId,
                 definitionId = presentationId,
@@ -370,7 +373,7 @@ class TestCredentialWallet(
 
     // FIXME: USE DB INSTEAD OF KEY MAPPING
 
-    override fun resolveDID(did: String): String {
+    override fun resolveDID(did: String): String = runBlocking {
         val key = runBlocking { DidService.resolveToKey(did) }.getOrElse {
             throw IllegalArgumentException(
                 "Could not resolve DID in CredentialWallet: $did, error cause attached.",
@@ -381,9 +384,9 @@ class TestCredentialWallet(
 
         keyMapping[keyId] = key
 
-        println("RESOLVED DID: $did to keyId: $keyId")
+        logger.debug("RESOLVED DID: {did} to keyId: {keyId}", did, keyId)
 
-        return did
+        did
     }
 
     override fun isPresentationDefinitionSupported(presentationDefinition: PresentationDefinition): Boolean {
@@ -432,8 +435,8 @@ class TestCredentialWallet(
             }
     }
 
-    fun getVpJson(credentialsPresented: List<String>, presentationId: String, nonce: String?, aud: String): String {
-        println("Credentials presented: $credentialsPresented")
+    suspend fun getVpJson(credentialsPresented: List<String>, presentationId: String, nonce: String?, aud: String): String {
+        logger.debug("Credentials presented: {credentialsPresented}", credentialsPresented)
         return Json.encodeToString(
             mapOf(
                 "sub" to this.did,
