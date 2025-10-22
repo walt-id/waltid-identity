@@ -5,8 +5,18 @@ import kotlin.jvm.JvmInline
 /**
  * DER encoded X.509 certificate as platform-agnostic wrapper.
  */
-@JvmInline
-value class CertificateDer(val bytes: ByteArray)
+data class CertificateDer(val bytes: ByteArray) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other == null || this::class != other::class) return false
+        if (other !is CertificateDer) return false
+        return bytes.contentEquals(other.bytes)
+    }
+
+    override fun hashCode(): Int {
+        return bytes.contentHashCode()
+    }
+}
 
 /**
  * Parse Base64-encoded DER certs (e.g., from x5c header) into raw DER bytes.

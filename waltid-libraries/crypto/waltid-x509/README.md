@@ -58,26 +58,14 @@ class X509ValidationException(message: String, cause: Throwable? = null) : Excep
 Add the module as a dependency to your multiplatform project:
 
 ```kotlin
-// settings.gradle.kts
-// include(":waltid-libraries:crypto:waltid-x509")  // if used as a composite build/module
+// build.gradle.kts
 
-// build.gradle.kts (your app/library)
-kotlin {
-    jvm()
-    iosArm64()
-    iosX64()
-    iosSimulatorArm64()
-    js(IR) { browser(); nodejs() }
+implementation("id.walt:waltid-x509:<version>") //when published
 
-    sourceSets {
-        val commonMain by getting {
-            dependencies {
-                implementation(project(":waltid-libraries:crypto:waltid-x509"))
-                // or: implementation("id.walt:waltid-x509:<version>") when published
-            }
-        }
-    }
-}
+OR
+
+include(":waltid-libraries:crypto:waltid-x509")  // if used as a composite build/module
+
 ```
 
 ---

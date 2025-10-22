@@ -28,7 +28,7 @@ actual fun validateCertificateChain(
         // Remove leaf if passed both as leaf and in chain
         all.removeIf { it == leafCert }
 
-        // Trust anchors from provided list or from self-signed in chain
+        // Trust anchors from a provided list or from self-signed in chain
         val anchors = buildTrustAnchors(trustAnchors, all)
         if (anchors.isEmpty()) {
             throw X509ValidationException(
