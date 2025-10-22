@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTime::class)
+@file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
 
 package id.walt.webwallet.service.oidc4vc
 
@@ -58,11 +58,15 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:$WALLET_PORT"
 
 class TestCredentialWallet(
+    val account: Uuid,
+    val wallet: Uuid,
     config: CredentialWalletConfig,
     val did: String,
 ) : OpenIDCredentialWallet<VPresentationSession>(WALLET_BASE_URL, config), Klogging {
@@ -213,8 +217,7 @@ class TestCredentialWallet(
             HACK_outsideMappedSelectedDisclosuresPerSession[session.authorizationRequest.state + session.authorizationRequest.presentationDefinition?.id]
 
         logger.debug("Selected credentials: {selectedCredentials}", selectedCredentials)
-//        val matchedCredentials = walletService.getCredentialsByIds(selectedCredentials)
-        val matchedCredentials = credentialsService.get(selectedCredentials)
+        val matchedCredentials = credentialsService.get(wallet, selectedCredentials)
         logger.debug("Matched credentials: {matchedCredentials}", matchedCredentials)
 
         logger.debug("Using disclosures: {selectedDisclosures}", selectedDisclosures)

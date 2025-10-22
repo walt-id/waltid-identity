@@ -6,7 +6,6 @@ import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.webwallet.db.models.Notification
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.seeker.Seeker
-import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.dids.DidsService
@@ -14,6 +13,7 @@ import id.walt.webwallet.service.events.Event
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.CredentialDataResult
 import id.walt.webwallet.service.exchange.IssuanceService
+import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
 import id.walt.webwallet.service.trust.TrustValidationService
 import id.walt.webwallet.usecase.event.EventLogUseCase
 import id.walt.webwallet.usecase.issuer.IssuerUseCase
@@ -27,6 +27,7 @@ import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
 class SilentClaimStrategy(
+    private val walletProvider: (account: Uuid, wallet: Uuid, did: String) -> TestCredentialWallet,
     private val issuanceService: IssuanceService,
     private val credentialService: CredentialsService,
     private val issuerTrustValidationService: TrustValidationService,
@@ -39,32 +40,33 @@ class SilentClaimStrategy(
     private val credentialTypeSeeker: Seeker<String>,
 ) {
     @Suppress("ConvertCallChainIntoSequence") // suspending
-    suspend fun claim(did: String, offer: String) = issuanceService.useOfferRequest(
-        offer = offer,
-        credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
-    ).mapNotNull {
-        val credential = WalletCredential.parseDocument(it.document, it.id, it.format) ?: JsonObject(emptyMap())
-        val manifest = WalletCredential.tryParseManifest(it.manifest) ?: JsonObject(emptyMap())
-        val issuerDid = WalletCredential.parseIssuerDid(credential, manifest) ?: "n/a"
-        val type = credentialTypeSeeker.get(credential)
-        val egfUri = "test"
+    suspend fun claim(accountId: Uuid, walletId: Uuid, did: String, offer: String) =
+        issuanceService.useOfferRequest(
+            offer = offer,
+            credentialWallet = walletProvider(accountId, walletId, did),
+        ).mapNotNull {
+            val credential = WalletCredential.parseDocument(it.document, it.id, it.format) ?: JsonObject(emptyMap())
+            val manifest = WalletCredential.tryParseManifest(it.manifest) ?: JsonObject(emptyMap())
+            val issuerDid = WalletCredential.parseIssuerDid(credential, manifest) ?: "n/a"
+            val type = credentialTypeSeeker.get(credential)
+            val egfUri = "test"
             Pair(it, issuerDid)
-    }.map {
-        prepareCredentialData(did = did, data = it.first, issuerDid = it.second)
-    }.flatten().groupBy {
-        it.first.wallet
-    }.mapNotNull { entry ->
-        val credentials = entry.value.map { it.first }.toTypedArray()
-        storeCredentials(entry.key, credentials).getOrNull()?.let {
-            accountService.getAccountForWallet(entry.key)?.run {
-                createEvents("", this, entry.value, EventType.Credential.Receive)
-                createNotifications(this, credentials, EventType.Credential.Receive)
+        }.map {
+            prepareCredentialData(did = did, data = it.first, issuerDid = it.second)
+        }.flatten().groupBy {
+            it.first.wallet
+        }.mapNotNull { entry ->
+            val credentials = entry.value.map { it.first }.toTypedArray()
+            storeCredentials(entry.key, credentials).getOrNull()?.let {
+                accountService.getAccountForWallet(entry.key)?.run {
+                    createEvents("", this, entry.value, EventType.Credential.Receive)
+                    createNotifications(this, credentials, EventType.Credential.Receive)
+                }
+                entry.value.map { it.first.id }
             }
-            entry.value.map { it.first.id }
+        }.flatten().fold(emptyList<String>()) { acc, i ->
+            acc + i
         }
-    }.flatten().fold(emptyList<String>()) { acc, i ->
-        acc + i
-    }
 
     private suspend fun validateIssuer(issuer: String, type: String, egfUri: String) =
         issuerTrustValidationService.validate(
