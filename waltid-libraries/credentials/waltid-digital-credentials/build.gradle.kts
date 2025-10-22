@@ -1,5 +1,6 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
+import Versions.KTOR_VERSION
 import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -41,6 +42,11 @@ kotlin {
 fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
 val enableAndroidBuild = getSetting("enableAndroidBuild")
 val enableIosBuild = getSetting("enableIosBuild")
+
+object Versions {
+    const val KTOR_VERSION = "3.2.2"
+    const val COROUTINES_VERSION = "1.10.1"
+}
 
 kotlin {
     targets.configureEach {
@@ -94,12 +100,12 @@ kotlin {
 //                implementation("io.github.optimumcode:json-schema-validator:0.4.0")
 //
 //                // Ktor client
-//                implementation("io.ktor:ktor-client-core:$ktor_version")
-//                implementation("io.ktor:ktor-client-serialization:$ktor_version")
-//                implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
-//                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
-//                implementation("io.ktor:ktor-client-json:$ktor_version")
-//                implementation("io.ktor:ktor-client-logging:$ktor_version")
+                implementation("io.ktor:ktor-client-core:$KTOR_VERSION")
+                implementation("io.ktor:ktor-client-serialization:$KTOR_VERSION")
+                implementation("io.ktor:ktor-client-content-negotiation:$KTOR_VERSION")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:$KTOR_VERSION")
+                implementation("io.ktor:ktor-client-json:$KTOR_VERSION")
+                implementation("io.ktor:ktor-client-logging:$KTOR_VERSION")
 //
 //                // Coroutines
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
@@ -132,6 +138,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
+                implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
             }
         }

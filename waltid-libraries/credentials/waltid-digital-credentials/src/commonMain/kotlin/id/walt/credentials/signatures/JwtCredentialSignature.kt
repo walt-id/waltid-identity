@@ -8,5 +8,7 @@ import kotlinx.serialization.json.JsonObject
 @SerialName("signature-jwt")
 data class JwtCredentialSignature(
     val signature: String,
-    override val jwtHeader: JsonObject?
+    //override var signerKey: Key,
+    override val jwtHeader: JsonObject?,
+    //override var x5cList: X5CList? = null // TODO?
 ) : CredentialSignature(), JwtBasedSignature

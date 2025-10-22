@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 @SerialName("signature-dip")
 data class DataIntegrityProofCredentialSignature(
-    val signature: JsonObject
+    val signature: JsonObject,
+    //override var signerKey: Key,
 ) : CredentialSignature() {
 }

@@ -44,13 +44,13 @@ object CredentialQueryMetaPolymorphicSerializer : KSerializer<CredentialQueryMet
         // This part needs to be robust or, ideally, guided by the parent 'format' field
         // if this serializer was part of a CredentialQuery custom serializer.
         return when {
-            jsonElement.containsKey("type_values") ->
+            jsonElement.containsKey(W3cCredentialMeta.TYPE_VALUES_KEY) ->
                 jsonInput.json.decodeFromJsonElement(W3cCredentialMeta.serializer(), jsonElement)
 
-            jsonElement.containsKey("vct_values") ->
+            jsonElement.containsKey(SdJwtVcMeta.VCT_VALUES_KEY) ->
                 jsonInput.json.decodeFromJsonElement(SdJwtVcMeta.serializer(), jsonElement)
 
-            jsonElement.containsKey("doctype_value") ->
+            jsonElement.containsKey(MsoMdocMeta.DOCTYPE_VALUE_KEY) ->
                 jsonInput.json.decodeFromJsonElement(MsoMdocMeta.serializer(), jsonElement)
 
             jsonElement.containsKey("properties") && jsonElement["properties"] is JsonObject -> // For GenericMeta

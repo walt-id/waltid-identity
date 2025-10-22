@@ -5,7 +5,6 @@ package id.walt.policies2.policies
 import com.nfeld.jsonpathkt.JsonPath
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.ExpirationDatePolicyException
-import id.walt.policies2.PolicyClaimChecker
 import id.walt.w3c.Claims
 import id.walt.w3c.JwtClaims
 import id.walt.w3c.VcClaims
@@ -32,7 +31,7 @@ class ExpirationDatePolicy : VerificationPolicy2() {
     }
 
     @Serializable
-    data class NotBeforePolicyClaimCheckResult(
+    data class ExpirationDateClaimCheckResult(
         val date: Instant,
 
         @SerialName("date_seconds")
@@ -71,7 +70,7 @@ class ExpirationDatePolicy : VerificationPolicy2() {
                 val expiresIn = storedDate - now
 
                 Result.success(
-                    NotBeforePolicyClaimCheckResult(
+                    ExpirationDateClaimCheckResult(
                         date = storedDate,
                         dateSeconds = storedDate.epochSeconds,
                         expiresIn = expiresIn,

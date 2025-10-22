@@ -1,5 +1,6 @@
 package id.walt.dcql.models.meta
 
+import id.walt.dcql.models.CredentialFormat
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -14,7 +15,14 @@ data class MsoMdocMeta(
      * REQUIRED. String that specifies an allowed value for the doctype
      * of the requested Verifiable Credential.
      */
-    @SerialName("doctype_value")
+    @SerialName(DOCTYPE_VALUE_KEY)
     val doctypeValue: String
     // Potentially add other mdoc specific meta fields
-) : CredentialQueryMeta
+) : CredentialQueryMeta {
+    override val format = CredentialFormat.MSO_MDOC
+
+    companion object {
+        const val DOCTYPE_VALUE_KEY = "doctype_value"
+    }
+
+}

@@ -20,7 +20,12 @@ enum class W3CPresentationValidationError(override val errorMessage: String) : P
 }
 
 enum class DcSdJwtPresentationValidationError(override val errorMessage: String) : PresentationValidationErrors {
-    MISSING_CNF_KID("SD-JWT core is missing 'cnf.kid' claim for holder verification."),
+    MISSING_CNF("SD-JWT core is missing 'cnf' claim for holder verification."),
+    MISSING_CNF_METHOD("SD-JWT core contains 'cnf' claim for holder verification, but no compatible method (or it is empty)."),
+    INVALID_CNF_KID("SD-JWT core contains 'cnf.kid' claim for holder verification, but the kid is not valid. Check if it is a string with a sensible kid."),
+    CNF_KID_CANNOT_RESOLVE_DID("SD-JWT core contains 'cnf.kid' claim for holder verification, but the kid is not resolvable."),
+    CNF_JWK_CANNOT_PARSE_JWK("SD-JWT core contains 'cnf.jwk' claim for holder verification, but the JWK is not parseable."),
+
     SIGNATURE_VERIFICATION_FAILED("Key Binding JWT signature verification failed."),
     AUDIENCE_MISMATCH("KB-JWT 'aud' claim mismatch."),
     NONCE_MISMATCH("KB-JWT 'nonce' claim mismatch."),

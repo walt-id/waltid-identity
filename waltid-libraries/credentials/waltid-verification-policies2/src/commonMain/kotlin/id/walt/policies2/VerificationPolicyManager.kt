@@ -1,6 +1,8 @@
 package id.walt.policies2
 
 import id.walt.policies2.policies.CredentialSignaturePolicy
+import id.walt.policies2.policies.ExpirationDatePolicy
+import id.walt.policies2.policies.NotBeforePolicy
 import id.walt.policies2.policies.VerificationPolicy2
 
 object VerificationPolicyManager {
@@ -14,10 +16,12 @@ object VerificationPolicyManager {
      * (no mandatory constructor arguments)
      */
     val simpleVerificationPolicies = listOf<VerificationPolicy2>(
-        CredentialSignaturePolicy()
+        CredentialSignaturePolicy(),
+        ExpirationDatePolicy(),
+        NotBeforePolicy()
     ).associateBy { it.id }
 
     fun getSimpleVerificationPolicyByName(id: String): VerificationPolicy2 =
-        simpleVerificationPolicies[id] ?: throw IllegalArgumentException("Unknown verification policy: type '$id'")
+        simpleVerificationPolicies[id] ?: throw IllegalArgumentException("Unknown primitive verification policy: type '$id'. Primitive verification policies are policies that do not have any arguments.")
 
 }

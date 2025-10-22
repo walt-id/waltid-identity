@@ -8,6 +8,8 @@ import id.walt.credentials.CredentialDetectorTypes.SDJWTVCSubType
 import id.walt.credentials.CredentialDetectorTypes.SignaturePrimaryType
 import id.walt.credentials.CredentialDetectorTypes.W3CSubType
 import id.walt.credentials.formats.*
+import id.walt.credentials.representations.X5CCertificateString
+import id.walt.credentials.representations.X5CList
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.DataIntegrityProofCredentialSignature
 import id.walt.credentials.signatures.JwtCredentialSignature
@@ -17,6 +19,7 @@ import id.walt.credentials.utils.JwtUtils
 import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.credentials.utils.SdJwtUtils.getSdArrays
 import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
+import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.utils.Base64Utils.base64Url
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.matchesBase64Url
@@ -82,7 +85,7 @@ object CredentialParser {
 
     fun getJwtHeaderOrDataSubject(data: JsonObject) = data.getString("sub") ?: getCredentialDataSubject(data)
 
-    private fun handleMdocs(credential: String, base64: Boolean = false): Pair<CredentialDetectionResult, MdocsCredential> {
+    private suspend fun handleMdocs(credential: String, base64: Boolean = false): Pair<CredentialDetectionResult, MdocsCredential> {
         log.trace { "Handle mdocs, string: $credential" }
 
         // --- New mdocs handling ---
@@ -112,15 +115,15 @@ object CredentialParser {
                 putJsonObject(namespace) {
                     val x = issuerSignedList.entries.map { it.value }
                     x.forEach { item: IssuerSignedItem ->
-                        println("$namespace - ${item.elementIdentifier} -> ${item.elementValue} (${item.elementValue::class.simpleName})")
+                        log.trace { "$namespace - ${item.elementIdentifier} -> ${item.elementValue} (${item.elementValue::class.simpleName})" }
 
                         val serialized: JsonElement = MdocsCborSerializer.lookupSerializer(namespace, item.elementIdentifier)
                             ?.runCatching {
                                 Json.encodeToJsonElement(this as KSerializer<Any?>, item.elementValue)
-                            }?.getOrElse { println("Error encoding with custom serializer: ${it.stackTraceToString()}"); null }
+                            }?.getOrElse { log.warn { "Error encoding with custom serializer: ${it.stackTraceToString()}" }; null }
                             ?: item.elementValue.toJsonElement()
 
-                        println("as JsonElement: $serialized")
+                        log.trace { "as JsonElement: $serialized" }
                         put(item.elementIdentifier, serialized)
                     }
 
@@ -145,6 +148,8 @@ object CredentialParser {
         val hasSd = !(mdoc.issuerSigned.nameSpaces?.values?.flatten().isNullOrEmpty())
 
 
+        val parsedIssuerAuth = document.issuerSigned.getParsedIssuerAuth()
+        val x5CList = X5CList(parsedIssuerAuth.x5c.map { X5CCertificateString(it) })
         // --- Return ---
 
         return CredentialDetectionResult(
@@ -153,7 +158,10 @@ object CredentialParser {
             signaturePrimary = SignaturePrimaryType.COSE,
             containsDisclosables = hasSd, providesDisclosures = hasSd
         ) to MdocsCredential(
-            signature = CoseCredentialSignature(),
+            signature = CoseCredentialSignature(
+                x5cList = x5CList,
+                signerKey = DirectSerializedKey(parsedIssuerAuth.signerKey)
+            ),
             //credentialData = credentialData,
             //credentialDataOld = mdoc.issuerSigned.toUIJson(),
             credentialData = JsonObject(
@@ -191,56 +199,61 @@ object CredentialParser {
         var availableDisclosures = parseDisclosureString(signature.substringAfter("~", ""))
 
         if (availableDisclosures?.isNotEmpty() == true) {
-//            println("=== MAPPING ===")
+            log.trace { "${"=== MAPPING ==="}" }
             // Map disclosures to disclosable locations
             val mappedDisclosures = ArrayList<SdJwtSelectiveDisclosure>()
 
             fun findForHash(hash: String) = availableDisclosures!!.firstOrNull { it.asHashed() == hash || it.asHashed2() == hash }
 
             containedDisclosables.entries.forEach { (sdLocation, disclosureHashes) ->
-//                println("Trying sd location: $sdLocation\n")
+                log.trace { "Trying sd location: $sdLocation\n" }
                 val unsuffixedLocation = sdLocation.removeSuffix("_sd")
                 disclosureHashes.forEach { hash ->
-//                    println("Trying hash: $hash")
-//                    availableDisclosures.forEach {
-//                        println("Available h: ${it.asHashed()}  –  ${it.asHashed2()}")
-//                    }
+                    log.trace { "Trying hash: $hash" }
+                    log.trace {
+                        "Available disclosures: ${availableDisclosures?.joinToString("\n") { "Available h: ${it.asHashed()}  –  ${it.asHashed2()}" }}"
+                    }
                     findForHash(hash)?.let { matchingDisclosure ->
                         mappedDisclosures.add(matchingDisclosure.copy(location = "$unsuffixedLocation${matchingDisclosure.name}"))
-//                        println("Found hash for ${matchingDisclosure.name}: ${matchingDisclosure.asHashed()}")
+                        log.trace { "Found hash for ${matchingDisclosure.name}: ${matchingDisclosure.asHashed()}" }
                     }
-//                    println()
                 }
             }
 
-//            mappedDisclosures.forEachIndexed { idx, it ->
-//                println("$idx: ${it.location} -> $it")
-//            }
+            log.trace {
+                mappedDisclosures.mapIndexed { idx, it ->
+                    "$idx: ${it.location} -> $it"
+                }.joinToString("\n")
+            }
 
             check(availableDisclosures.size == mappedDisclosures.size) { "Invalid disclosures: Different size after mapping disclosures (${availableDisclosures.size}) to mappable disclosable (${mappedDisclosures.size}), for credential: $credential" }
             availableDisclosures = mappedDisclosures
         }
 
-        val fullCredentialData = if (availableDisclosures?.isNotEmpty() == true || header.getValue("typ").jsonPrimitive.content == "vc+sd-jwt" ) {
-            SDJwt.parse(credential).fullPayload
-        } else payload
+        val fullCredentialData =
+            if (availableDisclosures?.isNotEmpty() == true || header.getValue("typ").jsonPrimitive.content == "vc+sd-jwt") {
+                SDJwt.parse(credential).fullPayload
+            } else payload
 
         return when {
-            payload.contains("@context") && payload.contains("vct")
-                -> detectedSdjwtSigned(CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvcdm) to
-                    SdJwtCredential(
-                        dmtype = SDJWTVCSubType.sdjwtvcdm,
-                        disclosables = containedDisclosables,
-                        disclosures = availableDisclosures,
-                        signature = SdJwtCredentialSignature(plainSignature, header, availableDisclosures),
-                        signed = signedCredentialWithoutDisclosures,
-                        signedWithDisclosures = credential,
-                        credentialData = fullCredentialData,
-                        originalCredentialData = payload,
+            payload.contains("@context") && payload.contains("vct") -> {
+                val issuer = getJwtHeaderOrDataIssuer(payload)
+                val subject = getCredentialDataSubject(payload)
+                detectedSdjwtSigned(CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvcdm) to
+                        SdJwtCredential(
+                            dmtype = SDJWTVCSubType.sdjwtvcdm,
+                            disclosables = containedDisclosables,
+                            disclosures = availableDisclosures,
+                            signature = SdJwtCredentialSignature(plainSignature, header, availableDisclosures),
+                            signed = signedCredentialWithoutDisclosures,
+                            signedWithDisclosures = credential,
+                            credentialData = fullCredentialData,
+                            originalCredentialData = payload,
 
-                        issuer = getJwtHeaderOrDataIssuer(payload),
-                        subject = getCredentialDataSubject(payload)
-                    )
+                            issuer = issuer,
+                            subject = subject
+                        )
+            }
 
             payload.contains("@context") || payload.contains("type") -> {
                 val w3cModelVersion = detectW3CDataModelVersion(payload)
@@ -275,29 +288,37 @@ object CredentialParser {
             }
 
             payload.contains("vct") && !payload.contains("@context")
-                -> detectedSdjwtSigned(CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvc) to
-                    SdJwtCredential(
-                        dmtype = SDJWTVCSubType.sdjwtvcdm,
-                        disclosables = containedDisclosables,
-                        disclosures = availableDisclosures,
-                        signature = SdJwtCredentialSignature(plainSignature, header, availableDisclosures),
-                        signed = signedCredentialWithoutDisclosures,
-                        signedWithDisclosures = credential,
-                        credentialData = fullCredentialData,
-                        originalCredentialData = payload,
+                -> {
+                detectedSdjwtSigned(CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvc) to
+                        SdJwtCredential(
+                            dmtype = SDJWTVCSubType.sdjwtvcdm,
+                            disclosables = containedDisclosables,
+                            disclosures = availableDisclosures,
+                            signature = SdJwtCredentialSignature(plainSignature, header, availableDisclosures),
+                            signed = signedCredentialWithoutDisclosures,
+                            signedWithDisclosures = credential,
+                            credentialData = fullCredentialData,
+                            originalCredentialData = payload,
 
-                        issuer = getJwtHeaderOrDataIssuer(payload),
-                        subject = getCredentialDataSubject(payload)
-                    )
+                            issuer = getJwtHeaderOrDataIssuer(payload),
+                            subject = getCredentialDataSubject(payload)
+                        )
+            }
 
-            payload.contains("vc") -> parseSdJwt(credential, header, payload["vc"]!!.jsonObject, signature)
+            payload.contains("vc") -> {
+                parseSdJwt(credential, header, payload["vc"]!!.jsonObject, signature)
+            }
 
-            else -> throw NotImplementedError("Unknown SD-JWT-signed credential: $credential")
+            else -> {
+                throw NotImplementedError("Unknown SD-JWT-signed credential: $credential")
+            }
         }
     }
 
+    suspend fun parseOnly(rawCredential: String) = detectAndParse(rawCredential).second
+
     @OptIn(ExperimentalEncodingApi::class)
-    fun detectAndParse(rawCredential: String): Pair<CredentialDetectionResult, DigitalCredential> {
+    suspend fun detectAndParse(rawCredential: String): Pair<CredentialDetectionResult, DigitalCredential> {
         val credential = rawCredential.trim()
 
         return when {
@@ -457,7 +478,7 @@ object CredentialParser {
             credential.matchesHex() -> handleMdocs(credential, base64 = false)
             credential.matchesBase64Url() -> handleMdocs(credential, base64 = true)
 
-            else -> throw NotImplementedError("unknown: $credential")
+            else -> throw NotImplementedError("CredentialParser - Unknown credential, cannot parse: $credential")
         }
     }
 }

@@ -42,8 +42,11 @@ object SdJwtVcPresenter {
 
         log.debug { "Handling IETF SD-JWT VC (${digitalCredential} with disclosures $disclosuresToPresent)" }
 
+        val disclosed = sdJwtCredential.disclose(digitalCredential, disclosuresToPresent)
+
         // Construct the Key Binding JWT
         val kbJwtString = createKeyBindingJwt(
+            disclosed = disclosed,
             nonce = authorizationRequest.nonce!!,
             audience = authorizationRequest.clientId,
             selectedDisclosures = disclosuresToPresent,
@@ -51,8 +54,7 @@ object SdJwtVcPresenter {
         )
 
         // Use the disclose method from the interface, then append the KB-JWT
-        val finalPresentationString =
-            sdJwtCredential.disclose(digitalCredential, disclosuresToPresent) + "~" + kbJwtString
+        val finalPresentationString = "$disclosed~$kbJwtString"
         log.trace { "Final presentation string for dc+sd-jwt is: $finalPresentationString" }
 
         return JsonPrimitive(finalPresentationString)
