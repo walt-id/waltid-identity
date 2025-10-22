@@ -32,6 +32,7 @@ class ReportServiceTest {
         every { eventServiceMock.get(any(), any(), any(), any(), any(), any(), any()) } returns events
         every {
             credentialServiceMock.get(
+                any(),
                 listOf(
                     "http://example.gov/credentials/3",
                     "http://example.gov/credentials/2",

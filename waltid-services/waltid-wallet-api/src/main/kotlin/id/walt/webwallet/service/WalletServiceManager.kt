@@ -142,6 +142,7 @@ object WalletServiceManager {
     )
     val silentClaimStrategy by lazy {
         SilentClaimStrategy(
+            walletProvider = SSIKit2WalletService::getCredentialWallet,
             issuanceService = IssuanceService,
             credentialService = credentialService,
             issuerTrustValidationService = issuerTrustValidationService,

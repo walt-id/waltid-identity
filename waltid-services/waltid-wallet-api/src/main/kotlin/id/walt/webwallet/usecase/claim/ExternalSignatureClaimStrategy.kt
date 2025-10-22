@@ -41,7 +41,7 @@ class ExternalSignatureClaimStrategy(
     ) = issuanceServiceExternalSignatures.submitExternallySignedOfferRequest(
         offerURL = offerURL,
         credentialIssuerURL = credentialIssuerURL,
-        credentialWallet = SSIKit2WalletService.getCredentialWallet(did),
+        credentialWallet = SSIKit2WalletService.getCredentialWallet(accountId, walletId, did),
         offeredCredentialProofsOfPossession = offeredCredentialProofsOfPossession,
         accessToken = accessToken,
     ).map { credentialDataResult ->

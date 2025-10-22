@@ -24,7 +24,7 @@ interface ReportService<T> {
                         val sorted = group.keys.sortedByDescending {
                             group[it]?.count()
                         }
-                        credentialService.get(sorted.filterNotNull())
+                        credentialService.get(param.walletId, sorted.filterNotNull())
                     }
             } ?: emptyList()
 
