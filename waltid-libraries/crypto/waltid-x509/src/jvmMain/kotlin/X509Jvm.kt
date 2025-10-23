@@ -1,6 +1,7 @@
 package id.walt.x509
 
 import java.io.ByteArrayInputStream
+import java.io.FileInputStream
 import java.security.KeyStore
 import java.security.cert.*
 import java.util.*
@@ -89,7 +90,12 @@ private fun buildTrustAnchors(
 
     // Adding system trust anchors
     if (enableSystemTrustAnchors) {
-        loadTrustAnchorsFromKeyStore(KeyStore.getInstance(KeyStore.getDefaultType())).forEach { der ->
+        val keyStore = KeyStore.getInstance(KeyStore.getDefaultType())
+        keyStore.load(
+            FileInputStream(System.getProperty("waltid.keystore.file")),
+            System.getProperty("waltid.keystore.password")?.toCharArray()
+        )
+        loadTrustAnchorsFromKeyStore(keyStore).forEach { der ->
             anchors.add(TrustAnchor(der.toX509(), null))
         }
     }
