@@ -9,11 +9,18 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
-object MdlX509SanDnsRequestUriSignedDirectPost : TestPlan {
+class MdlX509SanDnsRequestUriSignedDirectPost(
+    verifier2UrlPrefix: String = "https://verifier2.localhost/verification-session",
+
+    conformanceHost: String = "localhost.emobix.co.uk",
+    conformancePort: Int = 8443
+) : TestPlan {
 
     // Verifier
-    val verifierKey = Json.decodeFromString<DirectSerializedKey>("""{"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}""")
-    val verifierCertificateChain = listOf("MIIBVzCB/aADAgECAggNKZAvUrtimzAKBggqhkjOPQQDAjAfMR0wGwYDVQQDDBR2ZXJpZmllci5leGFtcGxlLmNvbTAeFw0yNTEwMTQwNjI0MjBaFw0yNjEwMTQwNjI0MjBaMB8xHTAbBgNVBAMMFHZlcmlmaWVyLmV4YW1wbGUuY29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG/TgBc0BkmMipiQ/6gkamIn3mmp7hcTrZuyrLTmknP1WRExl1dhdIx9/kAkuuceI3THkxXq7/y+sBzK0ZR7jPqMjMCEwHwYDVR0RBBgwFoIUdmVyaWZpZXIuZXhhbXBsZS5jb20wCgYIKoZIzj0EAwIDSQAwRgIhAOu0RGM6BjVQUepeLBogw+ZD3MQ9vFppbPIGMPjtn/qdAiEAttfdfyXHfzJ2tr+Pczyckzv3NlM43461cvP96sIzOQA=")
+    val verifierKey =
+        Json.decodeFromString<DirectSerializedKey>("""{"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}""")
+    val verifierCertificateChain =
+        listOf("MIIBVzCB/aADAgECAggNKZAvUrtimzAKBggqhkjOPQQDAjAfMR0wGwYDVQQDDBR2ZXJpZmllci5leGFtcGxlLmNvbTAeFw0yNTEwMTQwNjI0MjBaFw0yNjEwMTQwNjI0MjBaMB8xHTAbBgNVBAMMFHZlcmlmaWVyLmV4YW1wbGUuY29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG/TgBc0BkmMipiQ/6gkamIn3mmp7hcTrZuyrLTmknP1WRExl1dhdIx9/kAkuuceI3THkxXq7/y+sBzK0ZR7jPqMjMCEwHwYDVR0RBBgwFoIUdmVyaWZpZXIuZXhhbXBsZS5jb20wCgYIKoZIzj0EAwIDSQAwRgIhAOu0RGM6BjVQUepeLBogw+ZD3MQ9vFppbPIGMPjtn/qdAiEAttfdfyXHfzJ2tr+Pczyckzv3NlM43461cvP96sIzOQA=")
 
     // DCQL
 
@@ -75,7 +82,7 @@ object MdlX509SanDnsRequestUriSignedDirectPost : TestPlan {
                 },
                 "description": "Verifier - iso_mdl + x509_san_dns + request_uri_signed + direct_post",
                 "server": {
-                    "authorization_endpoint": "https://localhost.emobix.co.uk:8443"
+                    "authorization_endpoint": "https://$conformanceHost:$conformancePort"
                 }
             }
         """.trimIndent()
@@ -87,7 +94,7 @@ object MdlX509SanDnsRequestUriSignedDirectPost : TestPlan {
             signedRequest = true,
             encryptedResponse = false,
 
-            urlPrefix = "https://verifier2.localhost/verification-session",
+            urlPrefix = verifier2UrlPrefix,
             //urlHost, // <-- set by TestPlanRunner
             redirects = VerificationSessionRedirects(
                 successRedirectUri = "https://example.org/veriifcation-success"

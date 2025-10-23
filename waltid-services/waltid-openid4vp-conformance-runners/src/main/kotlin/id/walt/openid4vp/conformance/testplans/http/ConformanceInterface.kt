@@ -8,37 +8,37 @@ import id.walt.openid4vp.conformance.testplans.runner.TestPlanRunner.Companion.b
 import id.walt.openid4vp.conformance.utils.JsonUtils.fromJson
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.defaultRequest
-import io.ktor.client.plugins.logging.LogLevel
-import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.engine.okhttp.*
+import io.ktor.client.plugins.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.json
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration.Companion.seconds
 
-class ConformanceInterface() {
+class ConformanceInterface(
+    val conformanceHost: String,
+    val conformancePort: Int
+) {
 
-    companion object {
-        val conformanceHttp = HttpClient(OkHttp) {
-            followRedirects = false
+    val conformanceHttp = HttpClient(OkHttp) {
+        followRedirects = false
 
-            defaultRequest {
-                url {
-                    baseUrlBuilderSetup()
-                }
+        defaultRequest {
+            url {
+                baseUrlBuilderSetup(conformanceHost, conformancePort)
             }
-            install(ContentNegotiation) {
-                json()
-            }
-            install(Logging) {
-                level = LogLevel.ALL
-            }
+        }
+        install(ContentNegotiation) {
+            json()
+        }
+        install(Logging) {
+            level = LogLevel.ALL
         }
     }
 
@@ -53,7 +53,7 @@ class ConformanceInterface() {
      */
     fun createTestPlanUrlWithConfig(testPlanCreationUrl: ParametersBuilder.() -> Unit) =
         URLBuilder("/api/plan").apply {
-            baseUrlBuilderSetup()
+            baseUrlBuilderSetup(conformanceHost, conformancePort)
             parameters.apply {
                 testPlanCreationUrl.invoke(this)
             }
@@ -79,7 +79,7 @@ class ConformanceInterface() {
      */
     fun buildCreateTestUrl(testPlanId: String, testModule: String) =
         URLBuilder("/api/runner").apply {
-            baseUrlBuilderSetup()
+            baseUrlBuilderSetup(conformanceHost, conformancePort)
             parameters.apply {
                 append("test", testModule)
                 append("plan", testPlanId)
@@ -127,8 +127,8 @@ class ConformanceInterface() {
             }
 
 
-            if (counter > 10) {
-                throw IllegalStateException("Waited for 10 tries, but test is still not ready for presentation")
+            if (counter > 15) {
+                throw IllegalStateException("Waited for ${counter - 1} tries, but test is still not ready for presentation (waiting for waiting=$shouldBeWaiting)")
             }
 
             delay(1.seconds)
