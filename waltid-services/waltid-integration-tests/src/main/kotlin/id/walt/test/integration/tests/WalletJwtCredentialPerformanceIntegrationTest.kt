@@ -36,7 +36,7 @@ private val jwtCredential = IssuanceRequest(
 private val simplePresentationRequestPayload =
     loadResource("presentation/openbadgecredential-presentation-request.json")
 
-@Disabled("Only for manual performance testing of the community stack wallet")
+//@Disabled("Only for manual performance testing of the community stack wallet")
 @TestMethodOrder(OrderAnnotation::class)
 class WalletJwtCredentialPerformanceIntegrationTest : AbstractIntegrationTest(), Klogging {
     companion object {
