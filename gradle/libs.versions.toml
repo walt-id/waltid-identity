@@ -1,7 +1,7 @@
 [versions]
 coroutines = "1.10.2"
 serialization = "1.9.0"
-bcprov = "2.73.8"
+bcprov = "2.73.9"
 junit-jupiter = "5.11.4"
 okio = "3.16.0"
 nimbus = "10.0.1"
