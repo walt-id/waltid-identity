@@ -30,12 +30,8 @@ class E2ETest(
     val host: String = "localhost",
     val port: Int = 22222,
     val failEarly: Boolean = false,
+    val loglevelOption: String = "trace"
 ) {
-
-    init {
-        LoggingManager.useLoggingSetup("trace", RenderStrings.ANSI_LONG)
-        LoggingManager.setup()
-    }
 
     data class TestStats(
         val overall: Int,
@@ -129,7 +125,7 @@ class E2ETest(
                 run = E2ETestWebService(Application::e2eTestModule).run(block)
             )
         )*/
-        service.main(arrayOf("-l", "config-file"))
+        service.main(arrayOf("-l", loglevelOption))
 
         term.println("\n" + TextColors.magenta("Test results:"))
         testResults.forEachIndexed { index, result ->
