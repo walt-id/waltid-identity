@@ -98,6 +98,7 @@ dependencies {
     api(project(":waltid-libraries:credentials:waltid-dcql"))
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
     api(project(":waltid-libraries:credentials:waltid-verification-policies2"))
+    api(project(":waltid-libraries:credentials:waltid-vical"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier-openapi"))
