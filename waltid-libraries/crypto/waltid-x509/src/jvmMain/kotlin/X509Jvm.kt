@@ -10,26 +10,25 @@ import kotlin.collections.ArrayList
 fun CertificateDer.toX509(): X509Certificate =
     CertificateFactory.getInstance("X.509").generateCertificate(ByteArrayInputStream(this.bytes)) as X509Certificate
 
-actual fun parseX5cBase64(x5cBase64: List<String>): List<CertificateDer> =
-    x5cBase64.map { CertificateDer(Base64.getDecoder().decode(it)) }
-
 @Throws(X509ValidationException::class)
 actual fun validateCertificateChain(
     leaf: CertificateDer,
     chain: List<CertificateDer>,
     trustAnchors: List<CertificateDer>?,
+    enableTrustedChainRoot: Boolean,
+    enableSystemTrustAnchors: Boolean,
     enableRevocation: Boolean
 ) {
     try {
 
-        val leafCert =  CertificateDer(leaf.bytes).toX509()
+        val leafCert = CertificateDer(leaf.bytes).toX509()
         val all = chain.map { it.toX509() }.toMutableList()
 
         // Remove leaf if passed both as leaf and in chain
         all.removeIf { it == leafCert }
 
         // Trust anchors from a provided list or from self-signed in chain
-        val anchors = buildTrustAnchors(trustAnchors, all)
+        val anchors = buildTrustAnchors(trustAnchors, all, enableTrustedChainRoot, enableSystemTrustAnchors)
         if (anchors.isEmpty()) {
             throw X509ValidationException(
                 "No trust anchors available: provide trustAnchors or include a trusted root."
@@ -77,15 +76,26 @@ private fun isSelfSigned(cert: X509Certificate): Boolean =
  */
 private fun buildTrustAnchors(
     trustAnchors: List<CertificateDer>?,
-    chain: List<X509Certificate>
+    chain: List<X509Certificate>,
+    enableTrustedChainRoot: Boolean,
+    enableSystemTrustAnchors: Boolean
 ): Set<TrustAnchor> {
     val anchors = HashSet<TrustAnchor>()
 
+    // Adding provided trust anchors
     trustAnchors?.forEach { der ->
         anchors.add(TrustAnchor(der.toX509(), null))
     }
 
-    if (anchors.isEmpty()) {
+    // Adding system trust anchors
+    if (enableSystemTrustAnchors) {
+        loadTrustAnchorsFromKeyStore(KeyStore.getInstance(KeyStore.getDefaultType())).forEach { der ->
+            anchors.add(TrustAnchor(der.toX509(), null))
+        }
+    }
+
+    // Adding self-signed roots from chain
+    if (enableTrustedChainRoot) { // Add self-signed root certificates
         chain.filter { isSelfSigned(it) }.forEach { root ->
             anchors.add(TrustAnchor(root, null))
         }

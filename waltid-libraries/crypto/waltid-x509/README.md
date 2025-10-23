@@ -8,7 +8,6 @@ It focuses on developer-friendly APIs for parsing `x5c` JWT headers and validati
 ## Features
 
 - **KMP-first API**: common `expect/actual` with a consistent developer experience.
-- **x5c helpers**: parse Base64 DER certificates from JWT `x5c` headers.
 - **PKIX validation (JVM/Android)**: order-independent path building & validation using the platform PKI.
 - **Pluggable trust model**: validate against:
   - your **organization trust store** (recommended), or
@@ -33,11 +32,7 @@ It focuses on developer-friendly APIs for parsing `x5c` JWT headers and validati
 
 ```kotlin
 // Common API (expect)
-@JvmInline
-value class CertificateDer(val bytes: ByteArray)
-
-/** Parse a JWT x5c array (Base64 DER) to DER-wrapped certs. */
-expect fun parseX5cBase64(x5cBase64: List<String>): List<CertificateDer>
+data class CertificateDer(val bytes: ByteArray)
 
 /** Validate a leaf X.509 cert against a provided chain and trust anchors. */
 @Throws(X509ValidationException::class)
@@ -45,6 +40,8 @@ expect fun validateCertificateChain(
     leaf: CertificateDer,
     chain: List<CertificateDer>,
     trustAnchors: List<CertificateDer>? = null,
+    enableTrustedChainRoot: Boolean = false,
+    enableSystemTrustAnchors: Boolean = false,
     enableRevocation: Boolean = false
 )
 
@@ -74,6 +71,7 @@ include(":waltid-libraries:crypto:waltid-x509")  // if used as a composite build
 
 ```kotlin
 import waltid.x509.* // adjust to your actual package name
+import java.util.Base64
 
 fun validateFromX5cExample(
     x5cBase64: List<String>,             // JWT header "x5c": Base64 DER certs
@@ -81,7 +79,7 @@ fun validateFromX5cExample(
     enableRevocation: Boolean = false
 ) {
     // 1) Parse the x5c array into DER bytes (platform-agnostic wrapper)
-    val chain = parseX5cBase64(x5cBase64)
+    val chain = x5cBase64.map { CertificateDer(Base64.getDecoder().decode(it)) }
 
     // 2) The leaf is usually the first element in x5c (but you can pick explicitly)
     val leaf = chain.first()
@@ -94,6 +92,8 @@ fun validateFromX5cExample(
         leaf = leaf,
         chain = chain,
         trustAnchors = anchors,
+        enableTrustedChainRoot = anchors.isNullOrEmpty(),
+        enableSystemTrustAnchors = false,
         enableRevocation = enableRevocation
     )
     // If no exception is thrown, validation succeeded.
@@ -158,4 +158,3 @@ fun loadTrustAnchorsFromKeyStore(ks: KeyStore): List<CertificateDer>
 ## License
 
 Apache 2.0 (same as the rest of walt.id unless otherwise noted). See `LICENSE`.
-

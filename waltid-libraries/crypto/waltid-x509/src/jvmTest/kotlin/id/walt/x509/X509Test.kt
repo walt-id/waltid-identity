@@ -8,6 +8,9 @@ import kotlin.test.Test
 
 class X509Test {
 
+    fun parseX5cBase64(x5cBase64: List<String>): List<CertificateDer> =
+        x5cBase64.map { CertificateDer(Base64.getDecoder().decode(it)) }
+
     fun der(cert: X509Certificate) = CertificateDer(cert.encoded)
     fun b64(cert: X509Certificate): String = Base64.getEncoder().encodeToString(cert.encoded)
 
@@ -33,8 +36,7 @@ class X509Test {
         validateCertificateChain(
             leaf = der(c.leafCert),
             chain = parsed,
-            trustAnchors = anchors,
-            enableRevocation = false
+            trustAnchors = anchors
         )
     }
 
@@ -54,8 +56,7 @@ class X509Test {
         validateCertificateChain(
             leaf = der(c.leafCert),
             chain = parsed,
-            trustAnchors = null,
-            enableRevocation = false
+            enableTrustedChainRoot = true
         )
     }
 
@@ -73,8 +74,7 @@ class X509Test {
             validateCertificateChain(
                 leaf = der(c.leafCert),
                 chain = x5c,
-                trustAnchors = wrongAnchors,
-                enableRevocation = false
+                trustAnchors = wrongAnchors
             )
         }
         assertTrue(ex.message!!.contains("path"), "Expected path build/validation failure")
@@ -98,8 +98,7 @@ class X509Test {
             validateCertificateChain(
                 leaf = der(chainPast.leafCert),
                 chain = x5c,
-                trustAnchors = anchors,
-                enableRevocation = false
+                trustAnchors = anchors
             )
         }
         assertTrue(ex.message!!.contains("path"), "Expected path build/expiration failure")
@@ -120,8 +119,7 @@ class X509Test {
         validateCertificateChain(
             leaf = der(c.leafCert),
             chain = parsed,
-            trustAnchors = anchors,
-            enableRevocation = false
+            trustAnchors = anchors
         )
     }
 

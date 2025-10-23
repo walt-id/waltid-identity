@@ -6,7 +6,6 @@ import id.walt.credentials.representations.X5CList
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.vical.Vical
 import id.walt.x509.CertificateDer
 import id.walt.x509.validateCertificateChain
@@ -18,11 +17,26 @@ import kotlinx.serialization.json.JsonPrimitive
 
 private val log = KotlinLogging.logger { }
 
+/**
+ * A verification policy for VICAL-based credentials. This policy validates the authenticity,
+ * integrity, and trustworthiness of digital credentials using VICAL data. It provides
+ * configuration options for document type validation, system trust anchors, trusted chain roots,
+ * and revocation checks.
+ *
+ * @property vical The trusted VICAL file, encoded as either Base64 or hexadecimal.
+ * @property enableDocumentTypeValidation Flag to enable or disable validation of the credentials document type
+ * against the VICAL data.
+ * @property enableTrustedChainRoot Flag to enable or disable the use of a trusted root certificate (self-signed) in the chain.
+ * @property enableSystemTrustAnchors Flag to enable or disable the use of system trust anchors.
+ * @property enableRevocation Flag to enable or disable revocation checks.
+ */
 @Serializable
 @SerialName("vical")
 data class VicalPolicy(
-    /** the trusted VICAL file (base64 or hex encoded) */
     val vical: String,
+    val enableDocumentTypeValidation: Boolean = false,
+    val enableTrustedChainRoot: Boolean = false,
+    val enableSystemTrustAnchors: Boolean = false,
     val enableRevocation: Boolean = false
 ) : VerificationPolicy2() {
     override val id = "vical"
@@ -45,9 +59,9 @@ data class VicalPolicy(
                 CertificateDer(it.base64Der.decodeFromBase64())
             }.filter { it != signingCert } // Do not put the signing cert in the chain
 
-            val anchors: List<CertificateDer>? = loadTrustAnchorsFromVical(this.vical)
+            val anchors: List<CertificateDer>? = loadTrustAnchorsFromVical(this.vical, credential.docType)
 
-            validateCertificateChain(signingCert, chain, anchors, enableRevocation)
+            validateCertificateChain(signingCert, chain, anchors, enableTrustedChainRoot, enableSystemTrustAnchors, enableRevocation)
 
         } catch (e: Exception) {
             return Result.failure(e)
@@ -68,7 +82,7 @@ data class VicalPolicy(
      * @param x5cList The X5CList containing the chain of X.509 certificates represented
      * as base64 DER encoded strings.
      * @return The document signing certificate as a `CertificateDer`.
-     * @throws IllegalArgumentException If the signer key thumbprint cannot be determined
+     * @throws IllegalArgumentException If the signer key thumbprint cannot be determined,
      * or if the document signing certificate cannot be identified in the x5c list.
      */
     private suspend fun loadDocumentSigningCertFromX5CList(
@@ -96,22 +110,21 @@ data class VicalPolicy(
      * processing, the method returns null.
      *
      * @param vicalBase64 The Base64-encoded string representing the VICAL data.
+     * @param allowedDocType If `documentTypeValidation` is `true`, the document type to be validated against the VICAL data.
      * @return A list of DER-encoded certificates (`CertificateDer`) parsed from the VICAL data, or null if no anchors are available.
      */
-    private fun loadTrustAnchorsFromVical(vicalBase64: String): List<CertificateDer>? {
+    private fun loadTrustAnchorsFromVical(vicalBase64: String, allowedDocType: String): List<CertificateDer>? {
         // decode VICAL
         val decodedVical = Vical.decode(vicalBase64.decodeFromBase64())
 
+        val certificateInfos = if (enableDocumentTypeValidation) {
+            log.debug { "Document type validation is enabled" }
+            decodedVical.vicalData.certificateInfos.filter { allowedDocType in it.docType }
+        } else decodedVical.vicalData.certificateInfos
+
         // Build anchors from VICAL certificateInfos
-        val anchorsFromVical: List<CertificateDer> =
-            decodedVical.vicalData.certificateInfos
-                .map { info -> CertificateDer(info.certificate) }
+        val anchorsFromVical: List<CertificateDer> = certificateInfos.map { info -> CertificateDer(info.certificate) }
 
-        // TODO: Handling of allowed document types
-        // Optional: filter anchors by supported document type(s) declared in CertificateInfo.docType
-        // val anchorsFiltered = anchorsFromVical.filter { itInfo -> itInfo.docType.any { dt -> dt in docTypes } }
-
-        // Use anchorsFromVical if not empty, otherwise pass null so JVM implementation can try self-signed roots
         return anchorsFromVical.ifEmpty { null }
     }
 }
