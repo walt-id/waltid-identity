@@ -7,6 +7,7 @@ import id.walt.dcql.models.ClaimsQuery
 object DcqlClaimValidator {
 
     /**
+     * TODO: use or remove
      * A helper to check if the claims in a validated credential match the original DCQL claims query.
      */
     fun validateClaimsAgainstCredential(

@@ -16,7 +16,9 @@ class CredentialSignaturePolicy : VerificationPolicy2() {
     }
 
     override suspend fun verify(credential: DigitalCredential): Result<JsonObject> {
-        /*val issuer = credential.issuer
+        /* TODO: Cleanup and extend result messages and logging
+
+        val issuer = credential.issuer
 
         val possibleKeys: List<Result<Key>> = when {
             issuer != null && DidUtils.isDidUrl(issuer)

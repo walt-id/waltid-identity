@@ -52,5 +52,4 @@ object PolicyClaimChecker {
 
         return block.invoke(data, foundClaim).map { Json.encodeToJsonElement(it).jsonObject }
     }
-
 }
