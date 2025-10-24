@@ -10,91 +10,121 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.cbor.ByteString
 
 /**
- * Data model for the Photo ID profile as per ISO/IEC TS 23220-4, Annex C.
- * Note: `ByteArray` properties like `portrait` will be automatically encoded as `bstr` by the central MdocCbor instance.
+ * Birth date structure as per ISO/IEC 23220-2
  */
-// --- Data elements from ISO/IEC 23220-2 (Table 1) ---
+@Serializable
+data class BirthDate(
+    @SerialName("birth_date") val birthDate: LocalDate, // YYYY-MM-DD format
+    @SerialName("approximate_mask") val approximateMask: String? = null // 8-digit 0/1 mask
+) {
+    init {
+        // Validate approximate_mask format if provided
+        approximateMask?.let { mask ->
+            require(mask.matches(Regex("[01]{8}"))) { 
+                "approximate_mask must be an 8-digit binary string (0s and 1s only)" 
+            }
+        }
+    }
+}
+
+/**
+ * Core data elements from org.iso.23220.1 namespace as per ISO/IEC 23220-2 Table C.1
+ */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
-data class PhotoId(
-    @SerialName("family_name_unicode") val familyNameUnicode: String,
-    @SerialName("given_name_unicode") val givenNameUnicode: String,
-    @SerialName("birth_date") val birthDate: LocalDate, // full-date
-
+data class PhotoIdCore(
+    // Required fields
+    @SerialName("family_name") val familyName: String,
+    @SerialName("given_name") val givenName: String? = null,
+    @SerialName("family_name_viz") val familyNameViz: String? = null,
+    @SerialName("given_name_viz") val givenNameViz: String? = null,
+    @SerialName("family_name_latin1") val familyNameLatin1: String? = null,
+    @SerialName("given_name_latin1") val givenNameLatin1: String? = null,
+    @SerialName("birth_date") val birthDate: BirthDate,
+    
     @ByteString
     @Serializable(with = ByteArrayBase64UrlSerializer::class)
     @SerialName("portrait") val portrait: ByteArray,
-
-    @SerialName("issue_date") val issueDate: LocalDate, // tdate or full-date
-    @SerialName("expiry_date") val expiryDate: LocalDate, // tdate or full-date
-    @SerialName("issuing_authority_unicode") val issuingAuthorityUnicode: String,
+    
+    @ByteString
+    @Serializable(with = ByteArrayBase64UrlSerializer::class)
+    @SerialName("enrolment_portrait_image") val enrolmentPortraitImage: ByteArray? = null,
+    
+    @SerialName("issue_date") val issueDate: LocalDate, // YYYY-MM-DD
+    @SerialName("expiry_date") val expiryDate: LocalDate, // YYYY-MM-DD
+    @SerialName("issuing_authority") val issuingAuthority: String,
     @SerialName("issuing_country") val issuingCountry: String,
+    @SerialName("issuing_subdivision") val issuingSubdivision: String? = null,
+    @SerialName("age_over_18") val ageOver18: Boolean,
+    
+    // Optional fields
     @SerialName("age_in_years") val ageInYears: UInt? = null,
-    /** Age attestation: Over 12 years old? */
-    @SerialName("age_over_12")
-    val ageOver12: Boolean? = null,
-
-    /** Age attestation: Over 13 years old? */
-    @SerialName("age_over_13")
-    val ageOver13: Boolean? = null,
-
-    /** Age attestation: Over 14 years old? */
-    @SerialName("age_over_14")
-    val ageOver14: Boolean? = null,
-
-    /** Age attestation: Over 16 years old? */
-    @SerialName("age_over_16")
-    val ageOver16: Boolean? = null,
-
-    /** Age attestation: Over 18 years old? */
-    @SerialName("age_over_18")
-    val ageOver18: Boolean? = null,
-
-    /** Age attestation: Over 21 years old? */
-    @SerialName("age_over_21")
-    val ageOver21: Boolean? = null,
-
-    /** Age attestation: Over 25 years old? */
-    @SerialName("age_over_25")
-    val ageOver25: Boolean? = null,
-
-    /** Age attestation: Over 60 years old? */
-    @SerialName("age_over_60")
-    val ageOver60: Boolean? = null,
-
-    /** Age attestation: Over 62 years old? */
-    @SerialName("age_over_62")
-    val ageOver62: Boolean? = null,
-
-    /** Age attestation: Over 65 years old? */
-    @SerialName("age_over_65")
-    val ageOver65: Boolean? = null,
-
-    /** Age attestation: Over 68 years old? */
-    @SerialName("age_over_68")
-    val ageOver68: Boolean? = null,
-
+    @SerialName("age_over_NN") val ageOverNN: Boolean? = null,
     @SerialName("age_birth_year") val ageBirthYear: UInt? = null,
-    @SerialName("portrait_capture_date") val portraitCaptureDate: LocalDate? = null, // tdate
-    @SerialName("birthplace") val birthPlace: String? = null,
+    @SerialName("portrait_capture_date") val portraitCaptureDate: LocalDate? = null,
+    @SerialName("birthplace") val birthplace: String? = null,
     @SerialName("name_at_birth") val nameAtBirth: String? = null,
-    @SerialName("resident_address_unicode") val residentAddressUnicode: String? = null,
-    @SerialName("resident_city_unicode") val residentCityUnicode: String? = null,
+    @SerialName("resident_address") val residentAddress: String? = null,
+    @SerialName("resident_city") val residentCity: String? = null,
+    @SerialName("resident_city_latin1") val residentCityLatin1: String? = null,
     @SerialName("resident_postal_code") val residentPostalCode: String? = null,
     @SerialName("resident_country") val residentCountry: String? = null,
-    @SerialName("resident_city_latin1") val residentCityLatin1: String? = null,
     @Serializable(with = IsoSexEnumSerializer::class)
     @SerialName("sex") val sex: IsoSexEnum? = null,
     @SerialName("nationality") val nationality: String? = null,
-    @SerialName("document_number") val documentNumber: String? = null,
-    @SerialName("issuing_subdivision") val issuingSubdivision: String? = null,
-    @SerialName("family_name_latin1") val familyNameLatin1: String,
-    @SerialName("given_name_latin1") val givenNameLatin1: String,
+    @SerialName("document_number") val documentNumber: String? = null
+) : MdocData {
+    init {
+        // Validate string length constraints as per schema
+        require(familyName.length <= 150) { "family_name must be <= 150 characters" }
+        givenName?.let { require(it.length <= 150) { "given_name must be <= 150 characters" } }
+        familyNameViz?.let { require(it.length <= 150) { "family_name_viz must be <= 150 characters" } }
+        givenNameViz?.let { require(it.length <= 150) { "given_name_viz must be <= 150 characters" } }
+        familyNameLatin1?.let { require(it.length <= 150) { "family_name_latin1 must be <= 150 characters" } }
+        givenNameLatin1?.let { require(it.length <= 150) { "given_name_latin1 must be <= 150 characters" } }
+        issuingAuthority.let { require(it.length <= 150) { "issuing_authority must be <= 150 characters" } }
+        issuingSubdivision?.let { require(it.length <= 150) { "issuing_subdivision must be <= 150 characters" } }
+        birthplace?.let { require(it.length <= 150) { "birthplace must be <= 150 characters" } }
+        nameAtBirth?.let { require(it.length <= 150) { "name_at_birth must be <= 150 characters" } }
+        residentAddress?.let { require(it.length <= 150) { "resident_address must be <= 150 characters" } }
+        residentCity?.let { require(it.length <= 150) { "resident_city must be <= 150 characters" } }
+        residentCityLatin1?.let { require(it.length <= 150) { "resident_city_latin1 must be <= 150 characters" } }
+        residentPostalCode?.let { require(it.length <= 150) { "resident_postal_code must be <= 150 characters" } }
+        documentNumber?.let { require(it.length <= 150) { "document_number must be <= 150 characters" } }
+        
+        // Validate country code formats
+        require(issuingCountry.matches(Regex("[A-Z]{2,3}"))) { 
+            "issuing_country must be 2-3 uppercase letters (ISO 3166-1)" 
+        }
+        residentCountry?.let { 
+            require(it.matches(Regex("[A-Z]{2}"))) { 
+                "resident_country must be 2 uppercase letters (ISO 3166-1 alpha-2)" 
+            } 
+        }
+        nationality?.let { 
+            require(it.matches(Regex("[A-Z]{2,3}"))) { 
+                "nationality must be 2-3 uppercase letters (ISO 3166-1)" 
+            } 
+        }
+        
+        // Validate age constraints
+        ageInYears?.let { require(it >= 0u) { "age_in_years must be >= 0" } }
+        ageBirthYear?.let { require(it >= 0u) { "age_birth_year must be >= 0" } }
+        
+        // Validate date constraints
+        require(issueDate <= expiryDate) { "issue_date must be <= expiry_date" }
+    }
+}
 
-    // --- Data elements from org.iso.23220.photoid.1 namespace (Table 2) ---
+/**
+ * Additional Photo ID data from org.iso.23220.photoID.1 namespace as per ISO/IEC 23220-4 Table C.2
+ */
+@Serializable
+data class PhotoIdAdditional(
     @SerialName("person_id") val personId: String? = null,
     @SerialName("birth_country") val birthCountry: String? = null,
     @SerialName("birth_state") val birthState: String? = null,
@@ -102,9 +132,96 @@ data class PhotoId(
     @SerialName("administrative_number") val administrativeNumber: String? = null,
     @SerialName("resident_street") val residentStreet: String? = null,
     @SerialName("resident_house_number") val residentHouseNumber: String? = null,
-    @SerialName("travel_document_number") val travelDocumentNumber: String? = null,
     @SerialName("resident_state") val residentState: String? = null,
+    @SerialName("travel_document_type") val travelDocumentType: String? = null,
+    @SerialName("travel_document_number") val travelDocumentNumber: String? = null,
+    @SerialName("travel_document_mrz") val travelDocumentMrz: String? = null
 ) : MdocData {
+    init {
+        // Validate string length constraints as per schema
+        personId?.let { require(it.length <= 150) { "person_id must be <= 150 characters" } }
+        birthState?.let { require(it.length <= 150) { "birth_state must be <= 150 characters" } }
+        birthCity?.let { require(it.length <= 150) { "birth_city must be <= 150 characters" } }
+        administrativeNumber?.let { require(it.length <= 150) { "administrative_number must be <= 150 characters" } }
+        residentStreet?.let { require(it.length <= 150) { "resident_street must be <= 150 characters" } }
+        residentHouseNumber?.let { require(it.length <= 150) { "resident_house_number must be <= 150 characters" } }
+        residentState?.let { require(it.length <= 150) { "resident_state must be <= 150 characters" } }
+        travelDocumentType?.let { require(it.length <= 150) { "travel_document_type must be <= 150 characters" } }
+        travelDocumentNumber?.let { require(it.length <= 150) { "travel_document_number must be <= 150 characters" } }
+        travelDocumentMrz?.let { require(it.length <= 150) { "travel_document_mrz must be <= 150 characters" } }
+        
+        // Validate country code format
+        birthCountry?.let { 
+            require(it.matches(Regex("[A-Z]{2}"))) { 
+                "birth_country must be 2 uppercase letters (ISO 3166-1 alpha-2)" 
+            } 
+        }
+    }
+}
+
+/**
+ * ICAO 9303 data groups from org.iso.23220.datagroups.1 namespace as per ISO/IEC 23220-4 Table C.3
+ */
+@Serializable
+data class PhotoIdDataGroups(
+    @SerialName("version") val version: String? = null,
+    @SerialName("dg1") val dg1: String? = null, // base64
+    @SerialName("dg2") val dg2: String? = null, // base64
+    @SerialName("dg3") val dg3: String? = null, // base64
+    @SerialName("dg4") val dg4: String? = null, // base64
+    @SerialName("dg5") val dg5: String? = null, // base64
+    @SerialName("dg6") val dg6: String? = null, // base64
+    @SerialName("dg7") val dg7: String? = null, // base64
+    @SerialName("dg8") val dg8: String? = null, // base64
+    @SerialName("dg9") val dg9: String? = null, // base64
+    @SerialName("dg10") val dg10: String? = null, // base64
+    @SerialName("dg11") val dg11: String? = null, // base64
+    @SerialName("dg12") val dg12: String? = null, // base64
+    @SerialName("dg13") val dg13: String? = null, // base64
+    @SerialName("dg14") val dg14: String? = null, // base64
+    @SerialName("dg15") val dg15: String? = null, // base64
+    @SerialName("dg16") val dg16: String? = null, // base64
+    @SerialName("sod") val sod: String? = null // base64
+) : MdocData
+
+/**
+ * Complete Photo ID mdoc structure as per ISO/IEC 23220-4
+ * This represents the full document structure with all three namespaces
+ */
+@Serializable
+data class PhotoId(
+    @SerialName("docType") val docType: String = "org.iso.23220.photoID.1",
+    @SerialName("issuerSigned") val issuerSigned: PhotoIdIssuerSigned,
+    @SerialName("deviceSigned") val deviceSigned: Map<String, Any>? = null,
+    @SerialName("readerAuth") val readerAuth: String? = null // base64 COSE_Sign1
+) : MdocData {
+    init {
+        // Validate document type
+        require(docType == "org.iso.23220.photoID.1") { 
+            "docType must be 'org.iso.23220.photoID.1' for Photo ID mdoc" 
+        }
+    }
+}
+
+/**
+ * Issuer signed portion of Photo ID mdoc
+ */
+@Serializable
+data class PhotoIdIssuerSigned(
+    @SerialName("nameSpaces") val nameSpaces: PhotoIdNameSpaces,
+    @SerialName("issuerAuth") val issuerAuth: String, // base64 COSE_Sign1
+    @SerialName("digestAlgorithm") val digestAlgorithm: String? = null
+)
+
+/**
+ * Namespaces container for Photo ID mdoc
+ */
+@Serializable
+data class PhotoIdNameSpaces(
+    @SerialName("org.iso.23220.1") val core: PhotoIdCore,
+    @SerialName("org.iso.23220.photoID.1") val additional: PhotoIdAdditional,
+    @SerialName("org.iso.23220.datagroups.1") val dataGroups: PhotoIdDataGroups? = null
+)
 
     companion object : MdocCompanion {
         override fun registerSerializationTypes() {
@@ -112,133 +229,69 @@ data class PhotoId(
             val byteArray = ByteArraySerializer()
             val uint = UInt.serializer()
             val boolean = Boolean.serializer()
+            val string = String.serializer()
 
+            // Register serializers for org.iso.23220.1 namespace
             MdocsCborSerializer.register(
                 mapOf(
-                    "birth_date" to localDate,
+                    "birth_date" to BirthDate.serializer(),
                     "issue_date" to localDate,
                     "expiry_date" to localDate,
                     "portrait" to byteArray,
+                    "enrolment_portrait_image" to byteArray,
                     "sex" to IsoSexEnumSerializer,
                     "portrait_capture_date" to localDate,
-                    "age_in_year" to uint,
+                    "age_in_years" to uint,
                     "age_birth_year" to uint,
-                    "age_over_12" to boolean,
-                    "age_over_13" to boolean,
-                    "age_over_14" to boolean,
-                    "age_over_16" to boolean,
                     "age_over_18" to boolean,
-                    "age_over_21" to boolean,
-                    "age_over_25" to boolean,
-                    "age_over_60" to boolean,
-                    "age_over_62" to boolean,
-                    "age_over_65" to boolean,
-                    "age_over_68" to boolean,
-
+                    "age_over_NN" to boolean
                 ),
-                "org.iso.23220.photoid.1"
+                "org.iso.23220.1"
+            )
+            
+            // Register serializers for org.iso.23220.photoID.1 namespace
+            MdocsCborSerializer.register(
+                mapOf(
+                    "person_id" to string,
+                    "birth_country" to string,
+                    "birth_state" to string,
+                    "birth_city" to string,
+                    "administrative_number" to string,
+                    "resident_street" to string,
+                    "resident_house_number" to string,
+                    "resident_state" to string,
+                    "travel_document_type" to string,
+                    "travel_document_number" to string,
+                    "travel_document_mrz" to string
+                ),
+                "org.iso.23220.photoID.1"
+            )
+            
+            // Register serializers for org.iso.23220.datagroups.1 namespace
+            MdocsCborSerializer.register(
+                mapOf(
+                    "version" to string,
+                    "dg1" to string,
+                    "dg2" to string,
+                    "dg3" to string,
+                    "dg4" to string,
+                    "dg5" to string,
+                    "dg6" to string,
+                    "dg7" to string,
+                    "dg8" to string,
+                    "dg9" to string,
+                    "dg10" to string,
+                    "dg11" to string,
+                    "dg12" to string,
+                    "dg13" to string,
+                    "dg14" to string,
+                    "dg15" to string,
+                    "dg16" to string,
+                    "sod" to string
+                ),
+                "org.iso.23220.datagroups.1"
             )
         }
-
     }
 
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is PhotoId) return false
-
-        if (ageInYears != other.ageInYears) return false
-        if (ageOver12 != other.ageOver12) return false
-        if (ageOver13 != other.ageOver13) return false
-        if (ageOver14 != other.ageOver14) return false
-        if (ageOver16 != other.ageOver16) return false
-        if (ageOver18 != other.ageOver18) return false
-        if (ageOver21 != other.ageOver21) return false
-        if (ageOver25 != other.ageOver25) return false
-        if (ageOver60 != other.ageOver60) return false
-        if (ageOver62 != other.ageOver62) return false
-        if (ageOver65 != other.ageOver65) return false
-        if (ageOver68 != other.ageOver68) return false
-        if (ageBirthYear != other.ageBirthYear) return false
-        if (sex != other.sex) return false
-        if (familyNameUnicode != other.familyNameUnicode) return false
-        if (givenNameUnicode != other.givenNameUnicode) return false
-        if (birthDate != other.birthDate) return false
-        if (!portrait.contentEquals(other.portrait)) return false
-        if (issueDate != other.issueDate) return false
-        if (expiryDate != other.expiryDate) return false
-        if (issuingAuthorityUnicode != other.issuingAuthorityUnicode) return false
-        if (issuingCountry != other.issuingCountry) return false
-        if (portraitCaptureDate != other.portraitCaptureDate) return false
-        if (birthPlace != other.birthPlace) return false
-        if (nameAtBirth != other.nameAtBirth) return false
-        if (residentAddressUnicode != other.residentAddressUnicode) return false
-        if (residentCityUnicode != other.residentCityUnicode) return false
-        if (residentPostalCode != other.residentPostalCode) return false
-        if (residentCountry != other.residentCountry) return false
-        if (residentCityLatin1 != other.residentCityLatin1) return false
-        if (nationality != other.nationality) return false
-        if (documentNumber != other.documentNumber) return false
-        if (issuingSubdivision != other.issuingSubdivision) return false
-        if (familyNameLatin1 != other.familyNameLatin1) return false
-        if (givenNameLatin1 != other.givenNameLatin1) return false
-        if (personId != other.personId) return false
-        if (birthCountry != other.birthCountry) return false
-        if (birthState != other.birthState) return false
-        if (birthCity != other.birthCity) return false
-        if (administrativeNumber != other.administrativeNumber) return false
-        if (residentStreet != other.residentStreet) return false
-        if (residentHouseNumber != other.residentHouseNumber) return false
-        if (travelDocumentNumber != other.travelDocumentNumber) return false
-        if (residentState != other.residentState) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = ageInYears?.hashCode() ?: 0
-        result = 31 * result + (ageOver12?.hashCode() ?: 0)
-        result = 31 * result + (ageOver13?.hashCode() ?: 0)
-        result = 31 * result + (ageOver14?.hashCode() ?: 0)
-        result = 31 * result + (ageOver16?.hashCode() ?: 0)
-        result = 31 * result + (ageOver18?.hashCode() ?: 0)
-        result = 31 * result + (ageOver21?.hashCode() ?: 0)
-        result = 31 * result + (ageOver25?.hashCode() ?: 0)
-        result = 31 * result + (ageOver60?.hashCode() ?: 0)
-        result = 31 * result + (ageOver62?.hashCode() ?: 0)
-        result = 31 * result + (ageOver65?.hashCode() ?: 0)
-        result = 31 * result + (ageOver68?.hashCode() ?: 0)
-        result = 31 * result + (ageBirthYear?.hashCode() ?: 0)
-        result = 31 * result + (sex?.hashCode() ?: 0)
-        result = 31 * result + familyNameUnicode.hashCode()
-        result = 31 * result + givenNameUnicode.hashCode()
-        result = 31 * result + birthDate.hashCode()
-        result = 31 * result + portrait.contentHashCode()
-        result = 31 * result + issueDate.hashCode()
-        result = 31 * result + expiryDate.hashCode()
-        result = 31 * result + issuingAuthorityUnicode.hashCode()
-        result = 31 * result + issuingCountry.hashCode()
-        result = 31 * result + (portraitCaptureDate?.hashCode() ?: 0)
-        result = 31 * result + (birthPlace?.hashCode() ?: 0)
-        result = 31 * result + (nameAtBirth?.hashCode() ?: 0)
-        result = 31 * result + (residentAddressUnicode?.hashCode() ?: 0)
-        result = 31 * result + (residentCityUnicode?.hashCode() ?: 0)
-        result = 31 * result + (residentPostalCode?.hashCode() ?: 0)
-        result = 31 * result + (residentCountry?.hashCode() ?: 0)
-        result = 31 * result + (residentCityLatin1?.hashCode() ?: 0)
-        result = 31 * result + (nationality?.hashCode() ?: 0)
-        result = 31 * result + (documentNumber?.hashCode() ?: 0)
-        result = 31 * result + (issuingSubdivision?.hashCode() ?: 0)
-        result = 31 * result + familyNameLatin1.hashCode()
-        result = 31 * result + givenNameLatin1.hashCode()
-        result = 31 * result + (personId?.hashCode() ?: 0)
-        result = 31 * result + (birthCountry?.hashCode() ?: 0)
-        result = 31 * result + (birthState?.hashCode() ?: 0)
-        result = 31 * result + (birthCity?.hashCode() ?: 0)
-        result = 31 * result + (administrativeNumber?.hashCode() ?: 0)
-        result = 31 * result + (residentStreet?.hashCode() ?: 0)
-        result = 31 * result + (residentHouseNumber?.hashCode() ?: 0)
-        result = 31 * result + (travelDocumentNumber?.hashCode() ?: 0)
-        result = 31 * result + (residentState?.hashCode() ?: 0)
-        return result
-    }
 }
