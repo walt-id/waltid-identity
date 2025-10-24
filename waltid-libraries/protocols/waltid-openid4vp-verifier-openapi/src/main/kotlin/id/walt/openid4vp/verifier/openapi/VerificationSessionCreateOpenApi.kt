@@ -24,7 +24,7 @@ object VerificationSessionCreateOpenApi {
                 example("W3C type values") { value = exampleOf(Verifier2OpenApiExamples.w3cTypeValues) }
                 example("W3C without claims") { value = exampleOf(Verifier2OpenApiExamples.W3CWithoutClaims) }
                 example("W3C with claims and values") { value = exampleOf(Verifier2OpenApiExamples.W3CWithClaimsAndValues) }
-                example("VICAL policy") { value = exampleOf(Verifier2OpenApiExamples.W3CWithClaimsAndValues) }
+                example("VICAL policy (only for ISO 18013-5)") { value = exampleOf(Verifier2OpenApiExamples.VicalPolicyValues) }
             }
         }
         response {

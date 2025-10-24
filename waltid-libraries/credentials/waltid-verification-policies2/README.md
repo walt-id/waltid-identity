@@ -111,12 +111,6 @@ All policies share the same signature: they accept a `DigitalCredential` and ret
           "required": [
             "credentialSubject"
           ]
-        },
-        "vical": {
-          "type": "object",
-          "required": [
-            "credentialSubject"
-          ]
         }
       }
     ]

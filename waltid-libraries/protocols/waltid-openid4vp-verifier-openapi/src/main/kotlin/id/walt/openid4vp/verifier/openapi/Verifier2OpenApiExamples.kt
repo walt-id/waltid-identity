@@ -236,4 +236,49 @@ object Verifier2OpenApiExamples {
     }
             """.trimIndent()
 
+    val VicalPolicyValues = """
+    {
+  "dcql_query": {
+    "credentials": [
+      {
+        "id": "example_openbadge_jwt_vc",
+        "format": "jwt_vc_json",
+        "meta": {
+          "type_values": [
+            [
+              "VerifiableCredential",
+              "OpenBadgeCredential"
+            ]
+          ]
+        },
+        "claims": [
+          {
+            "path": [
+              "name"
+            ],
+            "values": [
+              "JFF x vc-edu PlugFest 3 Interoperability"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "policies": {
+    "vcPolicies": [
+      {
+        "policy": "signature"
+      },
+      {
+        "policy": "vical",
+        "vical": "<base64 encoded VICAL file>",
+        "enableDocumentTypeValidation": true,
+        "enableTrustedChainRoot": true,
+        "enableSystemTrustAnchors": true,
+        "enableRevocation": true
+      }
+    ]
+  }
+}        """.trimIndent()
+
 }
