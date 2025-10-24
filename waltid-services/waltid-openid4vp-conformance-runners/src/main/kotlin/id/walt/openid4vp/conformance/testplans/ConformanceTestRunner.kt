@@ -17,19 +17,24 @@ import io.ktor.server.application.*
 import kotlin.reflect.jvm.jvmName
 import kotlin.test.assertNotNull
 
-class ConformanceTestRunner {
+class ConformanceTestRunner(
+    verifier2UrlPrefix: String = "https://verifier2.localhost/verification-session",
+    val conformanceHost: String = "localhost.emobix.co.uk",
+    val conformancePort: Int = 8443
+) {
+
 
     private val testPlans: List<TestPlan> = listOf(
-        MdlX509SanDnsRequestUriSignedDirectPost,
-        SdJwtVcX509SanDnsRequestUriSignedDirectPost
+        MdlX509SanDnsRequestUriSignedDirectPost(verifier2UrlPrefix, conformanceHost, conformancePort),
+        SdJwtVcX509SanDnsRequestUriSignedDirectPost(verifier2UrlPrefix, conformanceHost, conformancePort)
     )
 
 
     fun run() {
-        val host = "127.0.0.1"
-        val port = 7003
+        val localVerifierHost = "127.0.0.1"
+        val localVerifierPort = 7003
 
-        E2ETest(host, port, true).testBlock(
+        E2ETest(localVerifierHost, localVerifierPort, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
@@ -39,7 +44,7 @@ class ConformanceTestRunner {
                             clientName = "Verifier2",
                             logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
                         ),
-                        urlPrefix = "NOT-CONFIGURED_http://$host:$port/verification-session",
+                        urlPrefix = "NOT-CONFIGURED_http://$localVerifierHost:$localVerifierPort/verification-session",
                         urlHost = "NOT-CONFIGURED_openid4vp://authorize"
                     )
                 )
@@ -54,7 +59,7 @@ class ConformanceTestRunner {
         ) {
             val http = testHttpClient()
 
-            val conformance = ConformanceInterface()
+            val conformance = ConformanceInterface(conformanceHost, conformancePort)
 
             test("Check if conformance available") {
                 val conformanceVersion = conformance.getServerVersion()
@@ -68,7 +73,7 @@ class ConformanceTestRunner {
                 val planName = plan::class.simpleName ?: plan::class.jvmName
 
                 test(planName) {
-                    TestPlanRunner(plan.config, http).test()
+                    TestPlanRunner(plan.config, http, conformanceHost, conformancePort).test()
                 }
             }
         }
