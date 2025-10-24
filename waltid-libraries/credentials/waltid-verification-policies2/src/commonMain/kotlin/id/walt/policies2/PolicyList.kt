@@ -58,13 +58,6 @@ object PolicyListSerializer : KSerializer<PolicyList> {
         val json = jsonOutput.json
 
         val jsonElements = value.policies.map { policy ->
-//            when (policy) {
-//                is CredentialSignaturePolicy -> JsonPrimitive(policy.id)
-//                else -> json.encodeToJsonElement(
-//                    VerificationPolicy2.serializer(),
-//                    policy
-//                )
-//            }
             json.encodeToJsonElement(
                 VerificationPolicy2.serializer(),
                 policy
