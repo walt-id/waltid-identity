@@ -12,7 +12,7 @@ class DynamicPolicyValidator(
     }
 
     private fun validatePolicyName(policyName: String) {
-        require(policyName.matches(Regex("^[a-zA-Z]+$"))) {
+        require(policyName.matches(Regex(POLICY_NAME_REGEX))) {
             "Policy name contains invalid characters."
         }
         require(policyName.length <= MAX_POLICY_NAME_LENGTH) {
@@ -32,5 +32,6 @@ class DynamicPolicyValidator(
     companion object {
         private const val MAX_REGO_CODE_SIZE = 1_000_000 // 1MB limit
         private const val MAX_POLICY_NAME_LENGTH = 64
+        private const val POLICY_NAME_REGEX = "^[a-zA-Z_][a-zA-Z0-9_]*$"
     }
 }
