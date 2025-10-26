@@ -7,6 +7,7 @@ import id.walt.policies.opa.DynamicPolicyConfigParser
 import id.walt.policies.opa.DynamicPolicyRegoCodeExtractor
 import id.walt.policies.opa.DynamicPolicyRepository
 import id.walt.policies.opa.DynamicPolicyValidator
+import id.walt.sdjwt.SDJwt
 import id.walt.w3c.utils.VCFormat
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -43,7 +44,8 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
     override val name = "dynamic"
     override val description =
         "A dynamic policy that can be used to implement custom verification logic."
-    override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc)
+    override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc) +
+            setOf(VCFormat.jwt_vp, VCFormat.jwt_vp_json, VCFormat.ldp_vp) // todo: ha, this makes it a hybrid policy 🤣
 
     companion object {
         private val http = HttpClient {
@@ -57,17 +59,12 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
         private val repository = DynamicPolicyRepository(client = http, regoCodeExtractor = regoCodeExtractor)
     }
 
-
     private suspend fun verifyPolicy(
         config: DynamicPolicyConfig,
-        data: JsonObject
+        input: JsonElement,
     ): Result<JsonObject> {
         return try {
             logger.info { "Verifying policy: ${config.policyName}" }
-            val input = mapOf(
-                "parameter" to config.argument,
-                "credentialData" to data.toMap()
-            ).toJsonObject()
 
             val response = http.post("${config.opaServer}/v1/data/${config.policyQuery}/${config.policyName}") {
                 contentType(ContentType.Application.Json)
@@ -84,6 +81,15 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
         }
     }
 
+    private fun getCredentials(presentation: JsonObject): List<JsonObject> {
+        // todo: does this cover the regular JWTs as well??
+        val tokenParserFunction: (String) -> SDJwt = { SDJwt.parse(it) }
+        val credentials = presentation["vp"]?.jsonObject?.get("verifiableCredential")?.jsonArray?.mapNotNull { vc ->
+            vc.jsonPrimitive.contentOrNull?.let { tokenParserFunction(it) }?.fullPayload
+        } ?: emptyList()
+        return credentials
+    }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -93,22 +99,14 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
         args: Any?,
         context: Map<String, Any>
     ): Result<Any> {
-
         return try {
             logger.info { "Starting policy verification process" }
             val config = configParser.parse(args)
             validator.validate(config)
             repository.upload(config).getOrThrow()
-            verifyPolicy(config, data).map { result ->
-                val decision = result.values.firstOrNull {
-                    it is JsonPrimitive && it.booleanOrNull == true
-                }
-                if (decision != null) {
-                    result
-                } else {
-                    throw DynamicPolicyException("The policy condition was not met for policy ${config.policyName}")
-                }
-            }
+            val input = computeInput(config, data)
+            val result = verifyPolicy(config = config, input = input)
+            processResult(result, config)
         } catch (e: Exception) {
             logger.error(e) { "Policy verification failed" }
             Result.failure(
@@ -122,6 +120,39 @@ class DynamicPolicy : CredentialDataValidatorPolicy() {
                 val config = configParser.parse(args)
                 repository.delete(config)
             }
+        }
+    }
+
+    private fun computeInput(
+        config: DynamicPolicyConfig,
+        data: JsonObject,
+    ) = // 🙈
+        let {
+            data.takeIf { isVerifiablePresentation(it) }?.toMap() ?: let {
+                getCredentials(data).map { it.toMap() }
+            }
+        }.let {
+            mapOf(
+                "parameter" to config.argument,
+                "credentialData" to it // todo: avoid passing [Any] (here [it] is [Any])
+            ).toJsonObject()
+        }
+
+
+    // 🙈
+    private fun isVerifiablePresentation(data: JsonObject) = data.containsKey("vp")
+
+    private fun processResult(
+        result: Result<JsonObject>,
+        config: DynamicPolicyConfig
+    ): Result<JsonObject> = result.map { result ->
+        val decision = result.values.firstOrNull {
+            it is JsonPrimitive && it.booleanOrNull == true
+        }
+        if (decision != null) {
+            result
+        } else {
+            throw DynamicPolicyException("The policy condition was not met for policy ${config.policyName}")
         }
     }
 
