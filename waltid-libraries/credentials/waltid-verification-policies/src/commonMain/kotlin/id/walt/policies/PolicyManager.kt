@@ -1,10 +1,7 @@
 package id.walt.policies
 
 import id.walt.policies.policies.*
-import id.walt.policies.policies.vp.HolderBindingPolicy
-import id.walt.policies.policies.vp.MaximumCredentialsPolicy
-import id.walt.policies.policies.vp.MinimumCredentialsPolicy
-import id.walt.policies.policies.vp.PresentationDefinitionPolicy
+import id.walt.policies.policies.vp.*
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
@@ -52,6 +49,7 @@ object PolicyManager {
             PresentationDefinitionPolicy(),
             DynamicPolicy(),
             StatusPolicy(),
+            VpRequiredCredentialsPolicy(),
         )
     }
 
