@@ -86,10 +86,6 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
       "expiration",
       "not-before",
       {
-        "policy": "webhook",
-        "url": "https://webhook.site/2ac6171a-cce9-4b89-9fe0-55136da1e2fe"
-      },
-      {
         "policy": "schema",
         "schema": {
           "given_name": "John",
