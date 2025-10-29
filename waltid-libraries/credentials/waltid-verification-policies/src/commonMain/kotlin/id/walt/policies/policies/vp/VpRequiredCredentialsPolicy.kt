@@ -26,21 +26,16 @@ class VpRequiredCredentialsPolicy : CredentialWrapperValidatorPolicy() {
     @JsPromise
     @JsExport.Ignore
     override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
-        val argObj = (args as? JsonElement)?.jsonObject
-            ?: return Result.failure(IllegalArgumentException("vp_required_credentials: missing or invalid args (expected JSON object)"))
+        require(args is JsonObject) { "vp_required_credentials: missing or invalid args (expected JSON object)" }
 
-        val requirements = argObj["required"]?.jsonArray
-            ?: return Result.failure(IllegalArgumentException("vp_required_credentials: 'required' array missing in args"))
-
+        val requirements = args["required"]?.jsonArray
+        require(requirements is JsonArray) { "vp_required_credentials: 'required' array missing in args" }
         val presentedTypes: List<String> = collectPresentedTypes(data)
 
         val missingMessages = mutableListOf<String>()
 
         requirements.forEach { reqEl ->
             val req = reqEl.jsonObject
-            val isRequired = req["required"]?.jsonPrimitive?.booleanOrNull ?: true
-            if (!isRequired) return@forEach
-
             when {
                 req.containsKey("credential_type") -> {
                     val credentialType = req["credential_type"]?.jsonPrimitive?.content
@@ -56,7 +51,7 @@ class VpRequiredCredentialsPolicy : CredentialWrapperValidatorPolicy() {
                         ?.filter { it.isNotBlank() }
                         ?: emptyList()
                     if (anyOf.isEmpty()) {
-                        return Result.failure(IllegalArgumentException("vp_required_credentials: 'any_of' must be a non-empty array of strings"))
+                        return@forEach
                     }
                     val foundAny = anyOf.any { t -> presentedTypes.any { it == t } }
                     if (!foundAny) missingMessages.add("Missing required credential: ${anyOf.joinToString(" OR ")}")
