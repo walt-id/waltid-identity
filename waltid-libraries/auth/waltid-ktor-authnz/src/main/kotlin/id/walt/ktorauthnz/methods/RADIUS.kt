@@ -30,7 +30,7 @@ import java.net.InetSocketAddress
 object RADIUS : UserPassBasedAuthMethod("radius") {
 
     override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
-        val config = session.lookupConfiguration<RADIUSConfiguration>(this)
+        val config = session.lookupFlowMethodConfiguration<RADIUSConfiguration>(this)
 
         val radiusClient: RadiusClient = UdpRadiusClient.newBuilder()
             .secret(config.radiusServerSecret.toByteArray())

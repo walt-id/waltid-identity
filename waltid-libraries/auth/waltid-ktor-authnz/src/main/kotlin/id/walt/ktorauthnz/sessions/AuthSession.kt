@@ -71,7 +71,7 @@ data class AuthSession(
         SessionManager.removeSession(this)
     }
 
-    inline fun <reified V : AuthMethodConfiguration> lookupConfiguration(method: AuthenticationMethod): V {
+    inline fun <reified V : AuthMethodConfiguration> lookupFlowMethodConfiguration(method: AuthenticationMethod): V {
         val flow = flows?.firstOrNull { it.method == method.id } ?: error("No flow for method: ${method.id}")
         val config: V =
             flow.config?.let {
