@@ -60,7 +60,6 @@ data class WebhookPolicy(
         val responseData = if (response.contentType()?.match(ContentType.Application.Json) == true) {
             response.body<JsonObject>()
         } else JsonNull
-        println("Response data: $responseData (${response.contentType()})")
 
         return if (response.status.isSuccess()) Result.success(responseData)
         else Result.failure(WebhookPolicyException(responseData))
