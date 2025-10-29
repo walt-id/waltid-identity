@@ -38,20 +38,26 @@ data class WebhookPolicy(
     }
 
     override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
-        val response = http.post(url) {
-            setBody(credential)
-            header(HttpHeaders.ContentType, ContentType.Application.Json)
+        val responseResult = runCatching {
+            http.post(url) {
+                setBody(credential)
+                header(HttpHeaders.ContentType, ContentType.Application.Json)
 
-            if (basicAuthUsername != null && basicAuthPassword != null) {
-                basicAuth(basicAuthUsername, basicAuthPassword)
-            }
+                if (basicAuthUsername != null && basicAuthPassword != null) {
+                    basicAuth(basicAuthUsername, basicAuthPassword)
+                }
 
-            if (bearerAuthToken != null) {
-                bearerAuth(bearerAuthToken)
+                if (bearerAuthToken != null) {
+                    bearerAuth(bearerAuthToken)
+                }
             }
         }
 
-        val responseData = if (response.contentType() == ContentType.Application.Json) {
+        val response = responseResult.getOrElse { ex ->
+            return Result.failure(IllegalArgumentException("Could not contact webhook URL: $url", ex))
+        }
+
+        val responseData = if (response.contentType()?.match(ContentType.Application.Json) == true) {
             response.body<JsonObject>()
         } else JsonNull
 
