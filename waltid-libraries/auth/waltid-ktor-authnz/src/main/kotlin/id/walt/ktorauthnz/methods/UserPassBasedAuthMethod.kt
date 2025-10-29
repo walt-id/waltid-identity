@@ -38,13 +38,6 @@ abstract class UserPassBasedAuthMethod(
     internal suspend fun ApplicationCall.getUsernamePasswordFromRequest(): UserPasswordCredential {
         val contentType = request.contentType()
         when {
-            // Basic auth (fallback)
-            contentType.match(ContentType.Any) -> {
-                val basicAuth = request.basicAuthenticationCredentials()
-                if (basicAuth != null)
-                    return basicAuth
-                else error("No basic auth credential header found. $EXPLANATION_MESSAGE")
-            }
             // As JSON document
             contentType.match(ContentType.Application.Json) -> {
                 val body = receive<JsonObject>()
@@ -68,6 +61,13 @@ abstract class UserPassBasedAuthMethod(
                 ?: error("Invalid or missing $passwordName in form post request. $EXPLANATION_MESSAGE")
 
                 return UserPasswordCredential(username, password)
+            }
+            // Basic auth (fallback)
+            contentType.match(ContentType.Any) -> {
+                val basicAuth = request.basicAuthenticationCredentials()
+                if (basicAuth != null)
+                    return basicAuth
+                else error("No basic auth credential header found. $EXPLANATION_MESSAGE")
             }
 
             else -> error("Invalid content type: $contentType. $EXPLANATION_MESSAGE")
