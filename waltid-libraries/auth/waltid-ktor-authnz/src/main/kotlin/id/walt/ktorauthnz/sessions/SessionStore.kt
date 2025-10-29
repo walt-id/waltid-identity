@@ -4,7 +4,8 @@ interface SessionStore {
 
     val name: String
 
-    suspend fun store(session: AuthSession)
+    /** Store the provided AuthSession */
+    suspend fun storeSession(session: AuthSession)
 
     /** Resolve an AuthSession by its id */
     suspend fun resolveSessionById(sessionId: String): AuthSession
