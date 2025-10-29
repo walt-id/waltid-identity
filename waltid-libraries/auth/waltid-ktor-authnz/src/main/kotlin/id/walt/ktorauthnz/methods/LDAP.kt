@@ -20,7 +20,7 @@ import org.apache.directory.ldap.client.api.LdapNetworkConnection
 object LDAP : UserPassBasedAuthMethod("ldap") {
 
     override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
-        val config = session.lookupConfiguration<LDAPConfiguration>(this)
+        val config = session.lookupFlowMethodConfiguration<LDAPConfiguration>(this)
 
         val (hostname, port) = config.ldapServerUrl.removePrefix("ldap://").split(":")
         val userDN = config.userDNFormat.format(credential.name)

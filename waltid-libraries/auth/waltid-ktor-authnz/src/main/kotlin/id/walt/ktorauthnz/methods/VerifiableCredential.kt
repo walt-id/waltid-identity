@@ -40,7 +40,7 @@ object VerifiableCredential : AuthenticationMethod("vc") {
         }) {
             get("start-presentation") {
                 val session = call.getAuthSession(authContext)
-                val config = session.lookupConfiguration<VerifiableCredentialAuthConfiguration>(this@VerifiableCredential)
+                val config = session.lookupFlowMethodConfiguration<VerifiableCredentialAuthConfiguration>(this@VerifiableCredential)
 
                 val redirectUrl = call.request.uri.removeSuffix("/start-presentation") + "/callback"
 

@@ -9,7 +9,7 @@ import com.atlassian.onetime.service.DefaultTOTPService
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
-import id.walt.ktorauthnz.methods.data.TOTPStoredData
+import id.walt.ktorauthnz.methods.storeddata.TOTPStoredData
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import io.github.smiley4.ktoropenapi.post
