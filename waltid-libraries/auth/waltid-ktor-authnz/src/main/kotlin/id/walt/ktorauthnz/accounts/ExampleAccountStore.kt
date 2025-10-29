@@ -5,9 +5,9 @@ import id.walt.ktorauthnz.accounts.identifiers.methods.UsernameIdentifier
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.TOTP
 import id.walt.ktorauthnz.methods.UserPass
-import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
-import id.walt.ktorauthnz.methods.data.TOTPStoredData
-import id.walt.ktorauthnz.methods.data.UserPassStoredData
+import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.storeddata.TOTPStoredData
+import id.walt.ktorauthnz.methods.storeddata.UserPassStoredData
 import kotlinx.coroutines.runBlocking
 
 object ExampleAccountStore : EditableAccountStore {

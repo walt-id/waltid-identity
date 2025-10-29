@@ -6,7 +6,7 @@ import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
-import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionStatus
 import id.walt.ktorauthnz.sessions.SessionManager
@@ -106,7 +106,7 @@ abstract class AuthenticationMethod(open val id: String) {
             SessionManager.openImplicitGlobalSession(currentContext.initialFlow!!)
         } else {
             // Session was started explicitly
-            KtorAuthnzManager.sessionStore.resolveSessionId(currentContext.sessionId ?: error("No session id"))
+            KtorAuthnzManager.sessionStore.resolveSessionById(currentContext.sessionId ?: error("No session id"))
         }
 
         return session

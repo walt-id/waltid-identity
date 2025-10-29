@@ -1,4 +1,4 @@
-package id.walt.ktorauthnz.methods.data
+package id.walt.ktorauthnz.methods.storeddata
 
 import id.walt.ktorauthnz.methods.TOTP
 import kotlinx.serialization.SerialName
