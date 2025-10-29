@@ -20,7 +20,7 @@ object SessionManager {
             expiration = authFlow.expiration?.let { Clock.System.now() + authFlow.parsedDuration!! }
         )
 
-        KtorAuthnzManager.sessionStore.store(newSession)
+        KtorAuthnzManager.sessionStore.storeSession(newSession)
 
         return newSession
     }
@@ -46,7 +46,7 @@ object SessionManager {
 
 
     suspend fun updateSession(updatedAuthSession: AuthSession) {
-        KtorAuthnzManager.sessionStore.store(updatedAuthSession)
+        KtorAuthnzManager.sessionStore.storeSession(updatedAuthSession)
     }
 
     suspend fun invalidateSession(authSession: AuthSession) {

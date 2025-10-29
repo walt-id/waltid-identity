@@ -58,7 +58,9 @@ class ValkeySessionStore(
         redis.execute(KedisValueCommands.del("session:$id"))
     }
 
-    override suspend fun store(session: AuthSession) {
+
+    // TODO: Contains workaround using HSET instead of SADD + pipelining instead of transaction, due to library support
+    override suspend fun storeSession(session: AuthSession) {
         logger.debug("saving session $session")
         redis.execute(KedisValueCommands.set("session:${session.id}", Json.encodeToString(session), option))
     }
