@@ -87,7 +87,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
       "not-before",
       {
         "policy": "webhook",
-        "url": "https://httpbin.org/status/200"
+        "url": "https://httpbin.io/json"
       },
       {
         "policy": "schema",
