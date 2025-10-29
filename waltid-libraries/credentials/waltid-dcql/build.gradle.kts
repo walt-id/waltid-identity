@@ -56,7 +56,7 @@ kotlin {
                 //implementation("io.github.optimumcode:json-schema-validator:0.4.0")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:7.0.5")

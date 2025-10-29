@@ -45,7 +45,7 @@ val enableIosBuild = getSetting("enableIosBuild")
 
 object Versions {
     const val KTOR_VERSION = "3.2.2"
-    const val COROUTINES_VERSION = "1.10.1"
+    const val COROUTINES_VERSION = "1.10.2"
 }
 
 kotlin {
@@ -108,7 +108,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-logging:$KTOR_VERSION")
 //
 //                // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 //
 //                // Kotlinx
 //                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
@@ -139,7 +139,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
             }
         }
         val jvmMain by getting {

@@ -93,7 +93,7 @@ kotlin {
                 implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
 //                // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 //
 //                // Kotlinx
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
@@ -118,7 +118,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
             }
         }
         val jvmMain by getting {

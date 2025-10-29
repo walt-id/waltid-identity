@@ -59,7 +59,7 @@ kotlin {
                 implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:7.0.5")

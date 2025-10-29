@@ -14,7 +14,7 @@ repositories {
 
 dependencies {
     testImplementation(kotlin("test"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 
     // walt.id
     api(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -23,7 +23,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
     // AWS
     implementation("aws.sdk.kotlin:kms:1.4.22")

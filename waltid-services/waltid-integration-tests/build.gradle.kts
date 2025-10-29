@@ -19,7 +19,7 @@ dependencies {
 
     // Testing
     implementation(kotlin("test"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.10.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.10.2")
     implementation("io.ktor:ktor-server-test-host:$ktorVersion")
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")

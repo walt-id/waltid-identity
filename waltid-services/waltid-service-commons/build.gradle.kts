@@ -68,7 +68,7 @@ dependencies {
     // Testing
     testApi(kotlin("test"))
     testApi("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
-    testApi("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+    testApi("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 }
 
 tasks.test {
