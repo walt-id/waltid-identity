@@ -25,7 +25,7 @@ sealed class AccountIdentifier {
         return true
     }
 
-    suspend fun resolveToAccountId() = KtorAuthnzManager.accountStore.lookupAccountUuid(this) ?: throw IllegalStateException("Account does not exist")
+    suspend fun resolveToAccountId() = KtorAuthnzManager.accountStore.lookupAccountUuid(this) ?: throw IllegalStateException("Account does not exist (for account identifier type ${this::class.simpleName})")
     suspend fun resolveIfExists() = KtorAuthnzManager.accountStore.lookupAccountUuid(this)
 
     abstract class AccountIdentifierFactory<T : AccountIdentifier>(val identifierName: String) {
