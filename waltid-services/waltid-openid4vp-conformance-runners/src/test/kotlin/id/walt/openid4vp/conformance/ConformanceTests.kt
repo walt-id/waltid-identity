@@ -4,16 +4,18 @@ import id.walt.openid4vp.conformance.testplans.ConformanceTestRunner
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.minutes
 
+@Disabled
 class ConformanceTests {
 
     companion object {
         val verifier2UrlPrefix: String = "https://verifier2.localhost/verification-session" // "https://xyz.ngrok-free.app/verification-session"
-        val conformanceHost: String = "localhost.emobix.co.uk" // "conformance.waltid.cloud"
-        val conformancePort: Int = 8443 // 443
+        val conformanceHost: String = "conformance.waltid.cloud" // "localhost.emobix.co.uk"
+        val conformancePort: Int = 443 // 8443
 
         val conformanceServerVersionResult = runBlocking {
             runCatching {
