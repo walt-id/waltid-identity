@@ -88,6 +88,31 @@ data class AuthSession(
 
         return config
     }
+
+    suspend fun setSessionData(method: AuthenticationMethod, data: SessionData) {
+        if (sessionData == null) {
+            sessionData = HashMap()
+        }
+
+        sessionData!![method.id] = data
+
+        SessionManager.updateSession(this)
+    }
+
+    inline fun <reified T : SessionData> getSessionData(method: AuthenticationMethod): T? {
+        val retrievedData = sessionData?.get(method.id)
+        //?: throw IllegalArgumentException("Session data for method ${method.id} not found")
+
+        if (retrievedData != null && retrievedData !is T) {
+            throw IllegalArgumentException("Session data for method ${method.id} is not of type ${T::class.jvmName}, but of ${retrievedData::class.jvmName}")
+        }
+
+        return retrievedData
+    }
+
+    suspend fun storeExternalIdMapping(namespace: String, externalId: String) {
+        KtorAuthnzManager.sessionStore.storeExternalIdMapping(namespace = namespace, externalId = externalId, internalSessionId = id)
+    }
 }
 
 @OptIn(ExperimentalSerializationApi::class)
