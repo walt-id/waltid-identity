@@ -41,6 +41,21 @@ object VerifierApiExamples {
     """.trimIndent()
 
     // language=json
+    private val vpRequiredCredentialsData = """
+        [
+            {
+                "policy": "vp_required_credentials",
+                "args": {
+                    "required": [
+                        { "credential_type": "gx:Issuer", "required": true },
+                        { "credential_type": "gx:LegalPerson", "required": true },
+                        { "any_of": [ "gx:EORI", "gx:LeiCode", "gx:VatID" ], "required": true }
+                    ]
+                }
+            }
+        ]
+    """.trimIndent()
+    // language=json
     private fun vcPoliciesData(additional: String? = null) = let {
         """
         [
@@ -181,6 +196,22 @@ object VerifierApiExamples {
         """.trimIndent()
     )
 
+    //language=json
+    val vpRequiredCredentialsLogic = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "vp_policies": $vpRequiredCredentialsData,
+                "request_credentials":
+                [
+                    { "format": "jwt_vc_json", "type": "gx:Issuer" },
+                    { "format": "jwt_vc_json", "type": "gx:LegalPerson" },
+                    { "format": "jwt_vc_json", "type": "gx:EORI" },
+                    { "format": "jwt_vc_json", "type": "gx:LeiCode" },
+                    { "format": "jwt_vc_json", "type": "gx:VatID" }
+                ]
+            }
+        """.trimIndent()
+    )
     //Call with policies for the VerifiablePresentation, default policies for VCs, generated PresentationDefinition:
     //language=json
     val vpPolicies = jsonObjectValueExampleDescriptorDsl(

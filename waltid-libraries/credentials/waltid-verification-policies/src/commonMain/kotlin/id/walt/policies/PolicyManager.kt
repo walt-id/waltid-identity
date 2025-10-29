@@ -50,6 +50,7 @@ object PolicyManager {
             DynamicPolicy(),
             StatusPolicy(),
             ExternalEVPForwardPolicy(),
+            VpRequiredCredentialsPolicy(),
         )
     }
 
