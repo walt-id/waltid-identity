@@ -1,6 +1,7 @@
 package id.walt.ktorauthnz.sessions
 
 import io.ktor.server.application.*
+import io.ktor.server.routing.*
 import io.ktor.util.date.*
 
 object SessionTokenCookieHandler {
@@ -25,7 +26,7 @@ object SessionTokenCookieHandler {
         )
     }
 
-    fun ApplicationCall.deleteCookie() {
+    fun RoutingCall.deleteCookie() {
         response.cookies.append(
             name = cookieName,
             value = "",
