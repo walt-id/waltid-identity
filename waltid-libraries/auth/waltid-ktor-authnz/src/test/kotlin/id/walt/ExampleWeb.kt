@@ -4,6 +4,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
+import id.walt.ktorauthnz.accounts.ExampleAccountStore
 import id.walt.ktorauthnz.auth.getAuthToken
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.ktorauthnz.auth.ktorAuthnz
@@ -20,6 +21,37 @@ import io.ktor.server.routing.*
 import kotlinx.coroutines.runBlocking
 import org.intellij.lang.annotations.Language
 
+fun Route.globalImplicitOidcExample() {
+    @Language("JSON")
+    val flowConfig = """
+        {
+            "method": "oidc",
+            "config": {
+              "openIdConfigurationUrl": "https://demo.certification.openid.net/test/yoFCNpmcqAC4vkd/.well-known/openid-configuration",
+              "clientId": "clientid",
+              "clientSecret": "clientsecret",
+              "callbackUri": "https://12856b1961c0.ngrok-free.app/auth/flows/oidc-example/oidc/callback",
+              "pkceEnabled": true
+            },
+            "ok": true
+        }
+    """.trimIndent()
+
+    route("oidc-example") {
+        val authFlow = AuthFlow.fromConfig(flowConfig)
+
+        val contextFunction: ApplicationCall.() -> AuthContext = {
+            AuthContext(
+                tenant = request.host(),
+                sessionId = parameters["sessionId"],
+                implicitSessionGeneration = true,
+                initialFlow = authFlow
+            )
+        }
+
+        registerAuthenticationMethod(OIDC, contextFunction)
+    }
+}
 
 fun Route.globalMultistepExample() {
     route("web3") {
@@ -215,6 +247,7 @@ fun Route.authFlowRoutes() {
     globalExplicitMultiStep()
 
     globalImplicitVc()
+    globalImplicitOidcExample()
 
     // Account flows (account specifies flow)
     //accountImplicitMultiStep()
@@ -229,6 +262,7 @@ fun Application.testApp(jwt: Boolean) {
             }
             else -> KtorAuthNzTokenHandler()
         }
+        KtorAuthnzManager.accountStore = ExampleAccountStore
 
         ktorAuthnz("ktor-authnz") {
         }
