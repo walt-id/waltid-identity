@@ -51,6 +51,15 @@ object SessionManager {
 
     suspend fun invalidateSession(authSession: AuthSession) {
         KtorAuthnzManager.sessionStore.dropSession(authSession.id)
+        // TODO: KtorAuthnzManager.sessionStore.dropExternalIdMappingByInternal(authSession.id)
+    }
+
+    suspend fun invalidateAllSessionsForAccount(accountId: String) {
+        KtorAuthnzManager.sessionStore.invalidateAllSessionsForAccount(accountId)
+    }
+
+    suspend fun getSessionIdByExternalId(namespace: String, externalId: String): String? {
+        return KtorAuthnzManager.sessionStore.resolveExternalIdMapping(namespace = namespace, externalId = externalId)
     }
 
 }
