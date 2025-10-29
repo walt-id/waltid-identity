@@ -236,4 +236,112 @@ object Verifier2OpenApiExamples {
     }
             """.trimIndent()
 
+    val VicalPolicyValues = """
+        {
+          "dcql_query": {
+            "credentials": [
+              {
+                "id": "my_photoid",
+                "format": "mso_mdoc",
+                "meta": {
+                  "doctype_value": "org.iso.23220.photoid.1"
+                },
+                "claims": [
+                  {
+                    "path": [
+                      "org.iso.18013.5.1",
+                      "family_name_unicode"
+                    ]
+                  },
+                  {
+                    "path": [
+                      "org.iso.18013.5.1",
+                      "given_name_unicode"
+                    ]
+                  },
+                  {
+                    "path": [
+                      "org.iso.18013.5.1",
+                      "issuing_authority_unicode"
+                    ]
+                  },
+                  {
+                    "path": [
+                      "org.iso.18013.5.1",
+                      "resident_postal_code"
+                    ],
+                    "values": [
+                      1180,
+                      1190,
+                      1200,
+                      1210
+                    ]
+                  },
+                  {
+                    "path": [
+                      "org.iso.18013.5.1",
+                      "issuing_country"
+                    ],
+                    "values": [
+                      "AT"
+                    ]
+                  },
+                  {
+                    "path": [
+                      "org.iso.23220.photoid.1",
+                      "person_id"
+                    ]
+                  },
+                  {
+                    "path": [
+                      "org.iso.23220.photoid.1",
+                      "resident_street"
+                    ]
+                  },
+                  {
+                    "path": [
+                      "org.iso.23220.photoid.1",
+                      "administrative_number"
+                    ]
+                  },
+                  {
+                    "path": [
+                      "org.iso.23220.photoid.1",
+                      "travel_document_number"
+                    ]
+                  },
+                  {
+                    "path": [
+                      "org.iso.23220.dtc.1",
+                      "dtc_version"
+                    ]
+                  },
+                  {
+                    "path": [
+                      "org.iso.23220.dtc.1",
+                      "dtc_dg1"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "policies": {
+            "vcPolicies": [
+              {
+                "policy": "signature"
+              },
+              {
+                "policy": "vical",
+                "vical": "<base64 encoded VICAL file>",
+                "enableDocumentTypeValidation": true,
+                "enableTrustedChainRoot": true,
+                "enableSystemTrustAnchors": true,
+                "enableRevocation": true
+              }
+            ]
+          }
+        }
+   """.trimIndent()
+
 }

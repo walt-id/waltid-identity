@@ -7,7 +7,8 @@ import id.walt.policies2.policies.VerificationPolicy2
 
 object VerificationPolicyManager {
 
-    /** Simple verification policies: policies that don't have to be instantiated (by JSON config),
+    /**
+     * Simple verification policies: policies that don't have to be instantiated (by JSON config)
      * but can simply be referred to by name.
      *
      * E.g. `"signature"` instead of `{"policy": "signature"}`
