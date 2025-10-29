@@ -50,11 +50,11 @@ data class AuthFlow(
 
         //val config = if (config != null) "\n${prefix}config=$config" else ""
         val end = when {
-            ok -> "$prefix-> Flow end (success)"
+            ok -> "|$prefix-> Flow end (success)"
             continueWith != null -> "${prefix}continue on success ->\n${continueWith.joinToString("\n") { it.toString(index + 1) }}"
-            else -> "$prefix?"
+            else -> "|$prefix?"
         }
-        return "${prefix}Method: $method\n$end"
+        return "|${prefix}Method: $method\n$end"
     }
 
     companion object {
