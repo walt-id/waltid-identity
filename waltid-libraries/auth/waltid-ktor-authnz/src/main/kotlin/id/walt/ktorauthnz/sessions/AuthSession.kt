@@ -71,7 +71,7 @@ data class AuthSession(
         check(token != null) { "Cannot logout, as no token yet exists (session is not even authenticated yet). You can drop the session without invoking the logout procedure." }
 
         KtorAuthnzManager.tokenHandler.dropToken(token!!)
-        SessionManager.removeSession(this)
+        SessionManager.invalidateSession(this)
     }
 
     inline fun <reified V : AuthMethodConfiguration> lookupFlowMethodConfiguration(method: AuthenticationMethod): V {
