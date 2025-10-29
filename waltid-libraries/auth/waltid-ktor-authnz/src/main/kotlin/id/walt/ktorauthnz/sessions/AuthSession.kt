@@ -7,6 +7,7 @@ import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.flows.methods
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
+import id.walt.ktorauthnz.methods.sessiondata.SessionData
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -41,7 +42,9 @@ data class AuthSession(
 
     var token: String? = null,
 
-    var expiration: Instant? = null
+    var expiration: Instant? = null,
+
+    var sessionData: MutableMap<String, SessionData>? = null
 ) {
     fun toInformation() = AuthSessionInformation(id, status, flows?.methods(), token, expiration)
     suspend fun progressFlow(method: AuthenticationMethod) {
