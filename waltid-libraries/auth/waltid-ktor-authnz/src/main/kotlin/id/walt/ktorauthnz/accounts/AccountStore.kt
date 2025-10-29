@@ -2,7 +2,7 @@ package id.walt.ktorauthnz.accounts
 
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.methods.AuthenticationMethod
-import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
 
 interface AccountStore {
 

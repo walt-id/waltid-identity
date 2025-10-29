@@ -2,7 +2,7 @@ package id.walt
 
 import id.walt.ktorauthnz.accounts.identifiers.AccountIdentifierManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
-import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
 import id.walt.ktorauthnz.methods.initalauth.AuthMethodRegistrationWrapper
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement

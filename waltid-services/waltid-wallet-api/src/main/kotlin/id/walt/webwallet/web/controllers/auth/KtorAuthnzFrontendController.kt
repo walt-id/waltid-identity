@@ -8,7 +8,7 @@ import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.ktorauthnz.auth.getAuthenticatedSession
 import id.walt.ktorauthnz.auth.getEffectiveRequestAuthToken
-import id.walt.ktorauthnz.methods.data.EmailPassStoredData
+import id.walt.ktorauthnz.methods.storeddata.EmailPassStoredData
 import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
 import id.walt.webwallet.db.models.Account
 import id.walt.webwallet.db.models.Accounts
