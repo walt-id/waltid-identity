@@ -47,9 +47,9 @@ object VerifierApiExamples {
                 "policy": "vp_required_credentials",
                 "args": {
                     "required": [
-                        { "credential_type": "gx:Issuer", "required": true },
-                        { "credential_type": "gx:LegalPerson", "required": true },
-                        { "any_of": [ "gx:EORI", "gx:LeiCode", "gx:VatID" ], "required": true }
+                        { "credential_type": "gx:Issuer"},
+                        { "credential_type": "gx:LegalPerson" },
+                        { "any_of": [ "gx:EORI", "gx:LeiCode", "gx:VatID" ] }
                     ]
                 }
             }
