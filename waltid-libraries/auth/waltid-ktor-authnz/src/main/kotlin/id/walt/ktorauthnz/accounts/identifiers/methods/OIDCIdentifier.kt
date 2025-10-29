@@ -6,12 +6,19 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 @SerialName("oidc")
-data class OIDCIdentifier(val host: String, val name: String) : AccountIdentifier() {
+data class OIDCIdentifier(
+    /** The issuer URL of the OpenID Provider, e.g., "https://idp.example.com/realms/my-realm" */
+    val issuer: String,
+    /** The subject ('sub') claim for the user from the IdP */
+    val subject: String
+) : AccountIdentifier() {
     override fun identifierName() = "oidc"
     override fun toDataString() = Json.encodeToString(this)
 
     companion object : AccountIdentifierFactory<OIDCIdentifier>("oidc") {
-        override fun fromAccountIdentifierDataString(dataString: String) = Json.decodeFromString<OIDCIdentifier>(dataString)
-        val EXAMPLE = OIDCIdentifier("host", "name")
+        override fun fromAccountIdentifierDataString(dataString: String) =
+            Json.decodeFromString<OIDCIdentifier>(dataString)
+
+        val EXAMPLE = OIDCIdentifier("issuer", "subject")
     }
 }
