@@ -59,7 +59,10 @@ dependencies {
     /*implementation(platform("dev.whyoleg.cryptography:cryptography-bom:0.4.0"))
     implementation("dev.whyoleg.cryptography:cryptography-core")
     implementation("dev.whyoleg.cryptography:cryptography-provider-jdk")*/
-    implementation("com.password4j:password4j:1.8.2")
+    implementation("com.password4j:password4j:1.8.4")
+    implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.8.0"))
+    implementation("org.kotlincrypto.hash:sha2")
+    implementation("org.kotlincrypto.random:crypto-rand:0.6.0")
 
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm")
