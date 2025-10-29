@@ -37,6 +37,39 @@ jobs:
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@a4a92e12ee9b7396ee9a22083ff21b3277c627d6
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+      - name: Install LocalTunnel
+        run: npm install -g localtunnel
+      - name: Start LocalTunnel and get URL
+        id: tunnel
+        run: |
+          # Start LocalTunnel on port 7003
+          lt --port 7003 --print-requests > lt_output.txt 2>&1 &
+
+          # Wait for tunnel to initialize
+          sleep 5
+
+          # Extract the tunnel URL from output
+          TUNNEL_URL=$(grep -Eo 'https://[a-z0-9-]+\.loca\.lt' lt_output.txt | head -n 1)
+
+          if [ -z "$TUNNEL_URL" ]; then
+            echo "❌ Failed to get LocalTunnel URL"
+            cat lt_output.txt
+            exit 1
+          fi
+
+          echo "✅ Tunnel URL: $TUNNEL_URL"
+          echo "url=$TUNNEL_URL" >> $GITHUB_OUTPUT
+      - name: Replace URL in Kotlin test
+        run: |
+          FILE_PATH="./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/kotlin/id/walt/openid4vp/conformance/ConformanceTests.kt"
+          OLD_URL="https://verifier2.localhost/verification-session"
+          NEW_URL="${{ steps.tunnel.outputs.url }}/verification-session"
+
+          echo "Replacing $OLD_URL with $NEW_URL in $FILE_PATH"
+          sed -i "s#${OLD_URL}#${NEW_URL}#g" "$FILE_PATH"
+
       - name: Clean and build with all tests
         if: ${{ runner.os != 'macos' }}
         run: ./gradlew clean build cleanAllTests allTests --rerun-tasks --no-daemon --parallel --max-workers=3 --continue
