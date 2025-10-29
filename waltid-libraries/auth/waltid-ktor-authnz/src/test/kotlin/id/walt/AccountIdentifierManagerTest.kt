@@ -3,6 +3,7 @@ package id.walt
 import id.walt.ktorauthnz.accounts.identifiers.AccountIdentifierManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.JWTIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.RADIUSIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.UsernameIdentifier
 import kotlin.test.Test
@@ -15,7 +16,8 @@ class AccountIdentifierManagerTest {
             EmailIdentifier("test@example.org"),
             JWTIdentifier("subject1"),
             RADIUSIdentifier("example.host", "username1"),
-            UsernameIdentifier("alice1")
+            UsernameIdentifier("alice1"),
+            OIDCIdentifier("issuer", "subject")
         ).associateWith { it.accountIdentifierName to it.toDataString() }
             .map { (k, v) ->
                 k to AccountIdentifierManager.getAccountIdentifier(v.first, v.second)
