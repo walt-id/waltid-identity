@@ -15,7 +15,7 @@ interface TokenHandler {
 
 
     suspend fun resolveTokenToSession(token: String) = getTokenSessionId(token)
-        .let { sessionId -> KtorAuthnzManager.sessionStore.resolveSessionId(sessionId) }
+        .let { sessionId -> KtorAuthnzManager.sessionStore.resolveSessionById(sessionId) }
         .also { session -> check(token == session.token) { "Token was not mapped to correct session" } }
 
 }

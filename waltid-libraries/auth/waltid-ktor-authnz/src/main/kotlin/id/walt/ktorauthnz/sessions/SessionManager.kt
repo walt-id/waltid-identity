@@ -25,6 +25,9 @@ object SessionManager {
         return newSession
     }
 
+    suspend fun getSessionById(sessionId: String): AuthSession =
+        KtorAuthnzManager.sessionStore.resolveSessionById(sessionId)
+
     /**
      * Session is explicitly started
      */

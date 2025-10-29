@@ -28,7 +28,7 @@ class KtorAuthNzTokenHandler : TokenHandler {
         tokenStore.getTokenSessionId(token)
 
     override suspend fun getTokenAccountId(token: String): String {
-        return KtorAuthnzManager.sessionStore.resolveSessionId(getTokenSessionId(token)).accountId ?: error("No account id for session")
+        return KtorAuthnzManager.sessionStore.resolveSessionById(getTokenSessionId(token)).accountId ?: error("No account id for session")
     }
 
     override suspend fun dropToken(token: String) =
