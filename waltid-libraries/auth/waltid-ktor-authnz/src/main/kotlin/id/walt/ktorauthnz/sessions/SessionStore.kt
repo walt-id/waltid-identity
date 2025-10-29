@@ -13,4 +13,12 @@ interface SessionStore {
     /** Delete an AuthSession by its id */
     suspend fun dropSession(id: String)
 
+    /** Drop all AuthSessions of an account id */
+    suspend fun invalidateAllSessionsForAccount(accountId: String)
+
+    suspend fun storeExternalIdMapping(namespace: String, externalId: String, internalSessionId: String)
+    suspend fun resolveExternalIdMapping(namespace: String, externalId: String): String?
+    suspend fun dropExternalIdMappingByExternal(namespace: String, externalId: String)
+    suspend fun dropExternalIdMappingByInternal(namespace: String, internalSessionId: String)
+
 }
