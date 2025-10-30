@@ -1,7 +1,6 @@
 package id.walt.ktorauthnz.exceptions
 
 import id.walt.commons.web.AuthException
-import io.ktor.http.HttpStatusCode
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
