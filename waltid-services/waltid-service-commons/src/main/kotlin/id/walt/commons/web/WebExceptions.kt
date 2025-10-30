@@ -42,3 +42,34 @@ class ForbiddenException(
 class UnsupportedMediaTypeException(
     message: String
 ) : WebException(HttpStatusCode.UnsupportedMediaType.value, message)
+
+
+// Authentication / Authorization exceptions used in Ktor AuthNZ
+sealed class AuthException(
+    override val message: String,
+    val status: HttpStatusCode
+) : RuntimeException(message)
+
+class InvalidCredentialsException :
+    AuthException("Invalid email or password.", HttpStatusCode.Unauthorized)
+
+class ExpiredTokenException(override val message: String) :
+    AuthException(message, HttpStatusCode.Unauthorized)
+
+class JWTVerificationException :
+    AuthException("JWT verification failed.", HttpStatusCode.Unauthorized)
+
+class RadiusAuthException :
+    AuthException("RADIUS server did not accept authentication", HttpStatusCode.NotAcceptable)
+
+class OTPAuthException :
+    AuthException("Invalid one-time password (OTP).", HttpStatusCode.Unauthorized)
+
+class Web3AuthException(override val message : String) :
+    AuthException(message, HttpStatusCode.Unauthorized)
+
+class InvalidChallengeException :
+    AuthException("Cannot verify that nonce was supplied by system.", HttpStatusCode.Unauthorized)
+
+class AccountDataNotFoundException(methodId: String) :
+    AuthException("No stored data found for authentication method: $methodId", HttpStatusCode.NotFound)
