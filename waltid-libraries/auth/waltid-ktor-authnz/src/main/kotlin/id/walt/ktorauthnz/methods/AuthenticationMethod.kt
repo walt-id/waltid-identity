@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.commons.web.AccountDataNotFoundException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
@@ -87,7 +88,9 @@ abstract class AuthenticationMethod(open val id: String) {
     // Data functions
     suspend inline fun <reified V : AuthMethodStoredData> lookupAccountIdentifierStoredData(identifier: AccountIdentifier): V {
         val storedData =
-            KtorAuthnzManager.accountStore.lookupStoredDataForAccountIdentifier(identifier, this) ?: error("No stored data for method: $id")
+            KtorAuthnzManager.accountStore.lookupStoredDataForAccountIdentifier(identifier, this) ?: throw AccountDataNotFoundException(
+                id
+            )
         return (storedData as? V) ?: error("${storedData::class.simpleName} is not requested ${V::class.simpleName}")
     }
 

@@ -1,5 +1,7 @@
 package id.walt.ktorauthnz.exceptions
 
+import id.walt.commons.web.AuthException
+import io.ktor.http.HttpStatusCode
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
@@ -9,9 +11,9 @@ data class AuthenticationFailureException(override val message: String) : Illega
 inline fun authFailure(message: String): Nothing = throw AuthenticationFailureException(message)
 
 @OptIn(ExperimentalContracts::class)
-inline fun authCheck(value: Boolean, lazyMessage: () -> Any): Unit {
+fun authCheck(value: Boolean, exception: AuthException) {
     contract {
         returns() implies value
     }
-    if (!value) authFailure(lazyMessage().toString())
+    if (!value) throw exception
 }
