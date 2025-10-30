@@ -4,7 +4,6 @@ package id.walt.vical
 
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.vical.serializers.VicalInstantSerializer
-import id.walt.x509.X5CList
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -12,6 +11,7 @@ import kotlinx.serialization.cbor.ByteString
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonObject
+
 /**
  * Represents the payload of a VICAL. This data class is aligned with the CDDL structure
  * defined in ISO/IEC 18013-5, Annex C.1.7.1.
@@ -42,7 +42,10 @@ data class VicalData(
         |    Issue id: ${vicalIssueID}
         |    Next update: ${nextUpdate}
         |     
-        |    ${certificateInfos.mapIndexed { idx, cert -> cert.toString().prependIndent("    ").drop(4) }.joinToString("\n")}
+        |    ${
+            certificateInfos.mapIndexed { idx, cert -> cert.toString().prependIndent("    ").drop(4) }
+                .joinToString("\n")
+        }
         |--- End of VICAL ---
         """.trimMargin()
 }
@@ -157,10 +160,95 @@ data class CertificateInfo(
             |    Not after: $notAfter
             |--- End of VICAL Certificate Entry ---
             """.trimMargin()
+
+    fun toJson(): String {
+        val jsonBuilder = StringBuilder()
+        jsonBuilder.append("{\n")
+        jsonBuilder.append("  \"certificate\": \"${certificate.toHexString()}\",\n")
+        jsonBuilder.append("  \"serialNumber\": \"${serialNumber.toHexString()}\",\n")
+        jsonBuilder.append("  \"ski\": \"${ski.toHexString()}\",\n")
+        jsonBuilder.append("  \"docType\": ${docType.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }},\n")
+        jsonBuilder.append(
+            "  \"certificateProfile\": ${
+                certificateProfile?.joinToString(
+                    prefix = "[",
+                    postfix = "]"
+                ) { "\"$it\"" } ?: "null"
+            },\n")
+        jsonBuilder.append("  \"issuingAuthority\": ${issuingAuthority?.let { "\"$it\"" } ?: "null"},\n")
+        jsonBuilder.append("  \"issuingCountry\": ${issuingCountry?.let { "\"$it\"" } ?: "null"},\n")
+        jsonBuilder.append("  \"stateOrProvinceName\": ${stateOrProvinceName?.let { "\"$it\"" } ?: "null"},\n")
+        jsonBuilder.append("  \"issuer\": ${issuer?.toHexString()?.let { "\"$it\"" } ?: "null"},\n")
+        jsonBuilder.append("  \"subject\": ${subject?.toHexString()?.let { "\"$it\"" } ?: "null"},\n")
+        jsonBuilder.append("  \"notBefore\": ${notBefore?.let { "\"$it\"" } ?: "null"},\n")
+        jsonBuilder.append("  \"notAfter\": ${notAfter?.let { "\"$it\"" } ?: "null"}\n")
+        jsonBuilder.append("}")
+        return jsonBuilder.toString()
+    }
 }
 
 @Serializable
-data class VicalCreateRequest(val signingKey: JsonObject, val vicalProvider: String, val certificatePemList: X5CList)
+data class CertificateInfoJson(
+    /** DER-encoded X.509 certificate */
+    @SerialName("certificate")  val certificate: String,
+
+    /** The serial number of the certificate */
+    @SerialName("serialNumber") val serialNumber: String,
+
+    /** The Subject Key Identifier of the certificate. */
+    @SerialName("ski") val ski: String,
+
+    /** An array of document types for which the certificate can be used as a trust anchor. */
+    @SerialName("docType") val docType: List<String>,
+
+    /** An optional array of Uniform Resource Names (URNs) that specify the type of certificate. */
+    @SerialName("certificateProfile") val certificateProfile: List<String>? = null,
+
+    /** An optional name of the authority that issued the certificate. */
+    @SerialName("issuingAuthority") val issuingAuthority: String? = null,
+
+    /** An optional ISO 3166-1 or ISO 3166-2 code for the issuing authority's country or region. */
+    @SerialName("issuingCountry") val issuingCountry: String? = null,
+
+    /** An optional name of the state or province of the issuing authority. */
+    @SerialName("stateOrProvinceName") val stateOrProvinceName: String? = null,
+
+    /** An optional DER-encoded Issuer field of the certificate. */
+    @SerialName("issuer") val issuer: String? = null,
+
+    /** An optional DER-encoded Subject field of the certificate. */
+    @SerialName("subject") val subject: String? = null,
+
+    /** The start date of the certificate's validity. */
+    @Serializable(with = VicalInstantSerializer::class)
+    @SerialName("notBefore") val notBefore: Instant? = null,
+
+    /** The end date of the certificate's validity. */
+    @Serializable(with = VicalInstantSerializer::class)
+    @SerialName("notAfter") val notAfter: Instant? = null
+){
+    fun toCertificateInfo() = CertificateInfo(
+        certificate = certificate.hexToByteArray(),
+        serialNumber = serialNumber.hexToByteArray(),
+        ski = ski.hexToByteArray(),
+        docType = docType,
+        certificateProfile = certificateProfile,
+        issuingAuthority = issuingAuthority,
+        issuingCountry = issuingCountry,
+        stateOrProvinceName = stateOrProvinceName,
+        issuer = issuer?.hexToByteArray(),
+        subject = subject?.hexToByteArray(),
+        notBefore = notBefore,
+        notAfter = notAfter
+    )
+}
+
+@Serializable
+data class VicalCreateRequest(
+    val signingKey: JsonObject,
+    val vicalProvider: String,
+    val certificateInfoList: List<CertificateInfoJson>
+)
 
 @Serializable
 data class VicalFetchRequest(val vicalUrl: String)

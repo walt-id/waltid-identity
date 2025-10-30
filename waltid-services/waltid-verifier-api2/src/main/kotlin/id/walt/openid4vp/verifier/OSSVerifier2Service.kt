@@ -3,6 +3,10 @@
 package id.walt.openid4vp.verifier
 
 import id.walt.commons.fetchBinaryFile
+import id.walt.cose.Cose
+import id.walt.cose.CoseCertificate
+import id.walt.cose.toCoseSigner
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
@@ -25,9 +29,10 @@ import io.ktor.server.util.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
-
 
 private val log = logger("Verifier2Service")
 private const val VERIFICATION_SESSION = "verification-session"
@@ -188,21 +193,40 @@ object Verifier2Service {
                             example("VICAL Create Request") {
                                 value = Json.decodeFromString<VicalCreateRequest>(
                                     """
+                                    {
+                                      "signingKey": {
+                                        "type": "jwk",
+                                        "jwk": {
+                                          "kty": "EC",
+                                          "d": "OWctGAH4JvvrolLjCmbLJqdK2jBRKpMQwNGD1Q6JnwM",
+                                          "crv": "P-256",
+                                          "kid": "0lwJbQHDxnh1Mzt3Hj9dL6mhv1YqvSeQQz0th68pY6w",
+                                          "x": "DxnRmkJloU8UkKTZB2XQWN1PB4d2yb-9xg_uGLGNLwA",
+                                          "y": "jUUlulJJ8jhLC1-2d8KeFCOGlsifDK5TZsc1NraewTk"
+                                        }
+                                      },
+                                      "vicalProvider": "walt.id VICAL Service",
+                                      "certificateInfoList": [
                                         {
-                                          "signingKey": {
-                                            "type": "jwk",
-                                            "jwk": {
-                                              "kty": "EC",
-                                              "d": "OWctGAH4JvvrolLjCmbLJqdK2jBRKpMQwNGD1Q6JnwM",
-                                              "crv": "P-256",
-                                              "kid": "0lwJbQHDxnh1Mzt3Hj9dL6mhv1YqvSeQQz0th68pY6w",
-                                              "x": "DxnRmkJloU8UkKTZB2XQWN1PB4d2yb-9xg_uGLGNLwA",
-                                              "y": "jUUlulJJ8jhLC1-2d8KeFCOGlsifDK5TZsc1NraewTk"
-                                            }
-                                          },
-                                          "vicalProvider": "walt.id VICAL Service",
-                                          "certificatePemList": ["-----BEGIN CERTIFICATE-----\nMIIBuDCCAV6gAwIBAgIUbIyfT3uEe ...", "..."]
-                                      }
+                                          "certificate": "fda16464bc6ec46e1dfb2ab24a861bbbc70a9809e84a95e273ae0733a1ebc96d3ecd605653a2b42ee2c96b858d1e3589f31a81ba512ed28ba23a27d2dc5689c915957464cdfcc69e9a880ab264ed250b2a9b405af300161b8604f99364972c2501ece5a33eeb69e96ade8fb2829d20062e6dc8e322df1d4074008fcc2714af5de5f6f3f641fe766dc566c2626e5a3f42eff4307e0159d138aae45578c2417e25a5453a9ea220659ac4a7233a7a3bab5f506c3ed3d5779702c42cedc5535fd481c7e988bad8f2105861cdd9e13b7ccda61f1ed29fe59938427f6e677e946a821f3d5d16bdf7e7e932fb924881bebabc4c6b24007ee2230c752103495e27d7b2e4",
+                                          "serialNumber": "01020304",
+                                          "ski": "cd4e2253d812ea6eb3cb166820def12c91a70cd6",
+                                          "docType": [
+                                            "org.iso.18013.5.1.mDL"
+                                          ],
+                                          "certificateProfile": [
+                                            "org.iso.18013.5.1.mDL.IACA"
+                                          ],
+                                          "issuingAuthority": "walt.id CA",
+                                          "issuingCountry": "AT",
+                                          "stateOrProvinceName": null,
+                                          "issuer": null,
+                                          "subject": null,
+                                          "notBefore": null,
+                                          "notAfter": null
+                                        }
+                                      ]
+                                    } 
                                     """.trimIndent()
                                 )
                             }
@@ -212,31 +236,35 @@ object Verifier2Service {
                 }) {
                     val vicalCreateRequest = call.receive<VicalCreateRequest>()
 
-                    // TODO: parse Certificate Info (see: VicalDataModelTest.kt)
-//                    val iacaCertificateInfoList = toCertificateInfoList(vicalCreateRequest.certificatePemList)
-//
-//
-//                    val vicalData = VicalData(
-//                        vicalProvider = vicalCreateRequest.vicalProvider,
-//                        date = Clock.System.now(),
-//                        vicalIssueID = 1L, // TODO: generate
-//                        nextUpdate = Instant.parse("2026-08-01T00:00:00Z"), // TODO: configure
-//                        certificateInfos = listOf(iacaCertificateInfoList)
-//                    )
-//
-//                    val signingKey = JWKKey.importJWK(Json.encodeToString(vicalCreateRequest.signingKey))
-//                    val signedVical = Vical.createAndSign(
-//                        vicalData = vicalData,
-//                        signer =  signingKey.toCoseSigner(),
-//                        algorithmId = Cose.Algorithm.ES256, // ES256 for secp256r1 = -7
-//                        signerCertificateChain = listOf(iacaCertificateInfoList)
-//                    )
-//
-//
-//                    val vicalBvicalCborytes = signedVical.toTaggedCbor()
+                    val signingKey = KeyManager.resolveSerializedKey(vicalCreateRequest.signingKey)
 
-                    // TODO: remove placeholder
-                    val vicalCbor = fetchBinaryFile("https://beta.nationaldts.com.au/api/vical")!!
+                    val iacaCertificateInfoList =
+                        vicalCreateRequest.certificateInfoList.map { json -> json.toCertificateInfo() }
+
+                    if (iacaCertificateInfoList.isEmpty()) {
+                        throw IllegalArgumentException("No IACA certificate info provided")
+                    }
+
+                    val vicalData = VicalData(
+                        vicalProvider = vicalCreateRequest.vicalProvider,
+                        date = Clock.System.now(),
+                        vicalIssueID = 1L, // TODO: generate
+                        nextUpdate = Instant.parse("2026-08-01T00:00:00Z"), // TODO: configure
+                        certificateInfos = iacaCertificateInfoList
+                    )
+
+                    val vicalProviderCertificate =
+                        CoseCertificate(signingKey.getPublicKeyRepresentation()) // TODO: should be propper certificates
+
+                    val signedVical = Vical.createAndSign(
+                        vicalData = vicalData,
+                        signer = signingKey.toCoseSigner(),
+                        algorithmId = Cose.Algorithm.ES256, // ES256 for secp256r1 = -7
+                        signerCertificateChain = listOf(vicalProviderCertificate)
+                    )
+
+                    val vicalCbor = signedVical.toTaggedCbor()
+
                     call.respond(VicalFetchResponse(vicalCbor.encodeToBase64()))
                 }
             }
