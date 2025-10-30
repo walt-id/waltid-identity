@@ -41,6 +41,22 @@ object VerifierApiExamples {
     """.trimIndent()
 
     // language=json
+    private val vpRequiredCredentialsData = """
+        [
+            {
+                "policy": "vp_required_credentials",
+                "args": {
+                    "required": [
+                        { "credential_type": "gx:Issuer"},
+                        { "credential_type": "gx:LegalPerson" },
+                        { "any_of": [ "gx:EORI", "gx:LeiCode", "gx:VatID" ] }
+                    ]
+                }
+            }
+        ]
+    """.trimIndent()
+
+    // language=json
     private fun vcPoliciesData(additional: String? = null) = let {
         """
         [
@@ -176,6 +192,23 @@ object VerifierApiExamples {
                             $dynamiPolicy
                         ]
                     }
+                ]
+            }
+        """.trimIndent()
+    )
+
+    //language=json
+    val vpRequiredCredentialsLogic = jsonObjectValueExampleDescriptorDsl(
+        """
+            {
+                "vp_policies": $vpRequiredCredentialsData,
+                "request_credentials":
+                [
+                    { "format": "jwt_vc_json", "type": "gx:Issuer" },
+                    { "format": "jwt_vc_json", "type": "gx:LegalPerson" },
+                    { "format": "jwt_vc_json", "type": "gx:EORI" },
+                    { "format": "jwt_vc_json", "type": "gx:LeiCode" },
+                    { "format": "jwt_vc_json", "type": "gx:VatID" }
                 ]
             }
         """.trimIndent()
