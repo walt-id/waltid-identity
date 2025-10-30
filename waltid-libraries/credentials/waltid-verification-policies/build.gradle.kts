@@ -90,6 +90,8 @@ kotlin {
 
                 // suspend-transform plugin annotations (required in the current version to avoid "compileOnly" warning)
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
+
+                implementation("com.soywiz:korlibs-io:6.0.2")
             }
         }
         val commonTest by getting {
