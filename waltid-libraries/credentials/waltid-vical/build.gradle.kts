@@ -69,7 +69,6 @@ kotlin {
 
         all {
             languageSettings.optIn("kotlinx.cinterop.BetaInteropApi")
-
         }
         val commonMain by getting {
             dependencies {
@@ -78,6 +77,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
                 // walt.id
+                implementation(project(":waltid-libraries:crypto:waltid-x509"))
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(project(":waltid-libraries:crypto:waltid-cose"))
 

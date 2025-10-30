@@ -4,6 +4,7 @@ package id.walt.vical
 
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.vical.serializers.VicalInstantSerializer
+import id.walt.x509.X5CList
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -157,6 +158,9 @@ data class CertificateInfo(
             |--- End of VICAL Certificate Entry ---
             """.trimMargin()
 }
+
+@Serializable
+data class VicalCreateRequest(val signingKey: JsonObject, val vicalProvider: String, val certificatePemList: X5CList)
 
 @Serializable
 data class VicalFetchRequest(val vicalUrl: String)

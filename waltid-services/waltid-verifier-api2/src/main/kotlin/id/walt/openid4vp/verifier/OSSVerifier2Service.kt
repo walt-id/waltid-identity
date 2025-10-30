@@ -25,9 +25,7 @@ import io.ktor.server.util.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
-import java.net.URI
-import java.nio.file.Files
-import java.nio.file.Paths
+import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 
 
@@ -72,6 +70,7 @@ object Verifier2Service {
         }
     }
 
+    @OptIn(ExperimentalTime::class)
     fun Route.registerRoute() {
         route(VERIFICATION_SESSION) {
             route("", {
@@ -179,6 +178,69 @@ object Verifier2Service {
             }
         }
         route(VICAL) {
+            route("", {
+                tags("VICAL")
+            }) {
+                post("create", {
+                    summary = "Creates a VICAL and converts it to Base64"
+                    request {
+                        body<VicalCreateRequest> {
+                            example("VICAL Create Request") {
+                                value = Json.decodeFromString<VicalCreateRequest>(
+                                    """
+                                        {
+                                          "signingKey": {
+                                            "type": "jwk",
+                                            "jwk": {
+                                              "kty": "EC",
+                                              "d": "OWctGAH4JvvrolLjCmbLJqdK2jBRKpMQwNGD1Q6JnwM",
+                                              "crv": "P-256",
+                                              "kid": "0lwJbQHDxnh1Mzt3Hj9dL6mhv1YqvSeQQz0th68pY6w",
+                                              "x": "DxnRmkJloU8UkKTZB2XQWN1PB4d2yb-9xg_uGLGNLwA",
+                                              "y": "jUUlulJJ8jhLC1-2d8KeFCOGlsifDK5TZsc1NraewTk"
+                                            }
+                                          },
+                                          "vicalProvider": "walt.id VICAL Service",
+                                          "certificatePemList": ["-----BEGIN CERTIFICATE-----\nMIIBuDCCAV6gAwIBAgIUbIyfT3uEe ...", "..."]
+                                      }
+                                    """.trimIndent()
+                                )
+                            }
+                        }
+                    }
+                    response { HttpStatusCode.OK to { body<VicalFetchResponse>() } }
+                }) {
+                    val vicalCreateRequest = call.receive<VicalCreateRequest>()
+
+                    // TODO: parse Certificate Info (see: VicalDataModelTest.kt)
+//                    val iacaCertificateInfoList = toCertificateInfoList(vicalCreateRequest.certificatePemList)
+//
+//
+//                    val vicalData = VicalData(
+//                        vicalProvider = vicalCreateRequest.vicalProvider,
+//                        date = Clock.System.now(),
+//                        vicalIssueID = 1L, // TODO: generate
+//                        nextUpdate = Instant.parse("2026-08-01T00:00:00Z"), // TODO: configure
+//                        certificateInfos = listOf(iacaCertificateInfoList)
+//                    )
+//
+//                    val signingKey = JWKKey.importJWK(Json.encodeToString(vicalCreateRequest.signingKey))
+//                    val signedVical = Vical.createAndSign(
+//                        vicalData = vicalData,
+//                        signer =  signingKey.toCoseSigner(),
+//                        algorithmId = Cose.Algorithm.ES256, // ES256 for secp256r1 = -7
+//                        signerCertificateChain = listOf(iacaCertificateInfoList)
+//                    )
+//
+//
+//                    val vicalBvicalCborytes = signedVical.toTaggedCbor()
+
+                    // TODO: remove placeholder
+                    val vicalCbor = fetchBinaryFile("https://beta.nationaldts.com.au/api/vical")!!
+                    call.respond(VicalFetchResponse(vicalCbor.encodeToBase64()))
+                }
+            }
+
             route("", {
                 tags("VICAL")
             }) {
