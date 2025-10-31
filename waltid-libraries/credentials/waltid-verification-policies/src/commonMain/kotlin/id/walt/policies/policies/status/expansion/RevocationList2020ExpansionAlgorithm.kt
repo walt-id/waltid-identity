@@ -1,10 +1,10 @@
 package id.walt.policies.policies.status.expansion
 
 import id.walt.policies.policies.Base64Utils
-import java.io.InputStream
-import java.util.zip.InflaterInputStream
+import korlibs.io.compression.deflate.ZLib
+import korlibs.io.compression.uncompress
 
 class RevocationList2020ExpansionAlgorithm : StatusListExpansionAlgorithm {
-    override operator fun invoke(bitstring: String): InputStream =
-        InflaterInputStream(Base64Utils.decode(bitstring).inputStream())
+    override suspend operator fun invoke(bitstring: String): ByteArray =
+        ZLib.uncompress(Base64Utils.decode(bitstring))
 }
