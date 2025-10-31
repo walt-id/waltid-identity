@@ -5,8 +5,10 @@ import kotlin.io.encoding.Base64
 private const val MULTIBASE_BASE64_URL_PREFIX = 'u'
 
 class Base64UrlHandler {
-    private val base64UrlRegex = Regex("^[A-Za-z0-9_-]*$")
-    private val urlDecoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
+    companion object {
+        private val base64UrlRegex = Regex("^[A-Za-z0-9_-]*$")
+        private val urlDecoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
+    }
 
     /**
      * Decodes a base64-url string (regular or multibase) and returns detailed result
