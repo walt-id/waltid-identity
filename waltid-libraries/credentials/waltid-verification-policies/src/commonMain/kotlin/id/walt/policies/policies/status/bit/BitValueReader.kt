@@ -2,7 +2,6 @@ package id.walt.policies.policies.status.bit
 
 import id.walt.policies.policies.status.expansion.StatusListExpansionAlgorithm
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.io.InputStream
 
 class BitValueReader(
     private val bitRepresentationStrategy: BitRepresentationStrategy,
@@ -10,31 +9,33 @@ class BitValueReader(
     private val BITS_PER_BYTE_UNSIGNED = 8u
     private val logger = KotlinLogging.logger {}
 
-    fun get(
+    suspend fun get(
         bitstring: String,
         idx: ULong,
         bitSize: Int = 1,
         expansionAlgorithm: StatusListExpansionAlgorithm,
     ) = getBitValue(expansionAlgorithm(bitstring), idx, bitSize)
 
-    private fun getBitValue(inputStream: InputStream, index: ULong, bitSize: Int): List<Char> =
-        inputStream.use { stream ->
-            if (stream.markSupported()) {
-                stream.mark(Int.MAX_VALUE)
-                logger.debug { "available bytes: ${bitmap(stream.readAllBytes())}" }
-                inputStream.reset()
-            }
-            //TODO: bitSize constraints
-            val bitStartPosition = index * bitSize.toUInt()
-            logger.debug { "bitStartPosition overall: $bitStartPosition" }
-            val byteStart = bitStartPosition / BITS_PER_BYTE_UNSIGNED
-            logger.debug { "skipping: $byteStart bytes" }
-            stream.skip(byteStart.toLong())
-            logger.debug { "available: ${stream.available()} bytes" }
-            val bytesToRead = (bitSize - 1) / BITS_PER_BYTE_UNSIGNED.toInt() + 1
-            logger.debug { "readingNext: $bytesToRead bytes" }
-            extractBitValue(stream.readNBytes(bytesToRead), index, bitSize.toUInt())
-        }
+    private fun getBitValue(input: ByteArray, index: ULong, bitSize: Int): List<Char> {
+        logger.debug { "available bytes: ${bitmap(input)}" }
+
+        // TODO: bitSize constraints
+        val bitStartPosition = index * bitSize.toUInt()
+        logger.debug { "bitStartPosition overall: $bitStartPosition" }
+
+        val byteStart = bitStartPosition / BITS_PER_BYTE_UNSIGNED
+        logger.debug { "skipping: $byteStart bytes" }
+        logger.debug { "available: ${input.size - byteStart.toInt()} bytes" }
+
+        val bytesToRead = (bitSize - 1) / BITS_PER_BYTE_UNSIGNED.toInt() + 1
+        logger.debug { "readingNext: $bytesToRead bytes" }
+
+        val startIndex = byteStart.toInt()
+        val endIndex = minOf(startIndex + bytesToRead, input.size)
+        val bytesToProcess = input.sliceArray(startIndex until endIndex)
+
+        return extractBitValue(bytesToProcess, index, bitSize.toUInt())
+    }
 
     private fun extractBitValue(bytes: ByteArray, index: ULong, bitSize: UInt): List<Char> {
         logger.debug { "selected byte: ${bitmap(bytes)}" }
@@ -57,6 +58,6 @@ class BitValueReader(
 
     private fun bitmap(byteArray: ByteArray) = byteArray.map { byte ->
         // Convert byte to binary string
-        String.format("%8s", Integer.toBinaryString(byte.toInt() and 0xFF)).replace(' ', '0')
+        byte.toUByte().toInt().toString(radix = 2).padStart(8, '0')
     }
 }
