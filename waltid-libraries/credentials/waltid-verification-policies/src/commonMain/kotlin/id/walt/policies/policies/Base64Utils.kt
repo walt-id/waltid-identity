@@ -1,5 +1,8 @@
 package id.walt.policies.policies
 
+import kotlin.io.encoding.Base64
+
 object Base64Utils {
-    fun decode(base64: String): ByteArray = Base64.getDecoder().decode(base64)
+    private val base64Encoding = Base64.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
+    fun decode(base64: String): ByteArray = base64Encoding.decode(base64)
 }
