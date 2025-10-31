@@ -17,7 +17,7 @@ class W3CStatusValidator(
     private val expansionAlgorithmFactory: StatusListExpansionAlgorithmFactory<W3CStatusContent>,
 ) : StatusValidatorBase<W3CStatusContent, W3CEntry, W3CStatusPolicyAttribute>(fetcher, reader) {
 
-    override fun getBitValue(statusList: W3CStatusContent, entry: W3CEntry): List<Char> =
+    override suspend fun getBitValue(statusList: W3CStatusContent, entry: W3CEntry): List<Char> =
         bitValueReaderFactory.new(strategy = BigEndianRepresentation()).get(
             bitstring = statusList.list,
             idx = entry.index,
