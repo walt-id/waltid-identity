@@ -7,8 +7,8 @@ import id.walt.policies.policies.status.model.IETFEntry
 import id.walt.policies.policies.status.model.IETFStatusContent
 import id.walt.policies.policies.status.model.IETFStatusPolicyAttribute
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
-import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.TestInstance
@@ -55,7 +55,7 @@ class IETFStatusValidatorTests : StatusValidatorTestsBase<IETFEntry, IETFStatusP
     override fun getBitRepresentationStrategy(): BitRepresentationStrategy = LittleEndianRepresentation()
 
     override fun setupBitValueReader(statusSize: Int, scenario: TestScenario, bitValue: List<Char>) {
-        every {
+        coEvery {
             mockBitValueReader.get(any(), index, statusSize, mockExpansionAlgorithm)
         } returns bitValue
     }
@@ -63,6 +63,6 @@ class IETFStatusValidatorTests : StatusValidatorTestsBase<IETFEntry, IETFStatusP
     override fun verifyBitValueReaderInteraction(
         statusSize: Int, expansionAlgorithmType: KClass<out StatusListExpansionAlgorithm>
     ) {
-        verify { mockBitValueReader.get(any(), index, statusSize, mockExpansionAlgorithm) }
+        coVerify { mockBitValueReader.get(any(), index, statusSize, mockExpansionAlgorithm) }
     }
 }
