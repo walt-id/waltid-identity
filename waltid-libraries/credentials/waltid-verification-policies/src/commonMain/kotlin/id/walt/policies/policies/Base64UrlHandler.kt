@@ -1,12 +1,12 @@
 package id.walt.policies.policies
 
-import java.util.Base64
+import kotlin.io.encoding.Base64
 
 private const val MULTIBASE_BASE64_URL_PREFIX = 'u'
 
 class Base64UrlHandler {
     private val base64UrlRegex = Regex("^[A-Za-z0-9_-]*$")
-    private val urlDecoder = Base64.getUrlDecoder()
+    private val urlDecoder = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
     /**
      * Decodes a base64-url string (regular or multibase) and returns detailed result
@@ -64,9 +64,7 @@ data class Base64UrlResult(
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as Base64UrlResult
+        if (other !is Base64UrlResult) return false
 
         if (type != other.type) return false
         if (originalString != other.originalString) return false
