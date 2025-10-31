@@ -17,7 +17,7 @@ class IETFStatusValidator(
 ) : StatusValidatorBase<IETFStatusContent, IETFEntry, IETFStatusPolicyAttribute>(fetcher, reader) {
     private val bitValueReader = bitValueReaderFactory.new(strategy = LittleEndianRepresentation())
 
-    override fun getBitValue(statusList: IETFStatusContent, entry: IETFEntry): List<Char> = bitValueReader.get(
+    override suspend fun getBitValue(statusList: IETFStatusContent, entry: IETFEntry): List<Char> = bitValueReader.get(
         bitstring = statusList.list,
         idx = entry.index,
         bitSize = statusList.size,
