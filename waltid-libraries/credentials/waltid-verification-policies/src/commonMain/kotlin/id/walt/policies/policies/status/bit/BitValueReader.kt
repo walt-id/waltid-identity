@@ -6,7 +6,10 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 class BitValueReader(
     private val bitRepresentationStrategy: BitRepresentationStrategy,
 ) {
-    private val BITS_PER_BYTE_UNSIGNED = 8u
+    companion object {
+        private val BITS_PER_BYTE_UNSIGNED = 8u
+    }
+
     private val logger = KotlinLogging.logger {}
 
     suspend fun get(
