@@ -25,7 +25,7 @@ abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : Statu
         statusValidations(bitValue, attribute)
     }
 
-    protected abstract fun getBitValue(statusList: K, entry: M): List<Char>
+    protected abstract suspend fun getBitValue(statusList: K, entry: M): List<Char>
 
     protected abstract fun customValidations(statusList: K, attribute: T)
 
