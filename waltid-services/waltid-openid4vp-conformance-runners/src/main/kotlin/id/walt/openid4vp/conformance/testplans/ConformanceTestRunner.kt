@@ -80,4 +80,4 @@ class ConformanceTestRunner(
     }
 }
 
-fun main() = ConformanceTestRunner().run()
+//fun main() = ConformanceTestRunner().run()
