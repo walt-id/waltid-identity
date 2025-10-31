@@ -1,5 +1,6 @@
 package id.walt.commons.web.plugins
 
+import id.walt.commons.web.AuthException
 import id.walt.commons.web.SerializableWebException
 import id.walt.commons.web.WebException
 import io.klogging.logger
@@ -24,10 +25,17 @@ fun Application.configureStatusPages() {
         }
         exception<Throwable> { call, cause ->
             logger.error(cause)
-
             val status = statusCodeForException(cause)
             call.respond(status, exceptionMap(cause, status))
         }
+        exception<AuthException> { call, cause ->
+            logger.error(cause)
+            val status = HttpStatusCode.fromValue(cause.status.value)
+            call.respond(status, exceptionMap(cause, status))
+        }
+
+
+
     }
 }
 

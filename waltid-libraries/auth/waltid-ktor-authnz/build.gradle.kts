@@ -50,6 +50,7 @@ dependencies {
 
     // JWT
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+    implementation(project(":waltid-services:waltid-service-commons"))
     implementation("com.nimbusds:nimbus-jose-jwt:9.41.2")
 
     // Cryptography

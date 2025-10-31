@@ -6,6 +6,7 @@ import com.atlassian.onetime.model.EmailAddress
 import com.atlassian.onetime.model.Issuer
 import com.atlassian.onetime.model.TOTPSecret
 import com.atlassian.onetime.service.DefaultTOTPService
+import id.walt.commons.web.OTPAuthException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
@@ -31,8 +32,8 @@ object TOTP : AuthenticationMethod("totp") {
 
         val service = DefaultTOTPService()
         authCheck(
-            service.verify(userProvidedOtpCode, secret).isSuccess()
-        ) { "Invalid OTP" }
+            service.verify(userProvidedOtpCode, secret).isSuccess() , OTPAuthException()
+        )
     }
 
     @Serializable
