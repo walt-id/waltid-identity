@@ -103,7 +103,7 @@ object StatusPolicyImplementation {
     private fun failResultMessage(validationResults: List<Result<Unit>>) =
         validationResults.filter { it.isFailure }.map { it.exceptionOrNull()?.message ?: "Unknown validation error" }
             .let {
-                "Verification failed: ${it.joinToString(System.lineSeparator())}"
+                "Verification failed: ${it.joinToString("\n")}"
             }
 
     private fun emptyResultMessage(attribute: W3CStatusPolicyListArguments) = if (attribute.list.isEmpty()) {
