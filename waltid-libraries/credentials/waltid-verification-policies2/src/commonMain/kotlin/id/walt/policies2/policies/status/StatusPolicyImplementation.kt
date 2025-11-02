@@ -20,8 +20,10 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.serializer
 
 object StatusPolicyImplementation {
@@ -67,7 +69,7 @@ object StatusPolicyImplementation {
         credentialFetcher, ietfJwtStatusReader, bitValueReaderFactory, tokenStatusListExpansionAlgorithm
     )
 
-    suspend fun verifyWithAttributes(data: JsonObject, attributes: StatusPolicyArgument): Result<Any> =
+    suspend fun verifyWithAttributes(data: JsonObject, attributes: StatusPolicyArgument): Result<JsonElement> =
         getStatusEntryElementExtractor(attributes).extract(data)?.let { processStatusEntry(it, attributes) }
             ?: Result.success(JsonObject(mapOf("policy_available" to JsonPrimitive(false))))
 
@@ -75,7 +77,11 @@ object StatusPolicyImplementation {
         is IETFStatusPolicyAttribute -> processIETF(data, args)
         is W3CStatusPolicyAttribute -> processW3C(data, args)
         is W3CStatusPolicyListArguments -> processListW3C(data, args)
-    }
+    }.fold(onSuccess = {
+        Result.success(JsonObject(emptyMap()))
+    }, onFailure = {
+        Result.failure(it)
+    })
 
     private suspend fun processW3C(data: JsonElement, attribute: W3CStatusPolicyAttribute): Result<Unit> {
         val statusEntry = w3cEntryContentParser.parse(data)

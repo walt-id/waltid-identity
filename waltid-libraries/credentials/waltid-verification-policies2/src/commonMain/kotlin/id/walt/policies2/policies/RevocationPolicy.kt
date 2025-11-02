@@ -21,5 +21,6 @@ class RevocationPolicy : VerificationPolicy2() {
     private val attribute = W3CStatusPolicyAttribute(value = 0u, purpose = "revocation", type = Values.STATUS_LIST_2021)
 
 
-    override suspend fun verify(credential: DigitalCredential): Result<JsonElement> = verifyWithAttributes(credential, attribute)
+    override suspend fun verify(credential: DigitalCredential): Result<JsonElement> =
+        verifyWithAttributes(credential.credentialData, attribute)
 }
