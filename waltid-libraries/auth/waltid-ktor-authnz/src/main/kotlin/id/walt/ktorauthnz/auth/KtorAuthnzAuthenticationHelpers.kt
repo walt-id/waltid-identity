@@ -15,11 +15,12 @@ fun ApplicationCall.getAuthToken(): String {
     return token
 }
 
-// TODO: switch to @OptIn instead of @Deprecated
+@RequiresOptIn("Consider that external sessions can be used by passing a JWT as token, which was not created by the internal TokenHandler")
+annotation class ExternallyProvidedJWTCannotResolveToAuthenticatedSession()
 
-@Deprecated("Externally provided JWT token cannot resolve to authenticated session")
+@ExternallyProvidedJWTCannotResolveToAuthenticatedSession
 suspend fun RoutingContext.getAuthenticatedSession(): AuthSession = KtorAuthnzManager.tokenHandler.resolveTokenToSession(call.getAuthToken())
-@Deprecated("Externally provided JWT token cannot resolve to authenticated session")
+@ExternallyProvidedJWTCannotResolveToAuthenticatedSession
 suspend fun PipelineContext<Unit, ApplicationCall>.getAuthenticatedSession(): AuthSession = KtorAuthnzManager.tokenHandler.resolveTokenToSession(call.getAuthToken())
 
 suspend fun ApplicationCall.getAuthenticatedAccount(): String = KtorAuthnzManager.tokenHandler.getTokenAccountId(getAuthToken())
