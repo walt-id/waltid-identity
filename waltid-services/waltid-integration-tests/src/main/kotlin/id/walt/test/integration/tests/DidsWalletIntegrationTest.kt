@@ -2,6 +2,8 @@
 
 package id.walt.test.integration.tests
 
+import id.walt.did.dids.DidService
+import id.walt.did.dids.resolver.local.DidWebResolver
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.jsonArray
@@ -66,16 +68,20 @@ class DidsWalletIntegrationTest : AbstractIntegrationTest() {
     fun shouldCreateWebKey() = runTest {
         val createdDidString = defaultWalletApi.createDid(
             method = "web",
-            options = mapOf("domain" to "domain", "path" to "path")
+            options = mapOf("domain" to "${environment.e2e.host}:${environment.e2e.port}", "path" to "/wallet-api/registry/mydid")
         )
+
         createdDids.add(createdDidString)
         val loadedDid = defaultWalletApi.getDid(createdDidString)
+        DidWebResolver.enableHttps(false)
+        val did = DidService.resolve(createdDidString).getOrNull()
+        assertNotNull(did)
         assertEquals(createdDidString, loadedDid["id"]?.jsonPrimitive?.content)
         val verificationMethod = loadedDid["verificationMethod"]?.jsonArray?.get(0)?.jsonObject
         assertNotNull(verificationMethod?.jsonObject).also {
             assertNotNull(it["publicKeyJwk"]?.jsonObject)
             assertEquals("JsonWebKey2020", it["type"]?.jsonPrimitive?.content)
-            assertEquals("did:web:domain:path", it["controller"]?.jsonPrimitive?.content)
+            assertEquals("did:web:localhost%3A22323:wallet-api:registry:mydid", it["controller"]?.jsonPrimitive?.content)
         }
     }
 

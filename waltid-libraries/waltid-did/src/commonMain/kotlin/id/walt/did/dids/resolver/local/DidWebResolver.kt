@@ -89,8 +89,7 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
             selectedPath.isEmpty() -> "/.well-known/did.json"
             else -> "/${selectedPath.joinToString("/")}/did.json"
         }
-
-        "$URL_PROTOCOL://$domain$path"
+        "$urlProtocol://$domain$path"
     } ?: throw IllegalArgumentException("Unexpected did format (missing identifier): $did")
 
     @JvmBlocking
@@ -127,7 +126,16 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
     }
 
     companion object {
-        const val URL_PROTOCOL = "https"
+
+        var urlProtocol = "https"
+
+        fun enableHttps(httpsEnabled: Boolean) {
+            if (httpsEnabled)
+                this.urlProtocol = "https"
+            else
+                this.urlProtocol = "http"
+        }
+
         internal val json = Json { ignoreUnknownKeys = true }
     }
 }

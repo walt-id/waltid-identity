@@ -3,12 +3,15 @@ package id.walt.webwallet
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
+import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.WebService
 import id.walt.crypto.keys.aws.WaltCryptoAws
 import id.walt.crypto.keys.oci.WaltCryptoOci
+import id.walt.did.dids.resolver.local.DidWebResolver
 import id.walt.did.helpers.WaltidServices
+import id.walt.webwallet.config.RuntimeConfig
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.web.Administration.configureAdministration
 import id.walt.webwallet.web.controllers.*
@@ -52,6 +55,8 @@ suspend fun main(args: Array<String>) {
 
 fun webWalletSetup() {
     log.info { "Setting up..." }
+    val runtimeConfig = ConfigManager.getConfig<RuntimeConfig>()
+    DidWebResolver.enableHttps(runtimeConfig.enableDidWebResolverHttps)
     Security.addProvider(BouncyCastleProvider())
 }
 
