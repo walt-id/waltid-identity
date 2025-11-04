@@ -24,6 +24,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.server.util.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -45,14 +46,19 @@ object OIDC : AuthenticationMethod("oidc") {
             json(Json { ignoreUnknownKeys = true })
         }
     }
-    private val configurationCache = mutableMapOf<String, OpenIdConfiguration>()
+
+    internal const val OIDC_SESSION_NAMESPACE = "oidc-session"
+    internal const val OIDC_STATE_NAMESPACE = "oidc-state"
+
+
+    private val configurationCache = mutableMapOf<Url, OpenIdConfiguration>()
 
     private val keyProviderCache = mutableMapOf<String, JwkKeyProvider>()
     private fun getJwkProvider(jwksUri: String) = keyProviderCache.getOrPut(jwksUri) {
         JwkKeyProvider(jwksUri)
     }
 
-    suspend fun resolveConfiguration(configUrl: String): OpenIdConfiguration {
+    suspend fun resolveConfiguration(configUrl: Url): OpenIdConfiguration {
         return configurationCache.getOrPut(configUrl) {
             http.get(configUrl).body<OpenIdConfiguration>()
         }
@@ -91,6 +97,45 @@ object OIDC : AuthenticationMethod("oidc") {
 
     // --- Core Authentication Flow ---
 
+    /**
+     * @param createdSession: Implicitly created session (containing flow method OIDC)
+     * @return Auth URL to be returned to the user
+     */
+    suspend fun startOidcSession(createdSession: AuthSession): Url {
+        val config = createdSession.lookupFlowMethodConfiguration<OidcAuthConfiguration>(OIDC)
+        val oidcConfig = config.getOpenIdConfiguration()
+
+        val state = generateSecureRandomString()
+        val nonce = generateSecureRandomString()
+        var codeChallenge: String? = null
+        var codeVerifier: String? = null
+
+        if (config.pkceEnabled) {
+            codeVerifier = generateSecureRandomString(64)
+            codeChallenge = generatePkceChallenge(codeVerifier)
+        }
+
+        createdSession.setSessionData(OIDC, OidcSessionAuthenticationStepData(state, nonce, codeVerifier))
+        createdSession.storeExternalIdMapping(OIDC_STATE_NAMESPACE, state)
+
+        val authUrl = URLBuilder(oidcConfig.authorizationEndpoint).apply {
+            parameters.apply {
+                append("response_type", "code")
+                append("scope", "openid profile email")
+                append("client_id", config.clientId)
+                append("redirect_uri", config.callbackUri)
+                append("state", state)
+                append("nonce", nonce)
+                if (codeChallenge != null) {
+                    append("code_challenge", codeChallenge)
+                    append("code_challenge_method", "S256")
+                }
+            }
+        }.build()
+
+        return authUrl
+    }
+
     override fun Route.registerAuthenticationRoutes(
         authContext: ApplicationCall.() -> AuthContext,
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
@@ -99,56 +144,33 @@ object OIDC : AuthenticationMethod("oidc") {
             // 1. Start of the login flow
             get("auth") {
                 val session = call.getAuthSession(authContext) // starts implicit session
-                val config = session.lookupFlowMethodConfiguration<OidcAuthConfiguration>(OIDC)
-                val oidcConfig = config.getOpenIdConfiguration()
+                val authUrl = startOidcSession(session)
 
-                val state = generateSecureRandomString()
-                val nonce = generateSecureRandomString()
-                var codeChallenge: String? = null
-                var codeVerifier: String? = null
+                val nextStepInfo = AuthSessionNextStepRedirectData(
+                    url = authUrl
+                )
 
-                if (config.pkceEnabled) {
-                    codeVerifier = generateSecureRandomString(64)
-                    codeChallenge = generatePkceChallenge(codeVerifier)
-                }
-
-                session.setSessionData(OIDC, OidcTempSessionData(state, nonce, codeVerifier))
-                session.storeExternalIdMapping("oidc-state", state)
-
-                val authUrl = URLBuilder(oidcConfig.authorizationEndpoint).apply {
-                    parameters.apply {
-                        append("response_type", "code")
-                        append("scope", "openid profile email")
-                        append("client_id", config.clientId)
-                        append("redirect_uri", config.callbackUri)
-                        append("state", state)
-                        append("nonce", nonce)
-                        if (codeChallenge != null) {
-                            append("code_challenge", codeChallenge)
-                            append("code_challenge_method", "S256")
-                        }
-                    }
-                }.build()
-
-                call.respondRedirect(authUrl.toString())
+                call.handleAuthNextStep(
+                    session = session,
+                    nextStepInfo = nextStepInfo,
+                    nextStepDescription = "The OIDC method requires you to open the Authentication URL in your web browser, and follow the steps of your Identity Provider from there. Please go ahead and open the authentication URL \"$authUrl\" in your web browser."
+                )
+                //call.respondRedirect(authUrl.toString())
             }
 
             // 2. Callback from the IdP
             get("callback") {
-                println("CALLBACK")
                 val params = call.request.queryParameters
                 val returnedCode = params["code"] ?: throw IllegalArgumentException("Missing 'code' in callback.")
                 val returnedState = params["state"] ?: throw IllegalArgumentException("Missing 'state' in callback.")
-                //val internalSessionId = params["session"] ?: throw IllegalArgumentException("Missing 'session' in callback.")
 
-                val sessionId = SessionManager.getSessionIdByExternalId("oidc-state", returnedState)
+                val sessionId = SessionManager.getSessionIdByExternalId(OIDC_STATE_NAMESPACE, returnedState)
                     ?: throw IllegalArgumentException("Unknown OIDC state in callback: $returnedState")
                 val session = SessionManager.getSessionById(sessionId)
-                println("SESSION IS: $session")
                 val config = session.lookupFlowMethodConfiguration<OidcAuthConfiguration>(OIDC)
                 val oidcConfig = config.getOpenIdConfiguration()
 
-                val tempSessionData = session.getSessionData<OidcTempSessionData>(OIDC)
+                val tempSessionData = session.getSessionData<OidcSessionAuthenticationStepData>(OIDC)
                     ?: throw IllegalStateException("No OIDC session data found or session expired.")
 
                 if (tempSessionData.state != returnedState) {
@@ -162,6 +184,20 @@ object OIDC : AuthenticationMethod("oidc") {
                 val subject = idTokenPayload["sub"]?.jsonPrimitive?.content
                     ?: throw IllegalStateException("ID Token is missing 'sub' claim.")
 
+                val sid = idTokenPayload["sid"]?.jsonPrimitive?.content ?: throw IllegalStateException("ID Token is missing 'sid' claim.")
+
+                // --- Our logout is successful
+
+                session.dropExternalIdMapping(OIDC_STATE_NAMESPACE, returnedState) // No longer need this
+                session.storeExternalIdMapping(OIDC_SESSION_NAMESPACE, sid) // sid
+
+                session.setSessionData(
+                    this@OIDC, OidcSessionAuthenticatedData(
+                        idpJwksUrl = oidcConfig.jwksUri,
+                        idpIss = oidcConfig.issuer
+                    )
+                )
+
                 val identifier = OIDCIdentifier(oidcConfig.issuer, subject)
 
                 val accountId = identifier.resolveIfExists()
@@ -172,12 +208,29 @@ object OIDC : AuthenticationMethod("oidc") {
                     ExampleAccountStore.registerAccount()
                 }*/
 
-                call.handleAuthSuccess(session, accountId)
+                val authContext = authContext(call)
+
+                // Redirect if a URL was configured:
+                if (config.redirectAfterLogin != null) {
+                    call.handleAuthSuccessAndRedirect(
+                        session = session,
+                        authContext = authContext,
+                        accountId = accountId,
+                        redirectUrl = config.redirectAfterLogin
+                    )
+                } else {
+                    call.handleAuthSuccess(
+                        session = session,
+                        authContext = authContext,
+                        accountId = accountId
+                    )
+                }
             }
 
             // --- Provider-Initiated Logout Routes ---
 
             post("logout/backchannel") {
+                log.trace { "OIDC: Backchannel-logout" }
                 val logoutTokenStr = call.receiveParameters()["logout_token"]
                     ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing logout_token")
 
@@ -187,41 +240,42 @@ object OIDC : AuthenticationMethod("oidc") {
                 val clientId = jwsParts.payload["aud"]?.jsonPrimitive?.content
                     ?: return@post call.respond(HttpStatusCode.BadRequest, "Logout token missing 'aud' claim")
 
+                val sid =
+                    jwsParts.payload["sid"]?.jsonPrimitive?.content ?: throw IllegalStateException("Logout token is missing 'sid' claim.")
+                log.trace { "Requested back-channel logout for OIDC session: $sid" }
 
-                // ------- TODO: Associate external session id with internal session id
-                // ------- (additional front + back mapping in session store)
+                val sessionId = SessionManager.getSessionIdByExternalId(OIDC_SESSION_NAMESPACE, sid)
+                log.trace { "This will logout authnz session: $sessionId" }
+                requireNotNull(sessionId) { "Could not find session for external OIDC session ID (sid): $sid" }
 
-                // Find the static configuration for the client ID that the token is for
-                // TODO val config = KtorAuthnzManager.getStaticConfigForClientId(clientId, OIDC) as? OidcAuthConfig
-                /*  ?: return@post call.respond(HttpStatusCode.BadRequest, "No configuration found for client_id")
+                val session = SessionManager.getSessionById(sessionId)
+                val sessionOidcConfig = session.getSessionData<OidcSessionAuthenticatedData>(this@OIDC)
+                log.trace { "Retrieved data to verify logout token: $sessionOidcConfig" }
+                requireNotNull(sessionOidcConfig) { "Could not get OIDC data for session" }
 
-              try {
-                  val oidcConfig = config.getOpenIdConfiguration()
-                  val logoutTokenPayload = validateLogoutToken(oidcConfig, logoutTokenStr, clientId)
-                  val subject = logoutTokenPayload["sub"]?.jsonPrimitive?.content
-                  val sessionId = logoutTokenPayload["sid"]?.jsonPrimitive?.content
+                validateLogoutToken(sessionOidcConfig, logoutTokenStr, clientId)
 
-                  if (subject != null) {
-                      val accountId = KtorAuthnzManager.accountStore.lookupAccountUuid(OIDCIdentifier(oidcConfig.issuer, subject))
-                      if (accountId != null) {
-                          SessionManager.invalidateAllSessionsForAccount(accountId)
-                      }
-                  } else if (sessionId != null) {
-                      log.warn { "OIDC Backchannel Logout by Session ID is not yet supported!" }
+                session.run {
+                    call.logoutAndDeleteCookie()
+                }
 
-                      // TODO SessionManager.invalidateSessionBySessionId(oidcConfig.issuer, sessionId)
-                  }
-
-                  call.respond(HttpStatusCode.OK)
-              } catch (e: Exception) {
-                  log.warn { "Invalid back-channel logout token: ${e.message}" }
-                  call.respond(HttpStatusCode.BadRequest, "Invalid logout_token")
-              }*/
+                call.respond(HttpStatusCode.OK)
             }
 
             get("logout/frontchannel") {
-                // TODO: delete session?
-                SessionTokenCookieHandler.run { call.deleteCookie() }
+                log.trace { "OIDC: Frontchannel-logout" }
+
+                val issuer = call.parameters.getOrFail("iss")
+                val oidcSessionId = call.parameters.getOrFail("sid")
+
+                val sessionId = SessionManager.getSessionIdByExternalId(OIDC_SESSION_NAMESPACE, oidcSessionId)
+                requireNotNull(sessionId) { "Could not find session for external OIDC session ID (sid): $oidcSessionId" }
+
+                val session = SessionManager.getSessionById(sessionId)
+                session.run {
+                    call.logoutAndDeleteCookie()
+                }
+
                 call.respond(HttpStatusCode.OK, "Session cookie cleared.")
             }
         }
@@ -256,7 +310,7 @@ object OIDC : AuthenticationMethod("oidc") {
      * @throws IllegalArgumentException if validation fails.
      */
     private suspend fun validateOidcJws(
-        oidcConfig: OIDC.OpenIdConfiguration,
+        oidcConfig: OidcSessionAuthenticatedData,
         token: String,
         clientId: String
     ): JsonObject {
@@ -268,7 +322,7 @@ object OIDC : AuthenticationMethod("oidc") {
         val kid = header["kid"]?.jsonPrimitive?.content
             ?: throw IllegalArgumentException("JWS header is missing 'kid' (Key ID).")
 
-        val keyProvider = getJwkProvider(oidcConfig.jwksUri)
+        val keyProvider = getJwkProvider(oidcConfig.idpJwksUrl)
         val validationKey = keyProvider.getKey(kid).getOrThrow()
 
         val verificationResult = validationKey.verifyJws(token)
@@ -277,7 +331,7 @@ object OIDC : AuthenticationMethod("oidc") {
         }
 
         // 2. Validate Common Claims
-        if (payload["iss"]?.jsonPrimitive?.content != oidcConfig.issuer) {
+        if (payload["iss"]?.jsonPrimitive?.content != oidcConfig.idpIss) {
             throw IllegalArgumentException("Invalid issuer ('iss') in token.")
         }
         if (payload["aud"]?.jsonPrimitive?.content != clientId) {
@@ -299,7 +353,7 @@ object OIDC : AuthenticationMethod("oidc") {
         expectedNonce: String
     ): JsonObject {
         // Perform common signature and claim validation
-        val payload = validateOidcJws(oidcConfig, token, clientId)
+        val payload = validateOidcJws(OidcSessionAuthenticatedData(oidcConfig), token, clientId)
 
         // Perform ID Token-specific claim validation
         if (payload["nonce"]?.jsonPrimitive?.content != expectedNonce) {
@@ -315,7 +369,7 @@ object OIDC : AuthenticationMethod("oidc") {
         return payload
     }
 
-    private suspend fun validateLogoutToken(oidcConfig: OpenIdConfiguration, token: String, clientId: String): JsonObject {
+    private suspend fun validateLogoutToken(oidcConfig: OidcSessionAuthenticatedData, token: String, clientId: String): JsonObject {
         // Perform common signature and claim validation
         val payload = validateOidcJws(oidcConfig, token, clientId)
 
