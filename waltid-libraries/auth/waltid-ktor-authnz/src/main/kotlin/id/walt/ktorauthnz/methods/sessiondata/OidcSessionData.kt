@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods.sessiondata
 
+import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
 import id.walt.ktorauthnz.methods.OIDC
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -15,13 +16,19 @@ data class OidcSessionAuthenticationStepData(
 @Serializable
 @SerialName("oidc-authenticated")
 data class OidcSessionAuthenticatedData(
-    val idpJwksUrl: String,
-    val idpIss: String
+    val tokenValidationData: TokenValidationData,
+    val oidcIdentifier: OIDCIdentifier
 ) : SessionData {
 
-    constructor(openIdConfiguration: OIDC.OpenIdConfiguration) : this(
-        idpJwksUrl = openIdConfiguration.jwksUri,
-        idpIss = openIdConfiguration.issuer
-    )
+    @Serializable
+    data class TokenValidationData(
+        val idpJwksUrl: String,
+        val idpIss: String,
+    ) {
+        constructor(openIdConfiguration: OIDC.OpenIdConfiguration) : this(
+            idpJwksUrl = openIdConfiguration.jwksUri,
+            idpIss = openIdConfiguration.issuer
+        )
+    }
 
 }

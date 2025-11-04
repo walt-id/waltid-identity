@@ -7,6 +7,7 @@ import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.methods.config.OidcAuthConfiguration
 import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticatedData
+import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticatedData.TokenValidationData
 import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticationStepData
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionNextStepRedirectData
@@ -18,6 +19,7 @@ import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -181,6 +183,9 @@ object OIDC : AuthenticationMethod("oidc") {
                 log.trace { "OIDC Token Response: $tokenResponse" }
                 val idTokenPayload = validateIdToken(oidcConfig, tokenResponse.idToken, config.clientId, tempSessionData.nonce)
 
+                val userInfo = userInfo(oidcConfig, tokenResponse.accessToken)
+                log.trace { "OIDC UserInfo Response: $userInfo" }
+
                 val subject = idTokenPayload["sub"]?.jsonPrimitive?.content
                     ?: throw IllegalStateException("ID Token is missing 'sub' claim.")
 
@@ -191,18 +196,22 @@ object OIDC : AuthenticationMethod("oidc") {
                 session.dropExternalIdMapping(OIDC_STATE_NAMESPACE, returnedState) // No longer need this
                 session.storeExternalIdMapping(OIDC_SESSION_NAMESPACE, sid) // sid
 
+                val identifier = OIDCIdentifier(oidcConfig.issuer, subject)
+
                 session.setSessionData(
                     this@OIDC, OidcSessionAuthenticatedData(
-                        idpJwksUrl = oidcConfig.jwksUri,
-                        idpIss = oidcConfig.issuer
+                        tokenValidationData = TokenValidationData(
+                            idpJwksUrl = oidcConfig.jwksUri,
+                            idpIss = oidcConfig.issuer,
+                        ),
+                        oidcIdentifier = identifier
                     )
                 )
-
-                val identifier = OIDCIdentifier(oidcConfig.issuer, subject)
 
                 val accountId = identifier.resolveIfExists()
 
                 /*if (accountId == null) {
+
                     // TODO: Create account if it does not exist
                     Account("", "")
                     ExampleAccountStore.registerAccount()
@@ -265,13 +274,17 @@ object OIDC : AuthenticationMethod("oidc") {
             get("logout/frontchannel") {
                 log.trace { "OIDC: Frontchannel-logout" }
 
-                val issuer = call.parameters.getOrFail("iss")
+                val iss = call.parameters.getOrFail("iss")
                 val oidcSessionId = call.parameters.getOrFail("sid")
 
                 val sessionId = SessionManager.getSessionIdByExternalId(OIDC_SESSION_NAMESPACE, oidcSessionId)
                 requireNotNull(sessionId) { "Could not find session for external OIDC session ID (sid): $oidcSessionId" }
 
                 val session = SessionManager.getSessionById(sessionId)
+                val oidcSessionData = session.getSessionData<OidcSessionAuthenticatedData>(this@OIDC)
+                requireNotNull(oidcSessionData) { "Could not get OIDC data for session" }
+                require(oidcSessionData.tokenValidationData.idpIss == iss) { "Invalid issuer for front channel logout" }
+
                 session.run {
                     call.logoutAndDeleteCookie()
                 }
@@ -282,6 +295,25 @@ object OIDC : AuthenticationMethod("oidc") {
     }
 
     // --- Helper & Validation Functions ---
+
+    /**
+     * Fetches user information from the UserInfo endpoint using the Access Token.
+     */
+    suspend fun userInfo(oidcConfig: OpenIdConfiguration, accessToken: String): JsonObject {
+        val endpoint = oidcConfig.userinfoEndpoint
+            ?: throw IllegalStateException("UserInfo endpoint is not configured in the OpenID provider metadata.")
+
+        val response = http.get(endpoint) {
+            bearerAuth(accessToken)
+        }
+
+        if (!response.status.isSuccess()) {
+            throw IllegalArgumentException("UserInfo request failed: ${response.bodyAsText()}")
+        }
+
+        val jsonObject = response.body<JsonObject>()
+        return jsonObject
+    }
 
     private suspend fun exchangeCodeForTokens(config: OidcAuthConfiguration, code: String, codeVerifier: String?): TokenResponse {
         val oidcConfig = config.getOpenIdConfiguration()
@@ -295,7 +327,7 @@ object OIDC : AuthenticationMethod("oidc") {
             setBody(FormDataContent(formParameters))
             basicAuth(config.clientId, config.clientSecret)
         }
-        if (!response.status.isSuccess()) throw RuntimeException("Token exchange failed: ${response.body<String>()}")
+        if (!response.status.isSuccess()) throw IllegalArgumentException("Token exchange failed: ${response.body<String>()}")
         return response.body()
     }
 
@@ -310,7 +342,7 @@ object OIDC : AuthenticationMethod("oidc") {
      * @throws IllegalArgumentException if validation fails.
      */
     private suspend fun validateOidcJws(
-        oidcConfig: OidcSessionAuthenticatedData,
+        oidcConfig: TokenValidationData,
         token: String,
         clientId: String
     ): JsonObject {
@@ -353,7 +385,7 @@ object OIDC : AuthenticationMethod("oidc") {
         expectedNonce: String
     ): JsonObject {
         // Perform common signature and claim validation
-        val payload = validateOidcJws(OidcSessionAuthenticatedData(oidcConfig), token, clientId)
+        val payload = validateOidcJws(TokenValidationData(oidcConfig), token, clientId)
 
         // Perform ID Token-specific claim validation
         if (payload["nonce"]?.jsonPrimitive?.content != expectedNonce) {
@@ -371,7 +403,7 @@ object OIDC : AuthenticationMethod("oidc") {
 
     private suspend fun validateLogoutToken(oidcConfig: OidcSessionAuthenticatedData, token: String, clientId: String): JsonObject {
         // Perform common signature and claim validation
-        val payload = validateOidcJws(oidcConfig, token, clientId)
+        val payload = validateOidcJws(oidcConfig.tokenValidationData, token, clientId)
 
         // Perform Logout Token-specific claim validation
         if (payload.containsKey("nonce")) {
