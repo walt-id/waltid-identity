@@ -3,6 +3,7 @@ package id.walt.policies2
 import id.walt.policies2.policies.CredentialSignaturePolicy
 import id.walt.policies2.policies.ExpirationDatePolicy
 import id.walt.policies2.policies.NotBeforePolicy
+import id.walt.policies2.policies.RevocationPolicy
 import id.walt.policies2.policies.VerificationPolicy2
 
 object VerificationPolicyManager {
@@ -19,7 +20,8 @@ object VerificationPolicyManager {
     val simpleVerificationPolicies = listOf<VerificationPolicy2>(
         CredentialSignaturePolicy(),
         ExpirationDatePolicy(),
-        NotBeforePolicy()
+        NotBeforePolicy(),
+        RevocationPolicy(),
     ).associateBy { it.id }
 
     fun getSimpleVerificationPolicyByName(id: String): VerificationPolicy2 =
