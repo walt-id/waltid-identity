@@ -5,6 +5,8 @@ package id.walt.ktorauthnz.sessions
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.flows.AuthFlow
+import id.walt.ktorauthnz.utils.ExternalMappingList
+import kotlinx.coroutines.flow.asFlow
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -15,7 +17,7 @@ object SessionManager {
 
         val newSession = AuthSession(
             id = sessionId,
-            status = AuthSessionStatus.CONTINUE_NEXT_STEP,
+            status = AuthSessionStatus.CONTINUE_NEXT_FLOW,
             flows = setOf(authFlow),
             expiration = authFlow.expiration?.let { Clock.System.now() + authFlow.parsedDuration!! }
         )
@@ -49,9 +51,15 @@ object SessionManager {
         KtorAuthnzManager.sessionStore.storeSession(updatedAuthSession)
     }
 
+    suspend fun dropAllExternalMappings(authSession: AuthSession) {
+        ExternalMappingList.ALL_EXTERNAL_MAPPINGS.asFlow().collect { namespace ->
+            runCatching { KtorAuthnzManager.sessionStore.dropExternalIdMappingByInternal(namespace, authSession.id) }
+        }
+    }
+
     suspend fun invalidateSession(authSession: AuthSession) {
         KtorAuthnzManager.sessionStore.dropSession(authSession.id)
-        // TODO: KtorAuthnzManager.sessionStore.dropExternalIdMappingByInternal(authSession.id)
+        dropAllExternalMappings(authSession)
     }
 
     suspend fun invalidateAllSessionsForAccount(accountId: String) {
