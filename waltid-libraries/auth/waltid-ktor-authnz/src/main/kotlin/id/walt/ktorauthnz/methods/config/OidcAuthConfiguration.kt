@@ -27,6 +27,9 @@ data class OidcAuthConfiguration(
     /** Enables Proof Key for Code Exchange (PKCE). Highly recommended for all clients. */
     val pkceEnabled: Boolean = true,
 
+    /** Where to redirect to after the IDP redirected us to the authnz callback? (usually a frontend URL) */
+    val redirectAfterLogin: Url? = null,
+
     /** The claim in the user info response to use for the unique account identifier. 'sub' is the standard. */
     val accountIdentifierClaim: String = "sub",
 ) : AuthMethodConfiguration {
