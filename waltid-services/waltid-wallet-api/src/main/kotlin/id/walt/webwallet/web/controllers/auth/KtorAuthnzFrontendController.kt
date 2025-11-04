@@ -4,12 +4,17 @@ package id.walt.webwallet.web.controllers.auth
 
 import id.walt.commons.web.UnauthorizedException
 import id.walt.ktorauthnz.KtorAuthnzManager
+import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
 import id.walt.ktorauthnz.auth.ExternallyProvidedJWTCannotResolveToAuthenticatedSession
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.ktorauthnz.auth.getAuthenticatedSession
 import id.walt.ktorauthnz.auth.getEffectiveRequestAuthToken
+import id.walt.ktorauthnz.methods.OIDC
+import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticatedData
+import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
 import id.walt.ktorauthnz.methods.storeddata.EmailPassStoredData
+import id.walt.ktorauthnz.sessions.SessionManager
 import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
 import id.walt.webwallet.db.models.Account
 import id.walt.webwallet.db.models.Accounts
@@ -24,6 +29,7 @@ import io.ktor.server.auth.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.server.util.url
 import io.ktor.util.date.*
 import kotlinx.serialization.json.*
 import org.jetbrains.exposed.v1.jdbc.insert
@@ -35,6 +41,36 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 private val logger = logger("AuthnzFrontendController")
+
+private suspend fun ktorAuthnzCreateAccount(
+    method: String,
+    identifier: AccountIdentifier,
+    storedData: AuthMethodStoredData? = null,
+    name: String,
+    email: String?
+): Uuid {
+    val createdAccountId = transaction {
+        Accounts.insert {
+            it[Accounts.tenant] = ""
+            it[id] = Uuid.random()
+            it[Accounts.name] = name
+            it[Accounts.email] = email
+            it[Accounts.password] = "!AUTHNZ ACCOUNT"
+            it[createdOn] = Clock.System.now().toJavaInstant()
+        }[Accounts.id]
+    }
+
+
+    KtorAuthnzManager.accountStore.addAccountIdentifierToAccount(createdAccountId.toString(), identifier)
+
+    if (storedData != null) {
+        KtorAuthnzManager.accountStore.addAccountStoredData(createdAccountId.toString(), method, storedData)
+    }
+
+    AccountsService.initializeUserAccount(tenant = "", name = name, registeredUserId = createdAccountId)
+
+    return createdAccountId
+}
 
 @OptIn(ExternallyProvidedJWTCannotResolveToAuthenticatedSession::class)
 fun Application.ktorAuthnzFrontendRoutes() {
@@ -54,11 +90,46 @@ fun Application.ktorAuthnzFrontendRoutes() {
                 }) {
                     call.respond(call.getAuthenticatedAccount())
                 }
+
                 get("session", { summary = "Return session ID if logged in" }) {
                     val token = getAuthenticatedSession().token ?: throw UnauthorizedException("Invalid session")
                     call.respond(mapOf("token" to mapOf("accessToken" to token)))
                 }
+
+
+                get("oidc-callback-frontend") {
+                    // Going from ktor-authnz to Web wallet
+
+                    // just check if already registered here
+                    val session = getAuthenticatedSession() // should work
+
+                    val oidcData = session.getSessionData<OidcSessionAuthenticatedData>(OIDC)
+                    requireNotNull(oidcData) { "Missing OIDC Authenticated Data" }
+
+                    val oidcIdentifier = oidcData.oidcIdentifier
+
+                    val accountId = oidcIdentifier.resolveIfExists()
+
+                    if (accountId == null) {
+                        // Have to create account (first login with this OIDC issuer/subject combination)
+                        val createdAccountId = ktorAuthnzCreateAccount(
+                            method = "email",
+                            identifier = oidcIdentifier,
+                            name = oidcIdentifier.subject,
+                            email = null
+                        )
+                        session.accountId = createdAccountId.toString()
+                        SessionManager.updateSession(session)
+                    }
+
+                    val newUrl = call.url { this.path("/") }
+                    call.respondRedirect(newUrl)
+                }
+
+
             }
+
+            // Unauthenticated endpoint follow here:
 
             post("login") {
                 val providedToken = call.receiveText()
@@ -96,27 +167,13 @@ fun Application.ktorAuthnzFrontendRoutes() {
 
                 require(type == "email") { "Only implemented for email login" }
 
-                val createdAccountId = transaction {
-                    Accounts.insert {
-                        it[Accounts.tenant] = ""
-                        it[id] = Uuid.random()
-                        it[Accounts.name] = name
-                        it[Accounts.email] = email
-                        it[Accounts.password] = "!AUTHNZ ACCOUNT"
-                        it[createdOn] = Clock.System.now().toJavaInstant()
-                    }[Accounts.id]
-                }
-
-
-                KtorAuthnzManager.accountStore.addAccountIdentifierToAccount(createdAccountId.toString(), EmailIdentifier(email))
-                KtorAuthnzManager.accountStore.addAccountStoredData(
-                    createdAccountId.toString(),
-                    "email",
-                    EmailPassStoredData(password = password)
+                val createdAccountId = ktorAuthnzCreateAccount(
+                    method = "email",
+                    identifier = EmailIdentifier(email),
+                    storedData = EmailPassStoredData(password = password),
+                    name = name,
+                    email = email
                 )
-
-                AccountsService.initializeUserAccount(tenant = "", name = name, registeredUserId = createdAccountId)
-
 
                 call.respond(
                     buildJsonObject {
@@ -126,6 +183,13 @@ fun Application.ktorAuthnzFrontendRoutes() {
             }
 
             post("logout") {
+                /* Requires an authenticate block:
+                 runCatching {
+                    val session = getAuthenticatedSession()
+                    session.run { call.logoutAndDeleteCookie() }
+                }*/
+
+                // After here is just for backup...
 
                 val token = call.getEffectiveRequestAuthToken()
                 if (token != null) {
