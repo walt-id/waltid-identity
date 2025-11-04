@@ -1,4 +1,15 @@
-# walt.id Verification Policies (v2)
+<div align="center">
+ <h1>Kotlin Multiplatform Verification Policies library (v2)</h1>
+ <span>by </span><a href="https://walt.id">walt.id</a>
+ <p>Composable verification policies for digital credentials<p>
+
+<a href="https://walt.id/community">
+<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
+</a>
+<a href="https://www.linkedin.com/company/walt-id/">
+<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
+</a>
+</div>
 
 Kotlin Multiplatform library that provides reusable verification policies for Digital Credentials (W3C VC, IETF SD-JWT WC, mDL/mdoc ISO 18013-5). It builds on top of the [walt.id generic Digital Credential interface](../waltid-digital-credentials) and powers high-level services such as the [walt.id Verifier APIs](../../services/waltid-verifier-api2).
 
@@ -159,6 +170,12 @@ Additional policies (for example credential status) are available in the legacy 
 
 The tests rely on example credentials from `waltid-digital-credentials-examples`. Some JVM tests initialise minimal DID services; make sure the required dependencies are available when adding new test cases.
 
+## Join the community
+
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
+* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+
+
 ## License
 
-Distributed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). See the root LICENSE file for details.
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
