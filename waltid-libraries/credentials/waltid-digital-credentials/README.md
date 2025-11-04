@@ -91,7 +91,7 @@ The library includes key resolution mechanisms to verify credentials:
 
 This library makes several important assumptions:
 
-- **Multiplatform Support**: Works on JVM (Kotlin/Java) and JavaScript platforms. The same detection and parsing logic works identically across platforms.
+- **Multiplatform Support**: Works on JVM (Kotlin/Java), JavaScript, and iOS platforms (iOS requires `enableIosBuild=true` Gradle property). The same detection and parsing logic works identically across platforms.
 - **Credential Format Detection**: The library can automatically detect credential formats from the input structure, but inputs must be in a recognizable format (JWT strings, JSON objects, CBOR-encoded mdocs).
 - **Signature Verification**: Verification requires access to the issuer's public key, which is resolved using the key resolver system.
 - **W3C Context Detection**: W3C credential versions are detected based on the `@context` field values.
@@ -304,6 +304,57 @@ console.log("Sub Type:", detection.credentialSubType);
 console.log("Signature:", detection.signaturePrimary);
 console.log("Format:", credential.format);
 console.log("Issuer:", credential.issuer);
+```
+
+## iOS/Swift Usage
+
+### Installation
+
+Add the library as a dependency in your `Package.swift` or Xcode project:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/walt-id/waltid-identity", from: "x.x.x")
+]
+```
+
+Or add it to your `build.gradle.kts` in a Kotlin Multiplatform Mobile project:
+
+```kotlin
+kotlin {
+    iosArm64()
+    iosSimulatorArm64()
+    
+    sourceSets {
+        val iosMain by creating {
+            dependencies {
+                implementation("id.walt.credentials:waltid-digital-credentials:<version>")
+            }
+        }
+    }
+}
+```
+
+### Basic Example
+
+```swift
+import waltid_digital_credentials
+
+func detectAndParseCredential() async throws {
+    let credentialString = "eyJraWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cC..."
+    
+    // Detect and parse
+    let result = try await CredentialParser.Companion.shared.detectAndParse(credentialString: credentialString)
+    let detection = result.component1()
+    let credential = result.component2()
+    
+    print("Primary Type: \(detection.credentialPrimaryType)")
+    print("Sub Type: \(detection.credentialSubType)")
+    print("Signature: \(detection.signaturePrimary)")
+    print("Format: \(credential.format)")
+    print("Issuer: \(credential.issuer ?? "unknown")")
+    print("Subject: \(credential.subject ?? "unknown")")
+}
 ```
 
 ## Join the community

@@ -85,7 +85,7 @@ This library makes several important assumptions:
 - **OpenID4VP Compliance**: The library follows Section 6 of the OpenID4VP specification (https://openid.net/specs/openid-4-verifiable-presentations-1_0.html)
 - **JSON Format**: DCQL queries are provided as JSON strings following the OpenID4VP schema
 - **Credential Interface**: Credentials must implement the `DcqlCredential` interface, which provides format, data, and disclosures
-- **Multiplatform Support**: Works on JVM (Kotlin/Java) and JavaScript platforms
+- **Multiplatform Support**: Works on JVM (Kotlin/Java), JavaScript, and iOS platforms (iOS requires `enableIosBuild=true` Gradle property)
 - **JSON Path Resolution**: Claims are accessed using JSON path notation (e.g., `["credentialSubject", "given_name"]`)
 - **Format-Specific Metadata**: Different credential formats have different metadata requirements that must be properly structured
 
@@ -372,6 +372,86 @@ if (matchResult.isSuccess()) {
   console.log(`Found ${matches.size} matching credential(s)`);
 } else {
   console.log("No matching credentials found");
+}
+```
+
+## iOS/Swift Usage
+
+### Installation
+
+Add the library as a dependency in your `Package.swift` or Xcode project:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/walt-id/waltid-identity", from: "x.x.x")
+]
+```
+
+Or add it to your `build.gradle.kts` in a Kotlin Multiplatform Mobile project:
+
+```kotlin
+kotlin {
+    iosArm64()
+    iosSimulatorArm64()
+    
+    sourceSets {
+        val iosMain by creating {
+            dependencies {
+                implementation("id.walt.dcql:waltid-dcql:<version>")
+            }
+        }
+    }
+}
+```
+
+### Basic Example
+
+```swift
+import waltid_dcql
+
+func matchCredentials() async throws {
+    // Parse a DCQL query
+    let queryJson = """
+    {
+      "credentials": [
+        {
+          "id": "id_card_query",
+          "format": "jwt_vc_json",
+          "meta": {},
+          "claims": [
+            { "path": ["credentialSubject", "given_name"] }
+          ]
+        }
+      ]
+    }
+    """
+    
+    let query = try DcqlParser.Companion.shared.parse(queryJson: queryJson).getOrThrow()
+    
+    // Prepare credentials
+    let credentials = [
+        RawDcqlCredential(
+            id: "cred-1",
+            format: "jwt_vc_json",
+            data: [
+                "credentialSubject": [
+                    "given_name": "Alice",
+                    "family_name": "Smith"
+                ]
+            ],
+            originalCredential: nil,
+            disclosures: nil
+        )
+    ]
+    
+    // Match credentials
+    let matchResult = DcqlMatcher.Companion.shared.match(query: query, credentials: credentials)
+    
+    if let matches = try? matchResult.getOrThrow() {
+        print("Found \(matches.count) matching credential(s)")
+    } else {
+        print("No matching credentials found")
+    }
 }
 ```
 

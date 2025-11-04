@@ -94,7 +94,7 @@ This library makes several important assumptions:
 - **JSON Format**: Presentation Definitions are provided as JSON strings following the DIF schema
 - **JSON Path Queries**: Fields are specified using JSON path notation (e.g., `$.credentialSubject.given_name`)
 - **JSON Schema Filters**: Field filters use JSON Schema for validation
-- **Multiplatform Support**: Works on JVM (Kotlin/Java) and JavaScript platforms
+- **Multiplatform Support**: Works on JVM (Kotlin/Java), JavaScript, and iOS platforms (iOS requires `enableIosBuild=true` Gradle property)
 - **W3C Credential Model**: The library integrates with W3C Verifiable Credentials through the `waltid-w3c-credentials` library
 
 ## How to Use This Library
@@ -374,6 +374,92 @@ definition.inputDescriptors.forEach(inputDescriptor => {
     console.log(`Matched credential for ${inputDescriptor.name}:`, credential);
   });
 });
+```
+
+## iOS/Swift Usage
+
+### Installation
+
+Add the library as a dependency in your `Package.swift` or Xcode project:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/walt-id/waltid-identity", from: "x.x.x")
+]
+```
+
+Or add it to your `build.gradle.kts` in a Kotlin Multiplatform Mobile project:
+
+```kotlin
+kotlin {
+    iosArm64()
+    iosSimulatorArm64()
+    
+    sourceSets {
+        val iosMain by creating {
+            dependencies {
+                implementation("id.walt.dif-definitions-parser:waltid-dif-definitions-parser:<version>")
+            }
+        }
+    }
+}
+```
+
+### Basic Example
+
+```swift
+import waltid_dif_definitions_parser
+import kotlinx_serialization_json
+
+func parseAndMatchCredentials() async throws {
+    // Parse a Presentation Definition
+    let definitionJson = """
+    {
+      "id": "32f54163-7166-48f1-93d8-ff217bdb0653",
+      "input_descriptors": [
+        {
+          "id": "id_card",
+          "name": "ID Card",
+          "constraints": {
+            "fields": [
+              {
+                "path": ["$.credentialSubject.given_name"]
+              }
+            ]
+          }
+        }
+      ]
+    }
+    """
+    
+    let json = Json.Companion.shared.default
+    let definition = try json.decodeFromString(
+        serializer: PresentationDefinition.serializer(),
+        string: definitionJson
+    )
+    
+    // Prepare credentials
+    let credentials = [
+        [
+            "credentialSubject": [
+                "given_name": "Alice",
+                "family_name": "Smith"
+            ]
+        ]
+    ]
+    
+    // Match credentials
+    for inputDescriptor in definition.inputDescriptors {
+        let matched = PresentationDefinitionParser.Companion.shared
+            .matchCredentialsForInputDescriptor(
+                credentials: credentials,
+                inputDescriptor: inputDescriptor
+            )
+        
+        // Process matched credentials
+        // Note: Flow collection in Swift requires additional coroutine handling
+    }
+}
 ```
 
 ## Join the community
