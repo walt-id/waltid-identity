@@ -1,6 +1,7 @@
 package id.walt.ktorauthnz.methods.config
 
 import id.walt.ktorauthnz.methods.OIDC
+import io.ktor.http.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
@@ -10,7 +11,7 @@ import kotlinx.serialization.Serializable
 @SerialName("oidc-config")
 data class OidcAuthConfiguration(
     /** EITHER provide the discovery URL for automatic configuration, e.g., "https://idp.example.com/realms/my-realm/.well-known/openid-configuration" */
-    val openIdConfigurationUrl: String? = null,
+    val openIdConfigurationUrl: Url? = null,
     /** OR provide the configuration manually. */
     var openIdConfiguration: OIDC.OpenIdConfiguration? = null,
 
