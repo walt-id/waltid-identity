@@ -10,5 +10,6 @@ import kotlinx.serialization.Serializable
 sealed interface CredentialQueryMeta {
     /** What CredentialFormat is this CredentialQueryMeta tied to */
     val format: CredentialFormat?
+    fun getTypeString(): String?
 }
 

@@ -14,6 +14,7 @@ data class GenericMeta(
     val properties: Map<String, JsonElement> // Allows arbitrary key-value pairs
 ) : CredentialQueryMeta {
     override val format = null
+    override fun getTypeString() = null
 }
 
 // Add other meta types for other formats like AnonCreds if/when supported
