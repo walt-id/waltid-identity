@@ -1,31 +1,317 @@
-# waltid-digital-credentials
+<div align="center">
+ <h1>Kotlin Multiplatform Digital Credentials library</h1>
+ <span>by </span><a href="https://walt.id">walt.id</a>
+ <p>Unified credential abstraction layer for parsing, detecting, and verifying digital credentials<p>
 
-Credential abstraction layer for unified credential handling.
+<a href="https://walt.id/community">
+<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
+</a>
+<a href="https://www.linkedin.com/company/walt-id/">
+<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
+</a>
+</div>
 
-Differentiate between:
-- W3C (W3C 1.1 DM, W3C 2 DM), W3C with selectively disclosable attributes (which could also be W3C 1.1 DM, W3C 2 DM)
-    - detect signatures: JOSE, specifically JWT, and SD-JWT; also: COSE, DataIntegrityProof (ECDSA, EdDSA, ECDSA-SD, BBS), or unsigned
-- SD-JWT VC (which could follow SD-JWT VC (= no) or SD-JWT VCDM (= w3c similar data model)
-- Mdocs (COSE encoded with Base64Url or Hex)
+## What This Library Contains
 
-Detection function where any of the above-mentioned can be inputted (e.g. unsigned SD-JWT VC or SD-JWT VC DM, or a ECDSA-DataIntegrityProof signed W3C 2.0), and it parses to the respective credential type (W3C, SD-JWT VC, Mdocs), subtype (W3C: W3C 1.1, W3C 2; SD-JWT VC: SD-JWT VC, SD-JWT VCDM; Mdocs) and signature (Unsigned, JWT, SD-JWT (JWT with disclosures), DataIntegrityProof, COSE)
+This library provides a unified abstraction layer for handling digital credentials across multiple formats and signature types. The library enables you to:
 
-## Usage example
+- **Detect and parse credentials** automatically from various formats (W3C, SD-JWT VC, mdocs) without knowing the format upfront
+- **Support multiple credential types**: W3C Verifiable Credentials (v1.1 and v2.0), SD-JWT VCs, and ISO mdoc credentials
+- **Handle different signature types**: JWT, SD-JWT (with selective disclosures), Data Integrity Proofs (ECDSA, EdDSA, ECDSA-SD, BBS), COSE, and unsigned credentials
+- **Verify credentials** using issuer key resolution from various sources (DID keys, X.509 certificates, well-known endpoints)
+- **Work with presentations** in multiple formats (JWT VC JSON, SD-JWT, LDP VC, mdoc)
+- **Support selective disclosure** for privacy-preserving credential presentations
+
+## Main Purpose
+
+This library solves the challenge of handling credentials in heterogeneous formats within a single codebase. It's particularly useful when you need to:
+
+- Build wallet applications that store and manage credentials from different issuers in various formats
+- Create verifier services that need to accept credentials in multiple formats
+- Implement credential processing pipelines without hardcoding format-specific logic
+- Support interoperability across different credential ecosystems (W3C, SD-JWT, mdoc)
+
+The library provides a single entry point (`CredentialParser.detectAndParse()`) that automatically identifies the credential format, signature type, and data model version, then parses it into a unified `DigitalCredential` interface.
+
+## Key Concepts
+
+### Credential Primary Types
+
+The library categorizes credentials into three primary types:
+- **W3C**: W3C Verifiable Credentials following the W3C Verifiable Credentials Data Model
+- **SDJWTVC**: Selective Disclosure JWT Verifiable Credentials (SD-JWT VC)
+- **MDOCS**: ISO/IEC 18013-5 mobile driver's license (mdoc) credentials
+
+### W3C Credential Subtypes
+
+W3C credentials can be further categorized by data model version:
+- **W3C_1_1**: W3C Verifiable Credentials Data Model v1.1
+- **W3C_2**: W3C Verifiable Credentials Data Model v2.0
+
+The library automatically detects the version based on the `@context` field in the credential.
+
+### SD-JWT VC Subtypes
+
+SD-JWT VCs can follow different data models:
+- **sdjwtvc**: Standard SD-JWT VC format
+- **sdjwtvcdm**: SD-JWT VC following the W3C data model structure
+
+### Signature Types
+
+Credentials can be signed using various signature mechanisms:
+- **JWT**: JSON Web Token signatures (JWS)
+- **SDJWT**: Selective Disclosure JWT (JWT with disclosures)
+- **DATA_INTEGRITY_PROOF**: W3C Data Integrity Proofs (ECDSA, EdDSA, ECDSA-SD, BBS)
+- **COSE**: CBOR Object Signing and Encryption (used for mdocs)
+- **UNSIGNED**: Credentials without cryptographic signatures
+
+### Selective Disclosure
+
+The library supports selective disclosure mechanisms:
+- **Contains Disclosables**: The credential has fields that can be selectively disclosed (indicated by `_sd` arrays)
+- **Provides Disclosures**: The credential includes actual disclosure values that have been revealed
+
+### Credential Detection
+
+The `CredentialParser.detectAndParse()` function automatically:
+1. Detects the credential format by examining the input structure
+2. Identifies the signature type and data model version
+3. Parses the credential into the appropriate type-specific class
+4. Extracts selective disclosure information if present
+5. Returns both detection metadata and the parsed credential object
+
+### Key Resolution
+
+The library includes key resolution mechanisms to verify credentials:
+- **DID Key Resolution**: Resolves keys from DID documents
+- **X.509 Certificate Resolution**: Extracts keys from X.509 certificate chains
+- **Well-Known Endpoint Resolution**: Fetches keys from well-known endpoints
+
+## Assumptions and Dependencies
+
+This library makes several important assumptions:
+
+- **Multiplatform Support**: Works on JVM (Kotlin/Java) and JavaScript platforms. The same detection and parsing logic works identically across platforms.
+- **Credential Format Detection**: The library can automatically detect credential formats from the input structure, but inputs must be in a recognizable format (JWT strings, JSON objects, CBOR-encoded mdocs).
+- **Signature Verification**: Verification requires access to the issuer's public key, which is resolved using the key resolver system.
+- **W3C Context Detection**: W3C credential versions are detected based on the `@context` field values.
+- **SD-JWT Format**: SD-JWT credentials must follow the SD-JWT specification format with `~` separator between JWT and disclosures.
+- **mdoc Encoding**: mdoc credentials can be provided as Base64Url or hexadecimal strings.
+
+## How to Use This Library
+
+### Basic Workflow
+
+1. **Detect and Parse**: Use `CredentialParser.detectAndParse()` to automatically detect and parse a credential string
+2. **Access Detection Info**: Use the detection result to understand the credential's type, subtype, and signature
+3. **Work with Credential**: Use the parsed credential object to access credential data, issuer, subject, and signature information
+4. **Verify Credential**: Use the credential's `verify()` method with the issuer's public key to verify the signature
+
+### Key Source Files
+
+For detailed implementation examples and understanding the library internals, refer to:
+
+- **`CredentialParser.kt`**: Main entry point for credential detection and parsing
+- **`CredentialDetectorTypes.kt`**: Type definitions for credential classification (primary types, subtypes, signature types)
+- **`formats/DigitalCredential.kt`**: Base interface for all credential formats
+- **`formats/w3c/`**: W3C credential implementations (W3C11, W3C2, AbstractW3C)
+- **`formats/sdjwtvc/SdJwtCredential.kt`**: SD-JWT VC credential implementation
+- **`formats/mdocs/MdocsCredential.kt`**: mdoc credential implementation
+- **`signatures/`**: Signature type implementations (JWT, SD-JWT, Data Integrity Proof, COSE)
+- **`keyresolver/`**: Key resolution mechanisms for credential verification
+- **`presentations/`**: Verifiable presentation format implementations
+- **Test files**: Located in `src/jvmTest`, these provide comprehensive examples of all credential types and signature combinations
+
+## JVM/Kotlin Usage
+
+### Installation
+
+Add the library as a dependency in your `build.gradle.kts`:
 
 ```kotlin
-val myCredentialString = "eyJraWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCN6Nk1ram9SaHExalNOSmRMaXJ1U1hyRkZ4YWdxcnp0WmFYSHFIR1VUS0piY055d3AiLCJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSJ9.eyJpc3MiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCIsInN1YiI6ImRpZDprZXk6ejZNa2t2WFNUWWExZnRpU2E5Wll2aWFmM1RFUEhWeVZQMVZoQjdNc2p1OUVyN0xHIiwidmMiOnsiQGNvbnRleHQiOlsiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJodHRwczovL3B1cmwuaW1zZ2xvYmFsLm9yZy9zcGVjL29iL3YzcDAvY29udGV4dC5qc29uIl0sImlkIjoidXJuOnV1aWQ6YmRmMjE2ZGItOTJmOC00MTYwLThiYTYtNmRlNDliODRhNGQ5IiwidHlwZSI6WyJWZXJpZmlhYmxlQ3JlZGVudGlhbCIsIk9wZW5CYWRnZUNyZWRlbnRpYWwiXSwiaXNzdWVyIjp7InR5cGUiOlsiUHJvZmlsZSJdLCJuYW1lIjoiSm9icyBmb3IgdGhlIEZ1dHVyZSAoSkZGKSIsInVybCI6Imh0dHBzOi8vd3d3LmpmZi5vcmcvIiwiaW1hZ2UiOiJodHRwczovL3czYy1jY2cuZ2l0aHViLmlvL3ZjLWVkL3BsdWdmZXN0LTEtMjAyMi9pbWFnZXMvSkZGX0xvZ29Mb2NrdXAucG5nIiwiaWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCJ9LCJjcmVkZW50aWFsU3ViamVjdCI6eyJ0eXBlIjpbIkFjaGlldmVtZW50U3ViamVjdCJdLCJhY2hpZXZlbWVudCI6eyJpZCI6InVybjp1dWlkOmFjMjU0YmQ1LThmYWQtNGJiMS05ZDI5LWVmZDkzODUzNjkyNiIsInR5cGUiOlsiQWNoaWV2ZW1lbnQiXSwibmFtZSI6IkpGRiB4IHZjLWVkdSBQbHVnRmVzdCAzIEludGVyb3BlcmFiaWxpdHkiLCJkZXNjcmlwdGlvbiI6IlRoaXMgd2FsbGV0IHN1cHBvcnRzIHRoZSB1c2Ugb2YgVzNDIFZlcmlmaWFibGUgQ3JlZGVudGlhbHMgYW5kIGhhcyBkZW1vbnN0cmF0ZWQgaW50ZXJvcGVyYWJpbGl0eSBkdXJpbmcgdGhlIHByZXNlbnRhdGlvbiByZXF1ZXN0IHdvcmtmbG93IGR1cmluZyBKRkYgeCBWQy1FRFUgUGx1Z0Zlc3QgMy4iLCJjcml0ZXJpYSI6eyJ0eXBlIjoiQ3JpdGVyaWEiLCJuYXJyYXRpdmUiOiJXYWxsZXQgc29sdXRpb25zIHByb3ZpZGVycyBlYXJuZWQgdGhpcyBiYWRnZSBieSBkZW1vbnN0cmF0aW5nIGludGVyb3BlcmFiaWxpdHkgZHVyaW5nIHRoZSBwcmVzZW50YXRpb24gcmVxdWVzdCB3b3JrZmxvdy4gVGhpcyBpbmNsdWRlcyBzdWNjZXNzZnVsbHkgcmVjZWl2aW5nIGEgcHJlc2VudGF0aW9uIHJlcXVlc3QsIGFsbG93aW5nIHRoZSBob2xkZXIgdG8gc2VsZWN0IGF0IGxlYXN0IHR3byB0eXBlcyBvZiB2ZXJpZmlhYmxlIGNyZWRlbnRpYWxzIHRvIGNyZWF0ZSBhIHZlcmlmaWFibGUgcHJlc2VudGF0aW9uLCByZXR1cm5pbmcgdGhlIHByZXNlbnRhdGlvbiB0byB0aGUgcmVxdWVzdG9yLCBhbmQgcGFzc2luZyB2ZXJpZmljYXRpb24gb2YgdGhlIHByZXNlbnRhdGlvbiBhbmQgdGhlIGluY2x1ZGVkIGNyZWRlbnRpYWxzLiJ9LCJpbWFnZSI6eyJpZCI6Imh0dHBzOi8vdzNjLWNjZy5naXRodWIuaW8vdmMtZWQvcGx1Z2Zlc3QtMy0yMDIzL2ltYWdlcy9KRkYtVkMtRURVLVBMVUdGRVNUMy1iYWRnZS1pbWFnZS5wbmciLCJ0eXBlIjoiSW1hZ2UifX0sImlkIjoiZGlkOmtleTp6Nk1ra3ZYU1RZYTFmdGlTYTlaWXZpYWYzVEVQSFZ5VlAxVmhCN01zanU5RXI3TEcifSwiaXNzdWFuY2VEYXRlIjoiMjAyNS0wNC0wOFQxOTo1MzozOS4zMjUzODIyMTdaIiwiZXhwaXJhdGlvbkRhdGUiOiIyMDI2LTA0LTA4VDE5OjUzOjM5LjMyNTQwMzkxN1oiLCJfc2QiOlsibVZkTkExaS1ZSjdQT0FWMmFNTjV2Xy1BU3pHOVhfSC12WDZ2NEpySWR3YyJdfSwianRpIjoidXJuOnV1aWQ6YmRmMjE2ZGItOTJmOC00MTYwLThiYTYtNmRlNDliODRhNGQ5IiwiZXhwIjoxNzc1Njc4MDE5LCJpYXQiOjE3NDQxNDIwMTksIm5iZiI6MTc0NDE0MjAxOX0.OZ3EywnJ_KDTPH5-S0OC3jN67pIdrJAwTugHh53jrI471TAbCCJ48-YVgX5l8ZLWLeKQMdFyvNpNQLqsbu9ECA~WyIzX0hndTl4UDh2T25qaW03UE4yc3FRPT0iLCJuYW1lIiwiSkZGIHggdmMtZWR1IFBsdWdGZXN0IDMgSW50ZXJvcGVyYWJpbGl0eSJd"
+repositories {
+    maven { url = uri("https://maven.waltid.dev/releases") }
+}
 
-val (detection, credential) = CredentialParser.detectAndParse(credentialExample)
-
-println(detection.credentialPrimaryType) // CredentialPrimaryDataType.W3C
-println(detection.credentialSubType)     // W3CSubType.W3C_1_1
-println(detection.signaturePrimary)      // CredentialDetectorTypes.SignaturePrimaryType.SDJWT
-
-println(detection.containsDisclosables)  // true
-println(detection.providesDisclosures)   // true
-
-println(credential) // W3C11(disclosables={$._sd=[mVdNA1i-YJ7POAV2aMN5v_-ASzG9X_H-vX6v4JrIdwc]}, disclosures=[SdJwtSelectiveDisclosure(salt=3_Hgu9xP8vOnjim7PN2sqQ==, name=name, value="JFF x vc-edu PlugFest 3 Interoperability", location=$.name, encoded=WyIzX0hndTl4UDh2T25qaW03UE4yc3FRPT0iLCJuYW1lIiwiSkZGIHggdmMtZWR1IFBsdWdGZXN0IDMgSW50ZXJvcGVyYWJpbGl0eSJd)], signedWithDisclosures=eyJraWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCN6Nk1ram9SaHExalNOSmRMaXJ1U1hyRkZ4YWdxcnp0WmFYSHFIR1VUS0piY055d3AiLCJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSJ9.eyJpc3MiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCIsInN1YiI6ImRpZDprZXk6ejZNa2t2WFNUWWExZnRpU2E5Wll2aWFmM1RFUEhWeVZQMVZoQjdNc2p1OUVyN0xHIiwidmMiOnsiQGNvbnRleHQiOlsiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJodHRwczovL3B1cmwuaW1zZ2xvYmFsLm9yZy9zcGVjL29iL3YzcDAvY29udGV4dC5qc29uIl0sImlkIjoidXJuOnV1aWQ6YmRmMjE2ZGItOTJmOC00MTYwLThiYTYtNmRlNDliODRhNGQ5IiwidHlwZSI6WyJWZXJpZmlhYmxlQ3JlZGVudGlhbCIsIk9wZW5CYWRnZUNyZWRlbnRpYWwiXSwiaXNzdWVyIjp7InR5cGUiOlsiUHJvZmlsZSJdLCJuYW1lIjoiSm9icyBmb3IgdGhlIEZ1dHVyZSAoSkZGKSIsInVybCI6Imh0dHBzOi8vd3d3LmpmZi5vcmcvIiwiaW1hZ2UiOiJodHRwczovL3czYy1jY2cuZ2l0aHViLmlvL3ZjLWVkL3BsdWdmZXN0LTEtMjAyMi9pbWFnZXMvSkZGX0xvZ29Mb2NrdXAucG5nIiwiaWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCJ9LCJjcmVkZW50aWFsU3ViamVjdCI6eyJ0eXBlIjpbIkFjaGlldmVtZW50U3ViamVjdCJdLCJhY2hpZXZlbWVudCI6eyJpZCI6InVybjp1dWlkOmFjMjU0YmQ1LThmYWQtNGJiMS05ZDI5LWVmZDkzODUzNjkyNiIsInR5cGUiOlsiQWNoaWV2ZW1lbnQiXSwibmFtZSI6IkpGRiB4IHZjLWVkdSBQbHVnRmVzdCAzIEludGVyb3BlcmFiaWxpdHkiLCJkZXNjcmlwdGlvbiI6IlRoaXMgd2FsbGV0IHN1cHBvcnRzIHRoZSB1c2Ugb2YgVzNDIFZlcmlmaWFibGUgQ3JlZGVudGlhbHMgYW5kIGhhcyBkZW1vbnN0cmF0ZWQgaW50ZXJvcGVyYWJpbGl0eSBkdXJpbmcgdGhlIHByZXNlbnRhdGlvbiByZXF1ZXN0IHdvcmtmbG93IGR1cmluZyBKRkYgeCBWQy1FRFUgUGx1Z0Zlc3QgMy4iLCJjcml0ZXJpYSI6eyJ0eXBlIjoiQ3JpdGVyaWEiLCJuYXJyYXRpdmUiOiJXYWxsZXQgc29sdXRpb25zIHByb3ZpZGVycyBlYXJuZWQgdGhpcyBiYWRnZSBieSBkZW1vbnN0cmF0aW5nIGludGVyb3BlcmFiaWxpdHkgZHVyaW5nIHRoZSBwcmVzZW50YXRpb24gcmVxdWVzdCB3b3JrZmxvdy4gVGhpcyBpbmNsdWRlcyBzdWNjZXNzZnVsbHkgcmVjZWl2aW5nIGEgcHJlc2VudGF0aW9uIHJlcXVlc3QsIGFsbG93aW5nIHRoZSBob2xkZXIgdG8gc2VsZWN0IGF0IGxlYXN0IHR3byB0eXBlcyBvZiB2ZXJpZmlhYmxlIGNyZWRlbnRpYWxzIHRvIGNyZWF0ZSBhIHZlcmlmaWFibGUgcHJlc2VudGF0aW9uLCByZXR1cm5pbmcgdGhlIHByZXNlbnRhdGlvbiB0byB0aGUgcmVxdWVzdG9yLCBhbmQgcGFzc2luZyB2ZXJpZmljYXRpb24gb2YgdGhlIHByZXNlbnRhdGlvbiBhbmQgdGhlIGluY2x1ZGVkIGNyZWRlbnRpYWxzLiJ9LCJpbWFnZSI6eyJpZCI6Imh0dHBzOi8vdzNjLWNjZy5naXRodWIuaW8vdmMtZWQvcGx1Z2Zlc3QtMy0yMDIzL2ltYWdlcy9KRkYtVkMtRURVLVBMVUdGRVNUMy1iYWRnZS1pbWFnZS5wbmciLCJ0eXBlIjoiSW1hZ2UifX0sImlkIjoiZGlkOmtleTp6Nk1ra3ZYU1RZYTFmdGlTYTlaWXZpYWYzVEVQSFZ5VlAxVmhCN01zanU5RXI3TEcifSwiaXNzdWFuY2VEYXRlIjoiMjAyNS0wNC0wOFQxOTo1MzozOS4zMjUzODIyMTdaIiwiZXhwaXJhdGlvbkRhdGUiOiIyMDI2LTA0LTA4VDE5OjUzOjM5LjMyNTQwMzkxN1oiLCJfc2QiOlsibVZkTkExaS1ZSjdQT0FWMmFNTjV2Xy1BU3pHOVhfSC12WDZ2NEpySWR3YyJdfSwianRpIjoidXJuOnV1aWQ6YmRmMjE2ZGItOTJmOC00MTYwLThiYTYtNmRlNDliODRhNGQ5IiwiZXhwIjoxNzc1Njc4MDE5LCJpYXQiOjE3NDQxNDIwMTksIm5iZiI6MTc0NDE0MjAxOX0.OZ3EywnJ_KDTPH5-S0OC3jN67pIdrJAwTugHh53jrI471TAbCCJ48-YVgX5l8ZLWLeKQMdFyvNpNQLqsbu9ECA~WyIzX0hndTl4UDh2T25qaW03UE4yc3FRPT0iLCJuYW1lIiwiSkZGIHggdmMtZWR1IFBsdWdGZXN0IDMgSW50ZXJvcGVyYWJpbGl0eSJd, credentialData={"iss":"did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp","sub":"did:key:z6MkkvXSTYa1ftiSa9ZYviaf3TEPHVyVP1VhB7Msju9Er7LG","vc":{"@context":["https://www.w3.org/2018/credentials/v1","https://purl.imsglobal.org/spec/ob/v3p0/context.json"],"id":"urn:uuid:bdf216db-92f8-4160-8ba6-6de49b84a4d9","type":["VerifiableCredential","OpenBadgeCredential"],"issuer":{"type":["Profile"],"name":"Jobs for the Future (JFF)","url":"https://www.jff.org/","image":"https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png","id":"did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"},"credentialSubject":{"type":["AchievementSubject"],"achievement":{"id":"urn:uuid:ac254bd5-8fad-4bb1-9d29-efd938536926","type":["Achievement"],"name":"JFF x vc-edu PlugFest 3 Interoperability","description":"This wallet supports the use of W3C Verifiable Credentials and has demonstrated interoperability during the presentation request workflow during JFF x VC-EDU PlugFest 3.","criteria":{"type":"Criteria","narrative":"Wallet solutions providers earned this badge by demonstrating interoperability during the presentation request workflow. This includes successfully receiving a presentation request, allowing the holder to select at least two types of verifiable credentials to create a verifiable presentation, returning the presentation to the requestor, and passing verification of the presentation and the included credentials."},"image":{"id":"https://w3c-ccg.github.io/vc-ed/plugfest-3-2023/images/JFF-VC-EDU-PLUGFEST3-badge-image.png","type":"Image"}},"id":"did:key:z6MkkvXSTYa1ftiSa9ZYviaf3TEPHVyVP1VhB7Msju9Er7LG"},"issuanceDate":"2025-04-08T19:53:39.325382217Z","expirationDate":"2026-04-08T19:53:39.325403917Z","name":"JFF x vc-edu PlugFest 3 Interoperability"},"jti":"urn:uuid:bdf216db-92f8-4160-8ba6-6de49b84a4d9","exp":1775678019,"iat":1744142019,"nbf":1744142019}, originalCredentialData={"@context":["https://www.w3.org/2018/credentials/v1","https://purl.imsglobal.org/spec/ob/v3p0/context.json"],"id":"urn:uuid:bdf216db-92f8-4160-8ba6-6de49b84a4d9","type":["VerifiableCredential","OpenBadgeCredential"],"issuer":{"type":["Profile"],"name":"Jobs for the Future (JFF)","url":"https://www.jff.org/","image":"https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png","id":"did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"},"credentialSubject":{"type":["AchievementSubject"],"achievement":{"id":"urn:uuid:ac254bd5-8fad-4bb1-9d29-efd938536926","type":["Achievement"],"name":"JFF x vc-edu PlugFest 3 Interoperability","description":"This wallet supports the use of W3C Verifiable Credentials and has demonstrated interoperability during the presentation request workflow during JFF x VC-EDU PlugFest 3.","criteria":{"type":"Criteria","narrative":"Wallet solutions providers earned this badge by demonstrating interoperability during the presentation request workflow. This includes successfully receiving a presentation request, allowing the holder to select at least two types of verifiable credentials to create a verifiable presentation, returning the presentation to the requestor, and passing verification of the presentation and the included credentials."},"image":{"id":"https://w3c-ccg.github.io/vc-ed/plugfest-3-2023/images/JFF-VC-EDU-PLUGFEST3-badge-image.png","type":"Image"}},"id":"did:key:z6MkkvXSTYa1ftiSa9ZYviaf3TEPHVyVP1VhB7Msju9Er7LG"},"issuanceDate":"2025-04-08T19:53:39.325382217Z","expirationDate":"2026-04-08T19:53:39.325403917Z","_sd":["mVdNA1i-YJ7POAV2aMN5v_-ASzG9X_H-vX6v4JrIdwc"]}, signature=SdJwtCredentialSignature(signature=OZ3EywnJ_KDTPH5-S0OC3jN67pIdrJAwTugHh53jrI471TAbCCJ48-YVgX5l8ZLWLeKQMdFyvNpNQLqsbu9ECA, providedDisclosures=[SdJwtSelectiveDisclosure(salt=3_Hgu9xP8vOnjim7PN2sqQ==, name=name, value="JFF x vc-edu PlugFest 3 Interoperability", location=$.name, encoded=WyIzX0hndTl4UDh2T25qaW03UE4yc3FRPT0iLCJuYW1lIiwiSkZGIHggdmMtZWR1IFBsdWdGZXN0IDMgSW50ZXJvcGVyYWJpbGl0eSJd)]), signed=eyJraWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCN6Nk1ram9SaHExalNOSmRMaXJ1U1hyRkZ4YWdxcnp0WmFYSHFIR1VUS0piY055d3AiLCJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSJ9.eyJpc3MiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCIsInN1YiI6ImRpZDprZXk6ejZNa2t2WFNUWWExZnRpU2E5Wll2aWFmM1RFUEhWeVZQMVZoQjdNc2p1OUVyN0xHIiwidmMiOnsiQGNvbnRleHQiOlsiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiLCJodHRwczovL3B1cmwuaW1zZ2xvYmFsLm9yZy9zcGVjL29iL3YzcDAvY29udGV4dC5qc29uIl0sImlkIjoidXJuOnV1aWQ6YmRmMjE2ZGItOTJmOC00MTYwLThiYTYtNmRlNDliODRhNGQ5IiwidHlwZSI6WyJWZXJpZmlhYmxlQ3JlZGVudGlhbCIsIk9wZW5CYWRnZUNyZWRlbnRpYWwiXSwiaXNzdWVyIjp7InR5cGUiOlsiUHJvZmlsZSJdLCJuYW1lIjoiSm9icyBmb3IgdGhlIEZ1dHVyZSAoSkZGKSIsInVybCI6Imh0dHBzOi8vd3d3LmpmZi5vcmcvIiwiaW1hZ2UiOiJodHRwczovL3czYy1jY2cuZ2l0aHViLmlvL3ZjLWVkL3BsdWdmZXN0LTEtMjAyMi9pbWFnZXMvSkZGX0xvZ29Mb2NrdXAucG5nIiwiaWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCJ9LCJjcmVkZW50aWFsU3ViamVjdCI6eyJ0eXBlIjpbIkFjaGlldmVtZW50U3ViamVjdCJdLCJhY2hpZXZlbWVudCI6eyJpZCI6InVybjp1dWlkOmFjMjU0YmQ1LThmYWQtNGJiMS05ZDI5LWVmZDkzODUzNjkyNiIsInR5cGUiOlsiQWNoaWV2ZW1lbnQiXSwibmFtZSI6IkpGRiB4IHZjLWVkdSBQbHVnRmVzdCAzIEludGVyb3BlcmFiaWxpdHkiLCJkZXNjcmlwdGlvbiI6IlRoaXMgd2FsbGV0IHN1cHBvcnRzIHRoZSB1c2Ugb2YgVzNDIFZlcmlmaWFibGUgQ3JlZGVudGlhbHMgYW5kIGhhcyBkZW1vbnN0cmF0ZWQgaW50ZXJvcGVyYWJpbGl0eSBkdXJpbmcgdGhlIHByZXNlbnRhdGlvbiByZXF1ZXN0IHdvcmtmbG93IGR1cmluZyBKRkYgeCBWQy1FRFUgUGx1Z0Zlc3QgMy4iLCJjcml0ZXJpYSI6eyJ0eXBlIjoiQ3JpdGVyaWEiLCJuYXJyYXRpdmUiOiJXYWxsZXQgc29sdXRpb25zIHByb3ZpZGVycyBlYXJuZWQgdGhpcyBiYWRnZSBieSBkZW1vbnN0cmF0aW5nIGludGVyb3BlcmFiaWxpdHkgZHVyaW5nIHRoZSBwcmVzZW50YXRpb24gcmVxdWVzdCB3b3JrZmxvdy4gVGhpcyBpbmNsdWRlcyBzdWNjZXNzZnVsbHkgcmVjZWl2aW5nIGEgcHJlc2VudGF0aW9uIHJlcXVlc3QsIGFsbG93aW5nIHRoZSBob2xkZXIgdG8gc2VsZWN0IGF0IGxlYXN0IHR3byB0eXBlcyBvZiB2ZXJpZmlhYmxlIGNyZWRlbnRpYWxzIHRvIGNyZWF0ZSBhIHZlcmlmaWFibGUgcHJlc2VudGF0aW9uLCByZXR1cm5pbmcgdGhlIHByZXNlbnRhdGlvbiB0byB0aGUgcmVxdWVzdG9yLCBhbmQgcGFzc2luZyB2ZXJpZmljYXRpb24gb2YgdGhlIHByZXNlbnRhdGlvbiBhbmQgdGhlIGluY2x1ZGVkIGNyZWRlbnRpYWxzLiJ9LCJpbWFnZSI6eyJpZCI6Imh0dHBzOi8vdzNjLWNjZy5naXRodWIuaW8vdmMtZWQvcGx1Z2Zlc3QtMy0yMDIzL2ltYWdlcy9KRkYtVkMtRURVLVBMVUdGRVNUMy1iYWRnZS1pbWFnZS5wbmciLCJ0eXBlIjoiSW1hZ2UifX0sImlkIjoiZGlkOmtleTp6Nk1ra3ZYU1RZYTFmdGlTYTlaWXZpYWYzVEVQSFZ5VlAxVmhCN01zanU5RXI3TEcifSwiaXNzdWFuY2VEYXRlIjoiMjAyNS0wNC0wOFQxOTo1MzozOS4zMjUzODIyMTdaIiwiZXhwaXJhdGlvbkRhdGUiOiIyMDI2LTA0LTA4VDE5OjUzOjM5LjMyNTQwMzkxN1oiLCJfc2QiOlsibVZkTkExaS1ZSjdQT0FWMmFNTjV2Xy1BU3pHOVhfSC12WDZ2NEpySWR3YyJdfSwianRpIjoidXJuOnV1aWQ6YmRmMjE2ZGItOTJmOC00MTYwLThiYTYtNmRlNDliODRhNGQ5IiwiZXhwIjoxNzc1Njc4MDE5LCJpYXQiOjE3NDQxNDIwMTksIm5iZiI6MTc0NDE0MjAxOX0.OZ3EywnJ_KDTPH5-S0OC3jN67pIdrJAwTugHh53jrI471TAbCCJ48-YVgX5l8ZLWLeKQMdFyvNpNQLqsbu9ECA)
+dependencies {
+    implementation("id.walt.credentials:waltid-digital-credentials:<version>")
+}
 ```
 
+### Basic Example
+
+```kotlin
+import id.walt.credentials.*
+import id.walt.credentials.formats.*
+
+fun main() {
+    // A credential in any format (JWT string, SD-JWT, JSON, mdoc)
+    val credentialString = "eyJraWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCN6Nk1ram9SaHExalNOSmRMaXJ1U1hyRkZ4YWdxcnp0WmFYSHFIR1VUS0piY055d3AiLCJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSJ9..."
+    
+    // Automatically detect and parse
+    val (detection, credential) = CredentialParser.detectAndParse(credentialString)
+    
+    // Access detection information
+    println("Primary Type: ${detection.credentialPrimaryType}") // W3C, SDJWTVC, or MDOCS
+    println("Sub Type: ${detection.credentialSubType}")         // W3C_1_1, W3C_2, etc.
+    println("Signature: ${detection.signaturePrimary}")       // JWT, SDJWT, DATA_INTEGRITY_PROOF, etc.
+    println("Has Disclosables: ${detection.containsDisclosables}")
+    println("Provides Disclosures: ${detection.providesDisclosures}")
+    
+    // Work with the credential
+    println("Format: ${credential.format}")              // e.g., "jwt_vc_json", "ldp_vc", "mso_mdoc"
+    println("Issuer: ${credential.issuer}")
+    println("Subject: ${credential.subject}")
+    
+    // Access credential data
+    val credentialData = credential.credentialData
+    println("Credential Data: $credentialData")
+}
+```
+
+### Working with W3C Credentials
+
+W3C credentials are automatically parsed into `W3C11` or `W3C2` objects:
+
+```kotlin
+val (detection, credential) = CredentialParser.detectAndParse(w3cCredentialString)
+
+when (credential) {
+    is W3C11 -> {
+        println("W3C 1.1 Credential")
+        println("Has selective disclosures: ${credential.disclosables != null}")
+    }
+    is W3C2 -> {
+        println("W3C 2.0 Credential")
+    }
+    else -> {
+        println("Not a W3C credential")
+    }
+}
+```
+
+### Working with SD-JWT Credentials
+
+SD-JWT credentials include selective disclosure information:
+
+```kotlin
+val (detection, credential) = CredentialParser.detectAndParse(sdJwtCredentialString)
+
+when (credential) {
+    is SdJwtCredential -> {
+        println("SD-JWT VC Credential")
+        println("Disclosures: ${credential.disclosures}")
+        
+        // Access disclosed claims
+        credential.disclosures?.forEach { disclosure ->
+            println("${disclosure.name} = ${disclosure.value}")
+        }
+    }
+}
+```
+
+### Working with mdoc Credentials
+
+mdoc credentials can be provided as Base64Url or hex strings:
+
+```kotlin
+// Base64Url encoded mdoc
+val mdocBase64 = "omdkb2NUeXBldW9yZy5pc28uMTgwMTMuNS4xLm1ETGxpc3N1ZXJTaWduZWQ..."
+
+val (detection, credential) = CredentialParser.detectAndParse(mdocBase64)
+
+when (credential) {
+    is MdocsCredential -> {
+        println("mdoc Credential")
+        println("DocType: ${credential.credentialData["docType"]}")
+    }
+}
+
+// Or hex encoded
+val mdocHex = "a06d646f6354797065756f72672e69736f2e31383031332e352e312e6d444c6c6973737565725369676e6564..."
+val (_, mdocCredential) = CredentialParser.detectAndParse(mdocHex)
+```
+
+### Verifying Credentials
+
+Verify credentials using issuer key resolution:
+
+```kotlin
+import id.walt.crypto.keys.Key
+
+suspend fun verifyCredential(credential: DigitalCredential) {
+    // Get the issuer's public key
+    val issuerKey = credential.getSignerKey()
+    
+    if (issuerKey != null) {
+        // Verify the credential
+        val verificationResult = credential.verify(issuerKey)
+        
+        if (verificationResult.isSuccess) {
+            println("Credential is valid!")
+        } else {
+            println("Verification failed: ${verificationResult.exceptionOrNull()?.message}")
+        }
+    } else {
+        println("Could not resolve issuer key")
+    }
+}
+```
+
+### Working with Presentations
+
+The library supports multiple presentation formats:
+
+```kotlin
+import id.walt.credentials.presentations.formats.*
+
+// Parse presentations in different formats
+// JWT VC JSON presentation
+val jwtVcJsonPresentation = JwtVcJsonPresentation(...)
+
+// SD-JWT presentation
+val sdJwtPresentation = DcSdJwtPresentation(...)
+
+// LDP VC presentation
+val ldpVcPresentation = LdpVcPresentation(...)
+
+// mdoc presentation
+val mdocPresentation = MsoMdocPresentation(...)
+```
+
+## JavaScript Usage
+
+### Installation
+
+Install the library via npm:
+
+```bash
+npm install waltid-digital-credentials
+```
+
+### Basic Example
+
+```javascript
+import { CredentialParser } from 'waltid-digital-credentials';
+
+// Detect and parse a credential
+const credentialString = "eyJraWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCN6Nk1ram9SaHExalNOSmRMaXJ1U1hyRkZ4YWdxcnp0WmFYSHFIR1VUS0piY055d3AiLCJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSJ9...";
+
+const [detection, credential] = await CredentialParser.detectAndParse(credentialString);
+
+console.log("Primary Type:", detection.credentialPrimaryType);
+console.log("Sub Type:", detection.credentialSubType);
+console.log("Signature:", detection.signaturePrimary);
+console.log("Format:", credential.format);
+console.log("Issuer:", credential.issuer);
+```
+
+## Join the community
+
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
+* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
 
 
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
