@@ -45,7 +45,7 @@ private val logger = KotlinLogging.logger { }
 @SerialName("azure")
 class AzureKey(
     val id: String,
-    val auth: AzureAuth,
+    val auth: AzureAuth? = null,
     private var _keyType: KeyType? = null,
     private var _publicKey: DirectSerializedKey? = null
 ) : Key() {
@@ -55,6 +55,37 @@ class AzureKey(
 
     @Transient
     private lateinit var accessTokenExpiration: Instant
+
+    /**
+     * Gets the effective authentication credentials.
+     * Tries credential provider first (new method), then falls back to embedded auth (legacy).
+     * 
+     * @return AzureAuth credentials
+     * @throws IllegalStateException if neither provider nor embedded auth is available
+     */
+    private fun getEffectiveAuth(): AzureAuth {
+        // Extract vault URL from key ID
+        val vaultUrl = AzureCredentialProvider.extractVaultUrl(id)
+        
+        // Try credential provider first (new method)
+        val providerAuth = AzureCredentialProvider.getCredentials(vaultUrl)
+        if (providerAuth != null) {
+            logger.trace { "Using credentials from AzureCredentialProvider for vault: $vaultUrl" }
+            return providerAuth
+        }
+        
+        // Fall back to embedded auth (legacy method)
+        if (auth != null) {
+            logger.trace { "Using embedded credentials for vault: $vaultUrl" }
+            return auth
+        }
+        
+        // Neither available - error
+        throw IllegalStateException(
+            "No Azure credentials available for vault: $vaultUrl. " +
+            "Either register credentials using AzureCredentialProvider.register() or provide embedded auth."
+        )
+    }
 
     private fun updateKeyType() {
         _keyType = _publicKey?.key?.keyType
@@ -67,10 +98,20 @@ class AzureKey(
 
     @JsExport.Ignore
     suspend fun updateAccessToken() {
-        val accessTokenResponse = fetchAccessToken(auth)
-
-        accessToken = accessTokenResponse.accessToken
-        accessTokenExpiration = accessTokenResponse.expiration
+        val vaultUrl = AzureCredentialProvider.extractVaultUrl(id)
+        val tokenSupplier = AzureCredentialProvider.getTokenSupplier(vaultUrl)
+        if (tokenSupplier != null) {
+            // Prefer token supplier (Workload Identity / Managed Identity)
+            val token = tokenSupplier.invoke("https://vault.azure.net/.default")
+            accessToken = token.accessToken
+            accessTokenExpiration = token.expiration
+        } else {
+            // Fallback to client credentials via provider or embedded auth
+            val effectiveAuth = getEffectiveAuth()
+            val accessTokenResponse = fetchAccessToken(effectiveAuth)
+            accessToken = accessTokenResponse.accessToken
+            accessTokenExpiration = accessTokenResponse.expiration
+        }
     }
 
     @JsExport.Ignore
@@ -97,7 +138,16 @@ class AzureKey(
     override val hasPrivateKey: Boolean
         get() = false
 
-    override fun toString(): String = "[Azure ${keyType.name} key @ ${auth.keyVaultUrl} - $id]"
+    override fun toString(): String {
+        val vaultUrl = AzureCredentialProvider.extractVaultUrl(id)
+        val authSource = when {
+            AzureCredentialProvider.hasTokenSupplier(vaultUrl) -> "provider-token"
+            AzureCredentialProvider.hasCredentials(vaultUrl) -> "provider-secret"
+            auth != null -> "embedded"
+            else -> "none"
+        }
+        return "[Azure ${_keyType?.name ?: "?"} key @ $vaultUrl (auth: $authSource) - $id]"
+    }
 
     @JvmBlocking
     @JvmAsync
@@ -381,8 +431,13 @@ class AzureKey(
         @JsExport.Ignore
         override suspend fun generate(type: KeyType, metadata: AzureKeyMetadata): AzureKey {
             val keyName = metadata.name ?: Random.nextInt().toString()
-
-            val accessTokenResponse = fetchAccessToken(metadata.auth)
+            
+            // Determine which credentials to use for generation
+            val vaultUrl = metadata.auth.keyVaultUrl
+            val providerAuth = AzureCredentialProvider.getCredentials(vaultUrl)
+            val authForGeneration = providerAuth ?: metadata.auth
+            
+            val accessTokenResponse = fetchAccessToken(authForGeneration)
 
             val (kty, crv) = keyTypeToAzureKeyMapping(type)
             val keyRequestBody = if (kty == "RSA") {
@@ -398,7 +453,7 @@ class AzureKey(
                     keyOps = listOf("sign", "verify")
                 )
             }
-            val response = client.post("${metadata.auth.keyVaultUrl}/keys/$keyName/create?api-version=7.4") {
+            val response = client.post("${vaultUrl}/keys/$keyName/create?api-version=7.4") {
                 contentType(ContentType.Application.Json)
                 bearerAuth(accessTokenResponse.accessToken)
                 setBody(keyRequestBody)
@@ -407,10 +462,20 @@ class AzureKey(
             val parsedAzurePublicKey = parseAzurePublicKey(response.jsonObject["key"]?.jsonObject!!)
 
             val keyId = parsedAzurePublicKey.kid
+            
+            // If credentials are in provider, don't embed them in the key (new method)
+            // Otherwise, embed them for backward compatibility (legacy method)
+            val embeddedAuth = if (providerAuth != null) {
+                logger.debug { "Creating key using AzureCredentialProvider credentials (no embedded auth)" }
+                null
+            } else {
+                logger.debug { "Creating key with embedded auth (legacy method)" }
+                metadata.auth
+            }
 
             return AzureKey(
                 id = keyId,
-                auth = metadata.auth,
+                auth = embeddedAuth,
                 _keyType = parsedAzurePublicKey.keyType,
                 _publicKey = DirectSerializedKey(parsedAzurePublicKey.publicKey)
             )
