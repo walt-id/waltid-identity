@@ -22,17 +22,18 @@ import org.intellij.lang.annotations.Language
 fun Route.globalImplicitOidcExample() {
     @Language("JSON")
     val flowConfig = """
-        {
-            "method": "oidc",
-            "config": {
-              "openIdConfigurationUrl": "https://demo.certification.openid.net/test/yoFCNpmcqAC4vkd/.well-known/openid-configuration",
-              "clientId": "clientid",
-              "clientSecret": "clientsecret",
-              "callbackUri": "https://12856b1961c0.ngrok-free.app/auth/flows/oidc-example/oidc/callback",
-              "pkceEnabled": true
-            },
-            "ok": true
-        }
+{
+  "method": "oidc",
+  "config": {
+    "openIdConfigurationUrl": "http://localhost:8080/realms/master/.well-known/openid-configuration",
+    "clientId": "waltid_ktor_authnz",
+    "clientSecret": "fzYFC6oAgbjozv8NoaXuOIfPxmT4XoVM",
+    "callbackUri": "http://authnz-example.localhost:8088/auth/flows/oidc-example/oidc/callback",
+    "pkceEnabled": true,
+    "redirectAfterLogin": "http://authnz-example.localhost:8088/protected"
+  },
+  "success": true
+}
     """.trimIndent()
 
     route("oidc-example") {
@@ -43,7 +44,8 @@ fun Route.globalImplicitOidcExample() {
                 tenant = request.host(),
                 sessionId = parameters["sessionId"],
                 implicitSessionGeneration = true,
-                initialFlow = authFlow
+                initialFlow = authFlow,
+                revealTokenToClient = false
             )
         }
 
@@ -57,7 +59,7 @@ fun Route.globalMultistepExample() {
         val flowConfig = """
         {
             "method": "web3",
-            "ok": true
+            "success": true
         }
     """.trimIndent()
         val authFlow = AuthFlow.fromConfig(flowConfig)
@@ -81,7 +83,7 @@ fun Route.globalImplicitSingleStep() {
         val flowConfig = """
             {
                 "method": "userpass",
-                "ok": true,
+                "success": true,
                 "expiration": "1d"
             }
         """.trimIndent()
@@ -109,7 +111,7 @@ fun Route.globalImplicitMultiStep() {
                 "method": "userpass",
                 "continue": [{
                   "method": "totp",
-                  "ok": true
+                  "success": true
                 }]
             }
         """.trimIndent()
@@ -149,7 +151,7 @@ fun Route.globalExplicitMultiStep() {
                 "method": "userpass",
                 "continue": [{
                   "method": "totp",
-                  "ok": true
+                  "success": true
                 }]
             }
         """.trimIndent()
@@ -179,7 +181,7 @@ fun Route.globalImplicitVc() {
                     ]
                 }
             },
-            "ok": true
+            "success": true
         }
     """.trimIndent()
         val authFlow = AuthFlow.fromConfig(flowConfig)
@@ -207,7 +209,7 @@ fun Route.globalImplicitVc() {
         val flowConfig = """
             {
                 "method": "userpass",
-                "ok": true
+                "success": true
             }
         """.trimIndent()
         val authFlow = AuthFlow.fromConfig(flowConfig)
@@ -251,6 +253,7 @@ fun Route.authFlowRoutes() {
     //accountImplicitMultiStep()
 }
 
+@OptIn(ExternallyProvidedJWTCannotResolveToAuthenticatedSession::class)
 fun Application.testApp(jwt: Boolean) {
     install(Authentication) {
         KtorAuthnzManager.tokenHandler = when {
@@ -277,8 +280,17 @@ fun Application.testApp(jwt: Boolean) {
         authenticate("ktor-authnz") {
             get("/protected") {
                 val token = call.getAuthToken()
-                val accountId = call.getAuthenticatedAccount()
-                call.respondText("Hello token ${token}, you are $accountId")
+                val accountId = runCatching { call.getAuthenticatedAccount() }
+                val session = runCatching { getAuthenticatedSession() }
+                call.respondText("Hello token ${token}, you are $accountId; session details: $session")
+            }
+
+            get("/logout") {
+                val session = getAuthenticatedSession()
+                session.run {
+                    call.logoutAndDeleteCookie()
+                }
+                call.respond("Logged out")
             }
         }
 
