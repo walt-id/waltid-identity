@@ -88,7 +88,7 @@ data class AuthSession(
         if (currentFlow.continueWith != null) {
             flows = currentFlow.continueWith
             status = AuthSessionStatus.CONTINUE_NEXT_FLOW
-        } else if (currentFlow.success) {
+        } else if (currentFlow.isEndConditionSuccess()) {
             flows = null
             status = AuthSessionStatus.SUCCESS
 
