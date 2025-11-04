@@ -10,7 +10,7 @@ import io.ktor.util.pipeline.*
 
 fun ApplicationCall.getAuthToken(): String {
     val token = principal<UserIdPrincipal>()?.name
-    check(token != null) { "No token for request principal" }
+    requireNotNull(token) { "Missing token: No token for request principal" }
 
     return token
 }
