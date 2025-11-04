@@ -1,4 +1,15 @@
-# walt.id X.509 (Kotlin Multiplatform)
+<div align="center">
+ <h1>Kotlin Multiplatform X.509 library</h1>
+ <span>by </span><a href="https://walt.id">walt.id</a>
+ <p>Work with X.509 certificates<p>
+
+<a href="https://walt.id/community">
+<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
+</a>
+<a href="https://www.linkedin.com/company/walt-id/">
+<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
+</a>
+</div>
 
 A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 certificates** across JVM/Android, iOS, and JS.  
 It focuses on developer-friendly APIs for parsing `x5c` JWT headers and validating a leaf certificate against a provided chain and trust anchors—using platform-native validation where possible.
@@ -155,6 +166,12 @@ fun loadTrustAnchorsFromKeyStore(ks: KeyStore): List<CertificateDer>
 
 ---
 
+## Join the community
+
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
+* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+
+
 ## License
 
-Apache 2.0 (same as the rest of walt.id unless otherwise noted). See `LICENSE`.
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
