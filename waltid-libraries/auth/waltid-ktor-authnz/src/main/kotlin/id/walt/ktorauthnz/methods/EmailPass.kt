@@ -20,17 +20,17 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-@Serializable
-@SerialName("email")
-data class EmailPassMethodInstance(
-    override val data: EmailPassStoredData,
-) : MethodInstance {
-    override val config = null
-
-    override fun authMethod() = EmailPass
-}
-
 object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
+
+    @Serializable
+    @SerialName("email")
+    data class EmailPassMethodInstance(
+        override val data: EmailPassStoredData,
+    ) : MethodInstance {
+        override val config = null
+
+        override fun authMethod() = EmailPass
+    }
 
     override val relatedAuthMethodStoredData = EmailPassStoredData::class
 

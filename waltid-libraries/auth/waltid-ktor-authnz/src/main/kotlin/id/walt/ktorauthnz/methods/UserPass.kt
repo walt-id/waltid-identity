@@ -18,10 +18,6 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.Serializable
-
-@Serializable
-data class UserPassCredentials(val username: String, val password: String)
 
 object UserPass : UserPassBasedAuthMethod("userpass") {
 
