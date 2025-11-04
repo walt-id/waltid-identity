@@ -54,7 +54,8 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
 
             val identifier = auth(session, credential, call)
 
-            call.handleAuthSuccess(session, identifier.resolveToAccountId())
+            val authContext = authContext(call)
+            call.handleAuthSuccess(session, authContext, identifier.resolveToAccountId())
         }
     }
 

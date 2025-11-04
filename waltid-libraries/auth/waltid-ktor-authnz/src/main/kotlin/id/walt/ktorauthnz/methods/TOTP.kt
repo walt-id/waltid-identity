@@ -57,13 +57,14 @@ object TOTP : AuthenticationMethod("totp") {
 
             auth(session, otp)
 
-            call.handleAuthSuccess(session, null)
+            val authContext = authContext(call)
+            call.handleAuthSuccess(session, authContext, null)
         }
     }
 
 }
 
-fun main() {
+/*fun main() {
     val service = DefaultTOTPService()
 
     val secret = TOTPSecret.fromBase32EncodedString("ZIQL3WHUAGCS5FQQDKP74HZCFT56TJHR")
@@ -77,4 +78,4 @@ fun main() {
         Issuer("Acme Co")
     )
     println("URI: $totpUri")
-}
+}*/
