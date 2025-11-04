@@ -65,24 +65,25 @@ dependencies {
     implementation("org.kotlincrypto.random:crypto-rand:0.6.0")
 
     // Ktor server
-    implementation("io.ktor:ktor-server-core-jvm")
-    implementation("io.ktor:ktor-server-auth-jvm")
-    implementation("io.ktor:ktor-server-auth-jwt-jvm")
-    //implementation("io.ktor:ktor-server-auth-ldap-jvm")
-    implementation("io.ktor:ktor-client-core-jvm")
-    implementation("io.ktor:ktor-client-apache-jvm")
-    implementation("io.ktor:ktor-server-sessions-jvm")
-    implementation("io.ktor:ktor-server-auto-head-response-jvm")
-    implementation("io.ktor:ktor-server-double-receive-jvm")
-    implementation("io.ktor:ktor-server-webjars-jvm")
-    implementation("io.ktor:ktor-server-host-common-jvm")
-    implementation("io.ktor:ktor-server-status-pages-jvm")
-    implementation("io.ktor:ktor-server-cors-jvm")
-    implementation("io.ktor:ktor-server-default-headers-jvm")
-    implementation("io.ktor:ktor-server-forwarded-header-jvm")
-    implementation("io.ktor:ktor-server-call-logging-jvm")
-    implementation("io.ktor:ktor-server-content-negotiation-jvm")
-    implementation("io.ktor:ktor-server-cio-jvm")
+    implementation("io.ktor:ktor-server-core")
+    implementation("io.ktor:ktor-server-auth")
+    implementation("io.ktor:ktor-server-auth-jwt")
+    //implementation("io.ktor:ktor-server-auth-ldap")
+    implementation("io.ktor:ktor-client-core")
+    implementation("io.ktor:ktor-client-apache")
+    implementation("io.ktor:ktor-server-sessions")
+    implementation("io.ktor:ktor-server-auto-head-response")
+    implementation("io.ktor:ktor-server-double-receive")
+    implementation("io.ktor:ktor-server-webjars")
+    implementation("io.ktor:ktor-server-host-common")
+    implementation("io.ktor:ktor-server-status-pages")
+    implementation("io.ktor:ktor-server-cors")
+    implementation("io.ktor:ktor-server-default-headers")
+    implementation("io.ktor:ktor-server-forwarded-header")
+    implementation("io.ktor:ktor-server-call-logging")
+    implementation("io.ktor:ktor-server-content-negotiation")
+    implementation("io.ktor:ktor-server-cio")
+    implementation("io.ktor:ktor-server-html-builder")
 
     // Ktor client
     implementation("io.ktor:ktor-client-core")
@@ -90,7 +91,7 @@ dependencies {
     implementation("io.ktor:ktor-client-content-negotiation")
 
     // Ktor shared
-    implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
+    implementation("io.ktor:ktor-serialization-kotlinx-json")
 
     // Ktor server external
     implementation("io.github.smiley4:ktor-openapi:5.3.0")
@@ -103,7 +104,7 @@ dependencies {
     implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
     // Logging
-    implementation("io.klogging:klogging-jvm:0.11.6")
+    implementation("io.klogging:klogging:0.11.6")
     implementation("io.klogging:slf4j-klogging:0.11.6")
 
     // Redis
@@ -115,7 +116,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 
     // Ktor
-    testImplementation("io.ktor:ktor-server-cio-jvm")
+    testImplementation("io.ktor:ktor-server-cio")
     testImplementation("io.ktor:ktor-server-test-host")
 
     // Kotlin
