@@ -1,9 +1,6 @@
 package id.walt.ktorauthnz.methods
 
 import com.atlassian.onetime.core.TOTP
-import com.atlassian.onetime.core.TOTPGenerator
-import com.atlassian.onetime.model.EmailAddress
-import com.atlassian.onetime.model.Issuer
 import com.atlassian.onetime.model.TOTPSecret
 import com.atlassian.onetime.service.DefaultTOTPService
 import id.walt.commons.web.OTPAuthException

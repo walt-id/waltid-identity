@@ -7,6 +7,7 @@ import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.UsernameIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
+import id.walt.ktorauthnz.methods.requests.UserPassCredentials
 import id.walt.ktorauthnz.methods.storeddata.UserPassStoredData
 import id.walt.ktorauthnz.security.PasswordHash
 import id.walt.ktorauthnz.security.PasswordHashing

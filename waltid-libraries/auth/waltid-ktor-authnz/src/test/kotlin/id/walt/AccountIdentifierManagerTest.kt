@@ -1,11 +1,7 @@
 package id.walt
 
 import id.walt.ktorauthnz.accounts.identifiers.AccountIdentifierManager
-import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
-import id.walt.ktorauthnz.accounts.identifiers.methods.JWTIdentifier
-import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
-import id.walt.ktorauthnz.accounts.identifiers.methods.RADIUSIdentifier
-import id.walt.ktorauthnz.accounts.identifiers.methods.UsernameIdentifier
+import id.walt.ktorauthnz.accounts.identifiers.methods.*
 import kotlin.test.Test
 
 class AccountIdentifierManagerTest {

@@ -5,6 +5,7 @@ package id.walt.webwallet.web.controllers.auth
 import id.walt.commons.web.UnauthorizedException
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
+import id.walt.ktorauthnz.auth.ExternallyProvidedJWTCannotResolveToAuthenticatedSession
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.ktorauthnz.auth.getAuthenticatedSession
 import id.walt.ktorauthnz.auth.getEffectiveRequestAuthToken
@@ -35,6 +36,7 @@ import kotlin.uuid.Uuid
 
 private val logger = logger("AuthnzFrontendController")
 
+@OptIn(ExternallyProvidedJWTCannotResolveToAuthenticatedSession::class)
 fun Application.ktorAuthnzFrontendRoutes() {
     routing {
         route("/wallet-api/auth", {

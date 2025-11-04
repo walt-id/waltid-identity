@@ -6,9 +6,11 @@ import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.methods.config.OidcAuthConfiguration
-import id.walt.ktorauthnz.methods.sessiondata.OidcTempSessionData
+import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticatedData
+import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticationStepData
+import id.walt.ktorauthnz.sessions.AuthSession
+import id.walt.ktorauthnz.sessions.AuthSessionNextStepRedirectData
 import id.walt.ktorauthnz.sessions.SessionManager
-import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
 import io.github.smiley4.ktoropenapi.route
 import io.klogging.logger
 import io.ktor.client.*

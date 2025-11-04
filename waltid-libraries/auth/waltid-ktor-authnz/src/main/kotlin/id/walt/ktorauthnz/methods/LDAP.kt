@@ -6,6 +6,7 @@ import id.walt.ktorauthnz.accounts.identifiers.methods.LDAPIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authFailure
 import id.walt.ktorauthnz.methods.config.LDAPConfiguration
+import id.walt.ktorauthnz.methods.requests.UserPassCredentials
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import io.github.smiley4.ktoropenapi.post

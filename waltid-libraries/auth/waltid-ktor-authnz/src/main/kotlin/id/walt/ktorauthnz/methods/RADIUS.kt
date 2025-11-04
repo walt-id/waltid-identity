@@ -7,6 +7,7 @@ import id.walt.ktorauthnz.accounts.identifiers.methods.RADIUSIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.config.RADIUSConfiguration
+import id.walt.ktorauthnz.methods.requests.UserPassCredentials
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import io.github.smiley4.ktoropenapi.post
