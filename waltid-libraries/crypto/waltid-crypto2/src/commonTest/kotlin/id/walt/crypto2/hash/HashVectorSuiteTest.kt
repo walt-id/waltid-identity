@@ -1,6 +1,9 @@
 package id.walt.crypto2.hash
 
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import okio.ByteString
+import okio.ByteString.Companion.toByteString
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -220,5 +223,78 @@ class HashVectorSuiteTest {
         }
     }
 
+    @Test
+    fun `mixed update paths produce expected digests`() {
+        manifests.forEach { manifest ->
+            val vector = manifest.vectors.first()
+
+            val primaryBytes = vector.messageBytes
+            val byteStringChunk: ByteString = vector.messageByteString
+            val stringChunk = "mix-${manifest.algorithm.name}-${vector.name}"
+            val asyncBytes = "async-bytes-${manifest.algorithm.name}".encodeToByteArray()
+            val asyncByteStringChunk = "async-byteString-${vector.name}".encodeToByteArray().toByteString()
+            val asyncStringChunk = "async-string-${manifest.algorithm.name}-${vector.name}"
+
+            val expectedMessage = primaryBytes + byteStringChunk.toByteArray() +
+                    stringChunk.encodeToByteArray() + asyncBytes + asyncByteStringChunk.toByteArray() +
+                    asyncStringChunk.encodeToByteArray()
+
+            val applySequence: (Digest) -> Unit = { digest ->
+                digest.update(primaryBytes)
+                digest.update(byteStringChunk)
+                digest.update(stringChunk)
+                runBlocking {
+                    digest.updateAsync(asyncBytes)
+                    digest.updateAsync(asyncByteStringChunk)
+                    digest.updateAsync(asyncStringChunk)
+                }
+            }
+
+            val digest = DigestFactory.create(manifest.algorithm).also(applySequence)
+            val expectedDigest = HashFactory.create(manifest.algorithm).hash(expectedMessage)
+
+            assertContentEquals(
+                expectedDigest,
+                digest.finish(),
+                "Mixed update finish mismatch for ${manifest.algorithm}",
+            )
+
+            val byteStringDigest = DigestFactory.create(manifest.algorithm).also(applySequence)
+            assertEquals(
+                expectedDigest.toByteString(),
+                byteStringDigest.finishToByteString(),
+                "Mixed update finishToByteString mismatch for ${manifest.algorithm}",
+            )
+        }
+    }
+
+    @Test
+    fun `reset handles edge scenarios`() {
+        val emptyMessage = ByteArray(0)
+        HashAlgorithm.entries.forEach { algorithm ->
+            val message = "reset-${algorithm.name}".encodeToByteArray()
+            val half = message.size / 2
+            val expected = HashFactory.create(algorithm).hash(message)
+            val expectedEmpty = HashFactory.create(algorithm).hash(emptyMessage)
+
+            DigestFactory.create(algorithm).apply {
+                assertContentEquals(expectedEmpty, finish(), "Empty digest mismatch for $algorithm")
+
+                reset()
+                update(message)
+                assertContentEquals(expected, finish(), "Reset-before-use mismatch for $algorithm")
+
+                update(message.copyOfRange(0, half))
+                reset()
+                update(message)
+                assertContentEquals(expected, finish(), "Reset-after-partial mismatch for $algorithm")
+
+                reset()
+                reset()
+                update(message)
+                assertContentEquals(expected, finish(), "Repeated reset mismatch for $algorithm")
+            }
+        }
+    }
 
 }
