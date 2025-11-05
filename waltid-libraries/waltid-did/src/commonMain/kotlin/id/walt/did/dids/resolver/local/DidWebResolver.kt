@@ -127,13 +127,13 @@ class DidWebResolver(private val client: HttpClient) : LocalResolverMethod("web"
 
     companion object {
 
-        var urlProtocol = "https"
+        private var httpsEnabled: Boolean = true
+
+        val urlProtocol: String
+            get() = if (httpsEnabled) "https" else "http"
 
         fun enableHttps(httpsEnabled: Boolean) {
-            if (httpsEnabled)
-                this.urlProtocol = "https"
-            else
-                this.urlProtocol = "http"
+            this.httpsEnabled = httpsEnabled
         }
 
         internal val json = Json { ignoreUnknownKeys = true }

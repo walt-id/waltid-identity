@@ -63,12 +63,28 @@ class DidsWalletIntegrationTest : AbstractIntegrationTest() {
         assertNotNull(verificationMethod?.jsonObject["publicKeyJwk"])
     }
 
+    private enum class ColonEncoding(val value: String) {
+        PLAIN(":"),
+        URL("%3A"),
+        PATH("/")
+    }
+
+    private fun createDomainString(encoding: ColonEncoding = ColonEncoding.PLAIN): String =
+        "${environment.e2e.host}${encoding.value}${environment.e2e.port}"
+
+    private fun createPathString(encoding: ColonEncoding = ColonEncoding.PLAIN): String =
+        ":wallet-api:registry:mydid".replace(":", encoding.value)
+
     @Order(0)
     @Test
     fun shouldCreateWebKey() = runTest {
+        val options = mapOf(
+            "domain" to createDomainString(),
+            "path" to createPathString(ColonEncoding.PATH)
+        )
         val createdDidString = defaultWalletApi.createDid(
             method = "web",
-            options = mapOf("domain" to "${environment.e2e.host}:${environment.e2e.port}", "path" to "/wallet-api/registry/mydid")
+            options = options
         )
 
         createdDids.add(createdDidString)
@@ -81,7 +97,8 @@ class DidsWalletIntegrationTest : AbstractIntegrationTest() {
         assertNotNull(verificationMethod?.jsonObject).also {
             assertNotNull(it["publicKeyJwk"]?.jsonObject)
             assertEquals("JsonWebKey2020", it["type"]?.jsonPrimitive?.content)
-            assertEquals("did:web:localhost%3A22323:wallet-api:registry:mydid", it["controller"]?.jsonPrimitive?.content)
+            val expectedController = "did:web:${createDomainString(ColonEncoding.URL)}${createPathString()}"
+            assertEquals(expectedController, it["controller"]?.jsonPrimitive?.content)
         }
     }
 

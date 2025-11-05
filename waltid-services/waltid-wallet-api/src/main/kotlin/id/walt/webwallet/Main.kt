@@ -54,9 +54,12 @@ suspend fun main(args: Array<String>) {
 }
 
 fun webWalletSetup() {
-    log.info { "Setting up..." }
-    val runtimeConfig = ConfigManager.getConfig<RuntimeConfig>()
-    DidWebResolver.enableHttps(runtimeConfig.enableDidWebResolverHttps)
+    log.info { "Setting up wallet ..." }
+    try {
+        DidWebResolver.enableHttps(ConfigManager.getConfig<RuntimeConfig>().enableDidWebResolverHttps)
+    } catch (e: Exception) {
+        log.error(e) { "Could not load `enableDidWebResolverHttps` from runtime config. " + e.message }
+    }
     Security.addProvider(BouncyCastleProvider())
 }
 
