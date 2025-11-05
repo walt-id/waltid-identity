@@ -1,4 +1,4 @@
-# Using RADIUS with ktor-authnz
+# Using OIDC with ktor-authnz
 
 _Note: Tested with Keycloak 26.4.2_
 
@@ -148,13 +148,17 @@ Explanation of config values:
   requires the full OIDC configuration as JSON, the easier option is to supply the dynamic
   configuration endpoint (typically a `/.well-known/openid-configuration` suffixed URL) in
   `openIdConfigurationUrl`.
-- `clientId` & `clientSecret`: data for this OIDC client to use for the authorization code flow with your IDP
+- `clientId` & `clientSecret`: data for this OIDC client to use for the authorization code flow with
+  your IDP
 - `pkceEnabled`: whether to use PKCE with the Authorization Code Flow (recommended)
-- `callbackUri`: the callback URL of the ktor-authnz backend, which your IDP will redirect the user to
+- `callbackUri`: the callback URL of the ktor-authnz backend, which your IDP will redirect the user
+  to
 - `redirectAfterLogin`: where the ktor-authnz backend will redirect the user from the callback page
 
 ## Request flow
-- User client initiates login at ktor-authnz backend, e.g. calling `http://authnz-example.localhost:8088/auth/flows/oidc-example/oidc/auth`
+
+- User client initiates login at ktor-authnz backend, e.g. calling
+  `http://authnz-example.localhost:8088/auth/flows/oidc-example/oidc/auth`
 - After the auth flow evaluation, the ktor-authnz backend will answer accordingly:
   ```json
   {
@@ -171,7 +175,168 @@ Explanation of config values:
   }
   ```
 - The client sees `next_step.type = redirect` and thus opens URL `next_step.url` (the IDP URL)
-- The user interacts with the Keycloak login interface (possibly gives consent if configured at the IDP)
-- If the user logged in successfully with the IDP, the IDP will redirect back to the ktor-authnz callback URL (configured in `callbackUri`)
-- The ktor-authnz backend (on the `callbackUri` page) will exchange the tokens (/ perform PKCE), and after validation will mark the authnz session as successful, etc
-- After the ktor-authnz backend completed its verifications, it will redirect the browser to the URL defined in `redirectAfterLogin` (typically a frontend URL)
+- The user interacts with the Keycloak login interface (possibly gives consent if configured at the
+  IDP)
+- If the user logged in successfully with the IDP, the IDP will redirect back to the ktor-authnz
+  callback URL (configured in `callbackUri`)
+- The ktor-authnz backend (on the `callbackUri` page) will exchange the tokens (/ perform PKCE), and
+  after validation will mark the authnz session as successful, etc
+- After the ktor-authnz backend completed its verifications, it will redirect the browser to the URL
+  defined in `redirectAfterLogin` (typically a frontend URL)
+
+## Use with Enterprise
+
+### Enterprise `auth.conf` configuration
+
+```hocon
+# Configure the Auth Flow (refer to: waltid-ktor-authnz)
+authFlow = {
+    method: oidc,
+    config: {
+        openIdConfigurationUrl: "http://localhost:8080/realms/master/.well-known/openid-configuration",
+        clientId: "waltid_ktor_authnz",
+        clientSecret: "fzYFC6oAgbjozv8NoaXuOIfPxmT4XoVM",
+        callbackUri: "http://waltid.enterprise.localhost:3000/auth/account/oidc/callback",
+        pkceEnabled: true,
+        redirectAfterLogin: "http://waltid.enterprise.localhost:3000"
+    },
+    success: true
+}
+```
+
+### Keycloak configuration:
+
+- Root URL: `http://waltid.enterprise.localhost:3000`
+- Home URL: `http://waltid.enterprise.localhost:3000`
+- Valid redirect URIs: `http://waltid.enterprise.localhost:3000/auth/account/oidc/callback`
+- Valid post logout redirect URIs: `+`
+- Web origins: `+`
+- Admin URL: `http://waltid.enterprise.localhost:3000`
+- Backchannel logout URL:
+  `http://waltid.enterprise.localhost:3000/auth/account/oidc/logout/backchannel`
+
+### Create a user in Keycloak:
+
+- Click `Users > User list > [Add user]`
+- enter Username (other data is optional)
+- You are now on the `User details` page of the newly created user. Go to the tab `Credentials` and
+  press the button `[Set password]` to set a password for the user, so the user can login.
+- Note the user ID on the `Details` page, this is the OIDC subject.
+
+### Add OIDC user to Enterprise
+
+`POST /v1/admin/account/register`
+
+```json
+{
+  "profile": {
+    "name": "Test User",
+    "email": "testuser@walt.id",
+    "addressCountry": "AT",
+    "address": "12345 Vienna"
+  },
+  "preferences": {
+    "timeZone": "UTC",
+    "languagePreference": "EN"
+  },
+  "initialAuth": {
+    "type": "oidc",
+    "identifier": {
+      "type": "oidc",
+      "issuer": "http://localhost:8080/realms/master",
+      "subject": "412cf56f-f85a-4247-91a6-f538867e2470"
+    }
+  }
+}
+```
+
+`201 Created`
+
+Set items in your request:
+
+- `issuer`: The issuer value of your IDP, can be found in the OpenID Endpoint Configuration (for
+  Keycloak, go to the global
+  `Configure > Realm settings > General > Endpoints > OpenID Endpoint Configuration` (very bottom of
+  the page)), e.g. `http://localhost:8080/realms/master/.well-known/openid-configuration` - in this
+  JSON document the very first attribute usually is already the `issuer` to use
+- `subject`: The `sub` value of the user at the IDP to link, in Keycloak:
+  `Manage > Users > User list > (Username) > ID`
+
+Alternatively, it can be set for an already existing account:
+`POST /v1/admin/account/auth/{account-id}/add-initial`
+
+```json
+{
+  "type": "oidc",
+  "identifier": {
+    "type": "oidc",
+    "issuer": "http://localhost:8080/realms/master",
+    "subject": "412cf56f-f85a-4247-91a6-f538867e2470"
+  }
+}
+```
+
+`201 Created`
+
+As you can see, the "`oidc`" Identifier type uses the combination of `issuer` and `subject` as a
+unique identifier (as a subject at an IDP has to be unique for the IDP) for the account. When a user
+is logged in with the OIDC method, the resulting OIDC `ID Token` is resolved into this combination
+and as such the linked account.
+
+### User login
+
+`http://waltid.enterprise.localhost:3000/auth/account/oidc/auth`
+
+```json
+{
+  "session_id": "bdb2a9a8-a56d-4ae4-8ea6-3585539b5285",
+  "status": "CONTINUE_NEXT_STEP",
+  "current_method": "oidc",
+  "next_method": [
+    "oidc"
+  ],
+  "next_step": {
+    "type": "redirect",
+    "url": "http://localhost:8080/realms/master/protocol/openid-connect/auth?response_type=code&scope=openid+profile+email&client_id=waltid_ktor_authnz&redirect_uri=http%3A%2F%2Fwaltid.enterprise.localhost%3A3000%2Fauth%2Faccount%2Foidc%2Fcallback&state=gnMiC87YaRlnpMaLHqgmWAEdquAzAKzSCNSJdyAEpo8&nonce=JDBsZK9IBl_xMFavT3u0M2xob4kYnZbiHUbSoZFOOrA&code_challenge=80P_Ui2zTq26R5DmU_O4EHTOhWHaOtdF-oIl6CIaomw&code_challenge_method=S256"
+  },
+  "next_step_description": "The OIDC method requires you to open the Authentication URL in your web browser, and follow the steps of your Identity Provider from there. Please go ahead and open the authentication URL \"http://localhost:8080/realms/master/protocol/openid-connect/auth?response_type=code&scope=openid+profile+email&client_id=waltid_ktor_authnz&redirect_uri=http%3A%2F%2Fwaltid.enterprise.localhost%3A3000%2Fauth%2Faccount%2Foidc%2Fcallback&state=gnMiC87YaRlnpMaLHqgmWAEdquAzAKzSCNSJdyAEpo8&nonce=JDBsZK9IBl_xMFavT3u0M2xob4kYnZbiHUbSoZFOOrA&code_challenge=80P_Ui2zTq26R5DmU_O4EHTOhWHaOtdF-oIl6CIaomw&code_challenge_method=S256\" in your web browser.",
+  "next_step_informational_message": "The \"oidc\" authentication method requires multiple-steps for authentication. Follow the steps in `next_step` (AuthSessionNextStepRedirectData) to complete the authentication method."
+}
+```
+
+Visit specified URL at IDP (typically automatically opened via JavaScript):
+`http://localhost:8080/realms/master/protocol/openid-connect/auth?response_type=code&scope=openid+profile+email&client_id=waltid_ktor_authnz&redirect_uri=http%3A%2F%2Fwaltid.enterprise.localhost%3A3000%2Fauth%2Faccount%2Foidc%2Fcallback&state=gnMiC87YaRlnpMaLHqgmWAEdquAzAKzSCNSJdyAEpo8&nonce=JDBsZK9IBl_xMFavT3u0M2xob4kYnZbiHUbSoZFOOrA&code_challenge=80P_Ui2zTq26R5DmU_O4EHTOhWHaOtdF-oIl6CIaomw&code_challenge_method=S256`
+
+IDP (Keycloak) displays user sign in page:
+
+```markdown
+# Sign in to your account
+
+Username or email: ______
+Password: ______
+
+[Sign in]
+```
+
+After pressing `[Sign in]`, User is redirected to the Enterprise Callback (specified in
+`callbackUri`), which then redirects the user to the page specified in auth flow config value
+`redirectAfterLogin` (typically a frontend page).
+
+Test: `GET http://waltid.enterprise.localhost:3000/v1/account/info`:
+
+```json
+{
+  "_id": "eaf0ad58-d430-4fd4-ac05-c9b64d6b25e5",
+  "type": "USER",
+  "profile": {
+    "name": "Test User",
+    "email": "testuser@walt.id",
+    "addressCountry": "AT",
+    "address": "12345 Vienna"
+  },
+  "accountPreferences": {
+    "timeZone": "UTC",
+    "languagePreference": "EN"
+  }
+}
+```
