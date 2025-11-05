@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
@@ -22,7 +25,16 @@ val enableAndroidBuild = getSetting("enableAndroidBuild")
 val enableIosBuild = getSetting("enableIosBuild")
 
 kotlin {
-    jvm()
+    jvm {
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        compilerOptions {
+            jvmTarget = JvmTarget.JVM_17
+        }
+
+        tasks.withType<Test>().configureEach {
+            useJUnitPlatform()
+        }
+    }
 
     js(IR) {
         nodejs {
