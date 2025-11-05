@@ -54,12 +54,14 @@ jobs:
           if [ -z "$TUNNEL_URL" ]; then
             echo "❌ Failed to get tunnel URL"
             cat lt_output.txt
-            exit 1
+            TUNNEL_URL=""
+          else
+            echo "✅ Tunnel URL: $TUNNEL_URL"
           fi
 
-          echo "✅ Tunnel URL: $TUNNEL_URL"
           echo "url=$TUNNEL_URL" >> $GITHUB_OUTPUT
       - name: Replace URL in Kotlin test
+        if: ${{ steps.tunnel.outputs.url != '' }}
         run: |
           FILE_PATH="./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/kotlin/id/walt/openid4vp/conformance/ConformanceTests.kt"
           OLD_URL="https://verifier2.localhost/verification-session"
