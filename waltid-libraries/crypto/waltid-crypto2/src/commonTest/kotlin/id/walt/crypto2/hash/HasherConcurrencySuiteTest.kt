@@ -114,6 +114,56 @@ class HasherConcurrencySuiteTest {
         }
     }
 
+    @Test
+    fun `cross algorithm hashing remains isolated`() = runTest {
+        val messages = HashAlgorithm.entries.associateWith { algorithm ->
+            "mix-${algorithm.name}-${messageString}".encodeToByteArray()
+        }
+        val expectedBytes = messages.mapValues { (algorithm, payload) ->
+            HashFactory.create(algorithm).hash(payload)
+        }
+        val expectedByteStrings = expectedBytes.mapValues { (_, bytes) -> bytes.toByteString() }
+        val shared = HashAlgorithm.entries.associateWith { HashFactory.create(it) }
+
+        val byteResults = withContext(Dispatchers.Default) {
+            List(CONCURRENCY_LEVEL * HashAlgorithm.entries.size) { index ->
+                async {
+                    val algorithm = HashAlgorithm.entries[index % HashAlgorithm.entries.size]
+                    val message = messages.getValue(algorithm)
+                    val hasher = shared.getValue(algorithm)
+                    algorithm to hasher.hash(message)
+                }
+            }.awaitAll()
+        }
+
+        byteResults.forEach { (algorithm, actual) ->
+            assertContentEquals(
+                expectedBytes.getValue(algorithm),
+                actual,
+                "Hasher cross-algorithm byte mismatch for ${algorithm.name}",
+            )
+        }
+
+        val byteStringResults = withContext(Dispatchers.Default) {
+            List(CONCURRENCY_LEVEL * HashAlgorithm.entries.size) { index ->
+                async {
+                    val algorithm = HashAlgorithm.entries[index % HashAlgorithm.entries.size]
+                    val message = messages.getValue(algorithm).toByteString()
+                    val hasher = shared.getValue(algorithm)
+                    algorithm to hasher.hashToByteString(message)
+                }
+            }.awaitAll()
+        }
+
+        byteStringResults.forEach { (algorithm, actual) ->
+            assertEquals(
+                expectedByteStrings.getValue(algorithm),
+                actual,
+                "Hasher cross-algorithm ByteString mismatch for ${algorithm.name}",
+            )
+        }
+    }
+
     private suspend fun verifyConcurrentBytes(expected: ByteArray, block: suspend () -> ByteArray) {
         withContext(Dispatchers.Default) {
             val results = List(CONCURRENCY_LEVEL) { async { block() } }.awaitAll()
