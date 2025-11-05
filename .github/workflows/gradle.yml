@@ -60,6 +60,7 @@ jobs:
           echo "✅ Tunnel URL: $TUNNEL_URL"
           echo "url=$TUNNEL_URL" >> $GITHUB_OUTPUT
       - name: Replace URL in Kotlin test
+        if: ${{ steps.tunnel.outputs.url != '' }}
         run: |
           FILE_PATH="./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/kotlin/id/walt/openid4vp/conformance/ConformanceTests.kt"
           OLD_URL="https://verifier2.localhost/verification-session"
