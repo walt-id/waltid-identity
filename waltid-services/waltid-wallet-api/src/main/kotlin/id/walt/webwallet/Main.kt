@@ -55,11 +55,11 @@ suspend fun main(args: Array<String>) {
 
 fun webWalletSetup() {
     log.info { "Setting up wallet ..." }
-    try {
-        DidWebResolver.enableHttps(ConfigManager.getConfig<RuntimeConfig>().enableDidWebResolverHttps)
-    } catch (e: Exception) {
-        log.error(e) { "Could not load `enableDidWebResolverHttps` from runtime config. " + e.message }
+
+    runCatching { DidWebResolver.enableHttps(ConfigManager.getConfig<RuntimeConfig>().enableDidWebResolverHttps) }.onFailure {
+        log.error(it) { "Could not load `enableDidWebResolverHttps` from runtime config. " + it.message }
     }
+
     Security.addProvider(BouncyCastleProvider())
 }
 
