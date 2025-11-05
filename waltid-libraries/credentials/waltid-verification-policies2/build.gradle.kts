@@ -68,6 +68,8 @@ kotlin {
                 implementation(project(":waltid-libraries:credentials:waltid-vical"))
                 implementation(project(":waltid-libraries:credentials:waltid-dcql"))
                 implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
+
+                implementation("com.soywiz:korlibs-io:6.0.2")
             }
         }
         val commonTest by getting {
