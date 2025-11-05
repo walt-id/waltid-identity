@@ -180,6 +180,36 @@ class DigestConcurrencySuiteTest {
         }
     }
 
+    @Test
+    fun `concurrent digests across algorithms remain isolated`() = runTest {
+        val messages = HashAlgorithm.entries.associateWith { algorithm ->
+            "mix-${algorithm.name}-${messageString}".encodeToByteArray()
+        }
+        val expected = messages.mapValues { (algorithm, payload) ->
+            HashFactory.create(algorithm).hash(payload)
+        }
+
+        val results = withContext(Dispatchers.Default) {
+            List(CONCURRENCY_LEVEL * HashAlgorithm.entries.size) { index ->
+                async {
+                    val algorithm = HashAlgorithm.entries[index % HashAlgorithm.entries.size]
+                    val digest = DigestFactory.create(algorithm)
+                    val payload = messages.getValue(algorithm)
+                    digest.update(payload)
+                    algorithm to digest.finish()
+                }
+            }.awaitAll()
+        }
+
+        results.forEach { (algorithm, actual) ->
+            assertContentEquals(
+                expected.getValue(algorithm),
+                actual,
+                "Digest cross-algorithm mismatch for ${algorithm.name}",
+            )
+        }
+    }
+
     private suspend fun verifyConcurrentBytes(expected: ByteArray, block: suspend () -> ByteArray) {
         withContext(Dispatchers.Default) {
             val results = List(CONCURRENCY_LEVEL) { async { block() } }.awaitAll()
