@@ -1,93 +1,107 @@
-# walt.id OpenID4VP Verifier Module
+<div align="center">
+<h1>OpenID4VP Verifier Implementation</h1>
+ <span>by </span><a href="https://walt.id">walt.id</a>
+ <p>Complete server-side implementation of the Verifier role for OpenID4VP 1.0<p>
 
-A server-side implementation of the **Verifier** role as defined in the **OpenID for Verifiable
-Presentations (OpenID4VP) 1.0** specification. It provides all the necessary tools to request,
-receive, and validate verifiable presentations from a Holder's Wallet with the OpenID4VP 1.0 flow.
+<a href="https://walt.id/community">
+<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
+</a>
+<a href="https://www.linkedin.com/company/walt-id/">
+<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
+</a>
+</div>
 
-This module is designed to be a flexible backend component to integrate into Verifier
-applications to verify user credentials.
+## What This Library Contains
 
-## Core Concepts
+A complete server-side implementation of the **Verifier** role as defined in **OpenID for Verifiable Presentations (OpenID4VP) 1.0**. This library provides all the necessary tools to request, receive, and validate verifiable presentations from a Holder's Wallet.
 
-To understand this module, it's helpful to be familiar with the OpenID4VP specification. Here are
-the key ideas:
+**This library handles:**
+- Creating and managing verification sessions
+- Generating authorization requests with DCQL queries
+- Validating presentations across multiple credential formats (SD-JWT VC, W3C VC, mdoc)
+- Checking DCQL fulfillment and credential set requirements
+- Session state management and lifecycle
 
-* **Verifier (Application)**: An entity that needs to verify credentials. This module
-  implements the Verifier's logic.
-* **Holder (End-User)**: The person who possesses the credentials.
-* **Wallet**: The Holder's application (e.g., a mobile app) that stores credentials and creates
-  presentations.
-* **Presentation**: Data derived from one or more credentials, created by the Wallet for a specific
-  Verifier.
-* **DCQL (Digital Credentials Query Language)**: A JSON-based language used by the Verifier to
-  specify exactly which credentials and claims it needs.
-* **Same-Device Flow**: The user interacts with your application and their Wallet on the same
-  device (e.g., a mobile phone).
-* **Cross-Device Flow**: The user interacts with your application on one device (e.g., a desktop
-  browser) and uses their Wallet on another (e.g., a mobile phone), typically by scanning a QR code.
+## Main Purpose
 
------
+This library enables you to build Verifier applications that request and verify digital credentials from Wallets. It's designed to be a flexible backend component that integrates into your Verifier application.
 
-## Key Features
+**Use this library when:**
+- Building a service that needs to verify user credentials
+- Implementing OpenID4VP 1.0 verifier functionality
+- Creating verification flows for age verification, identity proofing, or access control
+- Building kiosk or web applications that request credentials
 
-This module is packed with features that make implementing a Verifier simple and robust.
+## Key Concepts
 
-* **Specification**: Implements the final version of the **OpenID for
-  Verifiable Presentations 1.0.
-* **Multi-Format Support**: Natively validates presentations in various formats, including:
-    * **SD-JWT VC** (`dc+sd-jwt`)
-    * **ISO mdoc** (`mso_mdoc`) for Mobile Driver's Licenses (mDL) and other mobile
-      documents
-    * **W3C Verifiable Credentials as JWT** (`jwt_vc_json`)
-* **Credential Queries**: Full support for the **Digital Credentials Query Language (
-  DCQL)**. You can:
-    * Request specific claims from credentials.
-    * Define complex presentation requirements using `credential_sets`, including
-      optional and required groups of credentials.
-* **Security**: Handles various security checks out-of-the-box:
-    * **Nonce validation** to prevent replay attacks.
-    * **Audience validation** to ensure the presentation was intended for your
-      application (`client_id` or `origin`).
-    * Cryptographic validation of presentation and credential signatures.
-* **Flexible Session Management**: Provides a stateful session manager (`Verifier2Manager`) to
-  handle the entire verification lifecycle, from request creation to final validation.
-* **Flow Agnostic**: Easily configure for both **Same-Device** and **Cross-Device**
-  presentation flows.
+### Verification Session
 
------
+A `Verification2Session` represents a single verification flow from creation to completion. It contains:
+- Session ID and status
+- Authorization request with DCQL query
+- Validation results and presented credentials
+- Expiration and retention dates
 
-## Core Abstractions
+### DCQL Query
 
-Your application will primarily interact with these key components:
+The Digital Credentials Query Language (DCQL) query specifies what credentials you need. It defines:
+- Credential formats (e.g., `jwt_vc_json`, `dc+sd-jwt`, `mso_mdoc`)
+- Required claims with JSON paths
+- Claim value filters
+- Credential sets (combinations of credentials)
 
-| Class/Object                     | Description                                                                                                                                                                | Source File                         |
-|----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------|
-| `Verifier2Manager`               | The main entry point for creating and managing verification sessions. Use this to start a new verification flow.                                                           | `Verifier2Manager.kt`               |
-| `Verification2Session`           | The central state object for a single verification flow. It holds the session ID, status, authorization request, policies, and the final results.                          | `Verification2Session.kt`           |
-| `DcqlQuery`                      | A data class representing the DCQL query you send to the Wallet to define your credential requirements.                                                                    | `DcqlFulfillmentChecker.kt`         |
-| `Verifier2PresentationValidator` | The core validation engine. It dispatches the raw presentation string to the appropriate format-specific validator (`SdJwt...`, `Mdoc...`, etc.).                          | `Verifier2PresentationValidator.kt` |
-| `DcqlFulfillmentChecker`         | A utility that checks if the set of successfully validated presentations satisfies the rules defined in the original `DcqlQuery`, especially when using `credential_sets`. | `DcqlFulfillmentChecker.kt`         |
+See [waltid-dcql](../../credentials/waltid-dcql/README.md) for complete DCQL documentation.
 
------
+### Response Modes
 
-## Usage Workflow
+The library supports multiple response delivery modes:
+- **Same-Device Flow**: User interacts with your application and Wallet on the same device (redirect-based)
+- **Cross-Device Flow**: User interacts with your application on one device and Wallet on another (QR code + `direct_post`)
 
-Here’s a step-by-step guide to integrating the verifier module into your application.
+### Presentation Validation
 
-### Step 1: Create a Verification Session
+The library validates presentations in multiple formats:
+- **SD-JWT VC** (`dc+sd-jwt`) - Including selective disclosure verification
+- **W3C VC** (`jwt_vc_json`) - JWT-signed Verifiable Credentials
+- **mdoc** (`mso_mdoc`) - ISO mobile documents with full chain validation
 
-The flow begins when you create a `Verification2Session`. This is done by calling
-`Verifier2Manager.createVerificationSession`. You need to provide a `DcqlQuery` that specifies what
-you want to verify.
+## Assumptions and Dependencies
+
+### Multiplatform Support
+
+Works on JVM (Kotlin/Java), JavaScript, and iOS platforms (iOS requires `enableIosBuild=true` Gradle property).
+
+### Dependencies
+
+- **waltid-openid4vp** - Core OpenID4VP models
+- **waltid-dcql** - DCQL query models and fulfillment checking
+- **waltid-digital-credentials** - Credential format validators and parsers
+- **waltid-verification-policies2** - Verification policies for credential validation
+
+### Storage Requirements
+
+You must provide session storage (database, cache, or in-memory). The library manages session state but doesn't persist it.
+
+## How to Use This Library
+
+### Integration Workflow
+
+Here's a step-by-step guide to integrating the verifier library into your application.
+
+#### Step 1: Create a Verification Session
+
+Create a `Verification2Session` when you need to request credentials. Define your requirements using DCQL.
 
 ```kotlin
+import id.walt.openid4vp.verifier.Verifier2Manager
+import id.walt.dcql.models.*
+
 // 1. Define your credential requirements using DCQL
 val dcqlQuery = DcqlQuery(
     credentials = listOf(
         CredentialQuery(
             id = "eu-pid", // An ID to reference this query
             format = CredentialFormat.DC_SD_JWT,
-            meta = MsoMdocMeta("my.doctype.here"),
             claims = listOf(
                 ClaimsQuery(path = listOf("given_name")),
                 ClaimsQuery(path = listOf("family_name")),
@@ -104,148 +118,151 @@ val setup = VerificationSessionSetup(dcqlQuery = dcqlQuery)
 val newSession = Verifier2Manager.createVerificationSession(
     setup = setup,
     clientId = "did:key:z6MkrpCPDs58tC97bSotN5wMv2fAFsAm5is8x8Wc7m7yTj1y", // Your Verifier's identifier
-    uriPrefix = "https://verifier.example.com/api/v2/verification" // The base URL for your endpoints
+    uriPrefix = "https://verifier.example.com/api/v2/verification" // Base URL for your endpoints
 )
 
-// 4. Store the session object (e.g., in a database or in-memory cache) keyed by newSession.id
-// sessionCache.put(newSession.id, newSession)
+// 4. Store the session (e.g., in a database or cache)
+sessionCache.put(newSession.id, newSession)
 
-// 5. Get the response, which contains the URLs for the Wallet
+// 5. Get URLs for the Wallet
 val response = newSession.toSessionCreationResponse()
 val authorizationRequestUrl = response.fullAuthorizationRequestUrl // For same-device
 val bootstrapUrl = response.bootstrapAuthorizationRequestUrl // For cross-device (render as QR code)
-
-// Send `authorizationRequestUrl` or `bootstrapUrl` to your frontend.
 ```
 
-### Step 2: Expose Request Endpoints
+#### Step 2: Expose Request Endpoints
 
-Your application must expose two HTTP endpoints based on the URLs generated in Step 1.
+Your application must expose HTTP endpoints for the Wallet to interact with.
 
-1. **Authorization Request Endpoint** (`/api/v2/verification/{sessionId}/request`):
-   When the Wallet fetches this URL, it should return the Authorization Request.
+**Authorization Request Endpoint** (`/api/v2/verification/{sessionId}/request`):
+```kotlin
+// Example using Ktor
+get("/api/v2/verification/{sessionId}/request") {
+    val sessionId = call.parameters["sessionId"]!!
+    val session = sessionCache.get(sessionId) // Retrieve from your storage
+    call.respondText(session.authorizationRequest.toJwt())
+}
+```
 
-   ```kotlin
-   // Example using Ktor
-   get("/api/v2/verification/{sessionId}/request") {
-       val sessionId = call.parameters["sessionId"]!!
-       val session = sessionCache.get(sessionId) // Retrieve the session
-       // The module pre-formats the request JWT for you
-       call.respondText(session.authorizationRequest.toJwt())
-   }
-   ```
+**Response Endpoint** (`/api/v2/verification/{sessionId}/response`):
+This is where the Wallet POSTs the `vp_token`. This is where validation happens (see Step 3).
 
-2. **Response Endpoint** (`/api/v2/verification/{sessionId}/response`):
-   This is the `response_uri` where the Wallet will `POST` the `vp_token` after the user gives
-   consent. This is where the core verification logic happens.
+#### Step 3: Handle Presentation Submission
 
-### Step 3: Handle the Presentation Submission
-
-When a `POST` request hits your response endpoint, you need to parse the payload, retrieve the
-session, and start the validation process.
+When the Wallet POSTs the presentation, parse it and validate each credential.
 
 ```kotlin
+import id.walt.openid4vp.verifier.Verifier2PresentationValidator
+import id.walt.openid4vp.verifier.Verifier2Response
+
 // Example using Ktor
 post("/api/v2/verification/{sessionId}/response") {
     val sessionId = call.parameters["sessionId"]!!
     val session = sessionCache.get(sessionId)
     val params = call.receiveParameters()
 
-    val vpTokenString =
-        params["vp_token"] ?: return@post call.respond(Verifier2Response.MALFORMED_VP_TOKEN)
-    val state =
-        params["state"] ?: return@post call.respond(Verifier2Response.MISSING_STATE_PARAMETER)
+    val vpTokenString = params["vp_token"] 
+        ?: return@post call.respond(Verifier2Response.MALFORMED_VP_TOKEN)
+    val state = params["state"] 
+        ?: return@post call.respond(Verifier2Response.MISSING_STATE_PARAMETER)
 
-    // Check if the state matches the one in our session
+    // Validate state
     if (state != session.authorizationRequest.state) {
         return@post call.respond(Verifier2Response.INVALID_STATE_PARAMETER)
     }
 
-    // Now, let's validate the presentation...
-    // See Step 4
-}
-```
+    // Parse and validate presentations
+    val vpToken = Json.decodeFromString<Map<String, List<String>>>(vpTokenString)
+    val successfullyValidatedQueryIds = mutableSetOf<String>()
+    val allValidatedCredentials = mutableMapOf<String, List<DigitalCredential>>()
 
-### Step 4: Validate Each Presentation in the `vp_token`
+    // Loop through each credential query
+    for ((queryId, presentations) in vpToken) {
+        val credentialQuery = session.authorizationRequest.dcqlQuery!!
+            .credentials.first { it.id == queryId }
 
-The `vp_token` can contain multiple presentations for different requested credentials. You must loop
-through them and validate each one.
+        for (presentationString in presentations) {
+            val validationResult = Verifier2PresentationValidator.validatePresentation(
+                presentationString = presentationString,
+                expectedFormat = credentialQuery.format,
+                expectedAudience = session.authorizationRequest.clientId!!,
+                expectedNonce = session.authorizationRequest.nonce!!,
+                responseUri = session.authorizationRequest.responseUri,
+                originalClaimsQuery = credentialQuery.claims
+            )
 
-```kotlin
-// Inside your response handler from Step 3...
-
-val vpToken = Json.decodeFromString<Map<String, List<String>>>(vpTokenString)
-val successfullyValidatedQueryIds = mutableSetOf<String>()
-val allValidatedCredentials = mutableMapOf<String, List<DigitalCredential>>()
-
-// Loop through each entry in the vp_token. The key is the `id` from your DCQL query.
-for ((queryId, presentations) in vpToken) {
-    val credentialQuery =
-        session.authorizationRequest.dcqlQuery!!.credentials.first { it.id == queryId }
-
-    for (presentationString in presentations) {
-        val validationResult = Verifier2PresentationValidator.validatePresentation(
-            presentationString = presentationString,
-            expectedFormat = credentialQuery.format,
-            expectedAudience = session.authorizationRequest.clientId!!, // Your Verifier ID
-            expectedNonce = session.authorizationRequest.nonce!!,
-            responseUri = session.authorizationRequest.responseUri,
-            originalClaimsQuery = credentialQuery.claims
-        )
-
-        if (validationResult.isSuccess) {
-            log.info { "Successfully validated presentation for query ID: $queryId" }
-            successfullyValidatedQueryIds.add(queryId)
-            allValidatedCredentials[queryId] = validationResult.getOrThrow().credentials
-        } else {
-            log.warn { "Presentation validation failed for query ID $queryId: ${validationResult.exceptionOrNull()?.message}" }
-            // Decide how to handle partial failures. For now, we'll fail the whole session.
-            session.status = Verification2Session.VerificationSessionStatus.FAILED
-            // sessionCache.put(session.id, session)
-            Verifier2Response.Verifier2Error.PRESENTATION_VALIDATION_FAILED.throwAsError()
-            // or: return@post call.respond("...")
+            if (validationResult.isSuccess) {
+                successfullyValidatedQueryIds.add(queryId)
+                allValidatedCredentials[queryId] = validationResult.getOrThrow().credentials
+            } else {
+                // Handle validation failure
+                session.status = Verification2Session.VerificationSessionStatus.FAILED
+                sessionCache.put(session.id, session)
+                return@post call.respond(Verifier2Response.Verifier2Error.PRESENTATION_VALIDATION_FAILED)
+            }
         }
     }
+
+    // Check overall DCQL fulfillment (especially credential_sets)
+    val overallFulfillment = DcqlFulfillmentChecker.checkOverallDcqlFulfillment(
+        dcqlQuery = session.authorizationRequest.dcqlQuery!!,
+        successfullyValidatedQueryIds = successfullyValidatedQueryIds
+    )
+
+    if (!overallFulfillment) {
+        session.status = Verification2Session.VerificationSessionStatus.FAILED
+        sessionCache.put(session.id, session)
+        return@post call.respond(Verifier2Response.Verifier2Error.REQUIRED_CREDENTIALS_NOT_PROVIDED)
+    }
+
+    // Verification successful!
+    session.status = Verification2Session.VerificationSessionStatus.SUCCESSFUL
+    session.presentedCredentials = allValidatedCredentials
+    sessionCache.put(session.id, session)
+
+    // Use validated credentials for your business logic
+    call.respond(HttpStatusCode.OK, mapOf("status" to "success"))
 }
 ```
 
-### Step 5: Check Overall DCQL Fulfillment
+### Key Components
 
-After validating the individual presentations, you need to check if the *set* of received
-presentations satisfies the overall `DcqlQuery`, especially the rules in `credential_sets`.
+| Component | Description | Usage |
+|-----------|-------------|-------|
+| `Verifier2Manager` | Main entry point for creating verification sessions | `Verifier2Manager.createVerificationSession()` |
+| `Verification2Session` | State object for a verification flow | Store and retrieve by session ID |
+| `Verifier2PresentationValidator` | Validates presentations in various formats | `validatePresentation()` |
+| `DcqlFulfillmentChecker` | Checks if presentations satisfy DCQL requirements | `checkOverallDcqlFulfillment()` |
 
-```kotlin
-// Inside your response handler, after the validation loop...
+### Supported Credential Formats
 
-val overallFulfillment = DcqlFulfillmentChecker.checkOverallDcqlFulfillment(
-    dcqlQuery = session.authorizationRequest.dcqlQuery!!,
-    successfullyValidatedQueryIds = successfullyValidatedQueryIds
-)
+- **SD-JWT VC** (`dc+sd-jwt`) - With selective disclosure verification
+- **W3C VC** (`jwt_vc_json`) - JWT-signed Verifiable Credentials
+- **mdoc** (`mso_mdoc`) - ISO mobile documents with certificate chain validation
 
-if (!overallFulfillment) {
-    log.warn { "DCQL fulfillment check failed for session ${session.id}." }
-    session.status = Verification2Session.VerificationSessionStatus.FAILED
-    // sessionCache.put(session.id, session)
-    Verifier2Response.Verifier2Error.REQUIRED_CREDENTIALS_NOT_PROVIDED.throwAsError()
-    // or: return@post call.respond("...")
-}
-```
+### Error Handling
 
-### Step 6: Finalize the Session
+The library provides `Verifier2Response` error types for common failures:
+- `MALFORMED_VP_TOKEN` - Invalid `vp_token` format
+- `MISSING_STATE_PARAMETER` - Missing `state` in response
+- `INVALID_STATE_PARAMETER` - `state` doesn't match session
+- `PRESENTATION_VALIDATION_FAILED` - Presentation validation failed
+- `REQUIRED_CREDENTIALS_NOT_PROVIDED` - DCQL fulfillment check failed
 
-If all checks pass, the verification is successful\! Update the session status and proceed with your
-application logic.
+## Related Libraries
 
-```kotlin
-// At the end of your response handler...
+- **[waltid-openid4vp](../waltid-openid4vp/README.md)** - Core OpenID4VP models and types
+- **[waltid-openid4vp-clientidprefix](../waltid-openid4vp-clientidprefix/README.md)** - Client ID prefix parsing and validation
+- **[waltid-openid4vp-verifier-openapi](../waltid-openid4vp-verifier-openapi/README.md)** - OpenAPI schema generation utilities
+- **[waltid-dcql](../../credentials/waltid-dcql/README.md)** - Digital Credentials Query Language models and fulfillment checking
+- **[waltid-digital-credentials](../../credentials/waltid-digital-credentials/README.md)** - Credential format validators and parsers
+- **[waltid-verification-policies2](../../credentials/waltid-verification-policies2/README.md)** - Verification policies for credential validation
 
-log.info { "Verification successful for session ${session.id}!" }
-session.status = Verification2Session.VerificationSessionStatus.SUCCESSFUL
-session.presentedCredentials = allValidatedCredentials
-// sessionCache.put(session.id, session)
+## Join the community
 
-// You can now use the validated credentials in `allValidatedCredentials`
-// for your business logic.
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
+* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
 
-call.respond(HttpStatusCode.OK, mapOf("status" to "success"))
-```
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
