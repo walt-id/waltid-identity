@@ -13,6 +13,8 @@
 
 Kotlin Multiplatform library that provides reusable verification policies for Digital Credentials (W3C VC, IETF SD-JWT WC, mDL/mdoc ISO 18013-5). It builds on top of the [walt.id generic Digital Credential interface](../waltid-digital-credentials) and powers high-level services such as the [walt.id Verifier APIs](../../services/waltid-verifier-api2).
 
+The main difference between this library and the legacy [`waltid-verification-policies`](../waltid-verification-policies) library is the focus on multiplatform, and the usage of the new `DigitalCredential` interface from `waltid-digital-credentials`. This allows the policies to be more stable and easier to use across different credential formats.
+
 ## Table of contents
 - [Features](#features)
 - [Supported platforms](#supported-platforms)

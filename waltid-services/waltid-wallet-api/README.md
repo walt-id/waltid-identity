@@ -25,6 +25,10 @@ credentials from various issuers and verifiers using the OIDC4VC protocol standa
 capabilities, it also supports the integration of web3 wallets. This feature enables your users to view their tokens
 from different blockchain ecosystems like Ethereum, Polygon, and more.
 
+# Protocol Support
+
+The wallet-api currently supports OpenID4VCI Draft 11 and Draft 13, and OpenID4VP Draft 14 and Draft 20.
+
 # How to use it
 
 ***Docker compose***

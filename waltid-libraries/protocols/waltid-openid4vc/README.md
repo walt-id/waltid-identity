@@ -6,12 +6,25 @@
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
 </a>
-<a href="https://twitter.com/intent/follow?screen_name=walt_id">
-<img src="https://img.shields.io/twitter/follow/walt_id.svg?label=Follow%20@walt_id" alt="Follow @walt_id" />
+<a href="https://www.linkedin.com/company/walt-id/">
+<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
 </a>
 
 
 </div>
+
+## Protocol Support
+
+This library implements the following protocols:
+- OpenID4VCI Draft 11 and Draft 13
+- OpenID4VP Draft 14 and Draft 20
+- SIOPv2
+
+While you may be able to use this library to partially support other draft versions of the protocols, the  versions above are the ones that have been implemented and tested in other walt.id projects.
+
+We have implemented OpenID4VP 1.0 through a set of libraries prefixed with `waltid-openid4vp-` within the same protocols folder as this library.
+
+Our implementation for OpenID4VCI 1.0 will also be released as a separate library.
 
 ## Installation
 Add the openid4vc library as a dependency to your Kotlin or Java project.
@@ -447,7 +460,7 @@ end
 
 ## Join the community
 
-* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [Twitter](https://mobile.twitter.com/walt_id)
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
 * Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
 
 
