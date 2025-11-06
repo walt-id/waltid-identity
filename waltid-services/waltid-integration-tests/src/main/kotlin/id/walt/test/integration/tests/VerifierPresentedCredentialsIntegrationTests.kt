@@ -46,7 +46,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         val issuerKey = loadJsonResource("issuance/key.json")
         val issuerDid = loadResource("issuance/did.txt")
 
-        private val universityDegreeNoDisclosuresIssuanceRequest = Json.Default.decodeFromString<IssuanceRequest>(
+        private val universityDegreeNoDisclosuresIssuanceRequest = Json.decodeFromString<IssuanceRequest>(
             """
         {
           "issuerKey": {
@@ -113,7 +113,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
             })
         }
 
-        private val openBadgeNoDisclosuresIssuanceRequest = Json.Default.decodeFromString<IssuanceRequest>(
+        private val openBadgeNoDisclosuresIssuanceRequest = Json.decodeFromString<IssuanceRequest>(
             string = loadResource("issuance/openbadgecredential-issuance-request.json")
         ).copy(
             issuerKey = issuerKey,
@@ -151,7 +151,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
                 ),
             ),
         )
-        private val universityDegreeWithDisclosuresPresentationRequest = Json.Default.decodeFromString<JsonObject>(
+        private val universityDegreeWithDisclosuresPresentationRequest = Json.decodeFromString<JsonObject>(
             """
         {
             "vp_policies": [
@@ -212,7 +212,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
                 ),
             ),
         )
-        private val openBadgeWithDisclosuresPresentationRequest = Json.Default.decodeFromString<JsonObject>(
+        private val openBadgeWithDisclosuresPresentationRequest = Json.decodeFromString<JsonObject>(
             """
         {
             "vp_policies": [
@@ -264,7 +264,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
     """.trimIndent()
         )
 
-        private val sdJwtVcIssuanceRequest = Json.Default.decodeFromString<IssuanceRequest>(
+        private val sdJwtVcIssuanceRequest = Json.decodeFromString<IssuanceRequest>(
             """
         {
             "issuerKey": {
@@ -316,7 +316,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         }
     """.trimIndent()
         )
-        private val sdJwtVcPresentationRequest = Json.Default.decodeFromString<JsonObject>(
+        private val sdJwtVcPresentationRequest = Json.decodeFromString<JsonObject>(
             """
         {
             "request_credentials": [
@@ -583,7 +583,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
         val openBadgeNoDisclosuresWalletCredentialId =
             defaultWalletApi.claimCredential(offerUrl).first().id
 
-        val sessionId = Uuid.Companion.random().toString()
+        val sessionId = Uuid.random().toString()
         val presentationUrl = verifierApi.verify(openBadgeNoDisclosurePresentationRequest, sessionId)
             .assertContainsPresentationDefinitionUri()
         defaultWalletApi.usePresentationRequest(
@@ -1013,7 +1013,7 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
 
     @Test
     fun queryPresentedCredentialsAfterInvalidVpTokenSubmission() = runTest {
-        val sessionId = Uuid.Companion.random().toString()
+        val sessionId = Uuid.random().toString()
         verifierApi.verify(universityDegreeWithDisclosuresPresentationRequest, sessionId)
             .assertContainsPresentationDefinitionUri()
 
@@ -1028,14 +1028,14 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
             """{"id":"X0zlmZ3BuJNS","definition_id":"X0zlmZ3BuJNS","descriptor_map":[{"id":"UniversityDegreeCredential","format":"jwt_vp","path":"${'$'}","path_nested":{"format":"jwt_vc","path":"${'$'}.vp.verifiableCredential[0]"}}]}"""
 
         val dummyVpToken = dummyEcKey.signJws(
-            plaintext = Json.Default.encodeToString(buildJsonObject {
+            plaintext = Json.encodeToString(buildJsonObject {
                 put("kati", "allo".toJsonElement())
             }).toByteArray(),
         )
 
         val failure = verifierApi.client.submitForm(
             url = "/openid4vc/verify/${sessionId}",
-            formParameters = Parameters.Companion.build {
+            formParameters = Parameters.build {
                 append("vp_token", dummyVpToken)
                 append("presentation_submission", dummyPresentationSubmissionString)
                 append("state", sessionId)

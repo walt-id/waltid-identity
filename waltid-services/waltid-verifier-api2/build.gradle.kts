@@ -98,8 +98,10 @@ dependencies {
     api(project(":waltid-libraries:credentials:waltid-dcql"))
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
     api(project(":waltid-libraries:credentials:waltid-verification-policies2"))
+    api(project(":waltid-libraries:credentials:waltid-vical"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier"))
+    api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier-openapi"))
     implementation(project(":waltid-libraries:web:waltid-ktor-notifications"))
 }
 tasks.withType<Zip> {
@@ -226,7 +228,7 @@ ktor {
     jib {
         container {
             mainClass = "id.walt.openid4vp.verifier.MainKt"
-            workingDirectory = "/waltid-verifier-api"
+            workingDirectory = "/waltid-verifier-api2"
         }
         from {
             platforms {

@@ -6,7 +6,6 @@ import id.walt.policies2.policies.JsonSchemaPolicy
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Duration
@@ -54,7 +53,7 @@ data class ExpirationDatePolicyException(
 @Serializable
 @SerialName("WebhookPolicyException")
 data class WebhookPolicyException(
-    val response: JsonObject,
+    val response: JsonElement,
 ) : SerializableRuntimeException()
 
 @JsExport
@@ -110,7 +109,7 @@ class HolderBindingException(
 @Serializable
 @SerialName("NotAllowedIssuerException")
 class NotAllowedIssuerException(
-    val issuer: String,
+    val issuer: String?,
     val allowedIssuers: List<String>,
 ) : SerializableRuntimeException()
 

@@ -35,7 +35,7 @@ jobs:
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@a4a92e12ee9b7396ee9a22083ff21b3277c627d6
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@0d1d3a9838e7266c3ac353d3bb627c5161bb43eb
       - name: Patch *.gradle.kts for CI paths
         run: |
           sed -i '/allprojects {/,/}/{s/version = ".*"/version = "${{ inputs.version }}"/}' build.gradle.kts
@@ -60,7 +60,7 @@ jobs:
         continue-on-error: false
       - name: Upload artifact
         if: ${{ inputs.artifact }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.image }}
           path: ${{ runner.temp }}/${{ matrix.image }}.tar.gz

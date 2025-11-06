@@ -5,6 +5,7 @@ import id.walt.policies.policies.status.bit.BitValueReaderFactory
 import id.walt.policies.policies.status.content.JsonElementParser
 import id.walt.policies.policies.status.content.JwtParser
 import id.walt.policies.policies.status.entry.IETFEntryExtractor
+import id.walt.policies.policies.status.entry.MDocEntryExtractor
 import id.walt.policies.policies.status.entry.W3CEntryExtractor
 import id.walt.policies.policies.status.expansion.TokenStatusListExpansionAlgorithm
 import id.walt.policies.policies.status.expansion.W3cStatusListExpansionAlgorithmFactory
@@ -33,7 +34,9 @@ object StatusPolicyImplementation {
 
     private val w3cEntryExtractor = W3CEntryExtractor()
 
-    private val ietfEntryExtractor = IETFEntryExtractor()
+    private val mdocEntryExtractor = MDocEntryExtractor()
+
+    private val ietfEntryExtractor = IETFEntryExtractor(mdocExtractor = mdocEntryExtractor)
 
     private val w3cEntryContentParser = JsonElementParser(serializer<W3CEntry>())
 

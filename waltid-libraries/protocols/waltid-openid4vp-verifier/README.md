@@ -81,10 +81,6 @@ The flow begins when you create a `Verification2Session`. This is done by callin
 you want to verify.
 
 ```kotlin
-import id.walt.dcql.models.*
-import id.walt.dcql.models.meta.MsoMdocMeta
-import id.walt.openid4vp.verifier.Verifier2Manager.VerificationSessionSetup
-
 // 1. Define your credential requirements using DCQL
 val dcqlQuery = DcqlQuery(
     credentials = listOf(
@@ -176,9 +172,6 @@ The `vp_token` can contain multiple presentations for different requested creden
 through them and validate each one.
 
 ```kotlin
-import id.walt.openid4vp.verifier.verification.Verifier2PresentationValidator
-import kotlinx.serialization.json.Json
-
 // Inside your response handler from Step 3...
 
 val vpToken = Json.decodeFromString<Map<String, List<String>>>(vpTokenString)
@@ -222,8 +215,6 @@ After validating the individual presentations, you need to check if the *set* of
 presentations satisfies the overall `DcqlQuery`, especially the rules in `credential_sets`.
 
 ```kotlin
-import id.walt.openid4vp.verifier.verification.DcqlFulfillmentChecker
-
 // Inside your response handler, after the validation loop...
 
 val overallFulfillment = DcqlFulfillmentChecker.checkOverallDcqlFulfillment(

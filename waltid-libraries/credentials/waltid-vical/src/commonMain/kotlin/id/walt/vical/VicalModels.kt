@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-
+import kotlinx.serialization.json.JsonObject
 /**
  * Represents the payload of a VICAL. This data class is aligned with the CDDL structure
  * defined in ISO/IEC 18013-5, Annex C.1.7.1.
@@ -157,4 +157,17 @@ data class CertificateInfo(
             |--- End of VICAL Certificate Entry ---
             """.trimMargin()
 }
+
+@Serializable
+data class VicalFetchRequest(val vicalUrl: String)
+
+@Serializable
+data class VicalFetchResponse(val vicalBase64: String? = null)
+
+@Serializable
+data class VicalValidationRequest(val verificationKey: JsonObject, val vicalBase64: String)
+
+@Serializable
+data class VicalValidationResponse(val vicalValid: Boolean, val vicalBase64: String? = null)
+
 

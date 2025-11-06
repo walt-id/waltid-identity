@@ -1,9 +1,6 @@
 package id.walt.commons.logging
 
-import id.walt.commons.logging.setups.DebugLoggingSetup
-import id.walt.commons.logging.setups.DefaultLoggingSetup
-import id.walt.commons.logging.setups.LoggingSetup
-import id.walt.commons.logging.setups.TraceLoggingSetup
+import id.walt.commons.logging.setups.*
 import io.klogging.config.loggingConfiguration
 
 object LoggingManager {
@@ -26,6 +23,8 @@ object LoggingManager {
             DefaultLoggingSetup, // <- default
             DebugLoggingSetup,
             TraceLoggingSetup,
+            ErrorLoggingSetup,
+            ConfigFileLoggingSetup,
             // ..., extend here <---
         ).associateBy { it.name }
 
@@ -55,7 +54,6 @@ object LoggingManager {
 
     fun useLoggingSetup(logLevel: String, logType: RenderStrings?) {
         loggingSetup = loggingSetups[logLevel] ?: error("invalid log level supplied: $logLevel")
-
         logType?.let { LogStringManager.selectedRenderString = logType }
     }
 

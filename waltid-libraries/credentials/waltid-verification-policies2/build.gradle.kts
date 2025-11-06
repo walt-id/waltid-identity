@@ -25,9 +25,6 @@ kotlin {
     jvm()
 
     js(IR) {
-        browser {
-
-        }
         nodejs {
             generateTypeScriptDefinitions()
         }
@@ -67,8 +64,22 @@ kotlin {
                 /*
                  * walt.id:
                  */
+                implementation(project(":waltid-libraries:crypto:waltid-x509"))
+                implementation(project(":waltid-libraries:credentials:waltid-vical"))
                 implementation(project(":waltid-libraries:credentials:waltid-dcql"))
                 implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
+            }
+        }
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+                implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
+            }
+        }
+        val jvmTest by getting {
+            dependencies {
+                implementation("org.slf4j:slf4j-simple:2.0.16")
             }
         }
     }

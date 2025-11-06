@@ -1,5 +1,7 @@
 package id.walt.mdoc.verification
 
+import id.walt.cose.CoseCertificate
+import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseVerifier
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.jwk.JWKKey
@@ -14,7 +16,9 @@ import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.parser.MdocParser
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.json.JsonObject
+import kotlin.io.encoding.Base64
 import kotlin.time.ExperimentalTime
 
 /**
@@ -33,6 +37,8 @@ object MdocVerifier {
     suspend fun verify(mdocString: String, context: VerificationContext): VerificationResult {
         val document = MdocParser.parseToDocument(mdocString)
         val sessionTranscript = MdocCryptoHelper.reconstructOid4vpSessionTranscript(context)
+        log.trace { "SessionTranscript: $sessionTranscript" }
+        log.trace { "SessionTranscript (hex): ${coseCompliantCbor.encodeToHexString(sessionTranscript)}" }
         return verify(document, sessionTranscript)
     }
 
@@ -45,13 +51,23 @@ object MdocVerifier {
 
         // Step 1: Parse Document from credential payload
         val mso = document.issuerSigned.decodeMobileSecurityObject()
+        log.trace { "Decoded MSO (MobileSecurityObject): $mso" }
 
         // Execute subsequent verification steps, collecting results and errors
         val issuerAuthResult = runCatching { verifyIssuerAuthentication(document) }
+        log.trace { "Issuer auth result: $issuerAuthResult" }
+
         val msoTimestampsResult = runCatching { verifyMso(mso) }
+        log.trace { "MSO Timestamp result: $msoTimestampsResult" }
+
         val deviceAuthResult = runCatching { verifyDeviceAuthentication(document, mso, sessionTranscript) }
+        log.trace { "Device authentication result: $deviceAuthResult" }
+
         val dataIntegrityResult = runCatching { verifyIssuerSignedDataIntegrity(document, mso) }
+        log.trace { "Issuer-signed data integrity result: $dataIntegrityResult" }
+
         val keyAuthzResult = runCatching { verifyDeviceKeyAuthorization(document, mso) }
+        log.trace { "Key authorization result: $keyAuthzResult" }
 
         // Populate errors list from failed steps
         issuerAuthResult.exceptionOrNull()?.let { errors.add("Issuer Authentication failed: ${it.message}") }
@@ -65,6 +81,11 @@ object MdocVerifier {
         val docType = document.docType
         val credentialData = mergeMdocDataToJson(document)
 
+        val issuerAuthOrNull = issuerAuthResult.getOrNull()
+        val x5c = issuerAuthOrNull?.first?.map { Base64.encode(it.rawBytes) }
+        val signerKey = issuerAuthOrNull?.second?.let { DirectSerializedKey(it) }
+
+
         return VerificationResult(
             valid = isValid,
             issuerSignatureValid = issuerAuthResult.isSuccess,
@@ -74,7 +95,8 @@ object MdocVerifier {
             deviceKeyAuthorized = keyAuthzResult.isSuccess,
 
             docType = docType,
-            issuerKey = DirectSerializedKey(issuerAuthResult.getOrThrow()),
+            x5c = x5c,
+            signerKey = signerKey,
             credentialData = credentialData,
 
             errors = errors
@@ -97,9 +119,13 @@ object MdocVerifier {
         return mdocCredentialData
     }
 
-    suspend fun verifyIssuerAuthentication(document: Document): JWKKey {
+    suspend fun verifyIssuerAuthentication(document: Document): Pair<List<CoseCertificate>, JWKKey> {
+        log.trace { "--- Verifying issuer authentication ---" }
         val issuerAuth = document.issuerSigned.issuerAuth
-        val signerCertificateBytes = issuerAuth.unprotected.x5chain?.first()?.rawBytes
+        val x5c = issuerAuth.unprotected.x5chain
+        requireNotNull(x5c) { "Missing certificate chain in mdocs credential" }
+
+        val signerCertificateBytes = x5c.first()?.rawBytes
             ?: throw IllegalArgumentException("Missing signer certificate in x5chain.")
 
         log.trace {
@@ -110,13 +136,15 @@ object MdocVerifier {
         val issuerKey = JWKKey.importFromDerCertificate(signerCertificateBytes).getOrThrow()
         log.trace { "Signer key to be used: $issuerKey" }
 
+        log.trace { "Verifying issuer auth signature with signer key..." }
         if (!issuerAuth.verify(issuerKey.toCoseVerifier())) {
             throw IllegalArgumentException("IssuerAuth COSE_Sign1 signature is invalid.")
         }
-        return issuerKey
+        return x5c to issuerKey
     }
 
     fun verifyMso(mso: MobileSecurityObject) {
+        log.trace { "--- Verifying MSO ---" }
         val timestamps = mso.validityInfo
         timestamps.validate()
 
@@ -127,20 +155,27 @@ object MdocVerifier {
     }
 
     suspend fun verifyDeviceAuthentication(document: Document, mso: MobileSecurityObject, sessionTranscript: SessionTranscript) {
-        val deviceSigned = document.deviceSigned ?: throw IllegalArgumentException("DeviceSigned structure is missing.")
-        val devicePublicKey = JWKKey.importJWK(mso.deviceKeyInfo.deviceKey.toJWK().toString()).getOrThrow()
+        log.trace { "--- Verifying device authentication ---" }
 
+        val deviceSigned = document.deviceSigned ?: throw IllegalArgumentException("DeviceSigned structure is missing.")
+        log.trace { "Device signed: $deviceSigned" }
+
+        val devicePublicKey = JWKKey.importJWK(mso.deviceKeyInfo.deviceKey.toJWK().toString()).getOrThrow()
+        log.trace { "Device public key: $devicePublicKey" }
 
         val deviceAuth = deviceSigned.deviceAuth
+        log.trace { "Device auth (of device signed): $deviceAuth" }
 
         val deviceAuthBytes = MdocCryptoHelper.buildDeviceAuthenticationBytes(
             sessionTranscript,
             document.docType,
             deviceSigned.namespaces
         )
+        log.trace { "Device auth bytes (hex): ${deviceAuthBytes.toHexString()}" }
 
         when {
             deviceAuth.deviceSignature != null -> {
+                log.trace { "Device auth contains device signature: ${deviceAuth.deviceSignature}" }
                 require(
                     MdocCrypto.verifyDeviceSignature(
                         payloadToVerify = deviceAuthBytes,

@@ -14,9 +14,9 @@ import javax.security.auth.x500.X500Principal
 
 object TestServer {
 
-    private const val DID_WEB_PORT = 8888
-    const val DID_WEB_SSL_PORT = 8443
-    
+    private const val DID_WEB_PORT = 10888
+    const val DID_WEB_SSL_PORT = 10443
+
     private const val DID_WEB_PORT_PLACEHOLDER = "<DID_WEB_PORT>"
 
     private val keyStoreFile = File(this.javaClass.classLoader.getResource("")!!.path.plus("keystore.jks"))
@@ -25,7 +25,7 @@ object TestServer {
         URI(this.javaClass.classLoader.getResource(fileName)!!.toString()).path.let {
             File(it).readText().replace(DID_WEB_PORT_PLACEHOLDER, DID_WEB_SSL_PORT.toString())
         }
-        
+
     private val multiKeyDocumentResponse =
         URI(this.javaClass.classLoader.getResource("did-web/multi-key.json")!!.toString()).path.let { File(it).readText() }
     private val keyStore = buildKeyStore {

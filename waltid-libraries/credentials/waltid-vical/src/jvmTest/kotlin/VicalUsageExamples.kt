@@ -59,7 +59,7 @@ class VicalUsageExamples {
             // 4. SIGN: Create a CoseSigner from the key and sign the VICAL data.
             println("Signing VICAL...")
             val signer = vicalProviderKey.toCoseSigner()
-            val signedVical = Vical.Companion.createAndSign(
+            val signedVical = Vical.createAndSign(
                 vicalData = vicalData,
                 signer = signer,
                 algorithmId = Cose.Algorithm.ES256, // ES256 for secp256r1 = -7
@@ -77,7 +77,7 @@ class VicalUsageExamples {
 
             // 6. DECODE: A client receives the bytes and decodes them into a Vical object.
             println("Decoding VICAL...")
-            val receivedVical = Vical.Companion.decode(vicalBytes)
+            val receivedVical = Vical.decode(vicalBytes)
             println("Step 5: Client decoded the VICAL.")
             println(" - Provider: ${receivedVical.vicalData.vicalProvider}")
             println(" - Certificates found: ${receivedVical.vicalData.certificateInfos.size}")

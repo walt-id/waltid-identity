@@ -10,7 +10,7 @@ import kotlinx.serialization.json.encodeToJsonElement
 
 @Serializable
 @SerialName("regex")
-class CredentialDataMatcherPolicy(
+data class CredentialDataMatcherPolicy(
     val path: String,
     val regex: String,
     @SerialName("regex_options")

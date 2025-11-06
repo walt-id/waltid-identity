@@ -6,6 +6,7 @@ import com.atlassian.onetime.model.EmailAddress
 import com.atlassian.onetime.model.Issuer
 import com.atlassian.onetime.model.TOTPSecret
 import com.atlassian.onetime.service.DefaultTOTPService
+import id.walt.commons.web.OTPAuthException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
@@ -31,8 +32,8 @@ object TOTP : AuthenticationMethod("totp") {
 
         val service = DefaultTOTPService()
         authCheck(
-            service.verify(userProvidedOtpCode, secret).isSuccess()
-        ) { "Invalid OTP" }
+            service.verify(userProvidedOtpCode, secret).isSuccess() , OTPAuthException()
+        )
     }
 
     @Serializable
@@ -48,9 +49,10 @@ object TOTP : AuthenticationMethod("totp") {
         }) {
             val session = call.getAuthSession(authContext)
 
-            val otp = when (call.request.contentType()) {
-                ContentType.Application.Json -> call.receive<TOTPCode>().code
-                ContentType.Application.FormUrlEncoded ->
+            val contentType = call.request.contentType()
+            val otp = when {
+                contentType.match(ContentType.Application.Json) -> call.receive<TOTPCode>().code
+                contentType.match(ContentType.Application.FormUrlEncoded) ->
                     call.receiveParameters()["code"] ?: error("Invalid or missing OTP code form post request.")
 
                 else -> call.receiveText()

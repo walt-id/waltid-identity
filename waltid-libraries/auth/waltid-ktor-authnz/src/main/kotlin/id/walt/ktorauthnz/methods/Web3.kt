@@ -2,6 +2,8 @@
 
 package id.walt.ktorauthnz.methods
 
+import id.walt.commons.web.InvalidChallengeException
+import id.walt.commons.web.Web3AuthException
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -87,9 +89,9 @@ object Web3 : AuthenticationMethod("web3") {
 
         val recoveredAddress = "0x" + Keys.getAddress(recoveredKey)
 
-        authCheck(recoveredAddress.equals(expectedAddress, ignoreCase = true)) {
-            "Recovered address ($recoveredAddress) does not match provided address (${expectedAddress})"
-        }
+        authCheck(recoveredAddress.equals(expectedAddress, ignoreCase = true) ,
+            Web3AuthException("Recovered address ($recoveredAddress) does not match provided address (${expectedAddress})")
+        )
 
         return recoveredAddress
     }
@@ -100,7 +102,7 @@ object Web3 : AuthenticationMethod("web3") {
         val challenge = siweReq.challenge
         log.trace { "Challenge was: $challenge. Verifying challenge authenticity..." }
 
-        authCheck(jwtHandler.validateToken(challenge)) { "Cannot verify that nonce was supplied by system." }
+        authCheck(jwtHandler.validateToken(challenge) , InvalidChallengeException())
         log.trace { "Challenge is authentic. Verifying challenge timestamp..." }
 
         val decodedJwt = challenge.decodeJws()

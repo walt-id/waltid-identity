@@ -1,6 +1,5 @@
 package id.walt.dcql.models
 
-import id.walt.dcql.models.meta.NoMeta
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -24,9 +23,10 @@ data class DcqlQuery(
             throw IllegalArgumentException("Requested dcql query: credential has empty id")
         }
 
+        /* // See OSS #1270
         if (credentials.any { it.meta == NoMeta }) {
             throw IllegalArgumentException("Requested dcql query: credential has no meta field")
-        }
+        }*/
 
         if (credentials.any { it.claims != null && it.claims.isEmpty() }) {
             throw IllegalArgumentException("Requested dcql query: claims was set, but has no elements")

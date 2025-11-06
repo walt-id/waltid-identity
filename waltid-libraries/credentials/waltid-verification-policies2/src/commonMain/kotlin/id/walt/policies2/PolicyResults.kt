@@ -8,7 +8,7 @@ import kotlinx.serialization.json.JsonElement
 data class PolicyResult(
     val policy: VerificationPolicy2,
     val success: Boolean,
-    val result: JsonElement?,
+    val result: JsonElement? = null,
     val error: String? = null
 )
 
