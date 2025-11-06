@@ -11,6 +11,7 @@ object VerificationSessionCreateOpenApi {
     val createDocs: RouteConfig.() -> Unit = {
         summary = "Create new verification session"
         request {
+            headerParameter<String>("X-Request-Id")
             body<VerificationSessionSetup> {
                 example("Basic example") { value = Verifier2OpenApiExamples.basicExample }
                 example("W3C + path") { value = exampleOf(Verifier2OpenApiExamples.w3cPlusPath) }
