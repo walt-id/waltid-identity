@@ -12,8 +12,8 @@ class ConformanceTests {
 
     companion object {
         val verifier2UrlPrefix: String = "https://verifier2.localhost/verification-session" // "https://xyz.ngrok-free.app/verification-session"
-        val conformanceHost: String = "conformance.waltid.cloud" // "localhost.emobix.co.uk"
-        val conformancePort: Int = 443 // 8443
+        val conformanceHost: String = "localhost.emobix.co.uk" // "conformance.waltid.cloud"
+        val conformancePort: Int = 8443 // 443
 
         val conformanceServerVersionResult = runBlocking {
             runCatching {
