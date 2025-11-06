@@ -1,7 +1,9 @@
 package id.walt.ktorauthnz
 
 import id.walt.ktorauthnz.flows.AuthFlow
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class AuthContext(
     /**
      * Tenant discriminator in multi-tenant systems
@@ -22,6 +24,11 @@ data class AuthContext(
      * For implicit session start the auth flow is necessary
      */
     val initialFlow: AuthFlow? = null,
+
+    /**
+     * If the token should only be set as cookie, or also returned on auth success (for JavaScript use)
+     */
+    val revealTokenToClient: Boolean = true
 ) {
 
     init {

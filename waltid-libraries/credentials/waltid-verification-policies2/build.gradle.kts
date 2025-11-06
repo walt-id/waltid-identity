@@ -73,7 +73,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
                 implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
             }
         }

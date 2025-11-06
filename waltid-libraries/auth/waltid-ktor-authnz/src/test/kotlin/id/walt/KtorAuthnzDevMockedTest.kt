@@ -51,9 +51,9 @@ class KtorAuthnzDevMockedTest {
         }
 
         val sessionStore = KtorAuthnzManager.sessionStore as InMemorySessionStore
-        sessionStore.wip_sessions["dev-session"] = AuthSession(
+        sessionStore.sessions["dev-session"] = AuthSession(
             id = "dev-session",
-            status = AuthSessionStatus.OK,
+            status = AuthSessionStatus.SUCCESS,
             token = "dev-token",
             accountId = "11111111-1111-1111-1111-000000000000"
         )

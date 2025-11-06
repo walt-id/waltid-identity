@@ -10,7 +10,7 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Redis/Valkey/KeyDB Token Store
+ * Redis/Valkey/Redict/KeyDB Token Store
  */
 class ValkeyAuthnzTokenStore(
     val unixsocket: String?,
