@@ -378,8 +378,6 @@ fun Application.test() {
                 nonce = req.nonce,
             )
             val idToken = signPayload(Json.encodeToJsonElement(idTokenData).jsonObject)
-            //"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwidHlwZSI6ImFjY2VzcyB0b2tlbiIsImlhdCI6MTUxNjIzOTAyMn0.85jA3wiQSdd6Vm_pCe4BXt6ALhrOX4-mmBrN5L7gGz4"
-
 
             val tokenResponse = TokenResponse(
                 idToken = idToken,

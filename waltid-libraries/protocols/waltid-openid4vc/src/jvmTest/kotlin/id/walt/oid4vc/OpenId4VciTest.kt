@@ -43,7 +43,7 @@ import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
-class OpenID4VCI_Test {
+class OpenId4VciTest {
     val CREDENTIAL_OFFER_BASE_URL = "openid-credential-offer://test"
 
     val DEPLOYED_ISSUER_BASE_URL = "https://issuer.portal.test.waltid.cloud"
