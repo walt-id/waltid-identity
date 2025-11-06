@@ -424,7 +424,7 @@ class CI_JVM_Test {
     suspend fun entraAuthorize(): String {
         val tenantId = "8bc955d9-38fd-4c15-a520-0c656407537a"
         val clientId = "e50ceaa6-8554-4ae6-bfdf-fd95e2243ae0"
-        val clientSecret = "ctL8Q~Ezdrcrju85gEtvbCmQQDmm7bXjJKsdXbCr"
+        val clientSecret = "<your-client-secret>"
         val response = http.submitForm("https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token", parameters {
             append("client_id", clientId)
             append("scope", "3db474b9-6a0c-4840-96ac-1fceb342124f/.default")
