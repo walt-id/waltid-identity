@@ -282,7 +282,7 @@ fun Application.test() {
                     call.respondText(
                         """
                             <html><body>
-                            <p>Not presented yet, please try again<p>
+                            <p>Not presented yet, please try again</p>
                             <p>Present your credential: <code>$url</code> (just imagine real hard that this is a QR code)</p>
                             <a href="/login?state=${state}"><button>Present</button></a> Click here when presented (just imagine real hard that this is automatic)
                         </body></html>
