@@ -17,6 +17,7 @@ import id.walt.credentials.signatures.SdJwtCredentialSignature
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.utils.JwtUtils
 import id.walt.credentials.utils.JwtUtils.isJwt
+import id.walt.credentials.utils.SdJwtUtils.dropDollarPrefix
 import id.walt.credentials.utils.SdJwtUtils.getSdArrays
 import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
 import id.walt.crypto.keys.DirectSerializedKey
@@ -181,6 +182,8 @@ object CredentialParser {
         signature: String,
     ): Pair<CredentialDetectionResult, DigitalCredential> {
         val containedDisclosables = payload.getSdArrays()
+        val containedDisclosablesSaveable = containedDisclosables.dropDollarPrefix()
+
         val containsDisclosures = containedDisclosables.count() >= 1
 
         fun detectedSdjwtSigned(
@@ -242,7 +245,7 @@ object CredentialParser {
                 detectedSdjwtSigned(CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvcdm) to
                         SdJwtCredential(
                             dmtype = SDJWTVCSubType.sdjwtvcdm,
-                            disclosables = containedDisclosables,
+                            disclosables = containedDisclosablesSaveable,
                             disclosures = availableDisclosures,
                             signature = SdJwtCredentialSignature(plainSignature, header, availableDisclosures),
                             signed = signedCredentialWithoutDisclosures,
@@ -259,7 +262,7 @@ object CredentialParser {
                 val w3cModelVersion = detectW3CDataModelVersion(payload)
                 val credential = when (w3cModelVersion) {
                     W3CSubType.W3C_1_1 -> W3C11(
-                        disclosables = containedDisclosables,
+                        disclosables = containedDisclosablesSaveable,
                         disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(plainSignature, header, availableDisclosures),
                         signed = signedCredentialWithoutDisclosures,
@@ -272,7 +275,7 @@ object CredentialParser {
                     )
 
                     W3CSubType.W3C_2 -> W3C2(
-                        disclosables = containedDisclosables,
+                        disclosables = containedDisclosablesSaveable,
                         disclosures = availableDisclosures,
                         signature = SdJwtCredentialSignature(plainSignature, header, availableDisclosures),
                         signed = signedCredentialWithoutDisclosures,
@@ -292,7 +295,7 @@ object CredentialParser {
                 detectedSdjwtSigned(CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvc) to
                         SdJwtCredential(
                             dmtype = SDJWTVCSubType.sdjwtvcdm,
-                            disclosables = containedDisclosables,
+                            disclosables = containedDisclosablesSaveable,
                             disclosures = availableDisclosures,
                             signature = SdJwtCredentialSignature(plainSignature, header, availableDisclosures),
                             signed = signedCredentialWithoutDisclosures,
@@ -326,6 +329,7 @@ object CredentialParser {
                 val parsedJson = Json.decodeFromString<JsonObject>(credential)
 
                 val containedDisclosables = parsedJson.getSdArrays()
+                val containedDisclosablesSaveable = containedDisclosables.dropDollarPrefix()
                 val containsDisclosures = parsedJson.contains("_sd")
 
 
@@ -349,7 +353,7 @@ object CredentialParser {
                                 CredentialPrimaryDataType.W3C, W3CSubType.W3C_2, // DataIntegrityProof was introduced with DM 2
                                 SignaturePrimaryType.DATA_INTEGRITY_PROOF
                             ) to W3C2(
-                                disclosables = containedDisclosables,
+                                disclosables = containedDisclosablesSaveable,
                                 disclosures = null,
                                 signature = DataIntegrityProofCredentialSignature(proofElement),
                                 signed = credential,
@@ -371,7 +375,7 @@ object CredentialParser {
                         SDJWTVCSubType.sdjwtvcdm
                     ) to SdJwtCredential(
                         dmtype = SDJWTVCSubType.sdjwtvcdm,
-                        disclosables = containedDisclosables,
+                        disclosables = containedDisclosablesSaveable,
                         disclosures = null,
                         signature = null,
                         signed = null,
@@ -386,7 +390,7 @@ object CredentialParser {
                         CredentialPrimaryDataType.SDJWTVC, SDJWTVCSubType.sdjwtvc
                     ) to SdJwtCredential(
                         dmtype = SDJWTVCSubType.sdjwtvc,
-                        disclosables = containedDisclosables,
+                        disclosables = containedDisclosablesSaveable,
                         disclosures = null,
                         signature = null,
                         signed = null,
@@ -402,7 +406,7 @@ object CredentialParser {
 
                         val credential = when (w3cModelVersion) {
                             W3CSubType.W3C_1_1 -> W3C11(
-                                disclosables = containedDisclosables,
+                                disclosables = containedDisclosablesSaveable,
                                 disclosures = null,
                                 signature = null,
                                 signed = null,
@@ -414,7 +418,7 @@ object CredentialParser {
                             )
 
                             W3CSubType.W3C_2 -> W3C2(
-                                disclosables = containedDisclosables,
+                                disclosables = containedDisclosablesSaveable,
                                 disclosures = null,
                                 signature = null,
                                 signed = null,
