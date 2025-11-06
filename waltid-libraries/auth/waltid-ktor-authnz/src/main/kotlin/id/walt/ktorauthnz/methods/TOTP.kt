@@ -1,16 +1,13 @@
 package id.walt.ktorauthnz.methods
 
 import com.atlassian.onetime.core.TOTP
-import com.atlassian.onetime.core.TOTPGenerator
-import com.atlassian.onetime.model.EmailAddress
-import com.atlassian.onetime.model.Issuer
 import com.atlassian.onetime.model.TOTPSecret
 import com.atlassian.onetime.service.DefaultTOTPService
 import id.walt.commons.web.OTPAuthException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
-import id.walt.ktorauthnz.methods.data.TOTPStoredData
+import id.walt.ktorauthnz.methods.storeddata.TOTPStoredData
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import io.github.smiley4.ktoropenapi.post
@@ -60,13 +57,14 @@ object TOTP : AuthenticationMethod("totp") {
 
             auth(session, otp)
 
-            call.handleAuthSuccess(session, null)
+            val authContext = authContext(call)
+            call.handleAuthSuccess(session, authContext, null)
         }
     }
 
 }
 
-fun main() {
+/*fun main() {
     val service = DefaultTOTPService()
 
     val secret = TOTPSecret.fromBase32EncodedString("ZIQL3WHUAGCS5FQQDKP74HZCFT56TJHR")
@@ -80,4 +78,4 @@ fun main() {
         Issuer("Acme Co")
     )
     println("URI: $totpUri")
-}
+}*/
