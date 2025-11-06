@@ -22,7 +22,7 @@ import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
 import kotlin.test.*
 
-class EBSI_Conformance_Test {
+class EBSIConformanceTest {
 
     private val PRE_AUTHORIZED_ISSUANCE_PIN = "3818"
 

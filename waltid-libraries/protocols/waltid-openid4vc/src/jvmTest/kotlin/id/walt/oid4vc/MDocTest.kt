@@ -65,7 +65,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
-class MDoc_Test: AnnotationSpec() {
+class MDocTest: AnnotationSpec() {
 
   val ISSUER_KEY_ID = "ISSUER_KEY"
   val DEVICE_KEY_ID = "DEVICE_KEY"
