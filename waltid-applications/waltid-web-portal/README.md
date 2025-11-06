@@ -1,7 +1,7 @@
 <div align="center">
  <h1>Credential Issuance & Verification Portal</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Sample application that showcases the issuance and verification of W3C Verifiable Credentials<p>
+ <p>Sample application that showcases the issuance and verification of W3C Verifiable Credentials</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

@@ -4,7 +4,7 @@
   <p>Verifiable Credentials operations for 
 <a href="https://www.w3.org/TR/vc-data-model">W3C v1.1</a>
 and <a href="https://www.w3.org/TR/vc-data-model-2.0">W3C v2.0</a>
-data models.<p>
+data models.</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

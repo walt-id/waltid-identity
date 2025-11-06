@@ -1,7 +1,7 @@
 <div align="center">
  <h1>Kotlin Multiplatform X.509 library</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Work with X.509 certificates<p>
+ <p>Work with X.509 certificates</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

@@ -1,7 +1,7 @@
 <div align="center">
 <h1>walt.id Core Wallet</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Kotlin Multiplatform core library for building wallets using OpenID4VC/VP<p>
+ <p>Kotlin Multiplatform core library for building wallets using OpenID4VC/VP</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

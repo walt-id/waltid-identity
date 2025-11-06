@@ -1,7 +1,7 @@
 <div align="center">
  <h1>Kotlin Multiplatform Verification Policies library (v2)</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Composable verification policies for digital credentials<p>
+ <p>Composable verification policies for digital credentials</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

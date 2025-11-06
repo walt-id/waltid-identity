@@ -3,7 +3,7 @@
  <span>by </span><a href="https://walt.id">walt.id</a>
   <p>Credential issuance using the
 <a href="https://openid.net/sg/openid4vc/">OpenID for Verifiable Credentials</a>
-protocol.<p>
+protocol.</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

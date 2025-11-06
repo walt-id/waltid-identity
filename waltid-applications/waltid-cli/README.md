@@ -1,7 +1,7 @@
 <div align="center">
  <h1>walt.id CLI</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
-  <p>Manage keys, DIDs, issue W3C Verifiable Credentials, and verify them using the command line tool<p>
+  <p>Manage keys, DIDs, issue W3C Verifiable Credentials, and verify them using the command line tool</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

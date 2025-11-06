@@ -1,7 +1,7 @@
 <div align="center">
  <h1>Kotlin Multiplatform SD-JWT library</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
-  <p>Create JSON Web Tokens (JWTs) that support <b>Selective Disclosure</b><p>
+  <p>Create JSON Web Tokens (JWTs) that support <b>Selective Disclosure</b></p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

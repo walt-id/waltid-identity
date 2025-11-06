@@ -1,7 +1,7 @@
 <div align="center">
 <h1>walt.id Verifier API 2</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Ktor-based Verifier REST service implementing OpenID4VP 1.0 with DCQL and modern policy engine<p>
+ <p>Ktor-based Verifier REST service implementing OpenID4VP 1.0 with DCQL and modern policy engine</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

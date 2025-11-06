@@ -1,7 +1,7 @@
 <div align="center">
  <h1>Kotlin Multiplatform mdoc library</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Create credentials in <b>mdoc format</b> according to <b>ISO/IEC 18013-5:2021</b> standard<p>
+ <p>Create credentials in <b>mdoc format</b> according to <b>ISO/IEC 18013-5:2021</b> standard</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

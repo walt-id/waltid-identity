@@ -1,7 +1,7 @@
 <div align="center">
  <h1>Kotlin Multiplatform Digital Credentials library</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Unified credential abstraction layer for parsing, detecting, and verifying digital credentials<p>
+ <p>Unified credential abstraction layer for parsing, detecting, and verifying digital credentials</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
@@ -17,7 +17,7 @@ This library provides a unified abstraction layer for handling digital credentia
 
 - **Detect and parse credentials** automatically from various formats (W3C, SD-JWT VC, mdocs) without knowing the format upfront
 - **Support multiple credential types**: W3C Verifiable Credentials (v1.1 and v2.0), SD-JWT VCs, and ISO mdoc credentials
-- **Handle different signature types**: JWT, SD-JWT (with selective disclosures), Data Integrity Proofs (ECDSA, EdDSA, ECDSA-SD, BBS), COSE, and unsigned credentials
+- **Handle different signature types**: JWT, SD-JWT (with selective disclosures), COSE, unsigned credentials and could handle Data Integrity Proofs (ECDSA, EdDSA, ECDSA-SD, BBS) in future
 - **Verify credentials** using issuer key resolution from various sources (DID keys, X.509 certificates, well-known endpoints)
 - **Work with presentations** in multiple formats (JWT VC JSON, SD-JWT, LDP VC, mdoc)
 - **Support selective disclosure** for privacy-preserving credential presentations
@@ -61,7 +61,6 @@ SD-JWT VCs can follow different data models:
 Credentials can be signed using various signature mechanisms:
 - **JWT**: JSON Web Token signatures (JWS)
 - **SDJWT**: Selective Disclosure JWT (JWT with disclosures)
-- **DATA_INTEGRITY_PROOF**: W3C Data Integrity Proofs (ECDSA, EdDSA, ECDSA-SD, BBS)
 - **COSE**: CBOR Object Signing and Encryption (used for mdocs)
 - **UNSIGNED**: Credentials without cryptographic signatures
 

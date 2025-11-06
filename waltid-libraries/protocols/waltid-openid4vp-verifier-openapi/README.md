@@ -1,7 +1,7 @@
 <div align="center">
 <h1>OpenID4VP Verifier OpenAPI Helper</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>OpenAPI schema generation and example request bodies for OpenID4VP Verifier endpoints<p>
+ <p>OpenAPI schema generation and example request bodies for OpenID4VP Verifier endpoints</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

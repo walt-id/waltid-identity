@@ -1,7 +1,7 @@
 <div align="center">
  <h1>Kotlin Multiplatform DIF Definitions Parser library</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Parse and match credentials against DIF Presentation Definition objects<p>
+ <p>Parse and match credentials against DIF Presentation Definition objects</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

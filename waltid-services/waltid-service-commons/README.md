@@ -1,7 +1,7 @@
 <div align="center">
  <h1>Walt.id Service Commons</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
-    <p>Common configurations and codes shared between walt.id services<p>
+    <p>Common configurations and codes shared between walt.id services</p>
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
 </a>

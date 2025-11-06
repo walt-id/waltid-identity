@@ -1,7 +1,7 @@
 <div align="center">
  <h1>Kotlin Multiplatform Crypto - COSE library</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
-  <p>Create COSE messages for digital signing and authentication<p>
+  <p>Create COSE messages for digital signing and authentication</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

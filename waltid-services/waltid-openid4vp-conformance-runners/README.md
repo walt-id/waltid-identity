@@ -1,7 +1,7 @@
 <div align="center">
 <h1>walt.id OpenID4VP Conformance Runners</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Utilities and instructions to run OpenID4VP 1.0 conformance tests against walt.id services<p>
+ <p>Utilities and instructions to run OpenID4VP 1.0 conformance tests against walt.id services</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

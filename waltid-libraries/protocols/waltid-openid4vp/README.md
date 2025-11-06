@@ -1,7 +1,7 @@
 <div align="center">
 <h1>OpenID for Verifiable Presentations (OpenID4VP) 1.0</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Core Kotlin Multiplatform library providing models and utilities for OpenID4VP 1.0<p>
+ <p>Core Kotlin Multiplatform library providing models and utilities for OpenID4VP 1.0</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
