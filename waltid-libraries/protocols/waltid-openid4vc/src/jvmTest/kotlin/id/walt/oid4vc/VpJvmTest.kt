@@ -29,7 +29,7 @@ import org.junit.jupiter.api.BeforeAll
 import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 
-class VP_JVM_Test {
+class VpJvmTest {
 
     val http = HttpClient {
         install(ContentNegotiation) {

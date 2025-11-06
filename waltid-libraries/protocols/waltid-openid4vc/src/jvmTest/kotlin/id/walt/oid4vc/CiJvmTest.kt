@@ -43,7 +43,7 @@ import org.junit.jupiter.api.BeforeAll
 import java.io.File
 import kotlin.test.*
 
-class CI_JVM_Test {
+class CiJvmTest {
 
     var testMetadata = OpenIDProviderMetadata.Draft13(
         authorizationEndpoint = "https://localhost/oidc",
