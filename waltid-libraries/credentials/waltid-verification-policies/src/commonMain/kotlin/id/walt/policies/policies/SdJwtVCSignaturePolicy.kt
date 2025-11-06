@@ -34,7 +34,7 @@ class SdJwtVCSignaturePolicy() : JwtVerificationPolicy() {
         return if (DidUtils.isDidUrl(kid)) {
             DidService.resolveToKeys(kid).getOrThrow()
         } else {
-            val x5c = sdJwt.header["x5c"]?.jsonArray?.lastOrNull()
+            val x5c = sdJwt.header["x5c"]?.jsonArray?.firstOrNull()
                 ?: throw IllegalArgumentException("x5c header parameter is missing or empty.")
             val key = JWKKey.importPEM(x5c.jsonPrimitive.content).getOrThrow().let { JWKKey(it.exportJWK(), kid) }
             setOf(key)

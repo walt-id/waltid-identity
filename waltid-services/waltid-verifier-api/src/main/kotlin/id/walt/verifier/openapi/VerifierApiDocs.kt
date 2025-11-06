@@ -82,6 +82,10 @@ object VerifierApiDocs {
                 example("Example with VP policies", VerifierApiExamples.vpPolicies)
                 example("Example with VP & global VC policies", VerifierApiExamples.vpGlobalVcPolicies)
                 example(
+                    "Example with VP & specific credential policies",
+                    VerifierApiExamples.vpRequiredCredentialsLogic
+                )
+                example(
                     "Example with VP, VC & specific credential policies",
                     VerifierApiExamples.vcVpIndividualPolicies
                 )

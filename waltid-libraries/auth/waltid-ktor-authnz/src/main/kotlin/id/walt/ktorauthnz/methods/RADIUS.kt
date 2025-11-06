@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.commons.web.RadiusAuthException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.RADIUSIdentifier
@@ -51,7 +52,7 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
         )
 
         val responsePacket: Packet = radiusClient.send(accessRequest)
-        authCheck(responsePacket is AccessAccept) { "RADIUS server did not accept authentication" }
+        authCheck(responsePacket is AccessAccept , RadiusAuthException())
 
         return identifier
     }

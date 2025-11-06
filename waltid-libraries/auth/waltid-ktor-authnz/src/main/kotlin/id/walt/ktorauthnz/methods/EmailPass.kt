@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.commons.web.InvalidCredentialsException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
@@ -41,7 +42,8 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
         val passwordHash = PasswordHash.fromString(storedData.passwordHash ?: error("Missing password hash"))
         val check = PasswordHashing.check(credential.password, passwordHash)
 
-        authCheck(check.valid) { "Invalid password" }
+        authCheck(check.valid, InvalidCredentialsException())
+
         if (check.updated) {
             val newData = storedData.copy(passwordHash = check.updatedHash!!.toString())
             KtorAuthnzManager.accountStore.updateAccountIdentifierStoredData(identifier, id, newData)

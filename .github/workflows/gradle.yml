@@ -37,31 +37,31 @@ jobs:
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@a4a92e12ee9b7396ee9a22083ff21b3277c627d6
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-      - name: Install LocalTunnel
-        run: npm install -g localtunnel
-      - name: Start LocalTunnel and get URL
+      - name: Generate SSH Key
+        run: ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa
+      - name: Start tunnel and get URL
         id: tunnel
         run: |
-          # Start LocalTunnel on port 7003
-          lt --port 7003 --print-requests > lt_output.txt 2>&1 &
+          # Start tunnel on port 7003
+          ssh -o StrictHostKeyChecking=no -R 80:localhost:7003 serveo.net > lt_output.txt 2>&1 &
 
           # Wait for tunnel to initialize
           sleep 5
 
           # Extract the tunnel URL from output
-          TUNNEL_URL=$(grep -Eo 'https://[a-z0-9-]+\.loca\.lt' lt_output.txt | head -n 1)
+          TUNNEL_URL=$(grep -Eo 'https://[a-z0-9-]+\.serveo\.net' lt_output.txt | head -n 1)
 
           if [ -z "$TUNNEL_URL" ]; then
-            echo "❌ Failed to get LocalTunnel URL"
+            echo "❌ Failed to get tunnel URL"
             cat lt_output.txt
-            exit 1
+            TUNNEL_URL=""
+          else
+            echo "✅ Tunnel URL: $TUNNEL_URL"
           fi
 
-          echo "✅ Tunnel URL: $TUNNEL_URL"
           echo "url=$TUNNEL_URL" >> $GITHUB_OUTPUT
       - name: Replace URL in Kotlin test
+        if: ${{ steps.tunnel.outputs.url != '' }}
         run: |
           FILE_PATH="./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/kotlin/id/walt/openid4vp/conformance/ConformanceTests.kt"
           OLD_URL="https://verifier2.localhost/verification-session"
