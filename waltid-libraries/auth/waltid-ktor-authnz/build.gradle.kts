@@ -30,10 +30,10 @@ repositories {
 dependencies {
     // Auth methods
     // Core Web3j library
-    implementation("org.web3j:core:4.12.3") // (5.0.0 is an invalid version!)
+    implementation("org.web3j:core:4.14.0") // (5.0.0 is an invalid version!)
 
     // Optional: Web3j utils
-    implementation("org.web3j:utils:4.12.3") // (5.0.0 is an invalid version!)
+    implementation("org.web3j:utils:4.14.0") // (5.0.0 is an invalid version!)
 
 
     // RADIUS
@@ -42,8 +42,10 @@ dependencies {
     // LDAP
     implementation("org.apache.directory.api:apache-ldap-api:2.1.7") {
         exclude("org.apache.mina:mina-core") // Manually updated due to security CVE
+        exclude("org.apache.commons:commons-lang3") // Manually updated due to security CVE
     }
     implementation("org.apache.mina:mina-core:2.2.4")
+    implementation("org.apache.commons:commons-lang3:3.19.0")
 
     // TOTP/HOTP
     implementation("com.atlassian:onetime:2.1.2")
@@ -51,7 +53,7 @@ dependencies {
     // JWT
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
     implementation(project(":waltid-services:waltid-service-commons"))
-    implementation("com.nimbusds:nimbus-jose-jwt:9.41.2")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.48")
 
     // Cryptography
     /*implementation(platform("dev.whyoleg.cryptography:cryptography-bom:0.4.0"))
@@ -88,9 +90,9 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
 
     // Ktor server external
-    implementation("io.github.smiley4:ktor-openapi:5.0.2")
-    implementation("io.github.smiley4:ktor-swagger-ui:5.0.2")
-    implementation("io.github.smiley4:ktor-redoc:5.0.2")
+    implementation("io.github.smiley4:ktor-openapi:5.3.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:5.3.0")
+    implementation("io.github.smiley4:ktor-redoc:5.3.0")
 
     // JSON
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
@@ -103,11 +105,11 @@ dependencies {
 
     // Redis
     //implementation("eu.vendeli:rethis:0.3.3")
-    implementation("io.github.domgew:kedis:0.0.10")
+    implementation("io.github.domgew:kedis:0.0.11")
 
     /* --- Testing --- */
     testImplementation("io.ktor:ktor-client-logging")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 
     // Ktor
     testImplementation("io.ktor:ktor-server-cio-jvm")

@@ -79,7 +79,7 @@ kotlin {
                 implementation("com.github.ajalt.mordant:mordant-markdown:3.0.2")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:7.0.5")
@@ -88,7 +88,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
             }
         }
         val jvmMain by getting {
