@@ -35,7 +35,7 @@ jobs:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@a4a92e12ee9b7396ee9a22083ff21b3277c627d6
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@0d1d3a9838e7266c3ac353d3bb627c5161bb43eb
 
       - name: Generate SSH Key
         run: ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa
@@ -60,16 +60,15 @@ jobs:
           fi
 
           echo "url=$TUNNEL_URL" >> $GITHUB_OUTPUT
-      - name: Replace URL in Kotlin test
+      - name: Replace URLs in Kotlin test
         if: ${{ steps.tunnel.outputs.url != '' }}
         run: |
-          FILE_PATH="./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/kotlin/id/walt/openid4vp/conformance/ConformanceTests.kt"
-          OLD_URL="https://verifier2.localhost/verification-session"
-          NEW_URL="${{ steps.tunnel.outputs.url }}/verification-session"
-
-          echo "Replacing $OLD_URL with $NEW_URL in $FILE_PATH"
-          sed -i "s#${OLD_URL}#${NEW_URL}#g" "$FILE_PATH"
-
+          FILE="./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/kotlin/id/walt/openid4vp/conformance/ConformanceTests.kt"
+          sed -i \
+            -e "s#https://verifier2.localhost/verification-session#${{ steps.tunnel.outputs.url }}/verification-session#g" \
+            -e "s#localhost.emobix.co.uk#conformance.waltid.cloud#g" \
+            -e "s#8443#443#g" \
+            "$FILE"
       - name: Clean and build with all tests
         if: ${{ runner.os != 'macos' }}
         run: ./gradlew clean build cleanAllTests allTests --rerun-tasks --no-daemon --parallel --max-workers=3 --continue
