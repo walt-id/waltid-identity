@@ -1,12 +1,13 @@
 package id.walt.policies.policies
 
-import java.util.Base64
+import id.walt.sdjwt.utils.Base64Utils.base64UrlDecode
 
 private const val MULTIBASE_BASE64_URL_PREFIX = 'u'
 
 class Base64UrlHandler {
-    private val base64UrlRegex = Regex("^[A-Za-z0-9_-]*$")
-    private val urlDecoder = Base64.getUrlDecoder()
+    companion object {
+        private val base64UrlRegex = Regex("^[A-Za-z0-9_-]*$")
+    }
 
     /**
      * Decodes a base64-url string (regular or multibase) and returns detailed result
@@ -21,7 +22,7 @@ class Base64UrlHandler {
         Base64UrlResult(
             type = type,
             originalString = this,
-            decodedData = cleanString.decodeBase64UrlBytes(),
+            decodedData = cleanString.base64UrlDecode(),
             cleanEncodedString = cleanString
         )
     }
@@ -46,9 +47,7 @@ class Base64UrlHandler {
         }
     }?.getOrElse { false } ?: false
 
-    private fun String.isValidBase64UrlContent(): Boolean = runCatching { decodeBase64UrlBytes() }.isSuccess
-
-    private fun String.decodeBase64UrlBytes(): ByteArray = urlDecoder.decode(this)
+    private fun String.isValidBase64UrlContent(): Boolean = runCatching { base64UrlDecode() }.isSuccess
 }
 
 sealed class Base64UrlType {
@@ -64,9 +63,7 @@ data class Base64UrlResult(
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as Base64UrlResult
+        if (other !is Base64UrlResult) return false
 
         if (type != other.type) return false
         if (originalString != other.originalString) return false
