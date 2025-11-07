@@ -3,7 +3,7 @@ package id.walt.webwallet.service.account.authnz
 import id.walt.ktorauthnz.accounts.EditableAccountStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.methods.AuthenticationMethod
-import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers.userId
 import id.walt.webwallet.db.models.authnz.AuthnzStoredData

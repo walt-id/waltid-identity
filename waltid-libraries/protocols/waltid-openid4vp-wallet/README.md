@@ -1,168 +1,313 @@
-# waltid-openid4vp-wallet
+<div align="center">
+<h1>OpenID4VP Wallet Implementation</h1>
+ <span>by </span><a href="https://walt.id">walt.id</a>
+ <p>Complete Wallet/Holder implementation for OpenID4VP 1.0</p>
 
-This module provides a implementation of the **Holder/Wallet** functionality as defined in the
-**OpenID for Verifiable Presentations (OpenID4VP) 1.0 specification**. It is designed to be
-integrated into application that needs to act as a digital
-wallet, allowing users to present their digital credentials to verifiers.
+<a href="https://walt.id/community">
+<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
+</a>
+<a href="https://www.linkedin.com/company/walt-id/">
+<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
+</a>
+</div>
 
-The core logic is built around handling `Authorization Requests` from verifiers, selecting
-appropriate credentials based on a query, and constructing a valid `VP-Token` response according to
-the specified credential format and response mode.
+## What This Library Contains
 
-## Core Concepts
+A complete implementation of the **Holder/Wallet** functionality as defined in **OpenID for Verifiable Presentations (OpenID4VP) 1.0**. This library enables your application to act as a digital wallet, allowing users to present their digital credentials to verifiers.
 
-The OpenID4VP protocol defines an interaction flow between a **Verifier** (which requests proof) and
-a **Wallet** (which holds credentials).
+**This library handles:**
+- Parsing and processing authorization requests from Verifiers
+- Matching credentials against DCQL queries
+- Generating verifiable presentations in multiple formats
+- Delivering responses via various response modes (fragment, query, direct_post)
+- Supporting selective disclosure for privacy-preserving presentations
 
-1. **Authorization Request**: The Verifier initiates the process by sending an
-   `AuthorizationRequest` to the Wallet. This request specifies what credentials are needed
-   using **Digital Credentials Query Language (DCQL)**.
-2. **Credential Selection**: The Wallet parses the DCQL query and searches its storage for
-   credentials that match the Verifier's requirements.
-3. **User Consent**: The Wallet prompts the user for consent to share the selected credentials.
-4. **Presentation Generation**: Upon consent, the Wallet generates a cryptographic presentation of
-   the selected credentials. This process is highly dependent on the credential format (e.g.,
-   `sd-jwt`, `mso_mdoc`).
-5. **Authorization Response**: The Wallet packages the presentation(s) into a `vp_token` and sends
-   it back to the Verifier using a pre-negotiated `response_mode` (e.g., a browser redirect or a
-   direct server-to-server post).
+## Main Purpose
 
-This module handles steps 1, 4, and 5.
+This library enables you to build Wallet applications that receive authorization requests from Verifiers, select matching credentials, and generate verifiable presentations.
 
-Step 2 (credential selection and storage) and step 3 (user
-consent UI) are specific to the wallet and have to be provided by such.
+**Use this library when:**
+- Building a mobile or web wallet application
+- Implementing OpenID4VP 1.0 wallet functionality
+- Creating credential presentation flows for user authentication or access control
+- Building applications that store and present digital credentials
 
------
+## Key Concepts
 
-## Features
+### Authorization Request Processing
 
-* **Specification**: Implements the core flows of the OpenID4VP 1.0 specification.
-* **Credential Format Support**: Handles presentation logic for multiple credential
-  formats.
-    * **`dc+sd-jwt`**: IETF SD-JWT Verifiable Credentials, including selective disclosure and
-      key-binding JWTs.
-    * **`jwt_vc_json`**: Standard W3C Verifiable Credentials encoded as JWTs.
-    * **`mso_mdoc`**: ISO/IEC 18013-5 Mobile Documents (mdocs), such as mobile Driver's Licenses (
-      mDL).
-* **Flexible Response Modes**: Supports multiple ways to return the presentation to the verifier:
-    * `fragment`: Returns the `vp_token` in the URL fragment via browser redirect.
-    * `query`: Returns the `vp_token` in the URL query string via browser redirect.
-    * `form_post`: Returns a self-submitting HTML form to `POST` the `vp_token`.
-    * `direct_post`: Sends the `vp_token` directly to the Verifier's `response_uri` via an HTTP POST
-      request.
-* **Unopinionated Credential Storage**: The module does not impose any specific database or storage
-  solution. You provide a simple function to query your own credential store.
-* **Handles Complex Requests**: Parses both URL-encoded authorization requests and advanced
-  JWT-Secured Authorization Requests (JAR) passed by `request_uri`.
+The library receives authorization requests from Verifiers that specify:
+- **DCQL query** - What credentials are needed
+- **Response mode** - How to return the presentation
+- **Security parameters** - Nonce, state, client ID
 
------
+### Credential Selection
 
-## Architecture
+You provide a function (`selectCredentialsForQuery`) that:
+- Takes a DCQL query
+- Searches your credential storage
+- Returns matching credentials using the DCQL matcher
 
-The module is designed with the following separation of concerns:
+The library uses [waltid-dcql](../../credentials/waltid-dcql/README.md) for matching.
 
-### Main Entrypoint: `WalletPresentFunctionality2`
+### Presentation Generation
 
-The primary interaction point is the `walletPresentHandling` function. It acts as an orchestrator
-that:
+The library generates format-specific presentations:
+- **SD-JWT VC** - Combines original SD-JWT with disclosures and Key Binding JWT
+- **W3C VC** - Wraps credential JWT in a Verifiable Presentation JWT
+- **mdoc** - Builds SessionTranscript and DeviceAuth structures
 
-1. **Resolves the Authorization Request**: Fetches and parses the request details from the
-   `presentationRequestUrl`.
-2. **Delegates Credential Selection**: Calls the `selectCredentialsForQuery` lambda function that
-   you provide. This is where you hook in your wallet's storage logic.
-3. **Generates the `vp_token`**: Iterates through the matched credentials and, based on their
-   format, delegates the presentation creation to a specialized **Presenter**.
-4. **Constructs the Final Response**: Packages the `vp_token` according to the requested
-   `response_mode` and returns a result object (e.g., a redirect URL or a JSON success message).
+### Response Modes
 
-### Presenters
+The library supports multiple ways to return presentations:
+- **`fragment`** - URL fragment redirect (same-device)
+- **`query`** - URL query string redirect
+- **`form_post`** - Self-submitting HTML form
+- **`direct_post`** - Direct HTTP POST to Verifier
 
-For each supported credential format, there is a dedicated "Presenter" object responsible for
-handling the specific cryptographic operations required to create a valid presentation.
+## Assumptions and Dependencies
 
-* `SdJwtVcPresenter`: Handles `dc+sd-jwt`. It constructs the final presentation by combining the
-  original SD-JWT, the selected disclosures, and a newly created Key Binding JWT.
-* `W3CPresenter`: Handles `jwt_vc_json`. It wraps the selected W3C Verifiable Credential JWT
-  inside a Verifiable Presentation JWT, signed by the holder's key.
-* `MdocPresenter`: Handles `mso_mdoc`. It builds the required `SessionTranscript` and
-  `DeviceAuth` structures and assembles the final `DeviceResponse` CBOR object.
-* `LDPPresenter`: A placeholder for `ldp_vc` (W3C Credentials with Data Integrity Proofs), which
-  is **not yet supported**.
+### Multiplatform Support
 
------
+Works on JVM (Kotlin/Java), JavaScript, and iOS platforms (iOS requires `enableIosBuild=true` Gradle property).
 
-## Usage Example
+### Dependencies
 
-Integrating the module into a wallet application: The main task is to provide the
-logic for credential selection.
+- **waltid-openid4vp** - Core OpenID4VP models
+- **waltid-dcql** - DCQL query matching engine
+- **waltid-digital-credentials** - Credential format implementations
+- **waltid-holder-policies** - Optional holder-side access control policies
+- **waltid-verification-policies2** - For policy integration
+
+### Your Responsibilities
+
+You must provide:
+- **Credential storage** - Database or storage for user credentials
+- **Credential selection logic** - Function to query your storage
+- **User consent UI** - Interface for user to approve credential sharing
+- **Holder key management** - Private key for signing presentations
+
+## How to Use This Library
+
+### Integration Workflow
+
+Here's how to integrate the wallet library into your application.
+
+#### Step 1: Set Up Holder Identity
+
+You need a holder key and DID for signing presentations.
+
+```kotlin
+import id.walt.crypto.keys.Key
+import id.walt.crypto.KeyManager
+
+// Load or generate holder's key
+val holderKey: Key = KeyManager.loadKey("holder_key_id") // or generate new key
+val holderDid: String = "did:key:z6M..." // Holder's DID
+```
+
+#### Step 2: Implement Credential Selection
+
+Implement the credential selection function that queries your storage.
+
+```kotlin
+import id.walt.dcql.DcqlMatcher
+import id.walt.dcql.models.DcqlQuery
+import id.walt.dcql.models.RawDcqlCredential
+
+val selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>> =
+    { query ->
+        // 1. Fetch credentials from your storage
+        val storedCredentials = fetchCredentialsFromStorage() // Your storage query
+        
+        // 2. Convert to RawDcqlCredential format
+        val rawCredentials = storedCredentials.map { credential ->
+            RawDcqlCredential(
+                id = credential.id,
+                format = credential.format,
+                data = credential.data,
+                originalCredential = credential,
+                disclosures = credential.disclosures
+            )
+        }
+        
+        // 3. Use DCQL matcher to find matches
+        val matches = DcqlMatcher.match(query, rawCredentials)
+        
+        // 4. Return matches grouped by query ID
+        matches
+    }
+```
+
+#### Step 3: Process Authorization Request
+
+When your wallet receives an authorization request (e.g., from a QR code or deep link), process it:
 
 ```kotlin
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
-import id.walt.dcql.DcqlMatcher
-import id.walt.dcql.models.DcqlQuery
-import id.walt.crypto.keys.Key
 import io.ktor.http.*
-import kotlinx.serialization.json.JsonElement
 
-// 1. Prepare holder's key and DID
-val holderKey: Key = // ... load holder's private key
-val holderDid: String = "did:key:z6M..." // ... holder's DID
-
-// 2. receive a presentation request URL (e.g., from a QR code)
+// Receive presentation request URL (e.g., from QR code or deep link)
 val presentationRequestUrl = Url("openid4vp://?request_uri=https://verifier.com/request/123")
 
-// 3. Implement the credential selection logic
-// This lambda connects the module to WALLET-SPECIFIC credential storage.
-val selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>> =
-    { query ->
-        // Implement querying wallet database/storage for credentials that match the DCQL query.
-        // The walt.id DCQL engine (waltid-dcql) helps with this matching.
-        println("Wallet is selecting credentials for query: $query")
+// Optional: Holder policies for access control
+val holderPolicies: Flow<HolderPolicy>? = null // or load from your policy storage
 
-        // For this example, we return a hardcoded match.
-        // In a real app, you would dynamically find matching credentials, e.g. using waltid-dcql.
-        val myStoredCredentials = /* ... fetch credentials from your store ... */
-        val matches = DcqlMatcher.match(query, myStoredCredentials)
-
-        matches
-    }
-
-// 4. Call the wallet present function to do a presentation as wallet
+// Process the presentation request
 val presentationResult: Result<JsonElement> = WalletPresentFunctionality2.walletPresentHandling(
     holderKey = holderKey,
     holderDid = holderDid,
     presentationRequestUrl = presentationRequestUrl,
     selectCredentialsForQuery = selectCredentialsForQuery,
-    holderPoliciesToRun = null, // Optional: for advanced policy enforcement
-    runPolicies = null
+    holderPoliciesToRun = holderPolicies,
+    runPolicies = true // Set to true to enforce policies
 )
+```
 
-// 5. Process the result
-if (presentationResult.isSuccess) {
-    val responseJson = presentationResult.getOrThrow()
-    println("Presentation successful! Response: $responseJson")
+#### Step 4: Handle the Result
 
-    // The response will tell you what to do next, e.g., redirect the user.
-    // Example for response_mode=fragment or response_mode=query:
-    // { "get_url": "https://verifier.com/callback#vp_token=..." }
+Process the result and handle the response based on the response mode.
 
-    // Example for response_mode=direct_post:
-    // { "transmission_success": true, "verifier_response": {...} }
+```kotlin
+presentationResult.fold(
+    onSuccess = { responseJson ->
+        // Check response mode
+        when {
+            responseJson.jsonObject.containsKey("get_url") -> {
+                // Fragment or query mode - redirect user
+                val redirectUrl = responseJson.jsonObject["get_url"]!!.jsonPrimitive.content
+                // Redirect user's browser to this URL
+                navigateTo(redirectUrl)
+            }
+            responseJson.jsonObject.containsKey("transmission_success") -> {
+                // Direct post mode - already sent
+                val success = responseJson.jsonObject["transmission_success"]!!.jsonPrimitive.boolean
+                if (success) {
+                    println("Presentation sent successfully")
+                }
+            }
+        }
+    },
+    onFailure = { error ->
+        println("Presentation failed: ${error.message}")
+        // Handle error (e.g., show error message to user)
+    }
+)
+```
 
-} else {
-    println("Presentation failed: ${presentationResult.exceptionOrNull()?.message}")
+### Complete Example
+
+Here's a complete example integrating the wallet:
+
+```kotlin
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
+import id.walt.dcql.DcqlMatcher
+import id.walt.dcql.models.*
+import id.walt.crypto.keys.Key
+import io.ktor.http.*
+
+class WalletService(
+    private val credentialStorage: CredentialStorage,
+    private val holderKey: Key,
+    private val holderDid: String
+) {
+    suspend fun handlePresentationRequest(
+        requestUrl: String,
+        userConsent: Boolean
+    ): Result<JsonElement> {
+        if (!userConsent) {
+            return Result.failure(Exception("User declined consent"))
+        }
+        
+        val presentationRequestUrl = Url(requestUrl)
+        
+        // Credential selection function
+        val selectCredentials: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>> =
+            { query ->
+                val credentials = credentialStorage.findAll()
+                val rawCredentials = credentials.map { cred ->
+                    RawDcqlCredential(
+                        id = cred.id,
+                        format = cred.format,
+                        data = cred.data,
+                        originalCredential = cred.toDigitalCredential(),
+                        disclosures = cred.disclosures
+                    )
+                }
+                DcqlMatcher.match(query, rawCredentials)
+            }
+        
+        // Process presentation
+        return WalletPresentFunctionality2.walletPresentHandling(
+            holderKey = holderKey,
+            holderDid = holderDid,
+            presentationRequestUrl = presentationRequestUrl,
+            selectCredentialsForQuery = selectCredentials,
+            holderPoliciesToRun = null, // Optional: add holder policies
+            runPolicies = null
+        )
+    }
 }
 ```
 
------
+### Supported Credential Formats
 
-## Supported Credential Formats
+| Format | Identifier | Status | Notes |
+|--------|-----------|--------|-------|
+| SD-JWT VC | `dc+sd-jwt` | ✅ Supported | Includes selective disclosure and Key Binding JWT |
+| W3C VC (JWT) | `jwt_vc_json` | ✅ Supported | Wraps credential in Verifiable Presentation JWT |
+| mdoc | `mso_mdoc` | ✅ Supported | Builds SessionTranscript and DeviceAuth |
+| LDP VC | `ldp_vc` | ❌ Not Supported | Placeholder for future implementation |
 
-The module provides full presentation support for the following credential formats:
+### Holder Policies (Optional)
 
-| Format Identifier | Description                                                          | Status              |
-|:------------------|:---------------------------------------------------------------------|:--------------------|
-| **`dc+sd-jwt`**   | IETF SD-JWT Verifiable Credential. Supports selective disclosure.    | ✅ **Supported**     |
-| **`jwt_vc_json`** | W3C Verifiable Credential signed as a JWT.                           | ✅ **Supported**     |
-| **`mso_mdoc`**    | Mobile Document (e.g., mDL) compliant with ISO/IEC 18013-5.          | ✅ **Supported**     |
-| **`ldp_vc`**      | W3C Verifiable Credential with a Linked Data Proof (Data Integrity). | ❌ **Not Supported** |
+You can integrate holder policies to control credential presentation:
+
+```kotlin
+import id.walt.holder.policies.*
+
+val holderPolicies = flowOf(
+    HolderPolicy(
+        priority = 1,
+        description = "Block untrusted verifier",
+        direction = HolderPolicyDirection.PRESENT,
+        check = BasicHolderPolicyCheck(issuer = "did:example:untrusted"),
+        action = HolderPolicyAction.BLOCK
+    ),
+    HolderPolicy(
+        priority = 99,
+        description = "Default allow",
+        direction = HolderPolicyDirection.PRESENT,
+        apply = ApplyAllHolderPolicyCheck(),
+        action = HolderPolicyAction.ALLOW
+    )
+)
+```
+
+See [waltid-holder-policies](../../credentials/waltid-holder-policies/README.md) for more details.
+
+### Key Components
+
+| Component | Description | Usage |
+|-----------|-------------|-------|
+| `WalletPresentFunctionality2` | Main entry point for processing requests | `walletPresentHandling()` |
+| `SdJwtVcPresenter` | Creates SD-JWT VC presentations | Used internally |
+| `W3CPresenter` | Creates W3C VC presentations | Used internally |
+| `MdocPresenter` | Creates mdoc presentations | Used internally |
+
+## Related Libraries
+
+- **[waltid-openid4vp](../waltid-openid4vp/README.md)** - Core OpenID4VP models and types
+- **[waltid-openid4vp-clientidprefix](../waltid-openid4vp-clientidprefix/README.md)** - Client ID prefix parsing for Verifier authentication
+- **[waltid-dcql](../../credentials/waltid-dcql/README.md)** - Digital Credentials Query Language engine for credential matching
+- **[waltid-digital-credentials](../../credentials/waltid-digital-credentials/README.md)** - Credential format implementations and parsing
+- **[waltid-holder-policies](../../credentials/waltid-holder-policies/README.md)** - Holder-side access control policies
+
+## Join the community
+
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
+* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)

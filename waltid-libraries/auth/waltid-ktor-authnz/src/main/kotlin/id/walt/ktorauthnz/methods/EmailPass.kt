@@ -7,7 +7,7 @@ import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
-import id.walt.ktorauthnz.methods.data.EmailPassStoredData
+import id.walt.ktorauthnz.methods.storeddata.EmailPassStoredData
 import id.walt.ktorauthnz.security.PasswordHash
 import id.walt.ktorauthnz.security.PasswordHashing
 import id.walt.ktorauthnz.sessions.AuthSession
@@ -20,17 +20,17 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-@Serializable
-@SerialName("email")
-data class EmailPassMethodInstance(
-    override val data: EmailPassStoredData,
-) : MethodInstance {
-    override val config = null
-
-    override fun authMethod() = EmailPass
-}
-
 object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
+
+    @Serializable
+    @SerialName("email")
+    data class EmailPassMethodInstance(
+        override val data: EmailPassStoredData,
+    ) : MethodInstance {
+        override val config = null
+
+        override fun authMethod() = EmailPass
+    }
 
     override val relatedAuthMethodStoredData = EmailPassStoredData::class
 
@@ -81,7 +81,8 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
 
             val identifier = auth(session, credential, call)
 
-            call.handleAuthSuccess(session, identifier.resolveToAccountId())
+            val authContext = authContext(call)
+            call.handleAuthSuccess(session, authContext, identifier.resolveToAccountId())
         }
     }
 

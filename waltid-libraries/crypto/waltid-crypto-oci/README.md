@@ -1,7 +1,7 @@
 <div align="center">
  <h1>OCI optional extension for waltid-crypto</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
-  <p>Adds support for `OCIKey`, an OCI SDK backed `Key`.</b><p>
+  <p>Adds support for `OCIKey`, an OCI SDK backed `Key`.</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

@@ -1,6 +1,6 @@
 <div align="center">
  <h1>Ktor e2e Test Framework</h1>
- <p>Automates the Testing of all <b>Walt.Id</b> Rest API endpoints and use cases.<p>
+ <p>Automates the Testing of all <b>Walt.Id</b> Rest API endpoints and use cases.</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

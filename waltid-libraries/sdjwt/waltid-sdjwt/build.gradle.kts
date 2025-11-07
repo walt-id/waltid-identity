@@ -109,7 +109,7 @@ kotlin {
             dependencies {
                 implementation("dev.whyoleg.cryptography:cryptography-random:0.5.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
                 implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
                 implementation("io.github.oshai:kotlin-logging:7.0.5")
