@@ -1,40 +1,59 @@
-# waltid-openid4vp-conformance-runners
+<div align="center">
+<h1>walt.id OpenID4VP Conformance Runners</h1>
+ <span>by </span><a href="https://walt.id">walt.id</a>
+ <p>Utilities and instructions to run OpenID4VP 1.0 conformance tests against walt.id services</p>
 
-This service is built to work with the [OpenID Conformance Suite](https://gitlab.com/openid/conformance-suite).
+<a href="https://walt.id/community">
+<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
+</a>
+<a href="https://www.linkedin.com/company/walt-id/">
+<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
+</a>
+</div>
 
-Test plans (TODO):
+## What This Folder Contains
 
-- OpenID Compliance - OpenID4VP 1.0
-    - **Verifier**
-        - sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post
-        - sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post.jwt
-        - iso_mdl + x509_san_dns + request_uri_signed + direct_post
-        - iso_mdl + x509_san_dns + request_uri_signed + direct_post.jwt
-    - **Wallet**
-        - FOR ALL:
-            - request_uri_unsigned + direct_post
-            - request_uri_signed + direct_post
-            - request_uri_unsigned + direct_post.jwt
-            - request_uri_signed + direct_post.jwt
-        - sd_jwt_vc:
-            - did
-            - pre_registered
-            - redirect_uri
-            - web-origin
-            - x509_san_dns
-        - iso_mdl:
-            - did
-            - pre_registered
-            - redirect_uri
-            - web-origin
-            - x509_san_dns
+This folder documents how to set up and run the official **OpenID Conformance Suite** against walt.id implementations for **OpenID4VP 1.0** (Verifier and Wallet flows). It provides:
+- Step‑by‑step setup for the OpenID Conformance Suite using `nix` + `devenv`
+- Configuration snippets and example profiles in `config/`
+- A curated list of test plans to exercise Verifier and Wallet scenarios
 
+## Main Purpose
+
+Help developers validate walt.id OpenID4VP implementations against the official conformance suite by:
+- Installing and running the suite locally with trusted certificates and hosts
+- Pointing the suite to walt.id Verifier/Wallet endpoints
+- Executing a representative matrix of OpenID4VP 1.0 test cases
+
+## Key Concepts
+
+- **OpenID Conformance Suite**: The official test harness for OpenID/OAuth specs
+- **OpenID4VP 1.0**: Final specification for verifiable presentations; used here for both Verifier and Wallet roles
+- **Request Object Delivery**: `request_uri` (unsigned/signed) consumed by wallets
+- **Response Modes**: `direct_post` and `direct_post.jwt` are typical for cross‑device flows
+- **Client ID Schemes**: `x509_san_dns`, `redirect_uri`, `did`, `web-origin`, etc., used to authenticate verifiers
+
+## Test Plans
+
+OpenID Compliance — OpenID4VP 1.0
+
+- Verifier
+  - sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post
+  - sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post.jwt
+  - iso_mdl + x509_san_dns + request_uri_signed + direct_post
+  - iso_mdl + x509_san_dns + request_uri_signed + direct_post.jwt
+- Wallet (for all below run both unsigned/signed + direct_post/direct_post.jwt)
+  - sd_jwt_vc: `did`, `pre_registered`, `redirect_uri`, `web-origin`, `x509_san_dns`
+  - iso_mdl: `did`, `pre_registered`, `redirect_uri`, `web-origin`, `x509_san_dns`
+
+Note: See `config/` for example configuration files you can adapt for specific runs.
 
 ## Install & run OpenID Conformance Suite
 To setup the official conformance suite with devenv (official recommended way), install nix with your package manager (create nix build users on your machine, enable nix-daemon, etc.) and install devenv with nix.
 
 NOTE: This process will install a custom CA + add certificates to your keychain and browser certificate stores, and update your /etc/hosts (handled by hostctl)! 
 
+## Setup the OpenID Conformance Suite
 
 ### Clone the OpenID Conformance Suite repository
 ```shell
@@ -170,3 +189,13 @@ a small warning, e.g. "Connection verified by a certificate issuer that is not r
 ### Further information
 See https://gitlab.com/openid/conformance-suite/-/wikis/Developers/Build-&-Run#intellij to learn
 how to compile the conformance suite yourself.
+
+
+## Join the community
+
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
+* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)

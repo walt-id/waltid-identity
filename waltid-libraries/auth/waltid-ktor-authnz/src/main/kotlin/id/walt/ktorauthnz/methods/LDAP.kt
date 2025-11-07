@@ -6,6 +6,7 @@ import id.walt.ktorauthnz.accounts.identifiers.methods.LDAPIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authFailure
 import id.walt.ktorauthnz.methods.config.LDAPConfiguration
+import id.walt.ktorauthnz.methods.requests.UserPassCredentials
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import io.github.smiley4.ktoropenapi.post
@@ -20,7 +21,7 @@ import org.apache.directory.ldap.client.api.LdapNetworkConnection
 object LDAP : UserPassBasedAuthMethod("ldap") {
 
     override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
-        val config = session.lookupConfiguration<LDAPConfiguration>(this)
+        val config = session.lookupFlowMethodConfiguration<LDAPConfiguration>(this)
 
         val (hostname, port) = config.ldapServerUrl.removePrefix("ldap://").split(":")
         val userDN = config.userDNFormat.format(credential.name)
@@ -57,7 +58,8 @@ object LDAP : UserPassBasedAuthMethod("ldap") {
 
             val identifier = auth(session, credential, call)
 
-            call.handleAuthSuccess(session, identifier.resolveToAccountId())
+            val authContext = authContext(call)
+            call.handleAuthSuccess(session, authContext, identifier.resolveToAccountId())
         }
     }
 

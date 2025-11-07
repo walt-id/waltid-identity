@@ -1,7 +1,7 @@
 <div align="center">
  <h1>AWS SDK Extension for walt.id Crypto</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
-  <p>A Kotlin-based extension that enhances walt.id crypto with native AWS key management capabilities.</b><p>
+  <p>A Kotlin-based extension that enhances walt.id crypto with native AWS key management capabilities.</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />

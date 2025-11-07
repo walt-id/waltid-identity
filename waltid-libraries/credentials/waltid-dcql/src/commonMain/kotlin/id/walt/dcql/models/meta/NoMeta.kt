@@ -11,6 +11,7 @@ import kotlinx.serialization.Serializable
 @SerialName("NoMeta")
 object NoMeta : CredentialQueryMeta {
     override val format = null
+    override fun getTypeString() = null
 
 
 }

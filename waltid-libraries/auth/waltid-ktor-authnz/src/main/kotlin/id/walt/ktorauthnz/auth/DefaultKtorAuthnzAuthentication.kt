@@ -20,7 +20,7 @@ class DefaultKtorAuthnzAuthentication internal constructor(
 
     fun fail(context: AuthenticationContext, cause: AuthenticationFailedCause) {
         @Suppress("NAME_SHADOWING")
-        context.challenge("auth-kit-challenge", cause) { challenge, call ->
+        context.challenge("ktor-authnz-challenge", cause) { challenge, call ->
             // TODO: better error messages
             call.respond(HttpStatusCode.Unauthorized, "Unauthorized ($cause)")
             if (!challenge.completed && call.response.status() != null) {

@@ -4,9 +4,8 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
-import id.walt.ktorauthnz.auth.getAuthToken
-import id.walt.ktorauthnz.auth.getAuthenticatedAccount
-import id.walt.ktorauthnz.auth.ktorAuthnz
+import id.walt.ktorauthnz.accounts.ExampleAccountStore
+import id.walt.ktorauthnz.auth.*
 import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.methods.*
 import id.walt.ktorauthnz.sessions.SessionManager
@@ -20,6 +19,39 @@ import io.ktor.server.routing.*
 import kotlinx.coroutines.runBlocking
 import org.intellij.lang.annotations.Language
 
+fun Route.globalImplicitOidcExample() {
+    @Language("JSON")
+    val flowConfig = """
+{
+  "method": "oidc",
+  "config": {
+    "openIdConfigurationUrl": "http://localhost:8080/realms/master/.well-known/openid-configuration",
+    "clientId": "waltid_ktor_authnz",
+    "clientSecret": "fzYFC6oAgbjozv8NoaXuOIfPxmT4XoVM",
+    "callbackUri": "http://authnz-example.localhost:8088/auth/flows/oidc-example/oidc/callback",
+    "pkceEnabled": true,
+    "redirectAfterLogin": "http://authnz-example.localhost:8088/protected"
+  },
+  "success": true
+}
+    """.trimIndent()
+
+    route("oidc-example") {
+        val authFlow = AuthFlow.fromConfig(flowConfig)
+
+        val contextFunction: ApplicationCall.() -> AuthContext = {
+            AuthContext(
+                tenant = request.host(),
+                sessionId = parameters["sessionId"],
+                implicitSessionGeneration = true,
+                initialFlow = authFlow,
+                revealTokenToClient = false
+            )
+        }
+
+        registerAuthenticationMethod(OIDC, contextFunction)
+    }
+}
 
 fun Route.globalMultistepExample() {
     route("web3") {
@@ -27,7 +59,7 @@ fun Route.globalMultistepExample() {
         val flowConfig = """
         {
             "method": "web3",
-            "ok": true
+            "success": true
         }
     """.trimIndent()
         val authFlow = AuthFlow.fromConfig(flowConfig)
@@ -51,7 +83,7 @@ fun Route.globalImplicitSingleStep() {
         val flowConfig = """
             {
                 "method": "userpass",
-                "ok": true,
+                "success": true,
                 "expiration": "1d"
             }
         """.trimIndent()
@@ -79,7 +111,7 @@ fun Route.globalImplicitMultiStep() {
                 "method": "userpass",
                 "continue": [{
                   "method": "totp",
-                  "ok": true
+                  "success": true
                 }]
             }
         """.trimIndent()
@@ -119,7 +151,7 @@ fun Route.globalExplicitMultiStep() {
                 "method": "userpass",
                 "continue": [{
                   "method": "totp",
-                  "ok": true
+                  "success": true
                 }]
             }
         """.trimIndent()
@@ -149,7 +181,7 @@ fun Route.globalImplicitVc() {
                     ]
                 }
             },
-            "ok": true
+            "success": true
         }
     """.trimIndent()
         val authFlow = AuthFlow.fromConfig(flowConfig)
@@ -177,7 +209,7 @@ fun Route.globalImplicitVc() {
         val flowConfig = """
             {
                 "method": "userpass",
-                "ok": true
+                "success": true
             }
         """.trimIndent()
         val authFlow = AuthFlow.fromConfig(flowConfig)
@@ -215,11 +247,13 @@ fun Route.authFlowRoutes() {
     globalExplicitMultiStep()
 
     globalImplicitVc()
+    globalImplicitOidcExample()
 
     // Account flows (account specifies flow)
     //accountImplicitMultiStep()
 }
 
+@OptIn(ExternallyProvidedJWTCannotResolveToAuthenticatedSession::class)
 fun Application.testApp(jwt: Boolean) {
     install(Authentication) {
         KtorAuthnzManager.tokenHandler = when {
@@ -229,6 +263,7 @@ fun Application.testApp(jwt: Boolean) {
             }
             else -> KtorAuthNzTokenHandler()
         }
+        KtorAuthnzManager.accountStore = ExampleAccountStore
 
         ktorAuthnz("ktor-authnz") {
         }
@@ -245,8 +280,17 @@ fun Application.testApp(jwt: Boolean) {
         authenticate("ktor-authnz") {
             get("/protected") {
                 val token = call.getAuthToken()
-                val accountId = call.getAuthenticatedAccount()
-                call.respondText("Hello token ${token}, you are $accountId")
+                val accountId = runCatching { call.getAuthenticatedAccount() }
+                val session = runCatching { getAuthenticatedSession() }
+                call.respondText("Hello token ${token}, you are $accountId; session details: $session")
+            }
+
+            get("/logout") {
+                val session = getAuthenticatedSession()
+                session.run {
+                    call.logoutAndDeleteCookie()
+                }
+                call.respond("Logged out")
             }
         }
 

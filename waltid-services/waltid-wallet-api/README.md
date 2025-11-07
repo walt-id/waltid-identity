@@ -1,13 +1,13 @@
 <div align="center">
  <h1>Wallet API</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Identity wallets to manage Keys, DIDs, Credentials, and NFTs/SBTs<p>
+ <p>Identity wallets to manage Keys, DIDs, Credentials, and NFTs/SBTs</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
 </a>
-<a href="https://twitter.com/intent/follow?screen_name=walt_id">
-<img src="https://img.shields.io/twitter/follow/walt_id.svg?label=Follow%20@walt_id" alt="Follow @walt_id" />
+<a href="https://www.linkedin.com/company/walt-id/">
+<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
 </a>
 
 
@@ -24,6 +24,10 @@ capable of handling different keys, DIDs, and credential types and facilitate th
 credentials from various issuers and verifiers using the OIDC4VC protocol standard. Alongside digital identity
 capabilities, it also supports the integration of web3 wallets. This feature enables your users to view their tokens
 from different blockchain ecosystems like Ethereum, Polygon, and more.
+
+# Protocol Support
+
+The wallet-api currently supports OpenID4VCI Draft 11 and Draft 13, and OpenID4VP Draft 14 and Draft 20.
 
 # How to use it
 
@@ -116,7 +120,7 @@ docker run --name mssql -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=p@ssw0rd" -p 14
 
 ## Join the community
 
-* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [Twitter](https://mobile.twitter.com/walt_id)
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
 * Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
 
 

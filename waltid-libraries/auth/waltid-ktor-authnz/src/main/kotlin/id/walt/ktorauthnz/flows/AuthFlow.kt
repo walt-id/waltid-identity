@@ -1,5 +1,7 @@
 package id.walt.ktorauthnz.flows
 
+import io.klogging.logger
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -23,17 +25,34 @@ data class AuthFlow(
 
     @SerialName("continue")
     val continueWith: Set<AuthFlow>? = null,
-    val ok: Boolean = false,
+    val success: Boolean = false,
+    @Deprecated("replaced with success")
+    val ok: Boolean? = false,
     /** set how long this auth flow result will be valid for */
     val expiration: String? = null
 ) {
+
+    companion object {
+        private val log = logger("AuthFlow")
+
+        fun fromConfig(config: String): AuthFlow = Json.decodeFromString<AuthFlow>(config)
+    }
+
+    fun isEndConditionSuccess() = success || (ok ?: false)
 
     @Transient
     val parsedDuration = expiration?.let { Duration.parse(it) }
 
     init {
-        check(ok || continueWith != null) { "No end condition in auth flow with method $method" }
-        check(ok xor (continueWith != null)) { "Multiple end conditions in auth flow with method $method: OK and ${continueWith!!.methods()}" }
+        @Suppress("DEPRECATION")
+        if (ok != null) {
+            val msg = "Your AuthFlow configuration contains deprecated end-condition \"ok\" - use \"success\" instead."
+            runBlocking { log.warn { msg } }
+            println(msg)
+        }
+
+        check(isEndConditionSuccess() || continueWith != null) { "No end condition in auth flow with method $method" }
+        check(isEndConditionSuccess() xor (continueWith != null)) { "Multiple end conditions in auth flow with method $method: OK and ${continueWith!!.methods()}" }
 
         if (continueWith != null) {
             check(continueWith.isNotEmpty()) { "Next flow list (`continueWith`) is empty at method $method" }
@@ -50,17 +69,12 @@ data class AuthFlow(
 
         //val config = if (config != null) "\n${prefix}config=$config" else ""
         val end = when {
-            ok -> "$prefix-> Flow end (success)"
+            isEndConditionSuccess() -> "|$prefix-> Flow end (success)"
             continueWith != null -> "${prefix}continue on success ->\n${continueWith.joinToString("\n") { it.toString(index + 1) }}"
-            else -> "$prefix?"
+            else -> "|$prefix?"
         }
-        return "${prefix}Method: $method\n$end"
+        return "|${prefix}Method: $method\n$end"
     }
-
-    companion object {
-        fun fromConfig(config: String): AuthFlow = Json.decodeFromString<AuthFlow>(config)
-    }
-
 }
 
 @Language("json")
@@ -70,12 +84,12 @@ private val flowConfigExample = """
     "method": "userpass",
     "continue": [{
       "method": "totp",
-      "ok": true
+      "success": true
     }, {
       "method": "emailpass",
       "continue": [{
         "method": "totp",
-        "ok": true
+        "success": true
       }]
     }]
   },
@@ -87,7 +101,7 @@ private val flowConfigExample = """
         "HighAssuranceCredential"
       ]
     },
-    "ok": true
+    "success": true
   },
   
   "external": {
@@ -96,7 +110,7 @@ private val flowConfigExample = """
       "server_url": "ldap://entra.microsoft.com:3893",
       "user_dn_format": "cn=%s,ou=superheros,dc=glauth,dc=com"
     },
-    "ok": true
+    "success": true
   },
   
   "special-idp": {
@@ -113,7 +127,7 @@ private val flowConfigExample = """
           "HighAssuranceCredential"
         ]
       },
-      "ok": true
+      "success": true
     }]
   }
 }

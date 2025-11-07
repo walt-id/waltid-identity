@@ -86,7 +86,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
                 // HTTP
                 implementation("io.ktor:ktor-client-core:$ktor_version")
@@ -124,7 +124,7 @@ kotlin {
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(project(":waltid-libraries:waltid-did"))
                 implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
             }
         }
         val jvmMain by getting {
@@ -156,7 +156,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
                 implementation("io.ktor:ktor-client-logging-jvm:$ktor_version")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.10.2")
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 
                 implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")

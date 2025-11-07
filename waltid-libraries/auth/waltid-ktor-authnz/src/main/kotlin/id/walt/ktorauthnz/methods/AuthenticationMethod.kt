@@ -6,11 +6,10 @@ import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
-import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
-import id.walt.ktorauthnz.sessions.AuthSession
-import id.walt.ktorauthnz.sessions.AuthSessionStatus
-import id.walt.ktorauthnz.sessions.SessionManager
-import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
+import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
+import id.walt.ktorauthnz.sessions.*
+import id.walt.ktorauthnz.utils.HtmlRedirect.htmlBasedRedirect
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -41,24 +40,61 @@ abstract class AuthenticationMethod(open val id: String) {
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>? = null
     )
 
+
+    private suspend fun ApplicationCall.handleSessionAuthSuccess(session: AuthSession, authContext: AuthContext, accountId: String?) {
+        accountId?.let { session.accountId = it }
+        session.progressFlow(this@AuthenticationMethod)
+
+        if (session.status == AuthSessionStatus.SUCCESS || session.status == AuthSessionStatus.OK) {
+            session.currentlyActiveMethod = null // No longer any method active, authentication is done for this session
+            check(session.token != null) { "Session token does not exist after successful authentication?" }
+
+            SessionTokenCookieHandler.run { setCookie(session.token!!) }
+        }
+    }
+
     /**
      * Helper function, called when login was successful, will handle the proceeding actions.
      * - progresses the auth flow of the provided auth session (switch to next method or handle auth success)
      * - update session token cookie
      * - respond with updated session information
      * */
-    suspend fun ApplicationCall.handleAuthSuccess(session: AuthSession, accountId: String?) {
-        accountId?.let { session.accountId = it }
-        session.progressFlow(this@AuthenticationMethod)
+    suspend fun ApplicationCall.handleAuthSuccess(session: AuthSession, authContext: AuthContext, accountId: String?) {
+        handleSessionAuthSuccess(session, authContext, accountId)
 
-        if (session.status == AuthSessionStatus.OK) {
-            check(session.token != null) { "Session token does not exist after successful authentication?" }
+        val revealTokenToClient = authContext.revealTokenToClient
 
-            SessionTokenCookieHandler.run { setCookie(session.token!!) }
-        }
-
-        this.respond(session.toInformation())
+        this.respond(session.toInformation(revealTokenToClient = revealTokenToClient))
     }
+
+    suspend fun ApplicationCall.handleAuthSuccessAndRedirect(
+        session: AuthSession,
+        authContext: AuthContext,
+        accountId: String?,
+        redirectUrl: Url
+    ) {
+        handleSessionAuthSuccess(session, authContext, accountId)
+
+        /*
+        this.respondRedirect(redirectUrl)
+        ^^^ We cannot redirect like this, as the SameSite=Strict cookie
+        would not be served if the navigation chain starts cross site:
+         */
+
+        // Custom HTML-based redirect (correctly breaks cross-site navigation chain):
+        this.htmlBasedRedirect(redirectUrl)
+    }
+
+
+    /**
+     *
+     * */
+    suspend fun ApplicationCall.handleAuthNextStep(session: AuthSession, nextStepInfo: AuthSessionNextStep, nextStepDescription: String) {
+        session.progressStep(this@AuthenticationMethod, nextStepInfo)
+
+        this.respond(session.toInformation(nextStepDescription = nextStepDescription))
+    }
+
 
     // Registration
 
@@ -106,7 +142,7 @@ abstract class AuthenticationMethod(open val id: String) {
             SessionManager.openImplicitGlobalSession(currentContext.initialFlow!!)
         } else {
             // Session was started explicitly
-            KtorAuthnzManager.sessionStore.resolveSessionId(currentContext.sessionId ?: error("No session id"))
+            KtorAuthnzManager.sessionStore.resolveSessionById(currentContext.sessionId ?: error("No session id"))
         }
 
         return session

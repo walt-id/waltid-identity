@@ -20,6 +20,7 @@ data class SdJwtVcMeta(
     // Potentially add other SD-JWT VC specific meta fields
 ) : CredentialQueryMeta {
     override val format = CredentialFormat.DC_SD_JWT
+    override fun getTypeString() = vctValues.joinToString()
 
     companion object {
         const val VCT_VALUES_KEY = "vct_values"
