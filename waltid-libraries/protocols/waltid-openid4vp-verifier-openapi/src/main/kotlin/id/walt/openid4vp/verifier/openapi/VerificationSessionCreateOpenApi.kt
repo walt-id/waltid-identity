@@ -14,6 +14,10 @@ object VerificationSessionCreateOpenApi {
             headerParameter<String>("X-Request-Id")
             body<VerificationSessionSetup> {
                 example("Basic example") { value = Verifier2OpenApiExamples.basicExample }
+                example("Basic example with revoked-status-list policy") { value = Verifier2OpenApiExamples.basicExampleWithRevokedStatusListPolicy }
+                example("Basic example with credential-status policy for single BitstringStatusList") { value = Verifier2OpenApiExamples.basicExampleWithRevokedStatusListPolicy }
+                example("Basic example with credential-status policy for multiple BitstringStatusList") { value = Verifier2OpenApiExamples.basicExampleWithStatusPolicyForMultipleBitstringStatusList }
+                example("Basic example with credential-status policy for TokenStatusList") { value = Verifier2OpenApiExamples.basicExampleWithStatusPolicyForTokenStatusList }
                 example("W3C + path") { value = exampleOf(Verifier2OpenApiExamples.w3cPlusPath) }
                 example("Empty meta") { value = exampleOf(Verifier2OpenApiExamples.emptyMeta) }
                 example("Nested presentation request") {
