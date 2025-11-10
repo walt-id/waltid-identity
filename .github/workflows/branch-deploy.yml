@@ -39,7 +39,7 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       publish: true
   deploy:
-    uses: walt-id/waltid-identity/.github/workflows/helm-deployment.yml@82c7362df0b04e81d9eede712fc13c31f6009e50
+    uses: walt-id/waltid-identity/.github/workflows/helm-deployment.yml@a0ac00c985dda14575102be3f122ee7c9fcf9dc5
     secrets: inherit
     needs: [ version, docker, api-docker]
     with:
