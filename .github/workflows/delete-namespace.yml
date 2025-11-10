@@ -18,4 +18,4 @@ jobs:
         env:
           KUBE_CONFIG: ${{ secrets.AKS_KUBE_CONFIG }}
         with:
-          args: delete namespace ${GITHUB_REF_NAME}
+          args: delete namespace ${{ env.GITHUB_EVENT_REF_SLUG }}
