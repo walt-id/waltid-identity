@@ -1,5 +1,6 @@
 package id.walt.commons
 
+import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.statics.BuildConfig
 import id.walt.commons.config.statics.ServiceConfig
 import id.walt.commons.config.statics.ServiceConfig.serviceString
@@ -7,6 +8,7 @@ import id.walt.commons.featureflag.AbstractFeature
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.featureflag.ServiceFeatureCatalog
+import id.walt.did.dids.resolver.local.DidWebResolver
 import io.klogging.logger
 import kotlinx.coroutines.delay
 import kotlin.io.path.Path
@@ -80,6 +82,10 @@ object ServiceCommons {
         }.also {
             log.info { "Service initialization completed ($it)." }
         }
+    }
+
+    fun initDevMode() {
+        DidWebResolver.enableHttps(ConfigManager.getDevModeConfig().enableDidWebResolverHttps)
     }
 
     private suspend fun runService(init: ServiceInitialization) {

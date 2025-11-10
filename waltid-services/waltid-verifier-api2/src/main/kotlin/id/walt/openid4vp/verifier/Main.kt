@@ -1,5 +1,6 @@
 package id.walt.openid4vp.verifier
 
+import id.walt.commons.ServiceCommons
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
@@ -27,6 +28,7 @@ suspend fun main(args: Array<String>) {
                     registerResolver(LocalResolver())
                     updateResolversForMethods()
                 }
+                ServiceCommons.initDevMode()
             },
             run = WebService(Application::verifierModule).run()
         )

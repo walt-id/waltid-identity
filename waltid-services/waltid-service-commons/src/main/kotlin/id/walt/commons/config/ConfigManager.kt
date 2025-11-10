@@ -1,6 +1,8 @@
 package id.walt.commons.config
 
 import com.sksamuel.hoplite.*
+import id.walt.commons.config.list.DevModeConfig
+import id.walt.commons.featureflag.FeatureManager
 import io.klogging.noCoLogger
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.reflect.KClass
@@ -107,6 +109,13 @@ object ConfigManager {
                         )
                 }
         }
+
+    fun getDevModeConfig(): DevModeConfig {
+        return when (FeatureManager.isFeatureEnabled("dev-mode")) {
+            true -> getConfig<DevModeConfig>()
+            false -> DevModeConfig() // use default settings
+        }
+    }
 
     fun registerConfig(
         id: String,
