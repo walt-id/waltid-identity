@@ -1,5 +1,6 @@
 package id.walt.issuer
 
+import id.walt.commons.ServiceCommons
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
@@ -28,6 +29,7 @@ suspend fun main(args: Array<String>) {
             init = {
                 WaltidServices.minimalInit()
                 WaltCryptoAws.init()
+                ServiceCommons.initDevMode()
             },
             run = WebService(Application::issuerModule).run()
         )
