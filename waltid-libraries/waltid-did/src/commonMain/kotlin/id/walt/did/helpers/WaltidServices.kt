@@ -7,6 +7,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+@Deprecated("Use DidService instead")
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 object WaltidServices {
