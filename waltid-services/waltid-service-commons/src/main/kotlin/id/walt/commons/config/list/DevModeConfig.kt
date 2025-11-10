@@ -4,6 +4,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class DevModeConfig(
-    val mock: Boolean = false,
     val enableDidWebResolverHttps: Boolean = true,
 )
