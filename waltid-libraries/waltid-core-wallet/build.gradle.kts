@@ -39,7 +39,7 @@ kotlin {
 
                 implementation("io.github.oshai:kotlin-logging:7.0.5")
 
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(project(":waltid-libraries:waltid-did"))
@@ -75,7 +75,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
             }
         }
         val jvmTest by getting {

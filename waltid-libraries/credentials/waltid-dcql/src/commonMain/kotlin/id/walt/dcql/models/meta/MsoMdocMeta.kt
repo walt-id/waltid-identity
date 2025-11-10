@@ -20,6 +20,7 @@ data class MsoMdocMeta(
     // Potentially add other mdoc specific meta fields
 ) : CredentialQueryMeta {
     override val format = CredentialFormat.MSO_MDOC
+    override fun getTypeString() = doctypeValue
 
     companion object {
         const val DOCTYPE_VALUE_KEY = "doctype_value"

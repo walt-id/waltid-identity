@@ -38,12 +38,13 @@ object JWT : AuthenticationMethod("jwt") {
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
         }) {
             val session = call.getAuthSession(authContext)
-            val config = session.lookupConfiguration<JwtAuthConfiguration>(this@JWT)
+            val config = session.lookupFlowMethodConfiguration<JwtAuthConfiguration>(this@JWT)
 
             val jwt = call.receiveText()
             val id = auth(jwt, config)
 
-            call.handleAuthSuccess(session, id.resolveToAccountId())
+            val authContext = authContext(call)
+            call.handleAuthSuccess(session, authContext, id.resolveToAccountId())
         }
     }
 

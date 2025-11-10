@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
@@ -22,7 +25,16 @@ val enableAndroidBuild = getSetting("enableAndroidBuild")
 val enableIosBuild = getSetting("enableIosBuild")
 
 kotlin {
-    jvm()
+    jvm {
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        compilerOptions {
+            jvmTarget = JvmTarget.JVM_17
+        }
+
+        tasks.withType<Test>().configureEach {
+            useJUnitPlatform()
+        }
+    }
 
     js(IR) {
         nodejs {
@@ -68,18 +80,27 @@ kotlin {
                 implementation(project(":waltid-libraries:credentials:waltid-vical"))
                 implementation(project(":waltid-libraries:credentials:waltid-dcql"))
                 implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
+                implementation(project(":waltid-libraries:crypto:waltid-crypto"))// for Base64Utils
+
+                implementation("com.soywiz:korlibs-io:6.0.2")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
                 implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
             }
         }
         val jvmTest by getting {
             dependencies {
                 implementation("org.slf4j:slf4j-simple:2.0.16")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+                implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
+                implementation("io.ktor:ktor-server-test-host:$ktor_version")
+                implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
+                implementation("io.ktor:ktor-server-netty:$ktor_version")
+                implementation("io.mockk:mockk:1.14.2")
             }
         }
     }

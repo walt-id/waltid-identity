@@ -111,7 +111,7 @@ kotlin {
                 implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:7.0.5")
@@ -128,7 +128,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
             }
         }
         val jvmMain by getting {
@@ -142,7 +142,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.10.2")
 
                 // JOSE
                 implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")

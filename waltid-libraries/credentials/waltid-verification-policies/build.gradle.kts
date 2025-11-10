@@ -70,6 +70,7 @@ kotlin {
                 implementation(project(":waltid-libraries:credentials:waltid-dif-definitions-parser"))
                 implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
                 implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
+                implementation(project(":waltid-libraries:crypto:waltid-crypto"))//for Base64Utils
 
                 // Kotlinx
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
@@ -86,16 +87,18 @@ kotlin {
                 implementation("io.github.oshai:kotlin-logging:7.0.5")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
                 // suspend-transform plugin annotations (required in the current version to avoid "compileOnly" warning)
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
+
+                implementation("com.soywiz:korlibs-io:6.0.2")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
             }
         }
         val jvmTest by getting {

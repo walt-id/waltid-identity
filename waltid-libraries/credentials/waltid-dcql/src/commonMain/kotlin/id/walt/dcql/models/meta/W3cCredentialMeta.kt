@@ -21,6 +21,7 @@ data class W3cCredentialMeta(
     // Potentially add other W3C specific meta fields if defined by profiles
 ) : CredentialQueryMeta {
     override val format = CredentialFormat.JWT_VC_JSON
+    override fun getTypeString() = typeValues.joinToString()
 
     companion object {
         const val TYPE_VALUES_KEY = "type_values"
