@@ -4,6 +4,7 @@ on:
   delete:
     branches:
       - '*'
+  workflow_call:
   workflow_dispatch:
 
 jobs:
