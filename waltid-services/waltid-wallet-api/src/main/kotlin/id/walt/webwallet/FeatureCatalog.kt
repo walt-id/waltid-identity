@@ -21,9 +21,6 @@ object FeatureCatalog : ServiceFeatureCatalog {
 
     val web3 = OptionalFeature("web3", "Web3 account management", default = false)
 
-    val runtimeMockFeature =
-        OptionalFeature("runtime", "Runtime mock provider configuration", DevModeConfig::class, false)
-
     val oidcAuthenticationFeature = OptionalFeature("oidc", "OIDC login feature", OidcConfiguration::class, false)
     val silentExchange = OptionalFeature(
         "silent-exchange", "Silent exchange",
@@ -84,13 +81,11 @@ object FeatureCatalog : ServiceFeatureCatalog {
         web3,
         tenantFeature,
         pushFeature,
-        runtimeMockFeature,
         oidcAuthenticationFeature,
         silentExchange,
         rejectionReasonsFeature,
         registrationDefaultsFeature,
         keyGenerationDefaultsFeature,
-        runtimeMockFeature,
         didWebRegistry,
         x5cAuthFeature,
         externalSignatureEndpointsFeature,
