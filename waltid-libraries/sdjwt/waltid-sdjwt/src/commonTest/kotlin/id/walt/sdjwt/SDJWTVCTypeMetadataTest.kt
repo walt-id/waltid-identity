@@ -50,6 +50,65 @@ class SDJWTVCTypeMetadataTest {
     }
 
     @Test
+    fun `should be able to parse draft 04 type metadata`() {
+        //https://datatracker.ietf.org/doc/html/draft-ietf-oauth-sd-jwt-vc-04#name-type-metadata-example
+        //vct not defined in format section of type metadata, but included in the provided example spec...
+        val draft04TypeMetadataJsonPayload = """
+            {
+                "vct": "https://betelgeuse.example.com/education_credential",
+                "name": "Betelgeuse Education Credential - Preliminary Version",
+                "description": "This is our development version of the education credential. Don't panic.",
+                "extends": "https://galaxy.example.com/galactic-education-credential-0.9",
+                "extends#integrity": "sha256-9cLlJNXN-TsMk-PmKjZ5t0WRL5ca_xGgX3c1VLmXfh-WRL5",
+                "schema_uri": "https://exampleuniversity.com/public/credential-schema-0.9",
+                "schema_uri#integrity": "sha256-o984vn819a48ui1llkwPmKjZ5t0WRL5ca_xGgX3c1VLmXfh"
+            }
+        """.trimIndent()
+
+        val parsed = Json.decodeFromString<SDJWTVCTypeMetadata.Draft04>(draft04TypeMetadataJsonPayload)
+
+        assertEquals(
+            expected = "Betelgeuse Education Credential - Preliminary Version",
+            actual = parsed.name,
+        )
+
+        assertEquals(
+            expected = "This is our development version of the education credential. Don't panic.",
+            actual = parsed.description,
+        )
+
+
+        assertEquals(
+            expected = "https://galaxy.example.com/galactic-education-credential-0.9",
+            actual = parsed.extends,
+        )
+
+
+        assertEquals(
+            expected = "sha256-9cLlJNXN-TsMk-PmKjZ5t0WRL5ca_xGgX3c1VLmXfh-WRL5",
+            actual = parsed.extendsIntegrity,
+        )
+
+
+        assertEquals(
+            expected = "https://exampleuniversity.com/public/credential-schema-0.9",
+            actual = parsed.schemaUri,
+        )
+
+
+        assertEquals(
+            expected = "sha256-o984vn819a48ui1llkwPmKjZ5t0WRL5ca_xGgX3c1VLmXfh",
+            actual = parsed.schemaUriIntegrity,
+        )
+
+        assertEquals(
+            expected = "https://betelgeuse.example.com/education_credential",
+            actual = parsed.customParameters?.get("vct")!!.jsonPrimitive.content,
+        )
+
+    }
+
+    @Test
     fun `should be able to parse draft 13 type metadata`() {
         //https://datatracker.ietf.org/doc/html/draft-ietf-oauth-sd-jwt-vc-13#name-example-2-type-metadata
         val draft13TypeMetadataJsonPayload = """
