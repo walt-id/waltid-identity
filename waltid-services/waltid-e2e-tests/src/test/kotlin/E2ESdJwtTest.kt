@@ -6,7 +6,6 @@ import WaltidServicesE2ETests.Companion.sdjwtW3CCredential
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.resolver.local.DidKeyResolver
 import id.walt.issuer.issuance.IssuanceRequest
-import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.http
