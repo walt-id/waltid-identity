@@ -110,14 +110,11 @@ object OidcApi : CIProvider(), Klogging {
 
                 call.respond(
                     status = HttpStatusCode.OK,
-                    message = when (vctMetadata.sdJwtVcTypeMetadata != null) {
-                        true -> SDJWTVCTypeMetadata.fromJSON(vctMetadata.sdJwtVcTypeMetadata!!.toJSON())
-                        else -> SDJWTVCTypeMetadata(
-                            vct = vctMetadata.vct!!,
+                    message = (vctMetadata.sdJwtVcTypeMetadata
+                        ?: SDJWTVCTypeMetadata.Draft04(
                             name = credType,
                             description = "$credType Verifiable Credential"
-                        )
-                    }
+                        )).toJSON()
                 )
             }
         }
@@ -372,10 +369,13 @@ object OidcApi : CIProvider(), Klogging {
                 val params = call.receiveParameters().toMap()
                 logger.debug { "/direct_post params: $params" }
 
-                if (params["state"]?.get(0) == null || (params[ResponseType.IdToken.value]?.get(0) == null && params[ResponseType.VpToken.value]?.get(0) == null)) {
+                if (params["state"]?.get(0) == null || (params[ResponseType.IdToken.value]?.get(0) == null && params[ResponseType.VpToken.value]?.get(
+                        0
+                    ) == null)
+                ) {
                     call.respond(
                         status = HttpStatusCode.BadRequest,
-                        message ="missing state/id_token/vp_token parameter"
+                        message = "missing state/id_token/vp_token parameter"
                     )
                     throw IllegalArgumentException("missing missing state/id_token/vp_token  parameter")
                 }
@@ -524,7 +524,8 @@ object OidcApi : CIProvider(), Klogging {
                     logger.error(exc) { "Credential error: " }
                     call.respond(
                         status = HttpStatusCode.BadRequest,
-                        message = exc.toCredentialErrorResponse().toJSON())
+                        message = exc.toCredentialErrorResponse().toJSON()
+                    )
                 }
 
             }
@@ -549,7 +550,8 @@ object OidcApi : CIProvider(), Klogging {
                         logger.error(exc) { "DeferredCredentialError: " }
                         call.respond(
                             status = HttpStatusCode.BadRequest,
-                            message = exc.toCredentialErrorResponse().toJSON())
+                            message = exc.toCredentialErrorResponse().toJSON()
+                        )
                     }
                 }
             }
@@ -591,7 +593,8 @@ object OidcApi : CIProvider(), Klogging {
                         logger.error(exc) { "BatchCredentialError: " }
                         call.respond(
                             status = HttpStatusCode.BadRequest,
-                            message = exc.toBatchCredentialErrorResponse().toJSON())
+                            message = exc.toBatchCredentialErrorResponse().toJSON()
+                        )
                     }
                 }
             }
