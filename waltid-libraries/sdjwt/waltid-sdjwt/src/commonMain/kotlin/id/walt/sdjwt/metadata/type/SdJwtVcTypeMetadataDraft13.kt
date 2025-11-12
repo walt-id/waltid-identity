@@ -128,31 +128,30 @@ data class BackgroundImageMetadata(
 
 @Serializable
 data class ClaimInformation(
-    val path: List<String?>, //may contain null
+    val path: List<String?>, //may contain null as per the specification
     val display: List<ClaimDisplayMetadata>? = null,
     val mandatory: Boolean? = false,
     val sd: ClaimSdMetadata? = ClaimSdMetadata.Allowed,
     @SerialName("svg_id")
     val svgId: String? = null,
-) {
+)
 
-    @Serializable
-    data class ClaimDisplayMetadata(
-        val locale: String,
-        val label: String,
-        val description: String? = null,
-    )
+@Serializable
+data class ClaimDisplayMetadata(
+    val locale: String,
+    val label: String,
+    val description: String? = null,
+)
 
-    @Serializable
-    enum class ClaimSdMetadata {
+@Serializable
+enum class ClaimSdMetadata {
 
-        @SerialName("always")
-        Always,
+    @SerialName("always")
+    Always,
 
-        @SerialName("allowed")
-        Allowed,
+    @SerialName("allowed")
+    Allowed,
 
-        @SerialName("never")
-        Never
-    }
+    @SerialName("never")
+    Never
 }
