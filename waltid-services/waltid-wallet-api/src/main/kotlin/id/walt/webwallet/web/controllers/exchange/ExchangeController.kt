@@ -44,7 +44,7 @@ fun Application.exchange() = walletRoute {
             val did = call.request.queryParameters["did"]
                 ?: wallet.listDids().run {
                     // use default did if no did is provided in the parameters
-                    firstOrNull { it -> it.default }?.did
+                    firstOrNull { it.default }?.did
                     // use first DID if no DID is marked as default
                         ?: firstOrNull()?.did
                 }

@@ -21,7 +21,6 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.JsonObject
@@ -43,13 +42,9 @@ abstract class IssuanceServiceBase {
         val providerMetadataUri =
             credentialWallet.getCIProviderMetadataUrl(issuerURL)
         logger.debug { "Getting provider metadata from: $providerMetadataUri" }
-        val providerMetadataResult = http.get(providerMetadataUri)
-        logger.debug { runBlocking { "Provider metadata returned: ${providerMetadataResult.bodyAsText()}" } }
-        return providerMetadataResult
-            .body<JsonObject>()
-            .let {
-                OpenIDProviderMetadata.fromJSON(it)
-            }
+        val providerMetadataResult = http.get(providerMetadataUri).bodyAsText()
+        logger.debug { "Provider metadata returned: $providerMetadataResult" }
+        return OpenIDProviderMetadata.fromJSONString(providerMetadataResult)
     }
 
     protected suspend fun issueTokenRequest(
