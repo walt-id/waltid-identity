@@ -1,7 +1,10 @@
 @file:OptIn(ExperimentalSerializationApi::class)
 
-package id.walt.sdjwt
+package id.walt.sdjwt.metadata.type
 
+import id.walt.sdjwt.utils.JsonDataObject
+import id.walt.sdjwt.utils.JsonDataObjectFactory
+import id.walt.sdjwt.utils.JsonDataObjectSerializer
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor

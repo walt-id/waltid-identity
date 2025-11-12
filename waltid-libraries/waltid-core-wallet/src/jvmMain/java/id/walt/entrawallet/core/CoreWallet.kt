@@ -12,7 +12,7 @@ import id.walt.entrawallet.core.service.exchange.UsePresentationResponse
 import id.walt.entrawallet.core.utils.WalletCredential
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.sdjwt.SDJWTVCTypeMetadata
+import id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata
 import id.walt.webwallet.usecase.exchange.FilterData
 import io.ktor.http.*
 import io.ktor.util.*

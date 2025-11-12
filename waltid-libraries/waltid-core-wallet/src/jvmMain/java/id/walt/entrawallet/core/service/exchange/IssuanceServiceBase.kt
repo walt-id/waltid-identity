@@ -13,7 +13,7 @@ import id.walt.oid4vc.data.OfferedCredential
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.sdjwt.SDJWTVCTypeMetadata
+import id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata
 import id.walt.webwallet.utils.WalletHttpClients
 import io.ktor.client.call.*
 import io.ktor.client.request.*

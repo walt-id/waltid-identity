@@ -9,7 +9,7 @@ import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.http
-import id.walt.sdjwt.SDJWTVCTypeMetadata
+import id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata
 import id.walt.sdjwt.SDJwtVC
 import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.db.models.WalletCredential

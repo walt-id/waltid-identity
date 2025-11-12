@@ -1,4 +1,4 @@
-package id.walt.sdjwt
+package id.walt.sdjwt.utils
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer

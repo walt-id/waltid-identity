@@ -3,7 +3,7 @@ package id.walt.webwallet.web.controllers.exchange.openapi
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.sdjwt.SDJWTVCTypeMetadata
+import id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata
 import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.github.smiley4.ktoropenapi.config.RouteConfig

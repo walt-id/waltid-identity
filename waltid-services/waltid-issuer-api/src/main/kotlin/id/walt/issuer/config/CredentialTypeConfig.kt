@@ -5,7 +5,7 @@ import id.walt.commons.config.WaltConfig
 import id.walt.mdoc.doc.MDocTypes
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.*
-import id.walt.sdjwt.SDJWTVCTypeMetadata
+import id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 

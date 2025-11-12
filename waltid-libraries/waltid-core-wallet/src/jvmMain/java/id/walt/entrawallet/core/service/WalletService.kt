@@ -3,7 +3,7 @@ package id.walt.entrawallet.core.service
 import id.walt.entrawallet.core.service.exchange.PresentationRequestParameter
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.requests.CredentialOfferRequest
-import id.walt.sdjwt.SDJWTVCTypeMetadata
+import id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
