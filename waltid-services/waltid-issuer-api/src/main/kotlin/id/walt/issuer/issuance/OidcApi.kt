@@ -25,7 +25,7 @@ import id.walt.oid4vc.responses.PushedAuthorizationResponse
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.sdjwt.metadata.issuer.JWTVCIssuerMetadata
-import id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata
+import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -111,7 +111,7 @@ object OidcApi : CIProvider(), Klogging {
                 call.respond(
                     status = HttpStatusCode.OK,
                     message = (vctMetadata.sdJwtVcTypeMetadata
-                        ?: SDJWTVCTypeMetadata.Draft04(
+                        ?: SdJwtVcTypeMetadataDraft04(
                             name = credType,
                             description = "$credType Verifiable Credential"
                         )).toJSON()

@@ -5,7 +5,7 @@ import id.walt.commons.config.WaltConfig
 import id.walt.mdoc.doc.MDocTypes
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.*
-import id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata
+import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
@@ -153,7 +153,7 @@ data class CredentialTypeConfig(
                         textColor = "#000000"
                     )
                 ),*/
-                sdJwtVcTypeMetadata = SDJWTVCTypeMetadata.Draft04(
+                sdJwtVcTypeMetadata = SdJwtVcTypeMetadataDraft04(
                     name = "Identity Credential",
                     description = "The Identity Verifiable Credential"
                 )
@@ -165,7 +165,7 @@ data class CredentialTypeConfig(
                 cryptographicBindingMethodsSupported = setOf("did", "jwk"),
                 credentialSigningAlgValuesSupported = setOf("ES256"),
                 vct = "https://example.com/my_custom_vct",
-                sdJwtVcTypeMetadata = SDJWTVCTypeMetadata.Draft04(
+                sdJwtVcTypeMetadata = SdJwtVcTypeMetadataDraft04(
                     name = "THE vct VALUE SHOULD BE UPDATED TO A RESOLVABLE AUTHORITY DOMAIN",
                     description = """
                         This is an example to show that custom VCT 'registries' could also be used here.
@@ -180,7 +180,7 @@ data class CredentialTypeConfig(
                 cryptographicBindingMethodsSupported = setOf("jwk"),
                 credentialSigningAlgValuesSupported = setOf("ES256"),
                 vct = baseUrl + "/PhotoIDCredential",
-                sdJwtVcTypeMetadata = SDJWTVCTypeMetadata.Draft04(
+                sdJwtVcTypeMetadata = SdJwtVcTypeMetadataDraft04(
                     name = "PhotoID VC (ISO 23220‑4)",
                     description = "SD‑JWT Verifiable Credential based on Photo ID schema 1.0 (ISO 23220‑4 compliant)"
                 ),

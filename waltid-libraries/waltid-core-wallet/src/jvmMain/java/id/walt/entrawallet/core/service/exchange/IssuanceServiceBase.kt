@@ -13,7 +13,7 @@ import id.walt.oid4vc.data.OfferedCredential
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata
+import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import id.walt.webwallet.utils.WalletHttpClients
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -171,13 +171,13 @@ abstract class IssuanceServiceBase {
         )
     }
 
-    suspend fun resolveVct(vct: String): SDJWTVCTypeMetadata {
+    suspend fun resolveVct(vct: String): SdJwtVcTypeMetadataDraft04 {
         val authority = Url(vct).protocolWithAuthority
         val response = http.get("$authority/.well-known/vct${vct.substringAfter(authority)}")
 
         require(response.status.isSuccess()) { "VCT URL returns error: ${response.status}" }
 
-        return response.body<JsonObject>().let { SDJWTVCTypeMetadata.fromJSON(it) }
+        return response.body<JsonObject>().let { SdJwtVcTypeMetadataDraft04.fromJSON(it) }
     }
 
     fun isKeyProofRequiredForOfferedCredential(offeredCredential: OfferedCredential) =

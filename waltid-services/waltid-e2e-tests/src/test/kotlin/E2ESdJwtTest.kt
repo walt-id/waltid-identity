@@ -9,8 +9,8 @@ import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.http
-import id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata
 import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
@@ -98,13 +98,8 @@ class E2ESdJwtTest(
         val typeMetadataUrl =
             "${vctUrl.protocolWithAuthority}/.well-known/vct/${vctUrl.fullPath.substringAfter("/")}"
 
-        val typeMetadata = http.get(typeMetadataUrl).expectSuccess().body<SDJWTVCTypeMetadata>()
-
-        when {
-            typeMetadata is SDJWTVCTypeMetadata.Draft13 -> {
-                assertEquals(credential.vct, typeMetadata.vct)
-            }
-        }
+        val typeMetadata = http.get(typeMetadataUrl).expectSuccess().body<SdJwtVcTypeMetadataDraft04>()
+        assertEquals(credential.vct, typeMetadata.vct)
 
         // check SD-JWT-VC issuer metadata
         assertNotNull(credential.issuer)
@@ -178,13 +173,9 @@ class E2ESdJwtTest(
         val typeMetadataUrl =
             "${vctUrl.protocolWithAuthority}/.well-known/vct/${vctUrl.fullPath.substringAfter("/")}"
 
-        val typeMetadata = http.get(typeMetadataUrl).expectSuccess().body<SDJWTVCTypeMetadata>()
+        val typeMetadata = http.get(typeMetadataUrl).expectSuccess().body<SdJwtVcTypeMetadataDraft04>()
 
-        when {
-            typeMetadata is SDJWTVCTypeMetadata.Draft13 -> {
-                assertEquals(credential.vct, typeMetadata.vct)
-            }
-        }
+        assertEquals(credential.vct, typeMetadata.vct)
 
         // check SD-JWT-VC issuer metadata
         assertNotNull(credential.issuer)
