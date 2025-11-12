@@ -1,6 +1,8 @@
 package id.walt.sdjwt
 
 
+import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
+import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft13
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -19,13 +21,22 @@ class SDJWTVCTypeMetadataTest {
         """.trimIndent()
 
         listOf(
-            Json.decodeFromString<id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata>(metadataJsonString),
-            _root_ide_package_.id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata.fromJSONString(metadataJsonString)
+            Json.decodeFromString<SdJwtVcTypeMetadataDraft04>(metadataJsonString),
+            SdJwtVcTypeMetadataDraft04.fromJSONString(metadataJsonString),
         ).forEach {
             assertNotNull(it)
             val customParams = assertNotNull(it.customParameters)
-            val draft13Metadata = assertIs<id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata.Draft13>(it)
-            assertEquals("https://credentials.walt.id/identity_credential", draft13Metadata.vct)
+            assertEquals("https://credentials.walt.id/identity_credential", it.vct)
+            val additionalParam = assertNotNull(customParams["additional-parameter"])
+            assertEquals("why not do it", additionalParam.jsonPrimitive.content)
+        }
+        listOf(
+            Json.decodeFromString<SdJwtVcTypeMetadataDraft13>(metadataJsonString),
+            SdJwtVcTypeMetadataDraft13.fromJSONString(metadataJsonString),
+        ).forEach {
+            assertNotNull(it)
+            val customParams = assertNotNull(it.customParameters)
+            assertEquals("https://credentials.walt.id/identity_credential", it.vct)
             val additionalParam = assertNotNull(customParams["additional-parameter"])
             assertEquals("why not do it", additionalParam.jsonPrimitive.content)
         }
@@ -33,13 +44,13 @@ class SDJWTVCTypeMetadataTest {
 
     @Test
     fun shouldSerializeMetadataWithCustomParameters() {
-        val metadata = _root_ide_package_.id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata.fromJSON( buildJsonObject {
+        val metadataJsonObject = buildJsonObject {
             put("vct", JsonPrimitive("https://credentials.walt.id/identity_credential"))
             put("hello-p", JsonPrimitive("world"))
-        })
+        }
         listOf(
-            Json.encodeToString(metadata),
-            metadata.toJSONString()
+            SdJwtVcTypeMetadataDraft04.fromJSON(metadataJsonObject).toJSONString(),
+            SdJwtVcTypeMetadataDraft13.fromJSON(metadataJsonObject).toJSONString(),
         ).forEach {
             assertNotNull(it)
             //there must not be a property named "customParameters" in the json
@@ -52,7 +63,6 @@ class SDJWTVCTypeMetadataTest {
     @Test
     fun `should be able to parse draft 04 type metadata`() {
         //https://datatracker.ietf.org/doc/html/draft-ietf-oauth-sd-jwt-vc-04#name-type-metadata-example
-        //vct not defined in format section of type metadata, but included in the provided example spec...
         val draft04TypeMetadataJsonPayload = """
             {
                 "vct": "https://betelgeuse.example.com/education_credential",
@@ -65,7 +75,14 @@ class SDJWTVCTypeMetadataTest {
             }
         """.trimIndent()
 
-        val parsed = Json.decodeFromString<id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata.Draft04>(draft04TypeMetadataJsonPayload)
+        val parsed = Json.decodeFromString<SdJwtVcTypeMetadataDraft04>(
+            draft04TypeMetadataJsonPayload
+        )
+
+        assertEquals(
+            expected = "https://betelgeuse.example.com/education_credential",
+            actual = parsed.vct,
+        )
 
         assertEquals(
             expected = "Betelgeuse Education Credential - Preliminary Version",
@@ -102,8 +119,8 @@ class SDJWTVCTypeMetadataTest {
         )
 
         assertEquals(
-            expected = "https://betelgeuse.example.com/education_credential",
-            actual = parsed.customParameters?.get("vct")!!.jsonPrimitive.content,
+            expected = emptyMap(),
+            actual = parsed.customParameters,
         )
 
     }
@@ -302,7 +319,9 @@ class SDJWTVCTypeMetadataTest {
             }
         """.trimIndent()
 
-        val parsed = Json.decodeFromString<id.walt.sdjwt.metadata.type.SDJWTVCTypeMetadata.Draft13>(draft13TypeMetadataJsonPayload)
+        val parsed = Json.decodeFromString<SdJwtVcTypeMetadataDraft13>(
+            draft13TypeMetadataJsonPayload
+        )
 
         assertEquals(
             expected = "https://betelgeuse.example.com/education_credential",
