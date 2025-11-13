@@ -99,10 +99,16 @@ object Verifier2DirectPostHandler {
                 val validationOutcome = Verifier2PresentationValidator.validatePresentation(
                     presentationString = presentationString,
                     expectedFormat = originalCredentialQuery.format,
-                    expectedAudience = authorizationRequest.clientId,
+                    expectedAudience = expectedAudience,
                     expectedNonce = authorizationRequest.nonce!!,
                     responseUri = authorizationRequest.responseUri,
-                    originalClaimsQuery = originalCredentialQuery.claims
+                    originalClaimsQuery = originalCredentialQuery.claims,
+
+                    isDcApi = isDcApi == true,
+                    isEncrypted = isEncrypted,
+                    verifierOrigin = expectedOrigin, // Raw origin needed for mdoc,
+                    jwkThumbprint = jwkThumbprint,
+                    ephemeralDecryptionKey = ephemeralDecryptionKey
                 )
 
                 if (validationOutcome.isSuccess) {
