@@ -207,6 +207,39 @@ object Verifier2DirectPostHandler {
         }
 
 
+        val (vpTokenString, receivedState) = if (vpTokenString == null && responseString != null) {
+            // Encrypted flow
+            require(session.authorizationRequest.responseMode in listOf(OpenID4VPResponseMode.DIRECT_POST_JWT, OpenID4VPResponseMode.DC_API_JWT)) {
+                "Called encrypted flow, but resposeMode is not for encrypted response"
+            }
+
+            log.trace { "Decrypting encrypted token..." }
+            requireNotNull(verificationSession.ephemeralDecryptionKey) { "Missing decryption key for encrypted response flow" }
+            val decryptedPayloadString = (verificationSession.ephemeralDecryptionKey.key as JWKKey).decryptJwe(responseString)
+                .decodeToString()
+            val jsonPayload = Json.parseToJsonElement(decryptedPayloadString).jsonObject
+            val vpToken = jsonPayload["vp_token"].toString() // Extract the inner vp_token object
+            val state = jsonPayload["state"]?.jsonPrimitive?.content
+            if (state == null) {
+                log.info { "Direct POST response received without 'state' parameter." }
+                Verifier2Error.MISSING_STATE_PARAMETER.throwAsError()
+            }
+
+            vpToken to state
+        } else {
+            require(session.authorizationRequest.responseMode !in listOf(OpenID4VPResponseMode.DIRECT_POST_JWT, OpenID4VPResponseMode.DC_API_JWT)) {
+                "Called cleartext flow, but responseMode is for encrypted response"
+            }
+            // Cleartext flow
+            if (receivedState == null) {
+                log.info { "Direct POST response received without 'state' parameter." }
+                Verifier2Error.MISSING_STATE_PARAMETER.throwAsError()
+            }
+
+            requireNotNull(vpTokenString) { "missing vp_token in vp_token-handling block" }
+            vpTokenString to receivedState
+        }
+
         require(receivedState == session.authorizationRequest.state) { "State does not match" }
 
         // 2. Parse vp_token
