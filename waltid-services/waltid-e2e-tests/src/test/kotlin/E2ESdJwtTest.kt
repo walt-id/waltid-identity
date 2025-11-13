@@ -9,8 +9,8 @@ import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.oid4vc.util.http
-import id.walt.sdjwt.SDJWTVCTypeMetadata
 import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
@@ -98,7 +98,7 @@ class E2ESdJwtTest(
         val typeMetadataUrl =
             "${vctUrl.protocolWithAuthority}/.well-known/vct/${vctUrl.fullPath.substringAfter("/")}"
 
-        val typeMetadata = http.get(typeMetadataUrl).expectSuccess().body<SDJWTVCTypeMetadata>()
+        val typeMetadata = http.get(typeMetadataUrl).expectSuccess().body<SdJwtVcTypeMetadataDraft04>()
         assertEquals(credential.vct, typeMetadata.vct)
 
         // check SD-JWT-VC issuer metadata
@@ -132,7 +132,7 @@ class E2ESdJwtTest(
                 "should have a presentation submission after submission"
             )
 
-            assertTrue(it.verificationResult == true, "overall verification should be valid")
+            assertEquals(it.verificationResult, true, "overall verification should be valid")
             it.policyResults.let {
                 require(it != null) { "policyResults should be available after running policies" }
                 assertTrue(it.size > 1, "no policies have run")
@@ -173,7 +173,8 @@ class E2ESdJwtTest(
         val typeMetadataUrl =
             "${vctUrl.protocolWithAuthority}/.well-known/vct/${vctUrl.fullPath.substringAfter("/")}"
 
-        val typeMetadata = http.get(typeMetadataUrl).expectSuccess().body<SDJWTVCTypeMetadata>()
+        val typeMetadata = http.get(typeMetadataUrl).expectSuccess().body<SdJwtVcTypeMetadataDraft04>()
+
         assertEquals(credential.vct, typeMetadata.vct)
 
         // check SD-JWT-VC issuer metadata

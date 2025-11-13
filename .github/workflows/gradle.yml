@@ -22,20 +22,13 @@ jobs:
         # currently configured on workflow dispatch as a separate workflow (gradle-macos)
         os: [ ubuntu-latest ]
     steps:
-      - name: Free Disk Space (Ubuntu)
-        if: ${{ runner.os == 'linux' }}
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: false
-          docker-images: false
-
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@29f904ce0de831e02fe64507ebe284b02e66b50e
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@0d1d3a9838e7266c3ac353d3bb627c5161bb43eb
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@6bad7de2c6de9bc3faa68333de8b00be02613f4d
 
       - name: Generate SSH Key
         run: ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa

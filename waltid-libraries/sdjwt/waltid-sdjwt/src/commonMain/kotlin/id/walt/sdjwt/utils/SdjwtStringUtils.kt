@@ -1,4 +1,4 @@
-package id.walt.sdjwt
+package id.walt.sdjwt.utils
 
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi

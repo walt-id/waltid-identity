@@ -1,4 +1,4 @@
-package id.walt.sdjwt
+package id.walt.sdjwt.utils
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -46,15 +46,17 @@ abstract class JsonDataObjectSerializer<T : JsonDataObject>(serializer: KSeriali
     }
 
     override fun transformDeserialize(element: JsonElement): JsonElement {
-        val obj = JsonObject(
-            buildMap {
-                element.jsonObject.filterKeys { knownElementNames.contains(it) }
-                    .forEach { (key, value) -> deserializeKnownElement(key, value, this) }
-                put(
-                    customParametersName,
-                    JsonObject(element.jsonObject.toMap().filterKeys { !knownElementNames.contains(it) })
-                )
+        val obj = JsonObject(buildMap {
+            element.jsonObject.filterKeys {
+                knownElementNames.contains(it)
+            }.forEach { (key, value) ->
+                deserializeKnownElement(key, value, this)
             }
+            put(
+                customParametersName,
+                JsonObject(element.jsonObject.toMap().filterKeys { !knownElementNames.contains(it) })
+            )
+        }
         )
         return obj
     }
