@@ -259,7 +259,15 @@ object Verifier2DirectPostHandler {
 
 
         // ---------------------------
-        val presentationValidationResult = presentationValidation(session.authorizationRequest, vpTokenContents)
+        val presentationValidationResult = presentationValidation(
+            authorizationRequest = session.authorizationRequest,
+            vpTokenContents = vpTokenContents,
+
+            // DC API
+            isDcApi = session.authorizationRequest.responseMode in listOf(OpenID4VPResponseMode.DC_API, OpenID4VPResponseMode.DC_API_JWT),
+            expectedOrigins = session.authorizationRequest.expectedOrigins,
+            ephemeralDecryptionKey = session.ephemeralDecryptionKey?.key as JWKKey
+        )
         val allPresentationsValid = presentationValidationResult.presentationValid
 
         // queryId -> [validated credentials]
