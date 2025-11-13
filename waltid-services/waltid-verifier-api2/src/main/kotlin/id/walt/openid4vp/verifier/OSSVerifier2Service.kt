@@ -10,6 +10,7 @@ import id.walt.openid4vp.verifier.Verification2Session.VerificationSessionStatus
 import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
 import id.walt.openid4vp.verifier.openapi.VerificationSessionCreateOpenApi
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.vical.*
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
@@ -135,8 +136,15 @@ object Verifier2Service {
                             ?: throw IllegalArgumentException("Unknown session id")
 
                     if (verificationSession.signedAuthorizationRequestJwt != null) {
-                        // JAR (Signed)
-                        call.respond(verificationSession.signedAuthorizationRequestJwt!!)
+                        if (verificationSession.authorizationRequest.responseMode in listOf(OpenID4VPResponseMode.DC_API, OpenID4VPResponseMode.DC_API_JWT))  {
+                            call.respond(mapOf(
+                                "request" to verificationSession.signedAuthorizationRequestJwt,
+                                "client_id" to verificationSession.authorizationRequest.clientId
+                            ))
+                        } else {
+                            // JAR (Signed)
+                            call.respond(verificationSession.signedAuthorizationRequestJwt!!)
+                        }
                     } else {
                         // Unsigned
                         call.respond(verificationSession.authorizationRequest)
@@ -160,7 +168,9 @@ object Verifier2Service {
                         val verificationSession = sessions[sessionId]
 
                         val urlParameters = call.receiveParameters()
-                        val vpTokenString = urlParameters.getOrFail("vp_token")
+                        val responseString = urlParameters["response"]
+                        val vpTokenString = urlParameters["vp_token"]
+
                         val receivedState = urlParameters["state"]
 
                         log.trace { "Verification session data: state = $receivedState, vp_token = $vpTokenString" }
@@ -168,6 +178,7 @@ object Verifier2Service {
                         call.respond(
                             Verifier2DirectPostHandler.handleDirectPost(
                                 verificationSession = verificationSession,
+                                responseString = responseString,
                                 vpTokenString = vpTokenString,
                                 receivedState = receivedState,
                                 updateSessionCallback = updateSessionCallback,
