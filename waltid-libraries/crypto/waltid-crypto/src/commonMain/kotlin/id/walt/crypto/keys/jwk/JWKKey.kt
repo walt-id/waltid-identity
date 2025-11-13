@@ -41,6 +41,10 @@ expect class JWKKey(jwk: String?, _keyId: String? = null) : Key {
      */
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray>
     override suspend fun verifyJws(signedJws: String): Result<JsonElement>
+
+    suspend fun decryptJwe(jweString: String): ByteArray
+    suspend fun encryptJwe(plaintext: ByteArray): String
+
     /*
     /**
      * Encrypts as JWE: Encrypts a message using this public key (with the algorithm this key is based on)
