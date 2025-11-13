@@ -186,6 +186,35 @@ object VerificationSessionCreator {
             }
         }
 
+        val effectiveClientMetadata = if (isDcApi && isEncryptedResponse) {
+
+            val keyType = KeyType.secp256r1
+
+            if (useHaip) {
+                require(keyType == KeyType.secp256r1) { "HAIP profile requires P-256" }
+            }
+
+            // Generate P-256 Ephemeral Key
+            ephemeralKey = JWKKey.generate(keyType)
+
+            // Construct JWKS
+            val jwks = ClientMetadata.Jwks(listOf(ephemeralKey.getPublicKey().exportJWKObject()))
+            // TODO: check if jwks contains `alg` by default (should be "alg": "ECDH-ES")
+
+            // Merge into clientMetadata
+            val baseMetadata = clientMetadata ?: ClientMetadata()
+            baseMetadata.copy(
+                jwks = jwks,
+                // Ensure vp_formats_supported includes mso_mdoc for HAIP
+                vpFormatsSupported = baseMetadata.vpFormatsSupported ?: mapOf("mso_mdoc" to JsonObject(emptyMap())),
+                encryptedResponseEncValuesSupported = listOf("A128GCM")
+            )
+        } else {
+            clientMetadata
+        }
+
+
+
         require(isCrossDevice || isDcApi) { "No flow is selected" } // list all flows here
 
         val sessionId = Uuid.random().toString()
