@@ -254,7 +254,10 @@ object VerificationSessionCreator {
 
         val authorizationRequest = AuthorizationRequest(
             responseType = OpenID4VPResponseType.VP_TOKEN,
-            clientId = clientId,
+
+            // For Unsigned DC API, client_id MUST be omitted.
+            // For Signed DC API, it MUST be present.
+            clientId = if (isDcApi && !setup.signedRequest) null else clientId,
             redirectUri = null, // For Same-Device flow (fragment/query/after code exchange etc)
             // TODO: url building (handle host alias)
             responseUri = when {
@@ -266,7 +269,7 @@ object VerificationSessionCreator {
             state = state, // Opaque value used by the Verifier to maintain state between the request and callback.
             nonce = nonce, // String value used to mitigate replay attacks. Also used to establish holder binding.
             responseMode = when {
-                isDcApi && setup.encryptedResponse -> OpenID4VPResponseMode.DC_API
+                isDcApi && setup.encryptedResponse -> OpenID4VPResponseMode.DC_API_JWT // HAIP requires dc_api.jwt (encrypted)
                 isDcApi -> OpenID4VPResponseMode.DC_API
                 isCrossDevice && setup.encryptedResponse -> OpenID4VPResponseMode.DIRECT_POST_JWT
                 isCrossDevice -> OpenID4VPResponseMode.DIRECT_POST
@@ -281,7 +284,7 @@ object VerificationSessionCreator {
 
             // OpenID4VP New Parameters (Section 5.1)
             dcqlQuery = setup.dcqlQuery, // REQUIRED (unless 'scope' parameter represents a DCQL Query).
-            clientMetadata = clientMetadata,
+            clientMetadata = effectiveClientMetadata,
 
 
             /*
@@ -310,7 +313,7 @@ object VerificationSessionCreator {
              * An array of strings, each string representing an Origin of the Verifier that is making the request.
              * Not for use in unsigned requests.
              */
-            expectedOrigins = if (isDcApi && isSignedRequest) listOf("") /*setup.expectedOrigins*/ else null, // TODO: Fill in here
+            expectedOrigins = if (isDcApi && isSignedRequest) setup.expectedOrigins else null,
         )
         log.trace { "Constructed AuthorizationRequest: $authorizationRequest" }
 
@@ -347,6 +350,7 @@ object VerificationSessionCreator {
             authorizationRequest = authorizationRequest,
             authorizationRequestUrl = authorizationRequestUrl,
             signedAuthorizationRequestJwt = signedAuthorizationRequest,
+            ephemeralDecryptionKey = ephemeralKey?.let { DirectSerializedKey(it) },
 
             requestMode = if (setup.signedRequest) RequestMode.REQUEST_URI_SIGNED else RequestMode.REQUEST_URI,
 
