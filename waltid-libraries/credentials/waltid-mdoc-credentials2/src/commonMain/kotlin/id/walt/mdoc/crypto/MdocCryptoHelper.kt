@@ -1,11 +1,15 @@
 package id.walt.mdoc.crypto
 
 import id.walt.cose.coseCompliantCbor
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.SessionTranscript
+import id.walt.mdoc.objects.handover.OpenID4VPDCAPIHandoverInfo
 import id.walt.mdoc.objects.document.DeviceAuthentication
 import id.walt.mdoc.objects.document.DeviceAuthentication.Companion.DEVICE_AUTHENTICATION_TYPE
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
+import id.walt.mdoc.objects.handover.BaseHandoverInfo
+import id.walt.mdoc.objects.handover.NFCHandover
 import id.walt.mdoc.objects.handover.OpenID4VPHandover
 import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
@@ -25,21 +29,7 @@ object MdocCryptoHelper {
 
     private val log = KotlinLogging.logger { }
 
-    /**
-     * Reconstructs the SessionTranscript for an OID4VP flow using redirects.
-     * As per OpenID for Verifiable Presentations 1.0, Appendix B.2.6.1.
-     */
-    fun reconstructOid4vpSessionTranscript(context: VerificationContext): SessionTranscript {
-        // Step 1: Create the OpenID4VPHandoverInfo structure
-        val handoverInfo = OpenID4VPHandoverInfo(
-            clientId = context.expectedAudience,
-            responseUri = context.responseUri,
-            nonce = context.expectedNonce,
-            jwkThumbprint = null // jwkThumbprint is null when not using JWE for the response
-        )
-        log.trace { "Reconstructed OpenID4VPHandoverInfo: $handoverInfo" }
-
-
+    fun reconstructSessionTranscript(handoverInfo: BaseHandoverInfo): SessionTranscript {
         // Step 2: CBOR-encode and hash the HandoverInfo
         val handoverInfoBytes = coseCompliantCbor.encodeToByteArray(handoverInfo)
         log.trace { "Reconstructed CBOR handoverInfoBytes (hex): ${handoverInfoBytes.toHexString()}" }
@@ -49,12 +39,47 @@ object MdocCryptoHelper {
 
         // Step 3: Create the OpenID4VPHandover structure
         val handover = OpenID4VPHandover(
-            identifier = "OpenID4VPHandover",
+            identifier = when (handoverInfo) {
+                is OpenID4VPHandoverInfo -> "OpenID4VPHandover"
+                is OpenID4VPDCAPIHandoverInfo -> "OpenID4VPDCAPIHandover"
+                is NFCHandover -> TODO()
+            },
             infoHash = infoHash
         )
 
         // Step 4: Create the final SessionTranscript
-        return SessionTranscript.forOpenId(handover)
+        return when (handoverInfo) {
+            is NFCHandover -> TODO()
+            is OpenID4VPHandoverInfo, is OpenID4VPDCAPIHandoverInfo -> SessionTranscript.forOpenId(handover)
+        }
+    }
+
+    fun reconstructDcApiOid4vpSessionTranscript(context: VerificationContext): SessionTranscript {
+        // Step 1: Create the OpenID4VPHandoverInfo structure
+        val handoverInfo = OpenID4VPDCAPIHandoverInfo(
+            origin = context.expectedAudience,
+            nonce = context.expectedNonce,
+            jwkThumbprint = context.jwkThumbprint?.decodeFromBase64Url() // jwkThumbprint is null when not using JWE for the response
+        )
+        log.trace { "Reconstructed OpenID4VPDCAPIHandoverInfo: $handoverInfo" }
+        return reconstructSessionTranscript(handoverInfo)
+    }
+
+    /**
+     * Reconstructs the SessionTranscript for an OID4VP flow using redirects.
+     * As per OpenID for Verifiable Presentations 1.0, Appendix B.2.6.1.
+     */
+    fun reconstructOid4vpSessionTranscript(context: VerificationContext): SessionTranscript {
+        // Step 1: Create the OpenID4VPHandoverInfo structure
+        requireNotNull(context.expectedAudience) { "Missing audience for Session Transcript" }
+        val handoverInfo = OpenID4VPHandoverInfo(
+            clientId = context.expectedAudience,
+            responseUri = context.responseUri,
+            nonce = context.expectedNonce,
+            jwkThumbprint = context.jwkThumbprint?.decodeFromBase64Url() // jwkThumbprint is null when not using JWE for the response
+        )
+        log.trace { "Reconstructed OpenID4VPHandoverInfo: $handoverInfo" }
+        return reconstructSessionTranscript(handoverInfo)
     }
 
     /**
