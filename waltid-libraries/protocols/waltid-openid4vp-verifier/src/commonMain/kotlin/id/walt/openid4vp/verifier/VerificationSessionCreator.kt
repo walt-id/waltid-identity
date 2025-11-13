@@ -149,6 +149,8 @@ object VerificationSessionCreator {
         clientId: String,
         clientMetadata: ClientMetadata? = null,
         urlPrefix: String?,
+
+        /** origin for DC API */
         urlHost: String = "openid4vp://authorize",
 
         key: Key? = null,
@@ -166,7 +168,16 @@ object VerificationSessionCreator {
 
         val isCrossDevice = true // TODO: `setup is CrossDeviceFlow`
 
-        val isDcApi = false // TODO: `setup is DcApiFlow`
+        // val isDcApi = false // TODO: `setup is DcApiFlow`
+        val isDcApi = setup.dcApi
+        val useHaip = setup.haip
+        var ephemeralKey: JWKKey? = null
+
+        if (useHaip) {
+            require(isDcApi) { "HAIP Profile requires DC API flow." }
+            require(isEncryptedResponse) { "HAIP DC API requires encrypted response to be enabled!" }
+        }
+
         if (isDcApi) {
             require(urlPrefix == null) { "URL prefix is not used for DC API" }
             require(!urlHost.startsWith("openid4vp://authorize")) { "URL Host has to be set to the DC API origin" }
