@@ -1,4 +1,4 @@
-package id.walt.sdjwt
+package id.walt.sdjwt.metadata.issuer
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

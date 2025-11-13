@@ -20,7 +20,6 @@ import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeDocs.getUseOff
 import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeDocs.getUsePresentationRequestDocs
 import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeOpenApiCommons
 import id.walt.webwallet.web.controllers.walletRoute
-import io.github.oshai.kotlinlogging.withLoggingContext
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -45,7 +44,7 @@ fun Application.exchange() = walletRoute {
             val did = call.request.queryParameters["did"]
                 ?: wallet.listDids().run {
                     // use default did if no did is provided in the parameters
-                    firstOrNull { it -> it.default }?.did
+                    firstOrNull { it.default }?.did
                     // use first DID if no DID is marked as default
                         ?: firstOrNull()?.did
                 }
