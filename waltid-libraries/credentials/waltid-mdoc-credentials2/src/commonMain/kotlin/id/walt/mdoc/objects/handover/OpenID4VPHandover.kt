@@ -78,7 +78,7 @@ data class OpenID4VPHandoverInfo(
     @ByteString
     val jwkThumbprint: ByteArray?, // Null if response is not encrypted
     val responseUri: String?
-) {
+): BaseHandoverInfo {
     /**
      * Note: `equals` and `hashCode` are manually overridden because the default implementation for a
      * `data class` uses reference equality for `ByteArray` properties. This override ensures
