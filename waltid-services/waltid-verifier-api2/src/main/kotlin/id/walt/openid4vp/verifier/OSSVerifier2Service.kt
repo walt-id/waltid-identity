@@ -144,7 +144,9 @@ object Verifier2Service {
                         OpenID4VPResponseMode.DC_API,
                         OpenID4VPResponseMode.DC_API_JWT
                     )
+                    println("-- IS DC API: $isDcApi")
                     val isSigned = verificationSession.requestMode == Verification2Session.RequestMode.REQUEST_URI_SIGNED // TODO
+                    println("-- IS SIGNED: $isSigned")
 
                     fun dcApiWrapper(protocol: String, data: JsonObject) = mapOf(
                         "digital" to mapOf(
@@ -169,7 +171,7 @@ object Verifier2Service {
                                 )
                             )
 
-                        verificationSession.authorizationRequest.responseMode == OpenID4VPResponseMode.DC_API_JWT ->
+                        isDcApi && !isSigned ->
                             call.respond(
                                 dcApiWrapper(
                                     "openid4vp-v1-unsigned",
