@@ -3,6 +3,7 @@
 package id.walt.openid4vp.verifier
 
 import id.walt.credentials.formats.DigitalCredential
+import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionCreationResponse
 import id.walt.policies2.PolicyList
@@ -72,6 +73,7 @@ data class Verification2Session(
     val authorizationRequestUrl: Url,
 
     val signedAuthorizationRequestJwt: String? = null,
+    val ephemeralDecryptionKey: DirectSerializedKey? = null,
 
     /**
      * OpenID4VP configuration for this Verification Session
