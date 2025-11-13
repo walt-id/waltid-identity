@@ -4,6 +4,7 @@ package id.walt.openid4vp.verifier
 
 import id.walt.commons.fetchBinaryFile
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
+import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
 import id.walt.openid4vp.verifier.Verification2Session.VerificationSessionStatus
@@ -25,10 +26,9 @@ import io.ktor.server.sse.*
 import io.ktor.server.util.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.serializer
-import java.net.URI
-import java.nio.file.Files
-import java.nio.file.Paths
 import kotlin.uuid.ExperimentalUuidApi
 
 
@@ -135,19 +135,92 @@ object Verifier2Service {
                         sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
                             ?: throw IllegalArgumentException("Unknown session id")
 
-                    if (verificationSession.signedAuthorizationRequestJwt != null) {
-                        if (verificationSession.authorizationRequest.responseMode in listOf(OpenID4VPResponseMode.DC_API, OpenID4VPResponseMode.DC_API_JWT))  {
-                            call.respond(mapOf(
-                                "request" to verificationSession.signedAuthorizationRequestJwt,
-                                "client_id" to verificationSession.authorizationRequest.clientId
-                            ))
-                        } else {
+
+                    // openid4vp-v1-unsigned
+                    // openid4vp-v1-signed
+
+
+                    val isDcApi = verificationSession.authorizationRequest.responseMode in listOf(
+                        OpenID4VPResponseMode.DC_API,
+                        OpenID4VPResponseMode.DC_API_JWT
+                    )
+                    val isSigned = verificationSession.requestMode == Verification2Session.RequestMode.REQUEST_URI_SIGNED // TODO
+
+                    fun dcApiWrapper(protocol: String, data: JsonObject) = mapOf(
+                        "digital" to mapOf(
+                            "requests" to listOf(
+                                mapOf(
+                                    "protocol" to protocol,
+                                    "data" to data
+                                )
+                            )
+                        )
+                    ).toJsonObject()
+
+                    when {
+                        isDcApi && isSigned ->
+                            call.respond(
+                                dcApiWrapper(
+                                    "openid4vp-v1-signed", mapOf(
+                                        "client_id" to verificationSession.authorizationRequest.clientId,
+                                        "expected_origins" to verificationSession.authorizationRequest.expectedOrigins,
+                                        "request" to verificationSession.signedAuthorizationRequestJwt
+                                    ).toJsonObject()
+                                )
+                            )
+
+                        verificationSession.authorizationRequest.responseMode == OpenID4VPResponseMode.DC_API_JWT ->
+                            call.respond(
+                                dcApiWrapper(
+                                    "openid4vp-v1-unsigned",
+                                    Json.encodeToJsonElement(verificationSession.authorizationRequest).jsonObject
+                                )
+                            )
+
+                        verificationSession.signedAuthorizationRequestJwt != null ->
                             // JAR (Signed)
                             call.respond(verificationSession.signedAuthorizationRequestJwt!!)
+
+                        else ->
+                            // Unsigned
+                            call.respond(verificationSession.authorizationRequest)
+                    }
+
+                    if (verificationSession.authorizationRequest.responseMode in listOf(
+                            OpenID4VPResponseMode.DC_API,
+                            OpenID4VPResponseMode.DC_API_JWT
+                        )
+                    ) {
+
+                    } else {
+                        if (verificationSession.signedAuthorizationRequestJwt != null) {
+                            // JAR (Signed)
+                            call.respond(verificationSession.signedAuthorizationRequestJwt!!)
+
+                        } else {
+                            // Unsigned
+                            call.respond(verificationSession.authorizationRequest)
+                        }
+                    }
+
+
+
+                    if (verificationSession.signedAuthorizationRequestJwt != null) {
+                        if (verificationSession.authorizationRequest.responseMode in listOf(
+                                OpenID4VPResponseMode.DC_API,
+                                OpenID4VPResponseMode.DC_API_JWT
+                            )
+                        ) {
+                            call.respond(
+                                mapOf(
+                                    "request" to verificationSession.signedAuthorizationRequestJwt,
+                                    "client_id" to verificationSession.authorizationRequest.clientId
+                                )
+                            )
+                        } else {
                         }
                     } else {
-                        // Unsigned
-                        call.respond(verificationSession.authorizationRequest)
+
                     }
                 }
 
