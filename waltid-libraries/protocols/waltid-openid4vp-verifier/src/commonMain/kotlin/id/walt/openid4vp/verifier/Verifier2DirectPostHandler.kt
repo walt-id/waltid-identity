@@ -1,6 +1,7 @@
 package id.walt.openid4vp.verifier
 
 import id.walt.credentials.formats.DigitalCredential
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vp.verifier.Verification2Session.VerificationSessionStatus
 import id.walt.openid4vp.verifier.Verifier2Response.Verifier2Error
 import id.walt.openid4vp.verifier.verification.DcqlFulfillmentChecker
@@ -8,8 +9,11 @@ import id.walt.openid4vp.verifier.verification.Verifier2PresentationValidator
 import id.walt.policies2.PolicyResult
 import id.walt.policies2.PolicyResults
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 object Verifier2DirectPostHandler {
 
@@ -30,7 +34,12 @@ object Verifier2DirectPostHandler {
 
     suspend fun presentationValidation(
         authorizationRequest: AuthorizationRequest,
-        vpTokenContents: Map<String, List<String>>
+        vpTokenContents: Map<String, List<String>>,
+
+        // DC API:
+        isDcApi: Boolean?,
+        expectedOrigins: List<String>?,
+        ephemeralDecryptionKey: JWKKey?
     ): PresentationValidationResult {
         var allPresentationsValid = true
 
