@@ -180,7 +180,8 @@ object Verifier2DirectPostHandler {
      */
     suspend fun handleDirectPost(
         verificationSession: Verification2Session?,
-        vpTokenString: String,
+        responseString: String?, // for encrypted response
+        vpTokenString: String?,
         receivedState: String?,
         updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
         failSessionCallback: suspend (session: Verification2Session, event: SessionEvent, updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit) -> Unit,
