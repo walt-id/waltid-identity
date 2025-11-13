@@ -36,7 +36,13 @@ object MdocVerifier {
      */
     suspend fun verify(mdocString: String, context: VerificationContext): VerificationResult {
         val document = MdocParser.parseToDocument(mdocString)
-        val sessionTranscript = MdocCryptoHelper.reconstructOid4vpSessionTranscript(context)
+
+        val sessionTranscript = if (context.isDcApi) {
+            MdocCryptoHelper.reconstructDcApiOid4vpSessionTranscript(context)
+        } else {
+            MdocCryptoHelper.reconstructOid4vpSessionTranscript(context)
+        }
+
         log.trace { "SessionTranscript: $sessionTranscript" }
         log.trace { "SessionTranscript (hex): ${coseCompliantCbor.encodeToHexString(sessionTranscript)}" }
         return verify(document, sessionTranscript)
