@@ -47,6 +47,17 @@ object Verifier2DirectPostHandler {
             // queryId -> [validated credentials]
             mutableMapOf<String, MutableList<DigitalCredential>>() // Or a more structured object
 
+        val expectedOrigin = expectedOrigins?.first()
+        val expectedAudience = if (isDcApi == true) "origin:$expectedOrigin" else authorizationRequest.clientId
+        val isEncrypted =
+            authorizationRequest.responseMode in listOf(OpenID4VPResponseMode.DIRECT_POST_JWT, OpenID4VPResponseMode.DC_API_JWT)
+
+        // Calculate JWK Thumbprint if encrypted (this is required for HAIP)
+        val jwkThumbprint = if (isEncrypted && ephemeralDecryptionKey != null) {
+            ephemeralDecryptionKey.getPublicKey().getThumbprint()
+        } else {
+            null
+        }
 
         for ((queryId, presentedItemsJsonElements) in vpTokenContents) {
             val originalCredentialQuery = authorizationRequest.dcqlQuery?.credentials
