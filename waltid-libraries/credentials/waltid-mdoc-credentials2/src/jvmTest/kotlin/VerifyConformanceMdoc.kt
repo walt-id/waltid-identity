@@ -56,7 +56,7 @@ class VerifyConformanceMdoc {
         )
         println("Key (from MSO): $verifyResult")
 
-        require(verifyResult)
+        require(verifyResult) { "Failed verifying device signature" }
     }
 
     @Test
@@ -65,7 +65,7 @@ class VerifyConformanceMdoc {
         val verificationResult = MdocVerifier.verify(vpTokenMdocBase64, verificationContext)
         println("Verification result: $verificationResult")
 
-        assertTrue { verificationResult.valid }
+        assertTrue("Verification result is not valid") { verificationResult.valid }
     }
 
 }
