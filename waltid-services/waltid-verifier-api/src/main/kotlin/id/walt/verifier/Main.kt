@@ -4,6 +4,9 @@ import id.walt.commons.ServiceCommons
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
+import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.list.DevModeConfig
+import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.WebService
 import id.walt.did.dids.DidService
@@ -23,7 +26,6 @@ suspend fun main(args: Array<String>) {
                     registerResolver(LocalResolver())
                     updateResolversForMethods()
                 }
-                ServiceCommons.initDevMode()
             },
             run = WebService(Application::verifierModule).run()
         )

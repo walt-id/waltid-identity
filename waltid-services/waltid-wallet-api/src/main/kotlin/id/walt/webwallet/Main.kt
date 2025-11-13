@@ -45,7 +45,6 @@ suspend fun main(args: Array<String>) {
                 WaltCryptoOci.init()
                 WaltCryptoAws.init()
                 Db.start()
-                ServiceCommons.initDevMode()
             },
             run = WebService(Application::webWalletModule).run()
         )
