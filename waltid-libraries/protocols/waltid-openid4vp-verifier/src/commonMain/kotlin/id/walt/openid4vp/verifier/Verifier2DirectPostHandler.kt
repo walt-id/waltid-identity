@@ -192,12 +192,11 @@ object Verifier2DirectPostHandler {
         suspend fun Verification2Session.failSession(event: SessionEvent) =
             failSessionCallback.invoke(this, event, updateSessionCallback)
 
-        if (receivedState == null) {
-            log.info { "Direct POST response received without 'state' parameter." }
-            Verifier2Error.MISSING_STATE_PARAMETER.throwAsError()
-        }
+        require(vpTokenString != null || responseString != null) { "Neither vpToken nor response string is provided! At least one is required." }
 
-        log.debug { "Received vp_token string for state $receivedState: $vpTokenString" }
+
+
+        log.debug { "Received vp_token + response string for state $receivedState: vpToken: $vpTokenString - response: $responseString" }
 
         // 1. Retrieve session data based on state (or verificationSessionId if it maps to state)
         // This session data contains the original nonce, dcql_query, and client_id, ...
