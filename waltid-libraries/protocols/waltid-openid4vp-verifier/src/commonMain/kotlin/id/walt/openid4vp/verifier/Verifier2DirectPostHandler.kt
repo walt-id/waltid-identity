@@ -266,7 +266,7 @@ object Verifier2DirectPostHandler {
             // DC API
             isDcApi = session.authorizationRequest.responseMode in listOf(OpenID4VPResponseMode.DC_API, OpenID4VPResponseMode.DC_API_JWT),
             expectedOrigins = session.authorizationRequest.expectedOrigins,
-            ephemeralDecryptionKey = session.ephemeralDecryptionKey?.key as JWKKey
+            ephemeralDecryptionKey = session.ephemeralDecryptionKey?.key?.let { it as JWKKey }
         )
         val allPresentationsValid = presentationValidationResult.presentationValid
 
