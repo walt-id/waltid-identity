@@ -6,6 +6,7 @@ import id.walt.credentials.representations.X5CCertificateString
 import id.walt.credentials.representations.X5CList
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.mdoc.verification.MdocVerifier
 import id.walt.mdoc.verification.VerificationContext
 import id.walt.openid4vp.verifier.verification.Verifier2PresentationValidator.PresentationValidationResult
@@ -22,12 +23,27 @@ object MdocPresentationValidator {
         mdocBase64UrlString: String,
         // These three (expectedNonce, expectedAudience, responseUri) are required to reconstruct the SessionTranscript
         expectedNonce: String,
-        expectedAudience: String, // This is the client_id
-        responseUri: String?
-    ): Result<PresentationValidationResult> = runCatching {
-        requireNotNull(responseUri) { "Response uri is required for mdoc presentation validation" }
+        expectedAudience: String?, // This is the client_id
+        responseUri: String?,
 
-        val verificationContext = VerificationContext(expectedNonce, expectedAudience, responseUri)
+        ephemeralDecryptionKey: JWKKey? = null,
+        isDcApi: Boolean = false,
+        isEncrypted: Boolean = false,
+        jwkThumbprint: String? = null
+    ): Result<PresentationValidationResult> = runCatching {
+        // responseUri is not required for DC API, only for Redirect
+        if (!isDcApi) {
+            requireNotNull(responseUri) { "Response uri is required for redirect-based mdoc validation" }
+        }
+
+        val verificationContext = VerificationContext(
+            expectedNonce = expectedNonce,
+            expectedAudience = expectedAudience, // Origin if DC API
+            responseUri = responseUri,
+            isDcApi = isDcApi,
+            isEncrypted = isEncrypted,
+            jwkThumbprint = jwkThumbprint
+        )
         log.trace { "Validating Mdoc presentation, with verification context: $verificationContext" }
 
         val verificationResult = MdocVerifier.verify(mdocBase64UrlString, verificationContext)
