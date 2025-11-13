@@ -10,6 +10,10 @@ package id.walt.mdoc.verification
  */
 data class VerificationContext(
     val expectedNonce: String,
-    val expectedAudience: String,
-    val responseUri: String
+    val expectedAudience: String?,
+    val responseUri: String?,
+
+    val jwkThumbprint: String? = null,
+    val isEncrypted: Boolean = false,
+    val isDcApi: Boolean = false,
 )
