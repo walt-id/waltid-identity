@@ -387,7 +387,7 @@ object WalletPresentFunctionality2 {
     internal suspend fun createKeyBindingJwt(
         disclosed: String,
         nonce: String,
-        audience: String,
+        audience: String?,
         selectedDisclosures: List<SdJwtSelectiveDisclosure>,
         holderKey: Key
     ): String {

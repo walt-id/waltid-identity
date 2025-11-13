@@ -7,7 +7,7 @@ object W3CPresentationValidator {
 
     suspend fun validateW3cVpJwt(
         vpJwtString: String,
-        expectedAudience: String,
+        expectedAudience: String?,
         expectedNonce: String
     ): Result<PresentationValidationResult> {
         val presentation = JwtVcJsonPresentation.parse(vpJwtString)
