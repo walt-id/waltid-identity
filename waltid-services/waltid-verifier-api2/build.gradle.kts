@@ -95,6 +95,8 @@ dependencies {
     testApi(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
     testImplementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
 
+
+    api(project(":waltid-libraries:crypto:waltid-crypto"))
     api(project(":waltid-libraries:credentials:waltid-dcql"))
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
     api(project(":waltid-libraries:credentials:waltid-verification-policies2"))
