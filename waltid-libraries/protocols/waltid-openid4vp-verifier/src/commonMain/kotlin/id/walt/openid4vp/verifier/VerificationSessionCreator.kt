@@ -2,6 +2,8 @@ package id.walt.openid4vp.verifier
 
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.dcql.models.DcqlQuery
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.openid4vp.verifier.Verification2Session.*
@@ -107,6 +109,9 @@ object VerificationSessionCreator {
 
         val signedRequest: Boolean = false,
         val encryptedResponse: Boolean = false,
+        val dcApi: Boolean = false,
+        val haip: Boolean = false,
+
         val notifications: KtorSessionNotifications? = null,
         val redirects: VerificationSessionRedirects? = null,
 
@@ -116,6 +121,7 @@ object VerificationSessionCreator {
         val clientId: String? = null,
         val urlPrefix: String? = null,
         val urlHost: String? = null,
+        val expectedOrigins: List<String>? = null, // For DC API
         val key: DirectSerializedKey? = null,
         val x5c: List<String>? = null
     ) {
