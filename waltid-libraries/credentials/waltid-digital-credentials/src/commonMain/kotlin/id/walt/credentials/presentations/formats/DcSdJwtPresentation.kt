@@ -50,7 +50,7 @@ data class DcSdJwtPresentation(
 ) : VerifiablePresentation(format = PresentationFormat.`dc+sd-jwt`) {
 
     suspend fun presentationVerification(
-        expectedAudience: String,
+        expectedAudience: String?,
         expectedNonce: String,
         originalClaimsQuery: List<ClaimsQuery>?
     ) {
