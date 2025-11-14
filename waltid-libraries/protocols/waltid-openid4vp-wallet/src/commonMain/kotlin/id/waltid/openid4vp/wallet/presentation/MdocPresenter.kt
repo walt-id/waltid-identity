@@ -32,8 +32,9 @@ object MdocPresenter {
         authorizationRequest: AuthorizationRequest,
         responseUri: String
     ): SessionTranscript {
+        requireNotNull(authorizationRequest.clientId) { "Missing client id in authorization request - is this a DC API flow?" }
         val handoverInfo = OpenID4VPHandoverInfo(
-            clientId = authorizationRequest.clientId,
+            clientId = authorizationRequest.clientId!!,
             nonce = authorizationRequest.nonce!!,
             jwkThumbprint = null, // Not using JWE in DIRECT_POST
             responseUri = responseUri

@@ -2,6 +2,7 @@ package id.walt.openid4vp.verifier.verification
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.presentations.formats.VerifiablePresentation
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialFormat
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -20,10 +21,16 @@ object Verifier2PresentationValidator {
     suspend fun validatePresentation(
         presentationString: String,
         expectedFormat: CredentialFormat,
-        expectedAudience: String,
+        expectedAudience: String?,
         expectedNonce: String,
         responseUri: String?,
-        originalClaimsQuery: List<ClaimsQuery>?
+        originalClaimsQuery: List<ClaimsQuery>?,
+
+        ephemeralDecryptionKey: JWKKey?,
+        isDcApi: Boolean,
+        isEncrypted: Boolean,
+        verifierOrigin: String?,
+        jwkThumbprint: String?
     ): Result<PresentationValidationResult> {
         return when (expectedFormat) {
             CredentialFormat.JWT_VC_JSON -> W3CPresentationValidator.validateW3cVpJwt(
@@ -42,8 +49,13 @@ object Verifier2PresentationValidator {
             CredentialFormat.MSO_MDOC -> MdocPresentationValidator.validateMsoMdocPresentation(
                 mdocBase64UrlString = presentationString,
                 expectedNonce = expectedNonce,
-                expectedAudience = expectedAudience,
-                responseUri = responseUri
+                expectedAudience = if (isDcApi) verifierOrigin else expectedAudience,
+                responseUri = responseUri,
+
+                isDcApi = isDcApi,
+                isEncrypted = isEncrypted,
+                jwkThumbprint = jwkThumbprint,
+                ephemeralDecryptionKey = ephemeralDecryptionKey,
             )
 
             // Future: Implement other formats (e.g. LDP)

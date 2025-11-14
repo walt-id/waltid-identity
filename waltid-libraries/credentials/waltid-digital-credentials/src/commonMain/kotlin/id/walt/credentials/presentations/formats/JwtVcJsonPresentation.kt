@@ -40,7 +40,7 @@ data class JwtVcJsonPresentation(
 ) : VerifiablePresentation(format = PresentationFormat.jwt_vc_json) {
 
     suspend fun presentationVerification(
-        expectedAudience: String,
+        expectedAudience: String?,
         expectedNonce: String
     ) {
         presentationRequireNotNull(issuer, W3CPresentationValidationError.ISSUER_NOT_FOUND)
