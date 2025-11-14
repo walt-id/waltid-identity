@@ -56,7 +56,7 @@ class RealWorldVicalTest {
 
         println()
         println("Reading signer certificate...")
-        val signerCertificate = vical.coseSign1.unprotected.x5chain!!.first().rawBytes
+        val signerCertificate = vical.getCertificateChain()!!.first().rawBytes
         val signerPem = convertDerCertificateToPemCertificate(signerCertificate)
         println("Signer PEM:")
         println(signerPem)

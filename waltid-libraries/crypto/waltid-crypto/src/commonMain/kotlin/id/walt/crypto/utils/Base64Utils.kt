@@ -25,6 +25,18 @@ object Base64Utils {
     fun String.base64UrlDecode() = base64Url.decode(this)
     fun String.base64Decode() = base64.decode(this)
 
+    /**
+     * Enum to specify the Base64 character set variant.
+     */
+    enum class Base64Variant {
+        /** Standard Base64 alphabet using '+' and '/'. See RFC 4648 Section 4. */
+        STANDARD,
+
+        /** URL-safe Base64 alphabet using '-' and '_'. See RFC 4648 Section 5. */
+        URL_SAFE
+    }
+
+    fun String.matchesBase64Url(): Boolean = matchesBase64(Base64Variant.URL_SAFE)
 
     /**
      * Checks performed:
@@ -36,9 +48,9 @@ object Base64Utils {
      * 5. If padding is present, the total string length must be a multiple of 4.
      * 6. The length of the data part (before padding) modulo 4 is not 1.
      */
-    fun String.matchesBase64Url(): Boolean {
-        // Base64 encoding of empty data is an empty string
-        // However, 100% of our use-cases we explicitly do not want to match empty Base64 data.
+    fun String.matchesBase64(variant: Base64Variant = Base64Variant.STANDARD): Boolean {
+        // Base64 encoding of empty data is an empty string.
+        // However, for many use-cases, we explicitly do not want to match empty Base64 data.
         if (isEmpty()) {
             return false
         }
@@ -49,11 +61,16 @@ object Base64Utils {
 
         forEachIndexed { i, char ->
             val isPaddingChar = (char == '=')
-            val isValidDataChar = (char in 'A'..'Z') ||
+
+            val isCommonDataChar = (char in 'A'..'Z') ||
                     (char in 'a'..'z') ||
-                    (char in '0'..'9') ||
-                    (char == '-') ||
-                    (char == '_')
+                    (char in '0'..'9')
+
+            // Check for variant-specific characters ('+' and '/' for STANDARD, '-' and '_' for URL_SAFE)
+            val isValidDataChar = isCommonDataChar || when (variant) {
+                Base64Variant.STANDARD -> char == '+' || char == '/'
+                Base64Variant.URL_SAFE -> char == '-' || char == '_'
+            }
 
             if (isPaddingChar) {
                 if (firstPaddingIndex == -1) {
@@ -61,7 +78,7 @@ object Base64Utils {
                 }
                 paddingCount++
             } else if (!isValidDataChar) {
-                // Invalid character found anywhere
+                // Invalid character found anywhere in the string
                 return false
             } else if (firstPaddingIndex != -1) {
                 // Found a valid data character *after* padding started
@@ -71,11 +88,11 @@ object Base64Utils {
 
         // --- Padding Length and Total Length Check ---
         if (paddingCount > 2) {
-            // Max 2 padding characters allowed
+            // A maximum of 2 padding characters is allowed
             return false
         }
         if (paddingCount > 0 && length % 4 != 0) {
-            // If padding exists, total length must be a multiple of 4
+            // If padding exists, the total length must be a multiple of 4
             return false
         }
 
@@ -87,12 +104,12 @@ object Base64Utils {
         }
 
         // The length of the data part (before padding) modulo 4 cannot be 1.
-        // (Corresponds to Base64 encoding rules: 1 byte -> 2 chars, 2 bytes -> 3 chars, 3 bytes -> 4 chars)
+        // This is because Base64 encodes data in 3-byte chunks into 4-character chunks.
         if (dataLength % 4 == 1) {
             return false
         }
 
-        // If all checks passed, it's potentially Base64URL
+        // If all checks have passed, it's a valid Base64 string
         return true
     }
 }

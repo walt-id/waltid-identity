@@ -17,7 +17,6 @@ import kotlinx.serialization.encodeToByteArray
  */
 @Serializable
 data class Vical(
-    //val coseSign1: CoseSign1,
     val coseSign1: CoseSign1,
     val vicalData: VicalData
 ) {
@@ -32,6 +31,8 @@ data class Vical(
         // The external_aad is an empty byte string for VICAL as per the spec.
         return coseSign1.verify(verifier, externalAad = byteArrayOf())
     }
+
+    fun getCertificateChain() = coseSign1.unprotected.x5chain
 
     /**
      * Encodes the VICAL back into its tagged CBOR byte array representation.

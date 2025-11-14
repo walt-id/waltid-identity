@@ -62,7 +62,7 @@ To trust its contents, you must verify this signature.
 
 ```kotlin
 // 1. Extract the signer's certificate from the VICAL header
-val x5Chain = vical.coseSign1.unprotected.x5chain
+val x5Chain = vical.getCertificateChain()
 requireNotNull(x5Chain) { "Signer certificate chain (x5chain) not found in header." }
 val signerCertificate = x5Chain.first().rawBytes // select a certificate to verify
 
