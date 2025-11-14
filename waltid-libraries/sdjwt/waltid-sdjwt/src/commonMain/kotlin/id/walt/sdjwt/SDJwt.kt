@@ -1,6 +1,6 @@
 package id.walt.sdjwt
 
-import id.walt.sdjwt.SdjwtStringUtils.decodeFromBase64Url
+import id.walt.sdjwt.utils.SdjwtStringUtils.decodeFromBase64Url
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
