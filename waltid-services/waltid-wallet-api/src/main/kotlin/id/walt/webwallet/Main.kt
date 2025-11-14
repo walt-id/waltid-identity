@@ -1,6 +1,5 @@
 package id.walt.webwallet
 
-import id.walt.commons.ServiceCommons
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
