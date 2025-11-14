@@ -1,9 +1,8 @@
-package id.walt.webwallet.config
+package id.walt.commons.config.list
 
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class RuntimeConfig(
-    val mock: Boolean = false,
+data class DevModeConfig(
     val enableDidWebResolverHttps: Boolean = true,
-) : WalletConfig()
+)
