@@ -25,9 +25,6 @@ import io.ktor.server.util.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
-import java.net.URI
-import java.nio.file.Files
-import java.nio.file.Paths
 import kotlin.uuid.ExperimentalUuidApi
 
 
@@ -68,7 +65,7 @@ object Verifier2Service {
         updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit
     ) -> Unit = { session, event, updateSession ->
         updateSession(session, event) {
-            this.status = VerificationSessionStatus.FAILED
+            this.status = VerificationSessionStatus.UNSUCCESSFUL
         }
     }
 
