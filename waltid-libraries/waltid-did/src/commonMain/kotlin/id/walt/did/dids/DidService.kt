@@ -31,8 +31,6 @@ object DidService {
 
     val didResolvers = ArrayList<DidResolver>()
     val didRegistrars = ArrayList<DidRegistrar>()
-//    val didResolvers = arrayListOf<DidResolver>(LocalResolver())
-//    val didRegistrars = arrayListOf<DidRegistrar>(LocalRegistrar())
 
     /** method -> resolver */
     val resolverMethods = HashMap<String, DidResolver>()

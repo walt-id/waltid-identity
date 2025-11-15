@@ -6,6 +6,7 @@ import id.walt.commons.ServiceConfiguration
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.testing.E2ETest
 import id.walt.commons.web.plugins.httpJson
+import id.walt.did.dids.DidService
 import id.walt.issuer.issuerModule
 import id.walt.test.integration.environment.api.issuer.IssuerApi
 import id.walt.test.integration.environment.api.verifier.VerifierApi
@@ -85,7 +86,7 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
                 ),
                 init = {
                     id.walt.webwallet.webWalletSetup()
-                    id.walt.did.helpers.WaltidServices.minimalInit()
+                    DidService.minimalInit()
                     id.walt.webwallet.db.Db.start()
                 },
                 module = e2eTestModule,

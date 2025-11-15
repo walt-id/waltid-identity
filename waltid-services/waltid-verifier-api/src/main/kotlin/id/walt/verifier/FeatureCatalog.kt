@@ -1,5 +1,6 @@
 package id.walt.verifier
 
+import id.walt.commons.config.list.DevModeConfig
 import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature
 import id.walt.commons.featureflag.ServiceFeatureCatalog
@@ -12,6 +13,8 @@ object FeatureCatalog : ServiceFeatureCatalog {
 
     val entra = OptionalFeature("entra", "Enable Microsoft Entra support", EntraConfig::class, false)
 
+    val devModeFeature = OptionalFeature("dev-mode", "Development mode", DevModeConfig::class, default = false)
+
     override val baseFeatures = listOf(verifierService)
-    override val optionalFeatures: List<OptionalFeature> = listOf(entra)
+    override val optionalFeatures: List<OptionalFeature> = listOf(entra, devModeFeature)
 }

@@ -5,6 +5,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions
+import id.walt.did.dids.resolver.local.DidWebResolver
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 
@@ -13,14 +14,8 @@ class DidUtil {
     companion object {
         init {
             runBlocking {
-                // TODO: What exactly is needed?
-                // DidService.apply {
-                //     registerResolver(LocalResolver())
-                //     updateResolversForMethods()
-                //     registerRegistrar(LocalRegistrar())
-                //     updateRegistrarsForMethods()
-                // }
                 DidService.minimalInit()
+                DidWebResolver.enableHttps(false) // we want to accept DIDs without "httpS for development purposes
             }
         }
 

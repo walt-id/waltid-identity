@@ -1,8 +1,5 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.commons.config.ConfigManager
-import id.walt.webwallet.config.RuntimeConfig
-import id.walt.webwallet.manifest.extractor.EntraMockManifestExtractor
 import id.walt.webwallet.manifest.extractor.ManifestExtractor
 import id.walt.webwallet.manifest.provider.ManifestProvider
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -42,9 +39,8 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                val credentialService = CredentialsService()
-                val manifest = callManifest(call.parameters) { getManifest(it, credentialService) }
-                when (manifest) {
+
+                when (val manifest = getManifest(call.parameters, CredentialsService())) {
                     null -> call.respond(HttpStatusCode.NoContent)
                     else -> call.respond(manifest)
                 }
@@ -66,12 +62,7 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                val credentialService = CredentialsService()
-                val manifest = callManifest(call.parameters) {
-                    getManifest(it, credentialService)
-                }?.toString()
-
-                when (manifest) {
+                when (val manifest = getManifest(call.parameters, CredentialsService())?.toString()) {
                     null -> call.respond(HttpStatusCode.NoContent)
                     else -> call.respond(ManifestProvider.new(manifest).display())
                 }
@@ -93,12 +84,7 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                val credentialService = CredentialsService()
-                val manifest = callManifest(call.parameters) {
-                    getManifest(it, credentialService)
-                }?.toString()
-
-                when (manifest) {
+                when (val manifest = getManifest(call.parameters, CredentialsService())?.toString()) {
                     null -> call.respond(HttpStatusCode.NoContent)
                     else -> call.respond(ManifestProvider.new(manifest).issuer())
                 }
@@ -130,9 +116,7 @@ fun Application.manifest() = walletRoute {
                     }
                 }
             }) {
-                val manifest = callManifest(call.parameters) { extractManifest(it) }
-
-                when (manifest) {
+                when (val manifest = extractManifest(call.parameters)) {
                     null -> call.respond(HttpStatusCode.NoContent)
                     else -> call.respond(manifest)
                 }
@@ -141,14 +125,6 @@ fun Application.manifest() = walletRoute {
     }
 }
 
-internal suspend fun callManifest(parameters: Parameters, method: suspend (Parameters) -> JsonObject?): JsonObject? {
-    val runtimeConfig by lazy { ConfigManager.getConfig<RuntimeConfig>() }
-    return if (runtimeConfig.mock) {
-        EntraMockManifestExtractor().extract("")
-    } else {
-        return method.invoke(parameters)
-    }
-}
 
 @OptIn(ExperimentalUuidApi::class)
 internal fun getManifest(parameters: Parameters, credentialsService: CredentialsService): JsonObject? {

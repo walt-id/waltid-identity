@@ -7,7 +7,7 @@ import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.WebService
 import id.walt.crypto.keys.aws.WaltCryptoAws
-import id.walt.did.helpers.WaltidServices
+import id.walt.did.dids.DidService
 import id.walt.issuer.entra.entraIssuance
 import id.walt.issuer.issuance.OidcApi.oidcApi
 import id.walt.issuer.issuance.issuerApi
@@ -26,13 +26,14 @@ suspend fun main(args: Array<String>) {
                 CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment
             ),
             init = {
-                WaltidServices.minimalInit()
+                DidService.minimalInit()
                 WaltCryptoAws.init()
             },
             run = WebService(Application::issuerModule).run()
         )
     ).main(args)
 }
+
 
 fun Application.configurePlugins() {
     configureHTTP()

@@ -22,13 +22,6 @@ jobs:
         # currently configured on workflow dispatch as a separate workflow (gradle-macos)
         os: [ ubuntu-latest ]
     steps:
-      - name: Free Disk Space (Ubuntu)
-        if: ${{ runner.os == 'linux' }}
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: false
-          docker-images: false
-
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@29f904ce0de831e02fe64507ebe284b02e66b50e
         with:
