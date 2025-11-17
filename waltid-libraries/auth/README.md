@@ -12,31 +12,32 @@
   </a>
   
   <h2>Statuses Explained</h2>
-  <p align="center">
-    <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
-    <br/>
-    <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
-  </p>
-
-  <p align="center">
-    <img src="https://img.shields.io/badge/🟡%20Unmaintained-yellow?style=for-the-badge&logo=warning" alt="Status: Unmaintained" />
-    <br/>
-    <em>This project is not actively maintained. Certain features may be outdated or not working as expected.<br />We encourage users to contribute to the project to help keep it up to date.</em>
-  </p>
-
-
-  <p align="center">
-    <img src="https://img.shields.io/badge/🔴%20Deprecated-red?style=for-the-badge&logo=no-entry" alt="Status: Deprecated" />
-    <br/>
-    <em>This project is deprecated and no longer maintained. It should not be used in new projects.<br />Please use alternative libraries or migrate to recommended replacements.</em>
-  </p>
-
-
-  <p align="center">
-    <img src="https://img.shields.io/badge/🟠%20Planned%20Deprecation-orange?style=for-the-badge&logo=clock" alt="Status: Planned Deprecation" />
-    <br/>
-    <em>This project is still supported by the development team at walt.id, but is planned for deprecation sometime in [DATE].<br />We encourage users to migrate to using alternative libraries listed below.</em>
-  </p>
+  <table>
+    <tr>
+      <td align="center" width="50%">
+        <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
+        <br/>
+        <em>This project is being actively maintained by the development team at walt.id. Regular updates, bug fixes, and new features are being added.</em>
+      </td>
+      <td align="center" width="50%">
+        <img src="https://img.shields.io/badge/🟡%20Unmaintained-yellow?style=for-the-badge&logo=warning" alt="Status: Unmaintained" />
+        <br/>
+        <em>This project is not actively maintained. Certain features may be outdated or not working as expected. We encourage users to contribute to the project to help keep it up to date.</em>
+      </td>
+    </tr> 
+    <tr>
+      <td align="center" width="50%">
+        <img src="https://img.shields.io/badge/🔴%20Deprecated-red?style=for-the-badge&logo=no-entry" alt="Status: Deprecated" />
+        <br/>
+        <em>This project is deprecated and no longer maintained. It should not be used in new projects. Please use our alternative libraries or migrate to recommended replacements.</em>
+      </td>
+      <td align="center" width="50%">
+        <img src="https://img.shields.io/badge/🟠%20Planned%20Deprecation-orange?style=for-the-badge&logo=clock" alt="Status: Planned Deprecation" />
+        <br/>
+        <em>This project is still supported by the development team at walt.id, but is planned for deprecation. We encourage users to migrate to using our alternative libraries.</em>
+      </td>
+    </tr>
+  </table>
 </div>
 
 ## Overview
