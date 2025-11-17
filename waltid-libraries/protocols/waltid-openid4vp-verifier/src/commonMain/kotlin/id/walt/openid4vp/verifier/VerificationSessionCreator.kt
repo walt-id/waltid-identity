@@ -2,6 +2,8 @@ package id.walt.openid4vp.verifier
 
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.dcql.models.DcqlQuery
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.openid4vp.verifier.Verification2Session.*
@@ -107,6 +109,9 @@ object VerificationSessionCreator {
 
         val signedRequest: Boolean = false,
         val encryptedResponse: Boolean = false,
+        val dcApi: Boolean = false,
+        val haip: Boolean = false,
+
         val notifications: KtorSessionNotifications? = null,
         val redirects: VerificationSessionRedirects? = null,
 
@@ -116,6 +121,7 @@ object VerificationSessionCreator {
         val clientId: String? = null,
         val urlPrefix: String? = null,
         val urlHost: String? = null,
+        val expectedOrigins: List<String>? = null, // For DC API
         val key: DirectSerializedKey? = null,
         val x5c: List<String>? = null
     ) {
@@ -143,6 +149,8 @@ object VerificationSessionCreator {
         clientId: String,
         clientMetadata: ClientMetadata? = null,
         urlPrefix: String?,
+
+        /** origin for DC API */
         urlHost: String = "openid4vp://authorize",
 
         key: Key? = null,
@@ -160,7 +168,16 @@ object VerificationSessionCreator {
 
         val isCrossDevice = true // TODO: `setup is CrossDeviceFlow`
 
-        val isDcApi = false // TODO: `setup is DcApiFlow`
+        // val isDcApi = false // TODO: `setup is DcApiFlow`
+        val isDcApi = setup.dcApi
+        val useHaip = setup.haip
+        var ephemeralKey: JWKKey? = null
+
+        if (useHaip) {
+            require(isDcApi) { "HAIP Profile requires DC API flow." }
+            require(isEncryptedResponse) { "HAIP DC API requires encrypted response to be enabled!" }
+        }
+
         if (isDcApi) {
             require(urlPrefix == null) { "URL prefix is not used for DC API" }
             require(!urlHost.startsWith("openid4vp://authorize")) { "URL Host has to be set to the DC API origin" }
@@ -168,6 +185,35 @@ object VerificationSessionCreator {
                 //requireNotNull(setup.expectedOrigins)
             }
         }
+
+        val effectiveClientMetadata = if (isDcApi && isEncryptedResponse) {
+
+            val keyType = KeyType.secp256r1
+
+            if (useHaip) {
+                require(keyType == KeyType.secp256r1) { "HAIP profile requires P-256" }
+            }
+
+            // Generate P-256 Ephemeral Key
+            ephemeralKey = JWKKey.generate(keyType)
+
+            // Construct JWKS
+            val jwks = ClientMetadata.Jwks(listOf(ephemeralKey.getPublicKey().exportJWKObject()))
+            // TODO: check if jwks contains `alg` by default (should be "alg": "ECDH-ES")
+
+            // Merge into clientMetadata
+            val baseMetadata = clientMetadata ?: ClientMetadata()
+            baseMetadata.copy(
+                jwks = jwks,
+                // Ensure vp_formats_supported includes mso_mdoc for HAIP
+                vpFormatsSupported = baseMetadata.vpFormatsSupported ?: mapOf("mso_mdoc" to JsonObject(emptyMap())),
+                encryptedResponseEncValuesSupported = listOf("A128GCM")
+            )
+        } else {
+            clientMetadata
+        }
+
+
 
         require(isCrossDevice || isDcApi) { "No flow is selected" } // list all flows here
 
@@ -208,7 +254,10 @@ object VerificationSessionCreator {
 
         val authorizationRequest = AuthorizationRequest(
             responseType = OpenID4VPResponseType.VP_TOKEN,
-            clientId = clientId,
+
+            // For Unsigned DC API, client_id MUST be omitted.
+            // For Signed DC API, it MUST be present.
+            clientId = if (isDcApi && !setup.signedRequest) null else clientId,
             redirectUri = null, // For Same-Device flow (fragment/query/after code exchange etc)
             // TODO: url building (handle host alias)
             responseUri = when {
@@ -220,7 +269,7 @@ object VerificationSessionCreator {
             state = state, // Opaque value used by the Verifier to maintain state between the request and callback.
             nonce = nonce, // String value used to mitigate replay attacks. Also used to establish holder binding.
             responseMode = when {
-                isDcApi && setup.encryptedResponse -> OpenID4VPResponseMode.DC_API
+                isDcApi && setup.encryptedResponse -> OpenID4VPResponseMode.DC_API_JWT // HAIP requires dc_api.jwt (encrypted)
                 isDcApi -> OpenID4VPResponseMode.DC_API
                 isCrossDevice && setup.encryptedResponse -> OpenID4VPResponseMode.DIRECT_POST_JWT
                 isCrossDevice -> OpenID4VPResponseMode.DIRECT_POST
@@ -235,7 +284,7 @@ object VerificationSessionCreator {
 
             // OpenID4VP New Parameters (Section 5.1)
             dcqlQuery = setup.dcqlQuery, // REQUIRED (unless 'scope' parameter represents a DCQL Query).
-            clientMetadata = clientMetadata,
+            clientMetadata = effectiveClientMetadata,
 
 
             /*
@@ -264,7 +313,7 @@ object VerificationSessionCreator {
              * An array of strings, each string representing an Origin of the Verifier that is making the request.
              * Not for use in unsigned requests.
              */
-            expectedOrigins = if (isDcApi && isSignedRequest) listOf("") /*setup.expectedOrigins*/ else null, // TODO: Fill in here
+            expectedOrigins = if (isDcApi && isSignedRequest) setup.expectedOrigins else null,
         )
         log.trace { "Constructed AuthorizationRequest: $authorizationRequest" }
 
@@ -301,6 +350,7 @@ object VerificationSessionCreator {
             authorizationRequest = authorizationRequest,
             authorizationRequestUrl = authorizationRequestUrl,
             signedAuthorizationRequestJwt = signedAuthorizationRequest,
+            ephemeralDecryptionKey = ephemeralKey?.let { DirectSerializedKey(it) },
 
             requestMode = if (setup.signedRequest) RequestMode.REQUEST_URI_SIGNED else RequestMode.REQUEST_URI,
 

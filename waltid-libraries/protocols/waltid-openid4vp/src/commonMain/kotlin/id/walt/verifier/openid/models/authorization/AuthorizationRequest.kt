@@ -34,7 +34,7 @@ data class AuthorizationRequest(
      * May include a Client Identifier Prefix as per Section 5.9.
      */
     @SerialName("client_id")
-    val clientId: String,
+    val clientId: String?,
 
     /**
      * Conditional. OAuth 2.0 Redirection URI.

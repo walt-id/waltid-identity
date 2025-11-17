@@ -28,7 +28,7 @@ data class NFCHandover(
     /** Handover Request Message (binary) - null if NFC Static Handover was used */
     @ByteString
     val handoverRequest: ByteArray?
-) {
+): BaseHandoverInfo {
     /**
      * Note: `equals` and `hashCode` are manually overridden because the default implementation for a
      * `data class` uses reference equality for `ByteArray` properties. This override ensures

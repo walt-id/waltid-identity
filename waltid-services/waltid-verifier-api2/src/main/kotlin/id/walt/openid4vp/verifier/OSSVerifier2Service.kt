@@ -4,12 +4,14 @@ package id.walt.openid4vp.verifier
 
 import id.walt.commons.fetchBinaryFile
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
+import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
 import id.walt.openid4vp.verifier.Verification2Session.VerificationSessionStatus
 import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
 import id.walt.openid4vp.verifier.openapi.VerificationSessionCreateOpenApi
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.vical.*
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
@@ -24,10 +26,9 @@ import io.ktor.server.sse.*
 import io.ktor.server.util.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.serializer
-import java.net.URI
-import java.nio.file.Files
-import java.nio.file.Paths
 import kotlin.uuid.ExperimentalUuidApi
 
 
@@ -134,12 +135,94 @@ object Verifier2Service {
                         sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
                             ?: throw IllegalArgumentException("Unknown session id")
 
-                    if (verificationSession.signedAuthorizationRequestJwt != null) {
-                        // JAR (Signed)
-                        call.respond(verificationSession.signedAuthorizationRequestJwt!!)
+
+                    // openid4vp-v1-unsigned
+                    // openid4vp-v1-signed
+
+
+                    val isDcApi = verificationSession.authorizationRequest.responseMode in listOf(
+                        OpenID4VPResponseMode.DC_API,
+                        OpenID4VPResponseMode.DC_API_JWT
+                    )
+                    println("-- IS DC API: $isDcApi")
+                    val isSigned = verificationSession.requestMode == Verification2Session.RequestMode.REQUEST_URI_SIGNED // TODO
+                    println("-- IS SIGNED: $isSigned")
+
+                    fun dcApiWrapper(protocol: String, data: JsonObject) = mapOf(
+                        "digital" to mapOf(
+                            "requests" to listOf(
+                                mapOf(
+                                    "protocol" to protocol,
+                                    "data" to data
+                                )
+                            )
+                        )
+                    ).toJsonObject()
+
+                    when {
+                        isDcApi && isSigned ->
+                            call.respond(
+                                dcApiWrapper(
+                                    "openid4vp-v1-signed", mapOf(
+                                        "client_id" to verificationSession.authorizationRequest.clientId,
+                                        "expected_origins" to verificationSession.authorizationRequest.expectedOrigins,
+                                        "request" to verificationSession.signedAuthorizationRequestJwt
+                                    ).toJsonObject()
+                                )
+                            )
+
+                        isDcApi && !isSigned ->
+                            call.respond(
+                                dcApiWrapper(
+                                    "openid4vp-v1-unsigned",
+                                    Json.encodeToJsonElement(verificationSession.authorizationRequest).jsonObject
+                                )
+                            )
+
+                        verificationSession.signedAuthorizationRequestJwt != null ->
+                            // JAR (Signed)
+                            call.respond(verificationSession.signedAuthorizationRequestJwt!!)
+
+                        else ->
+                            // Unsigned
+                            call.respond(verificationSession.authorizationRequest)
+                    }
+
+                    if (verificationSession.authorizationRequest.responseMode in listOf(
+                            OpenID4VPResponseMode.DC_API,
+                            OpenID4VPResponseMode.DC_API_JWT
+                        )
+                    ) {
+
                     } else {
-                        // Unsigned
-                        call.respond(verificationSession.authorizationRequest)
+                        if (verificationSession.signedAuthorizationRequestJwt != null) {
+                            // JAR (Signed)
+                            call.respond(verificationSession.signedAuthorizationRequestJwt!!)
+
+                        } else {
+                            // Unsigned
+                            call.respond(verificationSession.authorizationRequest)
+                        }
+                    }
+
+
+
+                    if (verificationSession.signedAuthorizationRequestJwt != null) {
+                        if (verificationSession.authorizationRequest.responseMode in listOf(
+                                OpenID4VPResponseMode.DC_API,
+                                OpenID4VPResponseMode.DC_API_JWT
+                            )
+                        ) {
+                            call.respond(
+                                mapOf(
+                                    "request" to verificationSession.signedAuthorizationRequestJwt,
+                                    "client_id" to verificationSession.authorizationRequest.clientId
+                                )
+                            )
+                        } else {
+                        }
+                    } else {
+
                     }
                 }
 
@@ -160,7 +243,9 @@ object Verifier2Service {
                         val verificationSession = sessions[sessionId]
 
                         val urlParameters = call.receiveParameters()
-                        val vpTokenString = urlParameters.getOrFail("vp_token")
+                        val responseString = urlParameters["response"]
+                        val vpTokenString = urlParameters["vp_token"]
+
                         val receivedState = urlParameters["state"]
 
                         log.trace { "Verification session data: state = $receivedState, vp_token = $vpTokenString" }
@@ -168,6 +253,7 @@ object Verifier2Service {
                         call.respond(
                             Verifier2DirectPostHandler.handleDirectPost(
                                 verificationSession = verificationSession,
+                                responseString = responseString,
                                 vpTokenString = vpTokenString,
                                 receivedState = receivedState,
                                 updateSessionCallback = updateSessionCallback,

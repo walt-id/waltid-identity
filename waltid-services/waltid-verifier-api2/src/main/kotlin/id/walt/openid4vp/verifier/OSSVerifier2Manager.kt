@@ -15,10 +15,10 @@ object OSSVerifier2Manager {
             setup = setup,
             clientId = setup.clientId ?: config.clientId,
             clientMetadata = setup.clientMetadata ?: config.clientMetadata,
-            urlPrefix = setup.urlPrefix ?: config.urlPrefix,
+            urlPrefix = setup.urlPrefix ?: config.urlPrefix.takeIf { !setup.dcApi },
             urlHost = setup.urlHost ?: config.urlHost,
             key = setup.key?.key ?: config.key?.let { KeyManager.resolveSerializedKey(it) },
-            x5c = setup.x5c ?: config.x5c
+            x5c = setup.x5c ?: config.x5c,
         )
 
         return newSession

@@ -11,7 +11,7 @@ object SdJwtVcPresentationValidator {
      */
     suspend fun validateSdJwtVcPresentation(
         sdJwtPresentationString: String,
-        expectedAudience: String,
+        expectedAudience: String?,
         expectedNonce: String,
         originalClaimsQuery: List<ClaimsQuery>?
     ): Result<PresentationValidationResult> {
