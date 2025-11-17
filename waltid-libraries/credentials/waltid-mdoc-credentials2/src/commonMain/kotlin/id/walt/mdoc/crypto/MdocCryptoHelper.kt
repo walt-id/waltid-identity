@@ -29,11 +29,10 @@ object MdocCryptoHelper {
 
     private val log = KotlinLogging.logger { }
 
-    fun reconstructSessionTranscript(handoverInfo: BaseHandoverInfo): SessionTranscript {
-        // Step 2: CBOR-encode and hash the HandoverInfo
-        val handoverInfoBytes = coseCompliantCbor.encodeToByteArray(handoverInfo)
-        log.trace { "Reconstructed CBOR handoverInfoBytes (hex): ${handoverInfoBytes.toHexString()}" }
-
+    /**
+     * @param handoverInfoBytes: cannot serialize generic, serialize in caller function where type information is available
+     */
+    fun reconstructSessionTranscript(handoverInfo: BaseHandoverInfo, handoverInfoBytes: ByteArray): SessionTranscript {
         val infoHash = handoverInfoBytes.sha256()
         log.trace { "Handover info SHA-256 hash (hex): ${infoHash.toHexString()}" }
 
@@ -62,7 +61,12 @@ object MdocCryptoHelper {
             jwkThumbprint = context.jwkThumbprint?.decodeFromBase64Url() // jwkThumbprint is null when not using JWE for the response
         )
         log.trace { "Reconstructed OpenID4VPDCAPIHandoverInfo: $handoverInfo" }
-        return reconstructSessionTranscript(handoverInfo)
+
+        // Step 2: CBOR-encode and hash the HandoverInfo
+        val handoverInfoBytes = coseCompliantCbor.encodeToByteArray(handoverInfo)
+        log.trace { "Reconstructed CBOR handoverInfoBytes (hex): ${handoverInfoBytes.toHexString()}" }
+
+        return reconstructSessionTranscript(handoverInfo, handoverInfoBytes)
     }
 
     /**
@@ -79,7 +83,12 @@ object MdocCryptoHelper {
             jwkThumbprint = context.jwkThumbprint?.decodeFromBase64Url() // jwkThumbprint is null when not using JWE for the response
         )
         log.trace { "Reconstructed OpenID4VPHandoverInfo: $handoverInfo" }
-        return reconstructSessionTranscript(handoverInfo)
+
+        // Step 2: CBOR-encode and hash the HandoverInfo
+        val handoverInfoBytes = coseCompliantCbor.encodeToByteArray(handoverInfo)
+        log.trace { "Reconstructed CBOR handoverInfoBytes (hex): ${handoverInfoBytes.toHexString()}" }
+
+        return reconstructSessionTranscript(handoverInfo, handoverInfoBytes)
     }
 
     /**

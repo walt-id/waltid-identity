@@ -39,12 +39,20 @@ object MdocPresenter {
             jwkThumbprint = null, // Not using JWE in DIRECT_POST
             responseUri = responseUri
         )
-        val handoverInfoHash = coseCompliantCbor.encodeToByteArray(handoverInfo).sha256()
+        log.trace { "Client side session transaction openid4vp handover info: $handoverInfo" }
+
+        val handoverInfoCbor = coseCompliantCbor.encodeToByteArray(handoverInfo)
+        log.trace { "Client side Handover info cbor: ${handoverInfoCbor.toHexString()}" }
+
+        val handoverInfoHash = handoverInfoCbor.sha256()
+        log.trace { "Client side Handover info hash: ${handoverInfoHash.toHexString()}" }
+
         val handover = OpenID4VPHandover(
             identifier = "OpenID4VPHandover",
             infoHash = handoverInfoHash
         )
         val sessionTranscript = SessionTranscript.forOpenId(handover)
+        log.trace { "Client side Session transcript: $sessionTranscript" }
 
         return sessionTranscript
     }
@@ -98,6 +106,7 @@ object MdocPresenter {
             disclosedDeviceNamespaces = disclosedDeviceNamespaces,
             holderKey = holderKey
         )
+        log.trace { "Wallet-created device auth: $deviceAuth" }
 
         val dcqlQueryClaims = matchResult.originalQuery.claims
         requireNotNull(dcqlQueryClaims) { "Missing claims for DCQL credential query: ${matchResult.originalQuery}" }
