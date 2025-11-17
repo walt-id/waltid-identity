@@ -1,7 +1,7 @@
 <div align="center">
- <h1>Identity by walt.id</h1>
- <span>by </span><a href="https://walt.id">walt.id</a>
-  <p>Multi-Platform libraries, powerful APIs and easy-to-use white label apps to build identity and wallet solutions.</p>
+<img src="assets/walt-banner.png" alt="walt.id banner" />
+ 
+  <p>Multi-Platform libraries, powerful APIs and easy-to-use white label apps to build identity and wallet solutions <span>by </span><a href="https://walt.id">walt.id</a></p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
@@ -9,6 +9,13 @@
 <a href="https://www.linkedin.com/company/walt-id/">
 <img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
 </a>
+  
+  <h2>Status</h2>
+  <p align="center">
+    <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
+    <br/>
+    <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
+  </p>
 </div>
 
 ## Getting Started
@@ -25,12 +32,11 @@ Available for Kotlin/Java and JavaScript environments.
   issue and verify W3C credentials as JWTs and SD-JWTs.
 - **mdoc Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-mdoc-credentials)) -
   issue and verify mdoc credentials (mDL ISO/IEC 18013-5).
-- **OpenID4VC** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc)) -
-  implementation of the OID4VCI and OIDC4VP protocols.
 - **SD-JWT** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/sdjwt/waltid-sdjwt)) -
   create and verify Selective Disclosure JWTs.
-- **Ktor-Authnz** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/auth/waltid-ktor-authnz)) - Add various authentication methods (OIDC, Email/Password, ...) to Ktor projects.
-- **Permissions** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/auth/waltid-permissions)) - Enable fine-grained authorisation patterns in applications with waltid-permissions.
+- **OpenID4VC** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc)) -
+  implementation of the OID4VCI (draft 11 and draft 13) and OIDC4VP (draft 14 and draft 20) protocols.
+
 
 ### REST Services
 
@@ -98,9 +104,9 @@ solutions. Learn more [here](https://walt.id/blog/p/community-stack).
 
 * Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
 * Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+* Find more indepth documentation on our [docs site](https://docs.walt.id)
 
 
 ## License
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
-
