@@ -12,6 +12,7 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -180,7 +181,8 @@ object Verifier2DirectPostHandler {
     suspend fun handleDirectPost(
         verificationSession: Verification2Session?,
         responseString: String?, // for encrypted response
-        vpTokenString: String?,
+        bodyString: String? = null, // for raw DC API response
+        vpTokenString: String?, // for normal response
         receivedState: String?,
         updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
         failSessionCallback: suspend (session: Verification2Session, event: SessionEvent, updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit) -> Unit,
@@ -191,8 +193,7 @@ object Verifier2DirectPostHandler {
         suspend fun Verification2Session.failSession(event: SessionEvent) =
             failSessionCallback.invoke(this, event, updateSessionCallback)
 
-        require(vpTokenString != null || responseString != null) { "Neither vpToken nor response string is provided! At least one is required." }
-
+        require(vpTokenString != null || responseString != null || bodyString != null) { "Neither vpToken nor response nor body string is provided! At least one is required." }
 
 
         log.debug { "Received vp_token + response string for state $receivedState: vpToken: $vpTokenString - response: $responseString" }
@@ -205,41 +206,62 @@ object Verifier2DirectPostHandler {
             Verifier2Error.INVALID_STATE_PARAMETER.throwAsError()
         }
 
+        val responseMode = session.authorizationRequest.responseMode
 
-        val (vpTokenString, receivedState) = if (vpTokenString == null && responseString != null) {
-            // Encrypted flow
-            require(session.authorizationRequest.responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES) {
-                "Called encrypted flow, but responseMode is not for encrypted response"
+        val isDcApi = responseMode in OpenID4VPResponseMode.DC_API_RESPONSES
+
+        val (vpTokenString, receivedState) = when {
+            bodyString != null -> {
+                require(responseMode in OpenID4VPResponseMode.DC_API_RESPONSES) { "Used body response, but responseMode is not for DC API" }
+                val bodyJson = Json.decodeFromString<JsonObject>(bodyString)
+                //val protocol = bodyJson["protocol"].jsonPrimitive.content
+
+                /*when (protocol) {
+                    "openid4vp-v1-signed"
+                    else -> NotImplementedError("Protocol \"$protocol\" is not supported.")
+                }*/
+
+                val vpToken = bodyJson["data"]?.jsonObject["vp_token"]?.jsonObject?.toString()
+                    ?: throw IllegalArgumentException("Missing $.data.vp_token in posted JSON body")
+                vpToken to null
             }
 
-            log.trace { "Decrypting encrypted token..." }
-            requireNotNull(verificationSession.ephemeralDecryptionKey) { "Missing decryption key for encrypted response flow" }
-            val decryptedPayloadString = (verificationSession.ephemeralDecryptionKey.key as JWKKey).decryptJwe(responseString)
-                .decodeToString()
-            val jsonPayload = Json.parseToJsonElement(decryptedPayloadString).jsonObject
-            val vpToken = jsonPayload["vp_token"].toString() // Extract the inner vp_token object
-            val state = jsonPayload["state"]?.jsonPrimitive?.content
-            if (state == null) {
-                log.info { "Direct POST response received without 'state' parameter." }
-                Verifier2Error.MISSING_STATE_PARAMETER.throwAsError()
+            vpTokenString == null && responseString != null -> {
+                // Encrypted flow
+                require(responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES) {
+                    "Called encrypted flow, but responseMode is not for encrypted response"
+                }
+
+                log.trace { "Decrypting encrypted token..." }
+                requireNotNull(verificationSession.ephemeralDecryptionKey) { "Missing decryption key for encrypted response flow" }
+                val decryptedPayloadString = (verificationSession.ephemeralDecryptionKey.key as JWKKey).decryptJwe(responseString)
+                    .decodeToString()
+                val jsonPayload = Json.parseToJsonElement(decryptedPayloadString).jsonObject
+                val vpToken = jsonPayload["vp_token"].toString() // Extract the inner vp_token object
+                val state = jsonPayload["state"]?.jsonPrimitive?.content
+
+                vpToken to state
             }
 
-            vpToken to state
-        } else {
-            require(session.authorizationRequest.responseMode !in OpenID4VPResponseMode.ENCRYPTED_RESPONSES) {
-                "Called cleartext flow, but responseMode is for encrypted response"
+            else -> {
+                require(responseMode !in OpenID4VPResponseMode.ENCRYPTED_RESPONSES) {
+                    "Called cleartext flow, but responseMode is for encrypted response"
+                }
+                // Cleartext flow
+
+
+                requireNotNull(vpTokenString) { "missing vp_token in vp_token-handling block" }
+                vpTokenString to receivedState
             }
-            // Cleartext flow
+        }
+
+        if (!isDcApi) {
             if (receivedState == null) {
                 log.info { "Direct POST response received without 'state' parameter." }
                 Verifier2Error.MISSING_STATE_PARAMETER.throwAsError()
             }
-
-            requireNotNull(vpTokenString) { "missing vp_token in vp_token-handling block" }
-            vpTokenString to receivedState
+            require(receivedState == session.authorizationRequest.state) { "State does not match" }
         }
-
-        require(receivedState == session.authorizationRequest.state) { "State does not match" }
 
         // 2. Parse vp_token
         val vpTokenContents = parseVpToken(vpTokenString)
@@ -263,7 +285,7 @@ object Verifier2DirectPostHandler {
             vpTokenContents = vpTokenContents,
 
             // DC API
-            isDcApi = session.authorizationRequest.responseMode in OpenID4VPResponseMode.DC_API_RESPONSES,
+            isDcApi = responseMode in OpenID4VPResponseMode.DC_API_RESPONSES,
             expectedOrigins = session.authorizationRequest.expectedOrigins,
             ephemeralDecryptionKey = session.ephemeralDecryptionKey?.key?.let { it as JWKKey }
         )

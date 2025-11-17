@@ -27,8 +27,8 @@ data class OpenID4VPHandover(
 ) {
     init {
         // Enforce the constant value for the type identifier as per the specification.
-        require(identifier == "OpenID4VPHandover") {
-            "The identifier for OpenID4VPHandover must be 'OpenID4VPHandover'."
+        require(identifier in listOf("OpenID4VPHandover", "OpenID4VPDCAPIHandover")) {
+            "The identifier for OpenID4VPHandover must be 'OpenID4VPHandover' or other valid identifier. Instead, was: $identifier"
         }
     }
 

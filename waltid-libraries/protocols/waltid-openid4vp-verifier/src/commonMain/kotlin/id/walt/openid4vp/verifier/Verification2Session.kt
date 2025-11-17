@@ -111,7 +111,7 @@ data class Verification2Session(
     @Serializable
     data class PresentedRawData(
         val vpToken: Map<String, List<String>>,
-        val state: String,
+        val state: String?
     )
 
     @Serializable

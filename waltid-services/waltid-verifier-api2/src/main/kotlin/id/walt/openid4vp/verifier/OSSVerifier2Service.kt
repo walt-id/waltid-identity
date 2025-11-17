@@ -202,24 +202,42 @@ object Verifier2Service {
                         log.trace { "Received verification session response to session: $sessionId" }
                         val verificationSession = sessions[sessionId]
 
-                        val urlParameters = call.receiveParameters()
-                        val responseString = urlParameters["response"]
-                        val vpTokenString = urlParameters["vp_token"]
+                        if (call.request.contentType().match(ContentType.Application.Json)) {
+                            val body = call.receiveText()
 
-                        val receivedState = urlParameters["state"]
+                            log.trace { "Verification session data - body: $body" }
 
-                        log.trace { "Verification session data: state = $receivedState, vp_token = $vpTokenString" }
-
-                        call.respond(
-                            Verifier2DirectPostHandler.handleDirectPost(
-                                verificationSession = verificationSession,
-                                responseString = responseString,
-                                vpTokenString = vpTokenString,
-                                receivedState = receivedState,
-                                updateSessionCallback = updateSessionCallback,
-                                failSessionCallback = failSessionCallback
+                            call.respond(
+                                Verifier2DirectPostHandler.handleDirectPost(
+                                    verificationSession = verificationSession,
+                                    bodyString = body,
+                                    responseString = null,
+                                    vpTokenString = null,
+                                    receivedState = null,
+                                    updateSessionCallback = updateSessionCallback,
+                                    failSessionCallback = failSessionCallback
+                                )
                             )
-                        )
+                        } else {
+                            val urlParameters = call.receiveParameters()
+                            val responseString = urlParameters["response"]
+                            val vpTokenString = urlParameters["vp_token"]
+
+                            val receivedState = urlParameters["state"]
+
+                            log.trace { "Verification session data: state = $receivedState, vp_token = $vpTokenString" }
+
+                            call.respond(
+                                Verifier2DirectPostHandler.handleDirectPost(
+                                    verificationSession = verificationSession,
+                                    responseString = responseString,
+                                    vpTokenString = vpTokenString,
+                                    receivedState = receivedState,
+                                    updateSessionCallback = updateSessionCallback,
+                                    failSessionCallback = failSessionCallback
+                                )
+                            )
+                        }
                     }
                 }
             }
