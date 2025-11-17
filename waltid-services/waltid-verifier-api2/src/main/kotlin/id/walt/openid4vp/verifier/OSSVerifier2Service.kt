@@ -140,10 +140,7 @@ object Verifier2Service {
                     // openid4vp-v1-signed
 
 
-                    val isDcApi = verificationSession.authorizationRequest.responseMode in listOf(
-                        OpenID4VPResponseMode.DC_API,
-                        OpenID4VPResponseMode.DC_API_JWT
-                    )
+                    val isDcApi = verificationSession.authorizationRequest.responseMode in OpenID4VPResponseMode.DC_API_RESPONSES
                     println("-- IS DC API: $isDcApi")
                     val isSigned = verificationSession.requestMode == Verification2Session.RequestMode.REQUEST_URI_SIGNED // TODO
                     println("-- IS SIGNED: $isSigned")
@@ -186,43 +183,6 @@ object Verifier2Service {
                         else ->
                             // Unsigned
                             call.respond(verificationSession.authorizationRequest)
-                    }
-
-                    if (verificationSession.authorizationRequest.responseMode in listOf(
-                            OpenID4VPResponseMode.DC_API,
-                            OpenID4VPResponseMode.DC_API_JWT
-                        )
-                    ) {
-
-                    } else {
-                        if (verificationSession.signedAuthorizationRequestJwt != null) {
-                            // JAR (Signed)
-                            call.respond(verificationSession.signedAuthorizationRequestJwt!!)
-
-                        } else {
-                            // Unsigned
-                            call.respond(verificationSession.authorizationRequest)
-                        }
-                    }
-
-
-
-                    if (verificationSession.signedAuthorizationRequestJwt != null) {
-                        if (verificationSession.authorizationRequest.responseMode in listOf(
-                                OpenID4VPResponseMode.DC_API,
-                                OpenID4VPResponseMode.DC_API_JWT
-                            )
-                        ) {
-                            call.respond(
-                                mapOf(
-                                    "request" to verificationSession.signedAuthorizationRequestJwt,
-                                    "client_id" to verificationSession.authorizationRequest.clientId
-                                )
-                            )
-                        } else {
-                        }
-                    } else {
-
                     }
                 }
 

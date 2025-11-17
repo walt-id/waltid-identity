@@ -49,8 +49,7 @@ object Verifier2DirectPostHandler {
 
         val expectedOrigin = expectedOrigins?.first()
         val expectedAudience = if (isDcApi == true) "origin:$expectedOrigin" else authorizationRequest.clientId
-        val isEncrypted =
-            authorizationRequest.responseMode in listOf(OpenID4VPResponseMode.DIRECT_POST_JWT, OpenID4VPResponseMode.DC_API_JWT)
+        val isEncrypted = authorizationRequest.responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES
 
         // Calculate JWK Thumbprint if encrypted (this is required for HAIP)
         val jwkThumbprint = if (isEncrypted && ephemeralDecryptionKey != null) {
@@ -209,8 +208,8 @@ object Verifier2DirectPostHandler {
 
         val (vpTokenString, receivedState) = if (vpTokenString == null && responseString != null) {
             // Encrypted flow
-            require(session.authorizationRequest.responseMode in listOf(OpenID4VPResponseMode.DIRECT_POST_JWT, OpenID4VPResponseMode.DC_API_JWT)) {
-                "Called encrypted flow, but resposeMode is not for encrypted response"
+            require(session.authorizationRequest.responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES) {
+                "Called encrypted flow, but responseMode is not for encrypted response"
             }
 
             log.trace { "Decrypting encrypted token..." }
@@ -227,7 +226,7 @@ object Verifier2DirectPostHandler {
 
             vpToken to state
         } else {
-            require(session.authorizationRequest.responseMode !in listOf(OpenID4VPResponseMode.DIRECT_POST_JWT, OpenID4VPResponseMode.DC_API_JWT)) {
+            require(session.authorizationRequest.responseMode !in OpenID4VPResponseMode.ENCRYPTED_RESPONSES) {
                 "Called cleartext flow, but responseMode is for encrypted response"
             }
             // Cleartext flow
@@ -264,7 +263,7 @@ object Verifier2DirectPostHandler {
             vpTokenContents = vpTokenContents,
 
             // DC API
-            isDcApi = session.authorizationRequest.responseMode in listOf(OpenID4VPResponseMode.DC_API, OpenID4VPResponseMode.DC_API_JWT),
+            isDcApi = session.authorizationRequest.responseMode in OpenID4VPResponseMode.DC_API_RESPONSES,
             expectedOrigins = session.authorizationRequest.expectedOrigins,
             ephemeralDecryptionKey = session.ephemeralDecryptionKey?.key?.let { it as JWKKey }
         )

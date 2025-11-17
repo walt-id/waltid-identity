@@ -42,5 +42,11 @@ enum class OpenID4VPResponseMode {
 
     /** General OAuth, less emphasized in OpenID4VP examples */
     @SerialName("form_post")
-    FORM_POST
+    FORM_POST;
+
+    companion object {
+        val ENCRYPTED_RESPONSES = listOf(DIRECT_POST_JWT, DC_API_JWT)
+        val DC_API_RESPONSES = listOf(DC_API, DC_API_JWT)
+        val DIRECT_POST_RESPONSES = listOf(DIRECT_POST, DIRECT_POST_JWT)
+    }
 }

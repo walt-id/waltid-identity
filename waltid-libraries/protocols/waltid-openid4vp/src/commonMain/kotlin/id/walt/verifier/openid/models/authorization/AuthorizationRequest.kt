@@ -175,7 +175,7 @@ data class AuthorizationRequest(
         if (requestUriMethod != null && requestUriMethod.method !in listOf("get", "post")) {
             throw IllegalArgumentException("request_uri_method must be 'get' or 'post'.")
         }
-        if (responseMode in listOf(OpenID4VPResponseMode.DIRECT_POST, OpenID4VPResponseMode.DIRECT_POST_JWT)) {
+        if (responseMode in OpenID4VPResponseMode.DIRECT_POST_RESPONSES) {
             requireNotNull(responseUri) { "response_uri must not be null if response_mode is direct_post / direct_post_jwt" }
         }
     }

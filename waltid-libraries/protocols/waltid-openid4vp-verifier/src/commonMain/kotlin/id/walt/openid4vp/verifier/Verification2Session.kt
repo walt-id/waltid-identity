@@ -63,8 +63,8 @@ data class Verification2Session(
     /**
      * Minimal authorization request if request is provided by URL
      */
-    val bootstrapAuthorizationRequest: AuthorizationRequest?,
-    val bootstrapAuthorizationRequestUrl: Url?,
+    val bootstrapAuthorizationRequest: AuthorizationRequest? = null,
+    val bootstrapAuthorizationRequestUrl: Url? = null,
 
     /**
      * OpenID4VP Authorization Request used for this Verification Session
