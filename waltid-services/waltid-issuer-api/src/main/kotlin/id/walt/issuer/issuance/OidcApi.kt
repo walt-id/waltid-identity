@@ -522,6 +522,26 @@ object OidcApi : CIProvider(), Klogging {
                     )
                 } catch (exc: CredentialError) {
                     logger.error(exc) { "Credential error: " }
+                    // Update session status to UNSUCCESSFUL and emit callback
+                    runCatching {
+                        val parsed = OpenID4VC.verifyAndParseToken(
+                            token = accessToken.toString(),
+                            issuer = metadata.issuer!!,
+                            target = TokenTarget.ACCESS,
+                            tokenKey = CI_TOKEN_KEY
+                        )
+                        val sid = parsed[JWTClaims.Payload.subject]?.jsonPrimitive?.content
+                        if (sid != null) {
+                            getSession(sid)?.let {
+                                updateSessionStatus(
+                                    it,
+                                    IssuanceSessionStatus.UNSUCCESSFUL,
+                                    exc.message,
+                                    close = true
+                                )
+                            }
+                        }
+                    }
                     call.respond(
                         status = HttpStatusCode.BadRequest,
                         message = exc.toCredentialErrorResponse().toJSON()
@@ -548,6 +568,24 @@ object OidcApi : CIProvider(), Klogging {
                         call.respond(generateDeferredCredentialResponse(accessToken).toJSON())
                     } catch (exc: DeferredCredentialError) {
                         logger.error(exc) { "DeferredCredentialError: " }
+                        // Update session status to UNSUCCESSFUL and emit callback
+                        runCatching {
+                            val accessInfo = OpenID4VC.verifyAndParseToken(
+                                token = accessToken!!,
+                                issuer = metadata.issuer!!,
+                                target = TokenTarget.DEFERRED_CREDENTIAL,
+                                tokenKey = CI_TOKEN_KEY
+                            )
+                            val sid = accessInfo[JWTClaims.Payload.subject]?.jsonPrimitive?.content
+                            if (sid != null) getSession(sid)?.let {
+                                updateSessionStatus(
+                                    it,
+                                    IssuanceSessionStatus.UNSUCCESSFUL,
+                                    exc.message,
+                                    close = true
+                                )
+                            }
+                        }
                         call.respond(
                             status = HttpStatusCode.BadRequest,
                             message = exc.toCredentialErrorResponse().toJSON()
@@ -591,6 +629,18 @@ object OidcApi : CIProvider(), Klogging {
 
                     } catch (exc: BatchCredentialError) {
                         logger.error(exc) { "BatchCredentialError: " }
+                        // Update session status to UNSUCCESSFUL and emit callback
+                        runCatching {
+                            val sid = parsedToken?.get(JWTClaims.Payload.subject)?.jsonPrimitive?.content
+                            if (sid != null) getSession(sid)?.let {
+                                updateSessionStatus(
+                                    it,
+                                    IssuanceSessionStatus.UNSUCCESSFUL,
+                                    exc.message,
+                                    close = true
+                                )
+                            }
+                        }
                         call.respond(
                             status = HttpStatusCode.BadRequest,
                             message = exc.toBatchCredentialErrorResponse().toJSON()
