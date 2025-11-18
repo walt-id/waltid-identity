@@ -694,7 +694,11 @@ open class CIProvider(
             CredentialResponse.success(
                 format = credentialResult.format,
                 credential = credential,
-                customParameters = credentialResult.customParameters
+                cNonce = session.cNonce,
+                cNonceExpiresIn = (session.expirationTimestamp - Clock.System.now()).also {
+                    it.inWholeSeconds.toInt()
+                },
+                customParameters = credentialResult.customParameters,
             )
         } ?: generateProofOfPossessionNonceFor(session).let { updatedSession ->
             CredentialResponse.deferred(
