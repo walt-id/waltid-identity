@@ -87,7 +87,7 @@ class IssueSdJwtCredentialIntegrationTest : AbstractIntegrationTest() {
 
         verifierApi.getSession(verificationId).also {
             assertEquals(
-                PresentationDefinition.Companion.fromJSONString(presentationDefinition),
+                PresentationDefinition.fromJSONString(presentationDefinition),
                 it.presentationDefinition
             )
         }
@@ -142,7 +142,7 @@ class IssueSdJwtCredentialIntegrationTest : AbstractIntegrationTest() {
 
         verifierApi.getSession(verificationId).also {
             assertEquals(
-                PresentationDefinition.Companion.fromJSONString(presentationDefinition),
+                PresentationDefinition.fromJSONString(presentationDefinition),
                 it.presentationDefinition
             )
         }
