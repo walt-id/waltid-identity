@@ -9,6 +9,34 @@
 <a href="https://www.linkedin.com/company/walt-id/">
 <img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
 </a>
+  
+  <h2>Statuses Explained</h2>
+  <table>
+    <tr>
+      <td align="center" width="50%">
+        <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
+        <br/>
+        <em>This project is being actively maintained by the development team at walt.id. Regular updates, bug fixes, and new features are being added.</em>
+      </td>
+      <td align="center" width="50%">
+        <img src="https://img.shields.io/badge/🟡%20Unmaintained-yellow?style=for-the-badge&logo=warning" alt="Status: Unmaintained" />
+        <br/>
+        <em>This project is not actively maintained. Certain features may be outdated or not working as expected. We encourage users to contribute to the project to help keep it up to date.</em>
+      </td>
+    </tr> 
+    <tr>
+      <td align="center" width="50%">
+        <img src="https://img.shields.io/badge/🔴%20Deprecated-red?style=for-the-badge&logo=no-entry" alt="Status: Deprecated" />
+        <br/>
+        <em>This project is deprecated and no longer maintained. It should not be used in new projects. Please use our alternative libraries or migrate to recommended replacements.</em>
+      </td>
+      <td align="center" width="50%">
+        <img src="https://img.shields.io/badge/🟠%20Planned%20Deprecation-orange?style=for-the-badge&logo=clock" alt="Status: Planned Deprecation" />
+        <br/>
+        <em>This project is still supported by the development team at walt.id, but is planned for deprecation. We encourage users to migrate to using our alternative libraries.</em>
+      </td>
+    </tr>
+  </table>
 </div>
 
 ## Overview
@@ -17,12 +45,12 @@ This directory contains libraries for web server functionality, specifically foc
 
 ## Libraries
 
-### [waltid-ktor-notifications-core](./waltid-ktor-notifications-core)
+### [🟢 waltid-ktor-notifications-core](./waltid-ktor-notifications-core)
 Core library for Ktor server notifications. Provides multiplatform (JVM/JS/iOS) abstractions for publishing session updates and managing notification channels. Supports both Server-Sent Events (SSE) and webhook-based notifications.
 
 **Use when:** You need the core notification functionality and want to build custom notification implementations, or you're building multiplatform applications that need notification support.
 
-### [waltid-ktor-notifications](./waltid-ktor-notifications)
+### [🟢 waltid-ktor-notifications](./waltid-ktor-notifications)
 Ktor plugin for session notifications. Provides ready-to-use Ktor routes and plugins for implementing SSE endpoints and webhook notifications in Ktor applications.
 
 **Use when:** You're building a Ktor-based service that needs to notify clients about session updates via SSE or webhooks.
@@ -31,8 +59,13 @@ Ktor plugin for session notifications. Provides ready-to-use Ktor routes and plu
 
 * Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
 * Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+* Find more indepth documentation on our [docs site](https://docs.walt.id)
 
 ## License
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
+
+<div align="center">
+<img src="../../assets/walt-banner.png" alt="walt.id banner" />
+</div>
 
