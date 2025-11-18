@@ -9,38 +9,28 @@
 <a href="https://www.linkedin.com/company/walt-id/">
 <img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
 </a>
-  
-  <h2>Status</h2>
-  <p align="center">
-    <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
-    <br/>
-    <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
-  </p>
 </div>
 
 ## Getting Started
 
-### Multi-Platform Libraries
+Welcome to the walt.id identity repository! We are a team of developers who are passionate about building open tooling for digital identity and wallet solutions. We have a wealth of resources, applications and libraries which may be confusing at first glance, but hopefully this will help you get started based on what you want to do.
 
-Available for Kotlin/Java and JavaScript environments.
+The best place to find more information about concepts and usage of the Walt products is our [docs site](https://docs.walt.id).
 
-- **Crypto** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto)) -
-  create and use keys based on different algorithms and KMS backends (in-memory, AWS, Hashicorp TSE, OCI)
-- **DID** ([GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-did/README.md)) -
-  create, register, and resolve DIDs on different ecosystems.
-- **W3C Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-w3c-credentials)) -
-  issue and verify W3C credentials as JWTs and SD-JWTs.
-- **mdoc Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-mdoc-credentials)) -
-  issue and verify mdoc credentials (mDL ISO/IEC 18013-5).
-- **SD-JWT** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/sdjwt/waltid-sdjwt)) -
-  create and verify Selective Disclosure JWTs.
-- **OpenID4VC** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc)) -
-  implementation of the OID4VCI (draft 11 and draft 13) and OIDC4VP (draft 14 and draft 20) protocols.
+Once you've understood the basics and, you can start using some of our repositories to build your own solutions, depending on if you're trying to....
 
+### Test out the Walt product line
 
-### REST Services
+We provide a set of white-label apps to get started in no time. You can visit our hosted solutions directly if you are interested in testing out the product or doing interoperability testing with our products in the market.
 
-A set of APIs to build issuer, verifier, and wallet capabilities into any app.
+- **Web-Wallets** ([Demo](https://wallet.walt.id/login) | [Docs](https://docs.walt.id/community-stack/wallet/apps/web-wallet/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-web-wallet)) - Custodial web-wallet (PWA) solutions for credentials and tokens.
+- **Portal** ([Demo](https://portal.walt.id/) | [Docs](https://docs.walt.id/community-stack/issuer/apps/portal/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-web-portal)) - An issuer and verifier portal for credentials, which are managed [here](https://github.com/walt-id/waltid-credentials).
+
+### Build simple use cases involving digital credentials
+
+You can use the deployed white-label apps to build out simple use cases. But if you want to adjust the branding or credential types, we recommend running the web wallet and portal code locally and editing the code to your needs.
+
+If you don't want to use our white-label apps, you can also run the base APIs locally yourself and build out applicatons from scratch that fit your needs.
 
 - **Issuer API** ([Docs](https://docs.walt.id/community-stack/issuer/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-issuer-api)) -
   enable apps to issue credentials (W3C JWTs and SD-JWTs) via OID4VC.
@@ -49,15 +39,6 @@ A set of APIs to build issuer, verifier, and wallet capabilities into any app.
 - **Wallet API** ([Docs](https://docs.walt.id/community-stack/wallet/api/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-wallet-api)) -
   extend apps with wallet capabilities to collect, store, manage and share identity credentials and tokens.
 
-### Apps
-
-A set of white-label apps to get started in no time.
-
-- **Web-Wallets** ([Demo](https://wallet.walt.id/login) | [Docs](https://docs.walt.id/community-stack/wallet/apps/web-wallet/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-web-wallet)) - Custodial web-wallet (PWA) solutions for credentials and tokens.
-- **Portal** ([Demo](https://portal.walt.id/) | [Docs](https://docs.walt.id/community-stack/issuer/apps/portal/overview) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-web-portal)) - An issuer and verifier portal for credentials, which are managed [here](https://github.com/walt-id/waltid-credentials).
-
-
-## Use REST Services And Apps
 
 Use the [walt.id identity package](https://github.com/walt-id/waltid-identity/tree/main/docker-compose) to run all APIs and Apps with docker:
 
@@ -75,23 +56,25 @@ cd docker-compose && docker compose up
 
 Learn more about the docker settings & exposed ports [here](https://github.com/walt-id/waltid-identity/tree/main/docker-compose).
 
-## Use the Command Line Tool
 
-Use the [walt.id CLI](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-cli) to run the
-core functions from
-the command line. Make sure you have your Java Runtime set up.
+### Build digital credential tooling and applications
 
-**Clone walt.id identity**
+If you need even more customisability and control, you can build your own tooling and applications using the same libraries that we use for the APIs and applications above. We try to provide multiplatform libraries so you can build application running on JVM, JavaScript and iOS platforms. Some popular libraries you may want to look at are:
 
-```bash
-git clone https://github.com/walt-id/waltid-identity.git && cd waltid-identity
-```
-
-**Access CLI**
-
-```bash
-cd waltid-applications/waltid-cli && ./waltid-cli.sh
-```
+- **Crypto** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto)) -
+  create and use keys based on different algorithms and KMS backends (in-memory, AWS, Hashicorp TSE, OCI)
+- **DID** ([GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-did/README.md)) -
+  create, register, and resolve DIDs on different ecosystems.
+- **W3C Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-w3c-credentials)) -
+  issue and verify W3C credentials as JWTs and SD-JWTs.
+- **mdoc Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-mdoc-credentials)) -
+  issue and verify mdoc credentials (mDL ISO/IEC 18013-5).
+- **SD-JWT** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/sdjwt/waltid-sdjwt)) -
+  create and verify Selective Disclosure JWTs.
+- **OpenID4VC** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc)) -
+  implementation of the OID4VCI (draft 11 and draft 13) and OIDC4VP (draft 14 and draft 20) protocols.
+- **OpenID4VP** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vp)) -
+  implementation of the OpenID4VP 1.0 protocol.
 
 ## Architecture
 
