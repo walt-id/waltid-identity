@@ -695,9 +695,7 @@ open class CIProvider(
                 format = credentialResult.format,
                 credential = credential,
                 cNonce = session.cNonce,
-                cNonceExpiresIn = (session.expirationTimestamp - Clock.System.now()).also {
-                    it.inWholeSeconds.toInt()
-                },
+                cNonceExpiresIn = (session.expirationTimestamp - Clock.System.now()),
                 customParameters = credentialResult.customParameters,
             )
         } ?: generateProofOfPossessionNonceFor(session).let { updatedSession ->
@@ -711,7 +709,7 @@ open class CIProvider(
                     tokenKey = CI_TOKEN_KEY
                 ),
                 cNonce = updatedSession.cNonce,
-                cNonceExpiresIn = (updatedSession.expirationTimestamp - Clock.System.now()).also { it.inWholeSeconds.toInt() }
+                cNonceExpiresIn = (updatedSession.expirationTimestamp - Clock.System.now())
             )
         }
     }
