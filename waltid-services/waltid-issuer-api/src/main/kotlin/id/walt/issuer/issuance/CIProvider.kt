@@ -225,8 +225,7 @@ open class CIProvider(
                     statusReason = "Issuance session expired",
                     isClosed = true
                 )
-                val remaining =
-                    (expiredSession.expirationTimestamp - Clock.System.now()).let { d -> if (d.isNegative()) 0.minutes else d }
+                val remaining = 0.minutes
                 putSession(sessionId, expiredSession, remaining)
                 runBlocking {
                     if (!expiredSession.callbackUrl.isNullOrEmpty()) {
