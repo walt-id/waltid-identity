@@ -23,6 +23,9 @@
 
 `waltid-openid4vc` is a Kotlin multiplatform library that implements the data models and protocols of the [OpenID for Verifiable Credentials](https://openid.net/sg/openid4vc/) specifications. It provides comprehensive support for credential issuance, verification, and self-issued identity flows using draft versions of the OpenID4VC protocols.
 
+Learn more about OpenID4VP (Presentation) [here](https://docs.walt.id/concepts/data-exchange-protocols/openid4vp).
+Learn more about OpenID4VCI (Issuance) [here](https://docs.walt.id/concepts/data-exchange-protocols/openid4vci).
+
 ## Main Purpose
 
 This library enables:

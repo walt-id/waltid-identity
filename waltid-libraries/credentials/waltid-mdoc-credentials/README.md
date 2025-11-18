@@ -23,6 +23,10 @@
 ## What is the mdoc library
 This library implements the mdoc specification: [ISO/IEC 18013-5:2021](https://www.iso.org/standard/69084.html), Personal identification -- ISO-compliant driving licence -- Part 5: Mobile driving licence (mDL) application.
 
+### Further information
+
+Checkout the [documentation regarding mdoc credentials](https://docs.walt.id/concepts/digital-credentials/mdoc-mdl-iso), to find out more.
+
 ### Features
 * **Parse and verify** mdocs and mdoc requests, with verification of MSO-validity, doc type, certificate chains, items tamper check, issuer and device signatures.
 * **Create and sign** mdoc documents with issuer-signed items and COSE Sign1 issuer authentication (mobile security object, MSO).

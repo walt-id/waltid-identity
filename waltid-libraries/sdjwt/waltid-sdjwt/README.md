@@ -30,7 +30,7 @@
 
 ### Further information
 
-Checkout the [documentation regarding SD-JWTs](https://docs.walt.id/community-stack/concepts/digital-credentials/sd-jwt-vc), to find out more.
+Checkout the [documentation regarding SD-JWTs](https://docs.walt.id/concepts/digital-credentials/sd-jwt-vc), to find out more.
 
 ## What is the SD-JWT library?
 

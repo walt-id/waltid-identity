@@ -33,6 +33,8 @@ This library provides comprehensive operations for creating, issuing, and managi
 - **Sign credentials and presentations** using cryptographic keys from the `waltid-crypto` library
 - **Integrate with verification policies** from the `waltid-verification-policies` library for credential validation
 
+Learn more about W3C Credentials [here](https://docs.walt.id/concepts/digital-credentials/verifiable-credentials-w3c).
+
 ## Main Purpose
 
 This library provides a complete implementation for working with W3C Verifiable Credentials, enabling you to:

@@ -18,13 +18,16 @@
   </p>
 </div>
 
-waltid-mdoc-credentials2 is a Kotlin Multiplatform library for creating, parsing, and verifying mobile
-documents (mdocs) that conform to the respective standards (e.g. ISO/IEC 18013, 23220).
-It provides the core cryptographic and data structure logic required to build
-applications, such as digital wallets and verifier services, that are compliant with the mdoc
-standard.
+## Getting Started
+
+## What is the mdoc library
+This library implements the mdoc specification: [ISO/IEC 18013-5:2021](https://www.iso.org/standard/69084.html), Personal identification -- ISO-compliant driving licence -- Part 5: Mobile driving licence (mDL) application.
 
 This library is a successor to the [waltid-mdoc-credentials](../waltid-mdoc-credentials) library. It aims to provide a multiplatform library that is easier to use and maintain compared to the original library.
+
+### Further information
+
+Checkout the [documentation regarding mdoc credentials](https://docs.walt.id/concepts/digital-credentials/mdoc-mdl-iso), to find out more.
 
 ## Features
 

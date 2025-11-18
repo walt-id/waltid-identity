@@ -22,6 +22,8 @@
 
 This library provides the foundational data models, types, and utilities for implementing **OpenID for Verifiable Presentations (OpenID4VP) 1.0**. It defines the core structures used by Verifiers to request verifiable presentations from Wallets.
 
+Learn more about OpenID4VP [here](https://docs.walt.id/concepts/data-exchange-protocols/openid4vp).
+
 The library includes:
 - **Authorization Request models** - Data structures for OpenID4VP authorization requests
 - **Client Metadata** - Verifier metadata and capabilities

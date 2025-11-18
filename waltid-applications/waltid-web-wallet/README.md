@@ -44,6 +44,8 @@ This wallet enables users to:
 
 **Intro Video**: [Watch the intro video](https://youtu.be/HW9CNFmRFlI) to learn about features and see a demo.
 
+**Docs**: [Learn more about our Wallet API](https://docs.walt.id/community-stack/wallet/getting-started)
+
 ## Wallet Variants
 
 The web wallet comes in two variants:

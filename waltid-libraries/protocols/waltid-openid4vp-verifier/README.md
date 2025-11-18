@@ -22,6 +22,8 @@
 
 A complete server-side implementation of the **Verifier** role as defined in **OpenID for Verifiable Presentations (OpenID4VP) 1.0**. This library provides all the necessary tools to request, receive, and validate verifiable presentations from a Holder's Wallet.
 
+Learn more about OpenID4VP [here](https://docs.walt.id/concepts/data-exchange-protocols/openid4vp).
+
 **This library handles:**
 - Creating and managing verification sessions
 - Generating authorization requests with DCQL queries

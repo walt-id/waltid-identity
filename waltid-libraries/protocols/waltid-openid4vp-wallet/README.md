@@ -22,6 +22,8 @@
 
 A complete implementation of the **Holder/Wallet** functionality as defined in **OpenID for Verifiable Presentations (OpenID4VP) 1.0**. This library enables your application to act as a digital wallet, allowing users to present their digital credentials to verifiers.
 
+Learn more about OpenID4VP [here](https://docs.walt.id/concepts/data-exchange-protocols/openid4vp).
+
 **This library handles:**
 - Parsing and processing authorization requests from Verifiers
 - Matching credentials against DCQL queries
