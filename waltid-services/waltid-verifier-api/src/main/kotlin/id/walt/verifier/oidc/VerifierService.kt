@@ -38,6 +38,62 @@ import kotlin.time.Duration
 object VerifierService {
     private val logger = logger("Verification")
 
+    private fun nowIso() = kotlinx.datetime.Clock.System.now().toString()
+
+    private fun defaultEnterpriseState(): JsonObject = buildJsonObject {
+        put("status", JsonPrimitive("created"))
+        put(
+            "transitions",
+            buildJsonArray {
+                add(
+                    buildJsonObject {
+                        put("from", JsonNull)
+                        put("to", JsonPrimitive("created"))
+                        put("timestamp", JsonPrimitive(nowIso()))
+                    }
+                )
+            }
+        )
+    }
+
+    private fun addTransition(state: JsonObject, newStatus: String, failure: JsonObject? = null): JsonObject {
+        val oldStatus = state["status"]?.jsonPrimitive?.content
+        val transitions = state["transitions"]?.jsonArray ?: buildJsonArray {}
+        val newTransitions = buildJsonArray {
+            transitions.forEach { add(it) }
+            add(
+                buildJsonObject {
+                    if (oldStatus == null) put("from", JsonNull) else put("from", JsonPrimitive(oldStatus))
+                    put("to", JsonPrimitive(newStatus))
+                    put("timestamp", JsonPrimitive(nowIso()))
+                    failure?.let { put("failure", it) }
+                }
+            )
+        }
+        return buildJsonObject {
+            put("status", JsonPrimitive(newStatus))
+            put("transitions", newTransitions)
+            failure?.let { put("failure", it) }
+        }
+    }
+
+    private fun setEnterpriseStatus(
+        sessionId: String,
+        newStatus: String,
+        failureReason: String? = null,
+        description: String? = null,
+    ) {
+        val current = OIDCVerifierService.enterpriseSessionStatuses[sessionId] ?: defaultEnterpriseState()
+        val failure = failureReason?.let {
+            buildJsonObject {
+                put("reason", JsonPrimitive(it))
+                description?.let { d -> put("description", JsonPrimitive(d)) }
+            }
+        }
+        val updated = addTransition(current, newStatus, failure)
+        OIDCVerifierService.enterpriseSessionStatuses.set(sessionId, updated)
+    }
+
     private val http = HttpClient {
 
         install(ContentNegotiation) {
@@ -102,6 +158,9 @@ object VerifierService {
             responseType = responseType,
             trustedRootCAs = trustedRootCAs?.map { it.jsonPrimitive.content }
         )
+        // initialize enterprise status for this session
+        OIDCVerifierService.enterpriseSessionStatuses.set(session.id, defaultEnterpriseState())
+        setEnterpriseStatus(session.id, "request_sent")
 
         val specificPolicies = requestedCredentials.filter {
             !it.policies.isNullOrEmpty()
@@ -195,9 +254,19 @@ object VerifierService {
                 NotFoundException("No session verification information found for session id: ${session.id}")
             )
 
+        // mark that a presentation was received
+        setEnterpriseStatus(session.id, "presentation_received")
+
         val maybePresentationSessionResult = runCatching { OIDCVerifierService.verify(tokenResponse, session) }
 
         if (maybePresentationSessionResult.isFailure) {
+            val errMsg = maybePresentationSessionResult.exceptionOrNull()?.message
+            setEnterpriseStatus(
+                session.id,
+                "verification_failed",
+                failureReason = "invalid_signature",
+                description = errMsg
+            )
             return Result.failure(
                 CryptoArgumentException(
                     "Verification failed (VerificationUseCase): ${maybePresentationSessionResult.exceptionOrNull()!!.message}",
@@ -209,6 +278,8 @@ object VerifierService {
         val presentationSession = maybePresentationSessionResult.getOrThrow()
 
         return if (presentationSession.verificationResult == true) {
+            setEnterpriseStatus(session.id, "presentation_verified")
+            setEnterpriseStatus(session.id, "completed")
             val redirectUri = sessionVerificationInfo.successRedirectUri?.replace("\$id", session.id) ?: ""
             logger.debug { "Presentation is successful, redirecting to: $redirectUri" }
             Result.success(redirectUri)
@@ -243,10 +314,13 @@ object VerifierService {
         val policyResults =
             OIDCVerifierService.policyResults[session.id]?.let { Json.encodeToJsonElement(it).jsonObject }
 
+        val ent = OIDCVerifierService.enterpriseSessionStatuses[session.id]
         return Result.success(
             PresentationSessionInfo.fromPresentationSession(
                 session = session,
                 policyResults = policyResults
+            ).copy(
+                enterpriseStatusState = ent
             )
         )
     }

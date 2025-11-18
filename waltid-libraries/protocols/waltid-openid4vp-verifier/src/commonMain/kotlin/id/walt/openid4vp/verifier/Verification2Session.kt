@@ -141,6 +141,93 @@ data class Verification2Session(
         FAILED(false),
     }
 
+    // Enterprise verification status model
+    @Serializable
+    enum class EnterpriseVerificationStatus {
+        // Success path
+        created,
+        request_sent,
+        presentation_received,
+        presentation_verified,
+        completed,
+
+        // Unhappy paths (terminal)
+        exchange_unsuccessful,
+        presentation_rejected_by_user,
+        verification_failed,
+        verifier_error,
+        wallet_error
+    }
+
+    @Serializable
+    data class FailureDetail(
+        val reason: String,
+        val description: String? = null,
+    )
+
+    @Serializable
+    data class StatusTransition<T>(
+        val from: String?,
+        val to: String,
+        val timestamp: Instant,
+        val failure: FailureDetail? = null,
+    )
+
+    @Serializable
+    data class EnterpriseVerificationStatusState(
+        val status: EnterpriseVerificationStatus = EnterpriseVerificationStatus.created,
+        val transitions: List<StatusTransition<EnterpriseVerificationStatus>> = listOf(
+            StatusTransition(
+                from = null,
+                to = EnterpriseVerificationStatus.created.name,
+                timestamp = Clock.System.now()
+            )
+        ),
+        val failure: FailureDetail? = null,
+    )
+
+    var enterpriseStatusState: EnterpriseVerificationStatusState = EnterpriseVerificationStatusState()
+        private set
+
+    val enterpriseStatus: EnterpriseVerificationStatus
+        get() = enterpriseStatusState.status
+
+    fun markEnterpriseStatus(
+        newStatus: EnterpriseVerificationStatus,
+        reason: String? = null,
+        description: String? = null,
+    ) {
+        // Prevent transitions after terminal statuses
+        if (isEnterpriseTerminal(enterpriseStatus)) return
+        val failure = if (newStatus in setOf(
+                EnterpriseVerificationStatus.exchange_unsuccessful,
+                EnterpriseVerificationStatus.presentation_rejected_by_user,
+                EnterpriseVerificationStatus.verification_failed,
+                EnterpriseVerificationStatus.verifier_error,
+                EnterpriseVerificationStatus.wallet_error
+            ) && reason != null
+        ) FailureDetail(reason, description) else null
+
+        val newTransitions = enterpriseStatusState.transitions + StatusTransition<EnterpriseVerificationStatus>(
+            from = enterpriseStatusState.status.name,
+            to = newStatus.name,
+            timestamp = Clock.System.now(),
+            failure = failure
+        )
+        enterpriseStatusState = enterpriseStatusState.copy(
+            status = newStatus,
+            transitions = newTransitions,
+            failure = failure
+        )
+    }
+
+    fun isEnterpriseTerminal(status: EnterpriseVerificationStatus = enterpriseStatus): Boolean = status in setOf(
+        EnterpriseVerificationStatus.completed,
+        EnterpriseVerificationStatus.exchange_unsuccessful,
+        EnterpriseVerificationStatus.presentation_rejected_by_user,
+        EnterpriseVerificationStatus.verification_failed
+    )
+
     fun toSessionCreationResponse(): VerificationSessionCreationResponse {
         return VerificationSessionCreationResponse(
             sessionId = id,

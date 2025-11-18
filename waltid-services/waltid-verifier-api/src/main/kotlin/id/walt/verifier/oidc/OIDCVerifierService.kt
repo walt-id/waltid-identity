@@ -46,7 +46,7 @@ import kotlinx.serialization.modules.subclass
 import org.cose.java.AlgorithmID
 import org.cose.java.OneKey
 import java.security.cert.X509Certificate
-import java.util.Base64
+import java.util.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
@@ -91,6 +91,13 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
         decoding = {
             Json.decodeFromString(it)
         },
+    )
+
+    val enterpriseSessionStatuses = ConfiguredPersistence<JsonObject>(
+        discriminator = "verifier_enterprise_status",
+        defaultExpiration = 5.minutes,
+        encoding = { Json.encodeToString(it) },
+        decoding = { Json.decodeFromString(it) }
     )
 
     // Todo: Make this automatic?

@@ -6,6 +6,8 @@ import id.walt.issuer.issuance.OidcApi.buildCredentialOfferUri
 import id.walt.issuer.issuance.OidcApi.buildOfferUri
 import id.walt.issuer.issuance.OidcApi.getFormatByCredentialConfigurationId
 import id.walt.issuer.issuance.openapi.issuerapi.IssuanceRequestErrors
+import id.walt.issuer.issuance.openapi.issuerapi.IssuerSessionDocs
+import id.walt.issuer.issuance.openapi.issuerapi.IssuerSessionDocs.SwaggerIssuanceSessionInfo
 import id.walt.issuer.issuance.openapi.issuerapi.JwtDocs.getJwtBatchDocs
 import id.walt.issuer.issuance.openapi.issuerapi.JwtDocs.getJwtDocs
 import id.walt.issuer.issuance.openapi.issuerapi.MdocDocs.getMdocsDocs
@@ -16,6 +18,7 @@ import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.w3c.vc.vcs.W3CVC
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
@@ -24,6 +27,7 @@ import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -109,6 +113,24 @@ fun Application.issuerApi() {
             }
 
             route("openid4vc") {
+                get("session/{id}", IssuerSessionDocs.getIssuanceSessionDocs()) {
+                    val id = call.parameters["id"] ?: throw BadRequestException("Session ID required")
+                    val session = OidcApi.getSession(id)
+                    if (session == null) {
+                        call.respond(HttpStatusCode.NotFound, "Invalid id provided (expired?): $id")
+                    } else {
+                        val ent = Json.encodeToJsonElement(
+                            EnterpriseIssuanceStatusState.serializer(),
+                            session.enterpriseStatusState
+                        ).jsonObject
+                        val dto = SwaggerIssuanceSessionInfo(
+                            id = session.id,
+                            enterpriseStatusState = ent,
+                            customParameters = emptyMap()
+                        )
+                        call.respond(HttpStatusCode.OK, dto)
+                    }
+                }
                 route("jwt") {
                     post("issue", getJwtDocs()) {
                         val jwtIssuanceRequest = call.receive<IssuanceRequest>()

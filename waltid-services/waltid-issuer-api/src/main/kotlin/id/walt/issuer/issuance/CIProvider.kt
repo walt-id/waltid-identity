@@ -676,8 +676,10 @@ open class CIProvider(
             txCodeValue = txCodeValue,
             credentialOffer = credentialOfferBuilder.build(),
             callbackUrl = callbackUrl
-        ).also {
-            putSession(it.id, it, expiresIn)
+        ).let { created ->
+            val withOffer = created.nextEnterpriseStatus(EnterpriseIssuanceStatus.offer_sent)
+            putSession(withOffer.id, withOffer, expiresIn)
+            withOffer
         }
     }
 
@@ -686,6 +688,12 @@ open class CIProvider(
         session: IssuanceSession
     ): CredentialResponse = runBlocking {
         return@runBlocking credentialResult.credential?.let { credential ->
+            // Mark credential issued and completed on success
+            val remainingTtl =
+                session.expirationTimestamp.let { if (it > Clock.System.now()) it - Clock.System.now() else null }
+            val issued = session.nextEnterpriseStatus(EnterpriseIssuanceStatus.credential_issued)
+            val completed = issued.nextEnterpriseStatus(EnterpriseIssuanceStatus.completed)
+            putSession(completed.id, completed, remainingTtl)
             CredentialResponse.success(
                 format = credentialResult.format,
                 credential = credential,
@@ -712,6 +720,11 @@ open class CIProvider(
         session: IssuanceSession
     ): CredentialResponse =
         runBlocking {
+            // mark credential requested
+            val remainingTtl =
+                session.expirationTimestamp.let { if (it > Clock.System.now()) it - Clock.System.now() else null }
+            val requested = session.nextEnterpriseStatus(EnterpriseIssuanceStatus.credential_requested)
+            putSession(requested.id, requested, remainingTtl)
             // access_token should be validated on API level and issuance session extracted
             // Validate credential request (proof of possession, etc.)
             val nonce = session.cNonce
