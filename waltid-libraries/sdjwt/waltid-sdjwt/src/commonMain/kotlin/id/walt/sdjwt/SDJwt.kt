@@ -77,6 +77,9 @@ open class SDJwt internal constructor(
     val type
         get() = header["typ"]?.jsonPrimitive?.contentOrNull
 
+    val x5c
+        get() = header["x5c"]?.jsonArray?.map { it.jsonPrimitive.content }
+
     override fun toString() = toString(isPresentation)
 
     @JsName("toFormattedString")

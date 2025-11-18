@@ -12,6 +12,7 @@ import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.issuer.config.CredentialTypeConfig
@@ -267,6 +268,10 @@ open class CIProvider(
 
             val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
 
+            val x5c = request.x5Chain?.map {
+                X509CertUtils.parse(it).encoded.encodeToBase64()
+            }
+
             request.run {
                 when (credentialFormat) {
                     CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(
@@ -279,7 +284,7 @@ open class CIProvider(
                         display = credentialRequest.display ?: vc["display"]?.jsonArray?.map {
                             DisplayProperties.fromJSON(it.jsonObject)
                         },
-                        x5Chain = request.x5Chain
+                        x5Chain = x5c,
                     ).also {
                         if (!issuanceSession.callbackUrl.isNullOrEmpty())
                             sendCallback(
@@ -298,7 +303,7 @@ open class CIProvider(
                             ?: throw BadRequestException("Issuer API currently supports only issuer DID for issuer ID property in W3C credentials. Issuer DID was not given in issuance request."),
                         selectiveDisclosure = request.selectiveDisclosure,
                         dataMapping = request.mapping,
-                        x5Chain = request.x5Chain,
+                        x5Chain = x5c,
                         display = credentialRequest.display
 
                     ).also {
@@ -689,7 +694,9 @@ open class CIProvider(
             CredentialResponse.success(
                 format = credentialResult.format,
                 credential = credential,
-                customParameters = credentialResult.customParameters
+                cNonce = session.cNonce,
+                cNonceExpiresIn = (session.expirationTimestamp - Clock.System.now()),
+                customParameters = credentialResult.customParameters,
             )
         } ?: generateProofOfPossessionNonceFor(session).let { updatedSession ->
             CredentialResponse.deferred(
@@ -702,7 +709,7 @@ open class CIProvider(
                     tokenKey = CI_TOKEN_KEY
                 ),
                 cNonce = updatedSession.cNonce,
-                cNonceExpiresIn = (updatedSession.expirationTimestamp - Clock.System.now()).also { it.inWholeSeconds.toInt() }
+                cNonceExpiresIn = (updatedSession.expirationTimestamp - Clock.System.now())
             )
         }
     }
