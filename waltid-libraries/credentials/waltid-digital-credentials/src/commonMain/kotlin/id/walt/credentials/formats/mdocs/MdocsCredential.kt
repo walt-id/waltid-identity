@@ -20,6 +20,7 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
+internal const val MSO_MDOC_FORMAT = "mso_mdoc"
 private const val VC_MDOCS_SERIAL_NAME = "vc-mdocs"
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -43,7 +44,7 @@ data class MdocsCredential(
     @EncodeDefault
     override var subject: String? = null,
 ) : DigitalCredential() {
-    override val format: String = "mso_mdoc"
+    override val format: String = MSO_MDOC_FORMAT
 
     /**
      * This virtual DID is *virtual*: It does not exist in the mdocs credential.
