@@ -13,6 +13,7 @@ plugins {
     id("love.forte.plugin.suspend-transform")
     id("com.github.ben-manes.versions")
     kotlin("plugin.power-assert")
+    id("dev.mokkery") version "2.10.2"
 }
 
 group = "id.walt.credentials"
