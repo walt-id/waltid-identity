@@ -75,6 +75,12 @@ data class MdocsCredential(
             require(issuerAuthSignatureValid) { "IssuerAuth signature is invalid!" }
         }
 
+        /**
+         * hack to make [MdocsCredential] mockable for testing,
+         * otherwise would have to inject the document parser into the constructor
+         */
+        internal var msoExtractionTestHook: ((MdocsCredential) -> MobileSecurityObject?)? = null
+
     }
 
     fun parseToDocument(): Document {
@@ -135,7 +141,7 @@ data class MdocsCredential(
         override val descriptor: SerialDescriptor = MdocsCredentialDataTransferObject.serializer().descriptor
 
         override fun serialize(encoder: Encoder, value: MdocsCredential) {
-            val mso = runCatching {
+            val mso = msoExtractionTestHook?.invoke(value) ?: runCatching {
                 value.parseToDocument().issuerSigned.decodeMobileSecurityObject()
             }.getOrNull()
 
