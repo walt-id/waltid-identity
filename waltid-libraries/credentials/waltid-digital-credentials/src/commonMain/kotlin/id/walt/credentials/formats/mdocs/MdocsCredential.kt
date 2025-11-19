@@ -16,9 +16,11 @@ import kotlinx.serialization.*
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
+private const val VC_MDOCS_SERIAL_NAME = "vc-mdocs"
+
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
-@SerialName("vc-mdocs")
+@SerialName(VC_MDOCS_SERIAL_NAME)
 data class MdocsCredential(
     override val credentialData: JsonObject,
 
