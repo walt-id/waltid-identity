@@ -3,25 +3,35 @@
  <span>by </span><a href="https://walt.id">walt.id</a>
   <p>Manage keys, DIDs, issue W3C Verifiable Credentials, and verify them using the command line tool</p>
 
-<a href="https://walt.id/community">
-<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
-</a>
-<a href="https://www.linkedin.com/company/walt-id/">
-<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
-</a>
+  <a href="https://walt.id/community">
+  <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
+  </a>
+  <a href="https://www.linkedin.com/company/walt-id/">
+  <img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
+  </a>
+
+  <h2>Status</h2>
+  <p align="center">
+    <img src="https://img.shields.io/badge/🟡%20Unmaintained-yellow?style=for-the-badge&logo=warning" alt="Status: Unmaintained" />
+    <br/>
+    <em>This project is not actively maintained. Certain features may be outdated or not working as expected.<br />We encourage users to contribute to the project to help keep it up to date.</em>
+  </p>
+
 </div>
+
+
 
 # How to use
 
 ## In development
-
-* `git clone https://github.com/walt-id/waltid-identity.git`
-* `cd waltid-identity`
-* `./gradlew clean build`
-* `cd waltid-applications/waltid-cli`
-* `alias waltid="./waltid-cli.sh"` (for running the project)
-* `alias waltid="./waltid-cli-development.sh"` (for building and running the project)
-
+```bash
+git clone https://github.com/walt-id/waltid-identity.git
+cd waltid-identity
+./gradlew clean build
+cd waltid-applications/waltid-cli
+alias waltid="./waltid-cli.sh" (for running the project)
+alias waltid="./waltid-cli-development.sh" (for building and running the project)
+```
 Now, you can run:
 
 | Command                                                                                                                                               | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -771,12 +781,18 @@ This project is still a work in progress. As such, not all features are already 
 * Allowed Issuer ✅
 * Webhook ✅
 
+
 ## Join the community
 
 * Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
 * Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+* Find more indepth documentation on our [docs site](https://docs.walt.id)
 
 
 ## License
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
+
+<div align="center">
+<img src="../../assets/walt-banner.png" alt="walt.id banner" />
+</div>
