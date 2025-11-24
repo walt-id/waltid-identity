@@ -100,10 +100,11 @@ object VerificationSessionCreator {
 
     @Serializable
     data class VerificationSessionSetup(
-        val preset: VerificationSessionSetupPreset? = null,
-
         @SerialName("dcql_query")
         val dcqlQuery: DcqlQuery,
+
+        val sessionId: String? = null,
+        val preset: VerificationSessionSetupPreset? = null,
 
         val signedRequest: Boolean = false,
         val encryptedResponse: Boolean = false,
@@ -148,8 +149,8 @@ object VerificationSessionCreator {
         key: Key? = null,
         x5c: List<String>? = null,
     ): Verification2Session {
+        val sessionId = setup.sessionId ?: Uuid.random().toString()
         setup.dcqlQuery.precheck()
-
         val isSignedRequest = setup.signedRequest
         if (isSignedRequest)
             requireNotNull(key) { "Requested signed request, but did not provide a key (to sign request with)!" }
@@ -170,8 +171,6 @@ object VerificationSessionCreator {
         }
 
         require(isCrossDevice || isDcApi) { "No flow is selected" } // list all flows here
-
-        val sessionId = Uuid.random().toString()
         val nonce = Uuid.random().toString()
         val state = Uuid.random().toString()
 
