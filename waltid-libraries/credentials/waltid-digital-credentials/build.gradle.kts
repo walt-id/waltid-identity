@@ -140,6 +140,10 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-api")
+                implementation("org.junit.jupiter:junit-jupiter-params")
+                runtimeOnly("org.junit.jupiter:junit-jupiter-engine")
+
             }
         }
         val jvmMain by getting {
