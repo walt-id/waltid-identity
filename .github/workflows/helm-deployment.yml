@@ -22,12 +22,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout waltid-identity
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: walt-id/waltid-identity
           ref: ${{ github.ref_name }}
       - name: Checkout waltid-helm-charts
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: walt-id/waltid-helm-charts
           token: ${{ secrets.GH_ACCESS_TOKEN }}
