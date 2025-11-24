@@ -107,7 +107,8 @@ object SdJwtUtils {
                     SdJwtSelectiveDisclosure(
                         salt = jsonArray[0].jsonPrimitive.content,
                         name = jsonArray[1].jsonPrimitive.content,
-                        value = jsonArray[2]
+                        value = jsonArray[2],
+                        encoded = jsonArrayString
                     )
                 } else null
             }

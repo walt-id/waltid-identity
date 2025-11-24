@@ -3,6 +3,7 @@ package id.walt.credentials
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
@@ -31,7 +32,7 @@ class Rfc9901SampleTest {
     @MethodSource("rfcExamples")
     fun givenDisclosureVerifyHashUsingWaltHashed(testCase: SampleData) =
         runTest {
-            val sut = SdJwtSelectiveDisclosure(testCase.contents.toJsonElement().jsonArray)
+            val sut = SdJwtSelectiveDisclosure(Json.parseToJsonElement(testCase.contents).jsonArray, testCase.contents)
 
             assertEquals(testCase.sha256, sut.asHashed())
         }
@@ -40,9 +41,17 @@ class Rfc9901SampleTest {
     @MethodSource("rfcExamples")
     fun givenDisclosureVerifyHashUsingWaltHashed2(testCase: SampleData) =
         runTest {
-            val sut = SdJwtSelectiveDisclosure(testCase.contents.toJsonElement().jsonArray)
+            val sut = SdJwtSelectiveDisclosure(Json.parseToJsonElement(testCase.contents).jsonArray, testCase.contents)
 
             assertEquals(testCase.sha256, sut.asHashed2())
+        }
+    @ParameterizedTest
+    @MethodSource("rfcExamples")
+    fun givenDisclosureVerifyHashUsingWaltHashed3(testCase: SampleData) =
+        runTest {
+            val sut = SdJwtSelectiveDisclosure(Json.parseToJsonElement(testCase.contents).jsonArray, testCase.contents)
+
+            assertEquals(testCase.sha256, sut.asHashed3())
         }
 
     @ParameterizedTest

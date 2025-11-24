@@ -206,7 +206,7 @@ object CredentialParser {
             // Map disclosures to disclosable locations
             val mappedDisclosures = ArrayList<SdJwtSelectiveDisclosure>()
 
-            fun findForHash(hash: String) = availableDisclosures!!.firstOrNull { it.asHashed() == hash || it.asHashed2() == hash }
+            fun findForHash(hash: String) = availableDisclosures!!.firstOrNull { it.asHashed() == hash || it.asHashed2() == hash || it.asHashed3() == hash }
 
             containedDisclosables.entries.forEach { (sdLocation, disclosureHashes) ->
                 log.trace { "Trying sd location: $sdLocation\n" }
@@ -214,7 +214,7 @@ object CredentialParser {
                 disclosureHashes.forEach { hash ->
                     log.trace { "Trying hash: $hash" }
                     log.trace {
-                        "Available disclosures: ${availableDisclosures?.joinToString("\n") { "Available h: ${it.asHashed()}  –  ${it.asHashed2()}" }}"
+                        "Available disclosures: ${availableDisclosures?.joinToString("\n") { "Available h: ${it.asHashed()}  –  ${it.asHashed2()} –  ${it.asHashed3()}" }}"
                     }
                     findForHash(hash)?.let { matchingDisclosure ->
                         mappedDisclosures.add(matchingDisclosure.copy(location = "$unsuffixedLocation${matchingDisclosure.name}"))
