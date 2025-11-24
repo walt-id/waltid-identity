@@ -54,7 +54,7 @@ jobs:
       oss: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-identity-main' || 'identity-main' }}
       enterprise: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-enterprise-main' || 'enterprise-main' }}
   tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@70e59bbea44de0b3511bb6bd72faa553e92f7bcf
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@8fcefa7d4f599104fbcffc982133848eef3035ac
     needs: [ version, deploy ]
     with:
       version: ${{ needs.version.outputs.release_version }}

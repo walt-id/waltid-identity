@@ -48,7 +48,7 @@ jobs:
     with:
       version: ${{ needs.version.outputs.release_version }}
   tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@70e59bbea44de0b3511bb6bd72faa553e92f7bcf
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@8fcefa7d4f599104fbcffc982133848eef3035ac
     needs: [ version, deploy ]
     with:
       version: ${{ needs.version.outputs.release_version }}
