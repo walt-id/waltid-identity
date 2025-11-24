@@ -42,7 +42,7 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       publish: true
   deploy:
-    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@15a7b93ea2349d29459f4c280dcbcabcda1e5a28
+    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@95143fa66297fc9bcd1b3a10fbb6c19baa472358
     secrets: inherit
     needs: [ version, gradle, docker, api-docker ]
     with:
