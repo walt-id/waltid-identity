@@ -7,6 +7,8 @@ import id.walt.credentials.representations.X5CList
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.mdoc.crypto.MdocCryptoHelper
+import id.walt.mdoc.parser.MdocParser
 import id.walt.mdoc.verification.MdocVerifier
 import id.walt.mdoc.verification.VerificationContext
 import id.walt.openid4vp.verifier.verification.Verifier2PresentationValidator.PresentationValidationResult
@@ -47,6 +49,18 @@ object MdocPresentationValidator {
         log.trace { "Validating Mdoc presentation, with verification context: $verificationContext" }
 
         val verificationResult = MdocVerifier.verify(mdocBase64UrlString, verificationContext)
+
+        // Test some other (non-compliant) variations of DC API responses:
+        if (!verificationResult.valid && isDcApi) {
+            log.warn { "DC API response verification failed. Testing non-DC-API handover structure..." }
+            val document = MdocParser.parseToDocument(mdocBase64UrlString)
+            val mso = document.issuerSigned.decodeMobileSecurityObject()
+            val sessionTranscript = MdocCryptoHelper.reconstructOid4vpSessionTranscript(verificationContext)
+
+            log.warn { "Checking DC API response against non-DC-API handover..." }
+            val fallbackAuthentication = runCatching { MdocVerifier.verifyDeviceAuthentication(document, mso, sessionTranscript) }
+            log.warn { "Fallback authentication result: $fallbackAuthentication" }
+        }
 
         require(verificationResult.valid) { "Mdoc verification failed: ${verificationResult.errors}" }
 

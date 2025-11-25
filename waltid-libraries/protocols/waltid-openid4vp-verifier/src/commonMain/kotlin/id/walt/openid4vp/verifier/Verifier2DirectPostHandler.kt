@@ -212,7 +212,7 @@ object Verifier2DirectPostHandler {
 
         val (vpTokenString, receivedState) = when {
             bodyString != null -> {
-                require(responseMode in OpenID4VPResponseMode.DC_API_RESPONSES) { "Used body response, but responseMode is not for DC API" }
+                require(isDcApi) { "Used body response, but responseMode is not for DC API" }
                 val bodyJson = Json.decodeFromString<JsonObject>(bodyString)
                 //val protocol = bodyJson["protocol"].jsonPrimitive.content
 
@@ -221,8 +221,11 @@ object Verifier2DirectPostHandler {
                     else -> NotImplementedError("Protocol \"$protocol\" is not supported.")
                 }*/
 
-                val vpToken = bodyJson["data"]?.jsonObject["vp_token"]?.jsonObject?.toString()
-                    ?: throw IllegalArgumentException("Missing $.data.vp_token in posted JSON body")
+                val bodyData = bodyJson["data"] ?: bodyJson["credential"]?.jsonObject["data"]
+                ?: throw IllegalArgumentException("Missing $.data/$.credential.data in posted JSON body of DC API response")
+
+                val vpToken = bodyData.jsonObject["vp_token"]?.jsonObject?.toString()
+                    ?: throw IllegalArgumentException("Missing $.data.vp_token in posted JSON body of DC API response")
                 vpToken to null
             }
 
@@ -285,7 +288,7 @@ object Verifier2DirectPostHandler {
             vpTokenContents = vpTokenContents,
 
             // DC API
-            isDcApi = responseMode in OpenID4VPResponseMode.DC_API_RESPONSES,
+            isDcApi = isDcApi,
             expectedOrigins = session.authorizationRequest.expectedOrigins,
             ephemeralDecryptionKey = session.ephemeralDecryptionKey?.key?.let { it as JWKKey }
         )
