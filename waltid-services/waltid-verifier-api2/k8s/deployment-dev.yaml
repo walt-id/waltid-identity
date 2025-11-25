@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: issuer-dev-klogging-config
+  name: verifier2-dev-klogging-config
 data:
   klogging.json: |
     {
@@ -65,63 +65,71 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: issuer-web-config
+  name: verifier2-web-config
 data:
+  _features.conf : |
+    enabledFeatures = []
   web.conf: |
     webHost = "0.0.0.0"
     webPort = 3000
-  issuer-service.conf: |
-    baseUrl = "https://issuer.portal.test.waltid.cloud"
-  authentication-service.conf: |
-    name = "keycloak"
-    authorizeUrl = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/auth"
-    accessTokenUrl = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/token"
-    clientId = "issuer_api"
+  verifier-service.conf: |
+    clientId: "verifier2"
+    clientMetadata: {}
+    urlPrefix: "https://verifier2.portal.test.waltid.cloud/verification-session"
+    baseUrl = "https://verifier2.portal.test.waltid.cloud"
+    urlHost: "openid4vp://authorize"
+    key: {"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}
+    x5c: ["MIIBVzCB/aADAgECAggNKZAvUrtimzAKBggqhkjOPQQDAjAfMR0wGwYDVQQDDBR2ZXJpZmllci5leGFtcGxlLmNvbTAeFw0yNTEwMTQwNjI0MjBaFw0yNjEwMTQwNjI0MjBaMB8xHTAbBgNVBAMMFHZlcmlmaWVyLmV4YW1wbGUuY29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG/TgBc0BkmMipiQ/6gkamIn3mmp7hcTrZuyrLTmknP1WRExl1dhdIx9/kAkuuceI3THkxXq7/y+sBzK0ZR7jPqMjMCEwHwYDVR0RBBgwFoIUdmVyaWZpZXIuZXhhbXBsZS5jb20wCgYIKoZIzj0EAwIDSQAwRgIhAOu0RGM6BjVQUepeLBogw+ZD3MQ9vFppbPIGMPjtn/qdAiEAttfdfyXHfzJ2tr+Pczyckzv3NlM43461cvP96sIzOQA="]
 ---
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: issuer
+  name: verifier2
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: issuer
+      app: verifier2
   template:
     metadata:
       labels:
-        app: issuer
+        app: verifier2
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
       containers:
-        - name: issuer
-          image: waltid/issuer-api:__DEFAULT_IMAGE_TAG__
+        - name: verifier2
+          image: waltid/verifier-api2
           imagePullPolicy: Always
           env:
             - name: KLOGGING_CONFIG_PATH
               value: /config/klogging.json
           volumeMounts:
-            - name: issuer-web-config
-              mountPath: "/waltid-issuer-api/config/"
+            - name: verifier2-web-config
+              mountPath: "/waltid-verifier-api2/config/"
               readOnly: true
+            - name: verifier-request-signing
+              mountPath: "/waltid-verifier-api2/request-signing-secret/"
             - name: dev-klogging-config
               mountPath: /config
           ports:
             - containerPort: 3000
               name: http-api
       volumes:
-        - name: issuer-web-config
+        - name: verifier2-web-config
           configMap:
-            name: issuer-web-config
+            name: verifier2-web-config
+        - name: verifier-request-signing
+          secret:
+            secretName: verifier-request-signing
         - name: dev-klogging-config
           configMap:
-            name: issuer-dev-klogging-config
+            name: verifier-dev-klogging-config
 ---
 kind: Service
 apiVersion: v1
 metadata:
-  name: issuer
+  name: verifier2
 spec:
   ports:
     - name: http
@@ -129,28 +137,28 @@ spec:
       targetPort: http-api
       protocol: TCP
   selector:
-    app: issuer
+    app: verifier2
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: issuer
+  name: verifier2
   annotations:
     kubernetes.io/ingress.class: "nginx"
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   tls:
     - hosts:
-        - issuer.portal.test.waltid.cloud
-      secretName: issuer-tls-secret
+        - verifier2.portal.test.waltid.cloud
+      secretName: verifier2-tls-secret
   rules:
-    - host: issuer.portal.test.waltid.cloud
+    - host: verifier2.portal.test.waltid.cloud
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: issuer
+                name: verifier2
                 port:
                   name: http
