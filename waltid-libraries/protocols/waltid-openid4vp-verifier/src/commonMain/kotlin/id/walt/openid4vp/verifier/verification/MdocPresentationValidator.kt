@@ -2,8 +2,10 @@ package id.walt.openid4vp.verifier.verification
 
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.presentations.formats.MsoMdocPresentation
-import id.walt.did.dids.registrar.LocalRegistrar
-import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
+import id.walt.credentials.representations.X5CCertificateString
+import id.walt.credentials.representations.X5CList
+import id.walt.credentials.signatures.CoseCredentialSignature
+import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.mdoc.verification.MdocVerifier
 import id.walt.mdoc.verification.VerificationContext
 import id.walt.openid4vp.verifier.verification.Verifier2PresentationValidator.PresentationValidationResult
@@ -26,19 +28,31 @@ object MdocPresentationValidator {
         requireNotNull(responseUri) { "Response uri is required for mdoc presentation validation" }
 
         val verificationContext = VerificationContext(expectedNonce, expectedAudience, responseUri)
+        log.trace { "Validating Mdoc presentation, with verification context: $verificationContext" }
 
         val verificationResult = MdocVerifier.verify(mdocBase64UrlString, verificationContext)
 
         require(verificationResult.valid) { "Mdoc verification failed: ${verificationResult.errors}" }
 
         val docType = verificationResult.docType
-        val issuerVirtualDid = LocalRegistrar().createByKey(verificationResult.issuerKey.key, DidJwkCreateOptions()).did
+
+        // TODO: can reuse some functionality from Mdoc parser?
+        val signerKey = verificationResult.signerKey?.key ?: throw IllegalArgumentException("Missing signer key")
+        val x5CList = X5CList(
+            (verificationResult.x5c ?: throw IllegalArgumentException("Missing x5c"))
+                .map { X5CCertificateString(it) })
+
+        //val issuerVirtualDid = LocalRegistrar().createByKey(signerKey, DidJwkCreateOptions()).did
 
         val mdocsCredential = MdocsCredential(
             credentialData = verificationResult.credentialData,
             signed = mdocBase64UrlString,
             docType = docType,
-            issuer = issuerVirtualDid
+            issuer = null, //issuerVirtualDid,
+            signature = CoseCredentialSignature(
+                signerKey = DirectSerializedKey(signerKey),
+                x5cList = x5CList
+            )
         )
 
         PresentationValidationResult(

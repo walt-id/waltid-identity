@@ -21,7 +21,7 @@ import org.slf4j.event.Level
 suspend fun main(args: Array<String>) {
     ServiceMain(
         ServiceConfiguration("verifier"), ServiceInitialization(
-            features = Verifier2FeatureCatalog,
+            features = OSSVerifier2FeatureCatalog,
             init = {
                 DidService.apply {
                     registerResolver(LocalResolver())

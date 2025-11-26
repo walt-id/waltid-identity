@@ -2,6 +2,7 @@
 
 package id.walt.cose
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
@@ -28,6 +29,7 @@ val coseCompliantCbor by lazy {
     Cbor(from = Cbor.CoseCompliant) {
         ignoreUnknownKeys = true
         alwaysUseByteString = true
+        // DO NOT SET "encodeDefaults = true"
     }
 }
 
@@ -40,10 +42,17 @@ val coseCompliantCbor by lazy {
 @OptIn(ExperimentalSerializationApi::class)
 internal data class Signature1ToBeSigned(
     val context: String = "Signature1",
+
     @ByteString val protected: ByteArray,
     @ByteString val externalAad: ByteArray,
     @ByteString val payload: ByteArray,
-)
+) {
+    companion object {
+        val SIGNATURE1_CONTEXT = "Signature1"
+    }
+}
+
+private val log = KotlinLogging.logger { }
 
 /**
  * Helper to build the canonical CBOR byte array to be signed or verified.
@@ -55,10 +64,13 @@ internal fun buildSignatureStructure(
     externalAad: ByteArray
 ): ByteArray {
     val tbs = Signature1ToBeSigned(
+        context = "Signature1",
         protected = protectedBytes,
         externalAad = externalAad,
         payload = payload ?: byteArrayOf()
     )
+    log.trace { "Signature1ToBeSigned: $tbs" }
+
     return cborForSigStructure.encodeToByteArray(tbs)
 }
 
@@ -71,7 +83,7 @@ internal fun buildSignatureStructure(
 @CborArray
 @OptIn(ExperimentalSerializationApi::class)
 internal data class Mac0ToBeMaced(
-    val context: String = "MAC0", // [cite: 1047]
+    val context: String, // = "MAC0"
     @ByteString val protected: ByteArray,
     @ByteString val externalAad: ByteArray,
     @ByteString val payload: ByteArray,
@@ -87,6 +99,7 @@ internal fun buildMacStructure(
     externalAad: ByteArray
 ): ByteArray {
     val tbm = Mac0ToBeMaced(
+        context = "MAC0",
         protected = protectedBytes,
         externalAad = externalAad,
         payload = payload ?: byteArrayOf()

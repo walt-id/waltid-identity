@@ -1,6 +1,8 @@
 package id.walt.mdoc.objects.document
 
 import id.walt.cose.CoseSign1
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.objects.elements.IssuerSignedItem
@@ -15,6 +17,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.putJsonObject
+import kotlin.io.encoding.Base64
 
 /**
  * Represents the `IssuerSigned` structure within a `Document`, containing data elements attested to
@@ -80,6 +83,24 @@ data class IssuerSigned private constructor(
 
             }
         }
+    }
+
+    data class ParsedIssuerAuth(
+        val x5c: List<String>,
+        val signerKey: Key,
+    )
+
+    suspend fun getParsedIssuerAuth(): ParsedIssuerAuth {
+        val containedX5c = issuerAuth.unprotected.x5chain
+        requireNotNull(containedX5c) { "Missingg x5c X509 certificate chain in Mdocs credential" }
+
+        val convertedX5c = containedX5c.map { Base64.encode(it.rawBytes) }
+
+        val signerKeyCertificate = containedX5c.firstOrNull() ?: throw IllegalArgumentException("Contained x5c X509 certificate chain in Mdocs credentials is empty (no signer element)")
+        val signerKey = JWKKey.importFromDerCertificate(signerKeyCertificate.rawBytes)
+            .getOrThrow()
+
+        return ParsedIssuerAuth(x5c = convertedX5c, signerKey = signerKey)
     }
 
 

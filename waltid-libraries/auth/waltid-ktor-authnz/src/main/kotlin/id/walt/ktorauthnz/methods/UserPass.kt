@@ -1,12 +1,14 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.commons.web.InvalidCredentialsException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.UsernameIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
-import id.walt.ktorauthnz.methods.data.UserPassStoredData
+import id.walt.ktorauthnz.methods.requests.UserPassCredentials
+import id.walt.ktorauthnz.methods.storeddata.UserPassStoredData
 import id.walt.ktorauthnz.security.PasswordHash
 import id.walt.ktorauthnz.security.PasswordHashing
 import id.walt.ktorauthnz.sessions.AuthSession
@@ -16,10 +18,6 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.Serializable
-
-@Serializable
-data class UserPassCredentials(val username: String, val password: String)
 
 object UserPass : UserPassBasedAuthMethod("userpass") {
 
@@ -33,7 +31,7 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
         val passwordHash = PasswordHash.fromString(storedData.passwordHash ?: error("Missing password hash"))
         val check = PasswordHashing.check(credential.password, passwordHash)
 
-        authCheck(check.valid) { "Invalid password" }
+        authCheck(check.valid , InvalidCredentialsException())
         if (check.updated) {
             val newData = storedData.copy(passwordHash = check.updatedHash!!.toString())
             KtorAuthnzManager.accountStore.updateAccountIdentifierStoredData(identifier, id, newData)
@@ -56,7 +54,8 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
 
             val identifier = auth(session, credential, call)
 
-            call.handleAuthSuccess(session, identifier.resolveToAccountId())
+            val authContext = authContext(call)
+            call.handleAuthSuccess(session, authContext, identifier.resolveToAccountId())
         }
     }
 

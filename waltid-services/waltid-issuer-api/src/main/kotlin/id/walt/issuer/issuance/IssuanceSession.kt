@@ -12,6 +12,11 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 @Serializable
+enum class IssuanceSessionStatus {
+    ACTIVE, SUCCESSFUL, UNSUCCESSFUL, REJECTED_BY_USER, EXPIRED
+}
+
+@Serializable
 data class IssuanceSession(
     override val id: String,
     override val authorizationRequest: AuthorizationRequest?,
@@ -24,4 +29,7 @@ data class IssuanceSession(
     val cNonce: String? = null,
     val callbackUrl: String? = null,
     val customParameters: Map<String, JsonElement>? = null,
+    val status: IssuanceSessionStatus = IssuanceSessionStatus.ACTIVE,
+    val statusReason: String? = null,
+    val isClosed: Boolean = false,
 ) : AuthorizationSession()

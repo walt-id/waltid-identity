@@ -52,9 +52,9 @@ jobs:
           echo "Will use filename $filenameNoExtension for reports"
           echo "dataset_filename=$filenameNoExtension" >> $GITHUB_ENV
       - name: Checkout repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Checkout waltid-identity-postman
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: walt-id/waltid-identity-postman
           ref: main
@@ -83,19 +83,19 @@ jobs:
         continue-on-error: false
       - name: Download issuer-api artifact
         if: ${{ env.use-artifact }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: issuer-api
           path: ${{ runner.temp }}
       - name: Download verifier-api artifact
         if: ${{ env.use-artifact }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: verifier-api
           path: ${{ runner.temp }}
       - name: Download wallet-api artifact
         if: ${{ env.use-artifact }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: wallet-api
           path: ${{ runner.temp }}
@@ -128,7 +128,7 @@ jobs:
           chmod +x ./ping.sh
           ./ping.sh
       - name: Install node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
       - name: Install newman
@@ -149,7 +149,7 @@ jobs:
           --insecure \
           --verbose
       - name: Upload report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-report-${{ env.dataset_filename }}
           path: ./${{ env.dataset_filename }}.html

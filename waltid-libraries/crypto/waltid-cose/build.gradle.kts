@@ -74,6 +74,9 @@ kotlin {
         }
         val commonMain by getting {
             dependencies {
+                // Logging
+                implementation("io.github.oshai:kotlin-logging:7.0.5")
+
                 // JSON
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
@@ -103,7 +106,7 @@ kotlin {
                 implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")
 
                 // Coroutines
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:7.0.5")
@@ -121,7 +124,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
             }

@@ -1,11 +1,13 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.commons.web.RadiusAuthException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.RADIUSIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.config.RADIUSConfiguration
+import id.walt.ktorauthnz.methods.requests.UserPassCredentials
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import io.github.smiley4.ktoropenapi.post
@@ -29,7 +31,7 @@ import java.net.InetSocketAddress
 object RADIUS : UserPassBasedAuthMethod("radius") {
 
     override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
-        val config = session.lookupConfiguration<RADIUSConfiguration>(this)
+        val config = session.lookupFlowMethodConfiguration<RADIUSConfiguration>(this)
 
         val radiusClient: RadiusClient = UdpRadiusClient.newBuilder()
             .secret(config.radiusServerSecret.toByteArray())
@@ -51,7 +53,7 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
         )
 
         val responsePacket: Packet = radiusClient.send(accessRequest)
-        authCheck(responsePacket is AccessAccept) { "RADIUS server did not accept authentication" }
+        authCheck(responsePacket is AccessAccept , RadiusAuthException())
 
         return identifier
     }
@@ -69,7 +71,8 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
             val credential = call.getUsernamePasswordFromRequest()
 
             val identifier = auth(session, credential, call)
-            call.handleAuthSuccess(session, identifier.resolveToAccountId())
+            val authContext = authContext(call)
+            call.handleAuthSuccess(session, authContext, identifier.resolveToAccountId())
         }
     }
 

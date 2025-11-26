@@ -11,6 +11,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 
 @Serializable
@@ -37,21 +38,31 @@ data class WebhookPolicy(
     }
 
     override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
-        val response = http.post(url) {
-            setBody(credential)
-            header(HttpHeaders.ContentType, ContentType.Application.Json)
+        val responseResult = runCatching {
+            http.post(url) {
+                setBody(credential)
+                header(HttpHeaders.ContentType, ContentType.Application.Json)
 
-            if (basicAuthUsername != null && basicAuthPassword != null) {
-                basicAuth(basicAuthUsername, basicAuthPassword)
-            }
+                if (basicAuthUsername != null && basicAuthPassword != null) {
+                    basicAuth(basicAuthUsername, basicAuthPassword)
+                }
 
-            if (bearerAuthToken != null) {
-                bearerAuth(bearerAuthToken)
+                if (bearerAuthToken != null) {
+                    bearerAuth(bearerAuthToken)
+                }
             }
         }
 
-        return if (response.status.isSuccess()) Result.success(response.body<JsonObject>())
-        else Result.failure(WebhookPolicyException(response.body<JsonObject>()))
+        val response = responseResult.getOrElse { ex ->
+            return Result.failure(IllegalArgumentException("Could not contact webhook URL: $url", ex))
+        }
+
+        val responseData = if (response.contentType()?.match(ContentType.Application.Json) == true) {
+            response.body<JsonObject>()
+        } else JsonNull
+
+        return if (response.status.isSuccess()) Result.success(responseData)
+        else Result.failure(WebhookPolicyException(responseData))
 
     }
 }

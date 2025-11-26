@@ -26,7 +26,8 @@ data class VerificationResult(
     val deviceKeyAuthorized: Boolean? = null,
 
     val docType: String,
-    val issuerKey: DirectSerializedKey,
+    val x5c: List<String>?,
+    val signerKey: DirectSerializedKey?,
     val credentialData: JsonObject,
 
     val errors: List<String> = emptyList()

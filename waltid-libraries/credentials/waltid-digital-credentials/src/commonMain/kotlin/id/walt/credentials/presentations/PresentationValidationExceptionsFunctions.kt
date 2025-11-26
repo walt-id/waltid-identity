@@ -14,20 +14,21 @@ object PresentationValidationExceptionFunctions {
         lazyAdditionalMessage: (() -> String)? = null
     ) {
         contract { returns() implies value }
-        if (!value) throw errorFor(error, lazyAdditionalMessage?.invoke(), cause)
+        if (!value) presentationThrowError(error, cause, lazyAdditionalMessage)
     }
 
     internal fun <T> presentationRequireSuccess(
         res: Result<T>,
         error: PresentationValidationErrors,
         lazyAdditionalMessage: (() -> String)? = null
-    ) {
+    ): T {
         presentationRequire(
             value = res.isSuccess,
             error = error,
             cause = res.exceptionOrNull(),
             lazyAdditionalMessage = lazyAdditionalMessage
         )
+        return res.getOrThrow()
     }
 
     @OptIn(ExperimentalContracts::class)
@@ -39,8 +40,15 @@ object PresentationValidationExceptionFunctions {
         contract {
             returns() implies (value != null)
         }
-        if (value == null) throw errorFor(error, lazyAdditionalMessage?.invoke())
+        if (value == null) presentationThrowError(error, lazyAdditionalMessage = lazyAdditionalMessage)
     }
+
+    internal fun presentationThrowError(
+        error: PresentationValidationErrors,
+        cause: Throwable? = null,
+        lazyAdditionalMessage: (() -> String)? = null
+    ): Nothing =
+        throw errorFor(error, lazyAdditionalMessage?.invoke(), cause)
 
     private fun errorFor(error: PresentationValidationErrors, additionalMessage: String? = null, cause: Throwable? = null) =
         PresentationValidationException(

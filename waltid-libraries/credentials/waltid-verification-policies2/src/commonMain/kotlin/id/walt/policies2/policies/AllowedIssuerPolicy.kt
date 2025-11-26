@@ -3,7 +3,6 @@ package id.walt.policies2.policies
 import com.nfeld.jsonpathkt.JsonPath
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.NotAllowedIssuerException
-import id.walt.policies2.PolicyClaimChecker
 import id.walt.w3c.schemes.JwsSignatureScheme
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -11,7 +10,7 @@ import kotlinx.serialization.json.*
 
 @Serializable
 @SerialName("allowed-issuer")
-class AllowedIssuerPolicy(
+data class AllowedIssuerPolicy(
     @SerialName("allowed_issuer")
     val allowedIssuer: JsonElement
 ) : VerificationPolicy2() {
@@ -38,18 +37,25 @@ class AllowedIssuerPolicy(
 
     override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
         return PolicyClaimChecker.checkClaim(credential, claims) { claim ->
-            val issuer = this.getIssuerList().first()
+            val issuer = credential.issuer
             val allowedIssuers = getAllowedIssuers()
 
-            if (issuer in allowedIssuers) {
-                Result.success(
+            when (issuer) {
+                null -> Result.failure( // TODO: clearer exception
+                    NotAllowedIssuerException(
+                        issuer = issuer,
+                        allowedIssuers = allowedIssuers
+                    )
+                )
+
+                in allowedIssuers -> Result.success(
                     AllowedIssuerPolicyClaimCheckResult(
                         issuer = issuer,
                         claim = claim.toString()
                     )
                 )
-            } else {
-                Result.failure(
+
+                else -> Result.failure(
                     NotAllowedIssuerException(
                         issuer = issuer,
                         allowedIssuers = allowedIssuers

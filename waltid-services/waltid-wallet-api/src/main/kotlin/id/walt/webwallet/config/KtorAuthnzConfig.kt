@@ -11,7 +11,7 @@ import org.intellij.lang.annotations.Language
 private const val defaultAuthFlowJson = """
 {
   "method": "email",
-  "ok": true
+  "success": true
 }
 """
 

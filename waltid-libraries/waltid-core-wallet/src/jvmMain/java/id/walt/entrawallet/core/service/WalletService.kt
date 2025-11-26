@@ -3,7 +3,6 @@ package id.walt.entrawallet.core.service
 import id.walt.entrawallet.core.service.exchange.PresentationRequestParameter
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.requests.CredentialOfferRequest
-import id.walt.sdjwt.SDJWTVCTypeMetadata
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -15,7 +14,5 @@ abstract class WalletService(val tenant: String, val accountId: Uuid, val wallet
 
     abstract suspend fun resolvePresentationRequest(request: String): String
     abstract suspend fun resolveCredentialOffer(offerRequest: CredentialOfferRequest): CredentialOffer
-
-    abstract suspend fun resolveVct(vct: String): SDJWTVCTypeMetadata
 
 }

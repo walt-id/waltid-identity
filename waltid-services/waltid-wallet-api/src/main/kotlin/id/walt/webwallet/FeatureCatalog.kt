@@ -1,5 +1,6 @@
 package id.walt.webwallet
 
+import id.walt.commons.config.list.DevModeConfig
 import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature
 import id.walt.commons.featureflag.ServiceFeatureCatalog
@@ -9,20 +10,16 @@ object FeatureCatalog : ServiceFeatureCatalog {
 
     val databaseFeature = BaseFeature("db", "Database manager", DatasourceConfiguration::class)
 
-    val devModeFeature = OptionalFeature("dev-mode", "Development mode", default = false)
+    val devModeFeature = OptionalFeature("dev-mode", "Development mode", DevModeConfig::class, default = false)
 
     val legacyAuthenticationFeature = OptionalFeature("auth", "Legacy authentication system", AuthConfig::class, true)
     val ktorAuthnzAuthenticationFeature =
         OptionalFeature("ktor-authnz", "waltid-ktor-authnz authentication system", KtorAuthnzConfig::class, false)
-    // val loginsMethodFeature = BaseFeature("logins", "Logins method management", LoginMethodsConfig::class)
-
 
     val tenantFeature = OptionalFeature("tenant", "Cloud-based tenant management", TenantConfig::class, false)
     val pushFeature = OptionalFeature("push", "Push notifications", PushConfig::class, false)
 
     val web3 = OptionalFeature("web3", "Web3 account management", default = false)
-
-    val runtimeMockFeature = OptionalFeature("runtime", "Runtime mock provider configuration", RuntimeConfig::class, false)
 
     val oidcAuthenticationFeature = OptionalFeature("oidc", "OIDC login feature", OidcConfiguration::class, false)
     val silentExchange = OptionalFeature(
@@ -33,10 +30,16 @@ object FeatureCatalog : ServiceFeatureCatalog {
         ),
         default = false
     )
-    val rejectionReasonsFeature = OptionalFeature("rejectionreason", "Rejection reasons use case", RejectionReasonConfig::class, false)
+    val rejectionReasonsFeature =
+        OptionalFeature("rejectionreason", "Rejection reasons use case", RejectionReasonConfig::class, false)
 
     val registrationDefaultsFeature =
-        OptionalFeature("registration-defaults", "Registration defaults (key, did) configuration", RegistrationDefaultsConfig::class, true)
+        OptionalFeature(
+            "registration-defaults",
+            "Registration defaults (key, did) configuration",
+            RegistrationDefaultsConfig::class,
+            true
+        )
     val keyGenerationDefaultsFeature = OptionalFeature(
         "key-generation-defaults",
         "Key generation defaults (key backend & generation config) configuration",
@@ -78,13 +81,11 @@ object FeatureCatalog : ServiceFeatureCatalog {
         web3,
         tenantFeature,
         pushFeature,
-        runtimeMockFeature,
         oidcAuthenticationFeature,
         silentExchange,
         rejectionReasonsFeature,
         registrationDefaultsFeature,
         keyGenerationDefaultsFeature,
-        runtimeMockFeature,
         didWebRegistry,
         x5cAuthFeature,
         externalSignatureEndpointsFeature,

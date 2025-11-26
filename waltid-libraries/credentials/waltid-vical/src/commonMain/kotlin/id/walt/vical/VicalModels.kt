@@ -4,10 +4,12 @@ package id.walt.vical
 
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.vical.serializers.VicalInstantSerializer
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
+import kotlinx.serialization.json.JsonObject
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -19,6 +21,7 @@ import kotlin.time.Instant
  */
 @Serializable
 data class VicalData(
+    @EncodeDefault
     @SerialName("version") val version: String = "1.0",
     @SerialName("vicalProvider") val vicalProvider: String,
     @Serializable(with = VicalInstantSerializer::class)
@@ -142,19 +145,32 @@ data class CertificateInfo(
     override fun toString() =
         """
             |--- VICAL Certificate Entry ---
-            |    X509 Certificate: (hex) ${certificate.toHexString()}
+            |    X509 Certificate: (hex) ${JWKKey.convertDerCertificateToPemCertificate(certificate)}
             |    Serial: (hex) ${serialNumber.toHexString()}
-            |    SKI: (hex) ${ski.toHexString()} 
+            |    SKI: (hex) ${ski.toHexString()}
             |    Document type: $docType
             |    Certificate profile: $certificateProfile
             |    Issuing authority: $issuingAuthority
             |    Issuing country: $issuingCountry
             |    State or province name: $stateOrProvinceName
-            |    Issuer DER cert: (hex) ${issuer?.toHexString()}
-            |    Subject DER cert: (hex) ${subject?.toHexString()}
+            |    Issuer DER field: (hex) $issuer
+            |    Subject DER field: (hex) $subject
             |    Not before: $notBefore
             |    Not after: $notAfter
             |--- End of VICAL Certificate Entry ---
             """.trimMargin()
 }
+
+@Serializable
+data class VicalFetchRequest(val vicalUrl: String)
+
+@Serializable
+data class VicalFetchResponse(val vicalBase64: String? = null)
+
+@Serializable
+data class VicalValidationRequest(val verificationKey: JsonObject, val vicalBase64: String)
+
+@Serializable
+data class VicalValidationResponse(val vicalValid: Boolean, val vicalBase64: String? = null)
+
 

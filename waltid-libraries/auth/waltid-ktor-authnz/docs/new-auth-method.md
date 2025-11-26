@@ -186,7 +186,7 @@ fun Route.globalMultistepExample() {
         val flowConfig = """
         {
             "method": "multistep-example",
-            "ok": true
+            "success": true
         }
     """.trimIndent()
         val authFlow = AuthFlow.fromConfig(flowConfig)

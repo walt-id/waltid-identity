@@ -13,12 +13,12 @@ class LocalDidKeyConsistencyTest {
     private val localRegistrar = DidKeyRegistrar()
 
     @Test
-    fun testDidKeyCreateAndResolveConsistency() = runTest{
+    fun testDidKeyCreateAndResolveConsistency() = runTest {
         val keyList: List<JWKKey> = KeyType.entries.map { JWKKey.generate(it) }
         for (key in keyList) {
             val didResult = localRegistrar.registerByKey(key, DidKeyCreateOptions(keyType = key.keyType))
             val resolvedKey = localResolver.resolveToKey(didResult.did).getOrThrow()
-            assertEquals(key.getThumbprint(),resolvedKey.getThumbprint())
+            assertEquals(key.getThumbprint(), resolvedKey.getThumbprint())
         }
     }
 
@@ -29,7 +29,7 @@ class LocalDidKeyConsistencyTest {
             val didResult = localRegistrar.registerByKey(key, DidKeyCreateOptions(keyType = key.keyType, useJwkJcsPub = true))
             localResolver.resolveToKey(didResult.did)
             val resolvedKey = localResolver.resolveToKey(didResult.did).getOrThrow()
-            assertEquals(key.getThumbprint(),resolvedKey.getThumbprint())
+            assertEquals(key.getThumbprint(), resolvedKey.getThumbprint())
         }
     }
 }

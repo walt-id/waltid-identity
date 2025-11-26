@@ -8,6 +8,7 @@ import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.minutes
 
 class OidcIssuanceTest {
@@ -32,6 +33,10 @@ class OidcIssuanceTest {
             ),
             expiresIn = 5.minutes
         )
+
+        // Verify initial session status
+        assertEquals(id.walt.issuer.issuance.IssuanceSessionStatus.ACTIVE, issuanceSession.status)
+        assertEquals(false, issuanceSession.isClosed)
 
         val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
         val offerUri = OpenID4VCI.getCredentialOfferRequestUrl(offerRequest)

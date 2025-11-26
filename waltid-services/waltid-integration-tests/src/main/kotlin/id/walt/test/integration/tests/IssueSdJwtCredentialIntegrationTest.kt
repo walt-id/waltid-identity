@@ -3,9 +3,14 @@
 package id.walt.test.integration.tests
 
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
+import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.issuer.issuance.IssuanceRequest
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.util.JwtUtils
+import id.walt.sdjwt.SDJwtVC
 import id.walt.test.integration.expectLooksLikeJwt
 import id.walt.test.integration.loadJsonResource
 import id.walt.test.integration.toSdMap
@@ -15,10 +20,7 @@ import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.ktor.http.*
 import io.ktor.server.util.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
@@ -85,7 +87,7 @@ class IssueSdJwtCredentialIntegrationTest : AbstractIntegrationTest() {
 
         verifierApi.getSession(verificationId).also {
             assertEquals(
-                PresentationDefinition.Companion.fromJSONString(presentationDefinition),
+                PresentationDefinition.fromJSONString(presentationDefinition),
                 it.presentationDefinition
             )
         }
@@ -140,7 +142,7 @@ class IssueSdJwtCredentialIntegrationTest : AbstractIntegrationTest() {
 
         verifierApi.getSession(verificationId).also {
             assertEquals(
-                PresentationDefinition.Companion.fromJSONString(presentationDefinition),
+                PresentationDefinition.fromJSONString(presentationDefinition),
                 it.presentationDefinition
             )
         }
@@ -179,6 +181,72 @@ class IssueSdJwtCredentialIntegrationTest : AbstractIntegrationTest() {
                 assertNotNull(it, "policyResults should be available after running policies")
                 assertTrue(it.size > 1, "no policies have run")
             }
+        }
+    }
+
+    @Test
+    fun shouldClaimSdJwtVcWithoutDisclosableClaimsWithAllIssuerSigningMethods() = runTest {
+        val idCredentialNoDisclosuresNoMappingRequest = Json.decodeFromJsonElement<IssuanceRequest>(
+            loadJsonResource("issuance/identity-credential-no-disclosures-no-mapping.json")
+        )
+        val idCredentialNoDisclosuresRequest = Json.decodeFromJsonElement<IssuanceRequest>(
+            loadJsonResource("issuance/identity-credential-no-disclosures.json")
+        )
+
+        val issuerDid = loadJsonResource("issuance/mDLDocumentSignerKey.json").run {
+            JWKKey.importJWK(this.toString()).getOrThrow().run {
+                DidKeyRegistrar().registerByKey(this, DidKeyCreateOptions()).did
+            }
+        }
+
+        val issuerDSPem = loadResource("issuance/mDLDocumentSignerCertificate.pem")
+
+        listOf(
+            idCredentialNoDisclosuresNoMappingRequest,
+            idCredentialNoDisclosuresRequest,
+            idCredentialNoDisclosuresNoMappingRequest.copy(
+                issuerDid = issuerDid,
+            ),
+            idCredentialNoDisclosuresRequest.copy(
+                issuerDid = issuerDid,
+            ),
+            idCredentialNoDisclosuresNoMappingRequest.copy(
+                x5Chain = listOf(
+                    issuerDSPem,
+                ),
+            ),
+            idCredentialNoDisclosuresRequest.copy(
+                x5Chain = listOf(
+                    issuerDSPem,
+                ),
+            ),
+        ).forEach { issuanceRequest ->
+
+            val offerUrl = issuerApi.issueSdJwtCredential(issuanceRequest)
+
+            val claimedWalletCredentialList = defaultWalletApi.claimCredential(
+                offerUrl = offerUrl,
+            )
+
+            assertEquals(
+                expected = 1,
+                actual = claimedWalletCredentialList.size,
+            )
+
+            val claimedWalletCredential = claimedWalletCredentialList.first()
+
+            assertEquals(
+                expected = true,
+                actual = claimedWalletCredential.disclosures.isNullOrEmpty(),
+            )
+
+            assertEquals(
+                expected = CredentialFormat.sd_jwt_vc,
+                actual = claimedWalletCredential.format,
+            )
+
+            //implicit guard of successful parsing
+            SDJwtVC.parse(claimedWalletCredential.document)
         }
     }
 }

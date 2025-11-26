@@ -70,7 +70,7 @@ class DcqlMatcherTest {
             """
             {
               "credentials": [
-                { "id": "query1", "format": "jwt_vc_json" }
+                { "id": "query1", "format": "jwt_vc_json", "meta": {} }
               ]
             }
             """.trimIndent()
@@ -89,7 +89,7 @@ class DcqlMatcherTest {
             """
             {
               "credentials": [
-                { "id": "query1", "format": "jwt_vc_json", "multiple": true }
+                { "id": "query1", "format": "jwt_vc_json", "meta": {}, "multiple": true }
               ]
             }
             """.trimIndent()
@@ -111,6 +111,7 @@ class DcqlMatcherTest {
                 {
                   "id": "id_card_query",
                   "format": "jwt_vc_json",
+                  "meta": {},
                   "claims": [
                     { "path": ["credentialSubject", "given_name"] },
                     { "path": ["credentialSubject", "family_name"], "values": ["Smith"] }
@@ -136,6 +137,7 @@ class DcqlMatcherTest {
                 {
                   "id": "id_card_query",
                   "format": "jwt_vc_json",
+                  "meta": {},
                   "claims": [
                      { "path": ["credentialSubject", "family_name"], "values": ["Jones"] }
                   ]
@@ -161,6 +163,7 @@ class DcqlMatcherTest {
                 {
                   "id": "addr_query",
                   "format": "jwt_vc_json",
+                  "meta": {},
                   "claims": [
                     { "id": "gn", "path": ["credentialSubject", "given_name"] },
                     { "id": "sn", "path": ["credentialSubject", "family_name"] },
@@ -191,8 +194,8 @@ class DcqlMatcherTest {
             """
             {
               "credentials": [
-                { "id": "q_jwt", "format": "jwt_vc_json" },
-                { "id": "q_mdoc", "format": "mso_mdoc" }
+                { "id": "q_jwt", "format": "jwt_vc_json", "meta": {} },
+                { "id": "q_mdoc", "format": "mso_mdoc", "meta": {} }
               ],
               "credential_sets": [
                 {
@@ -222,8 +225,8 @@ class DcqlMatcherTest {
             """
             {
               "credentials": [
-                { "id": "q_jwt", "format": "jwt_vc_json" },
-                { "id": "q_mdoc", "format": "mso_mdoc" }
+                { "id": "q_jwt", "format": "jwt_vc_json", "meta": {} },
+                { "id": "q_mdoc", "format": "mso_mdoc", "meta": {} }
               ],
               "credential_sets": [
                 {
@@ -253,8 +256,8 @@ class DcqlMatcherTest {
             """
             {
               "credentials": [
-                { "id": "q_jwt", "format": "jwt_vc_json" },
-                { "id": "q_nonexistent", "format": "ac_vp" }
+                { "id": "q_jwt", "format": "jwt_vc_json", "meta": {} },
+                { "id": "q_nonexistent", "format": "ac_vp", "meta": {} }
               ]
             }
             """.trimIndent()

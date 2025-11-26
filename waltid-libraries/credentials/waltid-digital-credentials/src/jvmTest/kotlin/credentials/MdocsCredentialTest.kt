@@ -1,7 +1,0 @@
-package credentials
-
-class MdocsCredentialTest {
-
-
-
-}

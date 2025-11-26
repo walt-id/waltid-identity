@@ -385,6 +385,7 @@ object WalletPresentFunctionality2 {
      * Creates a Key Binding JWT for SD-JWT presentations.
      */
     internal suspend fun createKeyBindingJwt(
+        disclosed: String,
         nonce: String,
         audience: String,
         selectedDisclosures: List<SdJwtSelectiveDisclosure>,
@@ -401,9 +402,9 @@ object WalletPresentFunctionality2 {
         // Simpler approach (hashing concatenated presented disclosures):
         // This binds the KB-JWT to the exact set and order of presented disclosures.
         val stringToHash = if (selectedDisclosures.isNotEmpty()) {
-            selectedDisclosures.joinToString(separator = "~") { it.asEncoded() }
+            "$disclosed~" //selectedDisclosures.joinToString(separator = "~") { it.asEncoded() }
         } else {
-            "" // If there are no disclosures, what should sd_hash be?
+            disclosed // If there are no disclosures, what should sd_hash be?
             // Typically, a KB-JWT implies there are disclosures.
             // If it's possible to have a KB-JWT without disclosures (e.g. just binding to the core SD-JWT),
             // then the sd_hash might be calculated differently or be absent.
@@ -411,6 +412,8 @@ object WalletPresentFunctionality2 {
             // If selectedDisclosures can be empty, define how sd_hash is computed then?
             // Often, an empty string is hashed, or the field is omitted if allowed by profile.
         }
+
+        log.trace { "Wallet presentation: Calculating hash for SD-JWT kb from: $stringToHash" }
         val sdHash = calculateSha256Base64Url(stringToHash)
 
         val jwsHeaders = buildJsonObject {
