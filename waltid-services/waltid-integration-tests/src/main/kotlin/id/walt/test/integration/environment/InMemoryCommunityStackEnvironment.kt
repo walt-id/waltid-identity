@@ -6,6 +6,7 @@ import id.walt.commons.ServiceConfiguration
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.testing.E2ETest
 import id.walt.commons.web.plugins.httpJson
+import id.walt.did.dids.DidService
 import id.walt.issuer.issuerModule
 import id.walt.test.integration.environment.api.issuer.IssuerApi
 import id.walt.test.integration.environment.api.verifier.VerifierApi
@@ -55,7 +56,7 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
     constructor(
         host: String = "localhost",
         port: Int = 22323,
-    ) : this(E2ETest(host, port, true))
+    ) : this(E2ETest(host, port, true, loglevelOption = "config-file"))
 
     val defaultEmailAccount = EmailAccountRequest(
         name = "Max Mustermann",
@@ -73,6 +74,7 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
         scope.launch {
             e2e.testBlock(
                 config = ServiceConfiguration("e2e-test"),
+                logConfig = "config-file",
                 features = listOf(
                     id.walt.issuer.FeatureCatalog,
                     id.walt.verifier.FeatureCatalog,
@@ -84,13 +86,13 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
                 ),
                 init = {
                     id.walt.webwallet.webWalletSetup()
-                    id.walt.did.helpers.WaltidServices.minimalInit()
+                    DidService.minimalInit()
                     id.walt.webwallet.db.Db.start()
                 },
                 module = e2eTestModule,
                 timeout = defaultTestTimeout,
                 block = {
-                    logger.info { "================= Startup complete =============================" }
+                    logger.error { "================= Startup complete =============================" }
                     startupCompleted.complete(Unit)
                     logger.error("Wait for Shutting down InMemoryCommunityStackEnvironment")
                     shutdownInitialized.await()

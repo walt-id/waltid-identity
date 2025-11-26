@@ -2,6 +2,7 @@
 
 package id.walt.ktorauthnz.tokens.jwttoken
 
+import id.walt.commons.web.ExpiredTokenException
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.ktorauthnz.exceptions.authCheck
@@ -34,7 +35,9 @@ class JwtTokenHandler : TokenHandler {
         jwtPayload["exp"]?.jsonPrimitive?.long?.let { exp ->
             val expirationDate = Instant.fromEpochSeconds(exp)
             val now = Clock.System.now()
-            authCheck(now < expirationDate) { "JWT Login Token expired since: ${now - expirationDate}" }
+            authCheck(now < expirationDate ,
+                ExpiredTokenException("JWT Login Token expired since: ${now - expirationDate}")
+            )
         }
     }
 

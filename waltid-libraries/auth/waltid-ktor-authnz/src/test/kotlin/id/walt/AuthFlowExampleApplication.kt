@@ -24,7 +24,7 @@ fun loggingSetup() {
         sink("stderr", RENDER_ANSI, STDERR)
 
         logging {
-            fromLoggerBase("io.ktor.routing.Routing", stopOnMatch = true)
+            fromLoggerBase("io.ktor", stopOnMatch = true)
             fromMinLevel(Level.DEBUG) {
                 toSink("stdout")
             }
@@ -49,7 +49,9 @@ fun loggingSetup() {
 
 fun startExample(wait: Boolean = true, jwt: Boolean): EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration> {
     loggingSetup()
-    return embeddedServer(CIO, port = 8088, host = "0.0.0.0", module = { this.module(jwt) })
+    return embeddedServer(CIO, port = 8088, host = "0.0.0.0", module = {
+        this.module(jwt)
+    })
         .start(wait = wait)
 }
 

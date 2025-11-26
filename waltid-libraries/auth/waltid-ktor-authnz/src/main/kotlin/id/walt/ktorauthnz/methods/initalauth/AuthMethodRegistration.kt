@@ -2,7 +2,7 @@ package id.walt.ktorauthnz.methods.initalauth
 
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
-import id.walt.ktorauthnz.methods.data.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 

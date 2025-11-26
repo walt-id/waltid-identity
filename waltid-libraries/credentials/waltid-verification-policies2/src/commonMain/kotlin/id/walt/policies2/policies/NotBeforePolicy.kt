@@ -5,7 +5,6 @@ package id.walt.policies2.policies
 import com.nfeld.jsonpathkt.JsonPath
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.NotBeforePolicyException
-import id.walt.policies2.PolicyClaimChecker
 import id.walt.w3c.Claims
 import id.walt.w3c.JwtClaims
 import id.walt.w3c.VcClaims

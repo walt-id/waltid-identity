@@ -13,7 +13,7 @@ jobs:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@a4a92e12ee9b7396ee9a22083ff21b3277c627d6
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@6bad7de2c6de9bc3faa68333de8b00be02613f4d
 
       - name: Build iOS Simulator Framework (ARM64)
         uses: walt-id/waltid-identity/.github/actions/gradle-ios@d3aa55fb102dadb48032778d6e1df9a8f9155261

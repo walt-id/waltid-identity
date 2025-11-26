@@ -1,5 +1,7 @@
 package id.walt.commons
 
+import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.list.DevModeConfig
 import id.walt.commons.config.statics.BuildConfig
 import id.walt.commons.config.statics.ServiceConfig
 import id.walt.commons.config.statics.ServiceConfig.serviceString
@@ -7,6 +9,8 @@ import id.walt.commons.featureflag.AbstractFeature
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.featureflag.ServiceFeatureCatalog
+import id.walt.did.dids.resolver.local.DidWebResolver
+import io.klogging.Klogger
 import io.klogging.logger
 import kotlinx.coroutines.delay
 import kotlin.io.path.Path
@@ -25,6 +29,7 @@ data class ServiceInitialization(
     val featureAmendments: Map<AbstractFeature, suspend () -> Unit> = emptyMap(),
     val init: suspend () -> Unit,
     val run: suspend () -> Unit,
+    val pre: (suspend () -> Unit)? = null
 ) {
     constructor(
         features: ServiceFeatureCatalog,
@@ -37,7 +42,11 @@ data class ServiceInitialization(
 object ServiceCommons {
 
     private fun debugLineString(): String =
-        "Running on ${p("os.arch")} ${p("os.name")} ${p("os.version")} with ${p("java.vm.name")} ${p("java.vm.version")} in path ${Path(".").absolutePathString()}"
+        "Running on ${p("os.arch")} ${p("os.name")} ${p("os.version")} with ${p("java.vm.name")} ${p("java.vm.version")} in path ${
+            Path(
+                "."
+            ).absolutePathString()
+        }"
 
     private suspend fun initFeatures(init: ServiceInitialization) {
         val log = logger("Feature-Init")
@@ -57,14 +66,38 @@ object ServiceCommons {
         }
     }
 
+    private suspend fun preloadService(init: ServiceInitialization) {
+        if (init.pre != null) {
+            val log = logger("Service-Preload")
+            log.info { "Preloading $serviceString..." }
+
+            measureTime {
+                init.pre.invoke()
+            }.also {
+                log.info { "Service preloading completed ($it)." }
+            }
+        }
+    }
+
     private suspend fun initService(init: ServiceInitialization) {
         val log = logger("Service-Init")
 
         log.info { "Initializing $serviceString..." }
         measureTime {
             init.init.invoke()
+            initDevMode(log)
         }.also {
             log.info { "Service initialization completed ($it)." }
+        }
+    }
+
+    suspend fun initDevMode(log: Klogger) {
+        if (FeatureManager.isFeatureEnabled("dev-mode")) {
+            runCatching {
+                DidWebResolver.enableHttps(ConfigManager.getConfig<DevModeConfig>().enableDidWebResolverHttps)
+            }.onFailure {
+                log.warn { "Feature `dev-mode` is enabled, but the configuration file: `dev-mode.conf` could not be loaded." }
+            }
         }
     }
 
@@ -91,6 +124,7 @@ object ServiceCommons {
         log.debug { debugLineString() }
 
         measureTime {
+            preloadService(init)
             initFeatures(init)
             initService(init)
             runService(init)
@@ -101,5 +135,4 @@ object ServiceCommons {
         delay(50)
         log.info { "Service $serviceString done." }
     }
-
 }

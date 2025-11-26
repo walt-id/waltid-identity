@@ -1,13 +1,14 @@
 <div align="center">
  <h1>Identity by walt.id</h1>
- <p>Multi-Platform libraries, powerful APIs and easy-to-use white label apps to build identity and wallet solutions.</p>
+ <span>by </span><a href="https://walt.id">walt.id</a>
+  <p>Multi-Platform libraries, powerful APIs and easy-to-use white label apps to build identity and wallet solutions.</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
 </a>
-<a href="https://twitter.com/intent/follow?screen_name=walt_id">
-<img src="https://img.shields.io/twitter/follow/walt_id.svg?label=Follow%20@walt_id" alt="Follow @walt_id" />
-<img alt="GitHub commits since latest release" src="https://img.shields.io/github/commits-since/walt-id/waltid-identity/latest"></a>
+<a href="https://www.linkedin.com/company/walt-id/">
+<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
+</a>
 </div>
 
 ## Getting Started
@@ -95,10 +96,11 @@ solutions. Learn more [here](https://walt.id/blog/p/community-stack).
 
 ## Join the community
 
-* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [X](https://x.com/walt_id)
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
 * Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+
 
 ## License
 
-**Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-ssikit/blob/master/LICENSE).**
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 

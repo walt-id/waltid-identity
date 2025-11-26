@@ -12,7 +12,6 @@ import id.walt.entrawallet.core.service.exchange.UsePresentationResponse
 import id.walt.entrawallet.core.utils.WalletCredential
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.sdjwt.SDJWTVCTypeMetadata
 import id.walt.webwallet.usecase.exchange.FilterData
 import io.ktor.http.*
 import io.ktor.util.*
@@ -132,16 +131,5 @@ object CoreWallet {
         val parsedOffer = wallet.resolveCredentialOffer(id.walt.oid4vc.requests.CredentialOfferRequest.fromHttpParameters(reqParams))
         return parsedOffer
     }
-
-    /**
-     * Receive an verifiable credential type (VCT) URL and return resolved vct object as described in IETF SD-JWT VC
-     * @param vct The value of the vct in URL format, e.g. https://example.com/mycustomvct
-     * @return Resolved VCT
-     */
-    suspend fun resolveVctUrl(vct: String): SDJWTVCTypeMetadata {
-        val wallet = getWalletService()
-        return wallet.resolveVct(vct)
-    }
-
 
 }

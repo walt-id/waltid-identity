@@ -1,0 +1,57 @@
+{
+  "sinks": {
+    "stdout": {
+      "renderWith": "RENDER_SIMPLE",
+      "sendTo": "STDOUT"
+    },
+    "stderr": {
+      "renderWith": "RENDER_SIMPLE",
+      "sendTo": "STDERR"
+    }
+  },
+  "logging": [
+    {
+      "comment": "Default loglevel for all loggers except Request/Response logger: INFO",
+      "matchLogger": "^(?!(io\\.ktor\\.client|WebLog)).*$",
+      "levelRanges": [
+        {
+          "fromMinLevel": "ERROR",
+          "toSinks": [
+            "stderr"
+          ]
+        },
+        {
+          "fromMinLevel": "INFO",
+          "toMaxLevel": "WARN",
+          "toSinks": [
+            "stdout"
+          ]
+        }
+      ]
+    },
+    {
+      "comment": "Loglevel for service request monitoring - set it to INFO if you want enable it",
+      "exactLogger": "WebLog",
+      "levelRanges": [
+        {
+          "fromMinLevel": "WARN",
+          "toSinks": [
+            "stdout"
+          ]
+        }
+      ]
+    },
+    {
+      "comment": "Loglevel for http client requests - set it to INFO if you want enable it",
+      "fromLoggerBase": "io.ktor.client",
+      "levelRanges": [
+        {
+          "fromMinLevel": "WARN",
+          "toSinks": [
+            "stdout"
+          ]
+        }
+      ]
+    }
+  ]
+}

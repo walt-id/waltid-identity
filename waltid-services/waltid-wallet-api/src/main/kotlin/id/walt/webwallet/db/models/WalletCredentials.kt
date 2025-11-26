@@ -63,16 +63,22 @@ data class WalletCredential @OptIn(ExperimentalUuidApi::class) constructor(
         fun parseDocument(document: String, id: String, format: CredentialFormat) =
             runCatching {
                 when (format) {
-                    CredentialFormat.ldp_vc -> Json.parseToJsonElement(document).jsonObject
-                    CredentialFormat.jwt_vc, CredentialFormat.sd_jwt_vc, CredentialFormat.jwt_vc_json,
-                    CredentialFormat.jwt_vc_json_ld -> document.decodeJws().payload
-                        .run { jsonObject["vc"]?.jsonObject ?: jsonObject }
+                    CredentialFormat.ldp_vc ->
+                        Json.parseToJsonElement(document).jsonObject
 
-                    CredentialFormat.mso_mdoc -> MDoc.fromCBORHex(document).toMapElement().toJsonElement().jsonObject
-                    else -> throw IllegalArgumentException("Unknown credential format")
-                }?.toMutableMap().also {
-                    it?.putIfAbsent("id", JsonPrimitive(id))
-                }?.let {
+                    CredentialFormat.jwt_vc,
+                    CredentialFormat.sd_jwt_dc,
+                    CredentialFormat.sd_jwt_vc,
+                    CredentialFormat.jwt_vc_json,
+                    CredentialFormat.jwt_vc_json_ld ->
+                        document.decodeJws().payload.run { jsonObject["vc"]?.jsonObject ?: jsonObject }
+
+                    CredentialFormat.mso_mdoc ->
+                        MDoc.fromCBORHex(document).toMapElement().toJsonElement().jsonObject
+                    else -> throw IllegalArgumentException("Unknown credential format: " + format.value)
+                }.toMutableMap().also {
+                    it.putIfAbsent("id", JsonPrimitive(id))
+                }.let {
                     JsonObject(it)
                 }
             }.onFailure { it.printStackTrace() }

@@ -1,27 +1,44 @@
 package id.walt.policies.policies
 
 import id.walt.policies.CredentialWrapperValidatorPolicy
+import id.walt.policies.policies.status.StatusPolicyImplementation.verifyWithAttributes
+import id.walt.policies.policies.status.content.JsonElementParser
+import id.walt.policies.policies.status.model.StatusPolicyArgument
 import id.walt.w3c.utils.VCFormat
-import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.serializer
+import love.forte.plugin.suspendtrans.annotation.JsPromise
+import love.forte.plugin.suspendtrans.annotation.JvmAsync
+import love.forte.plugin.suspendtrans.annotation.JvmBlocking
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
+
 
 @Serializable
-abstract class StatusPolicyMp : CredentialWrapperValidatorPolicy(
-) {
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+class StatusPolicy : CredentialWrapperValidatorPolicy() {
 
     override val name = "credential-status"
     override val description = "Verifies Credential Status"
     override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc, VCFormat.sd_jwt_vc)
 
     @Transient
-    protected val logger = KotlinLogging.logger {}
+    @Contextual
+    private val argumentParser = JsonElementParser(serializer<StatusPolicyArgument>())
 
-    abstract override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any>
-}
-
-@Serializable
-expect class StatusPolicy() : StatusPolicyMp {
-    override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any>
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun verify(data: JsonObject, args: Any?, context: Map<String, Any>): Result<Any> {
+        requireNotNull(args) { "args required" }
+        require(args is JsonElement) { "args must be JsonElement" }
+        val arguments = argumentParser.parse(args)
+        return verifyWithAttributes(data, arguments)
+    }
 }

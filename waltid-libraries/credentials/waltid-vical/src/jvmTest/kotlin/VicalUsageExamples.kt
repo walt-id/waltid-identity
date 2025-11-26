@@ -59,7 +59,7 @@ class VicalUsageExamples {
             // 4. SIGN: Create a CoseSigner from the key and sign the VICAL data.
             println("Signing VICAL...")
             val signer = vicalProviderKey.toCoseSigner()
-            val signedVical = Vical.Companion.createAndSign(
+            val signedVical = Vical.createAndSign(
                 vicalData = vicalData,
                 signer = signer,
                 algorithmId = Cose.Algorithm.ES256, // ES256 for secp256r1 = -7
@@ -77,13 +77,13 @@ class VicalUsageExamples {
 
             // 6. DECODE: A client receives the bytes and decodes them into a Vical object.
             println("Decoding VICAL...")
-            val receivedVical = Vical.Companion.decode(vicalBytes)
+            val receivedVical = Vical.decode(vicalBytes)
             println("Step 5: Client decoded the VICAL.")
             println(" - Provider: ${receivedVical.vicalData.vicalProvider}")
             println(" - Certificates found: ${receivedVical.vicalData.certificateInfos.size}")
 
             // 7. VERIFY: The client verifies the signature.
-            //   a. Extract the certificate from `receivedVical.coseSign1.unprotected.x5chain`.
+            //   a. Extract the certificate from `receivedVical.getCertificateChain()`.
             //   b. Validate the certificate chain against a trusted root.
             //   c. Call `getPublicKeyFromCertificate(certificateBytes)` to get the public key.
             // For this self-contained example, we already have the public key, so we use it directly.

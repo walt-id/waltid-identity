@@ -21,6 +21,20 @@ object SdJwtUtils {
         return results.toMap() // Return an immutable map
     }
 
+    /**
+     * Fix the following error for MongoDB before version 5 (2021) or DocumentDB:
+     *
+     * ```
+     * Write operation error on server mongodb-database.svc.cluster.local:27017.
+     * Write error: WriteError{
+     *    code=52,
+     *    message='The dollar ($) prefixed field '$._sd' in 'session.presentedCredentials.pid.0.disclosables.$._sd' is not valid for storage.'
+     *  }
+     * ```
+     */
+    fun Map<String, Set<String>>.dropDollarPrefix() =
+        mapKeys { it.key.removePrefix("$.") }
+
     // Recursive helper function
     private fun findSdArraysRecursive(
         element: JsonElement,
@@ -93,7 +107,8 @@ object SdJwtUtils {
                     SdJwtSelectiveDisclosure(
                         salt = jsonArray[0].jsonPrimitive.content,
                         name = jsonArray[1].jsonPrimitive.content,
-                        value = jsonArray[2]
+                        value = jsonArray[2],
+                        encoded = jsonArrayString
                     )
                 } else null
             }

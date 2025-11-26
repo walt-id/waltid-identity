@@ -14,7 +14,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 object W3CPresenter {
 
-    private val log = KotlinLogging.logger {  }
+    private val log = KotlinLogging.logger { }
 
     suspend fun presentW3C(
         digitalCredential: DigitalCredential,
@@ -37,8 +37,11 @@ object W3CPresenter {
                 } ?: emptyList()
             log.debug { "Handling W3C JWT VC (${digitalCredential} with claims $disclosuresToPresent) with SD mechanism" }
 
+            val disclosed = digitalCredential.disclose(digitalCredential, disclosuresToPresent)
+
             // Construct the Key Binding JWT for SD-JWT mechanism
             val kbJwtString = createKeyBindingJwt(
+                disclosed = disclosed,
                 nonce = authorizationRequest.nonce!!,
                 audience = authorizationRequest.clientId,
                 selectedDisclosures = disclosuresToPresent, // Pass the actual disclosures for sd_hash
@@ -46,7 +49,7 @@ object W3CPresenter {
             )
             // Use the disclose method, appending the KB-JWT
             val sdPresentationString =
-                digitalCredential.disclose(digitalCredential, disclosuresToPresent) + "~" + kbJwtString
+                disclosed + "~" + kbJwtString
 
             return JsonPrimitive(sdPresentationString)
         } else {

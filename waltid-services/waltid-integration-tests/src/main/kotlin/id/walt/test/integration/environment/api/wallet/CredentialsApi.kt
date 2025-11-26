@@ -36,7 +36,7 @@ class CredentialsApi(private val e2e: E2ETest, private val client: HttpClient) {
 
     suspend fun listCredentialsRaw(
         wallet: Uuid,
-        filter: CredentialFilterObject = CredentialFilterObject.Companion.default
+        filter: CredentialFilterObject = CredentialFilterObject.default
     ) = client.get("/wallet-api/wallet/$wallet/credentials") {
         url {
             filter.toMap().onEach {
@@ -55,7 +55,7 @@ class CredentialsApi(private val e2e: E2ETest, private val client: HttpClient) {
 
     suspend fun listCredentials(
         wallet: Uuid,
-        filter: CredentialFilterObject = CredentialFilterObject.Companion.default
+        filter: CredentialFilterObject = CredentialFilterObject.default
     ) = listCredentialsRaw(wallet, filter).let { response ->
         response.expectSuccess()
         response.body<List<WalletCredential>>()
@@ -91,7 +91,7 @@ class CredentialsApi(private val e2e: E2ETest, private val client: HttpClient) {
             setBody(categories.toList())
         }
 
-    suspend fun attachCategoriesToCredential(walletId: Uuid, credentialId: String, vararg categories: String): Unit {
+    suspend fun attachCategoriesToCredential(walletId: Uuid, credentialId: String, vararg categories: String) {
         attachCategoriesToCredentialRaw(walletId, credentialId, *categories).expectSuccess()
     }
 
@@ -143,5 +143,5 @@ class CredentialsApi(private val e2e: E2ETest, private val client: HttpClient) {
             TODO("Not implemented")
         }
 
-    private fun CredentialFilterObject.toMap() = Json.Default.encodeToJsonElement(this).jsonObject.toMap()
+    private fun CredentialFilterObject.toMap() = Json.encodeToJsonElement(this).jsonObject.toMap()
 }

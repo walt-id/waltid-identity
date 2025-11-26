@@ -220,7 +220,7 @@ private fun createX5CAccountRequest(key: JWKKey, cert: X509Certificate): X5CAcco
     X5CAccountRequest(
         null,
         key.signJws(
-            Json.Default.encodeToJsonElement(
+            Json.encodeToJsonElement(
                 emptyMap<String, String>()
             ).toString().toByteArray(),
             headers = mapOf(
