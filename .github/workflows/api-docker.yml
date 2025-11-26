@@ -16,6 +16,11 @@ on:
         required: false
         type: boolean
         default: false
+      push_latest:
+        description: "If true, also push the :latest tag"
+        required: false
+        type: boolean
+        default: false
       artifact:
         description: "Upload docker artifact (defaults to false)"
         required: false
@@ -47,12 +52,14 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
       - name: Publish Docker images (${{ matrix.image }})
         if: ${{ inputs.publish }}
-        run: ./gradlew ${{ matrix.commandPath }}:publishImage
+        run: |
+          docker push waltid/${{ matrix.image }}:${{ inputs.version }}
+          if [ "${{ inputs.push_latest }}" = "true" ]; then
+            docker push waltid/${{ matrix.image }}:latest
+          fi
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 
       - name: Save Docker Image to ${{ matrix.image }}.tar.gz
         if: ${{ inputs.artifact }}
