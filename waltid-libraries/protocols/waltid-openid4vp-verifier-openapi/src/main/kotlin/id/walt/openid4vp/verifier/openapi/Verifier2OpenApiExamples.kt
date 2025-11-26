@@ -20,7 +20,8 @@ import kotlinx.serialization.json.Json
 object Verifier2OpenApiExamples {
 
     val basicExample = VerificationSessionSetup(
-        null, DcqlQuery(
+        preset = null,
+        dcqlQuery = DcqlQuery(
             credentials = listOf(
                 CredentialQuery(
                     id = "pid", format = CredentialFormat.DC_SD_JWT, meta = SdJwtVcMeta(

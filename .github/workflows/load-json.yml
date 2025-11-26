@@ -18,7 +18,7 @@ jobs:
     outputs:
       result: ${{ steps.load-json.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - id: load-json
         run: |
           echo "matrix=$(jq -c . < ${{ inputs.jsonpath }})" >> $GITHUB_OUTPUT
