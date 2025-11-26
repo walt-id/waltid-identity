@@ -19,7 +19,7 @@ jobs:
     outputs:
       result: ${{ steps.tag.outputs.tag }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Create and push the git tag
         id: tag
         run: |

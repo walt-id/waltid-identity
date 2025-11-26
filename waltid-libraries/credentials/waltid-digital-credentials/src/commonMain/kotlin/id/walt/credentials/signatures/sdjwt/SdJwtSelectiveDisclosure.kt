@@ -39,10 +39,12 @@ data class SdJwtSelectiveDisclosure(
     fun asEncoded2() = makeEncoded2(salt, name, value)
     fun asHashed() = SHA256().digest(asEncoded().encodeToByteArray()).encodeToBase64Url()
     fun asHashed2() = SHA256().digest(asEncoded2().encodeToByteArray()).encodeToBase64Url()
+    fun asHashed3() = SHA256().digest(encoded.encodeToByteArray().encodeToBase64Url().encodeToByteArray()).encodeToBase64Url()
 
-    constructor(jsonArray: JsonArray) : this(
+    constructor(jsonArray: JsonArray, encoded: String) : this(
         salt = jsonArray[0].jsonPrimitive.content,
         name = jsonArray[1].jsonPrimitive.content,
-        value = jsonArray[2]
+        value = jsonArray[2],
+        encoded = encoded
     )
 }

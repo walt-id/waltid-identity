@@ -17,34 +17,36 @@ import kotlin.test.assertEquals
 
 class TestPlanRunner(
     val config: TestPlanConfiguration,
-    val http: HttpClient
+    http: HttpClient,
+
+    val conformanceHost: String,
+    val conformancePort: Int
 ) {
     companion object {
-
-        val baseUrlBuilderSetup: URLBuilder.() -> Unit = {
+        val baseUrlBuilderSetup: URLBuilder.(host: String, port: Int) -> Unit = { cHost, cPort ->
             protocol = URLProtocol.HTTPS
-            host = "localhost.emobix.co.uk"
-            port = 8443
-        }
-
-        private val conformanceHttp = HttpClient(OkHttp) {
-            followRedirects = false
-
-            defaultRequest {
-                url {
-                    baseUrlBuilderSetup()
-                }
-            }
-            install(ContentNegotiation) {
-                json()
-            }
-            install(Logging) {
-                level = LogLevel.ALL
-            }
+            host = cHost
+            port = cPort
         }
     }
 
-    val conformance = ConformanceInterface()
+    private val conformanceHttp = HttpClient(OkHttp) {
+        followRedirects = false
+
+        defaultRequest {
+            url {
+                baseUrlBuilderSetup(conformanceHost, conformancePort)
+            }
+        }
+        install(ContentNegotiation) {
+            json()
+        }
+        install(Logging) {
+            level = LogLevel.ALL
+        }
+    }
+
+    val conformance = ConformanceInterface(conformanceHost, conformancePort)
     val verifier2 = Verifier2Interface(http)
 
     suspend fun test(): TestPlanResult {
@@ -75,11 +77,14 @@ class TestPlanRunner(
         val testId = createTestResponse.id
         println("Created test: $testId")
 
-        println("View test run at: https://localhost.emobix.co.uk:8443/log-detail.html?log=${testId}")
+        println("View test run at: https://$conformanceHost:$conformancePort/log-detail.html?log=${testId}")
+
+        println("Checking if test is already ready for presentation")
+        conformance.waitForTestStatus(testId, shouldBeWaiting = true)
 
         // Initial test run result
         val testRunResult = conformance.getTestRun(testId)
-        val authorizationEndpointToUse = testRunResult.getExposedAuthorizationEndpoint()
+        val authorizationEndpointToUse = testRunResult.getExposedAuthorizationEndpoint().replace("http://", "https://")
 
         println("Use authorization endpoint: $authorizationEndpointToUse")
 
@@ -88,12 +93,6 @@ class TestPlanRunner(
         val verificationSessionResponse = verifier2.createVerificationSession(authorizationEndpointToUse, config.verificationSessionSetup)
         val verificationSessionId = verificationSessionResponse.sessionId
         println("Created Verification Session: $verificationSessionResponse")
-
-
-        println("Checking if test is already ready for presentation")
-
-        conformance.waitForTestStatus(testId, shouldBeWaiting = true)
-
 
         println("-- Conformance & Verifier 2 -- -> Present to Verifier2")
 
@@ -104,6 +103,7 @@ class TestPlanRunner(
         }
 
         // After presentation
+        println("Waiting until Conformance processing is done...")
         conformance.waitForTestStatus(testId, shouldBeWaiting = false)
 
         val testRunInfo = conformance.getTestRunInfo(testId)

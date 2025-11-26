@@ -43,7 +43,7 @@ jobs:
 
       - name: Download artifact
         if: ${{ env.use-artifact }}
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: ${{ inputs.artifact }}
           path: ${{ runner.temp }}
@@ -57,7 +57,7 @@ jobs:
           docker load --input ${{ runner.temp }}/${{ inputs.artifact }}.tar
 
       - name: Check out repository code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Start ngrok tunnel
         run: |

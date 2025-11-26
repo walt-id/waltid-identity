@@ -3,6 +3,7 @@ package id.walt.policies.policies
 import id.walt.crypto.exceptions.VerificationException
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
@@ -34,9 +35,11 @@ class SdJwtVCSignaturePolicy() : JwtVerificationPolicy() {
         return if (DidUtils.isDidUrl(kid)) {
             DidService.resolveToKeys(kid).getOrThrow()
         } else {
-            val x5c = sdJwt.header["x5c"]?.jsonArray?.lastOrNull()
+            val issuerEncodedCert = sdJwt.header["x5c"]?.jsonArray?.first()?.jsonPrimitive?.content
                 ?: throw IllegalArgumentException("x5c header parameter is missing or empty.")
-            val key = JWKKey.importPEM(x5c.jsonPrimitive.content).getOrThrow().let { JWKKey(it.exportJWK(), kid) }
+            val key = JWKKey.importPEM(
+                pem = JWKKey.wrapAsPem(issuerEncodedCert.decodeFromBase64()),
+            ).getOrThrow().let { JWKKey(it.exportJWK(), kid) }
             setOf(key)
         }
     }

@@ -22,6 +22,8 @@ dependencies {
     // OIDC
     api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
+    api(project(":waltid-libraries:waltid-did"))
+
     // Ktor
     api("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
     api("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
@@ -68,7 +70,7 @@ dependencies {
     // Testing
     testApi(kotlin("test"))
     testApi("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
-    testApi("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+    testApi("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 }
 
 tasks.test {

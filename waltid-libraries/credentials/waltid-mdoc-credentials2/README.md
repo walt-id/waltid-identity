@@ -1,10 +1,23 @@
-# waltid-mdoc-credentials2 Library
+<div align="center">
+ <h1>Kotlin Multiplatform mdoc2 library</h1>
+ <span>by </span><a href="https://walt.id">walt.id</a>
+ <p>Create credentials in <b>mdoc format</b> according to <b>ISO/IEC 18013-5:2021</b> and <b>ISO/IEC 23220-2:2023</b> standards</p>
 
-waltid-mdocs is a Kotlin Multiplatform library for creating, parsing, and verifying mobile
+<a href="https://walt.id/community">
+<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
+</a>
+<a href="https://www.linkedin.com/company/walt-id/">
+<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
+</a>
+</div>
+
+waltid-mdoc-credentials2 is a Kotlin Multiplatform library for creating, parsing, and verifying mobile
 documents (mdocs) that conform to the respective standards (e.g. ISO/IEC 18013, 23220).
 It provides the core cryptographic and data structure logic required to build
 applications, such as digital wallets and verifier services, that are compliant with the mdoc
 standard.
+
+This library is a successor to the [waltid-mdoc-credentials](../waltid-mdoc-credentials) library. It aims to provide a multiplatform library that is easier to use and maintain compared to the original library.
 
 ## Features
 
@@ -146,3 +159,13 @@ if (deviceSignedJson != null) {
     println("Merged Data (device values override issuer values): $mergedData")
 }
 ```
+
+## Join the community
+
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
+* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+
+
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)

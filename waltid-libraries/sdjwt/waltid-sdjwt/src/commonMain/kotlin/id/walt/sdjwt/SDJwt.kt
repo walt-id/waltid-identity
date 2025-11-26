@@ -1,6 +1,6 @@
 package id.walt.sdjwt
 
-import id.walt.sdjwt.SdjwtStringUtils.decodeFromBase64Url
+import id.walt.sdjwt.utils.SdjwtStringUtils.decodeFromBase64Url
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
@@ -76,6 +76,9 @@ open class SDJwt internal constructor(
 
     val type
         get() = header["typ"]?.jsonPrimitive?.contentOrNull
+
+    val x5c
+        get() = header["x5c"]?.jsonArray?.map { it.jsonPrimitive.content }
 
     override fun toString() = toString(isPresentation)
 

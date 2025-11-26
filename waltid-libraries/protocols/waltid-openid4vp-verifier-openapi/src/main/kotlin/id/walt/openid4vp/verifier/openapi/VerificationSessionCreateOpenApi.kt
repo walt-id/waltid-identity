@@ -11,8 +11,13 @@ object VerificationSessionCreateOpenApi {
     val createDocs: RouteConfig.() -> Unit = {
         summary = "Create new verification session"
         request {
+            headerParameter<String>("X-Request-Id")
             body<VerificationSessionSetup> {
                 example("Basic example") { value = Verifier2OpenApiExamples.basicExample }
+                example("Basic example with revoked-status-list policy") { value = Verifier2OpenApiExamples.basicExampleWithRevokedStatusListPolicy }
+                example("Basic example with credential-status policy for single BitstringStatusList") { value = Verifier2OpenApiExamples.basicExampleWithRevokedStatusListPolicy }
+                example("Basic example with credential-status policy for multiple BitstringStatusList") { value = Verifier2OpenApiExamples.basicExampleWithStatusPolicyForMultipleBitstringStatusList }
+                example("Basic example with credential-status policy for TokenStatusList") { value = Verifier2OpenApiExamples.basicExampleWithStatusPolicyForTokenStatusList }
                 example("W3C + path") { value = exampleOf(Verifier2OpenApiExamples.w3cPlusPath) }
                 example("Empty meta") { value = exampleOf(Verifier2OpenApiExamples.emptyMeta) }
                 example("Nested presentation request") {
@@ -24,6 +29,7 @@ object VerificationSessionCreateOpenApi {
                 example("W3C type values") { value = exampleOf(Verifier2OpenApiExamples.w3cTypeValues) }
                 example("W3C without claims") { value = exampleOf(Verifier2OpenApiExamples.W3CWithoutClaims) }
                 example("W3C with claims and values") { value = exampleOf(Verifier2OpenApiExamples.W3CWithClaimsAndValues) }
+                example("VICAL policy (only for ISO mDL/mdoc") { value = exampleOf(Verifier2OpenApiExamples.VicalPolicyValues) }
             }
         }
         response {

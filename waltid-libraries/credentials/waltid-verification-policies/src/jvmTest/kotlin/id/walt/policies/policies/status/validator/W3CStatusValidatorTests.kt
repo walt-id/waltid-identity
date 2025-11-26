@@ -8,8 +8,8 @@ import id.walt.policies.policies.status.model.W3CEntry
 import id.walt.policies.policies.status.model.W3CStatusContent
 import id.walt.policies.policies.status.model.W3CStatusPolicyAttribute
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
-import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -63,7 +63,7 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CStatusPoli
     override fun getBitRepresentationStrategy(): BitRepresentationStrategy = BigEndianRepresentation()
 
     override fun setupBitValueReader(statusSize: Int, scenario: TestScenario, bitValue: List<Char>) {
-        every {
+        coEvery {
             mockBitValueReader.get(any(), index, statusSize, ofType(scenario.expansionAlgorithmType))
         } returns bitValue
     }
@@ -71,7 +71,7 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CStatusPoli
     override fun verifyBitValueReaderInteraction(
         statusSize: Int, expansionAlgorithmType: KClass<out StatusListExpansionAlgorithm>
     ) {
-        verify { mockBitValueReader.get(any(), index, statusSize, ofType(expansionAlgorithmType)) }
+        coVerify { mockBitValueReader.get(any(), index, statusSize, ofType(expansionAlgorithmType)) }
     }
 
     @Nested

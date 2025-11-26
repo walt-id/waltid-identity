@@ -2,6 +2,7 @@ package id.walt.ktorauthnz.methods
 
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.crypto.MACVerifier
+import id.walt.commons.web.JWTVerificationException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.JWTIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
@@ -21,7 +22,7 @@ object JWT : AuthenticationMethod("jwt") {
         val parsedJws = JWSObject.parse(jwt)
         val jwtVerifier = MACVerifier(config.verifyKey)
 
-        authCheck(parsedJws.verify(jwtVerifier)) { "Could not verify JWT!" }
+        authCheck(parsedJws.verify(jwtVerifier) , JWTVerificationException())
 
         val id = parsedJws.payload.toJSONObject()[config.identifyClaim] as String
 
@@ -37,12 +38,13 @@ object JWT : AuthenticationMethod("jwt") {
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
         }) {
             val session = call.getAuthSession(authContext)
-            val config = session.lookupConfiguration<JwtAuthConfiguration>(this@JWT)
+            val config = session.lookupFlowMethodConfiguration<JwtAuthConfiguration>(this@JWT)
 
             val jwt = call.receiveText()
             val id = auth(jwt, config)
 
-            call.handleAuthSuccess(session, id.resolveToAccountId())
+            val authContext = authContext(call)
+            call.handleAuthSuccess(session, authContext, id.resolveToAccountId())
         }
     }
 

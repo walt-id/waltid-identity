@@ -4,7 +4,7 @@ import java.util.Properties
 
 object Versions {
     const val KTOR_VERSION = "3.2.2" // also change 1 plugin
-    const val COROUTINES_VERSION = "1.10.1"
+    const val COROUTINES_VERSION = "1.10.2"
     const val HOPLITE_VERSION = "2.9.0"
 }
 
@@ -98,6 +98,7 @@ dependencies {
     api(project(":waltid-libraries:credentials:waltid-dcql"))
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
     api(project(":waltid-libraries:credentials:waltid-verification-policies2"))
+    api(project(":waltid-libraries:credentials:waltid-vical"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier-openapi"))

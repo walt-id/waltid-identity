@@ -2,12 +2,15 @@
 
 package id.walt.openid4vp.verifier
 
+import id.walt.commons.fetchBinaryFile
+import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
 import id.walt.openid4vp.verifier.Verification2Session.VerificationSessionStatus
 import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
 import id.walt.openid4vp.verifier.openapi.VerificationSessionCreateOpenApi
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.vical.*
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -24,8 +27,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
 import kotlin.uuid.ExperimentalUuidApi
 
+
 private val log = logger("Verifier2Service")
 private const val VERIFICATION_SESSION = "verification-session"
+private const val VICAL = "vical"
+
 
 object Verifier2Service {
 
@@ -59,7 +65,7 @@ object Verifier2Service {
         updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit
     ) -> Unit = { session, event, updateSession ->
         updateSession(session, event) {
-            this.status = VerificationSessionStatus.FAILED
+            this.status = VerificationSessionStatus.UNSUCCESSFUL
         }
     }
 
@@ -91,13 +97,15 @@ object Verifier2Service {
 
                     route({
                         summary = "Receive update events via SSE about the verification session"
+                        request { pathParameter<String>(VERIFICATION_SESSION) }
                     }) {
                         sse("$VERIFICATION_SESSION/events", serialize = { typeInfo, it ->
                             val serializer = Json.serializersModule.serializer(typeInfo.kotlinType!!)
                             Json.encodeToString(serializer, it)
                         }) {
                             val verifierSession =
-                                sessions[call.parameters.getOrFail("sessionId")] ?: throw IllegalArgumentException("Unknown session id")
+                                sessions[call.parameters.getOrFail("sessionId")]
+                                    ?: throw IllegalArgumentException("Unknown session id")
 
                             // Get the flow for this specific target.
                             val sseFlow = SseNotifier.getSseFlow(verifierSession.id)
@@ -120,7 +128,8 @@ object Verifier2Service {
                         response { HttpStatusCode.OK to { body<AuthorizationRequest>() } }
                     }) {
                     val verificationSession =
-                        sessions[call.parameters.getOrFail(VERIFICATION_SESSION)] ?: throw IllegalArgumentException("Unknown session id")
+                        sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
+                            ?: throw IllegalArgumentException("Unknown session id")
 
                     if (verificationSession.signedAuthorizationRequestJwt != null) {
                         // JAR (Signed)
@@ -166,6 +175,57 @@ object Verifier2Service {
                 }
             }
         }
+        route(VICAL) {
+            route("", {
+                tags("VICAL")
+            }) {
+                post("fetch", {
+                    summary = "Fetches a VICAL from a remote host or from the file system and converts it to Base64"
+                    request {
+                        body<VicalFetchRequest> {
+                            example("Remote VICAL") {
+                                value = VicalFetchRequest(vicalUrl = "https://beta.nationaldts.com.au/api/vical")
+                            }
+                        }
+                    }
+                    response { HttpStatusCode.OK to { body<VicalFetchResponse>() } }
+                }) {
+                    val vicalFetchRequest = call.receive<VicalFetchRequest>()
+                    val vicalCbor = fetchBinaryFile(vicalFetchRequest.vicalUrl)
+                    call.respond(VicalFetchResponse(vicalCbor?.encodeToBase64()))
+                }
+
+                post("validate", {
+                    summary = "Validates a VICAL by the provided verification key"
+                    request {
+                        body<VicalValidationRequest> {
+                            example("Validate provided VICAL") {
+                                value = Json.decodeFromString<VicalValidationRequest>(
+                                    """
+                                        {
+                                           "verificationKey":{
+                                              "type":"jwk",
+                                              "jwk":{
+                                                 "kty":"EC",
+                                                 "crv":"P-256",
+                                                 "x":"5n7yVdsDcdYRBAzb78_-6iAjpXCrIHId6qdJ7wwg1lE",
+                                                 "y":"EFp0x5hbusr51g61xDoL9Y1nlVUqFZGBcSdsuBsjizM"
+                                              }
+                                           },
+                                           "vicalBase64":"hEOhASahGCFZAy ..."
+                                        }
+                                    """.trimIndent()
+                                )
+                            }
+                        }
+                    }
+                    response { HttpStatusCode.OK to { body<VicalValidationResponse>() } }
+                }) {
+                    val vicalValidationRequest = call.receive<VicalValidationRequest>()
+                    log.debug { "Received VICAL validation request: $vicalValidationRequest" }
+                    call.respond(VicalService.validateVical(vicalValidationRequest))
+                }
+            }
+        }
     }
 }
-
