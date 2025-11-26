@@ -58,7 +58,7 @@ jobs:
         with:
           repository: walt-id/waltid-identity-postman
           ref: main
-          token: ${{ secrets.PAT }}
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
           path: "./postman"
       - name: Install Docker using Docker's official script
         run: |
