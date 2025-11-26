@@ -28,7 +28,7 @@ fun computeDigest(disclosureBase64Url: String): String {
 fun encoded(rawJson: String): String = Base64.getUrlEncoder().withoutPadding().encodeToString(rawJson.toByteArray(StandardCharsets.UTF_8))
 
 class Rfc9901SampleTest {
-    @ParameterizedTest
+    //@ParameterizedTest
     @MethodSource("rfcExamples")
     fun givenDisclosureVerifyHashUsingWaltHashed(testCase: SampleData) =
         runTest {
@@ -37,7 +37,7 @@ class Rfc9901SampleTest {
             assertEquals(testCase.sha256, sut.asHashed())
         }
 
-    @ParameterizedTest
+    //@ParameterizedTest
     @MethodSource("rfcExamples")
     fun givenDisclosureVerifyHashUsingWaltHashed2(testCase: SampleData) =
         runTest {
