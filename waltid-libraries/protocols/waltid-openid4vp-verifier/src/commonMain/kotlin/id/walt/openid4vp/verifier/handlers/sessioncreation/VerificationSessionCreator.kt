@@ -1,25 +1,31 @@
-package id.walt.openid4vp.verifier
+package id.walt.openid4vp.verifier.handlers.sessioncreation
 
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.dcql.models.DcqlQuery
-import id.walt.ktornotifications.core.KtorSessionNotifications
-import id.walt.openid4vp.verifier.Verification2Session.*
+import id.walt.openid4vp.verifier.data.VerificationSessionSetup
+import id.walt.openid4vp.verifier.data.CrossDeviceFlowSetup
+import id.walt.openid4vp.verifier.data.DcApiFlowSetup
+import id.walt.openid4vp.verifier.data.SameDeviceFlowSetup
+import id.walt.openid4vp.verifier.data.Verification2Session
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.http.*
+import io.ktor.http.URLBuilder
+import io.ktor.http.Url
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
@@ -29,111 +35,6 @@ import kotlin.uuid.Uuid
 object VerificationSessionCreator {
 
     private val log = KotlinLogging.logger { }
-
-    /**
-     * Defines all properties common to EVERY flow. Defined only ONCE.
-     */
-    @Serializable
-    data class CommonConfig(
-        @SerialName("dcql_query")
-        val dcqlQuery: DcqlQuery,
-
-        val signedRequest: Boolean = false,
-        val encryptedResponse: Boolean = false,
-
-        val notifications: KtorSessionNotifications? = null,
-
-        val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
-
-        val clientMetadata: ClientMetadata? = null,
-        val clientId: String? = null,
-
-        val key: DirectSerializedKey? = null,
-        val x5c: List<String>? = null
-    )
-
-    /**
-     * Defines properties common to URL-based flows. Defined only ONCE.
-     */
-    @Serializable
-    data class UrlConfig(
-        val urlHost: String,
-        val urlPrefix: String? = null
-    )
-
-    /**
-     * The polymorphic base type. Implementations will be composed of the config blocks.
-     */
-    @Serializable
-    @JsonClassDiscriminator("flowType")
-    sealed interface BaseVerificationSessionSetup {
-        // Expose the common config for easy, unified access from any flow type.
-        val common: CommonConfig
-    }
-
-    @Serializable
-    @SerialName("cross_device")
-    data class CrossDeviceFlow(
-        override val common: CommonConfig,
-        val urlConfig: UrlConfig,
-
-        // Properties unique to this flow
-        val redirects: VerificationSessionRedirects? = null // Optional final redirect
-    ) : BaseVerificationSessionSetup
-
-    @Serializable
-    @SerialName("same_device")
-    data class SameDeviceFlow(
-        override val common: CommonConfig,
-        val urlConfig: UrlConfig,
-
-        // Property unique to this flow
-        val redirects: VerificationSessionRedirects // Required for final redirect
-    ) : BaseVerificationSessionSetup
-
-    @Serializable
-    @SerialName("dc_api")
-    data class DcApiFlow(
-        override val common: CommonConfig,
-
-        // Property unique to this flow
-        val expectedOrigins: List<String>
-    ) : BaseVerificationSessionSetup
-
-    @Serializable
-    data class VerificationSessionSetup(
-        val preset: VerificationSessionSetupPreset? = null,
-
-        @SerialName("dcql_query")
-        val dcqlQuery: DcqlQuery,
-
-        val signedRequest: Boolean = false,
-        val encryptedResponse: Boolean = false,
-        val dcApi: Boolean = false,
-        val haip: Boolean = false,
-
-        val notifications: KtorSessionNotifications? = null,
-        val redirects: VerificationSessionRedirects? = null,
-
-        val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
-
-        val clientMetadata: ClientMetadata? = null,
-        val clientId: String? = null,
-        val urlPrefix: String? = null,
-        val urlHost: String? = null,
-        val expectedOrigins: List<String>? = null, // For DC API
-        val key: DirectSerializedKey? = null,
-        val x5c: List<String>? = null
-    ) {
-        @Serializable
-        enum class VerificationSessionSetupPreset {
-            @SerialName("cross_device_flow")
-            CROSS_DEVICE_FLOW,
-
-            @SerialName("same_device_flow")
-            SAME_DEVICE_FLOW,
-        }
-    }
 
     @Serializable
     data class VerificationSessionCreationResponse(
@@ -148,50 +49,40 @@ object VerificationSessionCreator {
 
         clientId: String,
         clientMetadata: ClientMetadata? = null,
+
+        /** Is used to build request URL and response URL */
         urlPrefix: String?,
 
-        /** origin for DC API */
-        urlHost: String = "openid4vp://authorize",
+        /**
+         * Is used to build bootstrap- & authorizationRequestUrl
+         * for DC API: origin
+         * */
+        urlHost: String,
 
+        // Both are required for signed requests:
         key: Key? = null,
         x5c: List<String>? = null,
     ): Verification2Session {
-        setup.dcqlQuery.precheck()
+        val isSignedRequest = setup.core.signedRequest
+        val isEncryptedResponse = setup.core.encryptedResponse
+        val isCrossDevice = setup is CrossDeviceFlowSetup
+        val isDcApi = setup is DcApiFlowSetup
+        val isDcApiHaip = isDcApi && setup.haip
 
-        val isSignedRequest = setup.signedRequest
-        if (isSignedRequest)
-            requireNotNull(key) { "Requested signed request, but did not provide a key (to sign request with)!" }
-
-        val isEncryptedResponse = setup.encryptedResponse
-        if (isEncryptedResponse)
-            requireNotNull(key) { "Requested encrypted response, but did not provide a key (to decrypt response with)!" }
-
-        val isCrossDevice = true // TODO: `setup is CrossDeviceFlow`
-
-        // val isDcApi = false // TODO: `setup is DcApiFlow`
-        val isDcApi = setup.dcApi
-        val useHaip = setup.haip
         var ephemeralKey: JWKKey? = null
-
-        if (useHaip) {
-            require(isDcApi) { "HAIP Profile requires DC API flow." }
-            require(isEncryptedResponse) { "HAIP DC API requires encrypted response to be enabled!" }
-        }
 
         if (isDcApi) {
             require(urlPrefix == null) { "URL prefix is not used for DC API" }
             require(!urlHost.startsWith("openid4vp://authorize")) { "URL Host has to be set to the DC API origin" }
-            if (isSignedRequest) {
-                //requireNotNull(setup.expectedOrigins)
-            }
         }
 
         val effectiveClientMetadata = if (isDcApi && isEncryptedResponse) {
 
             val keyType = KeyType.secp256r1
 
-            if (useHaip) {
-                require(keyType == KeyType.secp256r1) { "HAIP profile requires P-256" }
+            if (isDcApiHaip) {
+                // HAIP mandates P-256 (secp256r1)
+                require(keyType == KeyType.secp256r1) { "HAIP profile requires P-256 keys" }
             }
 
             // Generate P-256 Ephemeral Key
@@ -206,7 +97,14 @@ object VerificationSessionCreator {
             baseMetadata.copy(
                 jwks = jwks,
                 // Ensure vp_formats_supported includes mso_mdoc for HAIP
-                vpFormatsSupported = baseMetadata.vpFormatsSupported ?: mapOf("mso_mdoc" to JsonObject(emptyMap())),
+                vpFormatsSupported = baseMetadata.vpFormatsSupported ?: mapOf("mso_mdoc" to JsonObject(
+                    if (isDcApiHaip) mapOf(
+                        "alg_values_supported" to JsonArray(
+                            listOf(JsonPrimitive("ES256"))
+                        )
+                    ) else emptyMap()
+                )
+                ),
                 encryptedResponseEncValuesSupported = listOf("A128GCM")
             )
         } else {
@@ -219,7 +117,7 @@ object VerificationSessionCreator {
 
         val sessionId = Uuid.random().toString()
         val nonce = Uuid.random().toString()
-        val state = Uuid.random().toString()
+        val state = if (!isDcApi) Uuid.random().toString() else null
 
 //        ClientMetadata(
 //            clientName = "Badge Verifier",
@@ -257,7 +155,7 @@ object VerificationSessionCreator {
 
             // For Unsigned DC API, client_id MUST be omitted.
             // For Signed DC API, it MUST be present.
-            clientId = if (isDcApi && !setup.signedRequest) null else clientId,
+            clientId = if (isDcApi && !isSignedRequest) null else clientId,
             redirectUri = null, // For Same-Device flow (fragment/query/after code exchange etc)
             // TODO: url building (handle host alias)
             responseUri = when {
@@ -269,9 +167,9 @@ object VerificationSessionCreator {
             state = state, // Opaque value used by the Verifier to maintain state between the request and callback.
             nonce = nonce, // String value used to mitigate replay attacks. Also used to establish holder binding.
             responseMode = when {
-                isDcApi && setup.encryptedResponse -> OpenID4VPResponseMode.DC_API_JWT // HAIP requires dc_api.jwt (encrypted)
+                isDcApi && isEncryptedResponse -> OpenID4VPResponseMode.DC_API_JWT // HAIP requires dc_api.jwt (encrypted)
                 isDcApi -> OpenID4VPResponseMode.DC_API
-                isCrossDevice && setup.encryptedResponse -> OpenID4VPResponseMode.DIRECT_POST_JWT
+                isCrossDevice && isEncryptedResponse -> OpenID4VPResponseMode.DIRECT_POST_JWT
                 isCrossDevice -> OpenID4VPResponseMode.DIRECT_POST
                 else -> throw IllegalStateException("No flow is selected")
             },
@@ -283,7 +181,7 @@ object VerificationSessionCreator {
             request = null, // This would be the compact JWT string
 
             // OpenID4VP New Parameters (Section 5.1)
-            dcqlQuery = setup.dcqlQuery, // REQUIRED (unless 'scope' parameter represents a DCQL Query).
+            dcqlQuery = setup.core.dcqlQuery, // REQUIRED (unless 'scope' parameter represents a DCQL Query).
             clientMetadata = effectiveClientMetadata,
 
 
@@ -342,7 +240,7 @@ object VerificationSessionCreator {
             expirationDate = expiration,
             retentionDate = retentionDate,
 
-            status = if (expiration != null) VerificationSessionStatus.UNUSED else VerificationSessionStatus.ACTIVE,
+            status = if (expiration != null) Verification2Session.VerificationSessionStatus.UNUSED else Verification2Session.VerificationSessionStatus.ACTIVE,
 
             bootstrapAuthorizationRequest = bootstrapAuthorizationRequest,
             bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequestUrl,
@@ -352,11 +250,15 @@ object VerificationSessionCreator {
             signedAuthorizationRequestJwt = signedAuthorizationRequest,
             ephemeralDecryptionKey = ephemeralKey?.let { DirectSerializedKey(it) },
 
-            requestMode = if (setup.signedRequest) RequestMode.REQUEST_URI_SIGNED else RequestMode.REQUEST_URI,
+            requestMode = if (isSignedRequest) Verification2Session.RequestMode.REQUEST_URI_SIGNED else Verification2Session.RequestMode.REQUEST_URI,
 
-            policies = setup.policies,
-            notifications = setup.notifications,
-            redirects = setup.redirects
+            policies = setup.core.policies,
+            notifications = setup.core.notifications,
+            redirects = when (setup) {
+                is SameDeviceFlowSetup -> setup.redirects
+                is CrossDeviceFlowSetup -> setup.redirects
+                else -> null
+            }
         )
         log.trace { "New Verification2Session: $newSession" }
 
