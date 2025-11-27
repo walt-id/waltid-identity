@@ -63,7 +63,7 @@ object VerificationSessionCreator {
         key: Key? = null,
         x5c: List<String>? = null,
     ): Verification2Session {
-        val sessionId = setup.sessionId ?: Uuid.random().toString()
+        val sessionId = setup.core.sessionId ?: Uuid.random().toString()
 
         val isSignedRequest = setup.core.signedRequest
         val isEncryptedResponse = setup.core.encryptedResponse
