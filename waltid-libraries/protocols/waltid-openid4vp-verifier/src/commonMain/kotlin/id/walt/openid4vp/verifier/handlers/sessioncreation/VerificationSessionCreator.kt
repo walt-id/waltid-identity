@@ -4,28 +4,19 @@ import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.openid4vp.verifier.data.VerificationSessionSetup
-import id.walt.openid4vp.verifier.data.CrossDeviceFlowSetup
-import id.walt.openid4vp.verifier.data.DcApiFlowSetup
-import id.walt.openid4vp.verifier.data.SameDeviceFlowSetup
-import id.walt.openid4vp.verifier.data.Verification2Session
+import id.walt.openid4vp.verifier.data.*
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.http.URLBuilder
-import io.ktor.http.Url
+import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
@@ -91,7 +82,16 @@ object VerificationSessionCreator {
             ephemeralKey = JWKKey.generate(keyType)
 
             // Construct JWKS
-            val jwks = ClientMetadata.Jwks(listOf(ephemeralKey.getPublicKey().exportJWKObject()))
+            val jwks = ClientMetadata.Jwks(
+                listOf(
+                    JsonObject(ephemeralKey.getPublicKey().exportJWKObject()
+                        .toMutableMap().apply {
+                            set("alg", JsonPrimitive("ECDH-ES"))
+                            set("use", JsonPrimitive("enc"))
+                        }
+                    )
+                )
+            )
             // TODO: check if jwks contains `alg` by default (should be "alg": "ECDH-ES")
 
             // Merge into clientMetadata
@@ -99,13 +99,14 @@ object VerificationSessionCreator {
             baseMetadata.copy(
                 jwks = jwks,
                 // Ensure vp_formats_supported includes mso_mdoc for HAIP
-                vpFormatsSupported = baseMetadata.vpFormatsSupported ?: mapOf("mso_mdoc" to JsonObject(
-                    if (isDcApiHaip) mapOf(
-                        "alg_values_supported" to JsonArray(
-                            listOf(JsonPrimitive("ES256"))
-                        )
-                    ) else emptyMap()
-                )
+                vpFormatsSupported = baseMetadata.vpFormatsSupported ?: mapOf(
+                    "mso_mdoc" to JsonObject(
+                        if (isDcApiHaip) mapOf(
+                            "alg_values_supported" to JsonArray(
+                                listOf(JsonPrimitive("ES256"))
+                            )
+                        ) else emptyMap()
+                    )
                 ),
                 encryptedResponseEncValuesSupported = listOf("A128GCM")
             )
