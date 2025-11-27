@@ -148,61 +148,89 @@ val aggregateDependencyNotices = tasks.register("aggregateDependencyNotices") {
             }
         }
 
-        // Generate THIRDPARTY.md
-        val noticesByDependency = mutableMapOf<String, MutableSet<String>>()
-        targetDir.walkTopDown()
-            .filter { it.isFile && it.name.contains("NOTICE", ignoreCase = true) }
-            .forEach { file ->
-                val dependencyKey = file.parentFile?.parentFile?.name ?: return@forEach
-                val copyrights = file.readLines()
-                    .map { it.trim() }
-                    .filter { it.isNotBlank() }
-                    .map { it.trimStart('#', '-', '*', ' ').trim() }
-                    .filter { it.startsWith("copyright", ignoreCase = true) }
-                    .filter { line -> line.any { it.isDigit() } || line.contains("©") || line.length > 15 }
-                if (copyrights.isNotEmpty()) noticesByDependency.getOrPut(dependencyKey) { linkedSetOf() }.addAll(copyrights)
-            }
+        fun collectNotices(noticeRoot: File): Map<String, Set<String>> {
+            val notices = mutableMapOf<String, MutableSet<String>>()
+            if (!noticeRoot.exists()) return notices
+            noticeRoot.walkTopDown()
+                .filter { it.isFile && it.name.contains("NOTICE", ignoreCase = true) }
+                .forEach { file ->
+                    val dependencyKey = file.parentFile?.parentFile?.name ?: return@forEach
+                    val copyrights = file.readLines()
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() }
+                        .map { it.trimStart('#', '-', '*', ' ').trim() }
+                        .filter { it.startsWith("copyright", ignoreCase = true) }
+                        .filter { line -> line.any { it.isDigit() } || line.contains("©") || line.length > 15 }
+                    if (copyrights.isNotEmpty()) notices.getOrPut(dependencyKey) { linkedSetOf() }.addAll(copyrights)
+                }
+            return notices
+        }
 
-        val deps = mutableListOf<ThirdPartyInfo>()
-        subprojects.forEach { sub ->
-            val jsonFile = sub.layout.buildDirectory.file("licenses/THIRD-PARTY-NOTICE.json").get().asFile
-            if (!jsonFile.exists()) return@forEach
-
-            val parsed = JsonSlurper().parse(jsonFile) as? Map<*, *> ?: return@forEach
-            val depList = parsed["dependencies"] as? List<*> ?: return@forEach
-
-            depList.forEach { raw ->
-                val map = raw as? Map<*, *> ?: return@forEach
-                val name = map["moduleName"] as? String ?: return@forEach
+        fun parseDepsFromJson(jsonFile: File): List<ThirdPartyInfo> {
+            if (!jsonFile.exists()) return emptyList()
+            val parsed = JsonSlurper().parse(jsonFile) as? Map<*, *> ?: return emptyList()
+            val depList = parsed["dependencies"] as? List<*> ?: return emptyList()
+            return depList.mapNotNull { raw ->
+                val map = raw as? Map<*, *> ?: return@mapNotNull null
+                val name = map["moduleName"] as? String ?: return@mapNotNull null
                 val version = map["moduleVersion"] as? String ?: ""
                 val url = map["moduleUrl"] as? String ?: ""
                 val license = map["moduleLicense"] as? String ?: "License not specified"
-                deps += ThirdPartyInfo(name, version, url, license)
+                ThirdPartyInfo(name, version, url, license)
             }
         }
 
-        val uniqueDeps = deps
-            .groupBy { "${it.name}:${it.version}" }
-            .values
-            .map { entries -> entries.firstOrNull { it.url.isNotBlank() } ?: entries.first() }
-            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+        fun uniqueDeps(deps: List<ThirdPartyInfo>): List<ThirdPartyInfo> =
+            deps.groupBy { "${it.name}:${it.version}" }
+                .values
+                .map { entries -> entries.firstOrNull { it.url.isNotBlank() } ?: entries.first() }
+                .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
 
-        val thirdPartyFile = layout.projectDirectory.file("THIRD-PARTY-NOTICE.md").asFile
-        val thirdPartyContent = buildString {
-            appendLine("# Third-Party Software")
-            appendLine()
-            appendLine("This document lists third-party libraries used by walt.id identity.")
-            appendLine()
-            uniqueDeps.forEach { dep ->
-                val title = if (dep.url.isNotBlank()) "[${dep.name} ${dep.version}](${dep.url})" else "${dep.name} ${dep.version}".trim()
-                appendLine("* $title. ${dep.license}.")
-                val noticeKey = "${dep.name.replace(":", ".")}-${dep.version}"
-                noticesByDependency[noticeKey].orEmpty()
-                    .distinct()
-                    .forEach { noticeLine -> appendLine("  - $noticeLine") }
+        fun renderThirdPartyMd(title: String, intro: String, deps: List<ThirdPartyInfo>, notices: Map<String, Set<String>>): String =
+            buildString {
+                appendLine("# $title")
+                appendLine()
+                appendLine(intro)
+                appendLine()
+                uniqueDeps(deps).forEach { dep ->
+                    val linkTitle = if (dep.url.isNotBlank()) "[${dep.name} ${dep.version}](${dep.url})" else "${dep.name} ${dep.version}".trim()
+                    appendLine("* $linkTitle. ${dep.license}.")
+                    val noticeKey = "${dep.name.replace(":", ".")}-${dep.version}"
+                    notices[noticeKey].orEmpty().forEach { noticeLine ->
+                        appendLine("  - $noticeLine")
+                    }
+                }
             }
+
+        // Root-level combined THIRD-PARTY-NOTICE.md
+        val rootNotices = collectNotices(targetDir)
+        val rootDeps = subprojects.flatMap { sub ->
+            val jsonFile = sub.layout.buildDirectory.file("licenses/THIRD-PARTY-NOTICE.json").get().asFile
+            parseDepsFromJson(jsonFile)
         }
-        thirdPartyFile.writeText(thirdPartyContent)
+        layout.projectDirectory.file("THIRD-PARTY-NOTICE.md").asFile.writeText(
+            renderThirdPartyMd(
+                title = "Third-Party Software",
+                intro = "This document lists third-party libraries used by walt.id identity.",
+                deps = rootDeps,
+                notices = rootNotices
+            )
+        )
+
+        // Per-project THIRD-PARTY-NOTICE.md files
+        subprojects.forEach { sub ->
+            val subDeps = parseDepsFromJson(sub.layout.buildDirectory.file("licenses/THIRD-PARTY-NOTICE.json").get().asFile)
+            if (subDeps.isEmpty()) return@forEach
+            val subNoticesDir = sub.layout.buildDirectory.dir("licenses/notices").get().asFile
+            val subNotices = collectNotices(subNoticesDir)
+            val content = renderThirdPartyMd(
+                title = "Third-Party Software for ${sub.path}",
+                intro = "This document lists third-party libraries used by ${sub.path}.",
+                deps = subDeps,
+                notices = subNotices
+            )
+            sub.projectDir.resolve("THIRD-PARTY-NOTICE.md").writeText(content)
+        }
     }
 }
 
