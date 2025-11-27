@@ -1,11 +1,11 @@
 @file:OptIn(ExperimentalTime::class)
 
-package id.walt.openid4vp.verifier
+package id.walt.openid4vp.verifier.data
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.ktornotifications.core.KtorSessionNotifications
-import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionCreationResponse
+import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator.VerificationSessionCreationResponse
 import id.walt.policies2.PolicyList
 import id.walt.policies2.PolicyResults
 import id.walt.policies2.policies.CredentialSignaturePolicy
@@ -14,6 +14,7 @@ import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -123,7 +124,9 @@ data class Verification2Session(
 
     @Serializable
     data class VerificationSessionRedirects(
+        @SerialName("success_redirect_uri")
         val successRedirectUri: String? = null,
+        @SerialName("error_redirect_uri")
         val errorRedirectUri: String? = null
     )
 
