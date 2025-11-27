@@ -21,6 +21,7 @@ import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.service.account.AccountsService
 import id.walt.webwallet.web.plugins.KTOR_AUTHNZ_CONFIG_NAME
 import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
 import io.klogging.logger
 import io.ktor.http.*
@@ -31,6 +32,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.url
 import io.ktor.util.date.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
@@ -71,6 +73,14 @@ private suspend fun ktorAuthnzCreateAccount(
 
     return createdAccountId
 }
+
+@Serializable
+data class RegisterCall(
+    val name: String,
+    val email: String,
+    val password: String,
+    val type: String
+)
 
 @OptIn(ExternallyProvidedJWTCannotResolveToAuthenticatedSession::class)
 fun Application.ktorAuthnzFrontendRoutes() {
@@ -131,7 +141,9 @@ fun Application.ktorAuthnzFrontendRoutes() {
 
             // Unauthenticated endpoint follow here:
 
-            post("login") {
+            post("login", {
+                description = "Fake login for frontend"
+            }) {
                 val providedToken = call.receiveText()
                 logger.trace { "Provided token: $providedToken" }
 
@@ -157,13 +169,15 @@ fun Application.ktorAuthnzFrontendRoutes() {
                 )
             }
 
-            post("register") {
+            post("register", {
+               request { body<RegisterCall>()  }
+            }) {
                 logger.trace { "Fake register called" }
-                val registerData = call.receive<JsonObject>()
-                val name = registerData["name"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing name")
-                val email = registerData["email"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing email")
-                val password = registerData["password"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing password")
-                val type = registerData["type"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing type")
+                val registerData = call.receive<RegisterCall>()
+                val name = registerData.name
+                val email = registerData.email
+                val password = registerData.password
+                val type = registerData.type
 
                 require(type == "email") { "Only implemented for email login" }
 
