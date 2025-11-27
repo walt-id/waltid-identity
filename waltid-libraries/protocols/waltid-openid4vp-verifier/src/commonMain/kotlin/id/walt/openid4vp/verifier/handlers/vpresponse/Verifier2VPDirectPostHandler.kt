@@ -28,7 +28,7 @@ object Verifier2VPDirectPostHandler {
         responseData: DirectPostResponse,
 
         ephemeralDecryptionKey: DirectSerializedKey?
-    ) = when (responseData) {
+    ): Pair<String, String?> = when (responseData) {
 
         is DcApiJsonDirectPostResponse -> {
             require(responseMode in OpenID4VPResponseMode.DC_API_RESPONSES) { "Used body response, but responseMode is not for DC API" }
@@ -44,8 +44,24 @@ object Verifier2VPDirectPostHandler {
             ?: throw IllegalArgumentException("Missing $.data/$.credential.data in posted JSON body of DC API response")
 
             val vpToken = bodyData.jsonObject["vp_token"]?.jsonObject?.toString()
-                ?: throw IllegalArgumentException("Missing $.data.vp_token in posted JSON body of DC API response")
-            vpToken to null
+            val response = bodyData.jsonObject["response"]?.jsonPrimitive?.content
+
+            if (vpToken == null && response == null) {
+                throw IllegalArgumentException("Missing $.data.vp_token or response in posted JSON body of DC API response")
+            }
+
+            if (vpToken != null) {
+                vpToken to null
+            } else if (response != null) {
+                val (vpToken, state) = parseResponseBody(
+                    responseMode = responseMode,
+                    responseData = EncryptedResponseStringDirectPostResponse(response),
+                    ephemeralDecryptionKey = ephemeralDecryptionKey
+                )
+                vpToken to state
+            } else {
+                throw IllegalArgumentException("Missing any response content")
+            }
         }
 
         is EncryptedResponseStringDirectPostResponse -> {
