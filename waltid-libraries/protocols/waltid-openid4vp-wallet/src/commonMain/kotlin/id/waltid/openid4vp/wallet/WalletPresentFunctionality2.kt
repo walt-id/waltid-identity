@@ -148,7 +148,7 @@ object WalletPresentFunctionality2 {
             val requestUri = presentationRequestUrl.parameters["request_uri"]!!
             val httpResponse = http.get(requestUri)
 
-            check(httpResponse.status.isSuccess()) { "AuthorizationRequest cannot be retrieved (${httpResponse.status}): from $requestUri" }
+            check(httpResponse.status.isSuccess()) { "AuthorizationRequest cannot be retrieved (${httpResponse.status}): from $requestUri - ${httpResponse.bodyAsText()}" }
 
             val authorizationRequestContentType =
                 httpResponse.contentType()
