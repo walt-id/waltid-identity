@@ -8,6 +8,10 @@
     "image": "verifier-api"
   },
   {
+    "commandPath": ":waltid-services:waltid-verifier-api2",
+    "image": "verifier-api2"
+  },
+  {
     "commandPath": ":waltid-services:waltid-wallet-api",
     "image": "wallet-api"
   },
