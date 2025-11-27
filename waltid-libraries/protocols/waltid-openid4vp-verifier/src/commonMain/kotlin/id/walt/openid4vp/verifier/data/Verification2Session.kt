@@ -129,17 +129,33 @@ data class Verification2Session(
 
 
     enum class VerificationSessionStatus(val successful: Boolean? = null) {
+        /** Session ended up in unknown flow (should be avoided if possible) */
         UNKNOWN,
 
+        /** Session was created and is active (and can be used) */
         ACTIVE,
+
+        /** Session was not used yet, but is not yet expired (and can be used) */
         UNUSED,
 
+        /** Session is in use
+         * (AuthorizationRequest was requested)
+         */
         IN_USE,
+
+        /** Checking if received presentation will be processed (validated etc) */
+        VALIDATING_RECEIVED_REQUEST,
+
+        /** Received presentation is being processed (presentation validation + verification policies) */
         PROCESSING_FLOW,
 
+        /** Verification request expired without being utilized */
         EXPIRED(false),
 
+        /** Verification request was completed fully successfully (all validation & verification policies passed) */
         SUCCESSFUL(true),
+
+        /** Verification request was unsuccessful (presentation validation or verification requests failed) */
         FAILED(false),
     }
 
