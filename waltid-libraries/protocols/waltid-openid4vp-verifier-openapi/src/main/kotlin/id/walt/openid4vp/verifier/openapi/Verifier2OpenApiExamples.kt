@@ -8,10 +8,18 @@ import id.walt.dcql.models.meta.JwtVcJsonMeta
 import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.dcql.models.meta.SdJwtVcMeta
+import id.walt.dcql.models.meta.W3cCredentialMeta
+import id.walt.openid4vp.verifier.Verification2Session.DefinedVerificationPolicies
 import id.walt.openid4vp.verifier.data.*
 import id.walt.policies2.PolicyList
 import id.walt.policies2.policies.CredentialSignaturePolicy
+import id.walt.policies2.policies.RevocationPolicy
+import id.walt.policies2.policies.StatusPolicy
 import id.walt.policies2.policies.VicalPolicy
+import id.walt.policies2.policies.status.Values
+import id.walt.policies2.policies.status.model.IETFStatusPolicyAttribute
+import id.walt.policies2.policies.status.model.W3CStatusPolicyAttribute
+import id.walt.policies2.policies.status.model.W3CStatusPolicyListArguments
 import kotlinx.serialization.json.JsonPrimitive
 
 object Verifier2OpenApiExamples {
@@ -224,6 +232,78 @@ object Verifier2OpenApiExamples {
                         enableRevocation = true
                     )
                 ))
+            )
+        )
+    )
+
+    val basicExampleWithStatusPolicyForTokenStatusList = basicExample.copy(
+        policies = DefinedVerificationPolicies(
+            vcPolicies = PolicyList(
+                policies = listOf(
+                    StatusPolicy(
+                        argument = IETFStatusPolicyAttribute(
+                            value = 0u
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    val w3cCredentialQuery = CredentialQuery(
+        id = "pid", format = CredentialFormat.JWT_VC_JSON, meta = W3cCredentialMeta(
+            typeValues = listOf(listOf("VerifiableCredential", "identity_credential"))
+        ), claims = listOf(
+            ClaimsQuery(path = listOf("given_name")),
+            ClaimsQuery(path = listOf("family_name")),
+            ClaimsQuery(path = listOf("address", "street_address"))
+        )
+    )
+
+    val basicExampleWithRevokedStatusListPolicy = basicExample.copy(
+        dcqlQuery = DcqlQuery(
+            credentials = listOf(w3cCredentialQuery)
+        ), policies = DefinedVerificationPolicies(
+            vcPolicies = PolicyList(
+                policies = listOf(RevocationPolicy())
+            )
+        )
+    )
+
+    val basicExampleWithStatusPolicyForSingleBitstringStatusList = basicExample.copy(
+        dcqlQuery = DcqlQuery(
+            credentials = listOf(w3cCredentialQuery)
+        ), policies = DefinedVerificationPolicies(
+            vcPolicies = PolicyList(
+                policies = listOf(
+                    StatusPolicy(
+                        argument = W3CStatusPolicyAttribute(
+                            value = 0u, purpose = "Revocation", type = Values.BITSTRING_STATUS_LIST
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    val basicExampleWithStatusPolicyForMultipleBitstringStatusList = basicExample.copy(
+        dcqlQuery = DcqlQuery(
+            credentials = listOf(w3cCredentialQuery)
+        ), policies = DefinedVerificationPolicies(
+            vcPolicies = PolicyList(
+                policies = listOf(
+                    StatusPolicy(
+                        argument = W3CStatusPolicyListArguments(
+                            list = listOf(
+                                W3CStatusPolicyAttribute(
+                                    value = 0u, purpose = "Revocation", type = Values.BITSTRING_STATUS_LIST
+                                ), W3CStatusPolicyAttribute(
+                                    value = 0u, purpose = "Suspension", type = Values.BITSTRING_STATUS_LIST
+                                )
+                            )
+                        )
+                    )
+                )
             )
         )
     )

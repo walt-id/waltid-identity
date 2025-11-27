@@ -93,7 +93,8 @@ data class Verification2Session(
      * Presented data
      */
     var presentedRawData: PresentedRawData? = null,
-    var presentedCredentials: Map<String, List<DigitalCredential>>? = null
+    var presentedCredentials: Map<String, List<DigitalCredential>>? = null,
+    var statusReason: String? = null,
 ) {
 
     @Serializable
@@ -160,6 +161,7 @@ data class Verification2Session(
 
         /** Verification request was unsuccessful (presentation validation or verification requests failed) */
         FAILED(false),
+        UNSUCCESSFUL(false),
     }
 
     fun toSessionCreationResponse(): VerificationSessionCreationResponse {

@@ -63,6 +63,8 @@ object VerificationSessionCreator {
         key: Key? = null,
         x5c: List<String>? = null,
     ): Verification2Session {
+        val sessionId = setup.sessionId ?: Uuid.random().toString()
+
         val isSignedRequest = setup.core.signedRequest
         val isEncryptedResponse = setup.core.encryptedResponse
         val isCrossDevice = setup is CrossDeviceFlowSetup
@@ -114,8 +116,6 @@ object VerificationSessionCreator {
 
 
         require(isCrossDevice || isDcApi) { "No flow is selected" } // list all flows here
-
-        val sessionId = Uuid.random().toString()
         val nonce = Uuid.random().toString()
         val state = if (!isDcApi) Uuid.random().toString() else null
 

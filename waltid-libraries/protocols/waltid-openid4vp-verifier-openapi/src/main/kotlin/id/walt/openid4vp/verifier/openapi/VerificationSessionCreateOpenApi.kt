@@ -33,6 +33,11 @@ object VerificationSessionCreateOpenApi {
                 example("DCQL example: W3C without claims") { value = Verifier2OpenApiExamples.W3CWithoutClaims }
                 example("DCQL example: W3C with claims and values") { value = Verifier2OpenApiExamples.W3CWithClaimsAndValues }
 
+                example("Basic example with revoked-status-list policy") { value = Verifier2OpenApiExamples.basicExampleWithRevokedStatusListPolicy }
+                example("Basic example with credential-status policy for single BitstringStatusList") { value = Verifier2OpenApiExamples.basicExampleWithRevokedStatusListPolicy }
+                example("Basic example with credential-status policy for multiple BitstringStatusList") { value = Verifier2OpenApiExamples.basicExampleWithStatusPolicyForMultipleBitstringStatusList }
+                example("Basic example with credential-status policy for TokenStatusList") { value = Verifier2OpenApiExamples.basicExampleWithStatusPolicyForTokenStatusList }
+
                 example("VICAL: VICAL policy (only for ISO mDL/mdoc") { value = Verifier2OpenApiExamples.VicalPolicyValues }
             }
         }

@@ -13,7 +13,7 @@ import id.walt.oid4vc.data.OfferedCredential
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.sdjwt.SDJWTVCTypeMetadata
+import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import id.walt.webwallet.utils.WalletHttpClients
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -21,7 +21,6 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.JsonObject
@@ -43,13 +42,9 @@ abstract class IssuanceServiceBase {
         val providerMetadataUri =
             credentialWallet.getCIProviderMetadataUrl(issuerURL)
         logger.debug { "Getting provider metadata from: $providerMetadataUri" }
-        val providerMetadataResult = http.get(providerMetadataUri)
-        logger.debug { runBlocking { "Provider metadata returned: ${providerMetadataResult.bodyAsText()}" } }
-        return providerMetadataResult
-            .body<JsonObject>()
-            .let {
-                OpenIDProviderMetadata.fromJSON(it)
-            }
+        val providerMetadataResult = http.get(providerMetadataUri).bodyAsText()
+        logger.debug { "Provider metadata returned: $providerMetadataResult" }
+        return OpenIDProviderMetadata.fromJSONString(providerMetadataResult)
     }
 
     protected suspend fun issueTokenRequest(
@@ -171,13 +166,13 @@ abstract class IssuanceServiceBase {
         )
     }
 
-    suspend fun resolveVct(vct: String): SDJWTVCTypeMetadata {
+    suspend fun resolveVct(vct: String): SdJwtVcTypeMetadataDraft04 {
         val authority = Url(vct).protocolWithAuthority
         val response = http.get("$authority/.well-known/vct${vct.substringAfter(authority)}")
 
         require(response.status.isSuccess()) { "VCT URL returns error: ${response.status}" }
 
-        return response.body<JsonObject>().let { SDJWTVCTypeMetadata.fromJSON(it) }
+        return response.body<JsonObject>().let { SdJwtVcTypeMetadataDraft04.fromJSON(it) }
     }
 
     fun isKeyProofRequiredForOfferedCredential(offeredCredential: OfferedCredential) =

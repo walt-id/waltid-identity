@@ -710,7 +710,14 @@ object OpenID4VCI {
                     errorCode = CredentialErrorCode.invalid_request,
                     message = "VCT must be set on credential request"
                 )
-        ).plus("display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray)
+        ).let { defPayloadProps ->
+            display?.takeIf { it.isNotEmpty() }?.let { dis ->
+                defPayloadProps.plus(
+                    "display" to Json.encodeToJsonElement(dis)
+                )
+            } ?: defPayloadProps
+        }
+
 
         val undisclosedPayload = sdPayload.undisclosedPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
 

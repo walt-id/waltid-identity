@@ -70,6 +70,7 @@ kotlin {
                 implementation(project(":waltid-libraries:credentials:waltid-dif-definitions-parser"))
                 implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
                 implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
+                implementation(project(":waltid-libraries:crypto:waltid-crypto"))//for Base64Utils
 
                 // Kotlinx
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
@@ -90,6 +91,8 @@ kotlin {
 
                 // suspend-transform plugin annotations (required in the current version to avoid "compileOnly" warning)
                 implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
+
+                implementation("com.soywiz:korlibs-io:6.0.2")
             }
         }
         val commonTest by getting {

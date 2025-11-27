@@ -1,6 +1,6 @@
 package id.walt.oid4vc.data
 
-import id.walt.sdjwt.SDJWTVCTypeMetadata
+import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
@@ -79,7 +79,7 @@ data class CredentialSupported(
     @Serializable(ClaimDescriptorMapSerializer::class) val credentialSubject: Map<String, ClaimDescriptor>? = null,
     @Serializable(ClaimDescriptorNamespacedMapSerializer::class) val claims: Map<String, Map<String, ClaimDescriptor>>? = null,
     val order: List<String>? = null,
-    @SerialName("sdJwtVcTypeMetadata") val sdJwtVcTypeMetadata: SDJWTVCTypeMetadata? = null,
+    @SerialName("sdJwtVcTypeMetadata") val sdJwtVcTypeMetadata: SdJwtVcTypeMetadataDraft04? = null,
     override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
 

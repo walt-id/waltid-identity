@@ -70,7 +70,7 @@ object Verifier2Service {
         updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit
     ) -> Unit = { session, event, updateSession ->
         updateSession(session, event) {
-            this.status = VerificationSessionStatus.FAILED
+            this.status = VerificationSessionStatus.UNSUCCESSFUL
         }
     }
 
