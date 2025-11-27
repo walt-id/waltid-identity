@@ -7,6 +7,7 @@ import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.MsoMdocMeta
+import id.walt.dcql.models.meta.NoMeta
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.openid4vp.verifier.utils.UrlUtils
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -99,7 +100,8 @@ data class CrossDeviceFlowSetup(
 
         private val BASE_EXAMPLE = CrossDeviceFlowSetup(
             core = GeneralFlowConfig(
-                dcqlQuery = DcqlQuery(emptyList())
+                // stub DCQL query (to avoid creating invalid DCQL query)
+                dcqlQuery = DcqlQuery(listOf(CredentialQuery("stub", CredentialFormat.AC_VP, meta = NoMeta)))
             ),
             urlConfig = UrlConfig(
             ),
