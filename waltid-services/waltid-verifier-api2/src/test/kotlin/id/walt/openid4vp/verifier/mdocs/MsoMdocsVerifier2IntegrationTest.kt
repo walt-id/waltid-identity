@@ -19,7 +19,14 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
-import id.walt.openid4vp.verifier.*
+import id.walt.openid4vp.verifier.OSSVerifier2FeatureCatalog
+import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
+import id.walt.openid4vp.verifier.data.CrossDeviceFlowSetup
+import id.walt.openid4vp.verifier.data.GeneralFlowConfig
+import id.walt.openid4vp.verifier.data.Verification2Session
+import id.walt.openid4vp.verifier.data.VerificationSessionSetup
+import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator
+import id.walt.openid4vp.verifier.verifierModule
 import id.walt.policies2.PolicyList
 import id.walt.policies2.policies.CredentialDataMatcherPolicy
 import id.walt.policies2.policies.CredentialSignaturePolicy
@@ -79,6 +86,13 @@ class MsoMdocsVerifier2IntegrationTest {
                 CredentialSignaturePolicy(),
                 CredentialDataMatcherPolicy(path = "$.['org.iso.23220.dtc.1'].dtc_version", regex = """^("[0-9]+"|-?[0-9]+(\.[0-9]+)?)$""")
             )
+        )
+    )
+
+    private val verificationSessionSetup: VerificationSessionSetup = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            dcqlQuery = mdocsDcqlQuery,
+            policies = mdocsPolicies
         )
     )
 
@@ -241,12 +255,7 @@ class MsoMdocsVerifier2IntegrationTest {
             // Create the verification session
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
-                    setBody(
-                        VerificationSessionCreator.VerificationSessionSetup(
-                            dcqlQuery = mdocsDcqlQuery,
-                            policies = mdocsPolicies
-                        )
-                    )
+                    setBody(verificationSessionSetup)
                 }.body<VerificationSessionCreator.VerificationSessionCreationResponse>()
             }
             println("Verification Session Response: $verificationSessionResponse")

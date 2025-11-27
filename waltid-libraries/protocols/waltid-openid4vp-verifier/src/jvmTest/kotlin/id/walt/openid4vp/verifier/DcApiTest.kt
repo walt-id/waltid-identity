@@ -1,7 +1,11 @@
 package id.walt.openid4vp.verifier
 
+import id.walt.openid4vp.verifier.data.Verification2Session
+import id.walt.openid4vp.verifier.handlers.vpresponse.Verifier2VPDirectPostHandler
+import id.walt.openid4vp.verifier.handlers.vpresponse.Verifier2VPDirectPostHandler.DcApiJsonDirectPostResponse
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 
 class DcApiTest {
@@ -19,7 +23,6 @@ class DcApiTest {
       "authorizationRequest": {
         "response_type": "vp_token",
         "client_id": "x509_hash:abc-xyz-base64url-sha256-hash-of-der-x509-leaf",
-        "state": "9f0a99ba-68d8-4de3-92b3-6f236d9a1586",
         "response_mode": "dc_api",
         "nonce": "b9cc2837-fbe2-4c2c-a047-750071aa0063",
         "dcql_query": {
@@ -77,7 +80,8 @@ class DcApiTest {
     """.trimIndent()
 
     // language=JSON
-    val response1 = """
+    val response1 = Json.decodeFromString<JsonObject>(
+        """
     {
       "protocol": "openid4vp-v1-signed",
       "data": {
@@ -89,16 +93,16 @@ class DcApiTest {
       }
     }
     """.trimIndent()
+    )
 
     @Test
     fun testDcApi1() = runTest {
         val verificationSession = Json.decodeFromString<Verification2Session>(request1)
 
-        Verifier2DirectPostHandler.handleDirectPost(
+        Verifier2VPDirectPostHandler.handleDirectPost(
             verificationSession = verificationSession,
-            bodyString = response1,
-            responseString = null, vpTokenString = null,
-            receivedState = null,
+            responseData = DcApiJsonDirectPostResponse(response1),
+
             updateSessionCallback = { session, event, sessionBlock ->
                 println(">> Called callback for update session due to $event: $session")
             },

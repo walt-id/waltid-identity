@@ -112,7 +112,7 @@ val dcqlQuery = DcqlQuery(
 )
 
 // 2. Set up the session
-val setup = VerificationSessionSetup(dcqlQuery = dcqlQuery)
+val setup = CrossDeviceFlow(core = GeneralFlowConfig(dcqlQuery = dcqlQuery))
 
 // 3. Create the session
 val newSession = Verifier2Manager.createVerificationSession(
