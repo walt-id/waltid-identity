@@ -51,7 +51,7 @@ object MdocPresentationValidator {
         val verificationResult = MdocVerifier.verify(mdocBase64UrlString, verificationContext)
 
         // Test some other (non-compliant) variations of DC API responses:
-        if (!verificationResult.valid && isDcApi) {
+        /*if (!verificationResult.valid && isDcApi) {
             log.warn { "DC API response verification failed. Testing non-DC-API handover structure..." }
             val document = MdocParser.parseToDocument(mdocBase64UrlString)
             val mso = document.issuerSigned.decodeMobileSecurityObject()
@@ -60,7 +60,7 @@ object MdocPresentationValidator {
             log.warn { "Checking DC API response against non-DC-API handover..." }
             val fallbackAuthentication = runCatching { MdocVerifier.verifyDeviceAuthentication(document, mso, sessionTranscript) }
             log.warn { "Fallback authentication result: $fallbackAuthentication" }
-        }
+        }*/
 
         require(verificationResult.valid) { "Mdoc verification failed: ${verificationResult.errors}" }
 
