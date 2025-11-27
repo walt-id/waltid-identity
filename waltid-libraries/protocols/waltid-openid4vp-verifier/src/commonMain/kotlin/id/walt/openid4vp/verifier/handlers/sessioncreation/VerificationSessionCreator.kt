@@ -212,7 +212,7 @@ object VerificationSessionCreator {
              * An array of strings, each string representing an Origin of the Verifier that is making the request.
              * Not for use in unsigned requests.
              */
-            expectedOrigins = if (isDcApi && isSignedRequest) setup.expectedOrigins else null,
+            expectedOrigins = if (isDcApi) setup.expectedOrigins else null,
         )
         log.trace { "Constructed AuthorizationRequest: $authorizationRequest" }
 
