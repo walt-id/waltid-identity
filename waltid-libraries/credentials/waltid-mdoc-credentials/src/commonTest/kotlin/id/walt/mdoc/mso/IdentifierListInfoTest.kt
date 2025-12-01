@@ -8,6 +8,8 @@ import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.decodeFromHexString
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
+import kotlin.test.assertIs
 
 class IdentifierListInfoTest {
 
@@ -61,6 +63,23 @@ class IdentifierListInfoTest {
                 expected = payload,
                 actual = Cbor.decodeFromHexString<IdentifierListInfo>(payload.toCBORHex()),
             )
+        }
+    }
+
+    @Test
+    fun invalidPayloadsAsHexStrings() {
+
+        listOf(
+            "bf6375726964616c6c6fff", // { "uri": "allo"}
+            "bf62696464616c6c6fff", //{ "id": "allo"}
+            "bf626964646b6174696375726964616c6c6fff", // { "id": "kati", "uri": "allo"}
+            "bf62696464616c6c6f6375726905ff", // { "id": "allo", "uri": 5}
+        ).forEach {
+            assertFails {
+                IdentifierListInfo.fromCBORHex(it)
+            }.let { throwable ->
+                assertIs<IllegalArgumentException>(throwable)
+            }
         }
     }
 }

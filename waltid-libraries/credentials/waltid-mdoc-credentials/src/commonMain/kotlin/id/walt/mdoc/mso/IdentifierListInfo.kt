@@ -92,7 +92,7 @@ data class IdentifierListInfo(
             }
             require(element.value[MapKey("id")]!!.type == DEType.byteString) {
                 "Value of id key of IdentifierListInfo CBOR map expected to be of type ${DEType.byteString}, but instead was " +
-                        "found to be of type ${element.value[MapKey("idx")]!!.type}"
+                        "found to be of type ${element.value[MapKey("id")]!!.type}"
             }
             require(element.value.containsKey(MapKey("uri"))) {
                 "IdentifierListInfo CBOR map must contain key uri"
