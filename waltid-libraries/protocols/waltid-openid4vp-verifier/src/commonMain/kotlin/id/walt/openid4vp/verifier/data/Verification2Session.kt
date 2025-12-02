@@ -6,9 +6,9 @@ import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator.VerificationSessionCreationResponse
-import id.walt.policies2.PolicyList
-import id.walt.policies2.PolicyResults
-import id.walt.policies2.policies.CredentialSignaturePolicy
+import id.walt.policies2.vc.PolicyList
+import id.walt.policies2.vc.PolicyResults
+import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
@@ -75,6 +75,8 @@ data class Verification2Session(
 
     val signedAuthorizationRequestJwt: String? = null,
     val ephemeralDecryptionKey: DirectSerializedKey? = null,
+    /** JWK Thumbprint for [ephemeralDecryptionKey] */
+    val jwkThumbprint: String? = null,
 
     /**
      * OpenID4VP configuration for this Verification Session

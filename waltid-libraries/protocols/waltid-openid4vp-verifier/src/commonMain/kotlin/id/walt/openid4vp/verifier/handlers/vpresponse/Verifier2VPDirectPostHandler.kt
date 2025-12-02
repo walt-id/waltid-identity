@@ -220,7 +220,7 @@ object Verifier2VPDirectPostHandler {
             // DC API
             isDcApi = isDcApi,
             expectedOrigins = session.authorizationRequest.expectedOrigins,
-            ephemeralDecryptionKey = session.ephemeralDecryptionKey?.key?.let { it as JWKKey }
+            jwkThumbprint = session.jwkThumbprint
         )
         val allPresentationsValid = presentationValidationResult.presentationValid
 

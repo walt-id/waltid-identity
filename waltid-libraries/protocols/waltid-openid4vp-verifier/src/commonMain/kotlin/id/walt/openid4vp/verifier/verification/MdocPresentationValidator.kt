@@ -6,9 +6,6 @@ import id.walt.credentials.representations.X5CCertificateString
 import id.walt.credentials.representations.X5CList
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.crypto.keys.DirectSerializedKey
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.mdoc.crypto.MdocCryptoHelper
-import id.walt.mdoc.parser.MdocParser
 import id.walt.mdoc.verification.MdocVerifier
 import id.walt.mdoc.verification.VerificationContext
 import id.walt.openid4vp.verifier.verification.Verifier2PresentationValidator.PresentationValidationResult
@@ -28,7 +25,6 @@ object MdocPresentationValidator {
         expectedAudience: String?, // This is the client_id
         responseUri: String?,
 
-        ephemeralDecryptionKey: JWKKey? = null,
         isDcApi: Boolean = false,
         isEncrypted: Boolean = false,
         jwkThumbprint: String? = null

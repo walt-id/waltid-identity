@@ -1,7 +1,6 @@
 package id.walt.openid4vp.verifier.handlers.vpresponse
 
 import id.walt.credentials.formats.DigitalCredential
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vp.verifier.data.PresentationValidationResult
 import id.walt.openid4vp.verifier.verification.Verifier2PresentationValidator
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
@@ -19,7 +18,8 @@ object Verifier2SessionPresentationValidation {
         // DC API:
         isDcApi: Boolean?,
         expectedOrigins: List<String>?,
-        ephemeralDecryptionKey: JWKKey?
+        /** JWK Thumbprint of ephemeralDecryptionKey if encrypted (this is required for HAIP) */
+        jwkThumbprint: String?
     ): PresentationValidationResult {
         var allPresentationsValid = true
 
@@ -30,13 +30,6 @@ object Verifier2SessionPresentationValidation {
         val expectedOrigin = expectedOrigins?.first()
         val expectedAudience = if (isDcApi == true) "origin:$expectedOrigin" else authorizationRequest.clientId
         val isEncrypted = authorizationRequest.responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES
-
-        // Calculate JWK Thumbprint if encrypted (this is required for HAIP)
-        val jwkThumbprint = if (isEncrypted && ephemeralDecryptionKey != null) {
-            ephemeralDecryptionKey.getPublicKey().getThumbprint()
-        } else {
-            null
-        }
 
         for ((queryId, presentedItemsJsonElements) in vpTokenContents) {
             val originalCredentialQuery = authorizationRequest.dcqlQuery?.credentials
@@ -86,8 +79,7 @@ object Verifier2SessionPresentationValidation {
                     isDcApi = isDcApi == true,
                     isEncrypted = isEncrypted,
                     verifierOrigin = expectedOrigin, // Raw origin needed for mdoc,
-                    jwkThumbprint = jwkThumbprint,
-                    ephemeralDecryptionKey = ephemeralDecryptionKey
+                    jwkThumbprint = jwkThumbprint
                 )
 
                 if (validationOutcome.isSuccess) {

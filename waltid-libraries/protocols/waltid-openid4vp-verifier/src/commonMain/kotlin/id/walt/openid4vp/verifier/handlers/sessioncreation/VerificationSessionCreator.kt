@@ -250,6 +250,7 @@ object VerificationSessionCreator {
             authorizationRequestUrl = authorizationRequestUrl,
             signedAuthorizationRequestJwt = signedAuthorizationRequest,
             ephemeralDecryptionKey = ephemeralKey?.let { DirectSerializedKey(it) },
+            jwkThumbprint = ephemeralKey?.getPublicKey()?.getThumbprint(),
 
             requestMode = if (isSignedRequest) Verification2Session.RequestMode.REQUEST_URI_SIGNED else Verification2Session.RequestMode.REQUEST_URI,
 

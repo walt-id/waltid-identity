@@ -2,8 +2,8 @@ package id.walt.openid4vp.verifier.handlers.vpresponse
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.openid4vp.verifier.data.Verification2Session
-import id.walt.policies2.PolicyResult
-import id.walt.policies2.PolicyResults
+import id.walt.policies2.vc.PolicyResult
+import id.walt.policies2.vc.PolicyResults
 import io.github.oshai.kotlinlogging.KotlinLogging
 
 object Verifier2SessionPolicyValidation {
