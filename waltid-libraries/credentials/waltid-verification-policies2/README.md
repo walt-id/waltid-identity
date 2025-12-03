@@ -29,6 +29,7 @@ This library focuses on credential-level verification policies, complementing th
 - [Supported platforms](#supported-platforms)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Policy Configuration Levels](#policy-configuration-levels)
 - [Available policies](#available-policies)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -141,6 +142,13 @@ All policies share the same signature: they accept a `DigitalCredential` and ret
 ```
 
 In Kotlin you can deserialize the JSON into `PolicyList` or the higher-level `Verification2Session.DefinedVerificationPolicies` to drive policy execution.
+
+### Policy Configuration Levels
+
+Policies can be configured at multiple levels:
+- **VP-level (`vp_policies`)**: Applied to Verifiable Presentations (presentation signature, audience, nonce)
+- **Global VC-level (`vc_policies`)**: Applied to all credentials (signature, expiration, issuer checks)
+- **Specific VC-level (`specific_vc_policies`)**: Applied to credentials matching specific query IDs (credential-type-specific validation)
 
 ### Collecting results
 
