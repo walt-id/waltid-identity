@@ -92,7 +92,7 @@ All policies share the same signature: they accept a `DigitalCredential` and ret
 
 ```json
 {
-  "vcPolicies": [
+  "vc_policies": [
     "signature",
     "expiration",
     {
