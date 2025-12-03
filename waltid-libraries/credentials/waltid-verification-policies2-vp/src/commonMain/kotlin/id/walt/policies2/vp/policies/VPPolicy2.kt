@@ -24,8 +24,8 @@ sealed class VPPolicy2() {
     abstract val description: String
 
     init {
-        check(id.isNotEmpty()) { "Initialized ${this::class.portableSimpleName} VP policy with empty ID!" }
-        check(description.isNotEmpty()) { "Initialized ${this::class.portableSimpleName} VP policy with empty description!" }
+        //check(id.isNotEmpty()) { "Initialized ${this::class.portableSimpleName} VP policy with empty ID!" }
+        //check(description.isNotEmpty()) { "Initialized ${this::class.portableSimpleName} VP policy with empty description!" }
     }
 
     @Serializable
@@ -73,7 +73,7 @@ sealed class VPPolicy2() {
         return PolicyRunResult(
             policyExecuted = this,
             success = runResult.isSuccess && policyContext.errors.isEmpty(),
-            results = policyContext.results.mapValues { it.toJsonElement() },
+            results = policyContext.results.mapValues { it.value.toJsonElement() },
             errors = policyContext.errors.map { PolicyRunError(it) },
             executionTime = timedRunResult.duration
         )

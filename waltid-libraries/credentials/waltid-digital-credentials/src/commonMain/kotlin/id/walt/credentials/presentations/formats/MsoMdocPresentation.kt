@@ -4,6 +4,7 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.presentations.PresentationFormat
 import id.walt.crypto.utils.Base64Utils.matchesBase64
+import id.walt.crypto.utils.Base64Utils.matchesBase64Url
 import id.walt.crypto.utils.HexUtils.matchesHex
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -22,7 +23,7 @@ data class MsoMdocPresentation(
     companion object {
         suspend fun parse(mdocString: String): Result<MsoMdocPresentation> {
             val isHex = mdocString.matchesHex()
-            val isBase64 = mdocString.matchesBase64()
+            val isBase64 = mdocString.matchesBase64Url() || mdocString.matchesBase64()
 
             return runCatching {
                 val (_, mdocsCredential) = when {
