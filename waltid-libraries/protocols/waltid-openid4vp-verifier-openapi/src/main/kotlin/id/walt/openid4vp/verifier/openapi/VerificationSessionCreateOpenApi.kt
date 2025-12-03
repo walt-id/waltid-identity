@@ -10,10 +10,33 @@ import io.ktor.http.*
 
 object VerificationSessionCreateOpenApi {
 
+    private const val DOCUMENTATION_URL_PLACEHOLDER = "<a href='https://docs.walt.id/enterprise-stack/services/verifier2-service/overview'>the docs</a>"
+
     val createDocs: RouteConfig.() -> Unit = {
         summary = "Create new verification session"
+        description = """
+            Creates a new verification session with a DCQL query specifying which credentials and claims are required, along with optional verification policies.
+            
+            **Use Cases:**
+            - Request identity credentials from wallet holders
+            - Verify specific claims from verifiable credentials
+            - Apply verification policies (signature validation, revocation checks, status list validation)
+            - Support multiple credential formats (JWT VC, SD-JWT VC, ISO mDoc)
+            
+            **Important Notes:**
+            - Returns both bootstrap and full authorization request URLs for wallet interaction
+            - Supports multiple verification policies including signature, revocation, status list, and VICAL validation
+            - DCQL query allows requesting specific claims from credentials using JSON path notation
+            - Sessions expire after 10 minutes if unused and are retained for 10 years by default
+            - Session status can be tracked via SSE events endpoint
+            
+            For more information, see: $DOCUMENTATION_URL_PLACEHOLDER
+        """.trimIndent()
+        
         request {
-            headerParameter<String>("X-Request-Id")
+            headerParameter<String>("X-Request-Id") {
+                description = "Optional request ID for tracing"
+            }
             body<VerificationSessionSetup> {
                 example("Basic example") { value = Verifier2OpenApiExamples.basicExample }
 
@@ -43,7 +66,20 @@ object VerificationSessionCreateOpenApi {
         }
         response {
             HttpStatusCode.Created to {
-                body<VerificationSessionCreationResponse>()
+                description = "Verification session created successfully"
+                body<VerificationSessionCreationResponse> {
+                    required = true
+                    description = "Verification session creation response with session ID and authorization request URLs"
+                }
+            }
+            HttpStatusCode.BadRequest to {
+                description = "Invalid request - malformed DCQL query or invalid policy configuration"
+            }
+            HttpStatusCode.Unauthorized to {
+                description = "Authentication required"
+            }
+            HttpStatusCode.Forbidden to {
+                description = "Insufficient permissions to create verification sessions"
             }
         }
     }

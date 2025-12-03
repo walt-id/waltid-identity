@@ -114,7 +114,7 @@ val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
 
         val config = ConfigManager.getConfig<KtorAuthnzConfig>()
 
-        val configuredExpiration = Duration.parse(config.valkeyRetention ?: config.authFlow.expiration ?: "1d")
+        val configuredExpiration = Duration.parse(config.valkeyRetention ?: config.flowConfigs.firstOrNull()?.expiration ?: "1d")
 
         KtorAuthnzManager.tokenHandler = when (config.tokenType) {
             KtorAuthnzConfig.AuthnzTokens.STORE_IN_MEMORY -> {

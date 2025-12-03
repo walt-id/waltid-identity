@@ -29,8 +29,6 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 private val authConfig = ConfigManager.getConfig<KtorAuthnzConfig>()
-private val flowConfig = authConfig.authFlow
-
 
 private val web3Registration: suspend (any: Any) -> Unit = { any ->
     val identifier = any as? Web3Identifier ?: error("Provided argument is not web3 identifier")
@@ -66,23 +64,25 @@ fun Application.ktorAuthnzRoutes() {
         }) {
             route("account", {
                 summary = "Account authentication"
-                description = "Configured authentication flow:<br/><br/>${flowConfig.toString().replace("\n", "<br/>")}"
+                //description = "Configured authentication flow:<br/><br/>${flowConfig.toString().replace("\n", "<br/>")}"
             }) {
-                val contextFunction: ApplicationCall.() -> AuthContext = {
-                    AuthContext(
-                        tenant = request.host(),
-                        sessionId = parameters["sessionId"],
-                        implicitSessionGeneration = true,
-                        initialFlow = authConfig.authFlow
-                    )
+                authConfig.flowConfigs.forEach { flowConfig ->
+                    val contextFunction: ApplicationCall.() -> AuthContext = {
+                        AuthContext(
+                            tenant = request.host(),
+                            sessionId = parameters["sessionId"],
+                            implicitSessionGeneration = true,
+                            initialFlow = flowConfig
+                        )
+                    }
+
+                    val methodId: String = flowConfig.method
+                    val authenticationMethod: AuthenticationMethod = AuthMethodManager.getAuthenticationMethodById(methodId)
+
+                    val functionAmendments = authMethodFunctionAmendments[authenticationMethod]
+
+                    registerAuthenticationMethod(authenticationMethod, contextFunction, functionAmendments)
                 }
-
-                val methodId: String = flowConfig.method
-                val authenticationMethod: AuthenticationMethod = AuthMethodManager.getAuthenticationMethodById(methodId)
-
-                val functionAmendments = authMethodFunctionAmendments[authenticationMethod]
-
-                registerAuthenticationMethod(authenticationMethod, contextFunction, functionAmendments)
             }
         }
     }

@@ -15,7 +15,6 @@ plugins {
 
     id("io.ktor.plugin") version "3.2.2" // Versions.KTOR_VERSION
     id("org.owasp.dependencycheck") version "9.2.0"
-    id("com.github.jk1.dependency-license-report") version "2.9"
     id("maven-publish")
     id("com.github.ben-manes.versions")
     application
