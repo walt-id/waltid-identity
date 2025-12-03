@@ -7,9 +7,18 @@ import id.walt.mdoc.crypto.MdocCrypto
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlin.time.ExperimentalTime
 
-class MsoVerificationMdocVpPolicy : MdocVPPolicy("mso", "Verify MSO") {
+private const val policyId = "mso_mdoc/mso"
+
+@Serializable
+@SerialName(policyId)
+class MsoVerificationMdocVpPolicy : MdocVPPolicy() {
+
+    override val id = policyId
+    override val description = "Verify MSO"
 
     companion object {
         private val log = KotlinLogging.logger { }

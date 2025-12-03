@@ -6,8 +6,17 @@ import id.walt.mdoc.objects.digest.ValueDigest
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-class IssuerSignedDataMdocVpPolicy : MdocVPPolicy("issuer_signed_integrity", "Verify issuer-verified data integrity") {
+private const val policyId = "mso_mdoc/issuer_signed_integrity"
+
+@Serializable
+@SerialName(policyId)
+class IssuerSignedDataMdocVpPolicy : MdocVPPolicy() {
+
+    override val id = policyId
+    override val description = "Verify issuer-verified data integrity"
 
     companion object {
         private val log = KotlinLogging.logger { }

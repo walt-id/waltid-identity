@@ -9,9 +9,17 @@ import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-/** 1. */
-class IssuerAuthMdocVpPolicy : MdocVPPolicy("issuer_auth", "Verify issuer authentication") {
+private const val policyId = "mso_mdoc/issuer_auth"
+
+@Serializable
+@SerialName(policyId)
+class IssuerAuthMdocVpPolicy : MdocVPPolicy() {
+
+    override val id = policyId
+    override val description = "Verify issuer authentication"
 
     companion object {
         private val log = KotlinLogging.logger { }

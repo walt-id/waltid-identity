@@ -5,8 +5,17 @@ package id.walt.policies2.vp.policies
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-class DeviceKeyAuthMdocVpPolicy : MdocVPPolicy("device_key_auth", "Verify holder-verified data") {
+private const val policyId = "mso_mdoc/device_key_auth"
+
+@Serializable
+@SerialName(policyId)
+class DeviceKeyAuthMdocVpPolicy : MdocVPPolicy() {
+
+    override val id = policyId
+    override val description = "Verify holder-verified data"
 
     companion object {
         private val log = KotlinLogging.logger { }

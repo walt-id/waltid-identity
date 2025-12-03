@@ -10,8 +10,17 @@ import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.verification.MdocVerifier
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-class DeviceAuthMdocVpPolicy : MdocVPPolicy("device-auth", "Verify device authentication") {
+private const val policyId = "mso_mdoc/device-auth"
+
+@Serializable
+@SerialName(policyId)
+class DeviceAuthMdocVpPolicy : MdocVPPolicy() {
+
+    override val id = policyId
+    override val description = "Verify device authentication"
 
     companion object {
         private val log = KotlinLogging.logger { }
