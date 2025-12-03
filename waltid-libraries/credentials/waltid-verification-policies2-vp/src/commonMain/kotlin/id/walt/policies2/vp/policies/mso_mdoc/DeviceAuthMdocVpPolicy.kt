@@ -34,6 +34,7 @@ class DeviceAuthMdocVpPolicy : MdocVPPolicy() {
         verificationContext: VerificationSessionContext
     ): Result<Unit> = coroutineScope {
         log.trace { "--- Verifying device authentication ---" }
+        log.trace { "Using verification context: $verificationContext" }
 
         val deviceSigned = document.deviceSigned ?: throw IllegalArgumentException("DeviceSigned structure is missing.")
         log.trace { "Device signed: $deviceSigned" }

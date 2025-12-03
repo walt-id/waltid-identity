@@ -6,7 +6,8 @@ import id.walt.credentials.presentations.formats.JwtVcJsonPresentation
 import kotlinx.serialization.Serializable
 
 @Serializable
-abstract class JwtVcJsonVPPolicy() : VPPolicy2() {
+sealed class JwtVcJsonVPPolicy() : VPPolicy2() {
+
     abstract suspend fun VPPolicyRunContext.verifyJwtVcJsonPolicy(
         presentation: JwtVcJsonPresentation,
         verificationContext: VerificationSessionContext // JwtVcJsonVPVerificationRequest

@@ -42,10 +42,16 @@ object VPPolicyListSerializer : KSerializer<VPPolicyList> {
             "This serializer can be used only with Json format"
         )
         val json = jsonInput.json
-        val jsonArray = jsonInput.decodeJsonElement() as? JsonArray
-            ?: throw SerializationException("Expected a JsonArray")
 
-        val policies = jsonArray.map { element ->
+        val elem = jsonInput.decodeJsonElement()
+
+        val allPolicies = when (elem) {
+            is JsonObject -> elem.values.flatMap { it as? JsonArray ?: throw SerializationException("Expected a JsonArray, but was: $elem") }
+            is JsonArray -> elem.map { it }
+            else -> throw SerializationException("Invalid JSON structure of VPPolicyList, was: $elem")
+        }
+
+        val policies = allPolicies.map { element ->
             when (element) {
                 is JsonPrimitive -> {
                     if (!element.isString) {

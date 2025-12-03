@@ -68,6 +68,26 @@ class DcApiTest {
       "signedAuthorizationRequestJwt": "eyJ0eXAiOiJvYXV0aC1hdXRoei1yZXErand0IiwiZXhwIjoxNzY0MDY1NTAyLCJpYXQiOjE3NjQwNjUyMDIsImFsZyI6IkVTMjU2IiwieDVjIjpbIk1JSUJWekNCL2FBREFnRUNBZ2dOS1pBdlVydGltekFLQmdncWhrak9QUVFEQWpBZk1SMHdHd1lEVlFRRERCUjJaWEpwWm1sbGNpNWxlR0Z0Y0d4bExtTnZiVEFlRncweU5URXdNVFF3TmpJME1qQmFGdzB5TmpFd01UUXdOakkwTWpCYU1COHhIVEFiQmdOVkJBTU1GSFpsY21sbWFXVnlMbVY0WVcxd2JHVXVZMjl0TUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFRy9UZ0JjMEJrbU1pcGlRLzZna2FtSW4zbW1wN2hjVHJadXlyTFRta25QMVdSRXhsMWRoZEl4OS9rQWt1dWNlSTNUSGt4WHE3L3krc0J6SzBaUjdqUHFNak1DRXdId1lEVlIwUkJCZ3dGb0lVZG1WeWFXWnBaWEl1WlhoaGJYQnNaUzVqYjIwd0NnWUlLb1pJemowRUF3SURTUUF3UmdJaEFPdTBSR002QmpWUVVlcGVMQm9ndytaRDNNUTl2RnBwYlBJR01QanRuL3FkQWlFQXR0ZmRmeVhIZnpKMnRyK1Bjenlja3p2M05sTTQzNDYxY3ZQOTZzSXpPUUE9Il19.eyJyZXNwb25zZV90eXBlIjoidnBfdG9rZW4iLCJjbGllbnRfaWQiOiJ4NTA5X2hhc2g6YWJjLXh5ei1iYXNlNjR1cmwtc2hhMjU2LWhhc2gtb2YtZGVyLXg1MDktbGVhZiIsInN0YXRlIjoiOWYwYTk5YmEtNjhkOC00ZGUzLTkyYjMtNmYyMzZkOWExNTg2IiwicmVzcG9uc2VfbW9kZSI6ImRjX2FwaSIsIm5vbmNlIjoiYjljYzI4MzctZmJlMi00YzJjLWEwNDctNzUwMDcxYWEwMDYzIiwiZGNxbF9xdWVyeSI6eyJjcmVkZW50aWFscyI6W3siaWQiOiJteV9tZGwiLCJmb3JtYXQiOiJtc29fbWRvYyIsIm1ldGEiOnsiZG9jdHlwZV92YWx1ZSI6Im9yZy5pc28uMTgwMTMuNS4xLm1ETCJ9LCJjbGFpbXMiOlt7InBhdGgiOlsib3JnLmlzby4xODAxMy41LjEiLCJmYW1pbHlfbmFtZSJdfSx7InBhdGgiOlsib3JnLmlzby4xODAxMy41LjEiLCJnaXZlbl9uYW1lIl19LHsicGF0aCI6WyJvcmcuaXNvLjE4MDEzLjUuMSIsImFnZV9vdmVyXzIxIl19XX1dfSwiY2xpZW50X21ldGFkYXRhIjp7fSwiZXhwZWN0ZWRfb3JpZ2lucyI6WyJodHRwczovL2RpZ2l0YWwtY3JlZGVudGlhbHMud2FsdC5pZCJdfQ.W3DkFQwBfsb7qcuDiCr9G4Po0BSSsVgIuevsYPsCz0aFKOriq1KepLAnFb2VxZdDiMraxrvjbTbNBFqSP6JBvA",
       "requestMode": "REQUEST_URI_SIGNED",
       "policies": {
+        "vp_policies": {
+          "jwt_vc_json": [
+            "jwt_vc_json/audience-check",
+            "jwt_vc_json/nonce-check",
+            "jwt_vc_json/envelope_signature"
+          ],
+          "dc+sd-jwt": [
+            "dc+sd-jwt/audience-check",
+            "dc+sd-jwt/kb-jwt_signature",
+            "dc+sd-jwt/nonce-check",
+            "dc+sd-jwt/sd_hash-check"
+          ],
+          "mso_mdoc": [
+            "mso_mdoc/device-auth",
+            "mso_mdoc/device_key_auth",
+            "mso_mdoc/issuer_auth",
+            "mso_mdoc/issuer_signed_integrity",
+            "mso_mdoc/mso"
+          ]
+        },
         "vc_policies": [
           {
             "policy": "signature",
