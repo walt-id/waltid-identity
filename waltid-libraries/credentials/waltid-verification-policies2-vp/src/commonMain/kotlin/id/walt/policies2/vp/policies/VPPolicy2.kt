@@ -1,19 +1,30 @@
 package id.walt.policies2.vp.policies
 
-import id.walt.mdoc.objects.SessionTranscript
-import id.walt.mdoc.objects.document.Document
-import id.walt.mdoc.objects.mso.MobileSecurityObject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 
-abstract class AbstractVPPolicy(val id: String, val description: String) {
+@OptIn(ExperimentalSerializationApi::class)
+@JsonClassDiscriminator("policy")
+@Serializable
+sealed class VPPolicy2() {
+
+    abstract val id: String
+    abstract val description: String
+
+    init {
+        check(id.isNotEmpty()) { "Initialized ${this::class.qualifiedName} VP policy with empty ID!" }
+        check(description.isNotEmpty()) { "Initialized ${this::class.qualifiedName} VP policy with empty description!" }
+    }
 
     internal suspend fun runPolicy(
-        block: suspend VPPolicyRunContext.()->Result<Unit>,
+        block: suspend VPPolicyRunContext.() -> Result<Unit>,
     ) {
         val policyContext = VPPolicyRunContext()
 
@@ -29,7 +40,7 @@ abstract class AbstractVPPolicy(val id: String, val description: String) {
     class VPPolicyRunContext() {
 
         val resultMutex = Mutex()
-        private val results = LinkedHashMap<String, Any>()
+        private val results = LinkedHashMap<String, Any?>()
 
         val errorMutex = Mutex()
         private val errors = ArrayList<Throwable>()
@@ -40,8 +51,10 @@ abstract class AbstractVPPolicy(val id: String, val description: String) {
         suspend fun addResult(key: String, value: Boolean) = addJsonResult(key, JsonPrimitive(value))
         suspend fun addResult(key: String, value: List<JsonElement>) = addJsonResult(key, JsonArray(value))
         */
-        suspend fun addResult(key: String, value: Any) = resultMutex.withLock {
-            results[key] = value
+        suspend fun addResult(key: String, value: Any?) {
+            resultMutex.withLock {
+                results[key] = value
+            }
         }
 
         suspend fun addHashResult(key: String, subkey: String, value: Any) {
@@ -74,6 +87,7 @@ abstract class AbstractVPPolicy(val id: String, val description: String) {
         fun CoroutineScope.addOptionalJsonResult(key: String, valueBlock: suspend () -> JsonElement) = launch {
             addResult(key, valueBlock.invoke())
         }
+
         fun CoroutineScope.addOptionalResult(key: String, valueBlock: suspend () -> String) = launch {
             addResult(key, JsonPrimitive(valueBlock.invoke()))
         }
