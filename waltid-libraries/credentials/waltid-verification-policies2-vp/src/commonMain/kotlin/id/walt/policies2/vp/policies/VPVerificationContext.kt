@@ -13,6 +13,7 @@ data class VerificationSessionContext(
     val vpToken: String,
     val expectedNonce: String,
     val expectedAudience: String?,
+    val expectedOrigins: List<String>?,
 
     val responseUri: String?,
     val responseMode: OpenID4VPResponseMode,
@@ -20,7 +21,10 @@ data class VerificationSessionContext(
     val isSigned: Boolean,
     val isEncrypted: Boolean,
     val jwkThumbprint: String?
-)
+) {
+    val isDcApi
+        get() = responseMode in OpenID4VPResponseMode.DC_API_RESPONSES
+}
 
 /*
 /** vpToken = vpJwt string - used by JwtVcJsonPresentation parser */

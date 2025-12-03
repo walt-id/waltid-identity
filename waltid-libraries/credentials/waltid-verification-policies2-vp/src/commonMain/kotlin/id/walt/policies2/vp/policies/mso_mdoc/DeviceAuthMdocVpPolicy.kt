@@ -9,7 +9,6 @@ import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.verification.MdocVerificationContext
 import id.walt.mdoc.verification.MdocVerifier
-import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.SerialName
@@ -97,10 +96,11 @@ class DeviceAuthMdocVpPolicy : MdocVPPolicy() {
 
     private fun VerificationSessionContext.toMdocVerificationContext() = MdocVerificationContext(
         expectedNonce = expectedNonce,
-        expectedAudience = expectedAudience,
+        expectedAudience = if (isDcApi) (expectedOrigins?.firstOrNull()
+            ?: throw IllegalArgumentException("Missing expected origin for DC API")) else expectedAudience,
         responseUri = responseUri,
         isEncrypted = isEncrypted,
-        isDcApi = responseMode in OpenID4VPResponseMode.DC_API_RESPONSES,
+        isDcApi = isDcApi,
 
         jwkThumbprint = jwkThumbprint
     )

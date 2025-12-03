@@ -55,6 +55,7 @@ object PresentationVerificationEngine {
             vpToken = presentationString,
             expectedNonce = session.authorizationRequest.nonce!!,
             expectedAudience = expectedAudience,
+            expectedOrigins = session.authorizationRequest.expectedOrigins,
             responseUri = authorizationRequest.responseUri,
             responseMode = responseMode!!,
             isSigned = session.signedAuthorizationRequestJwt != null,
@@ -301,6 +302,9 @@ object PresentationVerificationEngine {
                     log.info { "  --- $s: $result" }
                 }
             }
+
+            val firstError = presentationValidationResult.firstNotNullOfOrNull { it.value.firstNotNullOfOrNull { it.value.errors.firstOrNull() } }
+            log.warn { "First error: $firstError" }
 
             session.failSession(SessionEvent.presentation_validation_failed)
 
