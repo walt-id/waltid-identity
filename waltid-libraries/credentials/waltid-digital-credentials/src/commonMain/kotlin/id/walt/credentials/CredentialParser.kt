@@ -1,7 +1,6 @@
 package id.walt.credentials
 
 import cbor.Cbor
-import id.walt.cose.coseCompliantCbor
 import id.walt.credentials.CredentialDetectorTypes.CredentialDetectionResult
 import id.walt.credentials.CredentialDetectorTypes.CredentialPrimaryDataType
 import id.walt.credentials.CredentialDetectorTypes.SDJWTVCSubType
@@ -22,7 +21,6 @@ import id.walt.credentials.utils.SdJwtUtils.getSdArrays
 import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.utils.Base64Utils.base64Url
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.matchesBase64Url
 import id.walt.crypto.utils.HexUtils.matchesHex
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -30,9 +28,8 @@ import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.MapKey
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.objects.MdocsCborSerializer
-import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
-import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.elements.IssuerSignedItem
+import id.walt.mdoc.parser.MdocParser
 import id.walt.sdjwt.SDJwt
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.KSerializer
@@ -86,25 +83,12 @@ object CredentialParser {
 
     fun getJwtHeaderOrDataSubject(data: JsonObject) = data.getString("sub") ?: getCredentialDataSubject(data)
 
-    private suspend fun handleMdocs(credential: String, base64: Boolean = false): Pair<CredentialDetectionResult, MdocsCredential> {
+    suspend fun handleMdocs(credential: String, base64: Boolean = false): Pair<CredentialDetectionResult, MdocsCredential> {
         log.trace { "Handle mdocs, string: $credential" }
 
         // --- New mdocs handling ---
-        val deviceResponseBytes = if (base64) credential.decodeFromBase64Url() else credential.hexToByteArray()
-
         // Parse DeviceResponse or Document into Document
-        val document = runCatching {
-            val deviceResponse = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(deviceResponseBytes)
-            val document =
-                deviceResponse.documents?.firstOrNull() ?: throw IllegalArgumentException("Mdoc document not found in DeviceResponse")
-            log.trace { "Mdoc parsed (from device response)" }
-            document
-        }.recoverCatching {
-            log.trace { "Mdoc could not be parsed as device response, trying as document" }
-            val document = coseCompliantCbor.decodeFromByteArray<Document>(deviceResponseBytes)
-            log.trace { "Mdoc parsed (from document)" }
-            document
-        }.getOrThrow()
+        val document = MdocParser.parseToDocument(credential)
 
 
         // Build a JSON object that includes the docType for the DcqlMatcher
