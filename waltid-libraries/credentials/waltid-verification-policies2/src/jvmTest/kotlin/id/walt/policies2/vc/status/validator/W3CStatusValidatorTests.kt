@@ -81,7 +81,7 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CStatusPoli
     inner class W3CSpecificValidationErrorScenarios {
 
         @ParameterizedTest
-        @MethodSource("id.walt.policies2.status.validator.StatusValidatorTestsBase#w3cTestScenarios")
+        @MethodSource("id.walt.policies2.vc.status.validator.StatusValidatorTestsBase#w3cTestScenarios")
         @DisplayName("Should throw StatusVerificationError when purpose doesn't match")
         fun shouldRejectPurposeMismatch(scenario: TestScenario) = runTest {
             val statusSize = 3
@@ -99,7 +99,7 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CStatusPoli
         }
 
         @ParameterizedTest
-        @MethodSource("id.walt.policies2.status.validator.StatusValidatorTestsBase#w3cTestScenarios")
+        @MethodSource("id.walt.policies2.vc.status.validator.StatusValidatorTestsBase#w3cTestScenarios")
         @DisplayName("Should throw StatusVerificationError when type doesn't match")
         fun shouldRejectTypeMismatch(scenario: TestScenario) = runTest {
             val statusSize = 3
