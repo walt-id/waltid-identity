@@ -1,16 +1,23 @@
-package id.walt.policies2.vp.policies.jwt_vc_json
+@file:Suppress("PackageDirectoryMismatch")
 
-import id.walt.policies2.vp.policies.AbstractVPPolicy
+package id.walt.policies2.vp.policies
 
-abstract class JwtVcJsonVPPolicy(jwtVcJsonId: String, description: String) : AbstractVPPolicy("jwt_vc-json/$jwtVcJsonId", description) {
+import id.walt.credentials.presentations.formats.JwtVcJsonPresentation
+
+abstract class JwtVcJsonVPPolicy(jwtVcJsonId: String, description: String) : VPPolicy2("jwt_vc-json/$jwtVcJsonId", description) {
     abstract suspend fun VPPolicyRunContext.verifyJwtVcJsonPolicy(
-
+        presentation: JwtVcJsonPresentation,
+        verificationContext: JwtVcJsonVPVerificationRequest
     ): Result<Unit>
 
     suspend fun runPolicy(
-
+        presentation: JwtVcJsonPresentation,
+        verificationContext: JwtVcJsonVPVerificationRequest
     ) = runPolicy {
-        verifyJwtVcJsonPolicy()
+        verifyJwtVcJsonPolicy(
+            presentation = presentation,
+            verificationContext = verificationContext
+        )
     }
 
 }
