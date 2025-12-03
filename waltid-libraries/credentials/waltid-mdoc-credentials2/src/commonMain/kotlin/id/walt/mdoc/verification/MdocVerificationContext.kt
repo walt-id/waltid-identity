@@ -8,7 +8,7 @@ package id.walt.mdoc.verification
  * @param expectedAudience The client_id of the verifier, which is the expected audience.
  * @param responseUri The response_uri from the initial request.
  */
-data class VerificationContext(
+data class MdocVerificationContext(
     val expectedNonce: String,
     val expectedAudience: String?,
     val responseUri: String?,

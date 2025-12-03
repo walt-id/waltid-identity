@@ -9,6 +9,7 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.ktornotifications.core.KtorSessionNotifications
+import id.walt.openid4vp.verifier.data.Verification2Session.DefinedVerificationPolicies
 import id.walt.openid4vp.verifier.utils.UrlUtils
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import kotlinx.serialization.SerialName
@@ -31,7 +32,7 @@ data class GeneralFlowConfig(
 
     val notifications: KtorSessionNotifications? = null,
 
-    val policies: Verification2Session.DefinedVerificationPolicies = Verification2Session.DefinedVerificationPolicies(),
+    val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
 
     @SerialName("client_metadata")
     val clientMetadata: ClientMetadata? = null,

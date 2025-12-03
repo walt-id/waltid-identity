@@ -120,8 +120,16 @@ data class Verification2Session(
 
     @Serializable
     data class DefinedVerificationPolicies(
-        // val vpPolicies: PolicyList = PolicyList(listOf(CredentialSignaturePolicy())), // TODO: vpPolicies
+        /** Policies to run on the presentations (Policies from: waltid-verification-policies2-vp) */
+        @SerialName("vp_policies")
+        val vpPolicies: PolicyList = PolicyList(listOf(CredentialSignaturePolicy())),
+
+        /** Policies to run on the credentials (Policies from: waltid-verification-policies2) */
+        @SerialName("vc_policies")
         val vcPolicies: PolicyList = PolicyList(listOf(CredentialSignaturePolicy())),
+
+        /** Policies to run on specific credential ids (Policies from: waltid-verification-policies2) */
+        @SerialName("specific_vc_policies")
         val specificVcPolicies: Map<String, PolicyList> = emptyMap(),
     )
 

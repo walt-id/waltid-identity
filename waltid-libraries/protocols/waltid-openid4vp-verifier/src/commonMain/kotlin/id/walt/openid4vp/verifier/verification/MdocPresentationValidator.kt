@@ -7,7 +7,7 @@ import id.walt.credentials.representations.X5CList
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.mdoc.verification.MdocVerifier
-import id.walt.mdoc.verification.VerificationContext
+import id.walt.mdoc.verification.MdocVerificationContext
 import id.walt.openid4vp.verifier.verification.Verifier2PresentationValidator.PresentationValidationResult
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -34,7 +34,7 @@ object MdocPresentationValidator {
             requireNotNull(responseUri) { "Response uri is required for redirect-based mdoc validation" }
         }
 
-        val verificationContext = VerificationContext(
+        val verificationContext = MdocVerificationContext(
             expectedNonce = expectedNonce,
             expectedAudience = expectedAudience, // Origin if DC API
             responseUri = responseUri,

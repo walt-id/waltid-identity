@@ -13,7 +13,7 @@ import id.walt.mdoc.objects.handover.NFCHandover
 import id.walt.mdoc.objects.handover.OpenID4VPHandover
 import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
-import id.walt.mdoc.verification.VerificationContext
+import id.walt.mdoc.verification.MdocVerificationContext
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
@@ -53,7 +53,7 @@ object MdocCryptoHelper {
         }
     }
 
-    fun reconstructDcApiOid4vpSessionTranscript(context: VerificationContext): SessionTranscript {
+    fun reconstructDcApiOid4vpSessionTranscript(context: MdocVerificationContext): SessionTranscript {
         // Step 1: Create the OpenID4VPHandoverInfo structure
         val handoverInfo = OpenID4VPDCAPIHandoverInfo(
             origin = context.expectedAudience,
@@ -73,7 +73,7 @@ object MdocCryptoHelper {
      * Reconstructs the SessionTranscript for an OID4VP flow using redirects.
      * As per OpenID for Verifiable Presentations 1.0, Appendix B.2.6.1.
      */
-    fun reconstructOid4vpSessionTranscript(context: VerificationContext): SessionTranscript {
+    fun reconstructOid4vpSessionTranscript(context: MdocVerificationContext): SessionTranscript {
         // Step 1: Create the OpenID4VPHandoverInfo structure
         requireNotNull(context.expectedAudience) { "Missing audience for Session Transcript" }
         val handoverInfo = OpenID4VPHandoverInfo(
