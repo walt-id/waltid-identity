@@ -7,7 +7,7 @@ import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator.VerificationSessionCreationResponse
 import id.walt.policies2.vc.PolicyList
-import id.walt.policies2.vc.PolicyResults
+import id.walt.policies2.vc.CredentialPolicyResults
 import id.walt.policies2.vp.policies.VPPolicyList
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import io.ktor.http.*
@@ -87,7 +87,7 @@ data class Verification2Session(
      * Policies
      */
     val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
-    var policyResults: PolicyResults? = null,
+    var policyResults: CredentialPolicyResults? = null,
 
     val redirects: VerificationSessionRedirects? = null,
 

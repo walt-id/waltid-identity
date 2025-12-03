@@ -261,7 +261,7 @@ object Verifier2VPDirectPostHandler {
         // If we reach here, all individual presentations are valid AND the overall DCQL structure is met.
         log.info { "All presentations in vp_token validated and DCQL fulfilled for session ${session.id}." }
 
-        val policyResults = Verifier2SessionPolicyValidation.validatePolicies(session.policies, allSuccessfullyValidatedAndProcessedData)
+        val policyResults = Verifier2SessionCredentialPolicyValidation.validateCredentialPolicies(session.policies, allSuccessfullyValidatedAndProcessedData)
 
         session.updateSession(SessionEvent.policy_results_available) {
             this.policyResults = policyResults

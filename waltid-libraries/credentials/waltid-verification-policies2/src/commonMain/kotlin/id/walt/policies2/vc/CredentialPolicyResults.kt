@@ -13,7 +13,7 @@ data class PolicyResult(
 )
 
 @Serializable
-data class PolicyResults(
+data class CredentialPolicyResults(
     //val vpPolicies: List<PolicyResult>, // TODO: vpPolicies
     val vcPolicies: List<PolicyResult>,
     val specificVcPolicies: Map<String, List<PolicyResult>>
