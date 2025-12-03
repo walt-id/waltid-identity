@@ -681,7 +681,7 @@ Response:
         "id": "regex"
       }
     ],
-    "specificVcPolicies": {}
+    "specific_vc_policies": {}
   },
   "policyResults": {
     "vc_policies": [
@@ -742,7 +742,7 @@ Response:
         }
       }
     ],
-    "specificVcPolicies": {},
+    "specific_vc_policies": {},
     "overallSuccess": true
   },
   "presentedRawData": {
@@ -1129,7 +1129,7 @@ Response:
           "id": "regex"
         }
       ],
-      "specificVcPolicies": {}
+      "specific_vc_policies": {}
     },
     "policyResults": {
       "vc_policies": [
@@ -1189,7 +1189,7 @@ Response:
           }
         }
       ],
-      "specificVcPolicies": {},
+      "specific_vc_policies": {},
       "overallSuccess": true
     },
     "presentedRawData": {

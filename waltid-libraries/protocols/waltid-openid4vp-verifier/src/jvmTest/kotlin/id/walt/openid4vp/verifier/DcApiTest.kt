@@ -74,7 +74,7 @@ class DcApiTest {
             "id": "signature"
           }
         ],
-        "specificVcPolicies": {}
+        "specific_vc_policies": {}
       }
     }
     """.trimIndent()

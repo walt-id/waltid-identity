@@ -115,7 +115,7 @@ All policies share the same signature: they accept a `DigitalCredential` and ret
       "enableRevocation": false
     }
   ],
-  "specificVcPolicies": {
+  "specific_vc_policies": {
     "identity_credential": [
       {
         "policy": "schema",
