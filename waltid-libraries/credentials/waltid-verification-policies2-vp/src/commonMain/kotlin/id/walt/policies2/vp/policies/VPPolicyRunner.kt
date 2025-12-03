@@ -9,7 +9,7 @@ import kotlinx.coroutines.coroutineScope
 
 object VPPolicyRunner {
 
-    suspend fun <T : VPPolicy2> runParallelPolicies(policies: List<T>, block: suspend T.() -> PolicyRunResult) = coroutineScope {
+    suspend fun <T : VPPolicy2> executeParallelPolicies(policies: List<T>, block: suspend T.() -> PolicyRunResult) = coroutineScope {
         policies
             .map { policy ->
                 /*
@@ -25,15 +25,15 @@ object VPPolicyRunner {
     }
 
 
-    suspend fun executePolicies(
+    suspend fun verifyPresentation(
         presentation: VerifiablePresentation,
         policies: VPPolicyList,
         verificationContext: VerificationSessionContext
-    ) {
-        when (presentation) {
-            is JwtVcJsonPresentation -> runParallelPolicies(policies.jwtVcJson) { runPolicy(presentation, verificationContext) }
-            is DcSdJwtPresentation -> runParallelPolicies(policies.dcSdJwt) { runPolicy(presentation, verificationContext) }
-            is MsoMdocPresentation -> runParallelPolicies(policies.msoMdoc) {
+    ): Map<String, PolicyRunResult> {
+        return when (presentation) {
+            is JwtVcJsonPresentation -> executeParallelPolicies(policies.jwtVcJson) { runPolicy(presentation, verificationContext) }
+            is DcSdJwtPresentation -> executeParallelPolicies(policies.dcSdJwt) { runPolicy(presentation, verificationContext) }
+            is MsoMdocPresentation -> executeParallelPolicies(policies.msoMdoc) {
                 runPolicy(document = presentation.mdoc.document, mso = presentation.mdoc.documentMso, verificationContext)
             }
 

@@ -27,7 +27,7 @@ import id.walt.openid4vp.verifier.data.Verification2Session
 import id.walt.openid4vp.verifier.data.VerificationSessionSetup
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator
 import id.walt.openid4vp.verifier.verifierModule
-import id.walt.policies2.vc.PolicyList
+import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialDataMatcherPolicy
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -81,7 +81,7 @@ class MsoMdocsVerifier2IntegrationTest {
     )
 
     private val mdocsPolicies = Verification2Session.DefinedVerificationPolicies(
-        vcPolicies = PolicyList(
+        vcPolicies = VCPolicyList(
             listOf(
                 CredentialSignaturePolicy(),
                 CredentialDataMatcherPolicy(path = "$.['org.iso.23220.dtc.1'].dtc_version", regex = """^("[0-9]+"|-?[0-9]+(\.[0-9]+)?)$""")

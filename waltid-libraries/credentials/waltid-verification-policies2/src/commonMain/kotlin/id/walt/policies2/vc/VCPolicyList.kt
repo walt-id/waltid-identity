@@ -11,16 +11,16 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 
 @Serializable(with = PolicyListSerializer::class)
-data class PolicyList(
+data class VCPolicyList(
     val policies: List<CredentialVerificationPolicy2>,
 )
 
-object PolicyListSerializer : KSerializer<PolicyList> {
+object PolicyListSerializer : KSerializer<VCPolicyList> {
 
     override val descriptor: SerialDescriptor =
         ListSerializer(CredentialVerificationPolicy2.serializer()).descriptor
 
-    override fun deserialize(decoder: Decoder): PolicyList {
+    override fun deserialize(decoder: Decoder): VCPolicyList {
         val jsonInput = decoder as? JsonDecoder ?: throw SerializationException(
             "This serializer can be used only with Json format"
         )
@@ -48,10 +48,10 @@ object PolicyListSerializer : KSerializer<PolicyList> {
                 )
             }
         }
-        return PolicyList(policies)
+        return VCPolicyList(policies)
     }
 
-    override fun serialize(encoder: Encoder, value: PolicyList) {
+    override fun serialize(encoder: Encoder, value: VCPolicyList) {
         val jsonOutput = encoder as? JsonEncoder ?: throw SerializationException(
             "This serializer can be used only with Json format"
         )

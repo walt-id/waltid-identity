@@ -8,12 +8,14 @@ object VPVerificationPolicyManager {
         NonceCheckSdJwtVPPolicy(),
         SdHashCheckSdJwtVPPolicy()
     )
+    val defaultDcSdJwtPolicies = simpleDcSdJwtPolicies.toList()
 
     val simpleJwtVcJsonPolicies: Array<JwtVcJsonVPPolicy> = arrayOf(
         AudienceCheckJwtVcJsonVPPolicy(),
         NonceCheckJwtVcJsonVPPolicy(),
         SignatureJwtVcJsonVPPolicy()
     )
+    val defaultJwtVcJsonPolicies = simpleJwtVcJsonPolicies.toList()
 
     val simpleMsoMdocPolicies: Array<MdocVPPolicy> = arrayOf(
         DeviceAuthMdocVpPolicy(),
@@ -22,6 +24,7 @@ object VPVerificationPolicyManager {
         IssuerSignedDataMdocVpPolicy(),
         MsoVerificationMdocVpPolicy()
     )
+    val defaultMsoMdocPolicies = simpleMsoMdocPolicies.toList()
 
 
     /**

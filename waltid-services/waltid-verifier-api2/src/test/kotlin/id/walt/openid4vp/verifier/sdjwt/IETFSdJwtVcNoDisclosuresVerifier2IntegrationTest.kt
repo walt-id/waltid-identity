@@ -30,7 +30,7 @@ import id.walt.openid4vp.verifier.data.Verification2Session
 import id.walt.openid4vp.verifier.data.VerificationSessionSetup
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator.VerificationSessionCreationResponse
 import id.walt.openid4vp.verifier.verifierModule
-import id.walt.policies2.vc.PolicyList
+import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
@@ -71,7 +71,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
     )
 
     private val sdjwtvcPolicies = Verification2Session.DefinedVerificationPolicies(
-        vcPolicies = PolicyList(
+        vcPolicies = VCPolicyList(
             listOf(
                 CredentialSignaturePolicy()
             )

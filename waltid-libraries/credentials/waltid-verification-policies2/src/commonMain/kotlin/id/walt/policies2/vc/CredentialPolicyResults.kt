@@ -5,23 +5,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 @Serializable
-data class PolicyResult(
+data class CredentialPolicyResult(
     val policy: CredentialVerificationPolicy2,
     val success: Boolean,
     val result: JsonElement? = null,
     val error: String? = null
 )
 
-@Serializable
-data class CredentialPolicyResults(
-    //val vpPolicies: List<PolicyResult>, // TODO: vpPolicies
-    val vcPolicies: List<PolicyResult>,
-    val specificVcPolicies: Map<String, List<PolicyResult>>
-) {
-
-    val overallSuccess: Boolean =
-        //vpPolicies.all { it.success } && // TODO: vpPolicies
-        vcPolicies.all { it.success } &&
-                specificVcPolicies.values.all { policies -> policies.all { it.success } }
-
-}
