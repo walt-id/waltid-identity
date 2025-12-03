@@ -5,6 +5,7 @@ enum class SessionEvent {
     authorization_request_requested,
     attempted_presentation,
     validated_credentials_available,
+    presentation_fulfils_dcql_query,
     policy_results_available,
     dcql_fulfillment_check_failed,
     presentation_validation_failed

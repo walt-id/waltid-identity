@@ -163,7 +163,7 @@ object PresentationVerificationEngine {
 
         val presentationValidationResult = verifyAllPresentation(vpTokenContents, session)
 
-        if (!presentationValidationResult.errors.isNotEmpty()) {
+        if (presentationValidationResult.errors.isNotEmpty()) {
             // Handle validation failure
             log.warn { "One or more presentations in vp_token failed validation for session ${session.id}" }
             log.warn { "Validation failures for session ${session.id}: ${presentationValidationResult.errors}" }
@@ -180,8 +180,11 @@ object PresentationVerificationEngine {
         }
         val allSuccessfullyValidatedAndProcessedData = presentationValidationResult.validated
 
-        // --- DCQL validation ---
+        session.updateSession(SessionEvent.validated_credentials_available) {
+            presentedCredentials = allSuccessfullyValidatedAndProcessedData
+        }
 
+        // --- DCQL validation ---
 
         // Check if the set of validated presentations satisfies the overall DCQL Query
         // (e.g., credential_sets, all *required* CredentialQuery IDs are present in allSuccessfullyValidatedAndProcessedData)
@@ -200,6 +203,9 @@ object PresentationVerificationEngine {
             //Verifier2Response.Verifier2Error.REQUIRED_CREDENTIALS_NOT_PROVIDED.throwAsError()
         }
 
+        session.updateSession(SessionEvent.presentation_fulfils_dcql_query) {
+
+        }
 
         // --- Credential verification ---
 
