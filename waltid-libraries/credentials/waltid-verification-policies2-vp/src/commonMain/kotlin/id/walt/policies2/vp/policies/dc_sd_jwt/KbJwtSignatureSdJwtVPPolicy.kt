@@ -7,8 +7,17 @@ import id.walt.credentials.presentations.PresentationValidationExceptionFunction
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequireSuccess
 import id.walt.credentials.presentations.formats.DcSdJwtPresentation
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-class KbJwtSignatureSdJwtVPPolicy : DcSdJwtVPPolicy("kb-jwt_signature", "Verify the KB-JWTs signature with the holders key") {
+private const val policyId = "dc+sd-jwt/audience-check"
+
+@Serializable
+@SerialName(policyId)
+class KbJwtSignatureSdJwtVPPolicy : DcSdJwtVPPolicy() {
+
+    override val id = policyId
+    override val description = "Verify the KB-JWTs signature with the holders key"
 
     override suspend fun VPPolicyRunContext.verifySdJwtPolicy(
         presentation: DcSdJwtPresentation,

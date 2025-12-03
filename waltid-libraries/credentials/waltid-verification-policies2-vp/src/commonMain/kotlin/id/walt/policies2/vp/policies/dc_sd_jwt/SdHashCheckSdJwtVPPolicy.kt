@@ -8,8 +8,17 @@ import id.walt.credentials.presentations.PresentationValidationExceptionFunction
 import id.walt.credentials.presentations.formats.DcSdJwtPresentation
 import id.walt.crypto.utils.ShaUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-class SdHashCheckSdJwtVPPolicy : DcSdJwtVPPolicy("sd_hash-check", "") {
+private const val policyId = "dc+sd-jwt/sd_hash-check"
+
+@Serializable
+@SerialName(policyId)
+class SdHashCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
+
+    override val id = policyId
+    override val description = "Verify SD-JWT Key Binding by recalculating SD Hashes"
 
     companion object {
         val log = KotlinLogging.logger { }

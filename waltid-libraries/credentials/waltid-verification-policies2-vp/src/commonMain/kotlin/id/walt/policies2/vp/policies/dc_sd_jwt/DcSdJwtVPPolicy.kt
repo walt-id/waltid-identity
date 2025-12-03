@@ -8,10 +8,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 sealed class DcSdJwtVPPolicy() : VPPolicy2() {
 
-    abstract val sdJwtId: String
-    override val id = "dc+sd-jwt/$sdJwtId"
-    abstract override val description: String
-
     abstract suspend fun VPPolicyRunContext.verifySdJwtPolicy(
         presentation: DcSdJwtPresentation,
         verificationContext: DcSdJwtVPVerificationRequest

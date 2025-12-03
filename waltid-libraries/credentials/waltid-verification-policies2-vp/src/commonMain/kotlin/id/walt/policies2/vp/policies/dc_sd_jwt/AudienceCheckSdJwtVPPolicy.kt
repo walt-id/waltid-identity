@@ -9,14 +9,13 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-private const val policyId = "audience-check"
+private const val policyId = "dc+sd-jwt/audience-check"
 
 @Serializable
 @SerialName(policyId)
-class AudienceCheckSdJwtVPPolicy : DcSdJwtVPPolicy(
-    policyId,
-    "Check if presentation audience matches expected audience for session"
-) {
+class AudienceCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
+    override val id = policyId
+    override val description = "Check if presentation audience matches expected audience for session"
 
     companion object {
         val log = KotlinLogging.logger { }

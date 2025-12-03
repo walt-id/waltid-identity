@@ -6,11 +6,17 @@ import id.walt.credentials.presentations.DcSdJwtPresentationValidationError
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequire
 import id.walt.credentials.presentations.formats.DcSdJwtPresentation
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-class NonceCheckSdJwtVPPolicy : DcSdJwtVPPolicy(
-    "nonce-check",
-    "Check if presentation nonce matches expected nonce for session"
-) {
+private const val policyId = "dc+sd-jwt/nonce-check"
+
+@Serializable
+@SerialName(policyId)
+class NonceCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
+
+    override val id = policyId
+    override val description = "Check if presentation nonce matches expected nonce for session"
 
     companion object {
         val log = KotlinLogging.logger { }
