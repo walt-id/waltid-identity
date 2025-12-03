@@ -4,7 +4,7 @@ import id.walt.policies2.vc.policies.status.expansion.StatusListExpansionAlgorit
 import io.github.oshai.kotlinlogging.KotlinLogging
 
 class BitValueReader(
-    private val bitRepresentationStrategy: id.walt.policies2.vc.policies.status.bit.BitRepresentationStrategy,
+    private val bitRepresentationStrategy: BitRepresentationStrategy,
 ) {
     companion object {
         private val BITS_PER_BYTE_UNSIGNED = 8u
@@ -26,11 +26,11 @@ class BitValueReader(
         val bitStartPosition = index * bitSize.toUInt()
         logger.debug { "bitStartPosition overall: $bitStartPosition" }
 
-        val byteStart = bitStartPosition / _root_ide_package_.id.walt.policies2.vc.policies.status.bit.BitValueReader.Companion.BITS_PER_BYTE_UNSIGNED
+        val byteStart = bitStartPosition / BITS_PER_BYTE_UNSIGNED
         logger.debug { "skipping: $byteStart bytes" }
         logger.debug { "available: ${input.size - byteStart.toInt()} bytes" }
 
-        val bytesToRead = (bitSize - 1) / _root_ide_package_.id.walt.policies2.vc.policies.status.bit.BitValueReader.Companion.BITS_PER_BYTE_UNSIGNED.toInt() + 1
+        val bytesToRead = (bitSize - 1) / BITS_PER_BYTE_UNSIGNED.toInt() + 1
         logger.debug { "readingNext: $bytesToRead bytes" }
 
         val startIndex = byteStart.toInt()
@@ -43,7 +43,7 @@ class BitValueReader(
     private fun extractBitValue(bytes: ByteArray, index: ULong, bitSize: UInt): List<Char> {
         logger.debug { "selected byte: ${bitmap(bytes)}" }
         val bits = bytes.toBitSequence()
-        val bitStartPosition = index * bitSize % _root_ide_package_.id.walt.policies2.vc.policies.status.bit.BitValueReader.Companion.BITS_PER_BYTE_UNSIGNED
+        val bitStartPosition = index * bitSize % BITS_PER_BYTE_UNSIGNED
         logger.debug { "bitStartPosition within byte: $bitStartPosition" }
         val bitSet = bits.drop(bitStartPosition.toInt()).iterator()
         val result = mutableListOf<Boolean>()

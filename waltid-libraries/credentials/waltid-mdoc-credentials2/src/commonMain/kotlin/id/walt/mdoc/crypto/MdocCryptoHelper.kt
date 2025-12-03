@@ -4,14 +4,10 @@ import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.SessionTranscript
-import id.walt.mdoc.objects.handover.OpenID4VPDCAPIHandoverInfo
 import id.walt.mdoc.objects.document.DeviceAuthentication
 import id.walt.mdoc.objects.document.DeviceAuthentication.Companion.DEVICE_AUTHENTICATION_TYPE
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
-import id.walt.mdoc.objects.handover.BaseHandoverInfo
-import id.walt.mdoc.objects.handover.NFCHandover
-import id.walt.mdoc.objects.handover.OpenID4VPHandover
-import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
+import id.walt.mdoc.objects.handover.*
 import id.walt.mdoc.objects.sha256
 import id.walt.mdoc.verification.MdocVerificationContext
 import io.github.oshai.kotlinlogging.KotlinLogging

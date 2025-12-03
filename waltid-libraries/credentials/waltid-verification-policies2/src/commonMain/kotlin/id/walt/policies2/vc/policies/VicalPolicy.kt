@@ -38,11 +38,11 @@ data class VicalPolicy(
     val enableTrustedChainRoot: Boolean = false,
     val enableSystemTrustAnchors: Boolean = false,
     val enableRevocation: Boolean = false
-) : id.walt.policies2.vc.policies.CredentialVerificationPolicy2() {
+) : CredentialVerificationPolicy2() {
     override val id = "vical"
 
     override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
-        _root_ide_package_.id.walt.policies2.vc.policies.log.debug { "Verifying credential with VICAL policy" }
+        log.debug { "Verifying credential with VICAL policy" }
         try {
             val credentialSignature = credential.signature
             if (!(credential is MdocsCredential && credentialSignature is CoseCredentialSignature))
@@ -118,7 +118,7 @@ data class VicalPolicy(
         val decodedVical = Vical.decode(vicalBase64.decodeFromBase64())
 
         val certificateInfos = if (enableDocumentTypeValidation) {
-            _root_ide_package_.id.walt.policies2.vc.policies.log.debug { "Document type validation is enabled" }
+            log.debug { "Document type validation is enabled" }
             decodedVical.vicalData.certificateInfos.filter { allowedDocType in it.docType }
         } else decodedVical.vicalData.certificateInfos
 

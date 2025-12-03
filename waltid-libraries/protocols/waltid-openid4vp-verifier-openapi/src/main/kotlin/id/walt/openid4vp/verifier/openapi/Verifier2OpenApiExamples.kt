@@ -224,7 +224,7 @@ object Verifier2OpenApiExamples {
                 )
             ),
             policies = DefinedVerificationPolicies(
-                vcPolicies = VCPolicyList(
+                vc_policies = VCPolicyList(
                     listOf(
                         CredentialSignaturePolicy(),
                         VicalPolicy(
@@ -243,7 +243,7 @@ object Verifier2OpenApiExamples {
     val basicExampleWithStatusPolicyForTokenStatusList = basicExample.copy(
         core = basicExample.core.copy(
             policies = DefinedVerificationPolicies(
-                vcPolicies = VCPolicyList(
+                vc_policies = VCPolicyList(
                     policies = listOf(
                         StatusPolicy(
                             argument = IETFStatusPolicyAttribute(
@@ -272,7 +272,7 @@ object Verifier2OpenApiExamples {
                 credentials = listOf(w3cCredentialQuery)
             ),
             policies = DefinedVerificationPolicies(
-                vcPolicies = VCPolicyList(
+                vc_policies = VCPolicyList(
                     policies = listOf(RevocationPolicy())
                 )
             )
@@ -285,7 +285,7 @@ object Verifier2OpenApiExamples {
                 credentials = listOf(w3cCredentialQuery)
             ),
             policies = DefinedVerificationPolicies(
-                vcPolicies = VCPolicyList(
+                vc_policies = VCPolicyList(
                     policies = listOf(
                         StatusPolicy(
                             argument = W3CStatusPolicyAttribute(
@@ -304,7 +304,7 @@ object Verifier2OpenApiExamples {
                 credentials = listOf(w3cCredentialQuery)
             ),
             policies = DefinedVerificationPolicies(
-                vcPolicies = VCPolicyList(
+                vc_policies = VCPolicyList(
                     policies = listOf(
                         StatusPolicy(
                             argument = W3CStatusPolicyListArguments(

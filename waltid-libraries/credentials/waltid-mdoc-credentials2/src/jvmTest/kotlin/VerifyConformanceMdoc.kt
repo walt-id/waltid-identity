@@ -2,8 +2,8 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.mdoc.crypto.MdocCrypto
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.parser.MdocParser
-import id.walt.mdoc.verification.MdocVerifier
 import id.walt.mdoc.verification.MdocVerificationContext
+import id.walt.mdoc.verification.MdocVerifier
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertTrue

@@ -76,7 +76,7 @@ class W3CVerifier2IntegrationTest {
     )
 
     private val w3cPolicies = Verification2Session.DefinedVerificationPolicies(
-        vcPolicies = VCPolicyList(
+        vc_policies = VCPolicyList(
             listOf(
                 CredentialSignaturePolicy()
             )

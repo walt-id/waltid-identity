@@ -241,15 +241,15 @@ object VerificationSessionCreator {
         } else null
 
         val effectivePolicies = DefinedVerificationPolicies(
-            vpPolicies = setup.core.policies.vpPolicies ?: VPPolicyList(
+            vp_policies = setup.core.policies.vp_policies ?: VPPolicyList(
                 jwtVcJson = VPVerificationPolicyManager.defaultJwtVcJsonPolicies,
                 dcSdJwt = VPVerificationPolicyManager.defaultDcSdJwtPolicies,
                 msoMdoc = VPVerificationPolicyManager.defaultMsoMdocPolicies
             ),
-            vcPolicies = setup.core.policies.vcPolicies ?: VCPolicyList(
+            vc_policies = setup.core.policies.vc_policies ?: VCPolicyList(
                 policies = listOf(CredentialSignaturePolicy())
             ),
-            specificVcPolicies = setup.core.policies.specificVcPolicies
+            specific_vc_policies = setup.core.policies.specific_vc_policies
         )
 
         val newSession = Verification2Session(

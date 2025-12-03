@@ -71,7 +71,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
     )
 
     private val sdjwtvcPolicies = Verification2Session.DefinedVerificationPolicies(
-        vcPolicies = VCPolicyList(
+        vc_policies = VCPolicyList(
             listOf(
                 CredentialSignaturePolicy()
             )

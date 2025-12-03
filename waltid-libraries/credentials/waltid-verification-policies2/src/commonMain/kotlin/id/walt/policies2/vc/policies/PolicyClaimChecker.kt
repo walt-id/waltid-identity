@@ -44,7 +44,7 @@ object PolicyClaimChecker {
         }
 
         if (foundClaim == null) {
-            return Result.success(_root_ide_package_.id.walt.policies2.vc.policies.PolicyClaimChecker.ClaimNotFoundClaimCheckResult.Companion.CLAIM_NOT_FOUND)
+            return Result.success(ClaimNotFoundClaimCheckResult.CLAIM_NOT_FOUND)
         }
 
         val data = credentialData.resolveOrNull(foundClaim)

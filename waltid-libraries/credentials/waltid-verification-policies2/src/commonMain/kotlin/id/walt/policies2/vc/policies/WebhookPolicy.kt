@@ -6,7 +6,6 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
-import io.ktor.client.request.setBody
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.SerialName
@@ -27,7 +26,7 @@ data class WebhookPolicy(
 
     @SerialName("bearerauth_token")
     val bearerAuthToken: String? = null,
-) : id.walt.policies2.vc.policies.CredentialVerificationPolicy2() {
+) : CredentialVerificationPolicy2() {
     override val id = "webhook"
 
     companion object {
@@ -40,7 +39,7 @@ data class WebhookPolicy(
 
     override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
         val responseResult = runCatching {
-            _root_ide_package_.id.walt.policies2.vc.policies.WebhookPolicy.Companion.http.post(url) {
+            http.post(url) {
                 setBody(credential)
                 header(HttpHeaders.ContentType, ContentType.Application.Json)
 

@@ -41,7 +41,7 @@ object PresentationVerificationEngine {
         presentationString: String,
         session: Verification2Session,
     ): Map<String, VPPolicy2.PolicyRunResult> {
-        requireNotNull(session.policies.vpPolicies) { "TODO: vpPolicies cannot be null right now" }
+        requireNotNull(session.policies.vp_policies) { "TODO: vpPolicies cannot be null right now" }
 
         val authorizationRequest = session.authorizationRequest
         val responseMode = session.authorizationRequest.responseMode
@@ -65,7 +65,7 @@ object PresentationVerificationEngine {
 
         return VPPolicyRunner.verifyPresentation(
             presentation = presentation,
-            policies = session.policies.vpPolicies,
+            policies = session.policies.vp_policies,
             verificationContext = verificationContext
         )
     }

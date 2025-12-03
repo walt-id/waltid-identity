@@ -1,7 +1,6 @@
 package id.walt.policies2.vc
 
 import id.walt.credentials.CredentialParser
-import id.walt.credentials.examples.SdJwtExamples
 import id.walt.credentials.examples.W3CExamples
 import id.walt.policies2.vc.policies.CredentialDataMatcherPolicy
 import kotlin.test.Test

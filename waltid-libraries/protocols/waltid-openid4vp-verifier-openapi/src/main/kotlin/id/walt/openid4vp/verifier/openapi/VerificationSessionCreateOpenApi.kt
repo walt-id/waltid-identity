@@ -79,7 +79,7 @@ object VerificationSessionCreateOpenApi {
                     value = Verifier2OpenApiExamples.basicExampleWithStatusPolicyForTokenStatusList
                 }
 
-                example("VICAL: ISO mdocs with VICAL policy (only for ISO mDL/mdoc") { value = Verifier2OpenApiExamples.VicalPolicyValues }
+                example("VICAL: ISO mdocs with VICAL policy (only for ISO mDL/mdoc)") { value = Verifier2OpenApiExamples.VicalPolicyValues }
             }
         }
         response {

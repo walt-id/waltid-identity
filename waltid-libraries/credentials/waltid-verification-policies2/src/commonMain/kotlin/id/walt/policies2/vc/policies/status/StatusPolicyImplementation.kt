@@ -8,12 +8,7 @@ import id.walt.policies2.vc.policies.status.entry.MDocEntryExtractor
 import id.walt.policies2.vc.policies.status.entry.W3CEntryExtractor
 import id.walt.policies2.vc.policies.status.expansion.TokenStatusListExpansionAlgorithm
 import id.walt.policies2.vc.policies.status.expansion.W3cStatusListExpansionAlgorithmFactory
-import id.walt.policies2.vc.policies.status.model.IETFEntry
-import id.walt.policies2.vc.policies.status.model.IETFStatusPolicyAttribute
-import id.walt.policies2.vc.policies.status.model.StatusPolicyArgument
-import id.walt.policies2.vc.policies.status.model.W3CEntry
-import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyAttribute
-import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyListArguments
+import id.walt.policies2.vc.policies.status.model.*
 import id.walt.policies2.vc.policies.status.reader.IETFJwtStatusValueReader
 import id.walt.policies2.vc.policies.status.reader.W3CStatusValueReader
 import id.walt.policies2.vc.policies.status.validator.IETFStatusValidator
@@ -34,7 +29,7 @@ object StatusPolicyImplementation {
         }
     }
 
-    private val credentialFetcher = _root_ide_package_.id.walt.policies2.vc.policies.status.CredentialFetcher(httpClient)
+    private val credentialFetcher = CredentialFetcher(httpClient)
 
     private val w3cEntryExtractor = W3CEntryExtractor()
 
@@ -59,7 +54,7 @@ object StatusPolicyImplementation {
 
     private val bitValueReaderFactory = BitValueReaderFactory()
 
-    private val base64UrlHandler = _root_ide_package_.id.walt.policies2.vc.policies.status.Base64UrlHandler()
+    private val base64UrlHandler = Base64UrlHandler()
 
     private val statusListExpansionAlgorithmFactory =
         W3cStatusListExpansionAlgorithmFactory(base64UrlHandler)

@@ -124,15 +124,15 @@ data class Verification2Session(
     data class DefinedVerificationPolicies(
         /** Policies to run on the presentations (Policies from: waltid-verification-policies2-vp) */
         @SerialName("vp_policies")
-        val vpPolicies: VPPolicyList? = null,
+        val vp_policies: VPPolicyList? = null,
 
         /** Policies to run on the credentials (Policies from: waltid-verification-policies2) */
         @SerialName("vc_policies")
-        val vcPolicies: VCPolicyList? = null,
+        val vc_policies: VCPolicyList? = null,
 
         /** Policies to run on specific credential ids (Policies from: waltid-verification-policies2) */
         @SerialName("specific_vc_policies")
-        val specificVcPolicies: Map<String, VCPolicyList>? = null
+        val specific_vc_policies: Map<String, VCPolicyList>? = null
     )
 
     @Serializable

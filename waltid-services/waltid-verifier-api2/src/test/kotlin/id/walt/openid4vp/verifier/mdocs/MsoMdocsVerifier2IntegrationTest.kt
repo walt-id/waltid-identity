@@ -81,7 +81,7 @@ class MsoMdocsVerifier2IntegrationTest {
     )
 
     private val mdocsPolicies = Verification2Session.DefinedVerificationPolicies(
-        vcPolicies = VCPolicyList(
+        vc_policies = VCPolicyList(
             listOf(
                 CredentialSignaturePolicy(),
                 CredentialDataMatcherPolicy(path = "$.['org.iso.23220.dtc.1'].dtc_version", regex = """^("[0-9]+"|-?[0-9]+(\.[0-9]+)?)$""")

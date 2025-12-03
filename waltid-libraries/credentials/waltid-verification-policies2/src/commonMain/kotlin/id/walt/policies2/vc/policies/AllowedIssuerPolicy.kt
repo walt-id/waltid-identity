@@ -13,7 +13,7 @@ import kotlinx.serialization.json.*
 data class AllowedIssuerPolicy(
     @SerialName("allowed_issuer")
     val allowedIssuer: JsonElement
-) : id.walt.policies2.vc.policies.CredentialVerificationPolicy2() {
+) : CredentialVerificationPolicy2() {
     override val id = "allowed-issuer"
 
     private fun JsonElement.getIssuerList(): List<String> = when (allowedIssuer) {
@@ -33,12 +33,10 @@ data class AllowedIssuerPolicy(
         val issuer: String,
 
         override val claim: String
-    ) : id.walt.policies2.vc.policies.PolicyClaimChecker.ClaimCheckResultSuccess()
+    ) : PolicyClaimChecker.ClaimCheckResultSuccess()
 
     override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
-        return _root_ide_package_.id.walt.policies2.vc.policies.PolicyClaimChecker.checkClaim(credential,
-            _root_ide_package_.id.walt.policies2.vc.policies.AllowedIssuerPolicy.Companion.claims
-        ) { claim ->
+        return PolicyClaimChecker.checkClaim(credential, claims) { claim ->
             val issuer = credential.issuer
             val allowedIssuers = getAllowedIssuers()
 

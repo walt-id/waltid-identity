@@ -488,7 +488,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                 assertNotNull(info2.policyResults)
                 assertTrue { info2.policyResults!!.overallSuccess }
 
-                assertTrue { info2.policyResults!!.vcPolicies.size == additionalSdjwtvcPolicies.vcPolicies?.policies?.size }
+                assertTrue { info2.policyResults!!.vcPolicies.size == additionalSdjwtvcPolicies.vc_policies?.policies?.size }
             }
         }
     }

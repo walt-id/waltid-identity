@@ -32,7 +32,7 @@ object Verifier2SessionCredentialPolicyValidation {
         // --- General VC Policies ---
         val generalPolicyJobs = validatedCredentials.flatMap { (queryId, credentials) ->
             credentials.flatMap { credential ->
-                policies.vcPolicies?.policies.orEmpty().map { policy ->
+                policies.vc_policies?.policies.orEmpty().map { policy ->
                     async(Dispatchers.Default) {
                         log.trace { "Validating '$queryId' credential with policy '${policy.id}': $credential" }
                         val result = policy.verify(credential)
@@ -50,7 +50,7 @@ object Verifier2SessionCredentialPolicyValidation {
         }
 
         // --- Specific VC Policies ---
-        val specificPolicyJobs = policies.specificVcPolicies.orEmpty().flatMap { (queryId, queryPolicies) ->
+        val specificPolicyJobs = policies.specific_vc_policies.orEmpty().flatMap { (queryId, queryPolicies) ->
             val credentials = validatedCredentials[queryId].orEmpty()
 
             credentials.flatMap { specificCredential ->

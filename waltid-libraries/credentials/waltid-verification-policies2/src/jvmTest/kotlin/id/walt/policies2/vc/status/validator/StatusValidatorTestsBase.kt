@@ -15,7 +15,6 @@ import id.walt.policies2.vc.policies.status.expansion.*
 import id.walt.policies2.vc.policies.status.model.*
 import id.walt.policies2.vc.policies.status.reader.StatusValueReader
 import id.walt.policies2.vc.policies.status.validator.StatusValidator
-import id.walt.policies2.vc.policies.status.model.StatusEntry
 import io.mockk.*
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals

@@ -1,19 +1,17 @@
 package id.walt.credentials.formats
 
-import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseVerifier
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.CredentialSignature
 import id.walt.crypto.keys.Key
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
-import id.walt.crypto.utils.Base64Utils.matchesBase64Url
-import id.walt.crypto.utils.HexUtils.matchesHex
 import id.walt.did.dids.resolver.local.DidJwkResolver
-import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.parser.MdocParser
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.*
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
