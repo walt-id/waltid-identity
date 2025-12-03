@@ -1,17 +1,27 @@
-package id.walt.policies2.vp.policies.dc_sd_jwt
+@file:Suppress("PackageDirectoryMismatch")
 
-import id.walt.policies2.vp.policies.AbstractVPPolicy
+package id.walt.policies2.vp.policies
 
-abstract class DcSdJwtVPPolicy(sdJwtId: String, description: String) : AbstractVPPolicy("dc+sd-jwt/$sdJwtId", description) {
+import id.walt.credentials.presentations.formats.DcSdJwtPresentation
+import kotlinx.serialization.Serializable
+
+@Serializable
+sealed class DcSdJwtVPPolicy() : VPPolicy2() {
+
+    abstract val sdJwtId: String
+    override val id = "dc+sd-jwt/$sdJwtId"
+    abstract override val description: String
 
     abstract suspend fun VPPolicyRunContext.verifySdJwtPolicy(
-
+        presentation: DcSdJwtPresentation,
+        verificationContext: DcSdJwtVPVerificationRequest
     ): Result<Unit>
 
     suspend fun runPolicy(
-
+        presentation: DcSdJwtPresentation,
+        verificationContext: DcSdJwtVPVerificationRequest
     ) = runPolicy {
-        verifySdJwtPolicy()
+        verifySdJwtPolicy(presentation, verificationContext)
     }
 
 }

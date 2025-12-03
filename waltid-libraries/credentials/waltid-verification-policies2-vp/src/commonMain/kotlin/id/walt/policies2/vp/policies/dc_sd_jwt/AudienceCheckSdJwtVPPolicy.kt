@@ -1,0 +1,38 @@
+@file:Suppress("PackageDirectoryMismatch")
+
+package id.walt.policies2.vp.policies
+
+import id.walt.credentials.presentations.DcSdJwtPresentationValidationError
+import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequire
+import id.walt.credentials.presentations.formats.DcSdJwtPresentation
+import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+private const val policyId = "audience-check"
+
+@Serializable
+@SerialName(policyId)
+class AudienceCheckSdJwtVPPolicy : DcSdJwtVPPolicy(
+    policyId,
+    "Check if presentation audience matches expected audience for session"
+) {
+
+    companion object {
+        val log = KotlinLogging.logger { }
+    }
+
+    override suspend fun VPPolicyRunContext.verifySdJwtPolicy(
+        presentation: DcSdJwtPresentation,
+        verificationContext: DcSdJwtVPVerificationRequest
+    ): Result<Unit> {
+        addResult("presentation_audience", presentation.audience)
+        addResult("expected_audience", verificationContext.base.expectedAudience)
+        presentationRequire(
+            presentation.audience == verificationContext.base.expectedAudience,
+            DcSdJwtPresentationValidationError.AUDIENCE_MISMATCH
+        ) { "Expected ${verificationContext.base.expectedAudience}, got ${presentation.audience}" }
+
+        return success()
+    }
+}
