@@ -16,12 +16,19 @@
     <br/>
     <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
   </p>
-
 </div>
 
-## What This Application Contains
 
-`waltid-web-portal` is a Next.js web application that provides a user-friendly interface for issuing and verifying W3C Verifiable Credentials. It serves as a demonstration and testing tool for the walt.id credential ecosystem, allowing users to interact with credentials through a web browser.
+## Overview
+
+This web portal integrates four core walt.id services to provide a complete credential lifecycle:
+
+- **Credentials API** (`NEXT_PUBLIC_VC_REPO`): Serves credential schemas and templates
+- **Issuer API** (`NEXT_PUBLIC_ISSUER`): Issues verifiable credentials to wallets
+- **Verifier API** (`NEXT_PUBLIC_VERIFIER`): Requests and verifies credentials from wallets
+- **Wallet** (`NEXT_PUBLIC_WALLET`): End-user wallet for receiving and presenting credentials
+
+The portal acts as a frontend that orchestrates these services to demonstrate credential issuance and verification flows.
 
 ## Main Purpose
 
@@ -154,6 +161,16 @@ docker run -p 7102:7102 -i -t waltid/portal
 ```
 
 **Note**: When using Docker, ensure environment variables are set via `-e` flags or an `.env` file.
+
+## Adding New Credentials
+
+To add support for new credential types:
+
+1. **Add credential schema** to the Credentials API repository
+2. **Update issuer metadata** to include the new credential type in supported credentials
+3. The portal will automatically discover and display new credentials from the configured endpoints
+
+Both the credential repository and issuer metadata must be updated for credentials to appear in the issuance flow.
 
 ## Join the community
 

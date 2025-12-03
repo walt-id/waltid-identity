@@ -1,0 +1,30 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview"
+  },
+  "devDependencies": {
+    "@nuxt/content": "^2.13.0",
+    "@nuxt/devtools": "^2.6.2",
+    "@unocss/nuxt": "^66.4.2",
+    "nuxt": "^3.10.0",
+    "@nuxt/icon": "^1.11.0",
+    "nuxt-security": "2.3.0",
+    "tailwindcss": "^4.1.11",
+    "vue-router": "^4.5.1"
+  },
+  "dependencies": {
+    "@headlessui/vue": "^1.7.23",
+    "@heroicons/vue": "^2.2.0",
+    "@julr/unocss-preset-forms": "^2.0.0",
+    "@nuxt/image": "^1.11.0",
+    "@nuxt/kit": "^3.10.0",
+    "@unocss/reset": "^66.4.2",
+    "@vueuse/nuxt": "^13.6.0",
+    "better-sqlite3": "^12.2.0"
+  }
+}
