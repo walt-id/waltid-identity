@@ -8,7 +8,7 @@ import kotlinx.serialization.json.*
 
 @Serializable
 @SerialName("signature")
-class CredentialSignaturePolicy : id.walt.policies2.vc.policies.CredentialVerificationPolicy2() {
+class CredentialSignaturePolicy : CredentialVerificationPolicy2() {
     override val id = "signature"
 
     companion object {

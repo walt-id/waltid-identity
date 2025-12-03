@@ -12,7 +12,7 @@ import kotlinx.serialization.json.JsonElement
 
 @Serializable
 @SerialName("revoked-status-list")
-class RevocationPolicy : id.walt.policies2.vc.policies.CredentialVerificationPolicy2() {
+class RevocationPolicy : CredentialVerificationPolicy2() {
 
     override val id: String = "revoked-status-list"
 

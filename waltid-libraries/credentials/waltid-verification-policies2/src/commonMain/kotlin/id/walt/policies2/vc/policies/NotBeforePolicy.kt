@@ -21,7 +21,7 @@ import kotlin.time.Instant
 
 @Serializable
 @SerialName("not-before")
-class NotBeforePolicy : id.walt.policies2.vc.policies.CredentialVerificationPolicy2() {
+class NotBeforePolicy : CredentialVerificationPolicy2() {
     override val id = "not-before"
 
     companion object {
@@ -45,12 +45,12 @@ class NotBeforePolicy : id.walt.policies2.vc.policies.CredentialVerificationPoli
         val availableSinceSeconds: Long,
 
         override val claim: String
-    ) : id.walt.policies2.vc.policies.PolicyClaimChecker.ClaimCheckResultSuccess()
+    ) : PolicyClaimChecker.ClaimCheckResultSuccess()
 
     override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
-        return _root_ide_package_.id.walt.policies2.vc.policies.PolicyClaimChecker.checkClaim(
+        return PolicyClaimChecker.checkClaim(
             credential,
-            _root_ide_package_.id.walt.policies2.vc.policies.NotBeforePolicy.Companion.claims
+            claims
         ) { claim ->
             require(this is JsonPrimitive) { "Claim at $claim is not a JSON primitive" }
 
