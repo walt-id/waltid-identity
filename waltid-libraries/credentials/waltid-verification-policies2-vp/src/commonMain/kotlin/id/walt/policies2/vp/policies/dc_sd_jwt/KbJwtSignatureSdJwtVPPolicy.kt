@@ -10,7 +10,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-private const val policyId = "dc+sd-jwt/audience-check"
+private const val policyId = "dc+sd-jwt/kb-jwt_signature"
 
 @Serializable
 @SerialName(policyId)
