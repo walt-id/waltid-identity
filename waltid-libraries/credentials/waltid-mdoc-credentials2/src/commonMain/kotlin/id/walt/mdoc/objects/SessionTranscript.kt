@@ -91,7 +91,7 @@ data class SessionTranscript private constructor(
         ): SessionTranscript = SessionTranscript(
             deviceEngagementBytesOid = null,
             eReaderKeyBytesOid = null,
-            isooid4VPHandover = handover,
+            isooid4VPHandover = handover
         )
 
         /** Creates a SessionTranscript for an OID4VP Handover flow based on the final OID4VP 1.0 spec. */
@@ -100,17 +100,18 @@ data class SessionTranscript private constructor(
         ): SessionTranscript = SessionTranscript(
             deviceEngagementBytesOid = null,
             eReaderKeyBytesOid = null,
-            oid4VPHandover = handover,
+            oid4VPHandover = handover
         )
 
         /** Creates a SessionTranscript for a DCAPI Handover flow. */
+        /* Can share handover?
         fun forDcApi(
             handover: DCAPIHandover,
         ): SessionTranscript = SessionTranscript(
             deviceEngagementBytesOid = null,
             eReaderKeyBytesOid = null,
-            dcapiHandover = handover,
-        )
+            dcapiHandover = handover
+        )*/
 
         /** Creates a SessionTranscript for a QR Code Handover flow (where the Handover element is null). */
         fun forQr(

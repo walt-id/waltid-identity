@@ -39,7 +39,7 @@ data class DcSdJwtPresentation(
     /** The holder-signed Key-Binding JWT that proves possession and binds to the transaction. */
     val keyBindingJwt: String,
 
-    val credential: DigitalCredential,
+    val credential: SdJwtCredential,
 
     // claims:
     val audience: String?,
@@ -50,7 +50,7 @@ data class DcSdJwtPresentation(
 ) : VerifiablePresentation(format = PresentationFormat.`dc+sd-jwt`) {
 
     suspend fun presentationVerification(
-        expectedAudience: String,
+        expectedAudience: String?,
         expectedNonce: String,
         originalClaimsQuery: List<ClaimsQuery>?
     ) {
@@ -162,7 +162,7 @@ data class DcSdJwtPresentation(
                     sdJwtCore + "~" + presentedDisclosures.sorted().joinToString("~"), // Sorted (should not be the case)
                     sdJwtCore + "~" + presentedDisclosures.sorted().joinToString("~") + "~", // Sorted + end suffix (should not be the case)
                     */
-                ) else listOf("")
+                ) else listOf("$sdJwtCore~")
 
             /*
             // NOTE: Log the allowed hash variants
@@ -178,6 +178,8 @@ data class DcSdJwtPresentation(
             // It should verify that the digests in the `_sd` array of the core match the hashes of the provided disclosures.
             val (_, reconstructedCredential) = CredentialParser.detectAndParse(hashableString)
                 ?: return Result.failure(IllegalArgumentException("Failed to parse/reconstruct credential from SD-JWT core and disclosures."))
+
+            require(reconstructedCredential is SdJwtCredential) { "Credential is not an SD-JWT credential: $reconstructedCredential" }
 
             return Result.success(
                 DcSdJwtPresentation(

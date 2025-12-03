@@ -138,6 +138,32 @@ data class PhotoId(
                 ),
                 "org.iso.23220.photoid.1"
             )
+
+            MdocsCborSerializer.register(
+                mapOf(
+                    "birth_date" to localDate,
+                    "issue_date" to localDate,
+                    "expiry_date" to localDate,
+                    "portrait" to byteArray,
+                    "sex" to IsoSexEnumSerializer,
+                    "portrait_capture_date" to localDate,
+                    "age_in_year" to uint,
+                    "age_birth_year" to uint,
+                    "age_over_12" to boolean,
+                    "age_over_13" to boolean,
+                    "age_over_14" to boolean,
+                    "age_over_16" to boolean,
+                    "age_over_18" to boolean,
+                    "age_over_21" to boolean,
+                    "age_over_25" to boolean,
+                    "age_over_60" to boolean,
+                    "age_over_62" to boolean,
+                    "age_over_65" to boolean,
+                    "age_over_68" to boolean,
+
+                    ),
+                "org.iso.23220.1"
+            )
         }
 
     }

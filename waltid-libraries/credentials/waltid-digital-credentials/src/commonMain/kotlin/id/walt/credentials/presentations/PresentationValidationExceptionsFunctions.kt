@@ -7,7 +7,7 @@ import kotlin.contracts.contract
 object PresentationValidationExceptionFunctions {
 
     @OptIn(ExperimentalContracts::class)
-    internal fun presentationRequire(
+    fun presentationRequire(
         value: Boolean,
         error: PresentationValidationErrors,
         cause: Throwable? = null,
@@ -17,7 +17,7 @@ object PresentationValidationExceptionFunctions {
         if (!value) presentationThrowError(error, cause, lazyAdditionalMessage)
     }
 
-    internal fun <T> presentationRequireSuccess(
+    fun <T> presentationRequireSuccess(
         res: Result<T>,
         error: PresentationValidationErrors,
         lazyAdditionalMessage: (() -> String)? = null
@@ -32,7 +32,7 @@ object PresentationValidationExceptionFunctions {
     }
 
     @OptIn(ExperimentalContracts::class)
-    internal fun <T : Any> presentationRequireNotNull(
+    fun <T : Any> presentationRequireNotNull(
         value: T?,
         error: PresentationValidationErrors,
         lazyAdditionalMessage: (() -> String)? = null
@@ -43,7 +43,7 @@ object PresentationValidationExceptionFunctions {
         if (value == null) presentationThrowError(error, lazyAdditionalMessage = lazyAdditionalMessage)
     }
 
-    internal fun presentationThrowError(
+    fun presentationThrowError(
         error: PresentationValidationErrors,
         cause: Throwable? = null,
         lazyAdditionalMessage: (() -> String)? = null

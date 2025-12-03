@@ -90,9 +90,14 @@ Parser and matcher for DIF Presentation Definition objects. Enables matching cre
 These libraries provide credential and presentation verification capabilities:
 
 #### **[🟢 waltid-verification-policies2](./waltid-verification-policies2)**
-Modern verification policy system for OpenID4VP 1.0. Provides composable policies with a consistent `Result<JsonElement>` contract, working with the unified `DigitalCredential` interface.
+Modern verification policy system for OpenID4VP 1.0. Provides composable credential-level verification policies with a consistent `Result<JsonElement>` contract, working with the unified `DigitalCredential` interface.
 
-**Use when:** You're building verifier services and need JSON-configurable verification policies.
+**Use when:** You're building verifier services and need JSON-configurable credential verification policies (signature, expiration, issuer, schema, etc.).
+
+#### **[🟢 waltid-verification-policies2-vp](./waltid-verification-policies2-vp)**
+Modern verification policy system for Verifiable Presentations. Provides composable presentation-level verification policies organized by format (JWT VC JSON, SD-JWT, mdoc). Complements credential-level policies in `waltid-verification-policies2`.
+
+**Use when:** You're building verifier services and need JSON-configurable presentation verification policies (audience, nonce, signature, integrity checks).
 
 #### **[🟠 waltid-verification-policies](./waltid-verification-policies)**
 Legacy verification policy system supporting OpenID4VP draft implementations. Provides comprehensive policy support including credential status checks, revocation, and presentation-level policies.
@@ -146,12 +151,14 @@ VICAL (Verifiable Issuer Certificate Authority List) trust list validation for m
 │ (OpenID4VP 1.0)         │ (DIF Presentation Exchange)   │
 └─────────────────────────┴───────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────┐
-│         Verification Libraries                          │
-├─────────────────────────┬───────────────────────────────┤
-│ waltid-verification-    │ waltid-verification-          │
-│ policies2               │ policies                      │
-└─────────────────────────┴───────────────────────────────┘
+┌─────────────────────────────────────────────────────────-┐
+│         Verification Libraries                           │
+├──────────────┬────────────--──┬──────────────────────────┤
+│ waltid-      │ waltid-        │ waltid-verification-     │
+│ verification-│ verification-  │ policies                 │
+│ policies2    │ policies2-vp   │ (legacy)                 │
+│ (credentials)│ (presentations)│                          │
+└──────────────┴──────────────--┴──────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────┐
 │         Supporting Libraries                            │
@@ -180,11 +187,12 @@ VICAL (Verifiable Issuer Certificate Authority List) trust list validation for m
 
 ### Building a Verifier Service
 
-1. Use **waltid-verification-policies2** for multiplatform verification policies
-2. Use **waltid-verification-policies** for legacy verification policies
-3. Use **waltid-digital-credentials** to parse credentials for verification
-4. Use **waltid-dcql** to create credential queries for OpenID4VP 1.0
-5. Use **waltid-dif-definitions-parser** to create Presentation Definitions for draft implementations
+1. Use **waltid-verification-policies2** for credential-level verification policies
+2. Use **waltid-verification-policies2-vp** for presentation-level verification policies
+3. Use **waltid-verification-policies** for legacy verification policies
+4. Use **waltid-digital-credentials** to parse credentials and presentations for verification
+5. Use **waltid-dcql** to create credential queries for OpenID4VP 1.0
+6. Use **waltid-dif-definitions-parser** to create Presentation Definitions for draft implementations
 
 ### Working with mdoc Credentials
 
@@ -199,7 +207,7 @@ Each library has its own README with detailed documentation. For quick reference
 
 - **New to credentials?** Start with [waltid-digital-credentials](./waltid-digital-credentials) to understand the unified abstraction
 - **Building an issuer?** See [waltid-w3c-credentials](./waltid-w3c-credentials) for W3C credentials or [waltid-mdoc-credentials2](./waltid-mdoc-credentials2) for mdocs
-- **Building a verifier?** See [waltid-verification-policies2](./waltid-verification-policies2) for OpenID4VP 1.0
+- **Building a verifier?** See [waltid-verification-policies2](./waltid-verification-policies2) for credential verification and [waltid-verification-policies2-vp](./waltid-verification-policies2-vp) for presentation verification
 - **Building a wallet?** See [waltid-digital-credentials](./waltid-digital-credentials) and [waltid-holder-policies](./waltid-holder-policies)
 
 ## Dependencies Between Libraries
@@ -213,6 +221,11 @@ The libraries have the following dependency relationships:
 
 - **waltid-verification-policies2** depends on:
   - waltid-digital-credentials (for unified credential interface)
+
+- **waltid-verification-policies2-vp** depends on:
+  - waltid-digital-credentials (for unified credential/presentation interface)
+  - waltid-openid4vp (for OpenID4VP protocol support)
+  - waltid-dcql (for DCQL query matching)
 
 - **waltid-holder-policies** depends on:
   - waltid-digital-credentials (for credential interface)

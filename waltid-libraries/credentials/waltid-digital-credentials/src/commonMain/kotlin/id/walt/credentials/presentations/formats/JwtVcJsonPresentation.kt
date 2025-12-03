@@ -40,11 +40,10 @@ data class JwtVcJsonPresentation(
 ) : VerifiablePresentation(format = PresentationFormat.jwt_vc_json) {
 
     suspend fun presentationVerification(
-        expectedAudience: String,
+        expectedAudience: String?,
         expectedNonce: String
     ) {
         presentationRequireNotNull(issuer, W3CPresentationValidationError.ISSUER_NOT_FOUND)
-        requireNotNull(issuer) { "Was unable to get issuer DID for W3C VP" }
 
         // Verify its signature using the Holder's public key (obtained from vpJwt.payload.iss DID or other mechanism).
         val holderKey = DidService.resolveToKey(issuer).getOrThrow() // TODO: handle multi key
@@ -54,11 +53,6 @@ data class JwtVcJsonPresentation(
             vpJwtStringVerification,
             W3CPresentationValidationError.SIGNATURE_VERIFICATION_FAILED
         ) { "Failed to verify VP JWT String: $jwt" }
-
-        presentationRequire(
-            vpJwtStringVerification.isSuccess,
-            W3CPresentationValidationError.SIGNATURE_VERIFICATION_FAILED
-        )
 
         // Verify aud == expectedAudience.
         presentationRequire(

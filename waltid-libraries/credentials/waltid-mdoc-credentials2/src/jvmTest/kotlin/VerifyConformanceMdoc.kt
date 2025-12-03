@@ -2,8 +2,8 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.mdoc.crypto.MdocCrypto
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.parser.MdocParser
+import id.walt.mdoc.verification.MdocVerificationContext
 import id.walt.mdoc.verification.MdocVerifier
-import id.walt.mdoc.verification.VerificationContext
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -18,7 +18,7 @@ class VerifyConformanceMdoc {
         private const val nonce = "ed441c8c-428e-4b9a-807b-b3873f82e03e"
         private val jwkThumbprint = null
         private const val responseUri = "https://verifier2.localhost/verification-session/9e1f6432-338b-4938-9339-2c194bc76ef4/response"
-        private val verificationContext = VerificationContext(nonce, clientId, responseUri)
+        private val verificationContext = MdocVerificationContext(nonce, clientId, responseUri)
     }
 
     @Test
@@ -56,7 +56,7 @@ class VerifyConformanceMdoc {
         )
         println("Key (from MSO): $verifyResult")
 
-        require(verifyResult)
+        require(verifyResult) { "Failed verifying device signature" }
     }
 
     @Test
@@ -65,7 +65,7 @@ class VerifyConformanceMdoc {
         val verificationResult = MdocVerifier.verify(vpTokenMdocBase64, verificationContext)
         println("Verification result: $verificationResult")
 
-        assertTrue { verificationResult.valid }
+        assertTrue("Verification result is not valid") { verificationResult.valid }
     }
 
 }

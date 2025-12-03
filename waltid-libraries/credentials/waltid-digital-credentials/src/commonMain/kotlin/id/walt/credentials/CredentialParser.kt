@@ -1,6 +1,5 @@
 package id.walt.credentials
 
-import cbor.Cbor
 import id.walt.cose.coseCompliantCbor
 import id.walt.credentials.CredentialDetectorTypes.CredentialDetectionResult
 import id.walt.credentials.CredentialDetectorTypes.CredentialPrimaryDataType
@@ -21,14 +20,10 @@ import id.walt.credentials.utils.SdJwtUtils.dropDollarPrefix
 import id.walt.credentials.utils.SdJwtUtils.getSdArrays
 import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
 import id.walt.crypto.keys.DirectSerializedKey
-import id.walt.crypto.utils.Base64Utils.base64Url
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.matchesBase64Url
 import id.walt.crypto.utils.HexUtils.matchesHex
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.mdoc.dataelement.MapElement
-import id.walt.mdoc.dataelement.MapKey
-import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.document.Document
@@ -37,7 +32,6 @@ import id.walt.sdjwt.SDJwt
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.decodeFromHexString
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -86,13 +80,21 @@ object CredentialParser {
 
     fun getJwtHeaderOrDataSubject(data: JsonObject) = data.getString("sub") ?: getCredentialDataSubject(data)
 
-    private suspend fun handleMdocs(credential: String, base64: Boolean = false): Pair<CredentialDetectionResult, MdocsCredential> {
+    suspend fun handleMdocs(credential: String, base64: Boolean = false): Pair<CredentialDetectionResult, MdocsCredential> {
         log.trace { "Handle mdocs, string: $credential" }
 
         // --- New mdocs handling ---
+
+        // vvvv
         val deviceResponseBytes = if (base64) credential.decodeFromBase64Url() else credential.hexToByteArray()
+        // ^^^^
 
         // Parse DeviceResponse or Document into Document
+
+        // vvvv
+        //val document = MdocParser.parseToDocument(credential)
+        // ^^^^
+
         val document = runCatching {
             val deviceResponse = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(deviceResponseBytes)
             val document =
@@ -110,7 +112,6 @@ object CredentialParser {
         // Build a JSON object that includes the docType for the DcqlMatcher
         val credentialData = buildJsonObject {
             put("docType", JsonPrimitive(document.docType))
-            // You can add other top-level metadata here if needed
 
             document.issuerSigned.namespaces?.forEach { (namespace, issuerSignedList) ->
                 putJsonObject(namespace) {
@@ -136,22 +137,26 @@ object CredentialParser {
         // TODO: Issuer currently issues incorrect Mdocs, so old mdocs lib is used.
         // TODO: When issuer is updated, remove the old mdocs lib usage below.
 
+        val hasSd = !document.issuerSigned.namespaces.isNullOrEmpty()
+
         // --- Old mdocs handling ---
 
-        val mapElement =
-            if (base64) Cbor.decodeFromByteArray<MapElement>(base64Url.decode(credential)) else Cbor.decodeFromHexString<MapElement>(
-                credential
-            )
-        // detect if this is the issuer-signed structure or the full mdoc
-        if (!mapElement.value.keys.containsAll(listOf(MapKey("docType"), MapKey("issuerSigned"))))
-            throw NotImplementedError("Invalid mdoc structure: $credential, only full mdocs are currently supported. If this is an issuer signed structure, like returned by an OpenID4VCI issuer, the doc type is additionally required to restore the full mdoc.")
-        val mdoc = MDoc.fromMapElement(mapElement)
-        val hasSd = !(mdoc.issuerSigned.nameSpaces?.values?.flatten().isNullOrEmpty())
 
+//        val mapElement =
+//            if (base64) Cbor.decodeFromByteArray<MapElement>(base64Url.decode(credential)) else Cbor.decodeFromHexString<MapElement>(
+//                credential
+//            )
+//        // detect if this is the issuer-signed structure or the full mdoc
+//        if (!mapElement.value.keys.containsAll(listOf(MapKey("docType"), MapKey("issuerSigned"))))
+//            throw NotImplementedError("Invalid mdoc structure: $credential, only full mdocs are currently supported. If this is an issuer signed structure, like returned by an OpenID4VCI issuer, the doc type is additionally required to restore the full mdoc.")
+//        val mdoc = MDoc.fromMapElement(mapElement)
+//        val hasSd = !(mdoc.issuerSigned.nameSpaces?.values?.flatten().isNullOrEmpty())
+//
+//
+        // --- Return ---
 
         val parsedIssuerAuth = document.issuerSigned.getParsedIssuerAuth()
         val x5CList = X5CList(parsedIssuerAuth.x5c.map { X5CCertificateString(it) })
-        // --- Return ---
 
         return CredentialDetectionResult(
             credentialPrimaryType = CredentialPrimaryDataType.MDOCS,
@@ -165,11 +170,11 @@ object CredentialParser {
             ),
             //credentialData = credentialData,
             //credentialDataOld = mdoc.issuerSigned.toUIJson(),
-            credentialData = JsonObject(
+            credentialData = credentialData /*JsonObject(credentialData
                 mdoc.issuerSigned.toUIJson().toMutableMap().apply {
                     put("docType", JsonPrimitive(document.docType))
                 }
-            ),
+            )*/,
             signed = credential,
             docType = document.docType
         )
@@ -206,7 +211,8 @@ object CredentialParser {
             // Map disclosures to disclosable locations
             val mappedDisclosures = ArrayList<SdJwtSelectiveDisclosure>()
 
-            fun findForHash(hash: String) = availableDisclosures!!.firstOrNull { it.asHashed() == hash || it.asHashed2() == hash || it.asHashed3() == hash }
+            fun findForHash(hash: String) =
+                availableDisclosures!!.firstOrNull { it.asHashed() == hash || it.asHashed2() == hash || it.asHashed3() == hash }
 
             containedDisclosables.entries.forEach { (sdLocation, disclosureHashes) ->
                 log.trace { "Trying sd location: $sdLocation\n" }

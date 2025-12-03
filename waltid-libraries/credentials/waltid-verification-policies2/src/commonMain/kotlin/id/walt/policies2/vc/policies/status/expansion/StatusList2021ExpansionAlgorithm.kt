@@ -1,0 +1,11 @@
+package id.walt.policies2.vc.policies.status.expansion
+
+import id.walt.crypto.utils.Base64Utils.base64Decode
+import korlibs.io.compression.deflate.GZIP
+import korlibs.io.compression.uncompress
+
+
+class StatusList2021ExpansionAlgorithm : id.walt.policies2.vc.policies.status.expansion.StatusListExpansionAlgorithm {
+    override suspend operator fun invoke(bitstring: String): ByteArray =
+        GZIP.uncompress(bitstring.base64Decode())
+}

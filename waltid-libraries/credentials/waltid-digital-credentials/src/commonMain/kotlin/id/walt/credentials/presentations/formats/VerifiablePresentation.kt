@@ -12,7 +12,7 @@ import kotlinx.serialization.json.JsonClassDiscriminator
  */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
-@JsonClassDiscriminator("format")
+@JsonClassDiscriminator("type")
 sealed class VerifiablePresentation(val format: PresentationFormat) {
     //abstract suspend fun presentationVerification()
 }
