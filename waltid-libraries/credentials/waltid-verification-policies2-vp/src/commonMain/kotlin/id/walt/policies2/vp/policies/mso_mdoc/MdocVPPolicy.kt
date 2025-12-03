@@ -1,24 +1,23 @@
-package id.walt.policies2.vp.policies.mso_mdoc
+@file:Suppress("PackageDirectoryMismatch")
 
-import id.walt.mdoc.objects.SessionTranscript
+package id.walt.policies2.vp.policies
+
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
-import id.walt.policies2.vp.policies.AbstractVPPolicy
 
-abstract class MdocVPPolicy(mdocId: String, description: String) : AbstractVPPolicy("mso_mdoc/$mdocId", description) {
+sealed class MdocVPPolicy(mdocId: String, description: String) : VPPolicy2("mso_mdoc/$mdocId", description) {
 
     abstract suspend fun VPPolicyRunContext.verifyMdocPolicy(
         document: Document,
         mso: MobileSecurityObject,
-        sessionTranscript: SessionTranscript?,
+        verificationContext: MsoMdocVPVerificationRequest,
     ): Result<Unit>
 
     suspend fun runPolicy(
         document: Document,
         mso: MobileSecurityObject,
-        sessionTranscript: SessionTranscript?,
+        verificationContext: MsoMdocVPVerificationRequest,
     ) = runPolicy {
-        verifyMdocPolicy(document, mso, sessionTranscript)
+        verifyMdocPolicy(document, mso, verificationContext)
     }
-
 }

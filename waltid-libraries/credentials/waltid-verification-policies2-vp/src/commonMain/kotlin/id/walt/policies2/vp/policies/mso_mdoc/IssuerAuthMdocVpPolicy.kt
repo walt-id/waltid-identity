@@ -1,9 +1,10 @@
-package id.walt.policies2.vp.policies.mso_mdoc
+@file:Suppress("PackageDirectoryMismatch")
+
+package id.walt.policies2.vp.policies
 
 import id.walt.cose.toCoseVerifier
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.jwk.JWKKey.Companion.convertDerCertificateToPemCertificate
-import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -19,7 +20,7 @@ class IssuerAuthMdocVpPolicy : MdocVPPolicy("issuer_auth", "Verify issuer authen
     override suspend fun VPPolicyRunContext.verifyMdocPolicy(
         document: Document,
         mso: MobileSecurityObject,
-        sessionTranscript: SessionTranscript?
+        verificationContext: MsoMdocVPVerificationRequest
     ) = coroutineScope {
         log.trace { "--- Verifying issuer authentication ---" }
         val issuerAuth = document.issuerSigned.issuerAuth

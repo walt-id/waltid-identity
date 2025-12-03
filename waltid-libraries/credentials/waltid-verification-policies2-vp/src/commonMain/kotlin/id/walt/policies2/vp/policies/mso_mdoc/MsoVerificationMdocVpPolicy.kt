@@ -1,24 +1,24 @@
 @file:OptIn(ExperimentalTime::class)
+@file:Suppress("PackageDirectoryMismatch")
 
-package id.walt.policies2.vp.policies.mso_mdoc
+package id.walt.policies2.vp.policies
 
 import id.walt.mdoc.crypto.MdocCrypto
-import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.ExperimentalTime
 
-class MsoMdocVpPolicy: MdocVPPolicy("mso", "Verify MSO") {
+class MsoVerificationMdocVpPolicy : MdocVPPolicy("mso", "Verify MSO") {
 
     companion object {
-        private val log = KotlinLogging.logger {  }
+        private val log = KotlinLogging.logger { }
     }
 
     override suspend fun VPPolicyRunContext.verifyMdocPolicy(
         document: Document,
         mso: MobileSecurityObject,
-        sessionTranscript: SessionTranscript?
+        verificationContext: MsoMdocVPVerificationRequest
     ): Result<Unit> {
         log.trace { "--- Verifying MSO ---" }
         val timestamps = mso.validityInfo

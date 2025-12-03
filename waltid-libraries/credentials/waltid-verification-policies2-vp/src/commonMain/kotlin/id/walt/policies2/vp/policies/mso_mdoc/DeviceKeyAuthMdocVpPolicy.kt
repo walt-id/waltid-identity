@@ -1,6 +1,7 @@
-package id.walt.policies2.vp.policies.mso_mdoc
+@file:Suppress("PackageDirectoryMismatch")
 
-import id.walt.mdoc.objects.SessionTranscript
+package id.walt.policies2.vp.policies
+
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -14,7 +15,7 @@ class DeviceKeyAuthMdocVpPolicy : MdocVPPolicy("device_key_auth", "Verify holder
     override suspend fun VPPolicyRunContext.verifyMdocPolicy(
         document: Document,
         mso: MobileSecurityObject,
-        sessionTranscript: SessionTranscript?
+        verificationContext: MsoMdocVPVerificationRequest
     ): Result<Unit> {
         log.trace { "--- MDOC DATA - HOLDER VERIFIED DATA ---" }
 

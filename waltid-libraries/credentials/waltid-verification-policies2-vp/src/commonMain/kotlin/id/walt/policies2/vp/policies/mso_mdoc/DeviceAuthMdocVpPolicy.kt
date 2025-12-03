@@ -1,11 +1,13 @@
-package id.walt.policies2.vp.policies.mso_mdoc
+@file:Suppress("PackageDirectoryMismatch")
+
+package id.walt.policies2.vp.policies
 
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.mdoc.crypto.MdocCrypto
 import id.walt.mdoc.crypto.MdocCryptoHelper
-import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
+import id.walt.mdoc.verification.MdocVerifier
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.coroutineScope
 
@@ -18,7 +20,7 @@ class DeviceAuthMdocVpPolicy : MdocVPPolicy("device-auth", "Verify device authen
     override suspend fun VPPolicyRunContext.verifyMdocPolicy(
         document: Document,
         mso: MobileSecurityObject,
-        sessionTranscript: SessionTranscript?
+        verificationContext: MsoMdocVPVerificationRequest
     ): Result<Unit> = coroutineScope {
         log.trace { "--- Verifying device authentication ---" }
 
@@ -33,6 +35,8 @@ class DeviceAuthMdocVpPolicy : MdocVPPolicy("device-auth", "Verify device authen
 
         val deviceAuth = deviceSigned.deviceAuth
         log.trace { "Device auth (of device signed): $deviceAuth" }
+
+        val sessionTranscript = MdocVerifier.buildSessionTranscriptForContext(verificationContext.toMdocVerificationContext())
 
         requireNotNull(sessionTranscript) { "Requiring session transcript for this verification policy" }
 

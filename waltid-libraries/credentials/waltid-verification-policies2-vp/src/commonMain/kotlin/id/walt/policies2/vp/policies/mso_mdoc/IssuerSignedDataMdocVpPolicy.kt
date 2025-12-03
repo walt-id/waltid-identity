@@ -1,6 +1,7 @@
-package id.walt.policies2.vp.policies.mso_mdoc
+@file:Suppress("PackageDirectoryMismatch")
 
-import id.walt.mdoc.objects.SessionTranscript
+package id.walt.policies2.vp.policies
+
 import id.walt.mdoc.objects.digest.ValueDigest
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
@@ -15,7 +16,7 @@ class IssuerSignedDataMdocVpPolicy : MdocVPPolicy("issuer_signed_integrity", "Ve
     override suspend fun VPPolicyRunContext.verifyMdocPolicy(
         document: Document,
         mso: MobileSecurityObject,
-        sessionTranscript: SessionTranscript?
+        verificationContext: MsoMdocVPVerificationRequest
     ): Result<Unit> {
         log.trace { "--- MDOC DATA - ISSUER VERIFIED DATA ---" }
         val issuerSignedNamespaces = document.issuerSigned.namespaces
@@ -58,7 +59,7 @@ class IssuerSignedDataMdocVpPolicy : MdocVPPolicy("issuer_signed_integrity", "Ve
                             .joinToString()
                     }"
                 }
-                val matchingDigest = msoDigestsForNamespace.entries.find { (digestId, digest) -> issuerSignedItem.digestId == digestId }
+                val matchingDigest = msoDigestsForNamespace.entries.find { (digestId, _) -> issuerSignedItem.digestId == digestId }
                     ?: throw IllegalArgumentException("MSO does not contain value digest for this signed item!")
 
                 log.trace { "Matching MSO Digest (${matchingDigest.key}): ${matchingDigest.value.toHexString()}" }
