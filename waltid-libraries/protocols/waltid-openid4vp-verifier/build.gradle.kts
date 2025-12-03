@@ -74,6 +74,7 @@ kotlin {
                 implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
                 implementation(project(":waltid-libraries:credentials:waltid-dcql"))
                 implementation(project(":waltid-libraries:credentials:waltid-verification-policies2"))
+                implementation(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
                 implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
                 implementation(project(":waltid-libraries:web:waltid-ktor-notifications-core"))
             }
