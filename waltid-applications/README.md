@@ -67,6 +67,11 @@ Web portal for credential issuance and verification. Next.js-based web applicati
 
 **Use when:** You need a web interface for credential issuance and verification workflows, or want a reference implementation for building credential portals.
 
+### [🟢 waltid-credentials](./waltid-credentials)
+Credential repository for W3C Verifiable Credentials, SD-JWT credentials, and ISO mDoc credentials.
+
+**Use when:** You need a repository of verifiable credential schemas and examples, or want a reference implementation for building a credential repository.
+
 ### [🟡 waltid-web-web3login](./waltid-web-web3login)
 Web3 login application. Nuxt.js application demonstrating Web3 wallet-based authentication and login flows.
 
@@ -93,6 +98,13 @@ iOS test application for crypto library. Demonstrates cryptographic operations a
 iOS test application for OpenID4VC library. Demonstrates OpenID4VC flows and credential operations on iOS.
 
 **Use when:** You need to test OpenID4VC functionality on iOS or understand iOS protocol integration.
+
+### [🟢 waltid-digital-credentials-button](https://github.com/walt-id/waltid-digital-credentials-button)
+Reusable Digital Credentials API web component plus a minimal demo backend. Includes vanilla, React, and Vue demos that hit real verifier endpoints through the in-repo backend middleware.
+
+**Use when:** You want to test using the Digital Credentials API for verifying credentials.
+
+**Note**: This is a standalone project and not part of the current monorepo as it is still experimental.
 
 
 ## Join the community
