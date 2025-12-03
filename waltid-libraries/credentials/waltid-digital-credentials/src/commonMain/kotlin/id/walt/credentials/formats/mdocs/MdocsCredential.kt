@@ -72,6 +72,7 @@ data class MdocsCredential(
     }
 
     val document by lazy { parseToDocument() }
+    val documentMso by lazy { document.issuerSigned.decodeMobileSecurityObject() }
 
     private fun parseToDocument(): Document {
         requireNotNull(signed) { "No signed in Mdocs credential" }
