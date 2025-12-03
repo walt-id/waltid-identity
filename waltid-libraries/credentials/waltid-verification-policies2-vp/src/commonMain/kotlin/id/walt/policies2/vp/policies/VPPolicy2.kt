@@ -24,8 +24,8 @@ sealed class VPPolicy2() {
     abstract val description: String
 
     init {
-        check(id.isNotEmpty()) { "Initialized ${this::class.qualifiedName} VP policy with empty ID!" }
-        check(description.isNotEmpty()) { "Initialized ${this::class.qualifiedName} VP policy with empty description!" }
+        check(id.isNotEmpty()) { "Initialized ${this::class.portableSimpleName} VP policy with empty ID!" }
+        check(description.isNotEmpty()) { "Initialized ${this::class.portableSimpleName} VP policy with empty description!" }
     }
 
     @Serializable

@@ -91,7 +91,7 @@ object MdocPresenter {
         val responseUri = authorizationRequest.responseUri
             ?: throw IllegalArgumentException("response_uri is required for mso_mdoc presentation")
 
-        val document: Document = mdocsCredential.parseToDocument()
+        val document: Document = mdocsCredential.document
         val issuerSigned: IssuerSigned = document.issuerSigned
 
         // Build OpenID4VPHandover (OID4VP Appendix B.2.6.1) without ISO-specific wallet nonce
