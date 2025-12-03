@@ -8,7 +8,7 @@ import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator.VerificationSessionCreationResponse
 import id.walt.policies2.vc.PolicyList
 import id.walt.policies2.vc.PolicyResults
-import id.walt.policies2.vc.policies.CredentialSignaturePolicy
+import id.walt.policies2.vp.policies.VPPolicyList
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
@@ -122,15 +122,15 @@ data class Verification2Session(
     data class DefinedVerificationPolicies(
         /** Policies to run on the presentations (Policies from: waltid-verification-policies2-vp) */
         @SerialName("vp_policies")
-        val vpPolicies: PolicyList = PolicyList(listOf(CredentialSignaturePolicy())),
+        val vpPolicies: VPPolicyList? = null,
 
         /** Policies to run on the credentials (Policies from: waltid-verification-policies2) */
         @SerialName("vc_policies")
-        val vcPolicies: PolicyList = PolicyList(listOf(CredentialSignaturePolicy())),
+        val vcPolicies: PolicyList? = null,
 
         /** Policies to run on specific credential ids (Policies from: waltid-verification-policies2) */
         @SerialName("specific_vc_policies")
-        val specificVcPolicies: Map<String, PolicyList> = emptyMap(),
+        val specificVcPolicies: Map<String, PolicyList>? = null
     )
 
     @Serializable
