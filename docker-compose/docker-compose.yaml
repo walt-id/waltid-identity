@@ -113,6 +113,8 @@ services:
       - identity
       - all
     pull_policy: missing
+    build:
+      context: ../waltid-applications/waltid-credentials/.
     depends_on:
       - caddy
     environment:

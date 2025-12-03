@@ -9,9 +9,18 @@
 <a href="https://www.linkedin.com/company/walt-id/">
 <img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
 </a>
-
-
 </div>
+
+## Overview
+
+This web portal integrates four core walt.id services to provide a complete credential lifecycle:
+
+- **Credentials API** (`NEXT_PUBLIC_VC_REPO`): Serves credential schemas and templates
+- **Issuer API** (`NEXT_PUBLIC_ISSUER`): Issues verifiable credentials to wallets
+- **Verifier API** (`NEXT_PUBLIC_VERIFIER`): Requests and verifies credentials from wallets
+- **Wallet** (`NEXT_PUBLIC_WALLET`): End-user wallet for receiving and presenting credentials
+
+The portal acts as a frontend that orchestrates these services to demonstrate credential issuance and verification flows.
 
 ## Getting Started
 
@@ -45,6 +54,16 @@ Using Docker:
 docker build -t waltid/portal -f waltid-web-portal/Dockerfile .
 docker run -p 7102:7102 -i -t waltid/portal
 ```
+
+## Adding New Credentials
+
+To add support for new credential types:
+
+1. **Add credential schema** to the Credentials API repository
+2. **Update issuer metadata** to include the new credential type in supported credentials
+3. The portal will automatically discover and display new credentials from the configured endpoints
+
+Both the credential repository and issuer metadata must be updated for credentials to appear in the issuance flow.
 
 ## Join the community
 
