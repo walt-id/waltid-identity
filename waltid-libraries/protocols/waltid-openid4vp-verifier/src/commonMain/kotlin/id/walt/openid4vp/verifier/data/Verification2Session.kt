@@ -3,11 +3,12 @@
 package id.walt.openid4vp.verifier.data
 
 import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.presentations.formats.VerifiablePresentation
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator.VerificationSessionCreationResponse
-import id.walt.policies2.vc.PolicyList
-import id.walt.policies2.vc.CredentialPolicyResults
+import id.walt.openid4vp.verifier.verification2.Verifier2PolicyResults
+import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vp.policies.VPPolicyList
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import io.ktor.http.*
@@ -87,7 +88,7 @@ data class Verification2Session(
      * Policies
      */
     val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
-    var policyResults: CredentialPolicyResults? = null,
+    var policyResults: Verifier2PolicyResults? = null,
 
     val redirects: VerificationSessionRedirects? = null,
 
@@ -95,6 +96,7 @@ data class Verification2Session(
      * Presented data
      */
     var presentedRawData: PresentedRawData? = null,
+    var presentedPresentations: Map<String, VerifiablePresentation>? = null,
     var presentedCredentials: Map<String, List<DigitalCredential>>? = null,
     var statusReason: String? = null,
 ) {
@@ -126,11 +128,11 @@ data class Verification2Session(
 
         /** Policies to run on the credentials (Policies from: waltid-verification-policies2) */
         @SerialName("vc_policies")
-        val vcPolicies: PolicyList? = null,
+        val vcPolicies: VCPolicyList? = null,
 
         /** Policies to run on specific credential ids (Policies from: waltid-verification-policies2) */
         @SerialName("specific_vc_policies")
-        val specificVcPolicies: Map<String, PolicyList>? = null
+        val specificVcPolicies: Map<String, VCPolicyList>? = null
     )
 
     @Serializable

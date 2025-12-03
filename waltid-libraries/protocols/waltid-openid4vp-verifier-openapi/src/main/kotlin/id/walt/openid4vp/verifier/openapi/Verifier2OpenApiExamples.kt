@@ -13,7 +13,7 @@ import id.walt.openid4vp.verifier.data.GeneralFlowConfig
 import id.walt.openid4vp.verifier.data.UrlConfig
 import id.walt.openid4vp.verifier.data.Verification2Session
 import id.walt.openid4vp.verifier.data.Verification2Session.DefinedVerificationPolicies
-import id.walt.policies2.vc.PolicyList
+import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vc.policies.RevocationPolicy
 import id.walt.policies2.vc.policies.StatusPolicy
@@ -224,7 +224,7 @@ object Verifier2OpenApiExamples {
                 )
             ),
             policies = DefinedVerificationPolicies(
-                vcPolicies = PolicyList(
+                vcPolicies = VCPolicyList(
                     listOf(
                         CredentialSignaturePolicy(),
                         VicalPolicy(
@@ -243,7 +243,7 @@ object Verifier2OpenApiExamples {
     val basicExampleWithStatusPolicyForTokenStatusList = basicExample.copy(
         core = basicExample.core.copy(
             policies = DefinedVerificationPolicies(
-                vcPolicies = PolicyList(
+                vcPolicies = VCPolicyList(
                     policies = listOf(
                         StatusPolicy(
                             argument = IETFStatusPolicyAttribute(
@@ -272,7 +272,7 @@ object Verifier2OpenApiExamples {
                 credentials = listOf(w3cCredentialQuery)
             ),
             policies = DefinedVerificationPolicies(
-                vcPolicies = PolicyList(
+                vcPolicies = VCPolicyList(
                     policies = listOf(RevocationPolicy())
                 )
             )
@@ -285,7 +285,7 @@ object Verifier2OpenApiExamples {
                 credentials = listOf(w3cCredentialQuery)
             ),
             policies = DefinedVerificationPolicies(
-                vcPolicies = PolicyList(
+                vcPolicies = VCPolicyList(
                     policies = listOf(
                         StatusPolicy(
                             argument = W3CStatusPolicyAttribute(
@@ -304,7 +304,7 @@ object Verifier2OpenApiExamples {
                 credentials = listOf(w3cCredentialQuery)
             ),
             policies = DefinedVerificationPolicies(
-                vcPolicies = PolicyList(
+                vcPolicies = VCPolicyList(
                     policies = listOf(
                         StatusPolicy(
                             argument = W3CStatusPolicyListArguments(

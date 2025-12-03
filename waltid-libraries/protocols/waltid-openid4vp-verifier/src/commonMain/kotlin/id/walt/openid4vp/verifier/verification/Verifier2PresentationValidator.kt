@@ -56,7 +56,7 @@ object Verifier2PresentationValidator {
             )
 
             // Future: Implement other formats (e.g. LDP)
-            else -> Result.failure(UnsupportedOperationException("Format $expectedFormat not supported for validation yet."))
+            CredentialFormat.LDP_VC, CredentialFormat.AC_VP -> Result.failure(UnsupportedOperationException("Format $expectedFormat not supported for validation yet."))
         }
     }
 

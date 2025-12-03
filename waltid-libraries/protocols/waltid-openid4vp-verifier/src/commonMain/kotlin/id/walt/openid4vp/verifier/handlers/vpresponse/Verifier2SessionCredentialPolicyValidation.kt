@@ -2,17 +2,27 @@ package id.walt.openid4vp.verifier.handlers.vpresponse
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.openid4vp.verifier.data.Verification2Session
-import id.walt.policies2.vc.PolicyResult
-import id.walt.policies2.vc.CredentialPolicyResults
+import id.walt.policies2.vc.CredentialPolicyResult
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 object Verifier2SessionCredentialPolicyValidation {
 
     private val log = KotlinLogging.logger {}
+
+    @Serializable
+    data class CredentialPolicyResults(
+        @SerialName("vc_policies")
+        val vcPolicies: List<CredentialPolicyResult>,
+
+        @SerialName("specific_vc_policies")
+        val specificVcPolicies: Map<String, List<CredentialPolicyResult>>
+    )
 
     internal suspend fun validateCredentialPolicies(
         policies: Verification2Session.DefinedVerificationPolicies,
@@ -28,7 +38,7 @@ object Verifier2SessionCredentialPolicyValidation {
                         val result = policy.verify(credential)
                         log.trace { "'$queryId' credential '${policy.id}' result: $result" }
 
-                        PolicyResult(
+                        CredentialPolicyResult(
                             policy = policy,
                             success = result.isSuccess,
                             result = result.getOrNull(),
@@ -48,7 +58,7 @@ object Verifier2SessionCredentialPolicyValidation {
                     async(Dispatchers.Default) {
                         val result = policy.verify(specificCredential)
 
-                        queryId to PolicyResult(
+                        queryId to CredentialPolicyResult(
                             policy = policy,
                             success = result.isSuccess,
                             result = result.getOrNull(),
