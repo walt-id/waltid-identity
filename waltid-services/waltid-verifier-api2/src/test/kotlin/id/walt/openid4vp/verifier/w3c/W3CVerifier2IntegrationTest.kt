@@ -339,6 +339,7 @@ class W3CVerifier2IntegrationTest {
                 assertTrue { presentationResult.isSuccess }
 
                 val resp = presentationResult.getOrThrow().jsonObject
+                println(resp)
                 assertTrue("Transmission did not succeed") { resp["transmission_success"]!!.jsonPrimitive.boolean }
                 assertTrue { resp["verifier_response"]!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
             }
