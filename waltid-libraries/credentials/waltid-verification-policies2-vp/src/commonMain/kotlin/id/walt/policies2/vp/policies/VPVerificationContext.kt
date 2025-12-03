@@ -1,28 +1,28 @@
 package id.walt.policies2.vp.policies
 
-import id.walt.dcql.models.ClaimsQuery
-import id.walt.mdoc.verification.MdocVerificationContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-sealed class VPVerificationRequest {
+/*sealed class VPVerificationRequest {
     abstract val base: BaseVerificationSessionContext
-}
+}*/
 
 @Serializable
-data class BaseVerificationSessionContext(
+//data class BaseVerificationSessionContext(
+data class VerificationSessionContext(
     val vpToken: String,
     val expectedNonce: String,
     val expectedAudience: String?,
 
     val responseUri: String?,
+    val responseMode: OpenID4VPResponseMode,
 
     val isSigned: Boolean,
     val isEncrypted: Boolean,
-    val responseMode: OpenID4VPResponseMode
+    val jwkThumbprint: String?
 )
 
+/*
 /** vpToken = vpJwt string - used by JwtVcJsonPresentation parser */
 @Serializable
 @SerialName("jwt_vc_json")
@@ -57,3 +57,4 @@ data class MsoMdocVPVerificationRequest(
         jwkThumbprint = jwkThumbprint
     )
 }
+*/

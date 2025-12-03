@@ -25,7 +25,7 @@ class IssuerSignedDataMdocVpPolicy : MdocVPPolicy() {
     override suspend fun VPPolicyRunContext.verifyMdocPolicy(
         document: Document,
         mso: MobileSecurityObject,
-        verificationContext: MsoMdocVPVerificationRequest
+        verificationContext: VerificationSessionContext
     ): Result<Unit> {
         log.trace { "--- MDOC DATA - ISSUER VERIFIED DATA ---" }
         val issuerSignedNamespaces = document.issuerSigned.namespaces

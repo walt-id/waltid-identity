@@ -24,14 +24,14 @@ class AudienceCheckJwtVcJsonVPPolicy : JwtVcJsonVPPolicy() {
 
     override suspend fun VPPolicyRunContext.verifyJwtVcJsonPolicy(
         presentation: JwtVcJsonPresentation,
-        verificationContext: JwtVcJsonVPVerificationRequest
+        verificationContext: VerificationSessionContext
     ): Result<Unit> {
         addResult("presentation_audience", presentation.audience)
-        addResult("expected_audience", verificationContext.base.expectedAudience)
+        addResult("expected_audience", verificationContext.expectedAudience)
         presentationRequire(
-            presentation.audience == verificationContext.base.expectedAudience,
+            presentation.audience == verificationContext.expectedAudience,
             W3CPresentationValidationError.AUDIENCE_MISMATCH
-        ) { "Expected ${verificationContext.base.expectedAudience}, got ${presentation.audience}" }
+        ) { "Expected ${verificationContext.expectedAudience}, got ${presentation.audience}" }
 
         return success()
     }

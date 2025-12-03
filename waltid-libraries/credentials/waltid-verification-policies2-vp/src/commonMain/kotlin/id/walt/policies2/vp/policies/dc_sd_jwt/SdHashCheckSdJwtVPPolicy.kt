@@ -26,7 +26,7 @@ class SdHashCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
 
     override suspend fun VPPolicyRunContext.verifySdJwtPolicy(
         presentation: DcSdJwtPresentation,
-        verificationContext: DcSdJwtVPVerificationRequest
+        verificationContext: VerificationSessionContext
     ): Result<Unit> {
         presentationRequireNotNull(
             presentation.sdHash,

@@ -12,13 +12,13 @@ sealed class MdocVPPolicy() : VPPolicy2() {
     abstract suspend fun VPPolicyRunContext.verifyMdocPolicy(
         document: Document,
         mso: MobileSecurityObject,
-        verificationContext: MsoMdocVPVerificationRequest,
+        verificationContext: VerificationSessionContext // MsoMdocVPVerificationRequest
     ): Result<Unit>
 
     suspend fun runPolicy(
         document: Document,
         mso: MobileSecurityObject,
-        verificationContext: MsoMdocVPVerificationRequest,
+        verificationContext: VerificationSessionContext // MsoMdocVPVerificationRequest
     ) = runPolicy {
         verifyMdocPolicy(document, mso, verificationContext)
     }

@@ -22,7 +22,7 @@ class SignatureJwtVcJsonVPPolicy : JwtVcJsonVPPolicy() {
 
     override suspend fun VPPolicyRunContext.verifyJwtVcJsonPolicy(
         presentation: JwtVcJsonPresentation,
-        verificationContext: JwtVcJsonVPVerificationRequest
+        verificationContext: VerificationSessionContext
     ): Result<Unit> = coroutineScope {
         addResult("issuer", presentation.issuer)
         presentationRequireNotNull(presentation.issuer, W3CPresentationValidationError.ISSUER_NOT_FOUND)

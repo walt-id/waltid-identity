@@ -7,7 +7,9 @@ import id.walt.mdoc.crypto.MdocCrypto
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
+import id.walt.mdoc.verification.MdocVerificationContext
 import id.walt.mdoc.verification.MdocVerifier
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.SerialName
@@ -29,7 +31,7 @@ class DeviceAuthMdocVpPolicy : MdocVPPolicy() {
     override suspend fun VPPolicyRunContext.verifyMdocPolicy(
         document: Document,
         mso: MobileSecurityObject,
-        verificationContext: MsoMdocVPVerificationRequest
+        verificationContext: VerificationSessionContext
     ): Result<Unit> = coroutineScope {
         log.trace { "--- Verifying device authentication ---" }
 
@@ -91,4 +93,14 @@ class DeviceAuthMdocVpPolicy : MdocVPPolicy() {
             }
         }
     }
+
+    private fun VerificationSessionContext.toMdocVerificationContext() = MdocVerificationContext(
+        expectedNonce = expectedNonce,
+        expectedAudience = expectedAudience,
+        responseUri = responseUri,
+        isEncrypted = isEncrypted,
+        isDcApi = responseMode in OpenID4VPResponseMode.DC_API_RESPONSES,
+
+        jwkThumbprint = jwkThumbprint
+    )
 }

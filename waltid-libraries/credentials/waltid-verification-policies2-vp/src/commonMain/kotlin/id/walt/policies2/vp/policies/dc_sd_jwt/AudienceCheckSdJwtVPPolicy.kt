@@ -23,14 +23,14 @@ class AudienceCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
 
     override suspend fun VPPolicyRunContext.verifySdJwtPolicy(
         presentation: DcSdJwtPresentation,
-        verificationContext: DcSdJwtVPVerificationRequest
+        verificationContext: VerificationSessionContext
     ): Result<Unit> {
         addResult("presentation_audience", presentation.audience)
-        addResult("expected_audience", verificationContext.base.expectedAudience)
+        addResult("expected_audience", verificationContext.expectedAudience)
         presentationRequire(
-            presentation.audience == verificationContext.base.expectedAudience,
+            presentation.audience == verificationContext.expectedAudience,
             DcSdJwtPresentationValidationError.AUDIENCE_MISMATCH
-        ) { "Expected ${verificationContext.base.expectedAudience}, got ${presentation.audience}" }
+        ) { "Expected ${verificationContext.expectedAudience}, got ${presentation.audience}" }
 
         return success()
     }

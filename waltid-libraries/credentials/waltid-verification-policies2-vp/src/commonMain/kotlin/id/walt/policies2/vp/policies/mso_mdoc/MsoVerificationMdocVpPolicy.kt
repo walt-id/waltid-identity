@@ -27,7 +27,7 @@ class MsoVerificationMdocVpPolicy : MdocVPPolicy() {
     override suspend fun VPPolicyRunContext.verifyMdocPolicy(
         document: Document,
         mso: MobileSecurityObject,
-        verificationContext: MsoMdocVPVerificationRequest
+        verificationContext: VerificationSessionContext
     ): Result<Unit> {
         log.trace { "--- Verifying MSO ---" }
         val timestamps = mso.validityInfo

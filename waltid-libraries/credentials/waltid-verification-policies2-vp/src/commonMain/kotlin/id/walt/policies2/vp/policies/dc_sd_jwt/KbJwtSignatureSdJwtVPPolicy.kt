@@ -21,7 +21,7 @@ class KbJwtSignatureSdJwtVPPolicy : DcSdJwtVPPolicy() {
 
     override suspend fun VPPolicyRunContext.verifySdJwtPolicy(
         presentation: DcSdJwtPresentation,
-        verificationContext: DcSdJwtVPVerificationRequest
+        verificationContext: VerificationSessionContext
     ): Result<Unit> = coroutineScope {
         // Resolve holder's public key
         val holderKey = presentation.credential.getHolderKey()

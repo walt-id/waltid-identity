@@ -24,12 +24,12 @@ class NonceCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
 
     override suspend fun VPPolicyRunContext.verifySdJwtPolicy(
         presentation: DcSdJwtPresentation,
-        verificationContext: DcSdJwtVPVerificationRequest
+        verificationContext: VerificationSessionContext
     ): Result<Unit> {
         presentationRequire(
-            presentation.nonce == verificationContext.base.expectedNonce,
+            presentation.nonce == verificationContext.expectedNonce,
             DcSdJwtPresentationValidationError.NONCE_MISMATCH
-        ) { "Expected ${verificationContext.base.expectedNonce}, got ${presentation.nonce}" }
+        ) { "Expected ${verificationContext.expectedNonce}, got ${presentation.nonce}" }
 
         return success()
     }
