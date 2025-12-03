@@ -1,14 +1,19 @@
 package id.walt.policies2.vp.policies
 
+import id.walt.crypto.utils.JsonUtils.toJsonElement
+import korlibs.io.lang.portableSimpleName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.time.Duration
+import kotlin.time.measureTimedValue
 
 @OptIn(ExperimentalSerializationApi::class)
 @JsonClassDiscriminator("policy")
@@ -23,27 +28,68 @@ sealed class VPPolicy2() {
         check(description.isNotEmpty()) { "Initialized ${this::class.qualifiedName} VP policy with empty description!" }
     }
 
+    @Serializable
+    data class PolicyRunError(
+        val error: String,
+        val message: String?,
+        val cause: PolicyRunError?
+    ) {
+        constructor(ex: Throwable) : this(
+            error = ex::class.simpleName ?: ex::class.portableSimpleName,
+            message = ex.message,
+            cause = ex.cause?.let { PolicyRunError(ex.cause!!) }
+        )
+    }
+
+    @Serializable
+    data class PolicyRunResult(
+        @SerialName("policy_executed")
+        val policyExecuted: VPPolicy2,
+
+        val success: Boolean,
+        val results: Map<String, JsonElement>,
+        val errors: List<PolicyRunError>,
+
+        @SerialName("execution_time")
+        val executionTime: Duration
+    )
+
     internal suspend fun runPolicy(
         block: suspend VPPolicyRunContext.() -> Result<Unit>,
-    ) {
+    ): PolicyRunResult {
         val policyContext = VPPolicyRunContext()
 
-        val runResult = runCatching {
-            block.invoke(policyContext)
+        val timedRunResult = measureTimedValue {
+            runCatching {
+                block.invoke(policyContext)
+            }
         }
+        val runResult = timedRunResult.value
+
         if (runResult.isFailure) {
             policyContext.addError(runResult.exceptionOrNull()!!)
         }
 
+        return PolicyRunResult(
+            policyExecuted = this,
+            success = runResult.isSuccess && policyContext.errors.isEmpty(),
+            results = policyContext.results.mapValues { it.toJsonElement() },
+            errors = policyContext.errors.map { PolicyRunError(it) },
+            executionTime = timedRunResult.duration
+        )
     }
 
     class VPPolicyRunContext() {
 
         val resultMutex = Mutex()
-        private val results = LinkedHashMap<String, Any?>()
+
+        /** Only use for reading results after run */
+        val results = LinkedHashMap<String, Any?>()
 
         val errorMutex = Mutex()
-        private val errors = ArrayList<Throwable>()
+
+        /** Only use for reading results after run */
+        val errors = ArrayList<Throwable>()
 
         private var success = false
 
