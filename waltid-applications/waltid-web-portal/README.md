@@ -24,8 +24,8 @@
 This web portal integrates four core walt.id services to provide a complete credential lifecycle:
 
 - **Credentials API** (`NEXT_PUBLIC_VC_REPO`): Serves credential schemas and templates
-- **Issuer API** (`NEXT_PUBLIC_ISSUER`): Issues verifiable credentials to wallets
-- **Verifier API** (`NEXT_PUBLIC_VERIFIER`): Requests and verifies credentials from wallets
+- **Issuer API** (`NEXT_PUBLIC_ISSUER`): Issues verifiable credentials to wallets (OpenID4VCI Draft 13)
+- **Verifier API** (`NEXT_PUBLIC_VERIFIER`): Requests and verifies credentials from wallets (OpenID4VP Draft 20)
 - **Wallet** (`NEXT_PUBLIC_WALLET`): End-user wallet for receiving and presenting credentials
 
 The portal acts as a frontend that orchestrates these services to demonstrate credential issuance and verification flows.
@@ -63,13 +63,6 @@ This portal enables users to:
 3. **Generate Request**: Create an OpenID4VP authorization request
 4. **Present Request**: Display QR code or direct link for wallet to present credential
 5. **Verify Result**: Display verification results after credential presentation
-
-### Portal Modes
-
-The portal operates in two modes:
-
-- **Issue Mode**: For credential issuance (OpenID4VCI Draft 13)
-- **Verify Mode**: For credential verification (OpenID4VP Draft 20)
 
 ## Assumptions and Dependencies
 
