@@ -24,9 +24,11 @@ import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.openid4vp.verifier.OSSVerifier2FeatureCatalog
 import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
-import id.walt.openid4vp.verifier.Verification2Session
-import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionCreationResponse
-import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
+import id.walt.openid4vp.verifier.data.CrossDeviceFlowSetup
+import id.walt.openid4vp.verifier.data.GeneralFlowConfig
+import id.walt.openid4vp.verifier.data.Verification2Session
+import id.walt.openid4vp.verifier.data.VerificationSessionSetup
+import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator.VerificationSessionCreationResponse
 import id.walt.openid4vp.verifier.verifierModule
 import id.walt.policies2.PolicyList
 import id.walt.policies2.policies.CredentialSignaturePolicy
@@ -73,6 +75,13 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
             listOf(
                 CredentialSignaturePolicy()
             )
+        )
+    )
+
+    private val verificationSessionSetup: VerificationSessionSetup = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            dcqlQuery = sdJwtVcDcqlQuery,
+            policies = sdjwtvcPolicies
         )
     )
 
@@ -337,12 +346,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
             // Create the verification session
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
-                    setBody(
-                        VerificationSessionSetup(
-                            dcqlQuery = sdJwtVcDcqlQuery,
-                            policies = sdjwtvcPolicies
-                        )
-                    )
+                    setBody(verificationSessionSetup)
                 }.body<VerificationSessionCreationResponse>()
             }
             println("Verification Session Response: $verificationSessionResponse")

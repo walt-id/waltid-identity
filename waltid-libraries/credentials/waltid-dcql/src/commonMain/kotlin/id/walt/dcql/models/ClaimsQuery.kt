@@ -1,5 +1,6 @@
 package id.walt.dcql.models
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -17,4 +18,8 @@ data class ClaimsQuery(
 
     /** Optional specific values to match */
     val values: List<JsonPrimitive>? = null,
+
+    /** defined at https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-parameter-in-the-claims-que */
+    @SerialName("intent_to_retain")
+    val intentToRetain: Boolean? = null
 )

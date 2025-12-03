@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 @SerialName("W3cCredentialMeta")
-data class W3cCredentialMeta(
+data class JwtVcJsonMeta(
     /**
      * REQUIRED. An array of string arrays that specifies the fully expanded types (IRIs)
      * after the @context was applied that the Verifier accepts.

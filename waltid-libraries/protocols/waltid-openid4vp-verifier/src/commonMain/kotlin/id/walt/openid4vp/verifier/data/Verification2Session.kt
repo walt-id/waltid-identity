@@ -1,10 +1,11 @@
 @file:OptIn(ExperimentalTime::class)
 
-package id.walt.openid4vp.verifier
+package id.walt.openid4vp.verifier.data
 
 import id.walt.credentials.formats.DigitalCredential
+import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.ktornotifications.core.KtorSessionNotifications
-import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionCreationResponse
+import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator.VerificationSessionCreationResponse
 import id.walt.policies2.PolicyList
 import id.walt.policies2.PolicyResults
 import id.walt.policies2.policies.CredentialSignaturePolicy
@@ -13,6 +14,7 @@ import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -62,8 +64,8 @@ data class Verification2Session(
     /**
      * Minimal authorization request if request is provided by URL
      */
-    val bootstrapAuthorizationRequest: AuthorizationRequest?,
-    val bootstrapAuthorizationRequestUrl: Url?,
+    val bootstrapAuthorizationRequest: AuthorizationRequest? = null,
+    val bootstrapAuthorizationRequestUrl: Url? = null,
 
     /**
      * OpenID4VP Authorization Request used for this Verification Session
@@ -72,6 +74,7 @@ data class Verification2Session(
     val authorizationRequestUrl: Url,
 
     val signedAuthorizationRequestJwt: String? = null,
+    val ephemeralDecryptionKey: DirectSerializedKey? = null,
 
     /**
      * OpenID4VP configuration for this Verification Session
@@ -110,7 +113,7 @@ data class Verification2Session(
     @Serializable
     data class PresentedRawData(
         val vpToken: Map<String, List<String>>,
-        val state: String,
+        val state: String?
     )
 
     @Serializable
@@ -122,23 +125,41 @@ data class Verification2Session(
 
     @Serializable
     data class VerificationSessionRedirects(
+        @SerialName("success_redirect_uri")
         val successRedirectUri: String? = null,
+        @SerialName("error_redirect_uri")
         val errorRedirectUri: String? = null
     )
 
 
     enum class VerificationSessionStatus(val successful: Boolean? = null) {
+        /** Session ended up in unknown flow (should be avoided if possible) */
         UNKNOWN,
 
+        /** Session was created and is active (and can be used) */
         ACTIVE,
+
+        /** Session was not used yet, but is not yet expired (and can be used) */
         UNUSED,
 
+        /** Session is in use
+         * (AuthorizationRequest was requested)
+         */
         IN_USE,
+
+        /** Checking if received presentation will be processed (validated etc) */
+        VALIDATING_RECEIVED_REQUEST,
+
+        /** Received presentation is being processed (presentation validation + verification policies) */
         PROCESSING_FLOW,
 
+        /** Verification request expired without being utilized */
         EXPIRED(false),
 
+        /** Verification request was completed fully successfully (all validation & verification policies passed) */
         SUCCESSFUL(true),
+
+        /** Verification request was unsuccessful (presentation validation or verification requests failed) */
         FAILED(false),
         UNSUCCESSFUL(false),
     }

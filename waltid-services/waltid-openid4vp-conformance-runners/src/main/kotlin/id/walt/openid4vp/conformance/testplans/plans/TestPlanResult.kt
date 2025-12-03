@@ -1,6 +1,6 @@
 package id.walt.openid4vp.conformance.testplans.plans
 
-import id.walt.openid4vp.verifier.Verification2Session
+import id.walt.openid4vp.verifier.data.Verification2Session
 
 data class TestPlanResult(
     val conformanceTestId: String,

@@ -82,7 +82,7 @@ kotlin {
             dependencies {
                 implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-                implementation("org.slf4j:slf4j-simple:2.0.16")
+                implementation("org.slf4j:slf4j-simple:2.0.17")
             }
         }
     }

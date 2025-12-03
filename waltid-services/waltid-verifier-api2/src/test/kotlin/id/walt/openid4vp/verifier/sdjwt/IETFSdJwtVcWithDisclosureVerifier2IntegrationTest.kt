@@ -24,9 +24,11 @@ import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.openid4vp.verifier.OSSVerifier2FeatureCatalog
 import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
-import id.walt.openid4vp.verifier.Verification2Session
-import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionCreationResponse
-import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
+import id.walt.openid4vp.verifier.data.CrossDeviceFlowSetup
+import id.walt.openid4vp.verifier.data.GeneralFlowConfig
+import id.walt.openid4vp.verifier.data.Verification2Session
+import id.walt.openid4vp.verifier.data.VerificationSessionSetup
+import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator.VerificationSessionCreationResponse
 import id.walt.openid4vp.verifier.verifierModule
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
@@ -122,6 +124,13 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
   }
         """.trimIndent()
         )
+
+    private val verificationSessionSetup: VerificationSessionSetup = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            dcqlQuery = sdJwtVcDcqlQuery,
+            policies = additionalSdjwtvcPolicies
+        )
+    )
 
     private val walletCredentials = listOf(
         Json.decodeFromString<DigitalCredential>(
@@ -384,12 +393,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
             // Create the verification session
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
-                    setBody(
-                        VerificationSessionSetup(
-                            dcqlQuery = sdJwtVcDcqlQuery,
-                            policies = additionalSdjwtvcPolicies
-                        )
-                    )
+                    setBody(verificationSessionSetup)
                 }.body<VerificationSessionCreationResponse>()
             }
             println("Verification Session Response: $verificationSessionResponse")

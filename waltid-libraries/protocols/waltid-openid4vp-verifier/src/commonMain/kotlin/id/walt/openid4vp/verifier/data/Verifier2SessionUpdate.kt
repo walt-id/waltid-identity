@@ -1,4 +1,4 @@
-package id.walt.openid4vp.verifier
+package id.walt.openid4vp.verifier.data
 
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import kotlinx.serialization.Serializable

@@ -2,9 +2,11 @@ package id.walt.openid4vp.conformance.testplans.plans
 
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.openid4vp.conformance.testplans.runner.req.TestPlanConfiguration
-import id.walt.openid4vp.verifier.Verification2Session
-import id.walt.openid4vp.verifier.Verification2Session.VerificationSessionRedirects
-import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
+import id.walt.openid4vp.verifier.data.CrossDeviceFlowSetup
+import id.walt.openid4vp.verifier.data.GeneralFlowConfig
+import id.walt.openid4vp.verifier.data.UrlConfig
+import id.walt.openid4vp.verifier.data.Verification2Session
+import id.walt.openid4vp.verifier.data.Verification2Session.VerificationSessionRedirects
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -98,23 +100,27 @@ class SdJwtVcX509SanDnsRequestUriSignedDirectPost(
             }
         """.trimIndent()
         ),
-        verificationSessionSetup = VerificationSessionSetup(
-            dcqlQuery = Json.decodeFromString(dcqlQuery),
-            policies = Verification2Session.DefinedVerificationPolicies(),
+        verificationSessionSetup = CrossDeviceFlowSetup(
+            core = GeneralFlowConfig(
+                dcqlQuery = Json.decodeFromString(dcqlQuery),
+                policies = Verification2Session.DefinedVerificationPolicies(),
 
-            signedRequest = true,
-            encryptedResponse = false,
+                signedRequest = true,
+                encryptedResponse = false,
 
-            urlPrefix = verifier2UrlPrefix,
-            //urlHost, // <-- set by TestPlanRunner
+                clientMetadata = ClientMetadata(),
+                clientId = "x509_san_dns:test123",
+
+                key = verifierKey,
+                x5c = verifierCertificateChain
+            ),
+            urlConfig = UrlConfig(
+                urlPrefix = verifier2UrlPrefix,
+                //urlHost, // <-- set by TestPlanRunner
+            ),
             redirects = VerificationSessionRedirects(
                 successRedirectUri = "https://example.org/veriifcation-success"
-            ),
-            clientMetadata = ClientMetadata(),
-            clientId = "x509_san_dns:test123",
-
-            key = verifierKey,
-            x5c = verifierCertificateChain
+            )
         )
     )
 }

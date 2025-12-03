@@ -129,7 +129,7 @@ kotlin {
         val jvmTest by getting {
             dependencies {
 //              implementation("io.mockk:mockk:1.13.2")
-                implementation("org.slf4j:slf4j-simple:2.0.16")
+                implementation("org.slf4j:slf4j-simple:2.0.17")
             }
         }
         val jsMain by getting {
