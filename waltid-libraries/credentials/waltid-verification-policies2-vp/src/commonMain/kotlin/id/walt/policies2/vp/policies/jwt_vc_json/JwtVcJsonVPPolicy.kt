@@ -4,7 +4,7 @@ package id.walt.policies2.vp.policies
 
 import id.walt.credentials.presentations.formats.JwtVcJsonPresentation
 
-abstract class JwtVcJsonVPPolicy(jwtVcJsonId: String, description: String) : VPPolicy2("jwt_vc-json/$jwtVcJsonId", description) {
+abstract class JwtVcJsonVPPolicy() : VPPolicy2() {
     abstract suspend fun VPPolicyRunContext.verifyJwtVcJsonPolicy(
         presentation: JwtVcJsonPresentation,
         verificationContext: JwtVcJsonVPVerificationRequest

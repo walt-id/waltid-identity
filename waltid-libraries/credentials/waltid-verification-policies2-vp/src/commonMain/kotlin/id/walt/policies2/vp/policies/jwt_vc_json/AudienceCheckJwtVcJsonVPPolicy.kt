@@ -6,11 +6,17 @@ import id.walt.credentials.presentations.PresentationValidationExceptionFunction
 import id.walt.credentials.presentations.W3CPresentationValidationError
 import id.walt.credentials.presentations.formats.JwtVcJsonPresentation
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-class AudienceCheckJwtVcJsonVPPolicy : JwtVcJsonVPPolicy(
-    "audience-check",
-    "Check if presentation audience matches expected audience for session"
-) {
+private const val policyId = "jwt_vc_json/audience-check"
+
+@Serializable
+@SerialName(policyId)
+class AudienceCheckJwtVcJsonVPPolicy : JwtVcJsonVPPolicy() {
+
+    override val id = policyId
+    override val description = "Check if presentation audience matches expected audience for session"
 
     companion object {
         val log = KotlinLogging.logger { }

@@ -296,7 +296,7 @@ class MsoMdocsVerifier2IntegrationTest {
             val presentationResult = testAndReturn("Present with wallet") {
                 WalletPresentFunctionality2.walletPresentHandling(
                     holderKey = holderKey,
-                    holderDid = null, // No DID required for mso_mdocs
+                    holderDid = null, // No DID required for mso_mdoc
                     presentationRequestUrl = bootstrapUrl!!,
                     selectCredentialsForQuery = selectCallback,
                     holderPoliciesToRun = null,

@@ -8,8 +8,17 @@ import id.walt.credentials.presentations.W3CPresentationValidationError
 import id.walt.credentials.presentations.formats.JwtVcJsonPresentation
 import id.walt.did.dids.DidService
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-class SignatureJwtVcJsonVPPolicy : JwtVcJsonVPPolicy("envelope_signature", "Verify signature using holders public key") {
+private const val policyId = "jwt_vc_json/envelope_signature"
+
+@Serializable
+@SerialName(policyId)
+class SignatureJwtVcJsonVPPolicy : JwtVcJsonVPPolicy() {
+
+    override val id = policyId
+    override val description = "Verify signature using holders public key"
 
     override suspend fun VPPolicyRunContext.verifyJwtVcJsonPolicy(
         presentation: JwtVcJsonPresentation,
