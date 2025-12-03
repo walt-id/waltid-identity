@@ -21,10 +21,10 @@ object MdocParser {
 
         require(isHex || isBase64) { "Signed is neither hex nor base64" }
         if (isHex && isBase64) {
-            log.warn { "Mdocs Document \"$signed\" is both hex & base64!" }
+            log.trace { "Mdocs Document \"$signed\" is both hex & base64!" }
         }
 
-        val signedBytes = if (isBase64) signed.decodeFromBase64Url() else signed.hexToByteArray()
+        val signedBytes = if (isHex) signed.hexToByteArray() else signed.decodeFromBase64Url()
 
         val document = runCatching {
             val deviceResponse = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(signedBytes)
