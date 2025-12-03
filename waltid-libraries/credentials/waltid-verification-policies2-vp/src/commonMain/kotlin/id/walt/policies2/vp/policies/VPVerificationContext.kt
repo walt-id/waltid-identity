@@ -1,50 +1,59 @@
 package id.walt.policies2.vp.policies
 
 import id.walt.dcql.models.ClaimsQuery
+import id.walt.mdoc.verification.MdocVerificationContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 sealed class VPVerificationRequest {
-    abstract val vpToken: String
-    abstract val expectedNonce: String
-    abstract val expectedAudience: String?
+    abstract val base: BaseVerificationSessionContext
 }
 
 @Serializable
 data class BaseVerificationSessionContext(
+    val vpToken: String,
+    val expectedNonce: String,
+    val expectedAudience: String?,
+
+    val responseUri: String?,
+
     val isSigned: Boolean,
     val isEncrypted: Boolean,
     val responseMode: OpenID4VPResponseMode
 )
 
+/** vpToken = vpJwt string - used by JwtVcJsonPresentation parser */
 @Serializable
 @SerialName("jwt_vc_json")
 data class JwtVcJsonVPVerificationRequest(
-    /** vpJwt string - used by JwtVcJsonPresentation parser */
-    override val vpToken: String,
-    override val expectedNonce: String,
-    override val expectedAudience: String?,
+    override val base: BaseVerificationSessionContext
 ) : VPVerificationRequest()
 
+/** full SD-JWT VC presentation string (core~disclosures~kb-jwt) - used by DcSdJwtPresentation parser */
 @Serializable
 @SerialName("dc+sd_jwt")
 data class DcSdJwtVPVerificationRequest(
-    /** full SD-JWT VC presentation string (core~disclosures~kb-jwt) - used by DcSdJwtPresentation parser */
-    override val vpToken: String,
-    override val expectedNonce: String,
-    override val expectedAudience: String?,
+    override val base: BaseVerificationSessionContext,
 
     val originalClaimsQuery: List<ClaimsQuery>?
 ) : VPVerificationRequest()
 
+/** mdoc Base64Url String */
 @Serializable
 @SerialName("mso_mdoc")
 data class MsoMdocVPVerificationRequest(
-    /** mdoc Base64Url String */
-    override val vpToken: String,
-    override val expectedNonce: String,
-    override val expectedAudience: String?,
+    override val base: BaseVerificationSessionContext,
 
     val jwkThumbprint: String?
-) : VPVerificationRequest()
+) : VPVerificationRequest() {
+    fun toMdocVerificationContext() = MdocVerificationContext(
+        expectedNonce = base.expectedNonce,
+        expectedAudience = base.expectedAudience,
+        responseUri = base.responseUri,
+        isEncrypted = base.isEncrypted,
+        isDcApi = base.responseMode in OpenID4VPResponseMode.DC_API_RESPONSES,
+
+        jwkThumbprint = jwkThumbprint
+    )
+}
