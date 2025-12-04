@@ -110,12 +110,14 @@ jobs:
         run: |
           gunzip ${{ runner.temp }}/issuer-api.tar.gz
           gunzip ${{ runner.temp }}/verifier-api.tar.gz
+          gunzip ${{ runner.temp }}/verifier-api2.tar.gz
           gunzip ${{ runner.temp }}/wallet-api.tar.gz
       - name: Load Docker images from tarballs
         if: ${{ env.use-artifact }}
         run: |
           docker load --input ${{ runner.temp }}/issuer-api.tar
           docker load --input ${{ runner.temp }}/verifier-api.tar
+          docker load --input ${{ runner.temp }}/verifier-api2.tar
           docker load --input ${{ runner.temp }}/wallet-api.tar
       - name: Run stack
         run: |
