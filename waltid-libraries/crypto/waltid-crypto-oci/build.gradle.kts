@@ -106,7 +106,7 @@ kotlin {
                 implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.57.1")
 
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:10.6")
 
                 // walt.id
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -117,7 +117,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
                 // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.16")
+                implementation("org.slf4j:slf4j-simple:2.0.17")
 
                 // Test
                 implementation(kotlin("test"))

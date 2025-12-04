@@ -4,7 +4,6 @@ import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.matchesBase64
-import id.walt.crypto.utils.HexUtils.matchesHex
 import io.github.oshai.kotlinlogging.KotlinLogging
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -65,17 +64,17 @@ ${Base64.Pem.encode(data)}
         val der = if (str.lines()[0].contains("BEGIN CERTIFICATE")) {
             str.replace("BEGIN CERTIFICATE", "")
                 .replace("END CERTIFICATE", "")
+                .replace("\r", "")
+                .replace("\n", "")
                 .dropWhile { it == '-' }
                 .dropLastWhile { it == '-' }
         } else str
 
-        val matchesHex = str.matchesHex()
-        val matchesBase64 = str.matchesBase64()
+        val matchesBase64 = der.matchesBase64()
 
         return when {
-            matchesHex -> der.hexToByteArray()
             matchesBase64 -> Base64.decode(der)
-            else -> throw IllegalArgumentException("Invalid format (expected PEM, or DER in Base64 or Hex): $derOrPem")
+            else -> throw IllegalArgumentException("Invalid format (expected PEM, or DER in Base64): $derOrPem")
         }
     }
 

@@ -35,6 +35,9 @@ spec:
     spec:
       containers:
         - name: verifier2
+          args:
+            - "-l"
+            - "trace"
           image: waltid/verifier-api2
           imagePullPolicy: Always
           volumeMounts:

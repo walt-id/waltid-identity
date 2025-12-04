@@ -79,7 +79,6 @@ class SimpleCOSECryptoProvider(keys: List<COSECryptoProviderKeyInfo>) : COSECryp
         sign1Msg.sign(OneKey(keyInfo.publicKey, keyInfo.privateKey))
 
         val cborObj = sign1Msg.EncodeToCBORObject()
-        println("Signed message: " + Hex.encode(cborObj.EncodeToBytes()))
         return Cbor.decodeFromByteArray(COSESign1Serializer, cborObj.EncodeToBytes())
     }
 

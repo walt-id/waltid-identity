@@ -67,7 +67,7 @@ kotlin {
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.8")
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:10.6")
 
                 /*
                  * walt.id:
@@ -89,7 +89,7 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.16")
+                implementation("org.slf4j:slf4j-simple:2.0.17")
             }
         }
     }

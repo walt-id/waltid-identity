@@ -32,7 +32,7 @@ class SdJwtCredentialsTest {
         check(disclosures.sortedByName() == vcDisclosures.sortedByName()) { "Expected disclosures != parsed disclosures" }
 
 
-        val selectedDisclosures = disclosures.map { SdJwtSelectiveDisclosure(it) }
+        val selectedDisclosures = disclosures.map { SdJwtSelectiveDisclosure(it, it.toString()) }
         val disclosedVc = vc.disclose(vc, selectedDisclosures)
         check(example.removeSuffix("~") == disclosedVc.removeSuffix("~")) { "disclosed $disclosedVc != example $example" }
     }

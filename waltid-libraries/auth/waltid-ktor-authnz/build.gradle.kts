@@ -53,7 +53,7 @@ dependencies {
     // JWT
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
     implementation(project(":waltid-services:waltid-service-commons"))
-    implementation("com.nimbusds:nimbus-jose-jwt:9.48")
+    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
 
     // Cryptography
     /*implementation(platform("dev.whyoleg.cryptography:cryptography-bom:0.4.0"))

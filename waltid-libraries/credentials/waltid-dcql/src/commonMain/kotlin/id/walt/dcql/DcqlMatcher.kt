@@ -345,7 +345,7 @@ object DcqlMatcher {
         // Ensure the metaQuery type aligns with the credential's actual format
         // This check is important if the metaQuery was constructed independently.
         val formatMatchesQueryType = when (expectedFormat) {
-            CredentialFormat.JWT_VC_JSON, CredentialFormat.LDP_VC -> metaQuery is W3cCredentialMeta
+            CredentialFormat.JWT_VC_JSON, CredentialFormat.LDP_VC -> metaQuery is JwtVcJsonMeta
             CredentialFormat.DC_SD_JWT -> metaQuery is SdJwtVcMeta
             CredentialFormat.MSO_MDOC -> metaQuery is MsoMdocMeta
             CredentialFormat.AC_VP -> true // Assuming no specific meta for AC_VP yet or handled by GenericMeta
@@ -366,7 +366,7 @@ object DcqlMatcher {
             credential.format !in allowedMetaForm.flatMap { it.id.toList() }
 
         return when (metaQuery) {
-            is W3cCredentialMeta -> {
+            is JwtVcJsonMeta -> {
                 if (isNotAllowedMetaFormat(CredentialFormat.JWT_VC_JSON, CredentialFormat.LDP_VC)) {
                     log.warn { "W3cCredentialMeta applied to non-W3C format ${credential.format} for ${credential.id}" }
                     return false

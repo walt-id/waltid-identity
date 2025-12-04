@@ -1,5 +1,5 @@
 <div align="center">
- <h1>Kotlin Multiplatform Verification Policies library (v2)</h1>
+ <h1>Kotlin Multiplatform VC Verification Policies library (v2)</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
  <p>Composable verification policies for digital credentials</p>
 
@@ -9,17 +9,27 @@
 <a href="https://www.linkedin.com/company/walt-id/">
 <img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
 </a>
+  
+  <h2>Status</h2>
+  <p align="center">
+    <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
+    <br/>
+    <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
+  </p>
 </div>
 
 Kotlin Multiplatform library that provides reusable verification policies for Digital Credentials (W3C VC, IETF SD-JWT WC, mDL/mdoc ISO 18013-5). It builds on top of the [walt.id generic Digital Credential interface](../waltid-digital-credentials) and powers high-level services such as the [walt.id Verifier APIs](../../services/waltid-verifier-api2).
 
 The main difference between this library and the legacy [`waltid-verification-policies`](../waltid-verification-policies) library is the focus on multiplatform, and the usage of the new `DigitalCredential` interface from `waltid-digital-credentials`. This allows the policies to be more stable and easier to use across different credential formats.
 
+This library focuses on credential-level verification policies, complementing the presentation-level policies in [`waltid-verification-policies2-vp`](../waltid-verification-policies2-vp).
+
 ## Table of contents
 - [Features](#features)
 - [Supported platforms](#supported-platforms)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Policy Configuration Levels](#policy-configuration-levels)
 - [Available policies](#available-policies)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -92,7 +102,7 @@ All policies share the same signature: they accept a `DigitalCredential` and ret
 
 ```json
 {
-  "vcPolicies": [
+  "vc_policies": [
     "signature",
     "expiration",
     {
@@ -115,7 +125,7 @@ All policies share the same signature: they accept a `DigitalCredential` and ret
       "enableRevocation": false
     }
   ],
-  "specificVcPolicies": {
+  "specific_vc_policies": {
     "identity_credential": [
       {
         "policy": "schema",
@@ -133,6 +143,13 @@ All policies share the same signature: they accept a `DigitalCredential` and ret
 
 In Kotlin you can deserialize the JSON into `PolicyList` or the higher-level `Verification2Session.DefinedVerificationPolicies` to drive policy execution.
 
+### Policy Configuration Levels
+
+Policies can be configured at multiple levels:
+- **VP-level (`vp_policies`)**: Applied to Verifiable Presentations (presentation signature, audience, nonce)
+- **Global VC-level (`vc_policies`)**: Applied to all credentials (signature, expiration, issuer checks)
+- **Specific VC-level (`specific_vc_policies`)**: Applied to credentials matching specific query IDs (credential-type-specific validation)
+
 ### Collecting results
 
 `PolicyResult` and `PolicyResults` capture the outcome of each policy and expose an `overallSuccess` helper that checks all VC policy groups. Persist the results to reconstruct verification decisions or to return structured responses from APIs.
@@ -143,18 +160,225 @@ When working with DCQL presentations, you can re-check that revealed claims sati
 
 ## Available policies
 
-| Policy id        | Class                                   | Description |
-|-----------------|-----------------------------------------|-------------|
-| `signature`     | `CredentialSignaturePolicy`             | Resolves the issuer key (DID, x5c, etc.) and verifies digital signatures. |
-| `expiration`    | `ExpirationDatePolicy`                  | Rejects credentials that have passed their `exp` / `validUntil`. |
-| `not-before`    | `NotBeforePolicy`                       | Prevents usage before the `nbf` / `validFrom` timestamp. |
-| `allowed-issuer`| `AllowedIssuerPolicy`                   | Checks the issuer DID / identifier against an allowlist. |
-| `schema`        | `JsonSchemaPolicy`                      | Validates arbitrary credential data against a JSON schema (powered by optimumcode/json-schema-validator). |
-| `regex`         | `CredentialDataMatcherPolicy`           | Runs regex checks on JSON path values, optionally allowing nulls. |
-| `webhook`       | `WebhookPolicy`                         | Calls out to an external HTTP endpoint and interprets the response. |
-| `vical`         | `VicalPolicy`                           | Validates mdoc certificates against VICAL trust anchors. |
+### `signature`
+Verifies the cryptographic signature of a credential.
 
-Additional policies (for example credential status) are available in the legacy [`waltid-verification-policies`](../waltid-verification-policies) module.
+**Use case:** Ensure credential authenticity and integrity.
+
+**Example:**
+```json
+{
+  "policy": "signature"
+}
+```
+
+---
+
+### `expiration`
+Checks if a credential has expired based on its `notAfter` claim.
+
+**Use case:** Ensure credentials are still valid and haven't expired.
+
+**Example:**
+```json
+{
+  "policy": "expiration"
+}
+```
+
+---
+
+### `not-before`
+Validates that a credential is not being used before its `notBefore` or `issuedAt` date.
+
+**Use case:** Prevent premature use of credentials that have future validity dates.
+
+**Example:**
+```json
+{
+  "policy": "not-before"
+}
+```
+
+---
+
+### `allowed-issuer`
+Validates that the credential issuer is in an allowed list.
+
+**Use case:** Restrict credentials to trusted issuers only.
+
+**Example:**
+```json
+{
+  "policy": "allowed-issuer",
+  "allowed_issuer": "did:example:issuer123"
+}
+```
+
+**Multiple issuers:**
+```json
+{
+  "policy": "allowed-issuer",
+  "allowed_issuer": ["did:example:issuer1", "did:example:issuer2"]
+}
+```
+
+---
+
+### `schema`
+Validates credential data against a JSON Schema.
+
+**Use case:** Ensure credential structure and data types match expected schema.
+
+**Example:**
+```json
+{
+  "policy": "schema",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "credentialSubject": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" }
+        }
+      }
+    }
+  },
+  "defaultType": null
+}
+```
+
+---
+
+### `regex`
+Validates credential data at a specific path using a regular expression.
+
+**Use case:** Pattern matching for specific credential fields (e.g., email format, ID numbers).
+
+**Example:**
+```json
+{
+  "policy": "regex",
+  "path": "$.credentialSubject.email",
+  "regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+  "regex_options": ["IGNORE_CASE"],
+  "allowNull": false
+}
+```
+
+---
+
+### `credential-status`
+Checks credential status using W3C or IETF status list formats.
+
+**Use case:** Verify credential hasn't been revoked or suspended.
+
+**Example (W3C StatusList2021):**
+```json
+{
+  "policy": "credential-status",
+  "argument": {
+    "discriminator": "w3c",
+    "value": 0,
+    "purpose": "revocation",
+    "type": "StatusList2021"
+  }
+}
+```
+
+**Example (IETF):**
+```json
+{
+  "policy": "credential-status",
+  "argument": {
+    "discriminator": "ietf",
+    "value": 0
+  }
+}
+```
+
+**Example (Multiple BitstringStatusList entries):**
+```json
+{
+  "policy": "credential-status",
+  "argument": {
+    "discriminator": "w3c-list",
+    "list": [
+      {
+        "value": 0,
+        "purpose": "revocation",
+        "type": "BitstringStatusList"
+      },
+      {
+        "value": 0,
+        "purpose": "suspension",
+        "type": "BitstringStatusList"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### `revoked-status-list`
+Checks revocation status using W3C StatusList2021 format.
+
+**Use case:** Quick revocation check for StatusList2021 credentials.
+
+**Example:**
+```json
+{
+  "policy": "revoked-status-list"
+}
+```
+
+---
+
+### `vical`
+Validates mdoc credentials using VICAL (Verifiable Issuer Certificate Authority List) data.
+
+**Use case:** Verify mdoc authenticity and certificate chain using trusted VICAL data.
+
+**Example:**
+```json
+{
+  "policy": "vical",
+  "vical": "base64EncodedVicalData",
+  "enableDocumentTypeValidation": false,
+  "enableTrustedChainRoot": false,
+  "enableSystemTrustAnchors": false,
+  "enableRevocation": false
+}
+```
+
+---
+
+### `webhook`
+Calls an external HTTP endpoint to verify the credential.
+
+**Use case:** Delegate verification to external systems or custom validation logic.
+
+**Example:**
+```json
+{
+  "policy": "webhook",
+  "url": "https://api.example.com/verify",
+  "basicauth_username": "user",
+  "basicauth_password": "pass",
+  "bearerauth_token": null
+}
+```
+
+**Bearer token authentication:**
+```json
+{
+  "policy": "webhook",
+  "url": "https://api.example.com/verify",
+  "bearerauth_token": "your-token-here"
+}
+```
 
 ### VICAL policy tips
 
@@ -176,8 +400,13 @@ The tests rely on example credentials from `waltid-digital-credentials-examples`
 
 * Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
 * Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+* Find more indepth documentation on our [docs site](https://docs.walt.id)
 
 
 ## License
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
+
+<div align="center">
+<img src="../../../assets/walt-banner.png" alt="walt.id banner" />
+</div>
