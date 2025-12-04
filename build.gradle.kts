@@ -37,7 +37,7 @@ plugins {
     id("com.android.application") version "8.12.3" apply false
 
     id("com.github.ben-manes.versions") version "0.53.0" apply false
-    id("io.ktor.plugin") version "3.2.2" apply false
+    id("io.ktor.plugin") version "3.3.3" apply false
 
     id("com.github.jk1.dependency-license-report") version "3.0.1" apply false
 }
