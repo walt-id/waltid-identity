@@ -97,7 +97,7 @@ kotlin {
                 implementation("org.slf4j:slf4j-simple:2.0.17")
 
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:10.6")
 
                 // BouncyCastle for PEM import
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")

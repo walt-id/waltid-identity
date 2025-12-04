@@ -90,7 +90,7 @@ dependencies {
 
     // Crypto
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
-    implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
 
     // Test
     testImplementation(kotlin("test"))

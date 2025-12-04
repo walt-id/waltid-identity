@@ -4,7 +4,7 @@ serialization = "1.9.0"
 bcprov = "2.73.9"
 junit-jupiter = "5.11.4"
 okio = "3.16.2"
-nimbus = "10.0.2"
+nimbus = "10.6"
 
 [libraries]
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
