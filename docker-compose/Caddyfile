@@ -18,6 +18,12 @@
     reverse_proxy http://verifier-api:{$VERIFIER_API_PORT}
 }
 
+# Verifier API2
+:{$VERIFIER_API2_PORT} {
+    reverse_proxy http://verifier-api2:{$VERIFIER_API2_PORT}
+}
+
+
 # Web Demo Wallet Frontend
 :{$DEMO_WALLET_FRONTEND_PORT} {
     reverse_proxy http://waltid-demo-wallet:{$DEMO_WALLET_FRONTEND_PORT} # frontend
