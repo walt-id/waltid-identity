@@ -159,9 +159,9 @@ docker run -p 7102:7102 -i -t waltid/portal
 
 To add support for new credential types:
 
-1. **Add credential schema** to the Credentials API repository
-2. **Update issuer metadata** to include the new credential type in supported credentials
-3. The portal will automatically discover and display new credentials from the configured endpoints
+1. **Add credential schema** to the Credentials API repository. Learn more [here](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-credentials).
+2. **Update issuer metadata** to include the new credential type in supported credentials. Learn more [here](https://docs.walt.id/community-stack/issuer/api/configurations/config-files/credential-issuer-metadata).
+3. The portal will automatically discover and display new credentials from the configured endpoints.
 
 Both the credential repository and issuer metadata must be updated for credentials to appear in the issuance flow.
 
