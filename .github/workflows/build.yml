@@ -50,7 +50,7 @@ jobs:
       artifact: issuer-api
       tag: "waltid/issuer-api:${{ needs.version.outputs.release_version }}"
   compose-test:
-    uses: walt-id/waltid-identity/.github/workflows/docker-compose-testing.yml@5a49a4e90912f4cd68f445ec44df746648259cce
+    uses: walt-id/waltid-identity/.github/workflows/docker-compose-testing.yml@e01a65dfa72a3615f8273cadeb4e86f723129cba
     needs: [ version, docker, api-docker ]
     secrets: inherit
     with:
