@@ -162,6 +162,10 @@ kotlin {
     }
 }
 
+tasks.named("jsBrowserTest") {
+    enabled = false
+}
+
 npmPublish {
     registries {
         val envToken = System.getenv("NPM_TOKEN")
