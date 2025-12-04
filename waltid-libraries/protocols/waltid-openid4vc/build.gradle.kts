@@ -131,12 +131,12 @@ kotlin {
             dependencies {
                 implementation("io.ktor:ktor-client-okhttp:$ktor_version")
                 implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
-                implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:10.6")
             }
         }
         val jvmTest by getting {
             dependencies {
-                implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:10.6")
                 implementation("io.kotest:kotest-runner-junit5:5.9.1")
                 implementation("io.kotest:kotest-assertions-core:5.9.1")
                 implementation("io.kotest:kotest-assertions-json:5.9.1")

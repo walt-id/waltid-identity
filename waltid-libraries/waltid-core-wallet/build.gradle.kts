@@ -62,7 +62,7 @@ kotlin {
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
 
                 // Problematic libraries:
-                implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:10.6")
                 implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
             }
         }

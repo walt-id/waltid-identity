@@ -145,7 +145,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.10.2")
 
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:10.6")
 
             }
         }

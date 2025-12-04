@@ -141,7 +141,7 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-issuer-api"))
     testImplementation(project(":waltid-services:waltid-verifier-api"))
 
-    implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
 
     implementation("io.ktor:ktor-client-java:$ktor_version")

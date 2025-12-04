@@ -29,7 +29,7 @@ dependencies {
     implementation("aws.sdk.kotlin:kms:1.4.22")
 
     // JOSE
-    implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
 
     // Hashing with SHA-2
     implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
