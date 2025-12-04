@@ -40,11 +40,11 @@
 
 ```json
 {
-    "id": "<uuid>",
-    "issuer": "<issuerDid>",
-    "credentialSubject": {
-        "id": "<subjectDid>"
-    },
-    "issuanceDate": "<timestamp>",
+   "id":"<uuid>",
+   "issuer":"<issuerDid>",
+   "credentialSubject":{
+      "id":"<subjectDid>"
+   },
+   "issuanceDate":"<timestamp>"
 }
 ```
