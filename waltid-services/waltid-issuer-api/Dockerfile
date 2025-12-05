@@ -24,7 +24,18 @@ RUN gradle buildFatJar --no-daemon
 
 # Stage 3: Create the Runtime Image
 FROM amazoncorretto:22 AS runtime
+WORKDIR /app
+
+# Create an unprivileged user and group
+RUN groupadd -r app && useradd -r -g app -u 10001 app
+
+COPY --chown=app:app --from=build \
+  /home/gradle/src/waltid-services/waltid-issuer-api/build/libs/*.jar \
+  /app/issuer-api.jar
+
+# Change ownership to non-root user
+RUN chown -R 10001:10001 /app
+
+USER 10001:10001
 EXPOSE 7002
-RUN mkdir /app
-COPY --from=build /home/gradle/src/waltid-services/waltid-issuer-api/build/libs/*.jar /app/issuer-api.jar
 ENTRYPOINT ["java","-jar","/app/issuer-api.jar"]
