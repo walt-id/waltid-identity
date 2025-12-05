@@ -127,7 +127,7 @@ object OpenApiModule {
                     Interact with the ${ServiceConfig.config.vendor} ${ServiceConfig.config.name}. Version is reported to be ${BuildConfig.version} and this service instance was started ${
                     Clock.System.now().roundToSecond()
                 }.
-                    Questions about anything here? Visit <a href='https://github.com/walt-id/#join-the-community'>support</a>.
+                    Questions about anything here? Visit <a href='${ServiceConfig.config.supportUrl}'>support</a>.
 
                 """.trimIndent().replace("\n", "<br/>")
 
@@ -137,8 +137,8 @@ object OpenApiModule {
                     email = "office@walt.id"
                 }
                 license {
-                    name = "Apache 2.0"
-                    url = "https://www.apache.org/licenses/LICENSE-2.0.html"
+                    name = ServiceConfig.config.licenseName
+                    url = ServiceConfig.config.licenseUrl
                 }
 
                 OpenApiConfig.customInfo?.invoke(this)

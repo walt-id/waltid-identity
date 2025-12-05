@@ -18,10 +18,34 @@ import kotlin.io.path.absolutePathString
 import kotlin.time.measureTime
 import java.lang.System.getProperty as p
 
+enum class ProductType {
+    OPEN_SOURCE,
+    ENTERPRISE
+}
+
+private fun defaultSupportUrl(product: ProductType) = when (product) {
+    ProductType.OPEN_SOURCE -> "https://walt.id/community"
+    ProductType.ENTERPRISE -> "https://support.walt.id"
+}
+
+private fun defaultLicenseName(product: ProductType) = when (product) {
+    ProductType.OPEN_SOURCE -> "Apache 2.0"
+    ProductType.ENTERPRISE -> "Commercial License"
+}
+
+private fun defaultLicenseUrl(product: ProductType) = when (product) {
+    ProductType.OPEN_SOURCE -> "https://www.apache.org/licenses/LICENSE-2.0.html"
+    ProductType.ENTERPRISE -> "https://walt.id/enterprise-stack"
+}
+
 data class ServiceConfiguration(
     val name: String = "",
     val vendor: String = "walt.id",
     val version: String = BuildConfig.version,
+    val product: ProductType = ProductType.OPEN_SOURCE,
+    val supportUrl: String = defaultSupportUrl(product),
+    val licenseName: String = defaultLicenseName(product),
+    val licenseUrl: String = defaultLicenseUrl(product),
 )
 
 data class ServiceInitialization(
