@@ -2,7 +2,7 @@
 coroutines = "1.10.2"
 serialization = "1.9.0"
 bcprov = "2.73.9"
-junit-jupiter = "5.11.4"
+junit-jupiter = "6.0.1"
 okio = "3.16.2"
 nimbus = "10.6"
 
