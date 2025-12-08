@@ -1,5 +1,4 @@
 FROM docker.io/node:alpine AS buildstage
-RUN apk add --update nodejs git
 COPY ./package.json /build/
 WORKDIR /build
 RUN npm install
