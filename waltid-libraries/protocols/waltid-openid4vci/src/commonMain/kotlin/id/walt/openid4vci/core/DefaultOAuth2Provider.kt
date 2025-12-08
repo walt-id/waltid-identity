@@ -24,7 +24,7 @@ class DefaultOAuth2Provider internal constructor(
     override fun createAuthorizeRequest(parameters: Map<String, String>): AuthorizeRequestResult =
         config.authorizeRequestValidator.validate(parameters)
 
-    override fun createAuthorizeResponse(request: AuthorizationRequest, session: Session): AuthorizeResponseResult {
+    override suspend fun createAuthorizeResponse(request: AuthorizationRequest, session: Session): AuthorizeResponseResult {
         request.setSession(session)
         val responses = mutableListOf<AuthorizeResponseResult>()
         for (handler in config.authorizeEndpointHandlers) {
@@ -88,7 +88,7 @@ class DefaultOAuth2Provider internal constructor(
     override fun createAccessRequest(parameters: Map<String, String>, session: Session): AccessRequestResult =
         config.accessRequestValidator.validate(parameters, session)
 
-    override fun createAccessResponse(request: AccessTokenRequest): AccessResponseResult {
+    override suspend fun createAccessResponse(request: AccessTokenRequest): AccessResponseResult {
         for (handler in config.tokenEndpointHandlers.toList()) {
             if (!handler.canHandleTokenEndpointRequest(request)) {
                 continue

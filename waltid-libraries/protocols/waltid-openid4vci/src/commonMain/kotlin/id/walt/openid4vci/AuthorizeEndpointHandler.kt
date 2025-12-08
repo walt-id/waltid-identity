@@ -10,5 +10,5 @@ import id.walt.openid4vci.request.AuthorizationRequest
  * When a handler does not apply to the incoming request it should let the dispatcher offer the request to the next handler.
  */
 interface AuthorizeEndpointHandler {
-    fun handleAuthorizeEndpointRequest(request: AuthorizationRequest, session: Session): AuthorizeResponseResult
+    suspend fun handleAuthorizeEndpointRequest(request: AuthorizationRequest, session: Session): AuthorizeResponseResult
 }

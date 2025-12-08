@@ -5,6 +5,8 @@ import id.walt.openid4vci.core.AccessResponseResult
 import id.walt.openid4vci.core.AuthorizeRequestResult
 import id.walt.openid4vci.core.AuthorizeResponseResult
 import id.walt.openid4vci.core.buildProvider
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -12,9 +14,9 @@ import kotlin.time.ExperimentalTime
 
 class ProviderAuthorizationOnlyFlowTest {
 
-    @OptIn(ExperimentalTime::class)
+    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
     @Test
-    fun `provider supporting only authorization code flow succeeds and rejects pre-authorized grant`() {
+    fun `provider supporting only authorization code flow succeeds and rejects pre-authorized grant`() = runTest {
         val config = createTestConfig()
         val issuerId = "test-issuer"
 

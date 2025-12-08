@@ -27,7 +27,7 @@ class AuthorizationCodeAuthorizeHandler(
 ) : AuthorizeEndpointHandler {
 
     @OptIn(ExperimentalTime::class)
-    override fun handleAuthorizeEndpointRequest(request: AuthorizationRequest, session: Session): AuthorizeResponseResult {
+    override suspend fun handleAuthorizeEndpointRequest(request: AuthorizationRequest, session: Session): AuthorizeResponseResult {
         if (!request.getResponseTypes().contains("code")) {
             return AuthorizeResponseResult.Failure(
                 OAuthError("unsupported_response_type", "Handler only supports response_type=code"),

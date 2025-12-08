@@ -61,7 +61,7 @@ internal suspend fun runConcurrentAuthCodeFlows(
 }
 
 @OptIn(ExperimentalTime::class)
-internal fun executeAuthorizationCodeFlow(
+internal suspend fun executeAuthorizationCodeFlow(
     provider: OAuth2Provider,
     iteration: Int,
     idx: Int,

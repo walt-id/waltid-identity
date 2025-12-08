@@ -10,5 +10,5 @@ import id.walt.openid4vci.request.AccessTokenRequest
  */
 interface TokenEndpointHandler {
     fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean
-    fun handleTokenEndpointRequest(request: AccessTokenRequest): TokenEndpointResult
+    suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): TokenEndpointResult
 }

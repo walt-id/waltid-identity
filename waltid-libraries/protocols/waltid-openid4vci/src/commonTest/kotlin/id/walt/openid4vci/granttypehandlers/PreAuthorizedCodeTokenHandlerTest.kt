@@ -10,7 +10,8 @@ import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.request.AccessTokenRequest
-import id.walt.openid4vci.tokens.TokenService
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,9 +28,9 @@ class PreAuthorizedCodeTokenHandlerTest {
     private val handler = PreAuthorizedCodeTokenHandler(repository, TokenService())
     private val issuer = DefaultPreAuthorizedCodeIssuer(repository)
 
-    @OptIn(ExperimentalTime::class)
+    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
     @Test
-    fun `handles pre-authorized code successfully`() {
+    fun `handles pre-authorized code successfully`() = runTest {
         val credentialSession = DefaultSession().apply { setSubject("credential-subject") }
         val issued = issuer.issue(
             PreAuthorizedCodeIssueRequest(
@@ -61,9 +62,9 @@ class PreAuthorizedCodeTokenHandlerTest {
         assertNull(repository.get(code, issuerId))
     }
 
-    @OptIn(ExperimentalTime::class)
+    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
     @Test
-    fun `rejects invalid PIN and allows retry`() {
+    fun `rejects invalid PIN and allows retry`() = runTest {
         val issued = issuer.issue(
             PreAuthorizedCodeIssueRequest(
                 issuerId = issuerId,
@@ -95,9 +96,9 @@ class PreAuthorizedCodeTokenHandlerTest {
         assertNull(repository.get(code, issuerId))
     }
 
-    @OptIn(ExperimentalTime::class)
+    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
     @Test
-    fun `rejects code reuse`() {
+    fun `rejects code reuse`() = runTest {
         val issued = issuer.issue(
             PreAuthorizedCodeIssueRequest(
                 issuerId = issuerId,

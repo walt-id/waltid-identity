@@ -26,7 +26,7 @@ class PreAuthorizedCodeTokenHandler(
         request.getGrantTypes().contains(GRANT_TYPE_PRE_AUTHORIZED_CODE)
 
     @OptIn(ExperimentalTime::class)
-    override fun handleTokenEndpointRequest(request: AccessTokenRequest): TokenEndpointResult {
+    override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): TokenEndpointResult {
         if (!canHandleTokenEndpointRequest(request)) {
             return TokenEndpointResult.Failure(
                 error = "unsupported_grant_type",

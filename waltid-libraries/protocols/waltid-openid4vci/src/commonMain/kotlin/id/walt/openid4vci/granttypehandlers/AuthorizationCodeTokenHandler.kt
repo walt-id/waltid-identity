@@ -20,7 +20,9 @@ class AuthorizationCodeTokenHandler(
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
         request.getGrantTypes().contains(GRANT_TYPE_AUTHORIZATION_CODE)
 
-    override fun handleTokenEndpointRequest(request: AccessTokenRequest): TokenEndpointResult {
+    @OptIn(ExperimentalTime::class)
+
+    override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): TokenEndpointResult {
         if (!canHandleTokenEndpointRequest(request)) {
             return TokenEndpointResult.Failure("unsupported_grant_type", "authorization_code grant not requested")
         }

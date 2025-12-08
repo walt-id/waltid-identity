@@ -20,11 +20,11 @@ import id.walt.openid4vci.request.AuthorizationRequest
  */
 interface OAuth2Provider {
     fun createAuthorizeRequest(parameters: Map<String, String>): AuthorizeRequestResult
-    fun createAuthorizeResponse(request: AuthorizationRequest, session: Session): AuthorizeResponseResult
+    suspend fun createAuthorizeResponse(request: AuthorizationRequest, session: Session): AuthorizeResponseResult
     fun writeAuthorizeError(request: AuthorizationRequest, error: OAuthError): AuthorizeHttpResponse
     fun writeAuthorizeResponse(request: AuthorizationRequest, response: AuthorizeResponse): AuthorizeHttpResponse
     fun createAccessRequest(parameters: Map<String, String>, session: Session): AccessRequestResult
-    fun createAccessResponse(request: AccessTokenRequest): AccessResponseResult
+    suspend fun createAccessResponse(request: AccessTokenRequest): AccessResponseResult
     fun writeAccessError(request: AccessTokenRequest, error: OAuthError): AccessHttpResponse
     fun writeAccessResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessHttpResponse
 }

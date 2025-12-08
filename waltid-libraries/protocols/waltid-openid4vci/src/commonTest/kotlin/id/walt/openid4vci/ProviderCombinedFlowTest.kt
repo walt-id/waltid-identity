@@ -6,6 +6,8 @@ import id.walt.openid4vci.core.AuthorizeRequestResult
 import id.walt.openid4vci.core.AuthorizeResponseResult
 import id.walt.openid4vci.core.buildProvider
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,9 +17,9 @@ import kotlin.time.ExperimentalTime
 
 class ProviderCombinedFlowTest {
 
-    @OptIn(ExperimentalTime::class)
+    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
     @Test
-    fun `provider with both handlers supports authorization and pre-authorized flows`() {
+    fun `provider with both handlers supports authorization and pre-authorized flows`() = runTest {
         val config = createTestConfig()
         val issuerId = "test-issuer"
 
