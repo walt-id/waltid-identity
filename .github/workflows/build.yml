@@ -9,7 +9,7 @@ concurrency:
 
 jobs:
   version:
-    uses: walt-id/waltid-identity/.github/workflows/version.yml@5eed6553d3d796a4230c0e662d631f428c2c7717
+    uses: walt-id/waltid-identity/.github/workflows/version.yml@f80ee88c9f932603729744c0ad5cb87aa4f7ab54
   gradle-build:
     uses: walt-id/waltid-identity/.github/workflows/gradle.yml@9a3f15450aa02ce5766f37aea8ef52c73a37849a
     secrets: inherit
