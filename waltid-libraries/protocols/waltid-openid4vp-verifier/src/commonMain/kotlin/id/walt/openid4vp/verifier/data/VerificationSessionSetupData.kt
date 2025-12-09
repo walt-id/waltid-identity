@@ -9,6 +9,7 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.ktornotifications.core.KtorSessionNotifications
+import id.walt.openid4vp.verifier.data.Verification2Session.DefinedVerificationPolicies
 import id.walt.openid4vp.verifier.utils.UrlUtils
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import kotlinx.serialization.SerialName
@@ -31,7 +32,7 @@ data class GeneralFlowConfig(
 
     val notifications: KtorSessionNotifications? = null,
 
-    val policies: Verification2Session.DefinedVerificationPolicies = Verification2Session.DefinedVerificationPolicies(),
+    val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
 
     @SerialName("client_metadata")
     val clientMetadata: ClientMetadata? = null,
@@ -185,14 +186,13 @@ data class DcApiFlowSetup(
                     )
                 ),
                 signedRequest = true,
-                encryptedResponse = true,
+                encryptedResponse = false,
                 clientId = "x509_hash:abc-xyz-base64url-sha256-hash-of-der-x509-leaf",
 
                 key = DirectSerializedKey(KeyManager.resolveSerializedKeyBlocking("""{"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}"""))
             ),
             expectedOrigins = listOf("http://localhost:7003"),
-            haip = false
-        )
+            haip = false        )
         val EXAMPLE_SIGNED_ENCRYPTED_MDL = EXAMPLE_SIGNED_MDL.copy(core = EXAMPLE_SIGNED_MDL.core.copy(encryptedResponse = true))
         val EXAMPLE_SIGNED_PHOTOID = EXAMPLE_SIGNED_MDL.copy(
             core = EXAMPLE_SIGNED_MDL.core.copy(

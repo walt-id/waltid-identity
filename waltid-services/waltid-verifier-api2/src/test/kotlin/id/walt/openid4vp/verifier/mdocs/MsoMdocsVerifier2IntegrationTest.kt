@@ -27,9 +27,9 @@ import id.walt.openid4vp.verifier.data.Verification2Session
 import id.walt.openid4vp.verifier.data.VerificationSessionSetup
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator
 import id.walt.openid4vp.verifier.verifierModule
-import id.walt.policies2.PolicyList
-import id.walt.policies2.policies.CredentialDataMatcherPolicy
-import id.walt.policies2.policies.CredentialSignaturePolicy
+import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vc.policies.CredentialDataMatcherPolicy
+import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.*
@@ -81,7 +81,7 @@ class MsoMdocsVerifier2IntegrationTest {
     )
 
     private val mdocsPolicies = Verification2Session.DefinedVerificationPolicies(
-        vcPolicies = PolicyList(
+        vc_policies = VCPolicyList(
             listOf(
                 CredentialSignaturePolicy(),
                 CredentialDataMatcherPolicy(path = "$.['org.iso.23220.dtc.1'].dtc_version", regex = """^("[0-9]+"|-?[0-9]+(\.[0-9]+)?)$""")
@@ -296,7 +296,7 @@ class MsoMdocsVerifier2IntegrationTest {
             val presentationResult = testAndReturn("Present with wallet") {
                 WalletPresentFunctionality2.walletPresentHandling(
                     holderKey = holderKey,
-                    holderDid = null, // No DID required for mso_mdocs
+                    holderDid = null, // No DID required for mso_mdoc
                     presentationRequestUrl = bootstrapUrl!!,
                     selectCredentialsForQuery = selectCallback,
                     holderPoliciesToRun = null,

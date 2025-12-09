@@ -67,7 +67,7 @@ kotlin {
                 implementation("org.bouncycastle:bcprov-lts8on:2.73.8")
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
                 // JOSE
-                implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+                implementation("com.nimbusds:nimbus-jose-jwt:10.6")
 
                 /*
                  * walt.id:

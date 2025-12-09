@@ -72,7 +72,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
         Json.decodeFromString<Verification2Session.DefinedVerificationPolicies>(
             """
   {
-    "vcPolicies": [
+    "vc_policies": [
       {
         "policy": "allowed-issuer",
         "allowed_issuer": [
@@ -449,6 +449,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                 assertTrue { presentationResult.isSuccess }
 
                 val resp = presentationResult.getOrThrow().jsonObject
+                println("Response: $resp")
                 assertTrue("Transmission success is false") { resp["transmission_success"]!!.jsonPrimitive.boolean }
                 assertTrue { resp["verifier_response"]!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
             }
@@ -487,7 +488,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                 assertNotNull(info2.policyResults)
                 assertTrue { info2.policyResults!!.overallSuccess }
 
-                assertTrue { info2.policyResults!!.vcPolicies.size == additionalSdjwtvcPolicies.vcPolicies.policies.size }
+                assertTrue { info2.policyResults!!.vcPolicies.size == additionalSdjwtvcPolicies.vc_policies?.policies?.size }
             }
         }
     }

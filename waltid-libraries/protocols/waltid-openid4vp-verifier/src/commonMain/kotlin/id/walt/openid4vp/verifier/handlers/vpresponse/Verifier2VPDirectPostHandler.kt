@@ -6,7 +6,7 @@ import id.walt.openid4vp.verifier.data.SessionEvent
 import id.walt.openid4vp.verifier.data.Verification2Session
 import id.walt.openid4vp.verifier.data.Verifier2Response
 import id.walt.openid4vp.verifier.utils.JsonUtils.parseAsJsonObject
-import id.walt.openid4vp.verifier.verification.DcqlFulfillmentChecker
+import id.walt.openid4vp.verifier.verification2.PresentationVerificationEngine
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
@@ -184,7 +184,6 @@ object Verifier2VPDirectPostHandler {
 
         val session = verificationSession
         val responseMode = session.authorizationRequest.responseMode
-        val isDcApi = responseMode in OpenID4VPResponseMode.DC_API_RESPONSES
 
         val (vpTokenString, receivedState) = parseResponseBody(
             responseMode = responseMode,
@@ -212,62 +211,8 @@ object Verifier2VPDirectPostHandler {
         // presented credential/presentation
 
 
-        // ---------------------------
-        val presentationValidationResult = Verifier2SessionPresentationValidation.validateVPToken(
-            authorizationRequest = session.authorizationRequest,
-            vpTokenContents = vpTokenContents,
+        PresentationVerificationEngine.executeAllVerification(vpTokenContents, session, updateSessionCallback, failSessionCallback)
 
-            // DC API
-            isDcApi = isDcApi,
-            expectedOrigins = session.authorizationRequest.expectedOrigins,
-            ephemeralDecryptionKey = session.ephemeralDecryptionKey?.key?.let { it as JWKKey }
-        )
-        val allPresentationsValid = presentationValidationResult.presentationValid
-
-        // queryId -> [validated credentials]
-        // Or a more structured object
-        val allSuccessfullyValidatedAndProcessedData = presentationValidationResult.allSuccessfullyValidatedAndProcessedData
-
-        session.updateSession(SessionEvent.validated_credentials_available) {
-            presentedCredentials = allSuccessfullyValidatedAndProcessedData
-        }
-
-        if (!allPresentationsValid) {
-            // Handle overall validation failure
-            // Handle individual presentation validation failure
-            log.error { "One or more presentations in vp_token failed validation for session ${session.id}" }
-
-            session.failSession(SessionEvent.presentation_validation_failed)
-
-            Verifier2Response.Verifier2Error.PRESENTATION_VALIDATION_FAILED.throwAsError()
-        }
-
-        // Check if the set of validated presentations satisfies the overall DCQL Query
-        // (e.g., credential_sets, all *required* CredentialQuery IDs are present in allSuccessfullyValidatedAndProcessedData)
-        val dcqlFulfilled = session.authorizationRequest.dcqlQuery?.let { dcqlQuery ->
-            DcqlFulfillmentChecker.checkOverallDcqlFulfillment(
-                dcqlQuery = dcqlQuery,
-                successfullyValidatedQueryIds = allSuccessfullyValidatedAndProcessedData.keys // set of query IDs for which we have valid presentations
-            )
-        }
-        if (dcqlFulfilled == false) {
-            log.error { "The set of validated presentations does not fulfill all DCQL requirements for session ${session.id}" }
-
-            session.failSession(SessionEvent.dcql_fulfillment_check_failed)
-
-            Verifier2Response.Verifier2Error.REQUIRED_CREDENTIALS_NOT_PROVIDED.throwAsError()
-        }
-
-        // If we reach here, all individual presentations are valid AND the overall DCQL structure is met.
-        log.info { "All presentations in vp_token validated and DCQL fulfilled for session ${session.id}." }
-
-        val policyResults = Verifier2SessionPolicyValidation.validatePolicies(session.policies, allSuccessfullyValidatedAndProcessedData)
-
-        session.updateSession(SessionEvent.policy_results_available) {
-            this.policyResults = policyResults
-            this.status =
-                if (policyResults.overallSuccess) Verification2Session.VerificationSessionStatus.SUCCESSFUL else Verification2Session.VerificationSessionStatus.FAILED
-        }
 
         val optionalSuccessRedirectUrl = session.redirects?.successRedirectUri
         val willRedirect = optionalSuccessRedirectUrl != null
@@ -285,10 +230,12 @@ object Verifier2VPDirectPostHandler {
         }
     }
 
-    fun parseVpToken(vpTokenString: String): Map<String, List<String>> = try {
+    fun parseVpToken(vpTokenString: String): ParsedVpToken = try {
         Json.Default.decodeFromString(vpTokenString)
     } catch (e: Exception) {
         log.info { "Failed to parse vp_token string: $vpTokenString. Error: ${e.message}" }
         Verifier2Response.Verifier2Error.MALFORMED_VP_TOKEN.throwAsError()
     }
+
+
 }

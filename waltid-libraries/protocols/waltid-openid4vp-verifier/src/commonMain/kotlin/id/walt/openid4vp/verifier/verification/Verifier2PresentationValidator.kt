@@ -2,7 +2,6 @@ package id.walt.openid4vp.verifier.verification
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.presentations.formats.VerifiablePresentation
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialFormat
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -26,7 +25,6 @@ object Verifier2PresentationValidator {
         responseUri: String?,
         originalClaimsQuery: List<ClaimsQuery>?,
 
-        ephemeralDecryptionKey: JWKKey?,
         isDcApi: Boolean,
         isEncrypted: Boolean,
         verifierOrigin: String?,
@@ -55,11 +53,10 @@ object Verifier2PresentationValidator {
                 isDcApi = isDcApi,
                 isEncrypted = isEncrypted,
                 jwkThumbprint = jwkThumbprint,
-                ephemeralDecryptionKey = ephemeralDecryptionKey,
             )
 
             // Future: Implement other formats (e.g. LDP)
-            else -> Result.failure(UnsupportedOperationException("Format $expectedFormat not supported for validation yet."))
+            CredentialFormat.LDP_VC, CredentialFormat.AC_VP -> Result.failure(UnsupportedOperationException("Format $expectedFormat not supported for validation yet."))
         }
     }
 

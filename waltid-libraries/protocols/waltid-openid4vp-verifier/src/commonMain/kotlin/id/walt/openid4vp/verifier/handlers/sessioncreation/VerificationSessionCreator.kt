@@ -5,6 +5,11 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vp.verifier.data.*
+import id.walt.openid4vp.verifier.data.Verification2Session.DefinedVerificationPolicies
+import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vc.policies.CredentialSignaturePolicy
+import id.walt.policies2.vp.policies.VPPolicyList
+import id.walt.policies2.vp.policies.VPVerificationPolicyManager
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
@@ -84,11 +89,12 @@ object VerificationSessionCreator {
             // Construct JWKS
             val jwks = ClientMetadata.Jwks(
                 listOf(
-                    JsonObject(ephemeralKey.getPublicKey().exportJWKObject()
-                        .toMutableMap().apply {
-                            set("alg", JsonPrimitive("ECDH-ES"))
-                            set("use", JsonPrimitive("enc"))
-                        }
+                    JsonObject(
+                        ephemeralKey.getPublicKey().exportJWKObject()
+                            .toMutableMap().apply {
+                                set("alg", JsonPrimitive("ECDH-ES"))
+                                set("use", JsonPrimitive("enc"))
+                            }
                     )
                 )
             )
@@ -234,6 +240,18 @@ object VerificationSessionCreator {
             key.signJws(Json.encodeToString(authorizationRequest).encodeToByteArray(), headers)
         } else null
 
+        val effectivePolicies = DefinedVerificationPolicies(
+            vp_policies = setup.core.policies.vp_policies ?: VPPolicyList(
+                jwtVcJson = VPVerificationPolicyManager.defaultJwtVcJsonPolicies,
+                dcSdJwt = VPVerificationPolicyManager.defaultDcSdJwtPolicies,
+                msoMdoc = VPVerificationPolicyManager.defaultMsoMdocPolicies
+            ),
+            vc_policies = setup.core.policies.vc_policies ?: VCPolicyList(
+                policies = listOf(CredentialSignaturePolicy())
+            ),
+            specific_vc_policies = setup.core.policies.specific_vc_policies
+        )
+
         val newSession = Verification2Session(
             id = sessionId,
 
@@ -250,10 +268,11 @@ object VerificationSessionCreator {
             authorizationRequestUrl = authorizationRequestUrl,
             signedAuthorizationRequestJwt = signedAuthorizationRequest,
             ephemeralDecryptionKey = ephemeralKey?.let { DirectSerializedKey(it) },
+            jwkThumbprint = ephemeralKey?.getPublicKey()?.getThumbprint(),
 
             requestMode = if (isSignedRequest) Verification2Session.RequestMode.REQUEST_URI_SIGNED else Verification2Session.RequestMode.REQUEST_URI,
 
-            policies = setup.core.policies,
+            policies = effectivePolicies,
             notifications = setup.core.notifications,
             redirects = when (setup) {
                 is SameDeviceFlowSetup -> setup.redirects

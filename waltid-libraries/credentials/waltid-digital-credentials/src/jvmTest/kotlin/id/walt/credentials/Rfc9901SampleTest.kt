@@ -1,7 +1,6 @@
 package id.walt.credentials
 
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
-import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray

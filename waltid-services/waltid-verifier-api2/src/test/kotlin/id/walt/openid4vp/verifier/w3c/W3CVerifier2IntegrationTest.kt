@@ -23,8 +23,8 @@ import id.walt.openid4vp.verifier.data.Verification2Session
 import id.walt.openid4vp.verifier.data.VerificationSessionSetup
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator
 import id.walt.openid4vp.verifier.verifierModule
-import id.walt.policies2.PolicyList
-import id.walt.policies2.policies.CredentialSignaturePolicy
+import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.*
@@ -76,7 +76,7 @@ class W3CVerifier2IntegrationTest {
     )
 
     private val w3cPolicies = Verification2Session.DefinedVerificationPolicies(
-        vcPolicies = PolicyList(
+        vc_policies = VCPolicyList(
             listOf(
                 CredentialSignaturePolicy()
             )
@@ -339,6 +339,7 @@ class W3CVerifier2IntegrationTest {
                 assertTrue { presentationResult.isSuccess }
 
                 val resp = presentationResult.getOrThrow().jsonObject
+                println(resp)
                 assertTrue("Transmission did not succeed") { resp["transmission_success"]!!.jsonPrimitive.boolean }
                 assertTrue { resp["verifier_response"]!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
             }

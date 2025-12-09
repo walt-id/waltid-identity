@@ -30,18 +30,19 @@ object MdocVerifier {
 
     private val log = KotlinLogging.logger {}
 
+    fun buildSessionTranscriptForContext(context: MdocVerificationContext): SessionTranscript = when {
+        context.isDcApi -> MdocCryptoHelper.reconstructDcApiOid4vpSessionTranscript(context)
+        else -> MdocCryptoHelper.reconstructOid4vpSessionTranscript(context)
+    }
+
     /**
      * OID4VP-specific verification entry point.
      * This is a convenient overload that constructs the SessionTranscript from OID4VP context.
      */
-    suspend fun verify(mdocString: String, context: VerificationContext): VerificationResult {
+    suspend fun verify(mdocString: String, context: MdocVerificationContext): VerificationResult {
         val document = MdocParser.parseToDocument(mdocString)
 
-        val sessionTranscript = if (context.isDcApi) {
-            MdocCryptoHelper.reconstructDcApiOid4vpSessionTranscript(context)
-        } else {
-            MdocCryptoHelper.reconstructOid4vpSessionTranscript(context)
-        }
+        val sessionTranscript = buildSessionTranscriptForContext(context)
 
         log.trace { "SessionTranscript: $sessionTranscript" }
         log.trace { "SessionTranscript (hex): ${coseCompliantCbor.encodeToHexString(sessionTranscript)}" }

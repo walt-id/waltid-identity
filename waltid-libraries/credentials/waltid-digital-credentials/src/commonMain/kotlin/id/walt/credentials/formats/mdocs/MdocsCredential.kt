@@ -1,18 +1,17 @@
 package id.walt.credentials.formats
 
-import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseVerifier
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.CredentialSignature
 import id.walt.crypto.keys.Key
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
-import id.walt.crypto.utils.Base64Utils.matchesBase64Url
-import id.walt.crypto.utils.HexUtils.matchesHex
 import id.walt.did.dids.resolver.local.DidJwkResolver
-import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.parser.MdocParser
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.*
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -70,35 +69,17 @@ data class MdocsCredential(
 
     }
 
-    fun parseToDocument(): Document {
+    val document by lazy { parseToDocument() }
+    val documentMso by lazy { document.issuerSigned.decodeMobileSecurityObject() }
+
+    private fun parseToDocument(): Document {
         requireNotNull(signed) { "No signed in Mdocs credential" }
         log.trace { "Signed is: $signed" }
 
-        val isHex = signed.matchesHex()
-        val isBase64 = signed.matchesBase64Url()
-
-        require(isHex || isBase64) { "Signed is neither hex nor base64" }
-
-        val signedBytes = if (isHex) signed.hexToByteArray() else signed.decodeFromBase64Url()
-
-        val document = runCatching {
-            log.trace { "Decoding DeviceResponse from: ${signedBytes.toHexString()}" }
-            val deviceResponse = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(signedBytes)
-            val document =
-                deviceResponse.documents?.firstOrNull() ?: throw IllegalArgumentException("Mdoc document not found in DeviceResponse")
-            document
-        }.recoverCatching {
-            log.trace { "Failed deserializing as DeviceResponse, trying as Document: ${it.stackTraceToString()}" }
-            val document = coseCompliantCbor.decodeFromByteArray<Document>(signedBytes)
-            document
-        }.getOrThrow()
-
-        return document
+        return MdocParser.parseToDocument(signed)
     }
 
     override suspend fun verify(publicKey: Key): Result<JsonElement> {
-        val document = parseToDocument()
-
         return runCatching { verifyMdocSignature(document, publicKey) }
             .map { credentialData }
     }

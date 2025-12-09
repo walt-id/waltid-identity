@@ -30,8 +30,8 @@ import id.walt.openid4vp.verifier.data.Verification2Session
 import id.walt.openid4vp.verifier.data.VerificationSessionSetup
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator.VerificationSessionCreationResponse
 import id.walt.openid4vp.verifier.verifierModule
-import id.walt.policies2.PolicyList
-import id.walt.policies2.policies.CredentialSignaturePolicy
+import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.*
@@ -71,7 +71,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
     )
 
     private val sdjwtvcPolicies = Verification2Session.DefinedVerificationPolicies(
-        vcPolicies = PolicyList(
+        vc_policies = VCPolicyList(
             listOf(
                 CredentialSignaturePolicy()
             )
@@ -402,6 +402,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
                 assertTrue { presentationResult.isSuccess }
 
                 val resp = presentationResult.getOrThrow().jsonObject
+                println("Response: $resp")
                 assertTrue("Transmission success is false") { resp["transmission_success"]!!.jsonPrimitive.boolean }
                 assertTrue { resp["verifier_response"]!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
             }

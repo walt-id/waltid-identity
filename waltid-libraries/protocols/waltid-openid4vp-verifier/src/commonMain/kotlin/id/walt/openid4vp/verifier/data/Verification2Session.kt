@@ -3,12 +3,13 @@
 package id.walt.openid4vp.verifier.data
 
 import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.presentations.formats.VerifiablePresentation
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator.VerificationSessionCreationResponse
-import id.walt.policies2.PolicyList
-import id.walt.policies2.PolicyResults
-import id.walt.policies2.policies.CredentialSignaturePolicy
+import id.walt.openid4vp.verifier.verification2.Verifier2PolicyResults
+import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vp.policies.VPPolicyList
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
@@ -75,6 +76,8 @@ data class Verification2Session(
 
     val signedAuthorizationRequestJwt: String? = null,
     val ephemeralDecryptionKey: DirectSerializedKey? = null,
+    /** JWK Thumbprint for [ephemeralDecryptionKey] */
+    val jwkThumbprint: String? = null,
 
     /**
      * OpenID4VP configuration for this Verification Session
@@ -85,7 +88,7 @@ data class Verification2Session(
      * Policies
      */
     val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
-    var policyResults: PolicyResults? = null,
+    var policyResults: Verifier2PolicyResults? = null,
 
     val redirects: VerificationSessionRedirects? = null,
 
@@ -93,6 +96,7 @@ data class Verification2Session(
      * Presented data
      */
     var presentedRawData: PresentedRawData? = null,
+    var presentedPresentations: Map<String, VerifiablePresentation>? = null,
     var presentedCredentials: Map<String, List<DigitalCredential>>? = null,
     var statusReason: String? = null,
 ) {
@@ -118,9 +122,17 @@ data class Verification2Session(
 
     @Serializable
     data class DefinedVerificationPolicies(
-        // val vpPolicies: PolicyList = PolicyList(listOf(CredentialSignaturePolicy())), // TODO: vpPolicies
-        val vcPolicies: PolicyList = PolicyList(listOf(CredentialSignaturePolicy())),
-        val specificVcPolicies: Map<String, PolicyList> = emptyMap(),
+        /** Policies to run on the presentations (Policies from: waltid-verification-policies2-vp) */
+        @SerialName("vp_policies")
+        val vp_policies: VPPolicyList? = null,
+
+        /** Policies to run on the credentials (Policies from: waltid-verification-policies2) */
+        @SerialName("vc_policies")
+        val vc_policies: VCPolicyList? = null,
+
+        /** Policies to run on specific credential ids (Policies from: waltid-verification-policies2) */
+        @SerialName("specific_vc_policies")
+        val specific_vc_policies: Map<String, VCPolicyList>? = null
     )
 
     @Serializable

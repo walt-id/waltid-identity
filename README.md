@@ -74,7 +74,7 @@ If you need even more customisability and control, you can build your own toolin
 - **OpenID4VC** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc)) -
   implementation of the OID4VCI (draft 11 and draft 13) and OIDC4VP (draft 14 and draft 20) protocols.
 - **OpenID4VP** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vp)) -
-  implementation of the OpenID4VP 1.0 protocol.
+  implementation of the OpenID4VP 1.0 protocol. Results from [OpenID Foundation's Conformance Suite](https://conformance.waltid.cloud/logs.html)
 
 ## Architecture
 
