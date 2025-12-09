@@ -66,7 +66,7 @@ jobs:
     with:
       version: ${{ needs.version.outputs.release_version }}
   release:
-    uses: walt-id/waltid-identity/.github/workflows/changelog.yml@cf46ed618f9b296fd9b63c7207ca288855bb5343
+    uses: walt-id/waltid-identity/.github/workflows/changelog.yml@f80ee88c9f932603729744c0ad5cb87aa4f7ab54
     secrets: inherit
     needs: [ tag ]
     with:
