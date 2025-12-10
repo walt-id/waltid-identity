@@ -2,6 +2,9 @@
 
 import WaltidServicesE2ETests.Companion.testHttpClient
 import id.walt.commons.testing.E2ETest
+import id.walt.crypto.keys.KeyGenerationRequest
+import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.issuer.services.onboarding.models.*
 import io.ktor.client.call.*
@@ -21,6 +24,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 import kotlin.time.DurationUnit
 import kotlin.time.ExperimentalTime
 import kotlin.time.toDuration
@@ -315,10 +319,52 @@ class IssuerIsoMdlOnboardingServiceTests(private val e2e: E2ETest) {
         }.expectFailure()
     }
 
+    private suspend fun testNotAfterInThePastFails() = e2e.test(
+        name = "Ensure that specifying a notAfter instant in the past during certificate creation causes a failure",
+    ) {
+        val timeNow = Clock.System.now()
+
+        val iacaSigner = IACASignerData(
+            certificateData = IACACertificateData(
+                country = "US",
+                commonName = "Test IACA",
+                issuerAlternativeNameConf = IssuerAlternativeNameConfiguration(uri = "https://iaca.example.com"),
+                crlDistributionPointUri = "https://iaca.example.com/crl"
+            ),
+            iacaKey = KeyManager.createKey(KeyGenerationRequest(
+                backend = "jwk",
+                keyType = KeyType.secp256r1,
+            )).exportJWKObject(),
+        )
+
+        client.post("/onboard/iso-mdl/document-signers") {
+            setBody(buildJsonObject {
+                put("iacaSigner", Json.encodeToJsonElement(iacaSigner))
+                put("certificateData", buildJsonObject {
+                    put("country", "US".toJsonElement())
+                    put("commonName", "Valid DSC".toJsonElement())
+                    put("crlDistributionPointUri", "Valid DSC".toJsonElement())
+                    put("notAfter", Json.encodeToJsonElement(timeNow.minus(1.days)))
+                })
+            })
+        }.expectFailure()
+
+        client.post("/onboard/iso-mdl/iacas") {
+            setBody(buildJsonObject {
+                put("certificateData", buildJsonObject {
+                    put("country", "US".toJsonElement())
+                    put("commonName", "Valid IACA".toJsonElement())
+                    put("notAfter", Json.encodeToJsonElement(timeNow.minus(1.days)))
+                })
+            })
+        }.expectFailure()
+    }
+
     suspend fun runTests() {
         testOnboardIACARootGeneratesValidCertificate()
         testOnboardDocumentSignerGeneratesValidCertificate()
         testDSValidityPeriodWithinIACAValidityPeriod()
         testDSValidityPeriodLargerThan457Days()
+        testNotAfterInThePastFails()
     }
 }
