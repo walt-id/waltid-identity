@@ -3,11 +3,7 @@
 package id.walt.webwallet.db.models
 
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.mdoc.encoding.MdocCbor
 import id.walt.mdoc.parser.MdocParser
-import id.walt.mdoc.objects.document.Document
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.sdjwt.SDJwt
 import id.walt.webwallet.manifest.provider.ManifestProvider

@@ -3,12 +3,14 @@
 
 package id.walt.issuer.issuance
 
-import com.nimbusds.jose.jwk.ECKey
-import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.persistence.ConfiguredPersistence
+import id.walt.cose.*
+import id.walt.crypto.keys.EccUtils
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeyTypes
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
@@ -16,43 +18,17 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.issuer.config.CredentialTypeConfig
 import id.walt.issuer.config.OIDCIssuerServiceConfig
-import id.walt.cose.Cose
-import id.walt.cose.CoseHeaders
-import id.walt.cose.CoseKey
-import id.walt.cose.CoseSign1
-import id.walt.cose.coseCompliantCbor
-import id.walt.cose.toCoseSigner
-import id.walt.cose.CoseSigner
-import id.walt.crypto.keys.EccUtils
-import id.walt.crypto.keys.KeyTypes
-import id.walt.cose.toCoseAlgorithm
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
-import id.walt.oid4vc.data.ProofOfPossession
-import id.walt.oid4vc.data.ProofType
-import net.orandja.obor.codec.Cbor as OborCbor
-import net.orandja.obor.data.CborArray
-import net.orandja.obor.data.CborMap
-import net.orandja.obor.data.CborObject
-import net.orandja.obor.data.CborText
-import net.orandja.obor.data.CborBytes
-import id.walt.mdoc.objects.document.Document
-import id.walt.mdoc.objects.document.IssuerSigned
+import id.walt.mdoc.credsdata.CredentialManager
+import id.walt.mdoc.encoding.MdocCbor
+import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.objects.digest.ValueDigest
 import id.walt.mdoc.objects.digest.ValueDigestList
+import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.mso.DeviceKeyInfo
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.objects.mso.ValidityInfo
-import id.walt.mdoc.encoding.MdocCbor
-import id.walt.mdoc.objects.MdocsCborSerializer
-import id.walt.mdoc.credsdata.CredentialManager
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.descriptors.SerialKind
-import kotlinx.serialization.descriptors.StructureKind
-import kotlin.random.Random
-import kotlinx.serialization.builtins.ByteArraySerializer
-import kotlinx.serialization.encodeToByteArray
 import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.OpenID4VCIVersion
@@ -68,7 +44,6 @@ import id.walt.oid4vc.providers.CredentialIssuerConfig
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
-import id.walt.oid4vc.util.COSESign1Utils
 import id.walt.oid4vc.util.JwtUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -84,14 +59,18 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.MissingFieldException
+import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.descriptors.StructureKind
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
-import org.cose.java.AlgorithmID
-import org.cose.java.OneKey
+import net.orandja.obor.data.*
+import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
+import net.orandja.obor.codec.Cbor as OborCbor
 
 /**
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
