@@ -15,7 +15,7 @@ import java.io.ByteArrayInputStream
 import java.math.BigInteger
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
-import java.util.Base64
+import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -308,7 +308,7 @@ class IssuerIsoMdlOnboardingServiceTests(private val e2e: E2ETest) {
                     put("country", "US".toJsonElement())
                     put("commonName", "Valid DSC".toJsonElement())
                     put("crlDistributionPointUri", "Valid DSC".toJsonElement())
-                    put("notBefore", Json.encodeToJsonElement(timeNow.minus((1L).toDuration(DurationUnit.DAYS))))
+                    put("notBefore", Json.encodeToJsonElement(timeNow))
                     put("notAfter", Json.encodeToJsonElement(timeNow.plus((458L).toDuration(DurationUnit.DAYS))))
                 })
             })
