@@ -38,12 +38,6 @@ data class DocumentSignerCertificateData(
             "Document signer certificate data organizationName must not be blank if specified"
         }
 
-        notBefore?.let {
-            require(it >= Clock.System.now()) {
-                "Document signer certificate data notBefore cannot be in the past"
-            }
-        }
-
         require(finalNotBefore < finalNotAfter) {
             "Document signer certificate data notBefore must be before (and not equal to) notAfter"
         }

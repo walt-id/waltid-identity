@@ -38,12 +38,6 @@ data class IACACertificateData(
             "IACA certificate data organizationName must not be blank if specified"
         }
 
-        notBefore?.let {
-            require(it >= Clock.System.now()) {
-                "IACA certificate data notBefore cannot be in the past"
-            }
-        }
-
         require(finalNotBefore < finalNotAfter) {
             "IACA certificate data notBefore must be before (and not equal to) notAfter"
         }
