@@ -3,8 +3,11 @@
 package id.walt.webwallet.db.models
 
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.mdoc.dataelement.json.toJsonElement
-import id.walt.mdoc.doc.MDoc
+import id.walt.mdoc.encoding.MdocCbor
+import id.walt.mdoc.parser.MdocParser
+import id.walt.mdoc.objects.document.Document
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.sdjwt.SDJwt
 import id.walt.webwallet.manifest.provider.ManifestProvider
@@ -73,8 +76,16 @@ data class WalletCredential @OptIn(ExperimentalUuidApi::class) constructor(
                     CredentialFormat.jwt_vc_json_ld ->
                         document.decodeJws().payload.run { jsonObject["vc"]?.jsonObject ?: jsonObject }
 
-                    CredentialFormat.mso_mdoc ->
-                        MDoc.fromCBORHex(document).toMapElement().toJsonElement().jsonObject
+                    CredentialFormat.mso_mdoc -> {
+                        val parsedDoc = MdocParser.parseToDocument(document)
+                        buildJsonObject {
+                            put("docType", parsedDoc.docType)
+                            put("issuerSigned", parsedDoc.issuerSigned.namespacesToJson())
+                            parsedDoc.deviceSigned?.let {
+                                put("deviceSigned", it.namespaces?.value?.namespacesToJson() ?: buildJsonObject { })
+                            }
+                        }
+                    }
                     else -> throw IllegalArgumentException("Unknown credential format: " + format.value)
                 }.toMutableMap().also {
                     it.putIfAbsent("id", JsonPrimitive(id))

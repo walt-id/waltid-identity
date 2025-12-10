@@ -65,6 +65,8 @@ dependencies {
 
     // Kotlinx.serialization
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:${Versions.KTOR_VERSION}")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
+    implementation("net.orandja.obor:obor:2.1.3")
 
     // Date
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
@@ -99,7 +101,7 @@ dependencies {
 
     api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
     api(project(":waltid-libraries:credentials:waltid-verification-policies"))
-    api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
+    api(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
     api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
     // crypto

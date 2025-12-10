@@ -3,7 +3,6 @@
 
 package id.walt.issuer.issuance
 
-import cbor.Cbor
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
@@ -17,14 +16,43 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.issuer.config.CredentialTypeConfig
 import id.walt.issuer.config.OIDCIssuerServiceConfig
-import id.walt.mdoc.COSECryptoProviderKeyInfo
-import id.walt.mdoc.SimpleCOSECryptoProvider
-import id.walt.mdoc.cose.COSESign1
-import id.walt.mdoc.dataelement.DataElement
-import id.walt.mdoc.dataelement.json.toDataElement
-import id.walt.mdoc.doc.MDocBuilder
-import id.walt.mdoc.mso.DeviceKeyInfo
-import id.walt.mdoc.mso.ValidityInfo
+import id.walt.cose.Cose
+import id.walt.cose.CoseHeaders
+import id.walt.cose.CoseKey
+import id.walt.cose.CoseSign1
+import id.walt.cose.coseCompliantCbor
+import id.walt.cose.toCoseSigner
+import id.walt.cose.CoseSigner
+import id.walt.crypto.keys.EccUtils
+import id.walt.crypto.keys.KeyTypes
+import id.walt.cose.toCoseAlgorithm
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.oid4vc.data.ProofOfPossession
+import id.walt.oid4vc.data.ProofType
+import net.orandja.obor.codec.Cbor as OborCbor
+import net.orandja.obor.data.CborArray
+import net.orandja.obor.data.CborMap
+import net.orandja.obor.data.CborObject
+import net.orandja.obor.data.CborText
+import net.orandja.obor.data.CborBytes
+import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.document.IssuerSigned
+import id.walt.mdoc.objects.digest.ValueDigest
+import id.walt.mdoc.objects.digest.ValueDigestList
+import id.walt.mdoc.objects.elements.IssuerSignedItem
+import id.walt.mdoc.objects.mso.DeviceKeyInfo
+import id.walt.mdoc.objects.mso.MobileSecurityObject
+import id.walt.mdoc.objects.mso.ValidityInfo
+import id.walt.mdoc.encoding.MdocCbor
+import id.walt.mdoc.objects.MdocsCborSerializer
+import id.walt.mdoc.credsdata.CredentialManager
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.descriptors.StructureKind
+import kotlin.random.Random
+import kotlinx.serialization.builtins.ByteArraySerializer
+import kotlinx.serialization.encodeToByteArray
 import id.walt.oid4vc.OpenID4VC
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.OpenID4VCIVersion
@@ -52,6 +80,7 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.MissingFieldException
@@ -382,27 +411,271 @@ open class CIProvider(
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    private suspend fun extractHolderKey(proof: ProofOfPossession): COSECryptoProviderKeyInfo? {
+    private suspend fun extractHolderKey(proof: ProofOfPossession): JWKKey? {
         when (proof.proofType) {
             ProofType.cwt -> {
-                return proof.cwt?.base64UrlDecode()?.let {
-                    COSESign1Utils.extractHolderKey(Cbor.decodeFromByteArray<COSESign1>(it))
+                return proof.cwt?.base64UrlDecode()?.let { cwtBytes ->
+                    try {
+                        // Parse the CWT as a CoseSign1
+                        val coseSign1 = CoseSign1.fromTagged(cwtBytes)
+                        
+                        // Decode protected headers using obor library to access COSE_Key or x5chain
+                        // Protected headers are CBOR-encoded, so we decode them as a CborMap
+                        val protectedHeadersMap = if (coseSign1.protected.isEmpty()) {
+                            null
+                        } else {
+                            try {
+                                OborCbor.decodeFromByteArray<CborObject>(coseSign1.protected) as? CborMap
+                            } catch (e: Exception) {
+                                log.warn(e) { "Failed to decode protected headers as CborMap: ${e.message}" }
+                                null
+                            }
+                        }
+                        
+                        // Check for COSE_Key in protected headers (string key "COSE_Key")
+                        val coseKeyBytes = protectedHeadersMap?.firstOrNull { entry ->
+                            (entry.key as? CborText)?.value == "COSE_Key"
+                        }?.value?.let { value ->
+                            when (value) {
+                                is CborBytes -> value.value
+                                is ByteArray -> value
+                                else -> null
+                            }
+                        }
+                        
+                        if (coseKeyBytes != null) {
+                            // Decode the COSE_Key
+                            val coseKey = coseCompliantCbor.decodeFromByteArray<CoseKey>(coseKeyBytes)
+                            // Convert CoseKey to JWK using the toJWK() method
+                            val jwkJson = coseKey.toJWK()
+                            JWKKey.importJWK(jwkJson.toString()).getOrNull()
+                        } else {
+                            // Check for x5chain (label 33) in protected headers
+                            // Try to find entry with integer key 33
+                            // In obor, integer keys might be represented as CborObject that can be converted
+                            val x5chainEntry = protectedHeadersMap?.firstOrNull { entry ->
+                                try {
+                                    // Try to convert the CborObject key to a number
+                                    // First check if it's already a number type, or try to parse it
+                                    val keyValue = when {
+                                        entry.key.toString().toLongOrNull() == 33L -> true
+                                        else -> {
+                                            // Try to get the raw value - obor might represent integers differently
+                                            // Check if the key's string representation equals "33"
+                                            entry.key.toString() == "33"
+                                        }
+                                    }
+                                    keyValue
+                                } catch (e: Exception) {
+                                    false
+                                }
+                            }
+                            
+                            val certBytes = when (val x5chainValue = x5chainEntry?.value) {
+                                is CborBytes -> x5chainValue.value
+                                is ByteArray -> x5chainValue
+                                is CborArray -> {
+                                    // x5chain is a list, get the first certificate
+                                    // CborArray should be iterable - try to get first element
+                                    try {
+                                        val firstItem = x5chainValue.firstOrNull()
+                                        when (firstItem) {
+                                            is CborBytes -> firstItem.value
+                                            is ByteArray -> firstItem
+                                            is CborObject -> {
+                                                // If it's a CborObject wrapping bytes, try to extract
+                                                (firstItem as? CborBytes)?.value
+                                            }
+                                            else -> null
+                                        }
+                                    } catch (e: Exception) {
+                                        log.warn(e) { "Failed to extract certificate from x5chain array: ${e.message}" }
+                                        null
+                                    }
+                                }
+                                else -> null
+                            }
+                            
+                            if (certBytes != null) {
+                                JWKKey.importFromDerCertificate(certBytes).getOrNull()
+                            } else {
+                                // Also check unprotected headers for x5chain
+                                coseSign1.unprotected.x5chain?.firstOrNull()?.let { cert ->
+                                    JWKKey.importFromDerCertificate(cert.rawBytes).getOrNull()
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        log.warn(e) { "Failed to extract holder key from CWT proof: ${e.message}" }
+                        null
+                    }
                 }
             }
 
             else -> {
                 return proof.jwt?.let { JwtUtils.parseJWTHeader(it) }?.get(JWTClaims.Header.jwk)?.jsonObject?.let {
-                    JWKKey.importJWK(it.toString()).getOrNull()?.let { key ->
-                        COSECryptoProviderKeyInfo(
-                            keyID = key.getKeyId(),
-                            algorithmID = AlgorithmID.ECDSA_256,
-                            publicKey = ECKey.parse(key.exportJWK()).toECPublicKey(),
-                            privateKey = null
-                        )
-                    }
+                    JWKKey.importJWK(it.toString()).getOrNull()
                 }
             }
         }
+    }
+
+    /**
+     * Converts a JsonElement to the appropriate Kotlin type for use in IssuerSignedItem.
+     * This extracts the actual value from JsonPrimitive, converts dates to LocalDate,
+     * converts number arrays to ByteArray when appropriate, and passes through complex types
+     * for custom serializers to handle.
+     * 
+     * @param namespace The namespace of the data element (e.g., "org.iso.18013.5.1")
+     * @param elementIdentifier The identifier of the data element (e.g., "birth_date", "portrait")
+     */
+    private fun JsonElement.toMdocValue(namespace: String, elementIdentifier: String): Any {
+        return when (this) {
+            is JsonPrimitive -> {
+                when {
+                    isString -> {
+                        // Check if this is a date field and convert to LocalDate
+                        // Date fields in mDL: birth_date, issue_date, expiry_date, portrait_capture_date
+                        val dateFields = setOf("birth_date", "issue_date", "expiry_date", "portrait_capture_date")
+                        if (dateFields.contains(elementIdentifier)) {
+                            try {
+                                // Parse date string in format "YYYY-MM-DD" to LocalDate
+                                LocalDate.parse(content)
+                            } catch (e: Exception) {
+                                // If parsing fails, keep as string and let serializer handle it
+                                log.warn(e) { "Failed to parse date string '$content' for $elementIdentifier, keeping as string" }
+                                content
+                            }
+                        } else {
+                            content
+                        }
+                    }
+                    booleanOrNull != null -> boolean
+                    intOrNull != null -> intOrNull!!
+                    longOrNull != null -> longOrNull!!
+                    doubleOrNull != null -> doubleOrNull!!.toLong() // Convert to Long for consistency
+                    else -> content // Fallback to string content
+                }
+            }
+            is JsonArray -> {
+                // Check if this is a ByteArray field (like "portrait")
+                // If all elements are numbers, convert to ByteArray
+                val byteArrayFields = setOf("portrait", "signature_usual_mark", 
+                    "biometric_template_face", "biometric_template_finger", 
+                    "biometric_template_signature_sign", "biometric_template_iris")
+                
+                if (byteArrayFields.contains(elementIdentifier)) {
+                    // Convert array of numbers to ByteArray
+                    try {
+                        mapNotNull { 
+                            when (it) {
+                                is JsonPrimitive -> it.intOrNull?.toByte() ?: it.longOrNull?.toByte()
+                                else -> null
+                            }
+                        }.toByteArray()
+                    } catch (e: Exception) {
+                        log.warn(e) { "Failed to convert array to ByteArray for $elementIdentifier, keeping as List" }
+                        // Fallback: convert array elements recursively
+                        map { it.toMdocValue(namespace, elementIdentifier) }
+                    }
+                } else {
+                    // Check if there's a registered serializer for this element
+                    val serializer = MdocsCborSerializer.lookupSerializer(namespace, elementIdentifier)
+                    if (serializer != null && serializer.descriptor.kind is StructureKind.LIST) {
+                        // This is a list of complex objects (e.g., driving_privileges)
+                        // Get the element descriptor to find the inner serializer
+                        val elementDescriptor = serializer.descriptor.getElementDescriptor(0)
+                        try {
+                            // Try to deserialize using the registered serializer directly
+                            // The serializer knows how to handle the list structure
+                            @Suppress("UNCHECKED_CAST")
+                            Json.decodeFromJsonElement(serializer as kotlinx.serialization.KSerializer<Any>, this)
+                        } catch (e: Exception) {
+                            log.warn(e) { "Failed to deserialize array using registered serializer for $elementIdentifier, falling back to element-by-element conversion" }
+                            // Fallback: try to deserialize each element individually
+                            // We need to find the element serializer - try to get it from the descriptor
+                            try {
+                                map { element ->
+                                    when (element) {
+                                        is JsonObject -> {
+                                            // Try to deserialize using Json directly
+                                            // For driving_privileges, we know it's DrivingPrivilege
+                                            // But we can't easily get the type, so let's use a different approach
+                                            element.toMdocValue(namespace, elementIdentifier)
+                                        }
+                                        else -> {
+                                            element.toMdocValue(namespace, elementIdentifier)
+                                        }
+                                    }
+                                }
+                            } catch (e2: Exception) {
+                                log.warn(e2) { "Failed to deserialize array elements for $elementIdentifier, keeping as List" }
+                                // Final fallback: convert array elements recursively
+                                map { it.toMdocValue(namespace, elementIdentifier) }
+                            }
+                        }
+                    } else {
+                        // For other arrays without registered serializers, convert elements recursively
+                        map { it.toMdocValue(namespace, elementIdentifier) }
+                    }
+                }
+            }
+            is JsonObject -> {
+                // Check if there's a registered serializer for this element
+                val serializer = MdocsCborSerializer.lookupSerializer(namespace, elementIdentifier)
+                if (serializer != null) {
+                    // Deserialize the JsonObject to the actual type
+                    try {
+                        @Suppress("UNCHECKED_CAST")
+                        Json.decodeFromJsonElement(serializer as kotlinx.serialization.KSerializer<Any>, this)
+                    } catch (e: Exception) {
+                        log.warn(e) { "Failed to deserialize JsonObject for $elementIdentifier, falling back to Map conversion" }
+                        // Fallback: convert to Map
+                        mapValues { it.value.toMdocValue(namespace, elementIdentifier) }
+                    }
+                } else {
+                    // No registered serializer, convert to Map
+                    mapValues { it.value.toMdocValue(namespace, elementIdentifier) }
+                }
+            }
+            is JsonNull -> throw IllegalArgumentException("Null values are not supported in mdoc data")
+        }
+    }
+
+    /**
+     * Converts a Key to a CoseKey by extracting the JWK parameters and mapping them to COSE format.
+     */
+    private suspend fun Key.toCoseKey(): CoseKey {
+        val jwk = exportJWKObject()
+        val kty = jwk["kty"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing kty in JWK")
+        val crv = jwk["crv"]?.jsonPrimitive?.content
+        
+        val coseKty = when (kty) {
+            "EC" -> Cose.KeyTypes.EC2
+            "OKP" -> Cose.KeyTypes.OKP
+            else -> throw IllegalArgumentException("Unsupported key type: $kty")
+        }
+        
+        val coseCrv = when (crv) {
+            "P-256" -> Cose.EllipticCurves.P_256
+            "P-384" -> Cose.EllipticCurves.P_384
+            "P-521" -> Cose.EllipticCurves.P_521
+            "Ed25519" -> Cose.EllipticCurves.Ed25519
+            "Ed448" -> Cose.EllipticCurves.Ed448
+            "secp256k1" -> Cose.EllipticCurves.secp256k1
+            else -> throw IllegalArgumentException("Unsupported curve: $crv")
+        }
+        
+        val x = jwk["x"]?.jsonPrimitive?.content?.base64UrlDecode()
+            ?: throw IllegalArgumentException("Missing x coordinate in JWK")
+        val y = jwk["y"]?.jsonPrimitive?.content?.base64UrlDecode()
+        
+        return CoseKey(
+            kty = coseKty,
+            crv = coseCrv,
+            x = x,
+            y = y
+        )
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -435,72 +708,189 @@ open class CIProvider(
         )
             ?: throw IllegalArgumentException("No matching issuance request found for this session: ${issuanceSession.id}!")
 
-        val issuerSignedItems = request.mdocData ?: throw MissingFieldException(listOf("mdocData"), "mdocData")
+        val issuerSignedItemsData = request.mdocData ?: throw MissingFieldException(listOf("mdocData"), "mdocData")
+
+        // Initialize CredentialManager to register serializers for complex types
+        CredentialManager.init()
+
+        val docType = credentialRequest.docType
+            ?: throw CredentialError(
+                credentialRequest = credentialRequest,
+                errorCode = CredentialErrorCode.invalid_request,
+                message = "Missing doc type in credential request"
+            )
 
         val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
+        val issuerKey = resolvedIssuerKey
 
-        val issuerKey = JWK.parse(resolvedIssuerKey.exportJWK()).toECKey()
+        // Convert holder key to CoseKey
+        val deviceCoseKey = holderKey.toCoseKey()
+        val deviceKeyInfo = DeviceKeyInfo(deviceKey = deviceCoseKey)
 
-        val keyID = resolvedIssuerKey.getKeyId()
-
-        val cryptoProvider = SimpleCOSECryptoProvider(
-            listOf(
-                COSECryptoProviderKeyInfo(
-                    keyID = keyID,
-                    algorithmID = AlgorithmID.ECDSA_256,
-                    publicKey = issuerKey.toECPublicKey(),
-                    privateKey = issuerKey.toECPrivateKey(),
-                    x5Chain = request.x5Chain?.map { X509CertUtils.parse(it) } ?: listOf(),
-                    trustedRootCAs = request.trustedRootCAs?.map { X509CertUtils.parse(it) } ?: listOf()
-                )
-            )
+        // Create validity info
+        val now = Clock.System.now()
+        val validityInfo = ValidityInfo(
+            signed = now,
+            validFrom = now,
+            validUntil = now.plus(365 * 24, DateTimeUnit.HOUR)
         )
 
-        val mdoc = MDocBuilder(
-            credentialRequest.docType
-                ?: throw CredentialError(
-                    credentialRequest = credentialRequest,
-                    errorCode = CredentialErrorCode.invalid_request,
-                    message = "Missing doc type in credential request"
-                )
-        ).apply {
-            issuerSignedItems.forEach { namespace ->
-                namespace.value.forEach { property ->
-                    addItemToSign(
-                        nameSpace = namespace.key,
-                        elementIdentifier = property.key,
-                        elementValue = property.value.toDataElement(),
+        // Create IssuerSignedItem objects for each data element
+        val namespacedIssuerSignedItems = mutableMapOf<String, MutableList<IssuerSignedItem>>()
+        var digestIdCounter = 0u
+
+        issuerSignedItemsData.forEach { (namespace, properties) ->
+            val items = mutableListOf<IssuerSignedItem>()
+            properties.forEach { (elementIdentifier, elementValue) ->
+                // Convert JsonElement to appropriate Kotlin type
+                // Pass namespace and elementIdentifier for smart conversion (dates, ByteArrays, etc.)
+                val convertedValue = elementValue.toMdocValue(namespace, elementIdentifier)
+                items.add(
+                    IssuerSignedItem(
+                        digestId = digestIdCounter++,
+                        random = Random.nextBytes(16),
+                        elementIdentifier = elementIdentifier,
+                        elementValue = convertedValue
                     )
-                }
+                )
             }
-        }.sign( // TODO: expiration date!
-            validityInfo = ValidityInfo(
-                signed = Clock.System.now(),
-                validFrom = Clock.System.now(),
-                validUntil = Clock.System.now().plus(365 * 24, DateTimeUnit.HOUR)
-            ),
-            deviceKeyInfo = DeviceKeyInfo(
-                deviceKey = DataElement.fromCBOR(
-                    OneKey(
-                        holderKey.publicKey,
-                        null
-                    ).AsCBOR().EncodeToBytes()
-                )
-            ),
-            cryptoProvider = cryptoProvider,
-            keyID = keyID
-        ).also {
-            if (!issuanceSession.callbackUrl.isNullOrEmpty())
-                sendCallback(
-                    sessionId = issuanceSession.id,
-                    type = "generated_mdoc",
-                    data = buildJsonObject { put("mdoc", it.toCBORHex()) },
-                    callbackUrl = issuanceSession.callbackUrl
-                )
+            namespacedIssuerSignedItems[namespace] = items
         }
+
+        // Calculate value digests for each namespace
+        val digestAlgorithm = "SHA-256"
+        val valueDigests = namespacedIssuerSignedItems.map { (namespace, items) ->
+            val digests = items.map { item ->
+                ValueDigest.fromIssuerSignedItem(item, namespace, digestAlgorithm)
+            }
+            namespace to ValueDigestList(digests)
+        }.toMap()
+
+        // Create Mobile Security Object
+        val mso = MobileSecurityObject(
+            version = "1.0",
+            digestAlgorithm = digestAlgorithm,
+            docType = docType,
+            valueDigests = valueDigests,
+            deviceKeyInfo = deviceKeyInfo,
+            validityInfo = validityInfo
+        )
+
+        // Serialize MSO to CBOR and wrap in tag #6.24
+        val msoBytes = MdocCbor.encodeToByteArray(mso)
+        val msoPayload = byteArrayOf(0xd8.toByte(), 24.toByte()) + MdocCbor.encodeToByteArray(ByteArraySerializer(), msoBytes)
+
+        // Create COSE headers with algorithm and certificate chain
+        val algorithm = issuerKey.keyType.toCoseAlgorithm()
+            ?: throw IllegalArgumentException("Unsupported key type for COSE signing: ${issuerKey.keyType}")
+        
+        val x5chain = request.x5Chain?.map { cert ->
+            val certBytes = try {
+                // Normalize the certificate string - handle escaped newlines and whitespace
+                val normalizedCert = cert
+                    .replace("\\n", "\n")  // Unescape newlines
+                    .replace("\\r", "\r")  // Unescape carriage returns
+                    .trim()
+                
+                // Check if it's PEM format (contains BEGIN CERTIFICATE)
+                if (normalizedCert.contains("BEGIN CERTIFICATE", ignoreCase = true)) {
+                    // Extract base64 content from PEM format
+                    // Remove PEM headers/footers and all whitespace
+                    val base64Content = normalizedCert
+                        .replace("-----BEGIN CERTIFICATE-----", "", ignoreCase = true)
+                        .replace("-----END CERTIFICATE-----", "", ignoreCase = true)
+                        .replace("\n", "")
+                        .replace("\r", "")
+                        .replace(" ", "")
+                        .replace("\t", "")
+                        .trim()
+                    // PEM uses standard base64, not base64Url
+                    // Use java.util.Base64 for standard base64 decoding
+                    java.util.Base64.getDecoder().decode(base64Content)
+                } else {
+                    // Assume it's base64Url encoded (strip all whitespace first)
+                    normalizedCert
+                        .replace("\n", "")
+                        .replace("\r", "")
+                        .replace(" ", "")
+                        .replace("\t", "")
+                        .trim()
+                        .base64UrlDecode()
+                }
+            } catch (e: Exception) {
+                log.warn(e) { "Failed to decode certificate: ${e.message}" }
+                throw IllegalArgumentException("Invalid certificate format in x5Chain: ${e.message}", e)
+            }
+            id.walt.cose.CoseCertificate(certBytes)
+        } ?: emptyList()
+
+        val protectedHeaders = CoseHeaders(
+            algorithm = algorithm,
+            x5chain = if (x5chain.isNotEmpty()) x5chain else null
+        )
+
+        // Sign the MSO
+        // Create a CoseSigner that works with cloud keys (AWS, Azure, etc.)
+        // Cloud keys may have hasPrivateKey = false but can still sign via signRaw()
+        val coseSigner = if (issuerKey.hasPrivateKey) {
+            // Standard key with private key - use the standard converter
+            issuerKey.toCoseSigner()
+        } else {
+            // Cloud key - create custom signer that uses signRaw directly
+            // Cloud keys (AWS, Azure, etc.) can sign even without hasPrivateKey = true
+            CoseSigner { dataToSign ->
+                val customSignatureScheme = algorithm?.let { algo ->
+                    when (algo) {
+                        Cose.Algorithm.PS256 -> "SHA256withRSA/PSS"
+                        Cose.Algorithm.PS384 -> "SHA384withRSA/PSS"
+                        Cose.Algorithm.PS512 -> "SHA512withRSA/PSS"
+                        else -> null
+                    }
+                }
+                var signature = issuerKey.signRaw(dataToSign, customSignatureScheme) as ByteArray
+                if (issuerKey.keyType in KeyTypes.EC_KEYS) {
+                    signature = EccUtils.convertDERtoIEEEP1363(signature)
+                }
+                signature
+            }
+        }
+        
+        val issuerAuth = CoseSign1.createAndSign(
+            protectedHeaders = protectedHeaders,
+            unprotectedHeaders = CoseHeaders(),
+            payload = msoPayload,
+            signer = coseSigner
+        )
+
+        // Create IssuerSigned structure
+        val issuerSigned = IssuerSigned.fromIssuerSignedItems(
+            namespacedItems = namespacedIssuerSignedItems,
+            issuerAuth = issuerAuth
+        )
+
+        // Create Document
+        val document = Document(
+            docType = docType,
+            issuerSigned = issuerSigned,
+            deviceSigned = null // Device signing happens later during presentation
+        )
+
+        // Serialize document to CBOR
+        val documentCbor = MdocCbor.encodeToByteArray(document)
+
+        // Send callback if configured
+        if (!issuanceSession.callbackUrl.isNullOrEmpty()) {
+            sendCallback(
+                sessionId = issuanceSession.id,
+                type = "generated_mdoc",
+                data = buildJsonObject { put("mdoc", documentCbor.encodeToBase64Url()) },
+                callbackUrl = issuanceSession.callbackUrl
+            )
+        }
+
         return CredentialResult(
             format = CredentialFormat.mso_mdoc,
-            credential = JsonPrimitive(mdoc.issuerSigned.toMapElement().toCBOR().encodeToBase64Url()),
+            credential = JsonPrimitive(documentCbor.encodeToBase64Url()),
             customParameters = mapOf("credential_encoding" to JsonPrimitive("issuer-signed"))
         )
     }

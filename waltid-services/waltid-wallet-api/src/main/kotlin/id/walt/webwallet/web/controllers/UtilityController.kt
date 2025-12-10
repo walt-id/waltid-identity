@@ -1,7 +1,6 @@
 package id.walt.webwallet.web.controllers
 
-import id.walt.mdoc.dataelement.DataElement
-import id.walt.mdoc.dataelement.json.toJsonElement
+import id.walt.mdoc.parser.MdocParser
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -9,6 +8,9 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 
 fun Application.utility() {
     webWalletRoute {
@@ -29,7 +31,47 @@ fun Application.utility() {
                 }
             }) {
                 val mdoc = call.receive<String>()
-                call.respond(DataElement.fromCBORHex<DataElement>(mdoc).toJsonElement())
+                
+                // Parse the mdoc using the new library
+                val document = MdocParser.parseToDocument(mdoc)
+                
+                // Convert to JSON
+                val jsonResponse = buildJsonObject {
+                    put("docType", document.docType)
+                    
+                    // Add issuer-signed data
+                    putJsonObject("issuerSigned") {
+                        val issuerData = document.issuerSigned.namespacesToJson()
+                        issuerData.forEach { (key, value) ->
+                            put(key, value)
+                        }
+                    }
+                    
+                    // Add device-signed data if present
+                    document.deviceSigned?.let { deviceSigned ->
+                        putJsonObject("deviceSigned") {
+                            val deviceData = deviceSigned.namespaces?.value?.namespacesToJson()
+                            deviceData?.forEach { (key, value) ->
+                                put(key, value)
+                            }
+                        }
+                    }
+                    
+                    // Add errors if present
+                    document.errors?.let { errors ->
+                        putJsonObject("errors") {
+                            errors.forEach { (namespace, namespaceErrors) ->
+                                putJsonObject(namespace) {
+                                    namespaceErrors.forEach { (elementId, errorCode) ->
+                                        put(elementId, errorCode)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                call.respond(jsonResponse)
             }
         }
     }

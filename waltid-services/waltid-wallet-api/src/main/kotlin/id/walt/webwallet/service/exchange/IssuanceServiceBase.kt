@@ -1,12 +1,10 @@
 package id.walt.webwallet.service.exchange
 
-import cbor.Cbor
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.JwsUtils.decodeJwsOrSdjwt
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
-import id.walt.mdoc.dataelement.toDataElement
-import id.walt.mdoc.doc.MDoc
-import id.walt.mdoc.issuersigned.IssuerSigned
+import id.walt.mdoc.encoding.MdocCbor
+import id.walt.mdoc.objects.document.Document
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.OfferedCredential
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
@@ -18,6 +16,7 @@ import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -72,19 +71,22 @@ abstract class IssuanceServiceBase {
                 ?: throw IllegalArgumentException("Credential request has no docType property")
         logger.debug { "Parsed docType: $docType" }
 
-        val mDoc = when (credentialEncoding) {
-            "issuer-signed" -> MDoc(
-                docType.toDataElement(), IssuerSigned.fromMapElement(
-                    Cbor.decodeFromByteArray(credential.base64UrlDecode())
-                ), null
-            )
+        val document = when (credentialEncoding) {
+            "issuer-signed" -> {
+                val cborBytes = credential.base64UrlDecode()
+                MdocCbor.decodeFromByteArray<Document>(cborBytes)
+            }
 
             else -> throw IllegalArgumentException("Invalid credential encoding: $credentialEncoding")
         }
         // TODO: review ID generation for mdoc
+        // Convert Document to CBOR hex string
+        val documentCbor = MdocCbor.encodeToByteArray(Document.serializer(), document)
+        val documentHex = documentCbor.joinToString("") { byte -> "%02x".format(byte) }
+        
         return CredentialDataResult(
             id = randomUUIDString(),
-            document = mDoc.toCBORHex(),
+            document = documentHex,
             type = docType,
             format = CredentialFormat.mso_mdoc,
         )
