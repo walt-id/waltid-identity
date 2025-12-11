@@ -329,8 +329,12 @@ class MdocIntegrationTest : AbstractIntegrationTest() {
                 }
             }
 
-            assertTrue {
+            assertFalse {
                 iacaCertificate.criticalExtensionOIDs.contains(Extension.cRLDistributionPoints.id)
+            }
+
+            assertTrue {
+                iacaCertificate.nonCriticalExtensionOIDs.contains(Extension.cRLDistributionPoints.id)
             }
         }
 

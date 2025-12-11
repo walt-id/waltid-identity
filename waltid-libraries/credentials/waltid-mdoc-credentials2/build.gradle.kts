@@ -22,6 +22,7 @@ val enableAndroidBuild = getSetting("enableAndroidBuild")
 val enableIosBuild = getSetting("enableIosBuild")
 
 kotlin {
+    jvmToolchain(21)
     jvm()
 
     js(IR) {

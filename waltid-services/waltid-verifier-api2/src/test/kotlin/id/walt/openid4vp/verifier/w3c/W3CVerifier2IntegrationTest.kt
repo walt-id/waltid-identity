@@ -34,9 +34,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.junit.jupiter.api.assertNotNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
@@ -360,7 +360,7 @@ class W3CVerifier2IntegrationTest {
                 assertEquals(2, info2.presentedCredentials!!.size)
                 assertNotNull(info2.presentedCredentials!!["openbadge"])
                 assertEquals(1, info2.presentedCredentials!!["openbadge"]!!.size)
-                assertNotNull { info2.presentedCredentials!!["universitydegree"] }
+                assertNotNull(info2.presentedCredentials!!["universitydegree"])
                 assertEquals(1, info2.presentedCredentials!!["universitydegree"]!!.size)
 
                 assertNotNull(info2.policyResults)
