@@ -160,7 +160,7 @@ object OnboardingService {
         crlDistributionPointUri: String,
     ): X509Certificate {
 
-        val subjectJavaPublicKey = parseECPublicKey(dsPublicKey.exportPEM())
+        val subjectJavaPublicKey = parseJcaPublicKey(dsPublicKey.exportPEM())
 
         val certBuilder = JcaX509v3CertificateBuilder(
             iacaName,
@@ -177,7 +177,7 @@ object OnboardingService {
         certBuilder.addExtension(
             Extension.authorityKeyIdentifier,
             false,
-            extUtils.createAuthorityKeyIdentifier(parseECPublicKey(iacaSigningKey.getPublicKey().exportPEM()))
+            extUtils.createAuthorityKeyIdentifier(parseJcaPublicKey(iacaSigningKey.getPublicKey().exportPEM()))
         )
 
         certBuilder.addExtension(
@@ -248,7 +248,7 @@ object OnboardingService {
         crlDistributionPointUri: String? = null,
     ): X509Certificate {
 
-        val javaPublicKey = parseECPublicKey(iacaSigningKey.getPublicKey().exportPEM())
+        val javaPublicKey = parseJcaPublicKey(iacaSigningKey.getPublicKey().exportPEM())
 
         val certBuilder = JcaX509v3CertificateBuilder(
             issuer,
@@ -387,7 +387,7 @@ object OnboardingService {
         return BigInteger(randomBytes).abs()
     }
 
-    private fun parseECPublicKey(pemEncodedPublicKey: String): PublicKey {
+    private fun parseJcaPublicKey(pemEncodedPublicKey: String): PublicKey {
         val reader = PemReader(StringReader(pemEncodedPublicKey))
         val pemObject = reader.readPemObject()
         val spki = SubjectPublicKeyInfo.getInstance(pemObject.content)
