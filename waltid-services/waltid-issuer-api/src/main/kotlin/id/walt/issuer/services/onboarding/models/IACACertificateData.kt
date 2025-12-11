@@ -30,18 +30,17 @@ data class IACACertificateData(
             "IACA certificate data invalid ISO 3166-1 country code: '$country'. Must be a valid 2-letter uppercase code."
         }
 
+        val timeNow = Clock.System.now()
+        require(finalNotAfter > timeNow) {
+            "IACA certificate notAfter $finalNotAfter must be greater than the current time: $timeNow "
+        }
+
         // Optional string validations
         require(stateOrProvinceName == null || stateOrProvinceName.isNotBlank()) {
             "IACA certificate data stateOrProvinceName must not be blank if specified"
         }
         require(organizationName == null || organizationName.isNotBlank()) {
             "IACA certificate data organizationName must not be blank if specified"
-        }
-
-        notBefore?.let {
-            require(it >= Clock.System.now()) {
-                "IACA certificate data notBefore cannot be in the past"
-            }
         }
 
         require(finalNotBefore < finalNotAfter) {
