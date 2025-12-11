@@ -6,6 +6,8 @@ import com.github.jk1.license.filter.DependencyFilter
 import com.github.jk1.license.filter.LicenseBundleNormalizer
 import groovy.json.JsonSlurper
 import org.gradle.api.tasks.TaskProvider
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 data class ThirdPartyInfo(val name: String, val version: String, val url: String, val license: String)
 
@@ -46,9 +48,6 @@ dependencies {
 }
 repositories {
     mavenCentral()
-}
-kotlin {
-    jvmToolchain(8)
 }
 
 allprojects {
@@ -234,4 +233,18 @@ val aggregateDependencyNotices = tasks.register("aggregateDependencyNotices") {
     }
 }
 
-// test
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
+kotlin {
+    // Use the same toolchain for Kotlin
+    jvmToolchain(21)
+}
+
+// Ensure Kotlin compiles to the same JVM bytecode level
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions.jvmTarget.set(JvmTarget.JVM_21)
+}
