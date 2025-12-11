@@ -50,6 +50,21 @@ services:
     environment:
       OPA_SERVER_URL: "http://opa-server:8181"
 
+  verifier-api2:
+    image: ${IMAGE_PREFIX}waltid/verifier-api2:${VERSION_TAG:-latest}
+    profiles:
+      - services
+      - identity
+      - all
+    pull_policy: missing
+    depends_on:
+      - caddy
+    env_file:
+      - .env
+    volumes:
+      - ./verifier-api2/config:/waltid-verifier-api2/config
+
+
   waltid-demo-wallet:
     image: ${IMAGE_PREFIX}waltid/waltid-demo-wallet:${VERSION_TAG:-latest}
     profiles:
@@ -113,6 +128,8 @@ services:
       - identity
       - all
     pull_policy: missing
+    build:
+      context: ../waltid-applications/waltid-credentials/.
     depends_on:
       - caddy
     environment:
@@ -207,6 +224,11 @@ services:
 
       - target: "$VERIFIER_API_PORT"
         published: $VERIFIER_API_PORT # verifier-api
+        protocol: tcp
+        mode: host
+
+      - target: "$VERIFIER_API2_PORT"
+        published: $VERIFIER_API2_PORT # verifier-api2
         protocol: tcp
         mode: host
 

@@ -171,6 +171,7 @@ $ docker-compose down -v
 - Wallet API: [http://localhost:7001](http://localhost:7001)
 - Issuer API: [http://localhost:7002](http://localhost:7002)
 - Verifier API: [http://localhost:7003](http://localhost:7003)
+- Verifier API2: [http://localhost:7004](http://localhost:7004)
 - Hashicorp vault: [http://localhost:8200](http://localhost:8200)
 - Open Policy Agent: [http://localhost:8181](http://localhost:8181)
 
@@ -189,6 +190,8 @@ $ docker-compose down -v
     - `issuer-api/config`
 - verifier API:
     - `verifier-api/config`
+- verifier API2:
+  - `verifier-api2/config`
 - ingress:
     - `Caddyfile`
 
@@ -262,6 +265,9 @@ Make sure the ports are also updated in:
 - verifier-api/config
     - verifier-service.conf
     - web.conf
+- verifier-api2/config
+  - verifier-service.conf
+  - web.conf
 - wallet-api/config
     - web.conf
     - db.conf

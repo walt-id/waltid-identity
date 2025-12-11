@@ -6,8 +6,13 @@ import id.walt.commons.fetchBinaryFile
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
-import id.walt.openid4vp.verifier.Verification2Session.VerificationSessionStatus
-import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
+import id.walt.openid4vp.verifier.data.VerificationSessionSetup
+import id.walt.openid4vp.verifier.data.SessionEvent
+import id.walt.openid4vp.verifier.data.Verification2Session
+import id.walt.openid4vp.verifier.data.Verification2Session.VerificationSessionStatus
+import id.walt.openid4vp.verifier.data.Verifier2SessionUpdate
+import id.walt.openid4vp.verifier.handlers.authrequest.Verifier2AuthorizationRequestHandler.respondAuthorizationRequest
+import id.walt.openid4vp.verifier.handlers.vpresponse.Verifier2VPDirectPostHandler.respondHandleDirectPostResponse
 import id.walt.openid4vp.verifier.openapi.VerificationSessionCreateOpenApi
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.vical.*
@@ -131,13 +136,10 @@ object Verifier2Service {
                         sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
                             ?: throw IllegalArgumentException("Unknown session id")
 
-                    if (verificationSession.signedAuthorizationRequestJwt != null) {
-                        // JAR (Signed)
-                        call.respond(verificationSession.signedAuthorizationRequestJwt!!)
-                    } else {
-                        // Unsigned
-                        call.respond(verificationSession.authorizationRequest)
-                    }
+                    call.respondAuthorizationRequest(
+                        verificationSession = verificationSession,
+                        updateSessionCallback = updateSessionCallback
+                    )
                 }
 
                 route("") {
@@ -156,20 +158,10 @@ object Verifier2Service {
                         log.trace { "Received verification session response to session: $sessionId" }
                         val verificationSession = sessions[sessionId]
 
-                        val urlParameters = call.receiveParameters()
-                        val vpTokenString = urlParameters.getOrFail("vp_token")
-                        val receivedState = urlParameters["state"]
-
-                        log.trace { "Verification session data: state = $receivedState, vp_token = $vpTokenString" }
-
-                        call.respond(
-                            Verifier2DirectPostHandler.handleDirectPost(
-                                verificationSession = verificationSession,
-                                vpTokenString = vpTokenString,
-                                receivedState = receivedState,
-                                updateSessionCallback = updateSessionCallback,
-                                failSessionCallback = failSessionCallback
-                            )
+                        call.respondHandleDirectPostResponse(
+                            verificationSession = verificationSession,
+                            updateSessionCallback = updateSessionCallback,
+                            failSessionCallback = failSessionCallback
                         )
                     }
                 }

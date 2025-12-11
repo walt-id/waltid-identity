@@ -80,7 +80,7 @@ dependencies {
 
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.5")
-    implementation("org.slf4j:jul-to-slf4j:2.0.16")
+    implementation("org.slf4j:jul-to-slf4j:2.0.17")
     implementation("io.klogging:klogging-jvm:0.11.6")
     implementation("io.klogging:slf4j-klogging:0.11.6")
 
@@ -104,7 +104,7 @@ dependencies {
 
     // crypto
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
-    implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
     // Bouncy Castle
     implementation("org.bouncycastle:bcprov-lts8on:2.73.8")
     implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")

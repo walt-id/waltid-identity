@@ -30,13 +30,20 @@ object MdocVerifier {
 
     private val log = KotlinLogging.logger {}
 
+    fun buildSessionTranscriptForContext(context: MdocVerificationContext): SessionTranscript = when {
+        context.isDcApi -> MdocCryptoHelper.reconstructDcApiOid4vpSessionTranscript(context)
+        else -> MdocCryptoHelper.reconstructOid4vpSessionTranscript(context)
+    }
+
     /**
      * OID4VP-specific verification entry point.
      * This is a convenient overload that constructs the SessionTranscript from OID4VP context.
      */
-    suspend fun verify(mdocString: String, context: VerificationContext): VerificationResult {
+    suspend fun verify(mdocString: String, context: MdocVerificationContext): VerificationResult {
         val document = MdocParser.parseToDocument(mdocString)
-        val sessionTranscript = MdocCryptoHelper.reconstructOid4vpSessionTranscript(context)
+
+        val sessionTranscript = buildSessionTranscriptForContext(context)
+
         log.trace { "SessionTranscript: $sessionTranscript" }
         log.trace { "SessionTranscript (hex): ${coseCompliantCbor.encodeToHexString(sessionTranscript)}" }
         return verify(document, sessionTranscript)
@@ -221,15 +228,22 @@ object MdocVerifier {
             issuerSignedItems.entries.forEach { issuerSignedItemWrapped ->
                 val issuerSignedItem = issuerSignedItemWrapped.value
                 val serialized = issuerSignedItemWrapped.serialized
+
+                log.trace { "  ${issuerSignedItem.elementIdentifier} (digestId=${issuerSignedItem.digestId}): ${issuerSignedItem.elementValue} (${issuerSignedItem.elementValue::class.simpleName ?: "?"}) (random hex=${issuerSignedItem.random.toHexString()}) => serialized hex = ${serialized.toHexString()}" }
+
                 val issuerSignedItemValueDigest = ValueDigest.fromIssuerSignedItem(issuerSignedItem, namespace, mso.digestAlgorithm)
+
                 val issuerSignedItemHash = issuerSignedItemValueDigest.value
+                log.trace { "  Issuer signed item value digest: DigestID = ${issuerSignedItemValueDigest.key}, hash (hex) = ${issuerSignedItemHash.toHexString()}" }
 
-                log.trace { "  ${issuerSignedItem.elementIdentifier} (${issuerSignedItem.digestId}): ${issuerSignedItem.elementValue} (${issuerSignedItem.elementValue::class.simpleName ?: "?"}) (random hex=${issuerSignedItem.random.toHexString()}) => serialized hex = ${serialized.toHexString()}" }
 
+
+                log.trace { "Finding matching digest in MSO Digests for namespace: ${msoDigestsForNamespace.entries.mapIndexed { idx, msoDigest -> "Option $idx: DigestID=${msoDigest.key} Hash=${msoDigest.value.toHexString()}" }.joinToString()}" }
                 val matchingDigest = msoDigestsForNamespace.entries.find { (digestId, digest) -> issuerSignedItem.digestId == digestId }
                     ?: throw IllegalArgumentException("MSO does not contain value digest for this signed item!")
-                log.trace { "Matching MSO Digest: ${matchingDigest.value.toHexString()}" }
-                log.trace { "IssuerSignedItem:    ${issuerSignedItemHash.toHexString()}" }
+
+                log.trace { "Matching MSO Digest (${matchingDigest.key}): ${matchingDigest.value.toHexString()}" }
+                log.trace { "IssuerSignedItem (${issuerSignedItemValueDigest.key}):    ${issuerSignedItemHash.toHexString()}" }
 
                 val hashesMatch = matchingDigest.value.contentEquals(issuerSignedItemHash)
 

@@ -84,14 +84,14 @@ dependencies {
 
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.5")
-    implementation("org.slf4j:jul-to-slf4j:2.0.16")
+    implementation("org.slf4j:jul-to-slf4j:2.0.17")
     implementation("io.klogging:klogging-jvm:0.11.6")
     implementation("io.klogging:slf4j-klogging:0.11.6")
     implementation("io.ktor:ktor-client-encoding:3.2.2")
 
     // Test
 
-    implementation("com.nimbusds:nimbus-jose-jwt:10.5")
+    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
 
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")

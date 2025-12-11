@@ -1,15 +1,15 @@
 package id.walt.mdoc.crypto
 
 import id.walt.cose.coseCompliantCbor
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.document.DeviceAuthentication
 import id.walt.mdoc.objects.document.DeviceAuthentication.Companion.DEVICE_AUTHENTICATION_TYPE
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
-import id.walt.mdoc.objects.handover.OpenID4VPHandover
-import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
+import id.walt.mdoc.objects.handover.*
 import id.walt.mdoc.objects.sha256
-import id.walt.mdoc.verification.VerificationContext
+import id.walt.mdoc.verification.MdocVerificationContext
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
@@ -26,35 +26,65 @@ object MdocCryptoHelper {
     private val log = KotlinLogging.logger { }
 
     /**
-     * Reconstructs the SessionTranscript for an OID4VP flow using redirects.
-     * As per OpenID for Verifiable Presentations 1.0, Appendix B.2.6.1.
+     * @param handoverInfoBytes: cannot serialize generic, serialize in caller function where type information is available
      */
-    fun reconstructOid4vpSessionTranscript(context: VerificationContext): SessionTranscript {
-        // Step 1: Create the OpenID4VPHandoverInfo structure
-        val handoverInfo = OpenID4VPHandoverInfo(
-            clientId = context.expectedAudience,
-            responseUri = context.responseUri,
-            nonce = context.expectedNonce,
-            jwkThumbprint = null // jwkThumbprint is null when not using JWE for the response
-        )
-        log.trace { "Reconstructed OpenID4VPHandoverInfo: $handoverInfo" }
-
-
-        // Step 2: CBOR-encode and hash the HandoverInfo
-        val handoverInfoBytes = coseCompliantCbor.encodeToByteArray(handoverInfo)
-        log.trace { "Reconstructed CBOR handoverInfoBytes (hex): ${handoverInfoBytes.toHexString()}" }
-
+    fun reconstructSessionTranscript(handoverInfo: BaseHandoverInfo, handoverInfoBytes: ByteArray): SessionTranscript {
         val infoHash = handoverInfoBytes.sha256()
         log.trace { "Handover info SHA-256 hash (hex): ${infoHash.toHexString()}" }
 
         // Step 3: Create the OpenID4VPHandover structure
         val handover = OpenID4VPHandover(
-            identifier = "OpenID4VPHandover",
+            identifier = when (handoverInfo) {
+                is OpenID4VPHandoverInfo -> "OpenID4VPHandover"
+                is OpenID4VPDCAPIHandoverInfo -> "OpenID4VPDCAPIHandover"
+                is NFCHandover -> TODO()
+            },
             infoHash = infoHash
         )
 
         // Step 4: Create the final SessionTranscript
-        return SessionTranscript.forOpenId(handover)
+        return when (handoverInfo) {
+            is NFCHandover -> TODO()
+            is OpenID4VPHandoverInfo, is OpenID4VPDCAPIHandoverInfo -> SessionTranscript.forOpenId(handover)
+        }
+    }
+
+    fun reconstructDcApiOid4vpSessionTranscript(context: MdocVerificationContext): SessionTranscript {
+        // Step 1: Create the OpenID4VPHandoverInfo structure
+        val handoverInfo = OpenID4VPDCAPIHandoverInfo(
+            origin = context.expectedAudience,
+            nonce = context.expectedNonce,
+            jwkThumbprint = context.jwkThumbprint?.decodeFromBase64Url() // jwkThumbprint is null when not using JWE for the response
+        )
+        log.trace { "Reconstructed OpenID4VPDCAPIHandoverInfo: $handoverInfo" }
+
+        // Step 2: CBOR-encode and hash the HandoverInfo
+        val handoverInfoBytes = coseCompliantCbor.encodeToByteArray(handoverInfo)
+        log.trace { "Reconstructed CBOR handoverInfoBytes (hex): ${handoverInfoBytes.toHexString()}" }
+
+        return reconstructSessionTranscript(handoverInfo, handoverInfoBytes)
+    }
+
+    /**
+     * Reconstructs the SessionTranscript for an OID4VP flow using redirects.
+     * As per OpenID for Verifiable Presentations 1.0, Appendix B.2.6.1.
+     */
+    fun reconstructOid4vpSessionTranscript(context: MdocVerificationContext): SessionTranscript {
+        // Step 1: Create the OpenID4VPHandoverInfo structure
+        requireNotNull(context.expectedAudience) { "Missing audience for Session Transcript" }
+        val handoverInfo = OpenID4VPHandoverInfo(
+            clientId = context.expectedAudience,
+            responseUri = context.responseUri,
+            nonce = context.expectedNonce,
+            jwkThumbprint = context.jwkThumbprint?.decodeFromBase64Url() // jwkThumbprint is null when not using JWE for the response
+        )
+        log.trace { "Reconstructed OpenID4VPHandoverInfo: $handoverInfo" }
+
+        // Step 2: CBOR-encode and hash the HandoverInfo
+        val handoverInfoBytes = coseCompliantCbor.encodeToByteArray(handoverInfo)
+        log.trace { "Reconstructed CBOR handoverInfoBytes (hex): ${handoverInfoBytes.toHexString()}" }
+
+        return reconstructSessionTranscript(handoverInfo, handoverInfoBytes)
     }
 
     /**

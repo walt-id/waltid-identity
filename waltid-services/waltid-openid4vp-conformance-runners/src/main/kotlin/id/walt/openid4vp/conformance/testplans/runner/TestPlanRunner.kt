@@ -4,7 +4,7 @@ import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.http.Verifier2Interface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.runner.req.TestPlanConfiguration
-import id.walt.openid4vp.verifier.Verification2Session.VerificationSessionStatus
+import id.walt.openid4vp.verifier.data.Verification2Session.VerificationSessionStatus
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*

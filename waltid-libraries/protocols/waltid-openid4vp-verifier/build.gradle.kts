@@ -22,12 +22,10 @@ val enableAndroidBuild = getSetting("enableAndroidBuild")
 val enableIosBuild = getSetting("enableIosBuild")
 
 kotlin {
+    jvmToolchain(21)
     jvm()
 
     js(IR) {
-        browser {
-
-        }
         nodejs {
             generateTypeScriptDefinitions()
         }
@@ -47,6 +45,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
                 // HTTP
+                implementation("io.ktor:ktor-server-core:$ktor_version")
                 implementation("io.ktor:ktor-client-core:$ktor_version")
                 implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
@@ -73,8 +72,22 @@ kotlin {
                 implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
                 implementation(project(":waltid-libraries:credentials:waltid-dcql"))
                 implementation(project(":waltid-libraries:credentials:waltid-verification-policies2"))
+                implementation(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
                 implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
                 implementation(project(":waltid-libraries:web:waltid-ktor-notifications-core"))
+            }
+        }
+
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            }
+        }
+
+        val jvmTest by getting {
+            dependencies {
+                implementation("org.slf4j:slf4j-simple:2.0.17")
             }
         }
     }

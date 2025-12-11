@@ -22,7 +22,7 @@ allprojects {
 }
 
 plugins {
-    val kotlinVersion = "2.2.20"
+    val kotlinVersion = "2.2.21"
     kotlin("multiplatform") version kotlinVersion apply false
     kotlin("jvm") version kotlinVersion
     kotlin("plugin.power-assert") version kotlinVersion apply false
@@ -33,10 +33,10 @@ plugins {
 
     id("love.forte.plugin.suspend-transform") version "2.2.20-0.13.1" apply false
 
-    id("com.android.library") version "8.11.1" apply false
-    id("com.android.application") version "8.11.1" apply false
+    id("com.android.library") version "8.12.3" apply false
+    id("com.android.application") version "8.12.3" apply false
 
-    id("com.github.ben-manes.versions") version "0.52.0" apply false
+    id("com.github.ben-manes.versions") version "0.53.0" apply false
     id("io.ktor.plugin") version "3.2.2" apply false
 
     id("com.github.jk1.dependency-license-report") version "3.0.1" apply false

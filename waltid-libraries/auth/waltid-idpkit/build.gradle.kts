@@ -43,7 +43,7 @@ dependencies {
     implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
     // OIDC
-    implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
 
     // for Ed25519
     implementation("com.google.crypto.tink:tink:1.16.0") {

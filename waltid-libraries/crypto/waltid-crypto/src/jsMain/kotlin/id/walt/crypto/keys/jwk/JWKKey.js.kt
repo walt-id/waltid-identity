@@ -475,4 +475,16 @@ actual class JWKKey actual constructor(
         actual override suspend fun importPEM(pem: String): Result<JWKKey> = JsJWKKeyCreator.importPEM(pem)
     }
 
+    @JsPromise
+    @JsExport.Ignore
+    actual suspend fun decryptJwe(jweString: String): ByteArray {
+        TODO("Not yet implemented")
+    }
+
+    @JsPromise
+    @JsExport.Ignore
+    actual suspend fun encryptJwe(plaintext: ByteArray): String {
+        TODO("Not yet implemented")
+    }
+
 }

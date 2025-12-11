@@ -22,6 +22,7 @@ val enableAndroidBuild = getSetting("enableAndroidBuild")
 val enableIosBuild = getSetting("enableIosBuild")
 
 kotlin {
+    jvmToolchain(21)
     jvm()
 
     js(IR) {
@@ -90,7 +91,7 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation("org.slf4j:slf4j-simple:2.0.16")
+                implementation("org.slf4j:slf4j-simple:2.0.17")
             }
         }
     }

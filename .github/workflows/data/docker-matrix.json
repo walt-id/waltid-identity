@@ -15,6 +15,11 @@
     "image": "portal"
   },
   {
+    "context": "waltid-identity/waltid-applications/waltid-credentials",
+    "folder": "waltid-identity/waltid-applications/waltid-credentials",
+    "image": "vc-repository"
+  },
+  {
     "context": "waltid-identity-enterprise",
     "folder": "waltid-identity-enterprise/waltid-enterprise-ui",
     "image": "waltid-enterprise-ui"
