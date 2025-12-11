@@ -19,17 +19,15 @@ import org.bouncycastle.asn1.x509.*
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
 import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder
 import org.bouncycastle.util.io.pem.PemReader
 import java.io.StringReader
 import java.math.BigInteger
-import java.security.KeyFactory
+import java.security.PublicKey
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
-import java.security.interfaces.ECPublicKey
-import java.security.spec.X509EncodedKeySpec
-import java.util.Base64
-import java.util.Date
+import java.util.*
 import kotlin.time.ExperimentalTime
 
 object OnboardingService {
@@ -389,13 +387,11 @@ object OnboardingService {
         return BigInteger(randomBytes).abs()
     }
 
-    private fun parseECPublicKey(ecPemEncodedPubKey: String): ECPublicKey {
-        val reader = PemReader(StringReader(ecPemEncodedPubKey))
+    private fun parseECPublicKey(pemEncodedPublicKey: String): PublicKey {
+        val reader = PemReader(StringReader(pemEncodedPublicKey))
         val pemObject = reader.readPemObject()
-        reader.close()
-        val keySpec = X509EncodedKeySpec(pemObject.content)
-        val keyFactory = KeyFactory.getInstance("EC")
-        return keyFactory.generatePublic(keySpec) as ECPublicKey
+        val spki = SubjectPublicKeyInfo.getInstance(pemObject.content)
+        return JcaPEMKeyConverter().setProvider("BC").getPublicKey(spki)
     }
 
     private fun x509CertificateToPEM(certificate: X509Certificate) = runBlocking {
