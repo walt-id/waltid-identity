@@ -574,19 +574,7 @@ open class CIProvider(
                             // Fallback: try to deserialize each element individually
                             // We need to find the element serializer - try to get it from the descriptor
                             try {
-                                map { element ->
-                                    when (element) {
-                                        is JsonObject -> {
-                                            // Try to deserialize using Json directly
-                                            // For driving_privileges, we know it's DrivingPrivilege
-                                            // But we can't easily get the type, so let's use a different approach
-                                            element.toMdocValue(namespace, elementIdentifier)
-                                        }
-                                        else -> {
-                                            element.toMdocValue(namespace, elementIdentifier)
-                                        }
-                                    }
-                                }
+                                map { it.toMdocValue(namespace, elementIdentifier) }
                             } catch (e2: Exception) {
                                 log.warn(e2) { "Failed to deserialize array elements for $elementIdentifier, keeping as List" }
                                 // Final fallback: convert array elements recursively
