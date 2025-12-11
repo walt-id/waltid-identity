@@ -59,16 +59,25 @@ allprojects {
 }
 
 subprojects {
-    plugins.withId("org.jetbrains.kotlin.jvm") {
-        apply(plugin = "com.github.jk1.dependency-license-report")
+    afterEvaluate {
+        // Determine all runtime-ish configurations available in this project (handles JVM + KMP jvmRuntimeClasspath)
+        val runtimeConfigs = configurations.names.filter { it.contains("runtimeClasspath", ignoreCase = true) }
+        if (runtimeConfigs.isEmpty()) {
+            logger.info("Skipping license report for ${project.path}: no runtimeClasspath configuration found")
+            return@afterEvaluate
+        }
+
+        if (!plugins.hasPlugin("com.github.jk1.dependency-license-report")) {
+            apply(plugin = "com.github.jk1.dependency-license-report")
+        }
 
         // configure the license report once per subproject
         configure<com.github.jk1.license.LicenseReportExtension> {
-            // Collect from this project + all subprojects (typical for multi-module)
-            projects = (listOf(project) + project.subprojects).toTypedArray()
+            // Collect only from this project
+            projects = arrayOf(project)
 
-            // Only runtime artifacts (what you really ship)
-            configurations = arrayOf("runtimeClasspath")
+            // Only runtime artifacts (what you really ship), using any runtimeClasspath-like config
+            configurations = runtimeConfigs.toTypedArray()
 
             // Where to put reports
             outputDir = layout.buildDirectory.dir("licenses").get().asFile.path
@@ -92,27 +101,34 @@ subprojects {
 
             doLast {
                 val outputDirFile = noticeOutput.get().asFile
-                val artifacts = runCatching {
-                    project.configurations.getByName("runtimeClasspath").resolvedConfiguration.resolvedArtifacts
-                }.getOrElse {
-                    logger.warn("Skipping notice collection for ${project.path}: ${it.message}")
-                    return@doLast
-                }
+                runtimeConfigs.forEach { configName ->
+                    val artifacts = runCatching {
+                        project.configurations.getByName(configName).resolvedConfiguration.resolvedArtifacts
+                    }.getOrElse {
+                        logger.warn("Skipping notice collection for ${project.path} ($configName): ${it.message}")
+                        emptySet()
+                    }
 
-                artifacts.forEach { artifact ->
-                    val id = artifact.moduleVersion.id
-                    project.copy {
-                        from(zipTree(artifact.file)) {
-                            includeEmptyDirs = false
-                            include("META-INF/NOTICE*", "NOTICE*", "META-INF/LICENSE*", "LICENSE*")
+                    artifacts.forEach { artifact ->
+                        val file = artifact.file
+                        if (!file.isFile) {
+                            logger.info("Skipping non-file artifact for ${project.path} ($configName): ${file.path}")
+                            return@forEach
                         }
-                        into(outputDirFile.resolve("${id.group}.${id.name}-${id.version}"))
+                        val id = artifact.moduleVersion.id
+                        project.copy {
+                            from(zipTree(file)) {
+                                includeEmptyDirs = false
+                                include("META-INF/NOTICE*", "NOTICE*", "META-INF/LICENSE*", "LICENSE*")
+                            }
+                            into(outputDirFile.resolve("${id.group}.${id.name}-${id.version}"))
+                        }
                     }
                 }
             }
         }
 
-        tasks.named("generateLicenseReport") {
+        tasks.matching { it.name == "generateLicenseReport" }.configureEach {
             finalizedBy(collectDependencyNotices)
         }
     }
