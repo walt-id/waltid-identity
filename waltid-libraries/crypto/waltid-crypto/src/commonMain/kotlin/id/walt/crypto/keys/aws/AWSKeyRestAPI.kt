@@ -68,7 +68,30 @@ class AWSKeyRestAPI(
 
 
     override var keyType: KeyType
-        get() = _keyType!!
+        get() {
+            if (_keyType == null && _publicKey != null) {
+                // Try to initialize from stored JWK synchronously (best effort)
+                try {
+                    val jwkObj = Json.parseToJsonElement(_publicKey!!).jsonObject
+                    val kty = jwkObj["kty"]?.jsonPrimitive?.content
+                    val crv = jwkObj["crv"]?.jsonPrimitive?.content
+                    _keyType = KeyTypes.getKeyTypeByJwkId(kty ?: throw IllegalArgumentException("Missing 'kty' in JWK"), crv)
+                } catch (e: Exception) {
+                    // If initialization fails, throw a helpful error
+                    throw IllegalStateException(
+                        "Key type not initialized. The key was deserialized without keyType. " +
+                                "Ensure the issuerKey includes both 'publicKey' and 'keyType' fields, " +
+                                "or call init() or getPublicKey() first to initialize from AWS.",
+                        e
+                    )
+                }
+            }
+            return _keyType ?: throw IllegalStateException(
+                "Key type not initialized. The key was deserialized without keyType and publicKey. " +
+                        "Ensure the issuerKey includes both 'publicKey' and 'keyType' fields, " +
+                        "or call init() or getPublicKey() first to initialize from AWS."
+            )
+        }
         set(value) {
             _keyType = value
         }
@@ -256,12 +279,83 @@ class AWSKeyRestAPI(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun getPublicKey(): Key = backedKey ?: when {
-        _publicKey != null -> _publicKey!!.let {
-            JWKKey.importJWK(it).getOrThrow()
+    override suspend fun init() {
+        // Initialize _keyType and _publicKey if they're missing
+        when {
+            // Case 1: Both are null - fetch from AWS
+            _keyType == null && _publicKey == null -> {
+                try {
+                    logger.debug { "Initializing AWS key from KMS: fetching public key for key ID $id" }
+                    val publicKey = AWSKeyRestAPI.getPublicKey(config, id)
+                    _publicKey = publicKey.exportJWK()
+                    // Extract keyType from the fetched public key
+                    val jwkObj = publicKey.exportJWKObject()
+                    val kty = jwkObj["kty"]?.jsonPrimitive?.content
+                    val crv = jwkObj["crv"]?.jsonPrimitive?.content
+                    _keyType = KeyTypes.getKeyTypeByJwkId(kty ?: throw IllegalArgumentException("Missing 'kty' in JWK"), crv)
+                    logger.debug { "Successfully initialized AWS key: keyType=${_keyType}, publicKey available" }
+                } catch (e: Exception) {
+                    logger.warn(e) { 
+                        "Failed to initialize AWS key from KMS. " +
+                        "Key will need to be initialized when keyType is accessed. " +
+                        "Error: ${e.message}" 
+                    }
+                    // Don't throw - allow lazy initialization later
+                }
+            }
+            // Case 2: _publicKey is available but _keyType is null - extract from JWK
+            _keyType == null && _publicKey != null -> {
+                try {
+                    val jwkObj = Json.parseToJsonElement(_publicKey!!).jsonObject
+                    val kty = jwkObj["kty"]?.jsonPrimitive?.content
+                    val crv = jwkObj["crv"]?.jsonPrimitive?.content
+                    _keyType = KeyTypes.getKeyTypeByJwkId(kty ?: throw IllegalArgumentException("Missing 'kty' in JWK"), crv)
+                    logger.debug { "Initialized keyType from stored JWK: ${_keyType}" }
+                } catch (e: Exception) {
+                    logger.warn(e) { 
+                        "Failed to initialize keyType from stored JWK. " +
+                        "Will try to fetch from AWS when keyType is accessed. " +
+                        "Error: ${e.message}" 
+                    }
+                    // Don't throw - allow lazy initialization later
+                }
+            }
+            // Case 3: Both are already initialized - nothing to do
+            else -> {
+                logger.trace { "AWS key already initialized: keyType=${_keyType}, publicKey available=${_publicKey != null}" }
+            }
         }
+    }
 
-        else -> getPublicKey()
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    override suspend fun getPublicKey(): Key = backedKey ?: when {
+        _publicKey != null -> {
+            val jwkKey = JWKKey.importJWK(_publicKey!!).getOrThrow()
+            // Initialize _keyType from the JWK if not already set
+            if (_keyType == null) {
+                val jwkObj = Json.parseToJsonElement(_publicKey!!).jsonObject
+                val kty = jwkObj["kty"]?.jsonPrimitive?.content
+                val crv = jwkObj["crv"]?.jsonPrimitive?.content
+                _keyType = KeyTypes.getKeyTypeByJwkId(kty ?: throw IllegalArgumentException("Missing 'kty' in JWK"), crv)
+            }
+            jwkKey
+        }
+        else -> {
+            // Fetch public key from AWS
+            val publicKey = getPublicKey(config, id)
+            _publicKey = publicKey.exportJWK()
+            // Initialize _keyType from the fetched public key
+            if (_keyType == null) {
+                val jwkObj = publicKey.exportJWKObject()
+                val kty = jwkObj["kty"]?.jsonPrimitive?.content
+                val crv = jwkObj["crv"]?.jsonPrimitive?.content
+                _keyType = KeyTypes.getKeyTypeByJwkId(kty ?: throw IllegalArgumentException("Missing 'kty' in JWK"), crv)
+            }
+            publicKey
+        }
     }.also { newBackedKey -> backedKey = newBackedKey }
 
     @JvmBlocking
