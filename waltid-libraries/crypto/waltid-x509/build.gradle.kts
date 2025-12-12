@@ -76,6 +76,8 @@ kotlin {
                 // CBOR
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+                implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+                implementation(libs.okio)
 
                 // Waltid
                 /*
@@ -126,7 +128,7 @@ implementation("org.kotlincrypto.macs:hmac-sha2")*/
         }
         val jvmMain by getting {
             dependencies {
-
+                implementation("org.bouncycastle:bcpkix-jdk18on:1.81")
             }
         }
         val jvmTest by getting {
