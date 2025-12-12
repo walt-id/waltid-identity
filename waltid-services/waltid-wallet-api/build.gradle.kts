@@ -99,6 +99,7 @@ dependencies {
 
     // Kotlinx.serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
 
     // Date
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
@@ -122,7 +123,9 @@ dependencies {
     // walt.id
     implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
     implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
+    // Keep old library for ProofOfPossession.CWTProofBuilder which uses MapElement
     implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
+    implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
     implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
 
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))

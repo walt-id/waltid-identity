@@ -107,6 +107,9 @@ kotlin {
                 // Date
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
+                // UUID
+                implementation("app.softwork:kotlinx-uuid-core:0.1.6")
+
                 // Cache
                 implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")
 

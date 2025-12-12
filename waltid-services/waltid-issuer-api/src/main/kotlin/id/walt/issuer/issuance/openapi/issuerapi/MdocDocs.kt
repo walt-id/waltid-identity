@@ -51,11 +51,19 @@ object MdocDocs {
             ) {
                 value = mDLAllFieldsMultipleAgeAttestations
             }
+
+            example(
+                name = "photoID example - Mandatory fields only",
+            ) {
+                value = photoIdBaseIssuanceExample
+            }
         }
     }
 
     private const val MDL_VC_CONFIG_ID = "org.iso.18013.5.1.mDL"
     private const val ISO_IEC_MDL_NAMESPACE_ID = "org.iso.18013.5.1"
+    private const val PHOTO_ID_VC_CONFIG_ID = "org.iso.23220.photoid.1.photoID"
+    private const val PHOTO_ID_NAMESPACE_ID = "org.iso.23220.photoid.1"
 
     val mdlBaseIssuanceExample = Json.decodeFromString<IssuanceRequest>(
         """
@@ -162,4 +170,40 @@ object MdocDocs {
             )
         }
     )
+
+    val photoIdBaseIssuanceExample = Json.decodeFromString<IssuanceRequest>(
+        """
+        {
+            "issuerKey": {
+              "type": "jwk",
+              "jwk": {
+                "kty": "EC",
+                "d": "-wSIL_tMH7-mO2NAfHn03I8ZWUHNXVzckTTb96Wsc1s",
+                "crv": "P-256",
+                "kid": "sW5yv0UmZ3S0dQuUrwlR9I3foREBHHFwXhGJGqGEVf0",
+                "x": "Pzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5U",
+                "y": "6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo"
+              }
+            },
+            "credentialConfigurationId": "$PHOTO_ID_VC_CONFIG_ID",
+            "mdocData": {
+                "$PHOTO_ID_NAMESPACE_ID": {
+                    "person_id": "123456",
+                    "birth_country": "US",
+                    "birth_state": "NEVADA",
+                    "birth_city": "Austin",
+                    "administrative_number": "654321",
+                    "resident_street": "Some Street",
+                    "resident_house_number": "House #1",
+                    "travel_document_number": "123456789",
+                    "resident_state": "Some State"
+                }
+            },
+            "x5Chain": [
+                "-----BEGIN CERTIFICATE-----\nMIICCTCCAbCgAwIBAgIUfqyiArJZoX7M61/473UAVi2/UpgwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDY0MTEzWhcNMjYwOTAyMDY0MTEzWjAzMQswCQYDVQQGEwJBVDEkMCIGA1UEAwwbV2FsdGlkIFRlc3QgRG9jdW1lbnQgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5Xp3CFQDMrMpR/SQ0jt/jTOqExk1PRzjQ79aKpIsJM1mqOBrDCBqTAfBgNVHSMEGDAWgBTxCn2nWMrE70qXb614U14BweY2azAdBgNVHQ4EFgQUx5qkOLC4lpl1xpYZGmF9HLxtp0gwDgYDVR0PAQH/BAQDAgeAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCQGA1UdHwQdMBswGaAXoBWGE2h0dHBzOi8vd2FsdC5pZC9jcmwwCgYIKoZIzj0EAwIDRwAwRAIgHTap3c6yCUNhDVfZWBPMKj9dCWZbrME03kh9NJTbw1ECIAvVvuGll9O21eR16SkJHHAA1pPcovhcTvF9fz9cc66M\n-----END CERTIFICATE-----\n"
+            ]
+        }
+    """.trimIndent()
+    )
+
 }
