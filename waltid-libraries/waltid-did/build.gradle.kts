@@ -32,7 +32,7 @@ suspendTransformPlugin {
 
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
 
 fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()

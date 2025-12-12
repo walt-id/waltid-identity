@@ -31,7 +31,7 @@ kotlin {
     //val enableAndroidBuild = getSetting("enableAndroidBuild")
     val enableIosBuild = getSetting("enableIosBuild")
 
-    jvmToolchain(17)
+    jvmToolchain(21)
 
     jvm {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)

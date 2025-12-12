@@ -35,13 +35,15 @@ tasks.test {
     useJUnitPlatform()
 }
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
 
 
-// Create a configuration for test artifacts
+
+
 configurations {
-    create("testArtifacts") {
+    // Avoid generic type inference issues by using the non-generic create API
+    configurations.create("testArtifacts") {
         extendsFrom(configurations["testImplementation"])
         isCanBeConsumed = true
         isCanBeResolved = false
@@ -49,7 +51,7 @@ configurations {
 }
 
 // Package the test classes in a jar
-val testJar by tasks.register<Jar>(Jar::class.toString()) {
+val testJar by tasks.register<Jar>("testJar") {
     archiveClassifier.set("test")
     from(sourceSets["test"].output)
 }
