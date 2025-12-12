@@ -43,7 +43,7 @@ import kotlinx.serialization.modules.subclass
 import org.cose.java.AlgorithmID
 import org.cose.java.OneKey
 import java.security.cert.X509Certificate
-import java.util.Base64
+import java.util.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
@@ -83,7 +83,7 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     // Persistence
     private val presentationSessions = ConfiguredPersistence<PresentationSession>(
         discriminator = "presentation_session",
-        defaultExpiration = 5.minutes,
+        defaultExpiration = 10.minutes,
         encoding = { Json.encodeToString(it) },
         decoding = {
             Json.decodeFromString(it)
