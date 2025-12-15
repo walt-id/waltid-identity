@@ -6,7 +6,6 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
-import id.walt.did.helpers.WaltidServices
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.definitions.JWTClaims
@@ -89,7 +88,7 @@ suspend fun main() {
     LoggingManager.useLoggingSetup(TraceLoggingSetup)
     LoggingManager.setup()
 
-    WaltidServices.minimalInit()
+    DidService.minimalInit()
 
     println("// -------- CREDENTIAL ISSUER ----------")
     // init credential offer for full authorization code flow

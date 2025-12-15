@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.openid4vp.verifier.data
 
 import id.walt.crypto.keys.DirectSerializedKey
@@ -12,6 +14,7 @@ import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.openid4vp.verifier.data.Verification2Session.DefinedVerificationPolicies
 import id.walt.openid4vp.verifier.utils.UrlUtils
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator

@@ -442,7 +442,7 @@ actual class JWKKey actual constructor(
 //        KeyType.Ed25519 -> decodeEd25519RawPublicKey(_internalJwk.toOctetKeyPair())
 //        KeyType.Ed25519 -> _internalJwk.toOctetKeyPair().toPublicKey()
         KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> _internalJwk.toRSAKey().toRSAPublicKey()
-        else -> TODO("Not yet supported: $keyType")
+//        else -> TODO("Not yet supported: $keyType")
     }
 
     private fun getSignatureAlgorithm(customSignatureAlgorithm: String? = null): Signature =

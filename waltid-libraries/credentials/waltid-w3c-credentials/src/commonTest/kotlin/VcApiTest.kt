@@ -17,7 +17,7 @@ class VcApiTest {
         if (!hostCondition()) return@runTest
 
         // Initialize services
-        WaltidServices.init()
+        DidService.init()
 
         val tseMetadata = TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", "dev-only-token")
 

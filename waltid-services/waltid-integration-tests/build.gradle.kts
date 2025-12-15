@@ -1,18 +1,8 @@
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.power-assert")
-    id("com.github.ben-manes.versions")
+    id("waltid.jvm.servicelib")
 }
 
 group = "id.walt"
-
-repositories {
-    mavenLocal()
-    mavenCentral()
-    maven("https://maven.waltid.dev/snapshots")
-}
 
 dependencies {
     val ktorVersion = "3.2.0"
@@ -52,17 +42,6 @@ dependencies {
 
 }
 
-@OptIn(ExperimentalKotlinGradlePluginApi::class)
-powerAssert {
-    functions = listOf(
-        // kotlin.test
-        "kotlin.assert", "kotlin.test.assertTrue", "kotlin.test.assertEquals", "kotlin.test.assertNull",
-
-        // checks
-        "kotlin.require", "kotlin.check"
-    )
-}
-
 sourceSets {
 // temporary: remove integration tests failing with unresolved address
 //    test {
@@ -70,10 +49,11 @@ sourceSets {
 //    }
 }
 
-tasks.test {
-    useJUnitPlatform()
-}
+
 kotlin {
     jvmToolchain(21)
 }
 
+/*tasks.test {
+    useJUnitPlatform()
+}*/
