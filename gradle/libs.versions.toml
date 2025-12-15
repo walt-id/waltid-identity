@@ -40,6 +40,7 @@ tink = "1.16.0"
 
 # Testing
 junit-jupiter = "5.11.4"
+mokkery = "3.0.0"
 
 # HTTP
 okio = "3.16.2"
@@ -48,6 +49,7 @@ okio = "3.16.2"
 
 # Plugins
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+
 kotlin-plugin-serialization = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin" }
 ktor-gradle-plugin = { module = "io.ktor.plugin:plugin", version.ref = "ktor" }
 benmanes-versions = { module = "com.github.ben-manes.versions:com.github.ben-manes.versions.gradle.plugin", version = "0.53.0" }
@@ -59,6 +61,7 @@ loveforte-suspendtransform = { module = "love.forte.plugin.suspend-transform:lov
 powerassert = { module = "org.jetbrains.kotlin.plugin.power-assert:org.jetbrains.kotlin.plugin.power-assert.gradle.plugin", version.ref="kotlin" }
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle" }
 jetbrains-compose = { module = "org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin", version.ref = "kotlin" }
+mokkery-gradle-plugin =  { module = "dev.mokkery:dev.mokkery.gradle.plugin", version.ref="mokkery" }
 
 # Libraries
 
@@ -115,5 +118,7 @@ waltid-ktor-client = [
 ]
 
 [plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 android-library = { id = "com.android.library", version.ref = "android-gradle" }
 android-application = { id = "com.android.application", version.ref = "android-gradle" }

@@ -7,7 +7,7 @@ plugins {
     id("waltid.publish.maven")
     id("waltid.publish.npm")
 
-    //id("dev.mokkery") version "2.10.2"
+    id("waltid.mokkery")
 }
 
 group = "id.walt.credentials"
