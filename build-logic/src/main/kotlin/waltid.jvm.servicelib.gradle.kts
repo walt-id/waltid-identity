@@ -1,8 +1,9 @@
-plugins {
-    id("waltid.base")
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
-    kotlin("jvm")
-    kotlin("plugin.serialization")
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+
+plugins {
+    id("waltid.jvm.library.base")
 }
 
 val catalogs = extensions.getByType<VersionCatalogsExtension>()
@@ -11,12 +12,4 @@ val javaVersion = identityLibs.findVersion("java-service").get().requiredVersion
 
 kotlin {
     jvmToolchain(javaVersion)
-}
-
-tasks.withType<Zip> {
-    isZip64 = true
-}
-
-dependencies {
-    implementation(kotlin("stdlib"))
 }

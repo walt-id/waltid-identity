@@ -3,7 +3,7 @@
 kotlin = "2.2.21"
 suspendtransform = "2.2.21-0.13.2"
 
-java-backend = "21"
+java-service = "21"
 java-library = "17"
 
 # Plugins

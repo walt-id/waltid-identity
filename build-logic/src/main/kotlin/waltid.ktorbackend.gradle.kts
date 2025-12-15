@@ -8,7 +8,7 @@ plugins {
 
 // Common Ktor Dependencies (if all services use these)
 dependencies {
-    val ktorVersion = "3.2.2" // Or load from catalog: libs.findVersion("ktor").get()
+    val ktorVersion = "3.2.2" // Or load from catalog: identityLibs.findVersion("ktor").get()
 
     // Core server dependencies
     implementation("io.ktor:ktor-server-core-jvm:$ktorVersion")

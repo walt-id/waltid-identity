@@ -1,13 +1,9 @@
 plugins {
-    id("waltid.jvm.library")
+    id("waltid.jvm.servicelib")
     id("waltid.publish.maven")
 }
 
 group = "id.walt"
-
-kotlin {
-    jvmToolchain(21) // <-- Override for web3j (requires 21 minimum)
-}
 
 dependencies {
     // Auth methods

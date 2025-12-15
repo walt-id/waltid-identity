@@ -5,8 +5,8 @@ plugins {
 }
 
 val catalogs = extensions.getByType<VersionCatalogsExtension>()
-val libs = catalogs.named("identityLibs")
-val javaVersion = libs.findVersion("java-library").get().requiredVersion.toInt()
+val identityLibs = catalogs.named("identityLibs")
+val javaVersion = identityLibs.findVersion("java-library").get().requiredVersion.toInt()
 
 fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
 val enableAndroidBuild = getSetting("enableAndroidBuild")

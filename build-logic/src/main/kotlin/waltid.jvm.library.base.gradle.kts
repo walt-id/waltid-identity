@@ -5,7 +5,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 plugins {
     id("waltid.base.library")
 
-    kotlin("multiplatform")
+    kotlin("jvm")
     kotlin("plugin.power-assert")
 }
 
@@ -15,14 +15,10 @@ val javaVersion = identityLibs.findVersion("java-library").get().requiredVersion
 
 kotlin {
     jvmToolchain(javaVersion)
-
-    compilerOptions {
-        freeCompilerArgs.add("-Xexpect-actual-classes")
-    }
 }
 
 powerAssert {
-    includedSourceSets = listOf("commonTest")
+    includedSourceSets = listOf("test")
     functions = listOf(
         // kotlin.test
         "kotlin.assert", "kotlin.test.assertEquals", "kotlin.test.assertNull", "kotlin.test.assertTrue", "kotlin.test.assertFalse",

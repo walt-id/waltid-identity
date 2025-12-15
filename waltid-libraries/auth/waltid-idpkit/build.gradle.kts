@@ -1,6 +1,5 @@
 plugins {
     id("waltid.ktorbackend")
-    id("com.github.ben-manes.versions")
 }
 
 group = "id.walt"

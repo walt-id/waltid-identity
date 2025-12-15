@@ -18,7 +18,7 @@ class DidExamples {
     @BeforeTest
     fun init() {
         runTest(timeout = 1.minutes) {
-            WaltidServices.init()
+            DidService.init()
         }
     }
 

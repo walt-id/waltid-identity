@@ -1,7 +1,5 @@
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-
 plugins {
-    id("waltid.jvm.library")
+    id("waltid.jvm.servicelib")
 }
 
 group = "id.walt"
