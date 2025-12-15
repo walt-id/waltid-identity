@@ -46,7 +46,6 @@ kotlin {
             dependencies {
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
                 api(project(":waltid-libraries:crypto:waltid-target-ios"))
-            }
         }
     }
 }

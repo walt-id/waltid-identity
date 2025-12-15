@@ -11,6 +11,7 @@ import kotlinx.serialization.Serializable
  * @param itemsRequest  CBOR-encoded items request
  * @param readerAuth  COSE Sign1 structure of reader authentication
  */
+@ConsistentCopyVisibility
 @Serializable
 data class MDocRequest internal constructor(
     val itemsRequest: EncodedCBORElement,

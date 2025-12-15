@@ -45,7 +45,7 @@ abstract class AuthenticationMethod(open val id: String) {
         accountId?.let { session.accountId = it }
         session.progressFlow(this@AuthenticationMethod)
 
-        if (session.status == AuthSessionStatus.SUCCESS || session.status == AuthSessionStatus.OK) {
+        if (session.status.isSuccess()) {
             session.currentlyActiveMethod = null // No longer any method active, authentication is done for this session
             check(session.token != null) { "Session token does not exist after successful authentication?" }
 

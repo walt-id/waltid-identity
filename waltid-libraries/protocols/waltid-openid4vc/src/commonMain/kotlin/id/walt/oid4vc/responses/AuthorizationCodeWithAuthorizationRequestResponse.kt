@@ -5,6 +5,7 @@ import id.walt.oid4vc.data.HTTPDataObjectFactory
 import id.walt.oid4vc.data.ResponseMode
 
 // Naming :/
+@ConsistentCopyVisibility
 data class AuthorizationCodeWithAuthorizationRequestResponse private constructor(
     val state: String?,
     val clientId: String?,

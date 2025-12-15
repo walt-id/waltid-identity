@@ -30,7 +30,10 @@ enum class AuthSessionStatus(val value: String) {
     CONTINUE_NEXT_FLOW("continue_next_flow"),
     CONTINUE_NEXT_STEP("continue_next_step"),
 
-    FAILURE("failure"),
+    FAILURE("failure");
+
+    @Suppress("DEPRECATION") // Allow check for deprecated `ok`
+    fun isSuccess() = this == SUCCESS || this == OK
 }
 
 @Serializable

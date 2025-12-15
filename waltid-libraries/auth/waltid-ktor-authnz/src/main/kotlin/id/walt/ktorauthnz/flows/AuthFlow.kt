@@ -38,6 +38,7 @@ data class AuthFlow(
         fun fromConfig(config: String): AuthFlow = Json.decodeFromString<AuthFlow>(config)
     }
 
+    @Suppress("DEPRECATION") // check for legacy Deprecated "ok"
     fun isEndConditionSuccess() = success || (ok ?: false)
 
     @Transient
