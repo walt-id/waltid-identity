@@ -19,17 +19,15 @@ import org.bouncycastle.asn1.x509.*
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
 import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder
 import org.bouncycastle.util.io.pem.PemReader
 import java.io.StringReader
 import java.math.BigInteger
-import java.security.KeyFactory
+import java.security.PublicKey
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
-import java.security.interfaces.ECPublicKey
-import java.security.spec.X509EncodedKeySpec
-import java.util.Base64
-import java.util.Date
+import java.util.*
 import kotlin.time.ExperimentalTime
 
 object OnboardingService {
@@ -162,7 +160,7 @@ object OnboardingService {
         crlDistributionPointUri: String,
     ): X509Certificate {
 
-        val subjectJavaPublicKey = parseECPublicKey(dsPublicKey.exportPEM())
+        val subjectJavaPublicKey = parseJcaPublicKey(dsPublicKey.exportPEM())
 
         val certBuilder = JcaX509v3CertificateBuilder(
             iacaName,
@@ -179,7 +177,7 @@ object OnboardingService {
         certBuilder.addExtension(
             Extension.authorityKeyIdentifier,
             false,
-            extUtils.createAuthorityKeyIdentifier(parseECPublicKey(iacaSigningKey.getPublicKey().exportPEM()))
+            extUtils.createAuthorityKeyIdentifier(parseJcaPublicKey(iacaSigningKey.getPublicKey().exportPEM()))
         )
 
         certBuilder.addExtension(
@@ -250,7 +248,7 @@ object OnboardingService {
         crlDistributionPointUri: String? = null,
     ): X509Certificate {
 
-        val javaPublicKey = parseECPublicKey(iacaSigningKey.getPublicKey().exportPEM())
+        val javaPublicKey = parseJcaPublicKey(iacaSigningKey.getPublicKey().exportPEM())
 
         val certBuilder = JcaX509v3CertificateBuilder(
             issuer,
@@ -389,13 +387,11 @@ object OnboardingService {
         return BigInteger(randomBytes).abs()
     }
 
-    private fun parseECPublicKey(ecPemEncodedPubKey: String): ECPublicKey {
-        val reader = PemReader(StringReader(ecPemEncodedPubKey))
+    private fun parseJcaPublicKey(pemEncodedPublicKey: String): PublicKey {
+        val reader = PemReader(StringReader(pemEncodedPublicKey))
         val pemObject = reader.readPemObject()
-        reader.close()
-        val keySpec = X509EncodedKeySpec(pemObject.content)
-        val keyFactory = KeyFactory.getInstance("EC")
-        return keyFactory.generatePublic(keySpec) as ECPublicKey
+        val spki = SubjectPublicKeyInfo.getInstance(pemObject.content)
+        return JcaPEMKeyConverter().setProvider("BC").getPublicKey(spki)
     }
 
     private fun x509CertificateToPEM(certificate: X509Certificate) = runBlocking {

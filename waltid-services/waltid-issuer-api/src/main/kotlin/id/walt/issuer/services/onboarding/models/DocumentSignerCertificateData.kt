@@ -38,17 +38,16 @@ data class DocumentSignerCertificateData(
             "Document signer certificate data organizationName must not be blank if specified"
         }
 
-        notBefore?.let {
-            require(it >= Clock.System.now()) {
-                "Document signer certificate data notBefore cannot be in the past"
-            }
+        val timeNow = Clock.System.now()
+        require(finalNotAfter > timeNow) {
+            "Document signer certificate notAfter $finalNotAfter must be greater than the current time: $timeNow "
         }
 
         require(finalNotBefore < finalNotAfter) {
             "Document signer certificate data notBefore must be before (and not equal to) notAfter"
         }
 
-        require( finalNotAfter.minus(finalNotBefore) <= (457L).toDuration(DurationUnit.DAYS)) {
+        require(finalNotAfter.minus(finalNotBefore) <= (457L).toDuration(DurationUnit.DAYS)) {
             "Document signer certificates should not have a validity that is larger than 457 days"
         }
 
