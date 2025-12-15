@@ -18,7 +18,7 @@
   </p>
 </div>
 
-Kotlin Multiplatform library that provides reusable verification policies for Verifiable Presentations (VP) across multiple formats (JWT VC JSON, SD-JWT, mdoc). It builds on top of the [walt.id generic Digital Credential interface](../waltid-digital-credentials) and powers high-level services such as the [walt.id Verifier APIs](../../services/waltid-verifier-api2).
+Kotlin Multiplatform library that provides reusable verification policies for Verifiable Presentations (VP) across multiple formats (JWT VC JSON, SD-JWT, mDL/mDoc ISO/IEC 18013 / 23220 family). It builds on top of the [walt.id generic Digital Credential interface](../waltid-digital-credentials) and powers high-level services such as the [walt.id Verifier APIs](../../services/waltid-verifier-api2).
 
 This library focuses on presentation-level verification policies, complementing the credential-level policies in [`waltid-verification-policies2`](../waltid-verification-policies2).
 
@@ -35,7 +35,7 @@ This library focuses on presentation-level verification policies, complementing 
 ## Features
 - Composable VP verification policies organized by presentation format.
 - Out-of-the-box signature, audience, nonce, and integrity validation for presentations.
-- Format-specific policies for JWT VC JSON, SD-JWT, and mdoc presentations.
+- Format-specific policies for JWT VC JSON, SD-JWT, and mDL/mDoc (ISO/IEC 18013 / 23220 family) presentations.
 - Ready for server-side and client-side Kotlin/JS consumers with optional iOS targets.
 
 ## Supported platforms
