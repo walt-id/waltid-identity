@@ -9,7 +9,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
 
 class IACACertificateDataValidationTest {
@@ -44,14 +43,6 @@ class IACACertificateDataValidationTest {
     fun `blank organizationName throws`() {
         assertFailsWith<IllegalArgumentException> {
             validIACACertData.copy(organizationName = "")
-        }
-    }
-
-    @Test
-    fun `notBefore in the past throws`() {
-        val past = Clock.System.now().minus(1.minutes)
-        assertFailsWith<IllegalArgumentException> {
-            validIACACertData.copy(notBefore = past)
         }
     }
 

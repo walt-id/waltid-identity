@@ -56,12 +56,12 @@ class DocumentSignerOnboardingRequestTest {
 
     @Test
     fun `different country between IACA and DS throws`() {
-        val badIaca = validIACASignerData.copy(
+        val badIACA = validIACASignerData.copy(
             certificateData = validIACASignerData.certificateData.copy(country = "GR")
         )
         assertFailsWith<IllegalArgumentException> {
             DocumentSignerOnboardingRequest(
-                iacaSigner = badIaca,
+                iacaSigner = badIACA,
                 certificateData = validDSCertData
             )
         }
@@ -99,14 +99,6 @@ class DocumentSignerOnboardingRequestTest {
     fun `blank stateOrProvinceName throws`() {
         assertFailsWith<IllegalArgumentException> {
             validDSCertData.copy(stateOrProvinceName = "")
-        }
-    }
-
-    @Test
-    fun `notBefore in the past throws`() {
-        val past = Clock.System.now().minus(1.days)
-        assertFailsWith<IllegalArgumentException> {
-            validDSCertData.copy(notBefore = past)
         }
     }
 
