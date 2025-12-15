@@ -30,7 +30,7 @@ tasks.named<CreateStartScripts>("startScripts") {
 }
 
 // Version Properties Generation
-val generateVersionProperties by tasks.registering(WriteProperties::class) {
+/*val generateVersionProperties by tasks.registering(WriteProperties::class) {
     destinationFile.set(layout.buildDirectory.file("generated/resources/version.properties"))
 
     property("version", rootProject.version.toString())
@@ -38,7 +38,7 @@ val generateVersionProperties by tasks.registering(WriteProperties::class) {
 }
 sourceSets.named("main") {
     resources.srcDir(generateVersionProperties)
-}
+}*/
 
 // Default Application Settings
 application {
