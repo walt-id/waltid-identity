@@ -34,4 +34,5 @@ dependencies {
 
     // Android
     implementation(identityLibs.android.gradle.plugin)
+    implementation(identityLibs.jetbrains.compose)
 }

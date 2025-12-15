@@ -58,6 +58,7 @@ petuska-npm-publish-plugin = { module = "dev.petuska.npm.publish:dev.petuska.npm
 loveforte-suspendtransform = { module = "love.forte.plugin.suspend-transform:love.forte.plugin.suspend-transform.gradle.plugin", version.ref = "suspendtransform" }
 powerassert = { module = "org.jetbrains.kotlin.plugin.power-assert:org.jetbrains.kotlin.plugin.power-assert.gradle.plugin", version.ref="kotlin" }
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle" }
+jetbrains-compose = { module = "org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin", version.ref = "kotlin" }
 
 # Libraries
 

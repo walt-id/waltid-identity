@@ -16,3 +16,7 @@ kotlin {
 tasks.withType<Zip> {
     isZip64 = true
 }
+
+dependencies {
+    implementation(kotlin("stdlib"))
+}
