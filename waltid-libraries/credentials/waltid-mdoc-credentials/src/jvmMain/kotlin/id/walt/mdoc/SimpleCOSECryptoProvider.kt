@@ -36,18 +36,18 @@ class SimpleCOSECryptoProvider(keys: List<COSECryptoProviderKeyInfo>) : COSECryp
         val sign1Msg = Sign1Message()
         sign1Msg.addAttribute(HeaderKeys.Algorithm, keyInfo.algorithmID.AsCBOR(), Attribute.PROTECTED)
         if (keyInfo.x5Chain.size == 1) {
-            CBORObject.FromObject(keyInfo.x5Chain.map { it.encoded }.reduceOrNull { acc, bytes -> acc + bytes })?.let {
+            CBORObject.FromByteArray(keyInfo.x5Chain.map { it.encoded }.reduceOrNull { acc, bytes -> acc + bytes })?.let {
                 sign1Msg.addAttribute(
-                    CBORObject.FromObject(X5_CHAIN),
+                    CBORObject.FromInt32(X5_CHAIN),
                     it,
                     Attribute.UNPROTECTED
                 )
             }
         } else {
-            CBORObject.FromObject(keyInfo.x5Chain.map { CBORObject.FromObject(it.encoded) }.toTypedArray<CBORObject?>())
+            CBORObject.FromCBORArray(keyInfo.x5Chain.map { CBORObject.FromByteArray(it.encoded) }.toTypedArray<CBORObject?>())
                 ?.let {
                     sign1Msg.addAttribute(
-                        CBORObject.FromObject(X5_CHAIN),
+                        CBORObject.FromInt32(X5_CHAIN),
                         it,
                         Attribute.UNPROTECTED
                     )

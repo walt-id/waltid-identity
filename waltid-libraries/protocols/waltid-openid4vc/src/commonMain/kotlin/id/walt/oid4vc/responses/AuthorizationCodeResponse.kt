@@ -3,6 +3,7 @@ package id.walt.oid4vc.responses
 import id.walt.oid4vc.data.HTTPDataObject
 import id.walt.oid4vc.data.HTTPDataObjectFactory
 
+@ConsistentCopyVisibility
 data class AuthorizationCodeResponse private constructor(
     val code: String?,
     val error: String?,

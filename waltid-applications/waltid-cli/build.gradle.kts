@@ -10,7 +10,6 @@ object Versions {
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
-    id("maven-publish")
     id("com.github.ben-manes.versions")
 }
 
@@ -24,15 +23,7 @@ repositories {
 kotlin {
     jvmToolchain(17)
 
-    targets.configureEach {
-        compilations.configureEach {
-            compileTaskProvider.configure {
-                compilerOptions {
-                    freeCompilerArgs.add("-Xexpect-actual-classes")
-                }
-            }
-        }
-    }
+
 
     jvm {
         compilations.all {
@@ -59,8 +50,7 @@ kotlin {
     }
 
     sourceSets {
-        val commonMain by getting {
-            dependencies {
+        commonMain.dependencies {
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
                 api(project(":waltid-libraries:waltid-did"))
                 api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
@@ -83,16 +73,12 @@ kotlin {
 
                 // Logging
                 implementation("io.github.oshai:kotlin-logging:7.0.5")
-            }
         }
-        val commonTest by getting {
-            dependencies {
+        commonTest.dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-            }
         }
-        val jvmMain by getting {
-            dependencies {
+        jvmMain.dependencies {
                 // Logging
                 implementation("org.slf4j:slf4j-simple:2.0.17")
 
@@ -101,10 +87,8 @@ kotlin {
 
                 // BouncyCastle for PEM import
                 implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
-            }
         }
-        val jvmTest by getting {
-            dependencies {
+        jvmTest.dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 implementation("com.wolpl.clikt-testkit:clikt-testkit:3.0.0")
 
@@ -137,13 +121,8 @@ kotlin {
                 implementation("io.ktor:ktor-client-logging-jvm:${Versions.KTOR_VERSION}")
 
             }
-        }
-        all {
-            languageSettings.enableLanguageFeature("InlineClasses")
-        }
+        
     }
 }
 
-/*tasks.test {
-    useJUnitPlatform()
-}*/
+/**/

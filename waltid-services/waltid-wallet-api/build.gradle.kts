@@ -1,64 +1,14 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import java.util.Properties
+import io.ktor.plugin.features.*
 
 plugins {
-    kotlin("jvm")
-    id("io.ktor.plugin") version "3.2.2"
-    kotlin("plugin.serialization")
-    id("maven-publish")
-    id("com.github.ben-manes.versions")
+    id("waltid.ktorbackend")
+    id("waltid.ktordocker")
 }
 
 group = "id.walt"
+
 application {
     mainClass.set("id.walt.webwallet.MainKt")
-    applicationName = "waltid-wallet-api"
-    val isDevelopment: Boolean = project.ext.has("development")
-    applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
-}
-
-repositories {
-    mavenLocal()
-    mavenCentral()
-    maven("https://jitpack.io")
-    maven("https://maven.waltid.dev/releases")
-    maven("https://maven.waltid.dev/snapshots")
-}
-
-tasks.withType<KotlinCompile> {
-    compilerOptions {
-        jvmTarget = JvmTarget.JVM_21
-    }
-}
-
-tasks.withType<Zip> {
-    isZip64 = true
-}
-
-tasks.withType<ProcessResources> {
-    doLast {
-        layout.buildDirectory.get().file("resources/main/version.properties").asFile.run {
-            parentFile.mkdirs()
-            Properties().run {
-                setProperty("version", rootProject.version.toString())
-                writer().use { store(it, "walt.id version store") }
-            }
-        }
-    }
-}
-
-/*java {
-    sourceCompatibility = JavaVersion.VERSION_15
-    targetCompatibility = JavaVersion.VERSION_15
-}*/
-
-kotlin {
-    jvmToolchain(21)
-}
-
-tasks.withType<Test> {
-    useJUnitPlatform()
 }
 
 dependencies {
@@ -196,90 +146,12 @@ dependencies {
     testImplementation("io.klogging:klogging-jvm:0.11.6")
 }
 
-// Define publication to allow publishing to local maven repo with the command:  ./gradlew publishToMavenLocal
-// This should not be published to https://maven.waltid.dev/ to save storage
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["kotlin"])
-            pom {
-                name.set("walt.id wallet API REST service")
-                description.set(
-                    """
-                    Kotlin/Java REST service for storing digital credentials
-                    """.trimIndent()
-                )
-                url.set("https://walt.id")
-
-                licenses {
-                    license {
-                        name.set("Apache License 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
-                    }
-                }
-
-                developers {
-                    developer {
-                        id.set("walt.id")
-                        name.set("walt.id")
-                        email.set("office@walt.id")
-                    }
-                }
-            }
-        }
-    }
-}
-
-fun waltidPrivateCredentials(repoName:String): Pair<String, String> = let {
-    val envUsername = System.getenv(repoName.uppercase() + "_USERNAME")
-    val envPassword = System.getenv(repoName.uppercase() + "_PASSWORD")
-
-    val usernameFile = File("$rootDir/secret-${repoName.lowercase()}-username.txt")
-    val passwordFile = File("$rootDir/secret-${repoName.lowercase()}-password.txt")
-
-    return Pair(
-        envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" },
-        envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
-    )
-}
-
 ktor {
     docker {
-        jreVersion.set(JavaVersion.VERSION_21)
-        localImageName.set("waltid/wallet-api")
-        imageTag.set("${project.version}")
-        portMappings.set(listOf(
-            io.ktor.plugin.features.DockerPortMapping(
-                7001,
-                7001,
-                io.ktor.plugin.features.DockerPortMappingProtocol.TCP
-            )
-        ))
-
-        val (username, password) = waltidPrivateCredentials("DOCKER")
-        externalRegistry.set(
-            io.ktor.plugin.features.DockerImageRegistry.dockerHub(
-                appName = provider { "wallet-api" },
-                username = provider { username },
-                password = provider { password }
+        portMappings.set(
+            listOf(
+                DockerPortMapping(7001, 7001, DockerPortMappingProtocol.TCP)
             )
         )
-    }
-    jib {
-        container {
-            workingDirectory = "/waltid-wallet-api"
-        }
-        from {
-            platforms {
-                platform {
-                    architecture = "amd64"
-                    os = "linux"
-                }
-                platform {
-                    architecture = "arm64"
-                    os = "linux"
-                }
-            }
-        }
     }
 }

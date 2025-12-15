@@ -141,6 +141,7 @@ class DidsApi(private val e2e: E2ETest, private val client: HttpClient) {
     }
 
     sealed class DefaultDidOption {
+        @ConsistentCopyVisibility
         data class Some internal constructor(val value: String) : DefaultDidOption()
         data object None : DefaultDidOption()
         data object Any : DefaultDidOption()

@@ -1,18 +1,10 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.power-assert")
-    id("com.github.ben-manes.versions")
+    id("waltid.jvm.library")
 }
 
 group = "id.walt"
-
-repositories {
-    mavenLocal()
-    mavenCentral()
-    maven("https://maven.waltid.dev/snapshots")
-}
 
 dependencies {
     val ktorVersion = "3.2.2"
@@ -44,22 +36,4 @@ dependencies {
     testImplementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
     testImplementation("org.kotlincrypto.hash:sha2")
 
-}
-
-@OptIn(ExperimentalKotlinGradlePluginApi::class)
-powerAssert {
-    functions = listOf(
-        // kotlin.test
-        "kotlin.assert", "kotlin.test.assertTrue", "kotlin.test.assertEquals", "kotlin.test.assertNull",
-
-        // checks
-        "kotlin.require", "kotlin.check"
-    )
-}
-
-tasks.test {
-    useJUnitPlatform()
-}
-kotlin {
-    jvmToolchain(21)
 }

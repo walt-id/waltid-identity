@@ -10,22 +10,13 @@ plugins {
 }
 
 group = "id.walt.crypto"
-
-repositories {
-    mavenCentral()
-    maven("https://jitpack.io")
-}
-
 suspendTransformPlugin {
     enabled = true
     includeRuntime = true
     transformers { useDefault() }
 }
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_15
-    targetCompatibility = JavaVersion.VERSION_15
-}
+
 
 kotlin {
     androidTarget {
@@ -34,7 +25,6 @@ kotlin {
                 compilerOptions {
                     jvmTarget = JvmTarget.JVM_1_8
                 }
-            }
         }
     }
 }
@@ -66,68 +56,31 @@ kotlin {
     }
 
     sourceSets {
-        val androidMain by getting {
-            dependencies {
+        androidMain.dependencies {
                 api(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 implementation("io.github.oshai:kotlin-logging:7.0.5")
-            }
         }
-        val androidInstrumentedTest by getting {
-            dependencies {
+        androidInstrumentedTest.dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
                 implementation("androidx.test.ext:junit:1.2.1")
                 implementation("androidx.test:runner:1.6.1")
                 implementation("androidx.test:rules:1.6.1")
-            }
         }
-        val androidUnitTest by getting {
-            dependencies {
+        androidUnitTest.dependencies {
                 implementation(kotlin("test"))
                 implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
-            }
         }
     }
 }
 
 
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["kotlin"])
+mavenPublishing {
             pom {
                 name.set("walt.id Crypto Android")
                 description.set("walt.id Kotlin/Java Crypto Android library")
-                url.set("https://walt.id")
-
-                licenses {
-                    license {
-                        name.set("Apache License 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
-                    }
-                }
-
-                developers {
-                    developer {
-                        id.set("walt.id")
-                        name.set("walt.id")
-                        email.set("office@walt.id")
-                    }
-                }
-            }
-        }
-    }
-
-    repositories {
-        maven {
-            url = uri(if (version.toString().endsWith("SNAPSHOT")) uri("https://maven.waltid.dev/snapshots") else uri("https://maven.waltid.dev/releases"))
-            credentials {
-                username = System.getenv("MAVEN_USERNAME") ?: File("$rootDir/secret_maven_username.txt").let { if (it.isFile) it.readLines().first() else "" }
-                password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let { if (it.isFile) it.readLines().first() else "" }
-            }
-        }
-    }
+}
 }
