@@ -100,8 +100,6 @@ spec:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 10001
         fsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
@@ -110,7 +108,6 @@ spec:
           image: busybox
           securityContext:
             allowPrivilegeEscalation: false
-            runAsUser: 0
             capabilities:
               drop:
                 - ALL
@@ -124,6 +121,8 @@ spec:
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 10001
             capabilities:
               drop:
                 - ALL

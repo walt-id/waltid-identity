@@ -101,8 +101,6 @@ spec:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 10001
         fsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
@@ -124,6 +122,8 @@ spec:
           image: waltid/wallet-api:__DEFAULT_IMAGE_TAG__
           securityContext:
             allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 10001
             capabilities:
               drop:
                 - ALL
