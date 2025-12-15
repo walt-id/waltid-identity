@@ -10,10 +10,10 @@ Milestone 1: Scaffolding
 - [x] Compile + basic unit tests
 
 Milestone 2: Request builder
-- [ ] base64url(no pad) helpers
-- [ ] Build EncryptionInfo = ["dcapi",{nonce,recipientPublicKey(COSE_Key)}]
-- [ ] Build / reuse DeviceRequest builder
-- [ ] Expose library API that returns `{ deviceRequestB64, encryptionInfoB64 }` for `/annex-c/request`
+- [x] base64url(no pad) helpers
+- [x] Build EncryptionInfo = ["dcapi",{nonce,recipientPublicKey(COSE_Key)}]
+- [x] Build / reuse DeviceRequest builder
+- [x] Expose library API that returns `{ deviceRequestB64, encryptionInfoB64 }` for `/annex-c/request`
 
 Milestone 3: Transcript + HPKE
 - [ ] Compute SessionTranscript and HPKE info

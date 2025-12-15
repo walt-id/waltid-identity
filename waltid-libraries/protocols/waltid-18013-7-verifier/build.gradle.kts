@@ -36,11 +36,10 @@ kotlin {
             /*
              * walt.id:
              */
-            implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
-            implementation(project(":waltid-libraries:credentials:waltid-dcql"))
             implementation(project(":waltid-libraries:credentials:waltid-verification-policies2"))
             implementation(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
+            implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
             implementation(project(":waltid-libraries:web:waltid-ktor-notifications-core"))
         }
 
@@ -57,7 +56,7 @@ kotlin {
 
 mavenPublishing {
     pom {
-        name.set("walt.id Verifier SDK - OpenID4VP version")
-        description.set("walt.id Kotlin/Java Verifier for OpenID4VP")
+        name.set("walt.id Verifier SDK - ISO 18013-7 Annex C")
+        description.set("walt.id Kotlin/Java Verifier for ISO 18013-7 Annex C")
     }
 }

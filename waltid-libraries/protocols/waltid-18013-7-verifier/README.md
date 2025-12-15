@@ -7,11 +7,12 @@ Currently exposed (Milestone 1):
 - `id.walt.iso18013.annexc.AnnexC` (protocol constant)
 - `id.walt.iso18013.annexc.AnnexCResponseVerifier` (decrypt API contract)
 - `id.walt.iso18013.annexc.cbor.Base64UrlNoPad` (base64url helper)
+- `id.walt.iso18013.annexc.AnnexCRequestBuilder` (builds `deviceRequestB64` + `encryptionInfoB64`)
 
 ## Build & test
 
 - Build: `./gradlew :waltid-libraries:protocols:waltid-18013-7-verifier:build`
-- Tests only: `./gradlew :waltid-libraries:protocols:waltid-18013-7-verifier:test`
+- Tests only: `./gradlew :waltid-libraries:protocols:waltid-18013-7-verifier:jvmTest`
 
 The JVM test harness loads `src/jvmTest/resources/annex-c/ANNEXC-REAL-001.json` and validates that the vector is
 structurally sane (base64url decode + basic fields).
