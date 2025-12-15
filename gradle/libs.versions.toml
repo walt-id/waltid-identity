@@ -43,7 +43,7 @@ junit-jupiter = "5.11.4"
 mokkery = "3.0.0"
 
 # HTTP
-okio = "3.16.2"
+okio = "3.16.4"
 
 [libraries]
 
