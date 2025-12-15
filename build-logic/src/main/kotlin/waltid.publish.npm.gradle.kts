@@ -4,7 +4,7 @@ plugins {
 
 npmPublish {
     registries {
-        val envToken = System.getenv("NPM_TOKEN")
+        val envToken = providers.environmentVariable("NPM_TOKEN").getOrNull()
         val npmTokenFile = File("secret_npm_token.txt")
         val secretNpmToken = envToken ?: npmTokenFile.let { if (it.isFile) it.readLines().first() else "" }
         val hasNPMToken = secretNpmToken.isNotEmpty()

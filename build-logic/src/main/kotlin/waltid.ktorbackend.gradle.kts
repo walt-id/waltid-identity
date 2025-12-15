@@ -30,16 +30,14 @@ tasks.named<CreateStartScripts>("startScripts") {
 }
 
 // Version Properties Generation
-tasks.withType<ProcessResources> {
-    doLast {
-        layout.buildDirectory.get().file("resources/main/version.properties").asFile.run {
-            parentFile.mkdirs()
-            Properties().run {
-                setProperty("version", rootProject.version.toString())
-                writer().use { store(it, "walt.id version store") }
-            }
-        }
-    }
+val generateVersionProperties by tasks.registering(WriteProperties::class) {
+    destinationFile.set(layout.buildDirectory.file("generated/resources/version.properties"))
+
+    property("version", rootProject.version.toString())
+    comment = "walt.id version store"
+}
+sourceSets.named("main") {
+    resources.srcDir(generateVersionProperties)
 }
 
 // Default Application Settings

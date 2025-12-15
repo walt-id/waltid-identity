@@ -9,8 +9,8 @@ plugins {
 
 
 fun getDockerCredentials(rootDir: File): Pair<String, String> {
-    val envUsername = System.getenv("DOCKER_USERNAME")
-    val envPassword = System.getenv("DOCKER_PASSWORD")
+    val envUsername = providers.environmentVariable("DOCKER_USERNAME").getOrNull()
+    val envPassword = providers.environmentVariable("DOCKER_PASSWORD").getOrNull()
     val usernameFile = File(rootDir, "secret-docker-username.txt")
     val passwordFile = File(rootDir, "secret-docker-password.txt")
 
