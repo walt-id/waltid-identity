@@ -193,14 +193,14 @@ object NotificationController {
 
                     when (type) {
                         "issuance" -> {
-                            val issuer = URL(queries["issuer"]!!.first()).host
+                            val issuer = Url(queries["issuer"]!!.first()).host
                             val credentialTypes = queries["credential_type"]!!
 
                             PushManager.sendIssuanceNotification(id, issuer, credentialTypes, offer)
                         }
 
                         "verification" -> {
-                            val remoteHost = URL(queries["redirect_uri"]!!.first()).host
+                            val remoteHost = Url(queries["redirect_uri"]!!.first()).host
 
                             PushManager.sendVerificationNotification(id, remoteHost, listOf("TODO"), offer)
                         }

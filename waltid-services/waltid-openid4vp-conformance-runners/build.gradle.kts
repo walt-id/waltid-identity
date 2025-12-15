@@ -1,6 +1,7 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import java.util.Properties
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
+
+import io.ktor.plugin.features.*
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 object Versions {
     const val KTOR_VERSION = "3.2.2" // also change 1 plugin
@@ -9,26 +10,11 @@ object Versions {
 }
 
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.power-assert")
-    kotlin("plugin.serialization")
-
-    id("io.ktor.plugin") version "3.2.2" // Versions.KTOR_VERSION
-    id("org.owasp.dependencycheck") version "9.2.0"
-    id("maven-publish")
-    id("com.github.ben-manes.versions")
-    application
+    id("waltid.ktorbackend")
+    id("waltid.ktordocker")
 }
 
 group = "id.walt"
-
-repositories {
-    mavenCentral()
-    maven("https://jitpack.io")
-    maven("https://maven.waltid.dev/releases")
-    maven("https://maven.waltid.dev/snapshots")
-}
-
 
 dependencies {
     api(project(":waltid-services:waltid-service-commons"))
@@ -109,155 +95,17 @@ dependencies {
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier-openapi"))
     implementation(project(":waltid-libraries:web:waltid-ktor-notifications"))
 }
-tasks.withType<Zip> {
-    isZip64 = true
-}
-tasks.withType<Test> {
-    useJUnitPlatform()
-
-    // Use the following condition to optionally run the integration tests:
-    // > gradle build -PrunIntegrationTests
-    if (!project.hasProperty("runIntegrationTests")) {
-        exclude("id/walt/test/integration/**")
-    }
-}
-
-tasks.withType<ProcessResources> {
-    doLast {
-        layout.buildDirectory.get().file("resources/main/version.properties").asFile.run {
-            parentFile.mkdirs()
-            Properties().run {
-                setProperty("version", rootProject.version.toString())
-                writer().use { store(it, "walt.id version store") }
-            }
-        }
-    }
-}
-
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
-    }
-}
-
-tasks.withType<KotlinCompile> {
-    compilerOptions {
-        jvmTarget = JvmTarget.JVM_21
-    }
-}
-
-tasks.named<CreateStartScripts>("startScripts") {
-    doLast {
-        windowsScript.writeText(
-            windowsScript.readText().replace(Regex("set CLASSPATH=.*"), "set CLASSPATH=%APP_HOME%\\\\lib\\\\*")
-        )
-    }
-}
 
 application {
     mainClass.set("id.walt.openid4vp.conformance.MainKt")
-    val isDevelopment: Boolean = project.ext.has("development")
-    applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
-}
-
-// Define publication to allow publishing to local maven repo with the command:  ./gradlew publishToMavenLocal
-// This should not be published to https://maven.waltid.dev/ to save storage
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["kotlin"])
-            pom {
-                name.set("walt.id OpenID4VP 1.0 remote controllable for conformace suite")
-                description.set(
-                    """
-                    Kotlin/Java REST service for OpenID4VP 1.0 Verifier + Wallet conformance suite runners
-                    """.trimIndent()
-                )
-                url.set("https://walt.id")
-
-                licenses {
-                    license {
-                        name.set("Apache License 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
-                    }
-                }
-
-                developers {
-                    developer {
-                        id.set("walt.id")
-                        name.set("walt.id")
-                        email.set("office@walt.id")
-                    }
-                }
-            }
-        }
-    }
-}
-
-fun waltidPrivateCredentials(repoName:String): Pair<String, String> = let {
-    val envUsername = System.getenv(repoName.uppercase() + "_USERNAME")
-    val envPassword = System.getenv(repoName.uppercase() + "_PASSWORD")
-
-    val usernameFile = File("$rootDir/secret-${repoName.lowercase()}-username.txt")
-    val passwordFile = File("$rootDir/secret-${repoName.lowercase()}-password.txt")
-
-    return Pair(
-        envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" },
-        envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
-    )
 }
 
 ktor {
     docker {
-        jreVersion.set(JavaVersion.VERSION_21)
-        localImageName.set("waltid/openid4vp-conformance-runners")
-        imageTag.set("${project.version}")
-        portMappings.set(listOf(
-            io.ktor.plugin.features.DockerPortMapping(
-                7003,
-                7003,
-                io.ktor.plugin.features.DockerPortMappingProtocol.TCP
-            )
-        ))
-
-        val (username, password) = waltidPrivateCredentials("DOCKER")
-        externalRegistry.set(
-            io.ktor.plugin.features.DockerImageRegistry.dockerHub(
-                appName = provider { "verifier-api" },
-                username = provider { username },
-                password = provider { password }
+        portMappings.set(
+            listOf(
+                DockerPortMapping(7003, 7003, DockerPortMappingProtocol.TCP)
             )
         )
     }
-
-    jib {
-        container {
-            mainClass = "id.walt.openid4vp.conformance.MainKt"
-            workingDirectory = "/waltid-openid4vp-conformance-runners"
-        }
-        from {
-            platforms {
-                platform {
-                    architecture = "amd64"
-                    os = "linux"
-                }
-                platform {
-                    architecture = "arm64"
-                    os = "linux"
-                }
-            }
-        }
-    }
-}
-
-
-powerAssert {
-    includedSourceSets = listOf("main", "test")
-    functions = listOf(
-        // kotlin.test
-        "kotlin.assert", "kotlin.test.assertEquals", "kotlin.test.assertNull", "kotlin.test.assertTrue", "kotlin.test.assertFalse",
-
-        // checks
-        "kotlin.require", "kotlin.check"
-    )
 }

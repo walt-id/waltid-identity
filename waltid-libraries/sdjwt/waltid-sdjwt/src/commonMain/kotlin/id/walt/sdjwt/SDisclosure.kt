@@ -16,6 +16,7 @@ import kotlin.js.JsExport
  * @param key Field key
  * @param value Field value
  */
+@ConsistentCopyVisibility
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 data class SDisclosure internal constructor(

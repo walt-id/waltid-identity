@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 object CredentialBuilderUtils {
     fun generateCredentialSubject(credentialSubject: String): JsonObject {

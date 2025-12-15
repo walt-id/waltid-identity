@@ -2,7 +2,7 @@ package id.walt.policies2.vc
 
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.W3CExamples
-import id.walt.did.helpers.WaltidServices
+import id.walt.did.dids.DidService
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -15,13 +15,13 @@ class CredentialSignaturePolicyTest : BasePolicyTest() {
 
     @Test
     fun testOk() = runTest {
-        WaltidServices.minimalInit()
+        DidService.minimalInit()
         runBaseTestOk()
     }
 
     @Test
     fun testFail() = runTest {
-        WaltidServices.minimalInit()
+        DidService.minimalInit()
         runBaseTestNok()
     }
 

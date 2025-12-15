@@ -53,7 +53,37 @@ data class CoseHeaders(
     //@CborLabel(34) @ByteString val x5t: ByteArray? = null,
     /** 35: URI pointing to an X.509 certificate (RFC 9360) */
     //@CborLabel(35) val x5u: String? = null,
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is CoseHeaders) return false
+
+        if (algorithm != other.algorithm) return false
+        if (criticalHeaders != other.criticalHeaders) return false
+        if (contentType != other.contentType) return false
+        if (!kid.contentEquals(other.kid)) return false
+        if (!iv.contentEquals(other.iv)) return false
+        if (!partialIv.contentEquals(other.partialIv)) return false
+        if (!kidContext.contentEquals(other.kidContext)) return false
+        if (type != other.type) return false
+        if (x5chain != other.x5chain) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = algorithm ?: 0
+        result = 31 * result + (criticalHeaders?.hashCode() ?: 0)
+        result = 31 * result + (contentType?.hashCode() ?: 0)
+        result = 31 * result + (kid?.contentHashCode() ?: 0)
+        result = 31 * result + (iv?.contentHashCode() ?: 0)
+        result = 31 * result + (partialIv?.contentHashCode() ?: 0)
+        result = 31 * result + (kidContext?.contentHashCode() ?: 0)
+        result = 31 * result + (type?.hashCode() ?: 0)
+        result = 31 * result + (x5chain?.hashCode() ?: 0)
+        return result
+    }
+}
 
 
 /**
@@ -106,6 +136,7 @@ object CoseContentTypeSerializer : KSerializer<CoseContentType> {
 }
 
 
+@OptIn(ExperimentalSerializationApi::class)
 data class CoseCertificate(
     @ByteString val rawBytes: ByteArray
 ) {
