@@ -20,10 +20,10 @@ Milestone 3: Transcript + HPKE
 - [x] Implement `AnnexCResponseVerifier.decryptToDeviceResponse(...)` (HPKE decrypt to DeviceResponse bytes)
 
 Milestone 4: Verifier2 API endpoints
-- [ ] /annex-c/create -> create session, store origin + policies
-- [ ] /annex-c/request -> call `waltid-18013-7-verifier` to build `{deviceRequestB64,encryptionInfoB64}`, return protocol object for DC API
-- [ ] /annex-c/response -> store response, call `AnnexCResponseVerifier.decryptToDeviceResponse(...)` in async validation job
-- [ ] /annex-c/info -> return session + validation result
+- [x] /annex-c/create -> create session, store origin + policies
+- [x] /annex-c/request -> call `waltid-18013-7-verifier` to build `{deviceRequestB64,encryptionInfoB64}`, return protocol object for DC API
+- [x] /annex-c/response -> store response, call `AnnexCResponseVerifier.decryptToDeviceResponse(...)` in async validation job
+- [x] /annex-c/info -> return session + validation result
 
 Milestone 5: Deterministic tests
 - [ ] Load `ANNEXC-REAL-001.json`

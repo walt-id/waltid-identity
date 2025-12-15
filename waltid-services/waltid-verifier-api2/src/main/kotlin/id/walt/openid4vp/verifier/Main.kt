@@ -6,6 +6,7 @@ import id.walt.commons.ServiceMain
 import id.walt.commons.web.WebService
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
+import id.walt.openid4vp.verifier.annexc.AnnexCService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.callid.*
@@ -81,5 +82,6 @@ fun Application.configureMonitoring() {
 fun Application.verifierApi() {
     routing {
         Verifier2Service.run { registerRoute() }
+        AnnexCService.run { registerRoute() }
     }
 }

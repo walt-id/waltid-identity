@@ -7,6 +7,7 @@ Currently exposed (Milestone 1):
 - `id.walt.iso18013.annexc.AnnexC` (protocol constant)
 - `id.walt.iso18013.annexc.AnnexCResponseVerifier` (decrypt API contract)
 - `id.walt.iso18013.annexc.AnnexCResponseVerifierJvm` (JVM HPKE decrypt implementation)
+- `id.walt.iso18013.annexc.AnnexCHpkeKeyGeneratorJvm` (JVM HPKE recipient keypair generator)
 - `id.walt.iso18013.annexc.cbor.Base64UrlNoPad` (base64url helper)
 - `id.walt.iso18013.annexc.AnnexCRequestBuilder` (builds `deviceRequestB64` + `encryptionInfoB64`)
 - `id.walt.iso18013.annexc.AnnexCTranscriptBuilder` (builds `SessionTranscript` + HPKE `info`)
