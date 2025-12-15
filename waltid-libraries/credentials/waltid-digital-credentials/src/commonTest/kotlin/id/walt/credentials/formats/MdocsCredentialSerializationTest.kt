@@ -1,9 +1,9 @@
 package id.walt.credentials.formats
 
-/*import dev.mokkery.answering.returns
+import dev.mokkery.answering.returns
 import dev.mokkery.every
 import dev.mokkery.matcher.any
-import dev.mokkery.mock*/
+import dev.mokkery.mock
 import id.walt.cose.Cose
 import id.walt.cose.CoseKey
 import id.walt.mdoc.objects.digest.ValueDigest
@@ -44,7 +44,7 @@ class MdocsCredentialSerializationTest {
         signed = "invalid_hex_string_mock_test",
         docType = "org.iso.18013.5.1.mDL"
     )
-    //private val mockExtractor = mock<Function1<MdocsCredential, MobileSecurityObject?>>()
+    private val mockExtractor = mock<Function1<MdocsCredential, MobileSecurityObject?>>()
     private val json = Json {
         encodeDefaults = true
         ignoreUnknownKeys = true
@@ -58,8 +58,8 @@ class MdocsCredentialSerializationTest {
 
     @Test
     fun `json serialization should include mso field`() {
-        //every { mockExtractor.invoke(any()) } returns dummyMso
-        //MdocsCredential.msoExtractionTestHook = mockExtractor
+        every { mockExtractor.invoke(any()) } returns dummyMso
+        MdocsCredential.msoExtractionTestHook = mockExtractor
         val encodedJson = json.encodeToString(credential)
         println(encodedJson)
 
