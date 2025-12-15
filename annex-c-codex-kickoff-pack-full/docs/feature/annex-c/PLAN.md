@@ -16,8 +16,8 @@ Milestone 2: Request builder
 - [x] Expose library API that returns `{ deviceRequestB64, encryptionInfoB64 }` for `/annex-c/request`
 
 Milestone 3: Transcript + HPKE
-- [ ] Compute SessionTranscript and HPKE info
-- [ ] Implement `AnnexCResponseVerifier.decryptToDeviceResponse(...)` (HPKE decrypt to DeviceResponse bytes)
+- [x] Compute SessionTranscript and HPKE info
+- [x] Implement `AnnexCResponseVerifier.decryptToDeviceResponse(...)` (HPKE decrypt to DeviceResponse bytes)
 
 Milestone 4: Verifier2 API endpoints
 - [ ] /annex-c/create -> create session, store origin + policies

@@ -43,6 +43,10 @@ kotlin {
             implementation(project(":waltid-libraries:web:waltid-ktor-notifications-core"))
         }
 
+        jvmMain.dependencies {
+            implementation(identityLibs.bouncycastle.prov)
+        }
+
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
