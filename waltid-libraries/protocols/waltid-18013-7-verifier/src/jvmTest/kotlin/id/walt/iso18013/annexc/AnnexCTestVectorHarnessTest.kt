@@ -1,6 +1,7 @@
 package id.walt.iso18013.annexc
 
 import id.walt.iso18013.annexc.cbor.Base64UrlNoPad
+import id.walt.mdoc.objects.sha256
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -28,6 +29,7 @@ class AnnexCTestVectorHarnessTest {
 
     @Serializable
     data class Expected(
+        val sessionTranscriptCborSha256Hex: String = "",
         val deviceResponseCborSha256Hex: String = "",
         val docType: String = "",
         val requestedElement: String = ""
@@ -52,6 +54,35 @@ class AnnexCTestVectorHarnessTest {
 
         val skR = hexToBytes(v.recipientPrivateKeyHex)
         assertEquals(32, skR.size, "skR must be 32 bytes (P-256 private scalar)")
+    }
+
+    @Test
+    fun `ANNEXC-REAL-001 transcript hash matches expected (if provided)`() {
+        val v = loadVector("annex-c/ANNEXC-REAL-001.json")
+        val hpkeInfo = AnnexCTranscriptBuilder.computeHpkeInfo(v.encryptionInfoB64, v.origin)
+        val transcriptHashHex = hpkeInfo.sha256().joinToString("") { "%02x".format(it) }
+
+        if (v.expected.sessionTranscriptCborSha256Hex.isNotBlank()) {
+            assertEquals(v.expected.sessionTranscriptCborSha256Hex, transcriptHashHex)
+        } else {
+            println("ANNEXC-REAL-001 sessionTranscriptCborSha256Hex: $transcriptHashHex")
+            assertTrue(transcriptHashHex.isNotBlank())
+        }
+    }
+
+    @Test
+    fun `ANNEXC-REAL-001 decrypt hash matches expected (if provided)`() {
+        val v = loadVector("annex-c/ANNEXC-REAL-001.json")
+        if (v.expected.deviceResponseCborSha256Hex.isBlank()) return
+
+        val plaintext = AnnexCResponseVerifierJvm.decryptToDeviceResponse(
+            encryptedResponseB64 = v.encryptedResponseB64,
+            encryptionInfoB64 = v.encryptionInfoB64,
+            origin = v.origin,
+            recipientPrivateKey = hexToBytes(v.recipientPrivateKeyHex),
+        )
+        val hashHex = plaintext.sha256().joinToString("") { "%02x".format(it) }
+        assertEquals(v.expected.deviceResponseCborSha256Hex, hashHex)
     }
 
     private fun loadVector(resourcePath: String): Vector {

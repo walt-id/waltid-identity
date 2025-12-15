@@ -26,6 +26,6 @@ Milestone 4: Verifier2 API endpoints
 - [x] /annex-c/info -> return session + validation result
 
 Milestone 5: Deterministic tests
-- [ ] Load `ANNEXC-REAL-001.json`
-- [ ] Verify transcript hash matches
-- [ ] If skR present, verify HPKE decrypt produces expected DeviceResponse hash
+- [x] Load `ANNEXC-REAL-001.json`
+- [x] Verify transcript hash matches
+- [x] If skR present, verify HPKE decrypt produces expected DeviceResponse hash

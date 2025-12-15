@@ -8,6 +8,7 @@ import id.walt.iso18013.annexc.AnnexCRequestBuilder
 import id.walt.iso18013.annexc.AnnexCResponseVerifierJvm
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
 import id.walt.iso18013.annexc.cbor.Base64UrlNoPad
+import id.walt.openid4vp.verifier.annexc.openapi.AnnexCOpenApi
 import id.walt.mdoc.parser.MdocParser
 import id.walt.mdoc.verification.MdocVerifier
 import io.github.smiley4.ktoropenapi.get
@@ -150,10 +151,7 @@ object AnnexCService {
     fun Route.registerRoute() {
         route(ANNEX_C) {
             route("", { tags("Annex C (ISO 18013-7)") }) {
-                post<AnnexCCreateRequest>("create", {
-                    summary = "Create Annex C session"
-                    response { HttpStatusCode.OK to { body<AnnexCCreateResponse>() } }
-                }) { request ->
+                post<AnnexCCreateRequest>("create", AnnexCOpenApi.createDocs) { request ->
                     val ttl = (request.ttlSeconds?.seconds ?: 5.minutes)
                     val now = Clock.System.now()
                     val expiresAt = now + ttl
@@ -178,10 +176,7 @@ object AnnexCService {
                     call.respond(AnnexCCreateResponse(sessionId = session.id, expiresAt = session.expiresAt.toString()))
                 }
 
-                post<AnnexCRequestRequest>("request", {
-                    summary = "Build DeviceRequest + EncryptionInfo for DC API"
-                    response { HttpStatusCode.OK to { body<AnnexCRequestResponse>() } }
-                }) { request ->
+                post<AnnexCRequestRequest>("request", AnnexCOpenApi.requestDocs) { request ->
                     val session = getSessionOrThrow(request.sessionId)
 
                     require(!isExpired(session)) { "Session expired" }
@@ -213,10 +208,7 @@ object AnnexCService {
                     )
                 }
 
-                post<AnnexCResponseRequest>("response", {
-                    summary = "Store wallet response and start async decrypt/verify"
-                    response { HttpStatusCode.OK to { body<AnnexCResponseAck>() } }
-                }) { request ->
+                post<AnnexCResponseRequest>("response", AnnexCOpenApi.responseDocs) { request ->
                     val session = getSessionOrThrow(request.sessionId)
                     require(!isExpired(session)) { "Session expired" }
 
@@ -263,11 +255,7 @@ object AnnexCService {
                     call.respond(AnnexCResponseAck())
                 }
 
-                get("info", {
-                    summary = "Get Annex C session info"
-                    request { queryParameter<String>("sessionId") }
-                    response { HttpStatusCode.OK to { body<AnnexCInfoResponse>() } }
-                }) {
+                get("info", AnnexCOpenApi.infoDocs) {
                     val sessionId = call.request.queryParameters["sessionId"]
                         ?: throw IllegalArgumentException("Missing query parameter: sessionId")
                     val session = getSessionOrThrow(sessionId)

@@ -41,5 +41,8 @@ Transcript / HPKE binding (ISO 18013-7 Annex C):
 The JVM test harness loads `src/jvmTest/resources/annex-c/ANNEXC-REAL-001.json` and validates that the vector is
 structurally sane (base64url decode + basic fields).
 
+Deterministic HPKE test vectors:
+- `src/jvmTest/resources/annex-c/ANNEXC-DETERMINISTIC-001.json` (transcript hash + HPKE decrypt hash assertions)
+
 `recipientPrivateKeyHex` in the sample vector is generated via `id.walt.iso18013.annexc.SkrGenerator` and is only a
 placeholder for scaffolding; it does not correspond to the captured `recipientPublicKey` in `encryptionInfoB64`.
