@@ -537,19 +537,10 @@ class TestCredentialWallet(
         val kid = keyId.takeIf { DidUtils.isDidUrl(it) }?.let {
             DidService.resolveToKey(it).getOrThrow().getKeyId()
         } ?: keyId
-        
-        val walletKey = KeysService.get(kid)
-        
-        if (walletKey == null) {
-            // Try to resolve directly from DID if it's a DID URL
-            if (DidUtils.isDidUrl(keyId)) {
-                return@runCatching DidService.resolveToKey(keyId).getOrNull()
-            }
-            return@runCatching null
+
+        KeysService.get(kid)?.let {
+            KeyManager.resolveSerializedKey(it.document)
         }
-        
-        KeyManager.resolveSerializedKey(walletKey.document)
-    }.getOrElse { 
-        throw IllegalArgumentException("Could not resolve key to sign token", it) 
-    } ?: error("No key was resolved when trying to resolve key to sign token")
-}
+        }.getOrElse { throw IllegalArgumentException("Could not resolve key to sign token", it) }
+            ?: error("No key was resolved when trying to resolve key to sign token")
+    }
