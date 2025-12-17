@@ -2,7 +2,7 @@
 
 package id.walt.webwallet.service.oidc4vc
 
-import com.nimbusds.jose.jwk.ECKey
+import id.walt.cose.*
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
@@ -13,17 +13,18 @@ import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
-import id.walt.mdoc.COSECryptoProviderKeyInfo
-import id.walt.mdoc.SimpleCOSECryptoProvider
-import id.walt.mdoc.dataelement.EncodedCBORElement
-import id.walt.mdoc.dataelement.ListElement
+import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.dataelement.MapElement
-import id.walt.mdoc.dataelement.NullElement
-import id.walt.mdoc.dataretrieval.DeviceResponse
-import id.walt.mdoc.doc.MDoc
-import id.walt.mdoc.docrequest.MDocRequestBuilder
-import id.walt.mdoc.mdocauth.DeviceAuthentication
-import id.walt.oid4vc.OpenID4VP
+import id.walt.mdoc.encoding.ByteStringWrapper
+import id.walt.mdoc.encoding.MdocCbor
+import id.walt.mdoc.objects.DeviceSigned
+import id.walt.mdoc.objects.SessionTranscript
+import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.elements.DeviceNameSpaces
+import id.walt.mdoc.objects.handover.OpenID4VPHandover
+import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
+import id.walt.mdoc.objects.sha256
+import id.walt.mdoc.parser.MdocParser
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.DescriptorMapping
@@ -52,7 +53,6 @@ import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import org.cose.java.AlgorithmID
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -60,6 +60,7 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import id.walt.mdoc.objects.deviceretrieval.DeviceResponse as MdocDeviceResponse
 
 const val WALLET_PORT = 8001
 const val WALLET_BASE_URL = "http://localhost:$WALLET_PORT"
@@ -116,23 +117,36 @@ class TestCredentialWallet(
         keyId: String?,
         privKey: Key?,
     ): String = runBlocking {
+        // TODO: This still uses MapElement from the old library. 
+        // The interface needs to be updated to use the new library's types.
+        // For now, keeping the old implementation until the interface is migrated.
         fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
 
         val key = privKey ?: keyId?.let { tryResolveKeyId(it) }
         ?: throw IllegalArgumentException("No key given or found for given keyId ${debugStateMsg()}")
 
-        val ecKey = ECKey.parseFromPEMEncodedObjects(key.exportPEM()).toECKey()
-        val cryptoProvider = SimpleCOSECryptoProvider(
-            listOf(
-                COSECryptoProviderKeyInfo(
-                    keyID = key.getKeyId(),
-                    algorithmID = AlgorithmID.ECDSA_256,
-                    publicKey = ecKey.toECPublicKey(),
-                    privateKey = ecKey.toECPrivateKey()
-                )
-            )
+        // Convert MapElement to ByteArray payload
+        val payloadBytes = payload.toCBOR()
+        
+        // Convert header MapElement to CoseHeaders if provided
+        val coseHeaders = header?.let {
+            // TODO: Parse header MapElement to CoseHeaders
+            CoseHeaders()
+        } ?: CoseHeaders()
+        
+        // Create and sign CoseSign1
+        val coseSign1 = CoseSign1.createAndSign(
+            protectedHeaders = CoseHeaders(
+                algorithm = Cose.Algorithm.ES256,
+                kid = key.getKeyId().encodeToByteArray()
+            ),
+            unprotectedHeaders = coseHeaders,
+            payload = payloadBytes,
+            signer = key.toCoseSigner()
         )
-        return@runBlocking cryptoProvider.sign1(payload.toCBOR(), header, null, keyId).toCBOR().encodeToBase64Url()
+        
+        // Encode to base64Url
+        return@runBlocking coseSign1.serialize().encodeToBase64Url()
     }
 
     override fun verifyTokenSignature(target: TokenTarget, token: String): Boolean = runBlocking {
@@ -156,8 +170,40 @@ class TestCredentialWallet(
         result.isSuccess
     }
 
-    override fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean {
-        TODO("Not yet implemented")
+    override fun verifyCOSESign1Signature(target: TokenTarget, token: String): Boolean = runBlocking {
+        return@runBlocking runCatching {
+            // Decode base64Url token
+            val tokenBytes = token.base64UrlDecode()
+            
+            // Parse as CoseSign1
+            val coseSign1 = CoseSign1.fromTagged(tokenBytes)
+            
+            // Decode protected headers from ByteArray
+            val protectedHeaders = if (coseSign1.protected.isEmpty()) {
+                CoseHeaders()
+            } else {
+                coseCompliantCbor.decodeFromByteArray(CoseHeaders.serializer(), coseSign1.protected)
+            }
+            
+            // Get the key from keyMapping or resolve it
+            val keyIdBytes = protectedHeaders.kid
+                ?: coseSign1.unprotected.kid
+                ?: throw IllegalArgumentException("No key ID found in COSE Sign1 headers")
+            
+            val keyId = keyIdBytes.decodeToString()
+            val key = keyMapping[keyId] ?: tryResolveKeyId(keyId)
+                ?: throw IllegalStateException("Could not resolve key with keyId $keyId")
+            
+            // Verify the signature using CoseVerifier
+            val verifier = key.toCoseVerifier()
+            coseSign1.verify(verifier)
+        }.fold(
+            onSuccess = { it },
+            onFailure = { 
+                logger.error(it) { "Failed to verify COSE Sign1 signature: ${it.message}" }
+                false
+            }
+        )
     }
 
     override fun httpGet(url: Url, headers: Headers?): SimpleHttpResponse {
@@ -269,38 +315,63 @@ class TestCredentialWallet(
         val mDocsPresented = runBlocking {
             val matchingMDocs = matchedCredentials.filter { it.format == CredentialFormat.mso_mdoc }
             if (matchingMDocs.isNotEmpty()) {
-                val mdocHandover = OpenID4VP.generateMDocOID4VPHandover(session.authorizationRequest, session.nonce!!)
-                val ecKey = ECKey.parse(key.exportJWK()).toECKey()
-                val cryptoProvider = SimpleCOSECryptoProvider(
-                    listOf(
-                        COSECryptoProviderKeyInfo(
-                            key.getKeyId(),
-                            AlgorithmID.ECDSA_256,
-                            ecKey.toECPublicKey(),
-                            ecKey.toECPrivateKey()
-                        )
-                    )
+                // Create OpenID4VPHandoverInfo from authorization request
+                val handoverInfo = OpenID4VPHandoverInfo(
+                    clientId = session.authorizationRequest.clientId,
+                    nonce = session.nonce ?: "",
+                    jwkThumbprint = null, // TODO: Extract from request if available
+                    responseUri = session.authorizationRequest.responseUri
                 )
+                
+                // Create OpenID4VPHandover
+                val handoverInfoBytes = coseCompliantCbor.encodeToByteArray(OpenID4VPHandoverInfo.serializer(), handoverInfo)
+                val infoHash = handoverInfoBytes.sha256()
+                val handover = OpenID4VPHandover(
+                    identifier = "OpenID4VPHandover",
+                    infoHash = infoHash
+                )
+                
+                // Create SessionTranscript
+                val sessionTranscript = SessionTranscript.forOpenId(handover)
+                
                 matchingMDocs.map { cred ->
-                    val mdoc = MDoc.fromCBORHex(cred.document)
-                    mdoc.presentWithDeviceSignature(
-                        MDocRequestBuilder(mdoc.docType.value).also {
-                            session.authorizationRequest.presentationDefinition!!.inputDescriptors.forEach { inputDescriptor ->
-                                inputDescriptor.constraints!!.fields!!.forEach { field ->
-                                    field.addToMdocRequest(it)
-                                }
-                            }
-                        }.build(),
-                        DeviceAuthentication(
-                            sessionTranscript = ListElement(
-                                listOf(
-                                    NullElement(),
-                                    NullElement(), //EncodedCBORElement(ephemeralReaderKey.getPublicKeyRepresentation()),
-                                    mdocHandover
-                                )
-                            ), mdoc.docType.value, EncodedCBORElement(MapElement(mapOf()))
-                        ), cryptoProvider, key.getKeyId()
+                    // Parse the stored mdoc document
+                    val document = MdocParser.parseToDocument(cred.document)
+                    
+                    // Build device authentication bytes
+                    val deviceAuthBytes = MdocCryptoHelper.buildDeviceAuthenticationBytes(
+                        transcript = sessionTranscript,
+                        docType = document.docType,
+                        namespaces = ByteStringWrapper(DeviceNameSpaces(emptyMap()))
                     )
+                    
+                    // Sign device authentication with device key
+                    val deviceAuthCoseSign1 = CoseSign1.createAndSign(
+                        protectedHeaders = CoseHeaders(
+                            algorithm = Cose.Algorithm.ES256,
+                            kid = key.getKeyId().encodeToByteArray()
+                        ),
+                        unprotectedHeaders = CoseHeaders(),
+                        payload = deviceAuthBytes,
+                        signer = key.toCoseSigner()
+                    )
+                    
+                    // Create DeviceSigned structure (empty namespaces for now - can be extended later)
+                    val deviceSigned = DeviceSigned.fromDeviceSignedItems(
+                        namespacedItems = emptyMap<String, List<id.walt.mdoc.objects.elements.DeviceSignedItem>>(), // TODO: Filter based on presentation definition if needed
+                        deviceAuth = deviceAuthCoseSign1
+                    )
+                    
+                    // Create new Document with device signature
+                    val presentedDocument = Document(
+                        docType = document.docType,
+                        issuerSigned = document.issuerSigned,
+                        deviceSigned = deviceSigned,
+                        errors = null
+                    )
+                    
+                    // Serialize document to CBOR
+                    MdocCbor.encodeToByteArray(Document.serializer(), presentedDocument)
                 }
             } else listOf()
         }
@@ -326,8 +397,19 @@ class TestCredentialWallet(
             )
         } else null
 
-        val deviceResponse =
-            if (mDocsPresented.isNotEmpty()) mDocsPresented.let { DeviceResponse(it).toCBORBase64URL() } else null
+        val deviceResponse = if (mDocsPresented.isNotEmpty()) {
+            // Create DeviceResponse wrapper
+            val deviceResponseObj = MdocDeviceResponse(
+                version = "1.0",
+                documents = mDocsPresented.map { 
+                    MdocCbor.decodeFromByteArray(Document.serializer(), it)
+                }.toTypedArray(),
+                documentErrors = null,
+                status = 0u
+            )
+            // Serialize to CBOR and encode as base64Url
+            coseCompliantCbor.encodeToByteArray(MdocDeviceResponse.serializer(), deviceResponseObj).encodeToBase64Url()
+        } else null
 
         logger.debug("GENERATED VP: {signedJwtVP}", signedJwtVP)
 
@@ -494,8 +576,8 @@ class TestCredentialWallet(
         mdoc: String,
         rootPath: String = "$",
     ) = let {
-        val mdoc = MDoc.fromCBORHex(mdoc)
-        val type = mdoc.docType.value
+        val document = MdocParser.parseToDocument(mdoc)
+        val type = document.docType
 
         DescriptorMapping(
             id = getDescriptorId(type, presentationDefinition),
