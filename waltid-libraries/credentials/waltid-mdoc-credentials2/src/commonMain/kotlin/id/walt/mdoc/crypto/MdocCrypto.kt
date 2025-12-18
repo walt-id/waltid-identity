@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.crypto
 
 import id.walt.cose.CoseKey
@@ -11,6 +13,7 @@ import id.walt.mdoc.encoding.MdocCbor
 import id.walt.mdoc.encoding.startsWith
 import id.walt.mdoc.objects.SessionTranscript
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray

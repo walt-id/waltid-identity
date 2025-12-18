@@ -283,7 +283,7 @@ class EBSIIssueToHolderConformanceTest {
         )
 
         val credRespRaw = ktorClient.post("$taoIssuerServer/credential") {
-            bearerAuth(tokenResp.accessToken!!)
+            bearerAuth(tokenResp.accessToken)
             contentType(ContentType.Application.Json)
             setBody(credReq.toJSONString())
         }
