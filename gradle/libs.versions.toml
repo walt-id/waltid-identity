@@ -40,7 +40,7 @@ tink = "1.16.0"
 
 # Testing
 junit-jupiter = "5.11.4"
-mokkery = "3.1.0"
+mokkery = "3.1.1"
 
 # HTTP
 okio = "3.16.2"
