@@ -69,7 +69,7 @@ object AnnexCService {
     data class AnnexCRequestResponse(
         val protocol: String,
         val data: Data,
-        val meta: Meta,
+        //val meta: Meta,
     ) {
         @Serializable
         data class Data(
@@ -199,11 +199,11 @@ object AnnexCService {
                             data = AnnexCRequestResponse.Data(
                                 deviceRequest = annexRequest.deviceRequestB64,
                                 encryptionInfo = annexRequest.encryptionInfoB64
-                            ),
-                            meta = AnnexCRequestResponse.Meta(
-                                sessionId = session.id,
-                                expiresAt = session.expiresAt.toString()
                             )
+//                            ,meta = AnnexCRequestResponse.Meta(
+//                                sessionId = session.id,
+//                                expiresAt = session.expiresAt.toString()
+//                            )
                         )
                     )
                 }
