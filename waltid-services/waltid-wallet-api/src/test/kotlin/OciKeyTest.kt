@@ -2,14 +2,13 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.oci.OCIKey
 import id.walt.crypto.keys.oci.OCIsdkMetadata
 import id.walt.did.dids.DidService
-import id.walt.did.helpers.WaltidServices
 import kotlinx.coroutines.test.runTest
 
 class OciKeyTest {
 
     //    @Test // oci authentication configuration required
     fun test() = runTest {
-        WaltidServices.minimalInit()
+        DidService.minimalInit()
 
         val keyId = "ocid1.key.oc1.eu-frankfurt-1.entaeh2zaafiy.abtheljtxwi3nb5wled526ebomymdw4ytoa5hekqsbuzeg2aaee35cgidx7q"
         val vaultId = "ocid1.vault.oc1.eu-frankfurt-1.entaeh2zaafiy.abtheljss64qlgv6cxm7t4fi5dvfntfbval2ldt6yja3s4niix2hf36defua"

@@ -7,7 +7,7 @@ group = "id.walt.wallet"
 
 kotlin {
     sourceSets {
-        val ktor_version = "3.2.2"
+        val ktor_version = "3.3.3"
 
         commonMain.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")

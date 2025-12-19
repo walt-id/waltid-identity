@@ -117,7 +117,7 @@ class DidsApi(private val e2e: E2ETest, private val client: HttpClient) {
             client.post("/wallet-api/wallet/$wallet/dids/create/${payload.method}") {
                 url {
                     payload.toMap().onEach {
-                        parameters.append(it.key, it.value.toString())
+                        parameters.append(it.key, it.value)
                     }
                 }
             }.expectSuccess().apply {

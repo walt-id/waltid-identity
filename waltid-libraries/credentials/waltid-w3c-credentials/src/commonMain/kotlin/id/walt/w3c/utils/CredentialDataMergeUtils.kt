@@ -107,10 +107,6 @@ object CredentialDataMergeUtils {
                     else -> this[k] = v
                 }
             }
-
-            else -> {
-                log.debug { "Unsupported: $v" }
-            }
         }
 
         return this
