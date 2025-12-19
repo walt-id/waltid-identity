@@ -792,7 +792,11 @@ open class CIProvider(
         } ?: emptyList()
 
         val protectedHeaders = CoseHeaders(
-            algorithm = algorithm,
+            algorithm = algorithm
+        )
+        
+        // x5chain should be in unprotected headers according to COSE spec
+        val unprotectedHeaders = CoseHeaders(
             x5chain = if (x5chain.isNotEmpty()) x5chain else null
         )
 
@@ -824,7 +828,7 @@ open class CIProvider(
         
         val issuerAuth = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
-            unprotectedHeaders = CoseHeaders(),
+            unprotectedHeaders = unprotectedHeaders,
             payload = msoPayload,
             signer = coseSigner
         )

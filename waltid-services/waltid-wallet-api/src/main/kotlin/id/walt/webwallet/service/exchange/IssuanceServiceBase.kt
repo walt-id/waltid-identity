@@ -136,9 +136,14 @@ abstract class IssuanceServiceBase {
     }
 
     fun isKeyProofRequiredForOfferedCredential(offeredCredential: OfferedCredential) =
-        // Use key proof if the supported cryptographic binding method is not empty, doesn't contain DID and contains cose_key or jwk
-        (offeredCredential.cryptographicBindingMethodsSupported != null &&
-                (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
-                        offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
-                !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
+        // For mdoc credentials, always use key proof (cose_key) as per ISO 18013-5 specification
+        if (offeredCredential.format == CredentialFormat.mso_mdoc) {
+            true
+        } else {
+            // Use key proof if the supported cryptographic binding method is not empty, doesn't contain DID and contains cose_key or jwk
+            (offeredCredential.cryptographicBindingMethodsSupported != null &&
+                    (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
+                            offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
+                    !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
+        }
 }

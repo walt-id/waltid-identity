@@ -18,6 +18,8 @@ import id.walt.mdoc.dataretrieval.DeviceResponse
 import id.walt.mdoc.doc.MDocVerificationParams
 import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.mdocauth.DeviceAuthentication
+import id.walt.mdoc.verification.MdocVerifier
+import id.walt.mdoc.verification.MdocVerificationContext
 import id.walt.oid4vc.OpenID4VP
 import id.walt.oid4vc.data.*
 import id.walt.oid4vc.data.dif.PresentationDefinition
@@ -28,6 +30,8 @@ import id.walt.oid4vc.responses.TokenResponse
 import id.walt.policies.VerificationPolicy
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest
+import id.walt.policies.models.PolicyResultSurrogate
+import id.walt.policies.models.PresentationResultEntrySurrogate
 import id.walt.policies.models.PresentationVerificationResponseSurrogate
 import id.walt.policies.policies.*
 import id.walt.policies.policies.vp.HolderBindingPolicy
@@ -214,50 +218,53 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     }
 
     private fun verifyMdoc(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
-        val mdocHandoverRestored = OpenID4VP.generateMDocOID4VPHandover(
-            authorizationRequest = session.authorizationRequest!!,
-            mdocNonce = Base64.getUrlDecoder().decode(tokenResponse.jwsParts!!.header["apu"]!!.jsonPrimitive.content)
-                .decodeToString()
+        val mdocString = tokenResponse.vpToken!!.jsonPrimitive.content
+        
+        // Extract nonce from the JWT header
+        val mdocNonce = Base64.getUrlDecoder().decode(tokenResponse.jwsParts!!.header["apu"]!!.jsonPrimitive.content)
+            .decodeToString()
+        
+        // Construct verification context from session data
+        val verificationContext = MdocVerificationContext(
+            expectedNonce = mdocNonce,
+            expectedAudience = session.authorizationRequest?.clientId,
+            responseUri = session.authorizationRequest?.responseUri
         )
-
-        val parsedDeviceResponse = DeviceResponse.fromCBORBase64URL(tokenResponse.vpToken!!.jsonPrimitive.content)
-
-        val parsedMdoc = parsedDeviceResponse.documents[0]
-
-        val deviceKey = OneKey(CBORObject.DecodeFromBytes(parsedMdoc.MSO!!.deviceKeyInfo.deviceKey.toCBOR()))
-
-        val issuerKey = parsedMdoc.issuerSigned.issuerAuth?.x5Chain?.first().let { X509CertUtils.parse(it) }?.publicKey
-            ?: throw BadRequestException("Issuer's Public Key Missing: The x5c header in the JWT is either missing or does not contain the expected X.509 certificate chain. Please ensure that the x5c header is correctly formatted and includes the issuer’s public key")
-
-        return parsedMdoc.verify(
-            MDocVerificationParams(
-                verificationTypes = VerificationType.forPresentation,
-                issuerKeyID = "ISSUER_KEY_ID",
-                deviceKeyID = "DEVICE_KEY_ID",
-                deviceAuthentication = DeviceAuthentication(
-                    sessionTranscript = ListElement(listOf(NullElement(), NullElement(), mdocHandoverRestored)),
-                    docType = session.authorizationRequest!!.presentationDefinition?.inputDescriptors?.first()?.id!!,
-                    deviceNameSpaces = EncodedCBORElement(MapElement(mapOf()))
+        
+        // Use the new library's verifier
+        val verificationResult = runBlocking {
+            MdocVerifier.verify(mdocString, verificationContext)
+        }
+        
+        // Store verification errors in policyResults for better error reporting
+        if (!verificationResult.valid && verificationResult.errors.isNotEmpty()) {
+            // Create a minimal policy result structure with mdoc verification errors
+            val mdocPolicyResults = verificationResult.errors.map { error ->
+                PolicyResultSurrogate(
+                    policy = "mdoc-verification",
+                    description = error,
+                    args = null,
+                    isSuccess = false,
+                    result = null,
+                    error = JsonPrimitive(error)
                 )
-            ), SimpleCOSECryptoProvider(
-                listOf(
-                    COSECryptoProviderKeyInfo(
-                        keyID = "ISSUER_KEY_ID",
-                        algorithmID = AlgorithmID.ECDSA_256,
-                        publicKey = issuerKey,
-                        privateKey = null,
-                        x5Chain = listOf(),
-                        trustedRootCAs = getAdditionalTrustedRootCAs(session)
-                    ),
-                    COSECryptoProviderKeyInfo(
-                        keyID = "DEVICE_KEY_ID",
-                        algorithmID = AlgorithmID.ECDSA_256,
-                        publicKey = deviceKey.AsPublicKey(),
-                        privateKey = null
-                    )
-                )
+            }
+            
+            val mdocPresentationResult = PresentationResultEntrySurrogate(
+                credential = verificationResult.docType,
+                policyResults = mdocPolicyResults
             )
-        )
+            
+            policyResults[session.id] = PresentationVerificationResponseSurrogate(
+                results = listOf(mdocPresentationResult),
+                time = kotlin.time.Duration.ZERO,
+                policiesRun = verificationResult.errors.size,
+                policiesSuccessful = 0,
+                policiesFailed = verificationResult.errors.size
+            )
+        }
+        
+        return verificationResult.valid
     }
 
     override fun initializeAuthorization(

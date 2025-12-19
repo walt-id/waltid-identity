@@ -4,9 +4,14 @@ package id.walt.verifier.oidc.models.presentedcredentials
 
 import com.nimbusds.jose.util.X509CertUtils
 import com.upokecenter.cbor.CBORObject
+import id.walt.cose.CoseHeaders
+import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import kotlinx.serialization.builtins.ByteArraySerializer
+import kotlinx.serialization.encodeToHexString
 import id.walt.mdoc.dataelement.DataElement
 import id.walt.mdoc.dataelement.EncodedCBORElement
 import id.walt.mdoc.dataelement.MapElement
@@ -17,12 +22,21 @@ import id.walt.mdoc.dataretrieval.DeviceResponse
 import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.mdoc.mso.MSO
 import id.walt.mdoc.mso.ValidityInfo
+import id.walt.mdoc.objects.deviceretrieval.DeviceResponse as Mdoc2DeviceResponse
+import id.walt.mdoc.objects.document.Document as Mdoc2Document
+import id.walt.mdoc.objects.mso.MobileSecurityObject as Mdoc2MobileSecurityObject
+import id.walt.mdoc.objects.mso.ValidityInfo as Mdoc2ValidityInfo
+import id.walt.mdoc.parser.MdocParser
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.putJsonObject
 import org.cose.java.OneKey
 import kotlin.time.ExperimentalTime
 
@@ -63,6 +77,17 @@ object PresentedMsoMdocViewModeFormatter {
             }
         ).toTypedArray()
     )
+    
+    private fun mapTransformValidityInfoNew(
+        validityInfo: Mdoc2ValidityInfo,
+    ): Map<String, JsonElement> = buildMap {
+        put("signed", validityInfo.signed.toString().toJsonElement())
+        put("validFrom", validityInfo.validFrom.toString().toJsonElement())
+        put("validUntil", validityInfo.validUntil.toString().toJsonElement())
+        validityInfo.expectedUpdate?.let {
+            put("expectedUpdate", it.toString().toJsonElement())
+        }
+    }
 
     private fun transformMdocNamespaces(
         nameSpaces: Map<String, List<EncodedCBORElement>>,
@@ -80,7 +105,43 @@ object PresentedMsoMdocViewModeFormatter {
 
     private fun createPresentedMsoMdocSimpleViewMode(
         base64UrlDeviceResponse: String,
-    ) = DeviceResponse.fromCBORBase64URL(base64UrlDeviceResponse).let { deviceResponse ->
+    ) = runBlocking {
+        // Try parsing with new library first, fallback to old library for backward compatibility
+        val parsedWithNewLibrary = runCatching {
+            // Try parsing with MdocParser (handles both DeviceResponse and Document)
+            val parsedDocument = MdocParser.parseToDocument(base64UrlDeviceResponse)
+            // Construct a DeviceResponse from the document for the view mode
+            val deviceResponse = Mdoc2DeviceResponse(
+                version = "1.0",
+                documents = arrayOf(parsedDocument),
+                status = 0u
+            )
+            
+            val document = deviceResponse.documents?.firstOrNull() 
+                ?: throw IllegalArgumentException("No documents in DeviceResponse")
+            val mso = document.issuerSigned.decodeMobileSecurityObject()
+            
+            PresentedMsoMdocSimpleViewMode(
+                version = deviceResponse.version,
+                status = deviceResponse.status.toInt(),
+                documents = deviceResponse.documents?.map { doc ->
+                    val docMso = doc.issuerSigned.decodeMobileSecurityObject()
+                    MdocSimpleViewMode(
+                        docType = doc.docType,
+                        nameSpaces = doc.issuerSigned.namespacesToJson().jsonObject.toMap().mapValues { (_, v) ->
+                            (v as JsonObject).toMap()
+                        },
+                        certificateChain = extractX5cFromNewLibrary(doc),
+                        validityInfo = mapTransformValidityInfoNew(docMso.validityInfo),
+                        deviceKey = extractDeviceKeyFromNewLibrary(docMso),
+                    )
+                } ?: emptyList(),
+            )
+        }
+        
+        parsedWithNewLibrary.getOrElse {
+            // Fallback to old library parser for backward compatibility
+            DeviceResponse.fromCBORBase64URL(base64UrlDeviceResponse).let { deviceResponse ->
         PresentedMsoMdocSimpleViewMode(
             version = deviceResponse.version.value,
             status = deviceResponse.status.value.toInt(),
@@ -90,18 +151,144 @@ object PresentedMsoMdocViewModeFormatter {
                     nameSpaces = transformMdocNamespaces(mDoc.issuerSigned.nameSpaces ?: emptyMap()),
                     certificateChain = parseX5cFromIssuerSigned(mDoc.issuerSigned),
                     validityInfo = mapTransformValidityInfo(mDoc.MSO!!.validityInfo),
-                    deviceKey = runBlocking {
-                        parseDeviceKeyJsonFromMso(mDoc.MSO!!)
+                            deviceKey = parseDeviceKeyJsonFromMso(mDoc.MSO!!),
+                        )
                     },
                 )
-            },
-        )
-
+            }
+        }
+    }
+    
+    private suspend fun extractX5cFromNewLibrary(document: Mdoc2Document): List<String> {
+        val issuerAuth = document.issuerSigned.issuerAuth
+        return issuerAuth.unprotected.x5chain?.map { cert ->
+            X509CertUtils.parse(cert.rawBytes).let {
+                X509CertUtils.toPEMString(it)
+            }
+        } ?: emptyList()
+    }
+    
+    private suspend fun extractDeviceKeyFromNewLibrary(mso: Mdoc2MobileSecurityObject): JsonObject {
+        val deviceKeyJwk = mso.deviceKeyInfo.deviceKey.toJWK()
+        val deviceKey = JWKKey.importJWK(Json.encodeToString(deviceKeyJwk)).getOrThrow()
+        return deviceKey.exportJWKObject()
     }
 
     private fun createPresentedMsoMdocVerboseViewMode(
         base64UrlDeviceResponse: String,
-    ) = DeviceResponse.fromCBORBase64URL(base64UrlDeviceResponse).let { deviceResponse ->
+    ) = runBlocking {
+        // Try parsing with new library first, fallback to old library for backward compatibility
+        val parsedWithNewLibrary = runCatching {
+            // Try parsing with MdocParser (handles both DeviceResponse and Document)
+            val document = MdocParser.parseToDocument(base64UrlDeviceResponse)
+            // Construct a DeviceResponse from the document for the view mode
+            val deviceResponse = Mdoc2DeviceResponse(
+                version = "1.0",
+                documents = arrayOf(document),
+                status = 0u
+            )
+            
+            PresentedMsoMdocVerboseViewMode(
+                raw = base64UrlDeviceResponse,
+                version = deviceResponse.version,
+                status = deviceResponse.status.toInt(),
+                documents = deviceResponse.documents?.map { doc ->
+                    val mso = doc.issuerSigned.decodeMobileSecurityObject()
+                    val issuerAuth = doc.issuerSigned.issuerAuth
+                    // Parse protected headers - if empty, use default headers
+                    val protectedHeaders = if (issuerAuth.protected.isEmpty()) {
+                        CoseHeaders()
+                    } else {
+                        // Use the same approach as MdocParser - decode using coseCompliantCbor
+                        // Since we can't directly access Cbor, we'll parse it through the Document's issuerAuth
+                        // For now, create empty headers and extract algorithm from issuerAuth if needed
+                        CoseHeaders() // TODO: Parse protected headers properly when Cbor is accessible
+                    }
+                    
+                    val issuerSignedNamespacesJson = doc.issuerSigned.namespacesToJson()
+                    
+                    MdocVerboseViewMode(
+                        docType = doc.docType,
+                        issuerSigned = IssuerSignedParsed(
+                            nameSpaces = issuerSignedNamespacesJson.jsonObject.toMap().mapValues { (_, v) ->
+                                (v as JsonObject).toMap()
+                            },
+                            issuerAuth = IssuerAuthParsed(
+                                x5c = extractX5cFromNewLibrary(doc),
+                                algorithm = protectedHeaders.algorithm ?: -1,
+                                protectedHeader = buildMap<String, JsonElement> {
+                                    protectedHeaders.algorithm?.let { put("alg", it.toJsonElement()) }
+                                    protectedHeaders.kid?.let { put("kid", it.decodeToString().toJsonElement()) }
+                                },
+                                payload = MsoParsed(
+                                    docType = mso.docType,
+                                    version = mso.version,
+                                    digestAlgorithm = mso.digestAlgorithm,
+                                    valueDigests = buildMap<String, JsonElement> {
+                                        mso.valueDigests.forEach { (namespace, digests) ->
+                                            put(namespace, buildMap<String, JsonElement> {
+                                                digests.entries.forEach { digest ->
+                                                    put(digest.key.toString(), JsonPrimitive(digest.value.joinToString("") { "%02x".format(it) }))
+                                                }
+                                            }.let { map -> buildJsonObject { map.forEach { (k, v) -> put(k, v) } } })
+                                        }
+                                    },
+                                    validityInfo = mapTransformValidityInfoNew(mso.validityInfo),
+                                    deviceKeyInfo = buildMap<String, JsonElement> {
+                                        put("deviceKey", extractDeviceKeyFromNewLibrary(mso))
+                                        mso.deviceKeyInfo.keyInfo?.let {
+                                            put("keyInfo", buildJsonObject {
+                                                it.forEach { (k, v) -> put(k.toString(), JsonPrimitive(v)) }
+                                            })
+                                        }
+                                        mso.deviceKeyInfo.keyAuthorizations?.let {
+                                            put("keyAuthorizations", Json.encodeToJsonElement(
+                                                id.walt.mdoc.objects.mso.KeyAuthorization.serializer(),
+                                                it
+                                            ))
+                                        }
+                                    },
+                                    status = mso.status?.let { 
+                                        Json.encodeToJsonElement(
+                                            id.walt.mdoc.objects.mso.Status.serializer(),
+                                            it
+                                        )
+                                    },
+                                ),
+                            ),
+                        ),
+                        deviceSigned = doc.deviceSigned?.let { deviceSigned ->
+                            DeviceSignedParsed(
+                                nameSpaces = deviceSigned.namespaces.value.namespacesToJson().jsonObject.toMap(),
+                                deviceAuth = buildMap<String, JsonElement> {
+                                    deviceSigned.deviceAuth.deviceSignature?.let {
+                                        put("deviceSignature", JsonPrimitive(it.serialize().joinToString("") { "%02x".format(it) }))
+                                    }
+                                    deviceSigned.deviceAuth.deviceMac?.let {
+                                        put("deviceMac", JsonPrimitive(it.toTagged().joinToString("") { "%02x".format(it) }))
+                                    }
+                                },
+                            )
+                        },
+                        errors = doc.errors?.let { 
+                            buildJsonObject {
+                                it.forEach { (namespace, errors) ->
+                                    putJsonObject(namespace) {
+                                        errors.forEach { (elementId, errorCode) ->
+                                            put(elementId, JsonPrimitive(errorCode))
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    )
+                } ?: emptyList(),
+            )
+        }
+        
+        parsedWithNewLibrary.getOrElse {
+            // Fallback to old library parser for backward compatibility
+            DeviceResponse.fromCBORBase64URL(base64UrlDeviceResponse).let { deviceResponse ->
         PresentedMsoMdocVerboseViewMode(
             raw = base64UrlDeviceResponse,
             version = deviceResponse.version.value,
@@ -126,9 +313,7 @@ object PresentedMsoMdocViewModeFormatter {
                                     valueDigests = mso.valueDigests.toUIJson().jsonObject.toMap(),
                                     validityInfo = mapTransformValidityInfo(mso.validityInfo),
                                     deviceKeyInfo = buildMap {
-                                        put("deviceKey", runBlocking {
-                                            parseDeviceKeyJsonFromMso(mso)
-                                        }.toJsonElement())
+                                                put("deviceKey", parseDeviceKeyJsonFromMso(mso).toJsonElement())
                                         mso.deviceKeyInfo.keyInfo?.let {
                                             put("keyInfo", it.toUIJson())
                                         }
@@ -151,6 +336,8 @@ object PresentedMsoMdocViewModeFormatter {
                 )
             },
         )
+            }
+        }
     }
 
     fun fromDeviceResponseString(

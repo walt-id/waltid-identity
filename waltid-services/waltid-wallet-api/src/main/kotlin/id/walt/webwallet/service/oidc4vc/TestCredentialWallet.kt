@@ -13,6 +13,9 @@ import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
+import com.nimbusds.jose.jwk.ECKey
+import id.walt.mdoc.COSECryptoProviderKeyInfo
+import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.encoding.ByteStringWrapper
@@ -25,6 +28,8 @@ import id.walt.mdoc.objects.handover.OpenID4VPHandover
 import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
 import id.walt.mdoc.parser.MdocParser
+import org.cose.java.AlgorithmID
+import org.cose.java.OneKey
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.DescriptorMapping
@@ -117,36 +122,47 @@ class TestCredentialWallet(
         keyId: String?,
         privKey: Key?,
     ): String = runBlocking {
-        // TODO: This still uses MapElement from the old library. 
-        // The interface needs to be updated to use the new library's types.
-        // For now, keeping the old implementation until the interface is migrated.
+        // For CWT proofs, we need to use the old library's SimpleCOSECryptoProvider
+        // because the issuer still uses the old library's COSESign1Utils.extractHolderKey to parse it.
+        // The header parameter contains the coseKey in the old library's MapElement format.
         fun debugStateMsg() = "(target: $target, payload: $payload, header: $header, keyId: $keyId)"
 
         val key = privKey ?: keyId?.let { tryResolveKeyId(it) }
         ?: throw IllegalArgumentException("No key given or found for given keyId ${debugStateMsg()}")
 
-        // Convert MapElement to ByteArray payload
-        val payloadBytes = payload.toCBOR()
+        // Convert Key to old library's OneKey format
+        val oneKey = OneKey(
+            ECKey.parse(key.getPublicKey().exportJWK()).toECPublicKey(),
+            if (key.hasPrivateKey) ECKey.parse(key.exportJWK()).toECPrivateKey() else null
+        )
         
-        // Convert header MapElement to CoseHeaders if provided
-        val coseHeaders = header?.let {
-            // TODO: Parse header MapElement to CoseHeaders
-            CoseHeaders()
-        } ?: CoseHeaders()
+        // Create COSECryptoProviderKeyInfo for signing
+        val keyInfo = COSECryptoProviderKeyInfo(
+            keyID = key.getKeyId(),
+            algorithmID = AlgorithmID.ECDSA_256,
+            publicKey = oneKey.AsPublicKey(),
+            privateKey = oneKey.AsPrivateKey()
+        )
         
-        // Create and sign CoseSign1
-        val coseSign1 = CoseSign1.createAndSign(
-            protectedHeaders = CoseHeaders(
-                algorithm = Cose.Algorithm.ES256,
-                kid = key.getKeyId().encodeToByteArray()
-            ),
-            unprotectedHeaders = coseHeaders,
-            payload = payloadBytes,
-            signer = key.toCoseSigner()
+        // Create SimpleCOSECryptoProvider with the key
+        val cryptoProvider = SimpleCOSECryptoProvider(listOf(keyInfo))
+        
+        // Use the provided header (which contains coseKey) or create empty headers
+        // Note: CWTProofBuilder passes headers as headersProtected, so we do the same here
+        val headersToUse = header ?: MapElement(emptyMap())
+        
+        // Sign using the old library's crypto provider
+        // The headers (including coseKey) must be in headersProtected because
+        // COSESign1Utils.extractHolderKey looks in the protected headers
+        val signedCoseSign1 = cryptoProvider.sign1(
+            payload = payload.toCBOR(),
+            headersProtected = headersToUse, // Headers with coseKey go here
+            headersUnprotected = null,
+            keyID = key.getKeyId()
         )
         
         // Encode to base64Url
-        return@runBlocking coseSign1.serialize().encodeToBase64Url()
+        return@runBlocking signedCoseSign1.toCBOR().encodeToBase64Url()
     }
 
     override fun verifyTokenSignature(target: TokenTarget, token: String): Boolean = runBlocking {
@@ -346,13 +362,15 @@ class TestCredentialWallet(
                     )
                     
                     // Sign device authentication with device key
-                    val deviceAuthCoseSign1 = CoseSign1.createAndSign(
+                    // According to ISO 18013-5:2021, device signatures must use detached payload (payload = null)
+                    // The DeviceAuthenticationBytes are verified separately as a detached payload
+                    val deviceAuthCoseSign1 = CoseSign1.createAndSignDetached(
                         protectedHeaders = CoseHeaders(
                             algorithm = Cose.Algorithm.ES256,
                             kid = key.getKeyId().encodeToByteArray()
                         ),
                         unprotectedHeaders = CoseHeaders(),
-                        payload = deviceAuthBytes,
+                        detachedPayload = deviceAuthBytes,
                         signer = key.toCoseSigner()
                     )
                     
