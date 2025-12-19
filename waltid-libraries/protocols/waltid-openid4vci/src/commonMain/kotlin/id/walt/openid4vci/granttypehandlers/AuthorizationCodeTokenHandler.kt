@@ -6,6 +6,9 @@ import id.walt.openid4vci.TokenEndpointResult
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.request.AccessTokenRequest
 import id.walt.openid4vci.tokens.TokenService
+import id.walt.openid4vci.tokens.defaultAccessTokenClaims
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Token endpoint handler for the authorization-code/preauthorized code grant.
@@ -14,7 +17,7 @@ import id.walt.openid4vci.tokens.TokenService
  */
 class AuthorizationCodeTokenHandler(
     private val codeRepository: AuthorizationCodeRepository,
-    private val tokenService: TokenService = TokenService(),
+    private val tokenService: TokenService,
 ) : TokenEndpointHandler {
 
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
@@ -55,7 +58,22 @@ class AuthorizationCodeTokenHandler(
         record.grantedScopes.forEach(request::grantScope)
         record.grantedAudience.forEach(request::grantAudience)
 
-        val accessToken = tokenService.createAccessToken(client.id, code)
+        val expiresAt = request.getSession()?.getExpiresAt(id.walt.openid4vci.TokenType.ACCESS_TOKEN)
+            ?: Clock.System.now()
+
+        val claims = defaultAccessTokenClaims(
+            subject = request.getSession()?.getSubject() ?: client.id,
+            issuer = request.getIssuerId() ?: client.id,
+            audience = request.getGrantedAudience().toSet().firstOrNull(),
+            scopes = request.getGrantedScopes().toSet(),
+            expiresAt = expiresAt,
+            additional = mapOf(
+                "client_id" to client.id,
+                "code" to code,
+            ),
+        )
+
+        val accessToken = tokenService.createAccessToken(claims)
 
         return TokenEndpointResult.Success(
             accessToken = accessToken,

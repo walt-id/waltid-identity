@@ -9,8 +9,10 @@ import id.walt.openid4vci.newArguments
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.request.AccessTokenRequest
 import id.walt.openid4vci.tokens.TokenService
+import id.walt.openid4vci.tokens.defaultAccessTokenClaims
 import kotlin.time.Instant
 import kotlin.time.ExperimentalTime
+import kotlin.time.Clock
 
 /**
  * Token endpoint handler for the OpenID4VCI pre-authorized code grant.
@@ -19,7 +21,7 @@ import kotlin.time.ExperimentalTime
  */
 class PreAuthorizedCodeTokenHandler(
     private val codeRepository: PreAuthorizedCodeRepository,
-    private val tokenService: TokenService = TokenService(),
+    private val tokenService: TokenService,
 ) : TokenEndpointHandler {
 
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
@@ -86,7 +88,22 @@ class PreAuthorizedCodeTokenHandler(
             )
         }
 
-        val accessToken = tokenService.createAccessToken(clientId, code)
+        val expiresAt = request.getSession()?.getExpiresAt(id.walt.openid4vci.TokenType.ACCESS_TOKEN)
+            ?: Clock.System.now()
+
+        val claims = defaultAccessTokenClaims(
+            subject = request.getSession()?.getSubject() ?: clientId,
+            issuer = request.getIssuerId() ?: clientId,
+            audience = request.getGrantedAudience().toSet().firstOrNull(),
+            scopes = request.getGrantedScopes().toSet(),
+            expiresAt = expiresAt,
+            additional = buildMap<String, Any?> {
+                put("client_id", clientId)
+                put("pre_authorized_code", code)
+            },
+        )
+
+        val accessToken = tokenService.createAccessToken(claims)
 
         val extra = buildMap<String, Any?> {
             consumed.credentialNonce?.let { put("c_nonce", it) }
@@ -103,7 +120,7 @@ class PreAuthorizedCodeTokenHandler(
 
     @OptIn(ExperimentalTime::class)
     private fun computeRemainingSeconds(expiresAt: Instant): Long {
-        val remaining = expiresAt - kotlin.time.Clock.System.now()
+        val remaining = expiresAt - Clock.System.now()
         return if (remaining.isNegative()) 0 else remaining.inWholeSeconds
     }
 }

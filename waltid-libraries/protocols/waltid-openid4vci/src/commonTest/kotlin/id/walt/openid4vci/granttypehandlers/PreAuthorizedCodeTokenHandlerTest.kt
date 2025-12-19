@@ -3,6 +3,7 @@ package id.walt.openid4vci.granttypehandlers
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.GRANT_TYPE_PRE_AUTHORIZED_CODE
+import id.walt.openid4vci.StubTokenService
 import id.walt.openid4vci.TokenEndpointResult
 import id.walt.openid4vci.argumentsOf
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
@@ -25,7 +26,7 @@ class PreAuthorizedCodeTokenHandlerTest {
     private val issuerId = "test-issuer"
 
     private val repository = InMemoryPreAuthorizedCodeRepository()
-    private val handler = PreAuthorizedCodeTokenHandler(repository, TokenService())
+    private val handler = PreAuthorizedCodeTokenHandler(repository, StubTokenService())
     private val issuer = DefaultPreAuthorizedCodeIssuer(repository)
 
     @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)

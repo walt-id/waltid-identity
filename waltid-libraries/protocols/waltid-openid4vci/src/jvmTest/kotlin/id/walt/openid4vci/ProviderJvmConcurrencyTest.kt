@@ -65,42 +65,42 @@ internal suspend fun executeAuthorizationCodeFlow(
     provider: OAuth2Provider,
     iteration: Int,
     idx: Int,
-    ): String {
-        val expectedSubject = "subject-$iteration-$idx"
-        val clientId = "concurrent-client-$iteration-$idx"
-        val state = "state-$iteration-$idx"
-        val issuerId = "issuer-$iteration"
-        val authorizeParams = mapOf(
-            "response_type" to "code",
-            "client_id" to clientId,
+): String {
+    val expectedSubject = "subject-$iteration-$idx"
+    val clientId = "concurrent-client-$iteration-$idx"
+    val state = "state-$iteration-$idx"
+    val issuerId = "issuer-$iteration"
+    val authorizeParams = mapOf(
+        "response_type" to "code",
+        "client_id" to clientId,
         "redirect_uri" to "https://client.example/callback",
         "scope" to "myscope",
         "state" to state,
     )
 
-        val authorizeRequest = provider.createAuthorizeRequest(authorizeParams)
-        require(authorizeRequest is AuthorizeRequestResult.Success)
-        authorizeRequest.request.setIssuerId(issuerId)
+    val authorizeRequest = provider.createAuthorizeRequest(authorizeParams)
+    require(authorizeRequest is AuthorizeRequestResult.Success)
+    authorizeRequest.request.setIssuerId(issuerId)
 
-        val authorizeResponse = provider.createAuthorizeResponse(
-            authorizeRequest.request,
-            DefaultSession(subject = expectedSubject),
-        )
+    val authorizeResponse = provider.createAuthorizeResponse(
+        authorizeRequest.request,
+        DefaultSession(subject = expectedSubject),
+    )
     require(authorizeResponse is AuthorizeResponseResult.Success)
     val code = authorizeResponse.response.parameters.getValue("code")
 
-        val accessRequestResult = provider.createAccessRequest(
-            mapOf(
-                "grant_type" to GRANT_TYPE_AUTHORIZATION_CODE,
-                "client_id" to clientId,
-                "code" to code,
-                "redirect_uri" to "https://client.example/callback",
-            ),
-            DefaultSession(),
-        )
-        require(accessRequestResult is AccessRequestResult.Success)
-        accessRequestResult.request.setIssuerId(issuerId)
-        val accessResponse = provider.createAccessResponse(accessRequestResult.request)
+    val accessRequestResult = provider.createAccessRequest(
+        mapOf(
+            "grant_type" to GRANT_TYPE_AUTHORIZATION_CODE,
+            "client_id" to clientId,
+            "code" to code,
+            "redirect_uri" to "https://client.example/callback",
+        ),
+        DefaultSession(),
+    )
+    require(accessRequestResult is AccessRequestResult.Success)
+    accessRequestResult.request.setIssuerId(issuerId)
+    val accessResponse = provider.createAccessResponse(accessRequestResult.request)
     require(accessResponse is AccessResponseResult.Success)
 
     assertEquals(expectedSubject, accessRequestResult.request.getSession()?.getSubject())

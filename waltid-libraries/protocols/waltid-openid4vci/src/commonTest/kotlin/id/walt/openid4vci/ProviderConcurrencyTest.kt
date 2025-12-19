@@ -21,7 +21,7 @@ package id.walt.openid4vci
 //class ProviderConcurrencyTest {
 //
 //    /**
-//     * Deterministic stress test mirroring the compose module: fast regression guard without real threads so it runs on
+//     * Deterministic stress test without real threads so it runs on
 //     * every platform/CI configuration.
 //     */
 //    @OptIn(ExperimentalCoroutinesApi::class)

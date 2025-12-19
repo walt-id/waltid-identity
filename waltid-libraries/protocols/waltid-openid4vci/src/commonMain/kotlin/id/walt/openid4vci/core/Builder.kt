@@ -3,7 +3,6 @@ package id.walt.openid4vci.core
 import id.walt.openid4vci.granttypehandlers.AuthorizationCodeAuthorizeHandler
 import id.walt.openid4vci.granttypehandlers.AuthorizationCodeTokenHandler
 import id.walt.openid4vci.granttypehandlers.PreAuthorizedCodeTokenHandler
-import id.walt.openid4vci.tokens.TokenService
 
 /**
  * Entry point for consumers to obtain the OAuth provider.
@@ -66,7 +65,7 @@ private fun registerDefaultHandlers(
 
         val authorizeTokenHandler = AuthorizationCodeTokenHandler(
             codeRepository = config.authorizationCodeRepository,
-            tokenService = TokenService(),
+            tokenService = config.tokenService,
         )
         config.tokenEndpointHandlers.append(authorizeTokenHandler)
     }
@@ -74,7 +73,7 @@ private fun registerDefaultHandlers(
     if (includePreAuthorizedCodeDefaultHandlers) {
         val preAuthorizedTokenHandler = PreAuthorizedCodeTokenHandler(
             codeRepository = config.preAuthorizedCodeRepository,
-            tokenService = TokenService(),
+            tokenService = config.tokenService,
         )
         config.tokenEndpointHandlers.append(preAuthorizedTokenHandler)
     }
