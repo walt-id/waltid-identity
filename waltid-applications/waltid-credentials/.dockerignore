@@ -1,6 +1,6 @@
 .idea
 .nuxt
-#.output
+.output
 .run
 node_modules
 *.md
@@ -17,3 +17,5 @@ helm-charts
 .env
 .editorconfig
 coverage*
+.npmrc
+.yarnrc

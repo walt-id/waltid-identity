@@ -686,7 +686,7 @@ class OpenId4VciTest {
 
         println("// -------- CREDENTIAL ISSUER ----------")
         // Issuer Client extracts Access Token from header
-        OpenID4VCI.verifyToken(tokenResponse.accessToken.toString(), ISSUER_TOKEN_KEY.getPublicKey())
+        OpenID4VCI.verifyToken(tokenResponse.accessToken, ISSUER_TOKEN_KEY.getPublicKey())
 
         //Then VC Stuff
 

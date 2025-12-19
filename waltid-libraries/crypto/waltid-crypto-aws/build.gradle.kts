@@ -19,7 +19,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
     // AWS
-    implementation("aws.sdk.kotlin:kms:1.4.22")
+    implementation("aws.sdk.kotlin:kms-jvm:1.5.103")
 
     // JOSE
     implementation("com.nimbusds:nimbus-jose-jwt:10.6")

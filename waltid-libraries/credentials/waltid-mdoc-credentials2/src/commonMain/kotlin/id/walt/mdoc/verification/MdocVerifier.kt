@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.verification
 
 import id.walt.cose.CoseCertificate
@@ -16,6 +18,7 @@ import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.parser.MdocParser
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.json.JsonObject
 import kotlin.io.encoding.Base64
@@ -132,7 +135,7 @@ object MdocVerifier {
         val x5c = issuerAuth.unprotected.x5chain
         requireNotNull(x5c) { "Missing certificate chain in mdocs credential" }
 
-        val signerCertificateBytes = x5c.first()?.rawBytes
+        val signerCertificateBytes = x5c.first().rawBytes
             ?: throw IllegalArgumentException("Missing signer certificate in x5chain.")
 
         log.trace {

@@ -52,7 +52,6 @@ object JsonObjectUtils {
 
                 is JsonObject -> updateJsonObjectPlaceholders(element, placeholder, valueSeparator, *placeholderValue)
                 is JsonArray -> updateJsonArrayPlaceholders(element, placeholder, valueSeparator, *placeholderValue)
-                else -> element
             }
         }
         return JsonArray(updatedList)

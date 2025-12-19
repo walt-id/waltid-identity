@@ -2,7 +2,6 @@ package id.walt.did
 
 import id.walt.crypto.keys.tse.TSEKeyMetadata
 import id.walt.did.dids.DidService
-import id.walt.did.helpers.WaltidServices
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*

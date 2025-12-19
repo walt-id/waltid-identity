@@ -7,7 +7,7 @@ plugins {
 group = "id.walt.protocols"
 
 kotlin {
-    val ktor_version = "3.2.2"
+    val ktor_version = "3.3.3"
 
     sourceSets {
         commonMain.dependencies {

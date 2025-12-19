@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.encoding
 
 import id.walt.cose.coseCompliantCbor

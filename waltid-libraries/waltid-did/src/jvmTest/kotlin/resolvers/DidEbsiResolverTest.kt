@@ -46,9 +46,9 @@ class DidEbsiResolverTest : DidResolverTestBase() {
     @ParameterizedTest
     @MethodSource
     override fun `given a did String, when calling resolve, then the result is a valid did document`(
-        did: String, key: JsonObject, assert: resolverAssertion<DidDocument>
+        did: String, key: JsonObject, resolverAssertion: resolverAssertion<DidDocument>
     ) {
-        super.`given a did String, when calling resolve, then the result is a valid did document`(did, key, assert)
+        super.`given a did String, when calling resolve, then the result is a valid did document`(did, key, resolverAssertion)
     }
 
 
@@ -58,9 +58,9 @@ class DidEbsiResolverTest : DidResolverTestBase() {
     override fun `given a did String, when calling resolveToKey, then the result is valid key`(
         did: String,
         key: JsonObject,
-        assert: resolverAssertion<Key>
+        resolverAssertion: resolverAssertion<Key>
     ) {
-        super.`given a did String, when calling resolveToKey, then the result is valid key`(did, key, assert)
+        super.`given a did String, when calling resolveToKey, then the result is valid key`(did, key, resolverAssertion)
     }
 
     companion object {

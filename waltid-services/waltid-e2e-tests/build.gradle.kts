@@ -5,7 +5,7 @@ plugins {
 group = "id.walt"
 
 dependencies {
-    val ktorVersion = "3.2.2"
+    val ktorVersion = "3.3.3"
 
     // Testing
     testImplementation(kotlin("test"))

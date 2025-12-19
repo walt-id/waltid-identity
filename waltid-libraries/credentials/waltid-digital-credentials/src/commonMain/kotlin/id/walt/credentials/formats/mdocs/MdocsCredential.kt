@@ -95,7 +95,7 @@ data class MdocsCredential(
     }
 
     suspend fun verify(): Result<JsonElement> {
-        val signerKey = getSignerKey() ?: throw IllegalArgumentException("Missing signer key for mdocs credential")
+        val signerKey = getSignerKey()
         return verify(signerKey)
     }
 

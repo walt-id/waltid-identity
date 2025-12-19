@@ -13,7 +13,7 @@ kotlin {
         outputModuleName = "verification-policies"
     }
 
-    val ktor_version = "3.2.2"
+    val ktor_version = "3.3.3"
     sourceSets {
         commonMain.dependencies {
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")

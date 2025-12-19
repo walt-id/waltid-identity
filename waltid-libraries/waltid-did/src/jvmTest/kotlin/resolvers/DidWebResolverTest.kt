@@ -25,9 +25,9 @@ class DidWebResolverTest : DidResolverTestBase() {
     override fun `given a did String, when calling resolve, then the result is a valid did document`(
         did: String,
         key: JsonObject,
-        assert: resolverAssertion<DidDocument>,
+        resolverAssertion: resolverAssertion<DidDocument>,
     ) {
-        super.`given a did String, when calling resolve, then the result is a valid did document`(did, key, assert)
+        super.`given a did String, when calling resolve, then the result is a valid did document`(did, key, resolverAssertion)
     }
 
     @ParameterizedTest
@@ -35,9 +35,9 @@ class DidWebResolverTest : DidResolverTestBase() {
     override fun `given a did String, when calling resolveToKey, then the result is valid key`(
         did: String,
         key: JsonObject,
-        assert: resolverAssertion<Key>,
+        resolverAssertion: resolverAssertion<Key>,
     ) {
-        super.`given a did String, when calling resolveToKey, then the result is valid key`(did, key, assert)
+        super.`given a did String, when calling resolveToKey, then the result is valid key`(did, key, resolverAssertion)
     }
 
     @ParameterizedTest
@@ -45,9 +45,9 @@ class DidWebResolverTest : DidResolverTestBase() {
     override fun `given a did String, when calling resolveToKeys, then the result is valid keys set`(
         did: String,
         key: JsonObject,
-        assert: resolverAssertion<Set<Key>>,
+        resolverAssertion: resolverAssertion<Set<Key>>,
     ) {
-        super.`given a did String, when calling resolveToKeys, then the result is valid keys set`(did, key, assert)
+        super.`given a did String, when calling resolveToKeys, then the result is valid keys set`(did, key, resolverAssertion)
     }
 
     companion object {
@@ -108,11 +108,10 @@ class DidWebResolverTest : DidResolverTestBase() {
                         { did: String, key: JsonObject, result: Result<Key> ->
                             // Just check that we got some key successfully
                             assertTrue(result.isSuccess)
-                            assertTrue(result.getOrThrow() != null)
+                            result.getOrThrow()
 
                             // Just having a non-null key is sufficient for this test
-                            val key = result.getOrThrow()
-                            assertTrue(key != null)
+                            result.getOrThrow()
                         }
                     )
                 )
