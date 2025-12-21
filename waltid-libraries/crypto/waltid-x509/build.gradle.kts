@@ -63,8 +63,6 @@ kotlin {
         iosSimulatorArm64()
     }
 
-    //val ktor_version = "3.2.0"
-
     sourceSets {
 
         all {
@@ -73,77 +71,37 @@ kotlin {
         }
         val commonMain by getting {
             dependencies {
-                // CBOR
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(libs.okio)
-
-                // Waltid
-                /*
-implementation(project(":waltid-libraries:crypto:waltid-crypto"))
-implementation(project(":waltid-libraries:crypto:waltid-cose"))
-
-
-
-// Ktor client
-implementation("io.ktor:ktor-client-core:$ktor_version")
-implementation("io.ktor:ktor-client-serialization:$ktor_version")
-implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
-implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
-implementation("io.ktor:ktor-client-json:$ktor_version")
-implementation("io.ktor:ktor-client-logging:$ktor_version")
-
-implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
-implementation("org.kotlincrypto.hash:sha2")
-
-// Date
-implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-
-// Cache
-implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")
-
-// Coroutines
-implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
-
-// Logging
-implementation("io.github.oshai:kotlin-logging:7.0.5")
-
-implementation("${SuspendTransPluginConstants.ANNOTATION_GROUP}:${SuspendTransPluginConstants.ANNOTATION_NAME}:${SuspendTransPluginConstants.ANNOTATION_VERSION}")
-
-
-implementation(project.dependencies.platform("org.kotlincrypto.macs:bom:0.6.1"))
-implementation("org.kotlincrypto.macs:hmac-sha2")*/
-
             }
         }
         val commonTest by getting {
             dependencies {
-                implementation(kotlin("test-common"))
-                implementation(kotlin("test-annotations-common"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
-
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+                implementation(libs.kotlin.test)
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.kotlinx.serialization.json)
             }
         }
         val jvmMain by getting {
             dependencies {
-                implementation("org.bouncycastle:bcpkix-jdk18on:1.81")
+                implementation(libs.bcprov.lts8on)
+                implementation(libs.bcpkix.lts8on)
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
         val jvmTest by getting {
             dependencies {
-                // Logging
-                implementation("org.slf4j:slf4j-simple:2.0.17")
 
                 // Test
-                implementation(kotlin("test"))
-
-                implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
-                implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
+                implementation(libs.kotlin.test)
+                implementation(libs.junit.jupiter.api)
+                implementation(libs.junit.jupiter.engine)
 
                 // Bouncy Castle
-                implementation("org.bouncycastle:bcpkix-jdk18on:1.81")
+                implementation(libs.bcprov.lts8on)
+
+                //Nimbus
+                implementation(libs.nimbus.jose.jwt)
             }
         }
         val jsMain by getting {
@@ -182,6 +140,7 @@ implementation("org.kotlincrypto.macs:hmac-sha2")*/
             languageSettings.enableLanguageFeature("InlineClasses")
         }
     }
+
 }
 
 kotlin {
