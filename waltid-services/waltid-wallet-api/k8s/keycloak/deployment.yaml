@@ -40,9 +40,17 @@ spec:
       labels:
         app: keycloak
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
         - name: init-myservice
           image: busybox
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           command: [ 'sh', '-c', 'chmod 777 /opt/keycloak/data/' ]
           volumeMounts:
             - mountPath: "/opt/keycloak/data/"
@@ -50,6 +58,11 @@ spec:
       containers:
         - name: keycloak
           image: quay.io/keycloak/keycloak:23.0.6
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           args: [ "start-dev", "--features=preview" ]
           env:
             - name: KEYCLOAK_ADMIN

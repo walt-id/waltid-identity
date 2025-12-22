@@ -100,9 +100,18 @@ spec:
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
+      securityContext:
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
         - name: init-myservice
           image: busybox
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           command: [ 'sh', '-c', 'chmod 777 /waltid-wallet-api/data/' ]
           volumeMounts:
             - mountPath: "/waltid-wallet-api/data/"
@@ -110,6 +119,13 @@ spec:
       containers:
         - name: wallet-api
           image: waltid/wallet-api:__DEFAULT_IMAGE_TAG__
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 10001
+            capabilities:
+              drop:
+                - ALL
           volumeMounts:
             - name: wallet-config
               mountPath: /waltid-wallet-api/config/db.conf
@@ -176,9 +192,19 @@ spec:
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: waltid-dev-wallet
           image: waltid/waltid-dev-wallet:__DEFAULT_IMAGE_TAG__
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
               value: "https://wallet-dev.demo.walt.id"
@@ -217,9 +243,19 @@ spec:
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: waltid-demo-wallet
           image: waltid/waltid-demo-wallet:__DEFAULT_IMAGE_TAG__
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
               value: "https://wallet.demo.walt.id"

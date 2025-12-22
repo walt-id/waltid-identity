@@ -24,7 +24,7 @@ kotlin {
     }
 
     sourceSets {
-        val ktor_version = "3.2.2"
+        val ktor_version = "3.3.3"
 
         commonMain.dependencies {
             implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))

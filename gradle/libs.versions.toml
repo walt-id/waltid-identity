@@ -1,7 +1,7 @@
 [versions]
 # Build/compilation versions
-kotlin = "2.2.21"
-suspendtransform = "2.2.21-0.13.2"
+kotlin = "2.3.0"
+suspendtransform = "2.3.0-0.13.2"
 
 java-service = "21"
 java-library = "17"
@@ -9,11 +9,11 @@ java-library = "17"
 # Plugins
 vanniktech-publish = "0.35.0"
 npm-publish = "3.5.3"
-jib = "3.5.1"
+jib = "3.5.2"
 android-gradle = "8.12.3"
 
 # Plugins / Dependencies
-ktor = "3.2.2"
+ktor = "3.3.3"
 
 # ...
 
@@ -40,7 +40,7 @@ tink = "1.16.0"
 
 # Testing
 junit-jupiter = "5.11.4"
-mokkery = "3.0.0"
+mokkery = "3.1.1"
 
 # HTTP
 okio = "3.16.2"

@@ -94,10 +94,20 @@ spec:
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: issuer
           image: waltid/issuer-api:__DEFAULT_IMAGE_TAG__
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: KLOGGING_CONFIG_PATH
               value: /config/klogging.json

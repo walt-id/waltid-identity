@@ -191,7 +191,7 @@ class TestJvm {
             val plaintext = "This is a plaintext for ${key.keyType.name}... 123".encodeToByteArray()
             println("Plaintext: ${plaintext.decodeToString()}")
 
-            val signed = key.signRaw(plaintext) as String
+            val signed = key.signRaw(plaintext).encodeBase64()
             println("Signed: $signed")
 
             val verified = key.verifyRaw(signed.decodeBase64Bytes(), plaintext)

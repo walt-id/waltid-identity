@@ -153,7 +153,7 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
 
         client.get("$authorizeEndpoint?${authorizationRequest.toHttpQueryString()}") {
         }.expectRedirect().apply {
-            assertEquals(true, headers["location"]!!.toString().contains("external_login"))
+            assertEquals(true, headers["location"]!!.contains("external_login"))
         }
     }
 

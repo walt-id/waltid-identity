@@ -6,7 +6,7 @@ plugins {
 group = "id.walt"
 
 object Versions {
-    const val KTOR_VERSION = "3.2.2"
+    const val KTOR_VERSION = "3.3.3"
 }
 
 dependencies {

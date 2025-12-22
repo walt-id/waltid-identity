@@ -33,9 +33,6 @@ COPY --chown=app:app --from=build \
   /home/gradle/src/waltid-services/waltid-issuer-api/build/libs/*.jar \
   /app/issuer-api.jar
 
-# Change ownership to non-root user
-RUN chown -R 10001:10001 /app
-
-USER 10001:10001
+USER app
 EXPOSE 7002
 ENTRYPOINT ["java","-jar","/app/issuer-api.jar"]

@@ -65,7 +65,7 @@ data class SdJwtCredential(
             }
 
             cnf.contains("kid") -> {
-                val holderKidRes = runCatching { cnf!!["kid"]!!.jsonPrimitive.content }
+                val holderKidRes = runCatching { cnf["kid"]!!.jsonPrimitive.content }
                 val holderKid = presentationRequireSuccess(holderKidRes, DcSdJwtPresentationValidationError.INVALID_CNF_KID)
                 val resolvedKey = presentationRequireSuccess(
                     DidService.resolveToKey(holderKid),

@@ -1,7 +1,10 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.credsdata
 
 import id.walt.mdoc.objects.MdocsCborSerializer
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString

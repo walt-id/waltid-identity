@@ -56,7 +56,7 @@ class DidsApi(private val e2e: E2ETest, private val client: HttpClient) {
             client.post("/wallet-api/wallet/$wallet/dids/create/${payload.method}") {
                 url {
                     payload.toMap().onEach {
-                        parameters.append(it.key, it.value.toString())
+                        parameters.append(it.key, it.value)
                     }
                 }
             }.expectSuccess().apply {
@@ -90,6 +90,7 @@ class DidsApi(private val e2e: E2ETest, private val client: HttpClient) {
     }
 
     sealed class DefaultDidOption {
+        @ConsistentCopyVisibility
         data class Some internal constructor(val value: String) : DefaultDidOption()
         data object None : DefaultDidOption()
         data object Any : DefaultDidOption()

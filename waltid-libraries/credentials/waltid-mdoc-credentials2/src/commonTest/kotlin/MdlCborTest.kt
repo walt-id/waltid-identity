@@ -309,7 +309,7 @@ class MdlCborTest {
         println(deviceResponse.documents!!.first().issuerSigned.namespacesToJson())
 
         assertEquals(deviceResponse.version, "1.0")
-        val document = deviceResponse.documents?.get(0)
+        val document = deviceResponse.documents[0]
         assertNotNull(document)
         assertEquals(document.docType, "org.iso.18013.5.1.mDL")
         val issuerSignedList = document.issuerSigned.namespaces?.get("org.iso.18013.5.1")

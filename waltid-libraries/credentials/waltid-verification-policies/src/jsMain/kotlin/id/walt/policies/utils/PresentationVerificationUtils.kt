@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalJsExport::class)
+
 package id.walt.policies.utils
 
 import id.walt.policies.models.PolicyRequest

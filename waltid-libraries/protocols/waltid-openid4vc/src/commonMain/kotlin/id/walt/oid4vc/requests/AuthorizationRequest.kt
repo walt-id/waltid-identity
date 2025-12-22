@@ -8,6 +8,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.sdjwt.JWTCryptoProvider
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.serialization.Serializable
@@ -61,6 +62,7 @@ data class AuthorizationRequest(
     val requireSignedRequestObject: Boolean? = null, //required by ISO 18013-7 specification
     override val customParameters: Map<String, List<String>> = mapOf()
 ) : HTTPDataObject(), IAuthorizationRequest {
+
     val isReferenceToPAR get() = requestUri?.startsWith(OpenID4VC.PUSHED_AUTHORIZATION_REQUEST_URI_PREFIX) ?: false
     override fun toHttpParameters(): Map<String, List<String>> {
         return buildMap {
@@ -213,6 +215,8 @@ data class AuthorizationRequest(
     }
 
     companion object : HTTPDataObjectFactory<AuthorizationRequest>() {
+        private val log = KotlinLogging.logger("oid4vc.AuthorizationRequest")
+
         private val knownKeys = setOf(
             "response_type",
             "client_id",
@@ -242,16 +246,20 @@ data class AuthorizationRequest(
         )
 
         suspend fun fromRequestObjectByReference(requestUri: String): AuthorizationRequest {
+            log.trace { "From request object by reference: $requestUri" }
             val body = id.walt.oid4vc.util.http.get(requestUri).bodyAsText()
+            log.trace { "Retrieved \"$requestUri\", result is: $body" }
 
             return fromRequestObject(body)
         }
 
         fun fromRequestObject(request: String): AuthorizationRequest {
+            log.trace { "From request object: $request" }
             return fromJSON(JwtUtils.parseJWTPayload(request))
         }
 
         fun fromJSON(requestObj: JsonObject): AuthorizationRequest {
+            log.trace { "From JSON: $requestObj" }
             return fromHttpParameters(requestObj.mapValues { e ->
                 when (e.value) {
                     is JsonArray -> e.value.jsonArray.map { it.toString() }.toList()
@@ -262,6 +270,7 @@ data class AuthorizationRequest(
         }
 
         suspend fun fromHttpParametersAuto(parameters: Map<String, List<String>>): AuthorizationRequest {
+
             return when {
                 parameters.containsKey("response_type") && parameters.containsKey("client_id") -> fromHttpParameters(
                     parameters
@@ -292,7 +301,8 @@ data class AuthorizationRequest(
                 issuerState = parameters["issuer_state"]?.firstOrNull(),
                 requestUri = parameters["request_uri"]?.firstOrNull(),
                 request = parameters["request"]?.firstOrNull(),
-                presentationDefinition = parameters["presentation_definition"]?.firstOrNull()?.let { PresentationDefinition.fromJSONString(it) },
+                presentationDefinition = parameters["presentation_definition"]?.firstOrNull()
+                    ?.let { PresentationDefinition.fromJSONString(it) },
                 presentationDefinitionUri = parameters["presentation_definition_uri"]?.firstOrNull(),
                 //dcqlQuery = parameters["dcql_query"]?.firstOrNull()?.let { DcqlQuery.fromJSONString(it) },
                 clientIdScheme = parameters["client_id_scheme"]?.firstOrNull()?.let { ClientIdScheme.fromValue(it) },

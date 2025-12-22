@@ -475,18 +475,18 @@ class SSIKit2WalletService(
             val kty = j["kty"]?.jsonPrimitive?.content
             return when (kty) {
                 "OKP" -> mapOf(
-                    "kty" to (kty ?: ""),
+                    "kty" to kty,
                     "crv" to (j["crv"]?.jsonPrimitive?.content ?: ""),
                     "x" to (j["x"]?.jsonPrimitive?.content ?: "")
                 )
                 "EC" -> mapOf(
-                    "kty" to (kty ?: ""),
+                    "kty" to kty,
                     "crv" to (j["crv"]?.jsonPrimitive?.content ?: ""),
                     "x" to (j["x"]?.jsonPrimitive?.content ?: ""),
                     "y" to (j["y"]?.jsonPrimitive?.content ?: "")
                 )
                 "RSA" -> mapOf(
-                    "kty" to (kty ?: ""),
+                    "kty" to kty,
                     "n" to (j["n"]?.jsonPrimitive?.content ?: ""),
                     "e" to (j["e"]?.jsonPrimitive?.content ?: "")
                 )
