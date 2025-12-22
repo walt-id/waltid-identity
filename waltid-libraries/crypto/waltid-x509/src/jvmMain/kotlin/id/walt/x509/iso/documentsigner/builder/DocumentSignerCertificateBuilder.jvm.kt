@@ -13,6 +13,7 @@ import id.walt.x509.iso.DocumentSignerEkuOid
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
 import id.walt.x509.iso.generateCertificateSerialNo
+import id.walt.x509.iso.CertificateValidityPeriod
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x509.*
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
@@ -26,8 +27,7 @@ import kotlin.time.Instant
 internal actual suspend fun platformSignDocumentSignerCertificate(
     country: String,
     commonName: String,
-    notBefore: Instant,
-    notAfter: Instant,
+    validityPeriod: CertificateValidityPeriod,
     crlDistributionPointUri: String,
     dsPublicKey: Key,
     iacaSignerSpec: IACASignerSpecification,
@@ -57,8 +57,8 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
 
     val altNames = issuerAlternativeNameToGeneralNameArray(iacaSignerSpec.data.issuerAlternativeName)
 
-    val certNotBeforeDate = Date(Instant.fromEpochSeconds(notBefore.epochSeconds).toEpochMilliseconds())
-    val certNotAfterDate = Date(Instant.fromEpochSeconds(notAfter.epochSeconds).toEpochMilliseconds())
+    val certNotBeforeDate = Date(Instant.fromEpochSeconds(validityPeriod.notBefore.epochSeconds).toEpochMilliseconds())
+    val certNotAfterDate = Date(Instant.fromEpochSeconds(validityPeriod.notAfter.epochSeconds).toEpochMilliseconds())
 
     val certBuilder = JcaX509v3CertificateBuilder(
         iacaName,
@@ -141,8 +141,10 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
         data = DocumentSignerDecodedCertificate(
             country = country,
             commonName = commonName,
-            notBefore = Instant.fromEpochSeconds(certNotBeforeDate.toInstant().epochSecond),
-            notAfter = Instant.fromEpochSeconds(certNotAfterDate.toInstant().epochSecond),
+            validityPeriod = CertificateValidityPeriod(
+                notBefore = Instant.fromEpochSeconds(certNotBeforeDate.toInstant().epochSecond),
+                notAfter = Instant.fromEpochSeconds(certNotAfterDate.toInstant().epochSecond),
+            ),
             crlDistributionPointUri = crlDistributionPointUri,
             serialNumber = serialNo,
             keyUsage = setOf(

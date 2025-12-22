@@ -27,19 +27,20 @@ class DocumentSignerCertificateValidator {
             "Document signer certificate data organizationName must not be blank if specified"
         }
 
+        val validity = data.validityPeriod
         val timeNow = Clock.System.now()
-        require(data.notAfter > timeNow) {
-            "Document signer certificate notAfter ${data.notAfter} must be greater than the current time: $timeNow "
+        require(validity.notAfter > timeNow) {
+            "Document signer certificate notAfter ${validity.notAfter} must be greater than the current time: $timeNow "
         }
 
-        require(data.notBefore < data.notAfter) {
+        require(validity.notBefore < validity.notAfter) {
             "Document signer certificate data notBefore must be before (and not equal to) notAfter"
         }
 
-        require(data.notAfter.minus(data.notBefore).inWholeSeconds <= DS_CERT_MAX_VALIDITY_SECONDS) {
+        require(validity.notAfter.minus(validity.notBefore).inWholeSeconds <= DS_CERT_MAX_VALIDITY_SECONDS) {
             "Document signer certificates should not have a validity that is larger than 457 days" +
-                    "notAfter: ${data.notAfter}, notBefore: ${data.notBefore} " +
-                    "and difference in whole days is: ${data.notAfter.minus(data.notBefore).inWholeDays}"
+                    "notAfter: ${validity.notAfter}, notBefore: ${validity.notBefore} " +
+                    "and difference in whole days is: ${validity.notAfter.minus(validity.notBefore).inWholeDays}"
         }
     }
 
@@ -55,11 +56,11 @@ class DocumentSignerCertificateValidator {
             "IACA and document signer state/province names must be the same"
         }
 
-        require(iacaData.notBefore <= dsData.notBefore) {
+        require(iacaData.validityPeriod.notBefore <= dsData.validityPeriod.notBefore) {
             "IACA certificate not before must be before the document signer's not before"
         }
 
-        require(iacaData.notAfter >= dsData.notAfter) {
+        require(iacaData.validityPeriod.notAfter >= dsData.validityPeriod.notAfter) {
             "IACA certificate not after must be after the document signer's not after"
         }
     }

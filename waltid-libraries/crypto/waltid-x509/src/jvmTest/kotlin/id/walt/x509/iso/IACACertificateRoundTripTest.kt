@@ -39,8 +39,10 @@ class IACACertificateRoundTripTest {
         val iacaCertBuilder = IACACertificateBuilder(
             country = "US",
             commonName = "Example IACA",
-            notBefore = validNotBefore,
-            notAfter = validNotAfter,
+            validityPeriod = CertificateValidityPeriod(
+                notBefore = validNotBefore,
+                notAfter = validNotAfter,
+            ),
             issuerAlternativeName = issuerAlternativeName,
             signingKey = signingKey,
         ).apply {

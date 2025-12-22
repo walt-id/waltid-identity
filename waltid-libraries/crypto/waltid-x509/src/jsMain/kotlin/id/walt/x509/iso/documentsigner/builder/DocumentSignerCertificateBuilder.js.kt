@@ -4,14 +4,13 @@ package id.walt.x509.iso.documentsigner.builder
 
 import id.walt.crypto.keys.Key
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
+import id.walt.x509.iso.CertificateValidityPeriod
 import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 
 internal actual suspend fun platformSignDocumentSignerCertificate(
     country: String,
     commonName: String,
-    notBefore: Instant,
-    notAfter: Instant,
+    validityPeriod: CertificateValidityPeriod,
     crlDistributionPointUri: String,
     dsPublicKey: Key,
     iacaSignerSpec: IACASignerSpecification,

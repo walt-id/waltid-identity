@@ -3,16 +3,15 @@
 package id.walt.x509.iso.iaca.certificate
 
 import id.walt.x509.CertificateKeyUsage
+import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.IssuerAlternativeName
 import okio.ByteString
 import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 
 data class IACADecodedCertificate(
     val country: String,
     val commonName: String,
-    val notBefore: Instant,
-    val notAfter: Instant,
+    val validityPeriod: CertificateValidityPeriod,
     val issuerAlternativeName: IssuerAlternativeName,
     val serialNumber: ByteString, //
     //TODO: Add SKI stuff? And if so, in what format?
@@ -27,8 +26,7 @@ data class IACADecodedCertificate(
     fun toIACACertificateProfileData() = IACACertificateProfileData(
         country = country,
         commonName = commonName,
-        notBefore = notBefore,
-        notAfter = notAfter,
+        validityPeriod = validityPeriod,
         issuerAlternativeName = issuerAlternativeName,
         stateOrProvinceName = stateOrProvinceName,
         organizationName = organizationName,

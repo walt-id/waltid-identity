@@ -3,16 +3,15 @@
 package id.walt.x509.iso.iaca.builder
 
 import id.walt.crypto.keys.Key
+import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.iaca.certificate.IACACertificateBundle
 import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 
 internal actual suspend fun platformSignIACACertificate(
     country: String,
     commonName: String,
-    notBefore: Instant,
-    notAfter: Instant,
+    validityPeriod: CertificateValidityPeriod,
     issuerAlternativeName: IssuerAlternativeName,
     signingKey: Key,
     stateOrProvinceName: String?,

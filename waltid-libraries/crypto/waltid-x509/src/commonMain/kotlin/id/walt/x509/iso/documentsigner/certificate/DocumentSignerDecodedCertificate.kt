@@ -3,15 +3,14 @@
 package id.walt.x509.iso.documentsigner.certificate
 
 import id.walt.x509.CertificateKeyUsage
+import id.walt.x509.iso.CertificateValidityPeriod
 import okio.ByteString
 import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 
 data class DocumentSignerDecodedCertificate(
     val country: String,
     val commonName: String,
-    val notBefore: Instant,
-    val notAfter: Instant,
+    val validityPeriod: CertificateValidityPeriod,
     val crlDistributionPointUri: String,
     val serialNumber: ByteString, //
     val keyUsage: Set<CertificateKeyUsage>, //
@@ -24,8 +23,7 @@ data class DocumentSignerDecodedCertificate(
     fun toDocumentSignerCertificateProfileData() = DocumentSignerCertificateProfileData(
         country = country,
         commonName = commonName,
-        notBefore = notBefore,
-        notAfter = notAfter,
+        validityPeriod = validityPeriod,
         crlDistributionPointUri = crlDistributionPointUri,
         stateOrProvinceName = stateOrProvinceName,
         organizationName = organizationName,

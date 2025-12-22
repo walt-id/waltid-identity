@@ -47,8 +47,10 @@ class DocumentSignerRoundTripTest {
         val iacaCertBuilder = IACACertificateBuilder(
             country = "US",
             commonName = "Example IACA",
-            notBefore = iacaValidNotBefore,
-            notAfter = iacaValidNotAfter,
+            validityPeriod = CertificateValidityPeriod(
+                notBefore = iacaValidNotBefore,
+                notAfter = iacaValidNotAfter,
+            ),
             issuerAlternativeName = issuerAlternativeName,
             signingKey = iacaSigningKey,
         ).apply {
@@ -60,8 +62,10 @@ class DocumentSignerRoundTripTest {
         val dsCertBuilder = DocumentSignerCertificateBuilder(
             country = "US",
             commonName = "Example DS",
-            notBefore = iacaValidNotBefore.plus((1).days),
-            notAfter = iacaValidNotAfter.minus(1.days),
+            validityPeriod = CertificateValidityPeriod(
+                notBefore = iacaValidNotBefore.plus(1.days),
+                notAfter = iacaValidNotAfter.minus(1.days),
+            ),
             crlDistributionPointUri = "https://ca.example.com/crl",
             documentSignerPublicKey = dsKey.getPublicKey(),
             iacaSignerSpec = IACASignerSpecification(

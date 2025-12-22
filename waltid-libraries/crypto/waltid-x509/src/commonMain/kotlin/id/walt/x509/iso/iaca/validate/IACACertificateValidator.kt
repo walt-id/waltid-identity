@@ -24,19 +24,20 @@ class IACACertificateValidator {
             "IACA certificate data organizationName must not be blank if specified"
         }
 
+        val validity = data.validityPeriod
         val timeNow = Clock.System.now()
-        require(data.notAfter > timeNow) {
-            "IACA certificate notAfter $data.notAfter must be greater than the current time: $timeNow "
+        require(validity.notAfter > timeNow) {
+            "IACA certificate notAfter $validity.notAfter must be greater than the current time: $timeNow "
         }
 
-        require(data.notBefore < data.notAfter) {
+        require(validity.notBefore < validity.notAfter) {
             "IACA certificate data notBefore must be before (and not equal to) notAfter"
         }
 
-        require(data.notAfter.minus(data.notBefore).inWholeSeconds < IACA_CERT_MAX_VALIDITY_SECONDS) {
+        require(validity.notAfter.minus(validity.notBefore).inWholeSeconds < IACA_CERT_MAX_VALIDITY_SECONDS) {
             "IACA certificates should not have a validity that is larger than 15 years" +
-                    "notAfter: ${data.notAfter}, notBefore: ${data.notBefore} " +
-                    "and difference in whole days is: ${data.notAfter.minus(data.notBefore).inWholeDays}"
+                    "notAfter: ${validity.notAfter}, notBefore: ${validity.notBefore} " +
+                    "and difference in whole days is: ${validity.notAfter.minus(validity.notBefore).inWholeDays}"
         }
     }
 }

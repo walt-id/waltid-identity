@@ -9,6 +9,7 @@ import id.walt.x509.CertificateKeyUsage
 import id.walt.x509.id.walt.x509.KeyContentSignerWrapper
 import id.walt.x509.id.walt.x509.buildX500Name
 import id.walt.x509.id.walt.x509.issuerAlternativeNameToGeneralNameArray
+import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.generateCertificateSerialNo
 import id.walt.x509.iso.iaca.certificate.IACACertificateBundle
@@ -27,8 +28,7 @@ import kotlin.time.Instant
 internal actual suspend fun platformSignIACACertificate(
     country: String,
     commonName: String,
-    notBefore: Instant,
-    notAfter: Instant,
+    validityPeriod: CertificateValidityPeriod,
     issuerAlternativeName: IssuerAlternativeName,
     signingKey: Key,
     stateOrProvinceName: String?,
@@ -48,8 +48,8 @@ internal actual suspend fun platformSignIACACertificate(
 
     val serialNo = generateCertificateSerialNo()
 
-    val certNotBeforeDate = Date(Instant.fromEpochSeconds(notBefore.epochSeconds).toEpochMilliseconds())
-    val certNotAfterDate = Date(Instant.fromEpochSeconds(notAfter.epochSeconds).toEpochMilliseconds())
+    val certNotBeforeDate = Date(Instant.fromEpochSeconds(validityPeriod.notBefore.epochSeconds).toEpochMilliseconds())
+    val certNotAfterDate = Date(Instant.fromEpochSeconds(validityPeriod.notAfter.epochSeconds).toEpochMilliseconds())
 
     val certBuilder = JcaX509v3CertificateBuilder(
         issuer,
@@ -130,8 +130,10 @@ internal actual suspend fun platformSignIACACertificate(
         decodedData = IACADecodedCertificate(
             country = country,
             commonName = commonName,
-            notBefore = Instant.fromEpochSeconds(certNotBeforeDate.toInstant().epochSecond),
-            notAfter = Instant.fromEpochSeconds(certNotAfterDate.toInstant().epochSecond),
+            validityPeriod = CertificateValidityPeriod(
+                notBefore = Instant.fromEpochSeconds(certNotBeforeDate.toInstant().epochSecond),
+                notAfter = Instant.fromEpochSeconds(certNotAfterDate.toInstant().epochSecond),
+            ),
             issuerAlternativeName = issuerAlternativeName,
             serialNumber = serialNo.toByteArray().toByteString(),
             isCA = true,
@@ -146,4 +148,3 @@ internal actual suspend fun platformSignIACACertificate(
         )
     )
 }
-

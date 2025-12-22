@@ -5,6 +5,7 @@ package id.walt.x509.iso.iaca.parser
 import com.nimbusds.jose.util.X509CertUtils
 import id.walt.x509.CertificateDer
 import id.walt.x509.id.walt.x509.*
+import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import okio.ByteString.Companion.toByteString
@@ -48,8 +49,10 @@ actual class IACACertificateParser actual constructor(val certificate: Certifica
         return IACADecodedCertificate(
             country = country,
             commonName = commonName,
-            notBefore = cert.notBefore.toInstant().toKotlinInstant(),
-            notAfter = cert.notAfter.toInstant().toKotlinInstant(),
+            validityPeriod = CertificateValidityPeriod(
+                notBefore = cert.notBefore.toInstant().toKotlinInstant(),
+                notAfter = cert.notAfter.toInstant().toKotlinInstant(),
+            ),
             issuerAlternativeName = parseIssuerAlternativeNameFromX509Certificate(cert),
             serialNumber = cert.serialNumber.toByteArray().toByteString(),
             isCA = (cert.basicConstraints != -1),

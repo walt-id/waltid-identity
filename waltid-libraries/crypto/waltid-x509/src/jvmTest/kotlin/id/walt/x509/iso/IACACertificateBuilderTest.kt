@@ -47,8 +47,10 @@ class IACACertificateBuilderTest {
         val iacaCertBuilder = IACACertificateBuilder(
             country = "US",
             commonName = "Example IACA",
-            notBefore = validNotBefore,
-            notAfter = validNotAfter,
+            validityPeriod = CertificateValidityPeriod(
+                notBefore = validNotBefore,
+                notAfter = validNotAfter,
+            ),
             issuerAlternativeName = issuerAlternativeName,
             signingKey = signingKey,
         ).apply {
@@ -126,12 +128,12 @@ class IACACertificateBuilderTest {
 
         assertEquals(
             expected = builder.notAfter,
-            actual = iacaCertData.notAfter,
+            actual = iacaCertData.validityPeriod.notAfter,
         )
 
         assertEquals(
             expected = builder.notBefore,
-            actual = iacaCertData.notBefore,
+            actual = iacaCertData.validityPeriod.notBefore,
         )
 
         assertEquals(
