@@ -3,9 +3,10 @@
 package id.walt.x509.iso.documentsigner.builder
 
 import id.walt.crypto.keys.Key
-import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
 import id.walt.x509.iso.CertificateValidityPeriod
+import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
 import kotlin.time.ExperimentalTime
+
 //TODO: Use data class for profile data
 class DocumentSignerCertificateBuilder(
     val country: String,
@@ -15,9 +16,6 @@ class DocumentSignerCertificateBuilder(
     val documentSignerPublicKey: Key,
     val iacaSignerSpec: IACASignerSpecification,
 ) {
-
-    val notBefore get() = validityPeriod.notBefore
-    val notAfter get() = validityPeriod.notAfter
 
     var stateOrProvinceName: String? = null
     var organizationName: String? = null

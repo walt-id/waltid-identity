@@ -17,9 +17,6 @@ class IACACertificateBuilder(
     val signingKey: Key,
 ) {
 
-    val notBefore get() = validityPeriod.notBefore
-    val notAfter get() = validityPeriod.notAfter
-
     var stateOrProvinceName: String? = null
     var organizationName: String? = null
     var crlDistributionPointUri: String? = null
