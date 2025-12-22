@@ -3,8 +3,8 @@ package id.walt.crypto2.hash
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import kotlin.test.Test

@@ -15,6 +15,8 @@ import io.github.smiley4.ktoropenapi.config.ValueExampleDescriptorConfig
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
+private const val HTTP_LOCALHOST_PORT = "http://localhost:22222"
+
 object ExchangeExternalSignaturesExamples {
 
     //OID4VP Examples
