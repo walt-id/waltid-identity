@@ -12,7 +12,7 @@ import java.io.ByteArrayInputStream
 import java.math.BigInteger
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
-import java.util.Base64
+import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull

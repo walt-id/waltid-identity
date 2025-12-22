@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     id("waltid.backend") // <-- Applies Kotlin JVM, Toolchain 21, etc.
     id("io.ktor.plugin")

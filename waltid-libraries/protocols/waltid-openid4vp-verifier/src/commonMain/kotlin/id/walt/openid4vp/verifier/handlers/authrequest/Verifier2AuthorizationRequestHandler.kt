@@ -5,8 +5,8 @@ import id.walt.openid4vp.verifier.data.SessionEvent
 import id.walt.openid4vp.verifier.data.Verification2Session
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
-import io.ktor.server.response.respond
-import io.ktor.server.routing.RoutingCall
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement

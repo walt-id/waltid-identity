@@ -1,5 +1,3 @@
-import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
-
 plugins {
     id("waltid.multiplatform.library")
     id("waltid.publish.maven")

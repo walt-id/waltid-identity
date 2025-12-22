@@ -6,10 +6,10 @@ import id.walt.commons.fetchBinaryFile
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
-import id.walt.openid4vp.verifier.data.VerificationSessionSetup
 import id.walt.openid4vp.verifier.data.SessionEvent
 import id.walt.openid4vp.verifier.data.Verification2Session
 import id.walt.openid4vp.verifier.data.Verification2Session.VerificationSessionStatus
+import id.walt.openid4vp.verifier.data.VerificationSessionSetup
 import id.walt.openid4vp.verifier.data.Verifier2SessionUpdate
 import id.walt.openid4vp.verifier.handlers.authrequest.Verifier2AuthorizationRequestHandler.respondAuthorizationRequest
 import id.walt.openid4vp.verifier.handlers.vpresponse.Verifier2VPDirectPostHandler.respondHandleDirectPostResponse

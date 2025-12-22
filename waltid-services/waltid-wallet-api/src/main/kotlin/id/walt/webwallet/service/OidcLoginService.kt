@@ -4,7 +4,6 @@ import com.auth0.jwk.JwkProvider
 import com.auth0.jwk.JwkProviderBuilder
 import id.walt.webwallet.service.WalletServiceManager.oidcConfig
 import java.net.URI
-import java.net.URL
 import java.util.concurrent.TimeUnit
 
 object OidcLoginService {

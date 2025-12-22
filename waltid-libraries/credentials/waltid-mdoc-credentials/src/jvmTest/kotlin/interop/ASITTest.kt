@@ -2,9 +2,9 @@
 
 package interop
 
-import at.asitplus.signum.indispensable.cosef.io.coseCompliantSerializer
 import at.asitplus.iso.IssuerSigned
 import at.asitplus.iso.MobileSecurityObject
+import at.asitplus.signum.indispensable.cosef.io.coseCompliantSerializer
 import at.asitplus.wallet.mdl.DrivingPrivilege
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.dataretrieval.DeviceResponse

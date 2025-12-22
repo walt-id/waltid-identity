@@ -8,7 +8,6 @@ import id.walt.mdoc.cose.COSESign1Serializer
 import id.walt.mdoc.cose.X5_CHAIN
 import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.MapKeyType
-import korlibs.crypto.encoding.Hex
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.cose.java.*
 import java.io.ByteArrayInputStream

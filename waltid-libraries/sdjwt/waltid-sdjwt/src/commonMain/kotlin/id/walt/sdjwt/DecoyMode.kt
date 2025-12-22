@@ -1,6 +1,5 @@
 package id.walt.sdjwt
 
-import id.walt.sdjwt.DecoyMode.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
