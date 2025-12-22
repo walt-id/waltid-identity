@@ -86,6 +86,7 @@ kotlin {
             dependencies {
                 implementation(libs.bcprov.lts8on)
                 implementation(libs.bcpkix.lts8on)
+                implementation(libs.nimbus.jose.jwt)
                 implementation(libs.kotlinx.coroutines.core)
             }
         }
