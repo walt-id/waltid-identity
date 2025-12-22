@@ -7,6 +7,15 @@ plugins {
     id("com.github.ben-manes.versions")
 }
 
+kotlin {
+    jvmToolchain(21)
+}
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
 group = "id.walt"
 version = "0.0.1"
 
