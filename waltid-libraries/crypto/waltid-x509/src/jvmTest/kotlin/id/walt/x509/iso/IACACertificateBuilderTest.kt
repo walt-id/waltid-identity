@@ -127,12 +127,12 @@ class IACACertificateBuilderTest {
         )
 
         assertEquals(
-            expected = builder.notAfter,
+            expected = builder.validityPeriod.notAfter,
             actual = iacaCertData.validityPeriod.notAfter,
         )
 
         assertEquals(
-            expected = builder.notBefore,
+            expected = builder.validityPeriod.notBefore,
             actual = iacaCertData.validityPeriod.notBefore,
         )
 
