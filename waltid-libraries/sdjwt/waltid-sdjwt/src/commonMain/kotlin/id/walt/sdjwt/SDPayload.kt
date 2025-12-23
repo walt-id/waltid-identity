@@ -15,6 +15,7 @@ import kotlin.js.JsExport
  * @param undisclosedPayload  Undisclosed payload JSON object, as contained in the JWT body
  * @param digestedDisclosures Map of digests to parsed disclosures, which are appended to the JWT token
  */
+@ConsistentCopyVisibility
 @Suppress("NON_EXPORTABLE_TYPE")
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -244,7 +245,6 @@ data class SDPayload internal constructor(
                             // NOTE: SecureRandom.nextInt always returns 0! Use nextDouble instead
                             DecoyMode.RANDOM -> SecureRandom.nextDouble(1.0, sdMap.decoys + 1.0).toInt()
                             DecoyMode.FIXED -> sdMap.decoys
-                            else -> 0
                         }
                         repeat(numDecoys) {
                             add(digest(generateSalt()))

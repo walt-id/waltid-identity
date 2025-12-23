@@ -252,6 +252,7 @@ object VerificationSessionCreator {
             specific_vc_policies = setup.core.policies.specific_vc_policies
         )
 
+        @Suppress("SENSELESS_COMPARISON") // TODO
         val newSession = Verification2Session(
             id = sessionId,
 

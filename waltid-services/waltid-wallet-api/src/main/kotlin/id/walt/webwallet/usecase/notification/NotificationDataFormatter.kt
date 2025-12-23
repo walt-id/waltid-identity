@@ -24,7 +24,7 @@ class NotificationDataFormatter(
             ),
         )
 
-        else -> NotificationDTO(notification, JsonObject((emptyMap())))
+        //else -> NotificationDTO(notification, JsonObject((emptyMap())))
     }
 
     private suspend fun credentialIssuanceDetails(data: CredentialIssuanceData) =

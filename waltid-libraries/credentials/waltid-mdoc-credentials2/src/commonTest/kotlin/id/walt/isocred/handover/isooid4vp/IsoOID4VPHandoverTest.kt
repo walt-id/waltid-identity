@@ -1,8 +1,11 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.isocred.handover.isooid4vp
 
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.handover.isooid4vp.IsoOID4VPHandover
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromHexString
 import kotlinx.serialization.encodeToHexString
 import kotlin.test.Test

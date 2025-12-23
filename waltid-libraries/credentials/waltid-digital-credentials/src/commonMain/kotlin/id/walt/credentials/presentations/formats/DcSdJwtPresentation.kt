@@ -57,7 +57,7 @@ data class DcSdJwtPresentation(
         // Validate Key Binding JWT
 
         // Resolve holder's public key
-        val holderKey = (credential as SdJwtCredential).getHolderKey()
+        val holderKey = credential.getHolderKey()
         presentationRequireNotNull(holderKey, DcSdJwtPresentationValidationError.MISSING_CNF)
 
 
@@ -177,7 +177,6 @@ data class DcSdJwtPresentation(
             // CredentialParser needs to handle this reconstruction and validation.
             // It should verify that the digests in the `_sd` array of the core match the hashes of the provided disclosures.
             val (_, reconstructedCredential) = CredentialParser.detectAndParse(hashableString)
-                ?: return Result.failure(IllegalArgumentException("Failed to parse/reconstruct credential from SD-JWT core and disclosures."))
 
             require(reconstructedCredential is SdJwtCredential) { "Credential is not an SD-JWT credential: $reconstructedCredential" }
 

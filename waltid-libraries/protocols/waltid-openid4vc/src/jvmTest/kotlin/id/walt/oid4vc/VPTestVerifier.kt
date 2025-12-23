@@ -63,7 +63,7 @@ class VPTestVerifier : OpenIDCredentialVerifier(
     override fun doVerify(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
         return runBlocking {
             tokenResponse.vpToken != null &&
-                    JwtSignaturePolicy().verify(tokenResponse.vpToken!!.toString(), null, mapOf()).isSuccess
+                    JwtSignaturePolicy().verify(tokenResponse.vpToken.toString(), null, mapOf()).isSuccess
         }
     }
 

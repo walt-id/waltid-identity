@@ -580,7 +580,7 @@ object OpenID4VCI {
             ?.let { payload ->
                 payload.value[MapKey(ProofOfPossession.CWTProofBuilder.LABEL_NONCE)].let {
                     when (it) {
-                        is ByteStringElement -> String(it.value)
+                        is ByteStringElement -> it.value.decodeToString(0, 0 + it.value.size)
                         is StringElement -> it.value
                         else -> throw Error("Invalid nonce type")
                     }

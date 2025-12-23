@@ -10,7 +10,7 @@ import id.walt.issuer.issuance.createCredentialOfferUri
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.sdjwt.SDMapBuilder
 import id.walt.w3c.vc.vcs.W3CVC
-import io.ktor.http.Url
+import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject

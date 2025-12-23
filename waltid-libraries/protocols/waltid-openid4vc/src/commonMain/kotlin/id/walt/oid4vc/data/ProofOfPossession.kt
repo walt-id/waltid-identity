@@ -16,6 +16,7 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 
+@ConsistentCopyVisibility
 @OptIn(ExperimentalSerializationApi::class)
 @KeepGeneratedSerializer
 @Serializable(with = ProofOfPossessionSerializer::class)

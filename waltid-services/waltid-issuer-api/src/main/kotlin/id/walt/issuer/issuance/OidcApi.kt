@@ -571,7 +571,7 @@ object OidcApi : CIProvider(), Klogging {
                         // Update session status to UNSUCCESSFUL and emit callback
                         runCatching {
                             val accessInfo = OpenID4VC.verifyAndParseToken(
-                                token = accessToken!!,
+                                token = accessToken,
                                 issuer = metadata.issuer!!,
                                 target = TokenTarget.DEFERRED_CREDENTIAL,
                                 tokenKey = CI_TOKEN_KEY
@@ -631,7 +631,7 @@ object OidcApi : CIProvider(), Klogging {
                         logger.error(exc) { "BatchCredentialError: " }
                         // Update session status to UNSUCCESSFUL and emit callback
                         runCatching {
-                            val sid = parsedToken?.get(JWTClaims.Payload.subject)?.jsonPrimitive?.content
+                            val sid = parsedToken.get(JWTClaims.Payload.subject)?.jsonPrimitive?.content
                             if (sid != null) getSession(sid)?.let {
                                 updateSessionStatus(
                                     it,

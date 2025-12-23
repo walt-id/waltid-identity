@@ -71,12 +71,6 @@ val modules = listOfNotNull(
 
     "$libraries:waltid-core-wallet",
 
-    /*
-    * "$libraries:util".group(
-        "waltid-reporting"
-    ),
-    */
-
     "$libraries:waltid-did",
     "$libraries:waltid-java-compat",
     "$libraries:waltid-library-commons",
@@ -108,10 +102,29 @@ val modules = listOfNotNull(
 include(*modules.toTypedArray())
 
 pluginManagement {
+    includeBuild("build-logic")
+
     repositories {
         google()
         mavenCentral()
         gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
+
+    repositories {
+        maven("https://maven.waltid.dev/releases")
+        maven("https://maven.waltid.dev/snapshots")
+        mavenCentral()
+        google()
+    }
+
+    versionCatalogs {
+        create("identityLibs") {
+            from(files("gradle/libs.versions.toml"))
+        }
     }
 }
 

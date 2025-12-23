@@ -11,8 +11,6 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.AbstractFeature
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.featureflag.ServiceFeatureCatalog
-import id.walt.commons.logging.LoggingManager
-import id.walt.commons.logging.RenderStrings
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*

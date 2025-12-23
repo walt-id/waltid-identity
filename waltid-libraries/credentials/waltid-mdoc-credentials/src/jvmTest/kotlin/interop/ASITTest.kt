@@ -2,9 +2,9 @@
 
 package interop
 
+import at.asitplus.iso.IssuerSigned
+import at.asitplus.iso.MobileSecurityObject
 import at.asitplus.signum.indispensable.cosef.io.coseCompliantSerializer
-import at.asitplus.wallet.lib.iso.IssuerSigned
-import at.asitplus.wallet.lib.iso.MobileSecurityObject
 import at.asitplus.wallet.mdl.DrivingPrivilege
 import id.walt.mdoc.dataelement.*
 import id.walt.mdoc.dataretrieval.DeviceResponse
@@ -32,7 +32,7 @@ class ASITTest {
 
         val deviceResponse = DeviceResponse.fromCBORHex(isoSpecExampleSignedDeviceResponse)
 
-        val asitDeviceResponse = coseCompliantSerializer.decodeFromHexString<at.asitplus.wallet.lib.iso.DeviceResponse>(
+        val asitDeviceResponse = coseCompliantSerializer.decodeFromHexString<at.asitplus.iso.DeviceResponse>(
             isoSpecExampleSignedDeviceResponse
         )
 

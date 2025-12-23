@@ -2,10 +2,10 @@ package id.walt.openid4vp.verifier
 
 import id.walt.commons.config.ConfigManager
 import id.walt.crypto.keys.KeyManager
-import id.walt.openid4vp.verifier.data.VerificationSessionSetup
 import id.walt.openid4vp.verifier.data.DcApiFlowSetup
 import id.walt.openid4vp.verifier.data.UrlBearingDeviceFlowSetup
 import id.walt.openid4vp.verifier.data.Verification2Session
+import id.walt.openid4vp.verifier.data.VerificationSessionSetup
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator
 
 object OSSVerifier2Manager {

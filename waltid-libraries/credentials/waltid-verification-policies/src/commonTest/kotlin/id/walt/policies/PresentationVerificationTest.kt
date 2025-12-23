@@ -11,9 +11,12 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 
 class PresentationVerificationTest {
+
+    private val json = Json { prettyPrint = true }
+
     // TODO: Include test in the scope of WAL-842
     //@Test
-    fun testPresentationVerification()= runTest {
+    fun testPresentationVerification() = runTest {
         DidService.apply {
             registerResolver(LocalResolver())
             updateResolversForMethods()
@@ -72,17 +75,13 @@ class PresentationVerificationTest {
         println("SP Policies: $specificPolicies")
 
         val r = Verifier.verifyPresentation(
-          VCFormat.jwt_vp_json,
+            VCFormat.jwt_vp_json,
             vpToken = vpToken, vpPolicies = vpPolicies, globalVcPolicies = vcPolicies, specificCredentialPolicies = specificPolicies, mapOf(
                 "presentationSubmission" to JsonObject(emptyMap()), "challenge" to "abc"
             )
         )
 
-        println(
-            Json { prettyPrint = true }.encodeToString(
-                r
-            )
-        )
+        println(json.encodeToString(r))
 
         val x = r.results.flatMap { it.policyResults }
         println("Results: " + x.size)

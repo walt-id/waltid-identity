@@ -2,7 +2,6 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.tse.TSEKey
 import id.walt.crypto.keys.tse.TSEKeyMetadata
 import id.walt.did.dids.DidService
-import id.walt.did.helpers.WaltidServices
 import id.walt.w3c.vc.vcs.W3CVC
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -17,7 +16,7 @@ class VcApiTest {
         if (!hostCondition()) return@runTest
 
         // Initialize services
-        WaltidServices.init()
+        DidService.init()
 
         val tseMetadata = TSEKeyMetadata("http://127.0.0.1:8200/v1/transit", "dev-only-token")
 
