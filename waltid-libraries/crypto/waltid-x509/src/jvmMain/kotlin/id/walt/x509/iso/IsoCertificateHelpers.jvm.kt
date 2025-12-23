@@ -16,6 +16,9 @@ internal actual fun generateCertificateSerialNo(): ByteString {
     return BigInteger(randomBytes).abs().toByteArray().toByteString()
 }
 
+//TODO: FIX THIS HERE SO THAT WE ONLY DO SIGNING WITH KEYS THAT ARE ALLOWED BY THE PROFILE
+//TODO: ECDSA ONLY FOR IACA
+//TODO: ECDSA AND EDDSA ALLOWED FOR DOCUMENT SIGNERS
 internal fun getJcaSigningAlgorithmNameFromKeyType(
     keyType: KeyType,
 ) = when (keyType) {
