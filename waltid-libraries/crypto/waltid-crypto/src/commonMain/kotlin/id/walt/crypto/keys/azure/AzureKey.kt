@@ -42,7 +42,7 @@ private val logger = KotlinLogging.logger { }
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
-@SerialName("azure")
+@SerialName("azure-rest-api")
 class AzureKey(
     val id: String,
     val auth: AzureAuth,
