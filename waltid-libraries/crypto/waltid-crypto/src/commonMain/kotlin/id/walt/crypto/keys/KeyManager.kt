@@ -44,7 +44,7 @@ object KeyManager {
             )
         }
 
-        register<AzureKey>("azure") { generateRequest: KeyGenerationRequest ->
+        register<AzureKey>("azure-rest-api") { generateRequest: KeyGenerationRequest ->
             AzureKey.generate(
                 generateRequest.keyType,
                 Json.decodeFromJsonElement(generateRequest.config!!)
