@@ -10,7 +10,9 @@ import java.security.cert.X509Certificate
 fun IssuerAlternativeName.Companion.parseFromX509Certificate(
     cert: X509Certificate,
 ): IssuerAlternativeName {
-    val issAltNamesBytes = requireNotNull(cert.getExtensionValue(Extension.issuerAlternativeName.id)) {
+    val issAltNamesBytes = requireNotNull(
+        cert.getExtensionValue(Extension.issuerAlternativeName.id)
+    ) {
         "Issuer alternative name X509 certificate extension must exist, but was found missing from input certificate"
     }
     val asn1OctetStr = ASN1OctetString.getInstance(issAltNamesBytes)
