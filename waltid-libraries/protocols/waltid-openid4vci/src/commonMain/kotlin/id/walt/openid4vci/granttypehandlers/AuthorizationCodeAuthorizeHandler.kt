@@ -42,13 +42,8 @@ class AuthorizationCodeAuthorizeHandler(
 
         request.redirectUri = redirectUri
 
-        val issuerId = request.getIssuerId()
-            ?: return AuthorizeResponseResult.Failure(
-                OAuthError("invalid_request", "Issuer context missing"),
-            )
-
         // For the skeleton we auto-grant everything that was requested and mark the response type as handled,
-        // mirroring the behaviour expected once consent is complete.
+        // the behaviour expected once consent is complete.
         request.getRequestedScopes().forEach { request.grantScope(it) }
         request.getRequestedAudience().forEach { request.grantAudience(it) }
         request.getResponseTypes().forEach { request.setResponseTypeHandled(it) }
@@ -68,7 +63,6 @@ class AuthorizationCodeAuthorizeHandler(
                 },
                 expiresAt = expiresAt,
             ),
-            issuerId,
         )
 
         val parameters = buildMap {

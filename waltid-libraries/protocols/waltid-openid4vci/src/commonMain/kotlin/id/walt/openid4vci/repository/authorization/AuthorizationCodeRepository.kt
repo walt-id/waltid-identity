@@ -8,8 +8,8 @@ import kotlin.time.ExperimentalTime
  * Storage abstraction for authorization code sessions.
  */
 interface AuthorizationCodeRepository {
-    fun save(record: AuthorizationCodeRecord, issuerId: String)
-    fun consume(code: String, issuerId: String): AuthorizationCodeRecord?
+    suspend fun save(record: AuthorizationCodeRecord)
+    suspend fun consume(code: String): AuthorizationCodeRecord?
 }
 
 data class AuthorizationCodeRecord @OptIn(ExperimentalTime::class) constructor(

@@ -8,9 +8,9 @@ import kotlin.time.ExperimentalTime
  * Storage abstraction for OpenID4VCI pre-authorized code sessions.
  */
 interface PreAuthorizedCodeRepository {
-    fun save(record: PreAuthorizedCodeRecord, issuerId: String)
-    fun get(code: String, issuerId: String): PreAuthorizedCodeRecord?
-    fun consume(code: String, issuerId: String): PreAuthorizedCodeRecord?
+    suspend fun save(record: PreAuthorizedCodeRecord)
+    suspend fun get(code: String): PreAuthorizedCodeRecord?
+    suspend fun consume(code: String): PreAuthorizedCodeRecord?
 }
 
 data class PreAuthorizedCodeRecord @OptIn(ExperimentalTime::class) constructor(

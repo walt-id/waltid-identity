@@ -67,7 +67,6 @@ class ProviderCombinedFlowTest {
         // Pre-authorized code flow
         val issuedCode = config.preAuthorizedCodeIssuer.issue(
             PreAuthorizedCodeIssueRequest(
-                issuerId = issuerId,
                 clientId = "pre-client",
                 scopes = setOf("openid"),
                 audience = setOf("aud:issuer"),
@@ -93,6 +92,6 @@ class ProviderCombinedFlowTest {
         assertTrue(preAccessResponse.isSuccess())
         val preTokenResponse = (preAccessResponse as AccessResponseResult.Success).response
         assertEquals("nonce-pre", preTokenResponse.extra["c_nonce"])
-        assertNull(config.preAuthorizedCodeRepository.get(preCode, issuerId))
+        assertNull(config.preAuthorizedCodeRepository.get(preCode))
     }
 }

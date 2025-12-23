@@ -28,11 +28,10 @@ import kotlin.time.ExperimentalTime
  * while services cover issuer-facing workflows.
  */
 interface PreAuthorizedCodeIssuer {
-    fun issue(request: PreAuthorizedCodeIssueRequest): PreAuthorizedCodeIssueResult
+    suspend fun issue(request: PreAuthorizedCodeIssueRequest): PreAuthorizedCodeIssueResult
 }
 
 data class PreAuthorizedCodeIssueRequest @OptIn(ExperimentalTime::class) constructor(
-    val issuerId: String,
     val clientId: String? = null,
     val userPinRequired: Boolean = false,
     val userPin: String? = null,
@@ -56,7 +55,7 @@ class DefaultPreAuthorizedCodeIssuer(
 ) : PreAuthorizedCodeIssuer {
 
     @OptIn(ExperimentalTime::class)
-    override fun issue(request: PreAuthorizedCodeIssueRequest): PreAuthorizedCodeIssueResult {
+    override suspend fun issue(request: PreAuthorizedCodeIssueRequest): PreAuthorizedCodeIssueResult {
         val code = generateCode()
         val now = kotlin.time.Clock.System.now()
         val expiresAt = now + codeLifetimeSeconds.seconds
@@ -76,8 +75,7 @@ class DefaultPreAuthorizedCodeIssuer(
                 expiresAt = expiresAt,
                 credentialNonce = request.credentialNonce,
                 credentialNonceExpiresAt = request.credentialNonceExpiresAt,
-            ),
-            request.issuerId,
+            )
         )
 
         return PreAuthorizedCodeIssueResult(

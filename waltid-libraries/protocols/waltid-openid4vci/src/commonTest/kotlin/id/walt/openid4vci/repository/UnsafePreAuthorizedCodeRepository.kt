@@ -5,18 +5,18 @@ import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import kotlin.time.ExperimentalTime
 
 class UnsafePreAuthorizedCodeRepository : PreAuthorizedCodeRepository {
-    private val records = mutableMapOf<Pair<String, String>, PreAuthorizedCodeRecord>()
+    private val records = mutableMapOf<String, PreAuthorizedCodeRecord>()
 
-    override fun save(record: PreAuthorizedCodeRecord, issuerId: String) {
-        records[issuerId to record.code] = record
+    override suspend fun save(record: PreAuthorizedCodeRecord) {
+        records[record.code] = record
     }
 
-    override fun get(code: String, issuerId: String): PreAuthorizedCodeRecord? =
-        records[issuerId to code]
+    override suspend fun get(code: String): PreAuthorizedCodeRecord? =
+        records[code]
 
     @OptIn(ExperimentalTime::class)
-    override fun consume(code: String, issuerId: String): PreAuthorizedCodeRecord? {
-        val record = records.remove(issuerId to code) ?: return null
+    override suspend fun consume(code: String): PreAuthorizedCodeRecord? {
+        val record = records.remove(code) ?: return null
         if (kotlin.time.Clock.System.now() > record.expiresAt) {
             return null
         }

@@ -7,24 +7,22 @@ import kotlin.time.ExperimentalTime
 @OptIn(ExperimentalTime::class)
 internal fun defaultAuthorizationCodeRepository(): AuthorizationCodeRepository =
     object : AuthorizationCodeRepository {
-        private val records = mutableMapOf<Pair<String, String>, AuthorizationCodeRecord>()
+        private val records = mutableMapOf<String, AuthorizationCodeRecord>()
         private val lock = SynchronizedObject()
 
-        override fun save(record: AuthorizationCodeRecord, issuerId: String) {
+        override suspend fun save(record: AuthorizationCodeRecord) {
             synchronized(lock) {
-                records[issuerKey(issuerId, record.code)] = record
+                records[record.code] = record
             }
         }
 
-        override fun consume(code: String, issuerId: String): AuthorizationCodeRecord? {
+        override suspend fun consume(code: String): AuthorizationCodeRecord? {
             return synchronized(lock) {
-                val record = records.remove(issuerKey(issuerId, code)) ?: return null
+                val record = records.remove(code) ?: return null
                 if (kotlin.time.Clock.System.now() > record.expiresAt) {
                     return null
                 }
                 record
             }
         }
-
-        private fun issuerKey(issuerId: String, code: String) = issuerId to code
     }

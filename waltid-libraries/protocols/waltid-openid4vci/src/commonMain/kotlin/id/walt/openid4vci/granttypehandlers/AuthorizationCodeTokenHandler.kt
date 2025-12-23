@@ -33,10 +33,7 @@ class AuthorizationCodeTokenHandler(
         val code = request.getRequestForm().getFirst("code")
             ?: return TokenEndpointResult.Failure("invalid_request", "Missing authorization code")
 
-        val issuerId = request.getIssuerId()
-            ?: return TokenEndpointResult.Failure("invalid_request", "Issuer context missing")
-
-        val record = codeRepository.consume(code, issuerId)
+        val record = codeRepository.consume(code)
             ?: return TokenEndpointResult.Failure("invalid_grant", "Authorization code is invalid or has already been used")
 
         val client = request.getClient()

@@ -39,10 +39,7 @@ class PreAuthorizedCodeTokenHandler(
         val code = request.getRequestForm().getFirst("pre-authorized_code")
             ?: return TokenEndpointResult.Failure("invalid_request", "Missing pre-authorized_code")
 
-        val issuerId = request.getIssuerId()
-            ?: return TokenEndpointResult.Failure("invalid_request", "Issuer context missing")
-
-        val record = codeRepository.get(code, issuerId)
+        val record = codeRepository.get(code)
             ?: return TokenEndpointResult.Failure(
                 "invalid_grant",
                 "Pre-authorized code is invalid or has already been used",
@@ -63,7 +60,7 @@ class PreAuthorizedCodeTokenHandler(
             )
         }
 
-        val consumed = codeRepository.consume(code, issuerId)
+        val consumed = codeRepository.consume(code)
             ?: return TokenEndpointResult.Failure(
                 "invalid_grant",
                 "Pre-authorized code is invalid or has already been used",
