@@ -5,44 +5,32 @@ package id.walt.x509.iso.documentsigner.builder
 import id.walt.crypto.keys.Key
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
+import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import kotlin.time.ExperimentalTime
 
 //TODO: Use data class for profile data
 class DocumentSignerCertificateBuilder(
-    val country: String,
-    val commonName: String,
+    val principalName: DocumentSignerPrincipalName,
     val validityPeriod: CertificateValidityPeriod,
     val crlDistributionPointUri: String,
     val documentSignerPublicKey: Key,
     val iacaSignerSpec: IACASignerSpecification,
 ) {
 
-    var stateOrProvinceName: String? = null
-    var organizationName: String? = null
-    var localityName: String? = null
-
     //TODO: Add call to validator before calling platform sign function
     suspend fun build() = platformSignDocumentSignerCertificate(
-        country = country,
-        commonName = commonName,
+        principalName = principalName,
         validityPeriod = validityPeriod,
         crlDistributionPointUri = crlDistributionPointUri,
         dsPublicKey = documentSignerPublicKey,
         iacaSignerSpec = iacaSignerSpec,
-        stateOrProvinceName = stateOrProvinceName,
-        organizationName = organizationName,
-        localityName = localityName,
     )
 }
 
 internal expect suspend fun platformSignDocumentSignerCertificate(
-    country: String,
-    commonName: String,
+    principalName: DocumentSignerPrincipalName,
     validityPeriod: CertificateValidityPeriod,
     crlDistributionPointUri: String,
     dsPublicKey: Key,
     iacaSignerSpec: IACASignerSpecification,
-    stateOrProvinceName: String? = null,
-    organizationName: String? = null,
-    localityName: String? = null,
 ): DocumentSignerCertificateBundle

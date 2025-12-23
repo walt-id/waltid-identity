@@ -7,11 +7,8 @@ import id.walt.x509.iso.IssuerAlternativeName
 import kotlin.time.ExperimentalTime
 
 data class IACACertificateProfileData(
-    val country: String,
-    val commonName: String,
+    val principalName: IACAPrincipalName,
     val validityPeriod: CertificateValidityPeriod,
     val issuerAlternativeName: IssuerAlternativeName,
-    val stateOrProvinceName: String? = null,
-    val organizationName: String? = null,
     val crlDistributionPointUri: String? = null,
 )

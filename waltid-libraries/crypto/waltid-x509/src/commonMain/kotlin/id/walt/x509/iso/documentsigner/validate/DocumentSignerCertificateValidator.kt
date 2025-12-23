@@ -15,16 +15,19 @@ class DocumentSignerCertificateValidator {
         data: DocumentSignerCertificateProfileData,
     ) {
 
-        require(isValidIsoCountryCode(data.country)) {
-            "Document signer certificate data invalid ISO 3166-1 country code: '${data.country}'. Must be a valid 2-letter uppercase code."
+        require(isValidIsoCountryCode(data.principalName.country)) {
+            "Document signer certificate data invalid ISO 3166-1 country code: '${data.principalName.country}'. Must be a valid 2-letter uppercase code."
         }
 
         // Validations of optional string values
-        require(data.stateOrProvinceName == null || data.stateOrProvinceName.isNotBlank()) {
+        require(data.principalName.stateOrProvinceName == null || data.principalName.stateOrProvinceName.isNotBlank()) {
             "Document signer certificate data stateOrProvinceName must not be blank if specified"
         }
-        require(data.organizationName == null || data.organizationName.isNotBlank()) {
+        require(data.principalName.organizationName == null || data.principalName.organizationName.isNotBlank()) {
             "Document signer certificate data organizationName must not be blank if specified"
+        }
+        require(data.principalName.localityName == null || data.principalName.localityName.isNotBlank()) {
+            "Document signer certificate data localityName must not be blank if specified"
         }
 
         val validity = data.validityPeriod
@@ -48,11 +51,11 @@ class DocumentSignerCertificateValidator {
         dsData: DocumentSignerCertificateProfileData,
         iacaData: IACACertificateProfileData,
     ) {
-        require(iacaData.country == dsData.country) {
+        require(iacaData.principalName.country == dsData.principalName.country) {
             "IACA and document signer country names must be the same"
         }
 
-        require(iacaData.stateOrProvinceName == dsData.stateOrProvinceName) {
+        require(iacaData.principalName.stateOrProvinceName == dsData.principalName.stateOrProvinceName) {
             "IACA and document signer state/province names must be the same"
         }
 

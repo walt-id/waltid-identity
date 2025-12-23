@@ -7,8 +7,10 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.x509.iso.documentsigner.builder.DocumentSignerCertificateBuilder
 import id.walt.x509.iso.documentsigner.builder.IACASignerSpecification
+import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import id.walt.x509.iso.documentsigner.parser.DocumentSignerCertificateParser
 import id.walt.x509.iso.iaca.builder.IACACertificateBuilder
+import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -45,8 +47,10 @@ class DocumentSignerRoundTripTest {
             uri = "https://ca.example.com",
         )
         val iacaCertBuilder = IACACertificateBuilder(
-            country = "US",
-            commonName = "Example IACA",
+            principalName = IACAPrincipalName(
+                country = "US",
+                commonName = "Example IACA",
+            ),
             validityPeriod = CertificateValidityPeriod(
                 notBefore = iacaValidNotBefore,
                 notAfter = iacaValidNotAfter,
@@ -60,8 +64,10 @@ class DocumentSignerRoundTripTest {
         val iacaCertBundle = iacaCertBuilder.build()
 
         val dsCertBuilder = DocumentSignerCertificateBuilder(
-            country = "US",
-            commonName = "Example DS",
+            principalName = DocumentSignerPrincipalName(
+                country = "US",
+                commonName = "Example DS",
+            ),
             validityPeriod = CertificateValidityPeriod(
                 notBefore = iacaValidNotBefore.plus(1.days),
                 notAfter = iacaValidNotAfter.minus(1.days),

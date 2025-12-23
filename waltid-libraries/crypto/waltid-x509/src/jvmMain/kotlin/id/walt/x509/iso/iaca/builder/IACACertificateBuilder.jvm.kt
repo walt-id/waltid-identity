@@ -14,6 +14,7 @@ import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.generateCertificateSerialNo
 import id.walt.x509.iso.iaca.certificate.IACACertificateBundle
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
+import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import okio.ByteString.Companion.toByteString
 import org.bouncycastle.asn1.x509.*
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
@@ -26,22 +27,19 @@ import kotlin.time.Instant
 
 
 internal actual suspend fun platformSignIACACertificate(
-    country: String,
-    commonName: String,
+    principalName: IACAPrincipalName,
     validityPeriod: CertificateValidityPeriod,
     issuerAlternativeName: IssuerAlternativeName,
     signingKey: Key,
-    stateOrProvinceName: String?,
-    organizationName: String?,
     crlDistributionPointUri: String?
 ): IACACertificateBundle {
     val javaPublicKey = parsePEMEncodedJcaPublicKey(signingKey.getPublicKey().exportPEM())
 
     val issuer = buildX500Name(
-        country = country,
-        commonName = commonName,
-        stateOrProvinceName = stateOrProvinceName,
-        organizationName = organizationName,
+        country = principalName.country,
+        commonName = principalName.commonName,
+        stateOrProvinceName = principalName.stateOrProvinceName,
+        organizationName = principalName.organizationName,
     )
 
     val altNames = issuerAlternativeNameToGeneralNameArray(issuerAlternativeName)
@@ -128,8 +126,7 @@ internal actual suspend fun platformSignIACACertificate(
             bytes = certificate.encoded,
         ),
         decodedData = IACADecodedCertificate(
-            country = country,
-            commonName = commonName,
+            principalName = principalName,
             validityPeriod = CertificateValidityPeriod(
                 notBefore = Instant.fromEpochSeconds(certNotBeforeDate.toInstant().epochSecond),
                 notAfter = Instant.fromEpochSeconds(certNotAfterDate.toInstant().epochSecond),
@@ -142,8 +139,6 @@ internal actual suspend fun platformSignIACACertificate(
                 CertificateKeyUsage.KeyCertSign,
                 CertificateKeyUsage.CRLSign,
             ),
-            stateOrProvinceName = stateOrProvinceName,
-            organizationName = organizationName,
             crlDistributionPointUri = crlDistributionPointUri,
         )
     )

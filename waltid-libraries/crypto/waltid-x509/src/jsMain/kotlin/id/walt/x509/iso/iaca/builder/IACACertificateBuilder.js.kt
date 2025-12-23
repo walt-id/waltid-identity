@@ -6,17 +6,15 @@ import id.walt.crypto.keys.Key
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.iaca.certificate.IACACertificateBundle
+import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import kotlin.time.ExperimentalTime
 
 internal actual suspend fun platformSignIACACertificate(
-    country: String,
-    commonName: String,
+    principalName: IACAPrincipalName,
     validityPeriod: CertificateValidityPeriod,
     issuerAlternativeName: IssuerAlternativeName,
     signingKey: Key,
-    stateOrProvinceName: String?,
-    organizationName: String?,
-    crlDistributionPointUri: String?
+    crlDistributionPointUri: String?,
 ): IACACertificateBundle {
     TODO("Not yet implemented")
 }

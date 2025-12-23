@@ -13,14 +13,14 @@ class IACACertificateValidator {
     fun validateProfileData(
         data: IACACertificateProfileData,
     ) {
-        require(isValidIsoCountryCode(data.country)) {
-            "IACA certificate data invalid ISO 3166-1 country code: '${data.country}'. Must be a valid 2-letter uppercase code."
+        require(isValidIsoCountryCode(data.principalName.country)) {
+            "IACA certificate data invalid ISO 3166-1 country code: '${data.principalName.country}'. Must be a valid 2-letter uppercase code."
         }
 
-        require(data.stateOrProvinceName == null || data.stateOrProvinceName.isNotBlank()) {
+        require(data.principalName.stateOrProvinceName == null || data.principalName.stateOrProvinceName.isNotBlank()) {
             "IACA certificate data stateOrProvinceName must not be blank if specified"
         }
-        require(data.organizationName == null || data.organizationName.isNotBlank()) {
+        require(data.principalName.organizationName == null || data.principalName.organizationName.isNotBlank()) {
             "IACA certificate data organizationName must not be blank if specified"
         }
 

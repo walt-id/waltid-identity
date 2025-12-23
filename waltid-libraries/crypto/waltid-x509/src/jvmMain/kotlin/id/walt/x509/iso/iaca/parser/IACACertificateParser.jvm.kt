@@ -8,6 +8,7 @@ import id.walt.x509.id.walt.x509.*
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
+import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import okio.ByteString.Companion.toByteString
 import org.bouncycastle.asn1.ASN1OctetString
 import org.bouncycastle.asn1.x509.Extension
@@ -47,8 +48,12 @@ actual class IACACertificateParser actual constructor(val certificate: Certifica
         }
 
         return IACADecodedCertificate(
-            country = country,
-            commonName = commonName,
+            principalName = IACAPrincipalName(
+                country = country,
+                commonName = commonName,
+                stateOrProvinceName = issuerName.getStateOrProvinceName(),
+                organizationName = issuerName.getOrganizationName(),
+            ),
             validityPeriod = CertificateValidityPeriod(
                 notBefore = cert.notBefore.toInstant().toKotlinInstant(),
                 notAfter = cert.notAfter.toInstant().toKotlinInstant(),
@@ -58,8 +63,6 @@ actual class IACACertificateParser actual constructor(val certificate: Certifica
             isCA = (cert.basicConstraints != -1),
             pathLengthConstraint = cert.basicConstraints,
             keyUsage = keyUsageSet,
-            stateOrProvinceName = issuerName.getStateOrProvinceName(),
-            organizationName = issuerName.getOrganizationName(),
             crlDistributionPointUri = parseCrlDistributionPointUriFromCert(cert),
         )
     }

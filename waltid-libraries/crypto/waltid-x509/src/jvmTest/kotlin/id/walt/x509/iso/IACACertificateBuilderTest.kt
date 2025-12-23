@@ -45,8 +45,10 @@ class IACACertificateBuilderTest {
             uri = "https://ca.example.com",
         )
         val iacaCertBuilder = IACACertificateBuilder(
-            country = "US",
-            commonName = "Example IACA",
+            principalName = id.walt.x509.iso.iaca.certificate.IACAPrincipalName(
+                country = "US",
+                commonName = "Example IACA",
+            ),
             validityPeriod = CertificateValidityPeriod(
                 notBefore = validNotBefore,
                 notAfter = validNotAfter,
@@ -82,7 +84,7 @@ class IACACertificateBuilderTest {
         // 5. Should contain at least 71 bits (recommended)
         assertTrue(cert.serialNumber.bitLength() >= 71, "Serial number should contain at least 71 bits of entropy")
 
-        assertEquals(iacaCertBuilder.country, cert.issuerX500Principal.name.substringAfter("C=").take(2))
+        assertEquals(iacaCertBuilder.principalName.country, cert.issuerX500Principal.name.substringAfter("C=").take(2))
         assertEquals(cert.subjectX500Principal, cert.issuerX500Principal) // self-signed
         assertEquals(cert.basicConstraints, 0) // Is a CA
         assertTrue(cert.keyUsage[5]) // keyCertSign
@@ -117,13 +119,8 @@ class IACACertificateBuilderTest {
     ) {
 
         assertEquals(
-            expected = builder.country,
-            actual = iacaCertData.country,
-        )
-
-        assertEquals(
-            expected = builder.commonName,
-            actual = iacaCertData.commonName,
+            expected = builder.principalName,
+            actual = iacaCertData.principalName,
         )
 
         assertEquals(
@@ -139,16 +136,6 @@ class IACACertificateBuilderTest {
         assertEquals(
             expected = builder.issuerAlternativeName,
             actual = iacaCertData.issuerAlternativeName,
-        )
-
-        assertEquals(
-            expected = builder.stateOrProvinceName,
-            actual = iacaCertData.stateOrProvinceName,
-        )
-
-        assertEquals(
-            expected = builder.organizationName,
-            actual = iacaCertData.organizationName,
         )
 
         assertEquals(

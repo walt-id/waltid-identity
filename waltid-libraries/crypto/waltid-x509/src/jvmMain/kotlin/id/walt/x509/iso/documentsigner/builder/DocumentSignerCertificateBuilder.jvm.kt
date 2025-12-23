@@ -9,11 +9,12 @@ import id.walt.x509.CertificateKeyUsage
 import id.walt.x509.id.walt.x509.KeyContentSignerWrapper
 import id.walt.x509.id.walt.x509.buildX500Name
 import id.walt.x509.id.walt.x509.issuerAlternativeNameToGeneralNameArray
+import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.DocumentSignerEkuOid
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
+import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import id.walt.x509.iso.generateCertificateSerialNo
-import id.walt.x509.iso.CertificateValidityPeriod
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x509.*
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
@@ -25,32 +26,28 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 internal actual suspend fun platformSignDocumentSignerCertificate(
-    country: String,
-    commonName: String,
+    principalName: DocumentSignerPrincipalName,
     validityPeriod: CertificateValidityPeriod,
     crlDistributionPointUri: String,
     dsPublicKey: Key,
     iacaSignerSpec: IACASignerSpecification,
-    stateOrProvinceName: String?,
-    organizationName: String?,
-    localityName: String?
 ): DocumentSignerCertificateBundle {
 
     val subjectJavaPublicKey = parsePEMEncodedJcaPublicKey(dsPublicKey.exportPEM())
 
     val iacaName = buildX500Name(
-        country = iacaSignerSpec.data.country,
-        commonName = iacaSignerSpec.data.commonName,
-        stateOrProvinceName = iacaSignerSpec.data.stateOrProvinceName,
-        organizationName = iacaSignerSpec.data.organizationName,
+        country = iacaSignerSpec.data.principalName.country,
+        commonName = iacaSignerSpec.data.principalName.commonName,
+        stateOrProvinceName = iacaSignerSpec.data.principalName.stateOrProvinceName,
+        organizationName = iacaSignerSpec.data.principalName.organizationName,
     )
 
     val dsName = buildX500Name(
-        country = country,
-        commonName = commonName,
-        stateOrProvinceName = stateOrProvinceName,
-        organizationName = organizationName,
-        localityName = localityName,
+        country = principalName.country,
+        commonName = principalName.commonName,
+        stateOrProvinceName = principalName.stateOrProvinceName,
+        organizationName = principalName.organizationName,
+        localityName = principalName.localityName,
     )
 
     val serialNo = generateCertificateSerialNo()
@@ -139,8 +136,7 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
             bytes = certificate.encoded,
         ),
         data = DocumentSignerDecodedCertificate(
-            country = country,
-            commonName = commonName,
+            principalName = principalName,
             validityPeriod = CertificateValidityPeriod(
                 notBefore = Instant.fromEpochSeconds(certNotBeforeDate.toInstant().epochSecond),
                 notAfter = Instant.fromEpochSeconds(certNotAfterDate.toInstant().epochSecond),
@@ -151,9 +147,6 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
                 CertificateKeyUsage.DigitalSignature
             ),
             isCA = false,
-            stateOrProvinceName = stateOrProvinceName,
-            organizationName = organizationName,
-            localityName = localityName,
         ),
     )
 }
