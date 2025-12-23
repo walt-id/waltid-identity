@@ -4,14 +4,13 @@ package id.walt.x509.iso.documentsigner.parser
 
 import com.nimbusds.jose.util.X509CertUtils
 import id.walt.x509.CertificateDer
-import id.walt.x509.id.walt.x509.*
+import id.walt.x509.id.walt.x509.iso.documentsigner.certificate.parseFromJcaX500Name
+import id.walt.x509.id.walt.x509.mustParseCertificateKeyUsageSetFromX509Certificate
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
+import id.walt.x509.iso.parseCrlDistributionPointUriFromCert
 import okio.ByteString.Companion.toByteString
-import org.bouncycastle.asn1.ASN1OctetString
-import org.bouncycastle.asn1.x509.Extension
-import org.bouncycastle.asn1.x509.KeyUsage
 import org.bouncycastle.cert.jcajce.JcaX500NameUtil
 import kotlin.time.ExperimentalTime
 import kotlin.time.toKotlinInstant
@@ -22,18 +21,9 @@ actual class DocumentSignerCertificateParser actual constructor(val certificate:
 
         val cert = X509CertUtils.parse(certificate.bytes)
 
-        val subjectName = JcaX500NameUtil.getSubject(cert)
-
-        val country = requireNotNull(
-            subjectName.getCountryCode()
-        ) {
-            "Subject country code must exist as part of principal name in X509 certificate , but was found missing"
-        }
-        val commonName = requireNotNull(
-            subjectName.getCommonName()
-        ) {
-            "Subject common name must exist as part of principal name in X509 certificate , but was found missing"
-        }
+        val principalName = DocumentSignerPrincipalName.parseFromJcaX500Name(
+            name = JcaX500NameUtil.getSubject(cert),
+        )
 
         val crlDistributionPointUri = requireNotNull(
             parseCrlDistributionPointUriFromCert(cert)
@@ -41,22 +31,10 @@ actual class DocumentSignerCertificateParser actual constructor(val certificate:
             "CRL distribution point URI must exist as part of the X509 certificate but was found missing"
         }
 
-        val keyUsageSet = requireNotNull(
-            cert.getExtensionValue(Extension.keyUsage.id)
-        ) {
-            "KeyUsage extension must exist as part of the X509 certificate, but was found missing"
-        }.let { keyUsageExtRaw ->
-            KeyUsage.getInstance(ASN1OctetString.getInstance(keyUsageExtRaw).octets).toCertificateKeyUsages()
-        }
+        val keyUsageSet = mustParseCertificateKeyUsageSetFromX509Certificate(cert)
 
         return DocumentSignerDecodedCertificate(
-            principalName = DocumentSignerPrincipalName(
-                country = country,
-                commonName = commonName,
-                stateOrProvinceName = subjectName.getStateOrProvinceName(),
-                organizationName = subjectName.getOrganizationName(),
-                localityName = subjectName.getLocalityName(),
-            ),
+            principalName = principalName,
             validityPeriod = CertificateValidityPeriod(
                 notBefore = cert.notBefore.toInstant().toKotlinInstant(),
                 notAfter = cert.notAfter.toInstant().toKotlinInstant(),

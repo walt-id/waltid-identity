@@ -1,10 +1,10 @@
 package id.walt.x509
 
-import id.walt.x509.id.walt.x509.issuerAlternativeNameToGeneralNameArray
 import id.walt.x509.id.walt.x509.toBCKeyUsage
 import id.walt.x509.id.walt.x509.toBouncyCastleKeyUsage
 import id.walt.x509.id.walt.x509.toCertificateKeyUsages
 import id.walt.x509.iso.IssuerAlternativeName
+import id.walt.x509.iso.issuerAlternativeNameToGeneralNameArray
 import org.bouncycastle.asn1.x509.GeneralName
 import org.bouncycastle.asn1.x509.KeyUsage
 import org.junit.jupiter.api.Assertions.assertEquals

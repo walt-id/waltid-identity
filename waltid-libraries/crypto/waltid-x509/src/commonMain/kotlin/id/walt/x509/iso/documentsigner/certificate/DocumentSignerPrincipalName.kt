@@ -6,4 +6,6 @@ data class DocumentSignerPrincipalName(
     val stateOrProvinceName: String? = null,
     val organizationName: String? = null,
     val localityName: String? = null,
-)
+) {
+    companion object
+}

@@ -5,4 +5,6 @@ data class IACAPrincipalName(
     val commonName: String,
     val stateOrProvinceName: String? = null,
     val organizationName: String? = null,
-)
+) {
+    companion object
+}

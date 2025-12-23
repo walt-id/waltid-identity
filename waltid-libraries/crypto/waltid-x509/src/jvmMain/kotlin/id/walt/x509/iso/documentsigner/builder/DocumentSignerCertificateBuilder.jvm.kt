@@ -8,13 +8,13 @@ import id.walt.x509.CertificateDer
 import id.walt.x509.CertificateKeyUsage
 import id.walt.x509.id.walt.x509.KeyContentSignerWrapper
 import id.walt.x509.id.walt.x509.buildX500Name
-import id.walt.x509.id.walt.x509.issuerAlternativeNameToGeneralNameArray
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.DocumentSignerEkuOid
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import id.walt.x509.iso.generateCertificateSerialNo
+import id.walt.x509.iso.issuerAlternativeNameToGeneralNameArray
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x509.*
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
