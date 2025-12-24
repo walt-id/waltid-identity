@@ -5,7 +5,6 @@ package id.walt.x509.iso
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
-import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.iaca.builder.IACACertificateBuilder
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
@@ -64,7 +63,7 @@ class IACACertificateRoundTripTest {
         val decodedCert = iacaCertParser.parse()
 
         assertEquals(
-            expected = iacaCertBundle.decodedData,
+            expected = iacaCertBundle.decodedCertData,
             actual = decodedCert,
         )
 

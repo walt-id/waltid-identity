@@ -66,7 +66,7 @@ class IACACertificateBuilderTest {
 
         assertIACABuilderDataEqualsCertificateData(
             builder = iacaCertBuilder,
-            iacaCertData = iacaCertBundle.decodedData,
+            iacaCertData = iacaCertBundle.decodedCertData,
         )
 
         val cert = X509CertUtils.parse(iacaCertBundle.certificateDer.bytes)
@@ -87,7 +87,7 @@ class IACACertificateBuilderTest {
         // 5. Should contain at least 71 bits (recommended)
         assertTrue(cert.serialNumber.bitLength() >= 71, "Serial number should contain at least 71 bits of entropy")
 
-        assertEquals(iacaCertBuilder.principalName.country, cert.issuerX500Principal.name.substringAfter("C=").take(2))
+        assertEquals(iacaCertBuilder.profileData.principalName.country, cert.issuerX500Principal.name.substringAfter("C=").take(2))
         assertEquals(cert.subjectX500Principal, cert.issuerX500Principal) // self-signed
         assertEquals(cert.basicConstraints, 0) // Is a CA
         assertTrue(cert.keyUsage[5]) // keyCertSign
@@ -110,7 +110,7 @@ class IACACertificateBuilderTest {
         val uriName = uri.names!!.find { it.tagNo == GeneralName.uniformResourceIdentifier }
         val crlUriValue = (uriName!!.name as DERIA5String).string
         assertEquals(
-            expected = iacaCertBundle.decodedData.crlDistributionPointUri,
+            expected = iacaCertBundle.decodedCertData.crlDistributionPointUri,
             actual = crlUriValue,
             message = "CRL distribution point URI must match expected value",
         )
@@ -122,17 +122,17 @@ class IACACertificateBuilderTest {
     ) {
 
         assertEquals(
-            expected = builder.principalName,
+            expected = builder.profileData.principalName,
             actual = iacaCertData.principalName,
         )
 
         assertEquals(
-            expected = builder.validityPeriod.notAfter,
+            expected = builder.profileData.validityPeriod.notAfter,
             actual = iacaCertData.validityPeriod.notAfter,
         )
 
         assertEquals(
-            expected = builder.validityPeriod.notBefore,
+            expected = builder.profileData.validityPeriod.notBefore,
             actual = iacaCertData.validityPeriod.notBefore,
         )
 

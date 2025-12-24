@@ -12,9 +12,6 @@ class IACACertificateBuilder(
     val signingKey: Key,
 ) {
 
-    val principalName get() = profileData.principalName
-    val validityPeriod get() = profileData.validityPeriod
-
     suspend fun build() = platformSignIACACertificate(
         profileData = profileData,
         signingKey = signingKey,

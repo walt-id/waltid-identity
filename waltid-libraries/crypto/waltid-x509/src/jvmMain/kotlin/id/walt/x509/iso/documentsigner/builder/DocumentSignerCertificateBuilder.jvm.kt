@@ -12,8 +12,8 @@ import id.walt.x509.id.walt.x509.buildX500Name
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.DocumentSignerEkuOid
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
+import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
-import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import id.walt.x509.iso.generateCertificateSerialNo
 import id.walt.x509.iso.issuerAlternativeNameToGeneralNameArray
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
@@ -27,20 +27,22 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 internal actual suspend fun platformSignDocumentSignerCertificate(
-    principalName: DocumentSignerPrincipalName,
-    validityPeriod: CertificateValidityPeriod,
-    crlDistributionPointUri: String,
-    dsPublicKey: Key,
+    profileData: DocumentSignerCertificateProfileData,
+    publicKey: Key,
     iacaSignerSpec: IACASignerSpecification,
 ): DocumentSignerCertificateBundle {
 
-    val subjectJavaPublicKey = parsePEMEncodedJcaPublicKey(dsPublicKey.exportPEM())
+    val principalName = profileData.principalName
+    val validityPeriod = profileData.validityPeriod
+    val crlDistributionPointUri = profileData.crlDistributionPointUri
+
+    val subjectJavaPublicKey = parsePEMEncodedJcaPublicKey(publicKey.exportPEM())
 
     val iacaName = buildX500Name(
-        country = iacaSignerSpec.data.principalName.country,
-        commonName = iacaSignerSpec.data.principalName.commonName,
-        stateOrProvinceName = iacaSignerSpec.data.principalName.stateOrProvinceName,
-        organizationName = iacaSignerSpec.data.principalName.organizationName,
+        country = iacaSignerSpec.profileData.principalName.country,
+        commonName = iacaSignerSpec.profileData.principalName.commonName,
+        stateOrProvinceName = iacaSignerSpec.profileData.principalName.stateOrProvinceName,
+        organizationName = iacaSignerSpec.profileData.principalName.organizationName,
     )
 
     val dsName = buildX500Name(
@@ -53,7 +55,7 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
 
     val serialNo = generateCertificateSerialNo()
 
-    val altNames = issuerAlternativeNameToGeneralNameArray(iacaSignerSpec.data.issuerAlternativeName)
+    val altNames = issuerAlternativeNameToGeneralNameArray(iacaSignerSpec.profileData.issuerAlternativeName)
 
     val certNotBeforeDate = Date(Instant.fromEpochSeconds(validityPeriod.notBefore.epochSeconds).toEpochMilliseconds())
     val certNotAfterDate = Date(Instant.fromEpochSeconds(validityPeriod.notAfter.epochSeconds).toEpochMilliseconds())
@@ -132,11 +134,12 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
 
     val certificateHolder = certBuilder.build(keySignerBuilder)
     val certificate = JcaX509CertificateConverter().getCertificate(certificateHolder)
+
     return DocumentSignerCertificateBundle(
         certificateDer = CertificateDer(
             bytes = certificate.encoded,
         ),
-        data = DocumentSignerDecodedCertificate(
+        decodedCertData = DocumentSignerDecodedCertificate(
             principalName = principalName,
             validityPeriod = CertificateValidityPeriod(
                 notBefore = Instant.fromEpochSeconds(certNotBeforeDate.toInstant().epochSecond),

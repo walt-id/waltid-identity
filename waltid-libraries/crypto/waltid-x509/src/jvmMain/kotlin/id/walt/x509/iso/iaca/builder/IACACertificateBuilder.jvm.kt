@@ -10,12 +10,10 @@ import id.walt.x509.CertificateKeyUsage
 import id.walt.x509.id.walt.x509.KeyContentSignerWrapper
 import id.walt.x509.id.walt.x509.buildX500Name
 import id.walt.x509.iso.CertificateValidityPeriod
-import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.generateCertificateSerialNo
 import id.walt.x509.iso.iaca.certificate.IACACertificateBundle
-import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
-import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
+import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import id.walt.x509.iso.issuerAlternativeNameToGeneralNameArray
 import okio.ByteString.Companion.toByteString
 import org.bouncycastle.asn1.x509.*
@@ -32,9 +30,10 @@ internal actual suspend fun platformSignIACACertificate(
     profileData: IACACertificateProfileData,
     signingKey: Key,
 ): IACACertificateBundle {
-    val principalName: IACAPrincipalName = profileData.principalName
-    val issuerAlternativeName: IssuerAlternativeName = profileData.issuerAlternativeName
-    val validityPeriod: CertificateValidityPeriod = profileData.validityPeriod
+
+    val principalName = profileData.principalName
+    val issuerAlternativeName = profileData.issuerAlternativeName
+    val validityPeriod = profileData.validityPeriod
 
     val javaPublicKey = parsePEMEncodedJcaPublicKey(signingKey.getPublicKey().exportPEM())
 
@@ -101,14 +100,14 @@ internal actual suspend fun platformSignIACACertificate(
                     DistributionPoint(
                         DistributionPointName(
                             GeneralNames(
-                                    GeneralName(
-                                        GeneralName.uniformResourceIdentifier,
-                                        profileData.crlDistributionPointUri
-                                    )
+                                GeneralName(
+                                    GeneralName.uniformResourceIdentifier,
+                                    profileData.crlDistributionPointUri
                                 )
-                            ),
-                            null,
-                            null,
+                            )
+                        ),
+                        null,
+                        null,
                     )
                 )
             )
@@ -126,7 +125,7 @@ internal actual suspend fun platformSignIACACertificate(
         certificateDer = CertificateDer(
             bytes = certificate.encoded,
         ),
-        decodedData = IACADecodedCertificate(
+        decodedCertData = IACADecodedCertificate(
             principalName = principalName,
             validityPeriod = CertificateValidityPeriod(
                 notBefore = Instant.fromEpochSeconds(certNotBeforeDate.toInstant().epochSecond),

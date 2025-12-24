@@ -7,6 +7,7 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.x509.iso.documentsigner.builder.DocumentSignerCertificateBuilder
 import id.walt.x509.iso.documentsigner.builder.IACASignerSpecification
+import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import id.walt.x509.iso.documentsigner.parser.DocumentSignerCertificateParser
 import id.walt.x509.iso.iaca.builder.IACACertificateBuilder
@@ -66,19 +67,21 @@ class DocumentSignerRoundTripTest {
         val iacaCertBundle = iacaCertBuilder.build()
 
         val dsCertBuilder = DocumentSignerCertificateBuilder(
-            principalName = DocumentSignerPrincipalName(
-                country = "US",
-                commonName = "Example DS",
+            profileData = DocumentSignerCertificateProfileData(
+                principalName = DocumentSignerPrincipalName(
+                    country = "US",
+                    commonName = "Example DS",
+                ),
+                validityPeriod = CertificateValidityPeriod(
+                    notBefore = iacaValidNotBefore.plus(1.days),
+                    notAfter = iacaValidNotAfter.minus(1.days),
+                ),
+                crlDistributionPointUri = "https://ca.example.com/crl",
             ),
-            validityPeriod = CertificateValidityPeriod(
-                notBefore = iacaValidNotBefore.plus(1.days),
-                notAfter = iacaValidNotAfter.minus(1.days),
-            ),
-            crlDistributionPointUri = "https://ca.example.com/crl",
-            documentSignerPublicKey = dsKey.getPublicKey(),
+            publicKey = dsKey.getPublicKey(),
             iacaSignerSpec = IACASignerSpecification(
                 signingKey = iacaSigningKey,
-                data = iacaCertBundle.decodedData.toIACACertificateProfileData(),
+                profileData = iacaCertBundle.decodedCertData.toIACACertificateProfileData(),
             )
         )
 
@@ -91,7 +94,7 @@ class DocumentSignerRoundTripTest {
         val decodedCert = dsCertParser.parse()
 
         assertEquals(
-            expected = dsCertificateBundle.data,
+            expected = dsCertificateBundle.decodedCertData,
             actual = decodedCert,
         )
     }
