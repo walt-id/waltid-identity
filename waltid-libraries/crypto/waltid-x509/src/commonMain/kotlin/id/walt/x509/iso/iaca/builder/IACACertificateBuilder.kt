@@ -14,10 +14,9 @@ class IACACertificateBuilder(
 ) {
 
     suspend fun build(): IACACertificateBundle {
-        IACAValidator().validateCertificateBuilderInputs(
-            data = profileData,
-            signingKey = signingKey,
-        )
+        val validator = IACAValidator()
+        validator.validateIACASigningKey(signingKey)
+        validator.validateIACACertificateProfileData(profileData)
         return platformSignIACACertificate(
             profileData = profileData,
             signingKey = signingKey,

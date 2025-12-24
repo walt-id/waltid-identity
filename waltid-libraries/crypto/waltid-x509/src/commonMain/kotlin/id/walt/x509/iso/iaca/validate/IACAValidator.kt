@@ -4,18 +4,21 @@ package id.walt.x509.iso.iaca.validate
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.IACA_CERT_MAX_VALIDITY_SECONDS
+import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
+import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import id.walt.x509.iso.isValidIsoCountryCode
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 internal class IACAValidator {
 
-    fun validateCertificateBuilderInputs(
-        data: IACACertificateProfileData,
+    fun validateIACASigningKey(
         signingKey: Key,
     ) {
+
         require(signingKey.hasPrivateKey) {
             "IACA signing key must have a private key."
         }
@@ -24,30 +27,69 @@ internal class IACAValidator {
             "IACA signing key type must be one of ${allowedSigningKeyTypes}, but was found to be ${signingKey.keyType}"
         }
 
-        require(isValidIsoCountryCode(data.principalName.country)) {
-            "IACA certificate data invalid ISO 3166-1 country code: '${data.principalName.country}'. Must be a valid 2-letter uppercase code."
+    }
+
+    fun validateIACACertificateProfileData(
+        data: IACACertificateProfileData,
+    ) {
+
+        validatePrincipalName(data.principalName)
+
+        validateIssuerAlternativeName(data.issuerAlternativeName)
+
+        validateValidityPeriod(data.validityPeriod)
+
+        data.crlDistributionPointUri?.let {
+            require(it.isNotBlank()) {
+                "IACA CRL distribution point, when optionally specified, must not be blank."
+            }
         }
 
-        require(data.principalName.stateOrProvinceName == null || data.principalName.stateOrProvinceName.isNotBlank()) {
+    }
+
+    private fun validatePrincipalName(
+        principalName: IACAPrincipalName,
+    ) {
+
+        require(isValidIsoCountryCode(principalName.country)) {
+            "IACA certificate data invalid ISO 3166-1 country code: '${principalName.country}'. Must be a valid 2-letter uppercase code."
+        }
+
+        require(principalName.stateOrProvinceName == null || principalName.stateOrProvinceName.isNotBlank()) {
             "IACA certificate data stateOrProvinceName must not be blank if specified"
         }
-        require(data.principalName.organizationName == null || data.principalName.organizationName.isNotBlank()) {
+        require(principalName.organizationName == null || principalName.organizationName.isNotBlank()) {
             "IACA certificate data organizationName must not be blank if specified"
         }
 
+    }
+
+    private fun validateValidityPeriod(
+        validityPeriod: CertificateValidityPeriod,
+    ) {
+
         val timeNow = Clock.System.now()
-        require(data.validityPeriod.notAfter > timeNow) {
-            "IACA certificate notAfter ${data.validityPeriod.notAfter} must be greater than the current time: $timeNow "
+        require(validityPeriod.notAfter > timeNow) {
+            "IACA certificate notAfter ${validityPeriod.notAfter} must be greater than the current time: $timeNow "
         }
 
-        require(data.validityPeriod.notBefore < data.validityPeriod.notAfter) {
+        require(validityPeriod.notBefore < validityPeriod.notAfter) {
             "IACA certificate data notBefore must be before (and not equal to) notAfter"
         }
 
-        require(data.validityPeriod.notAfter.minus(data.validityPeriod.notBefore).inWholeSeconds < IACA_CERT_MAX_VALIDITY_SECONDS) {
+        require(validityPeriod.notAfter.minus(validityPeriod.notBefore).inWholeSeconds < IACA_CERT_MAX_VALIDITY_SECONDS) {
             "IACA certificates should not have a validity that is larger than 15 years" +
-                    "notAfter: ${data.validityPeriod.notAfter}, notBefore: ${data.validityPeriod.notBefore} " +
-                    "and difference in whole days is: ${data.validityPeriod.notAfter.minus(data.validityPeriod.notBefore).inWholeDays}"
+                    "notAfter: ${validityPeriod.notAfter}, notBefore: ${validityPeriod.notBefore} " +
+                    "and difference in whole days is: ${validityPeriod.notAfter.minus(validityPeriod.notBefore).inWholeDays}"
+        }
+
+    }
+
+    private fun validateIssuerAlternativeName(
+        issAltName: IssuerAlternativeName,
+    ) {
+        require(!issAltName.email.isNullOrBlank() || !issAltName.uri.isNullOrBlank()) {
+            "IACA issuer alternative name must have at least one of 'email' or 'uri' specified with a non-null, or blank value"
         }
     }
 
