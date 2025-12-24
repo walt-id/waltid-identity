@@ -15,7 +15,7 @@ val applications = ":waltid-applications"
 val services = ":waltid-services"
 
 val modules = listOfNotNull(
-    *"$libraries:crypto".group(
+    * "$libraries:crypto".group(
         "waltid-crypto",
         "waltid-crypto-oci",
         "waltid-crypto-aws",
@@ -29,7 +29,7 @@ val modules = listOfNotNull(
         "waltid-x509",
     ),
 
-    *"$libraries:credentials".group(
+    * "$libraries:credentials".group(
         "waltid-w3c-credentials",
         "waltid-digital-credentials",
         "waltid-digital-credentials-examples",
@@ -44,7 +44,7 @@ val modules = listOfNotNull(
         "waltid-mdoc-credentials2"
     ),
 
-    *"$libraries:protocols".group(
+    * "$libraries:protocols".group(
         "waltid-openid4vc",
 
         "waltid-openid4vp",
@@ -54,18 +54,18 @@ val modules = listOfNotNull(
         "waltid-openid4vp-wallet"
     ),
 
-    *"$libraries:sdjwt".group(
+    * "$libraries:sdjwt".group(
         "waltid-sdjwt",
         "waltid-sdjwt-ios" whenEnabled enableIosBuild,
     ),
 
-    *"$libraries:auth".group(
+    * "$libraries:auth".group(
         "waltid-ktor-authnz",
         "waltid-permissions",
         "waltid-idpkit"
     ),
 
-    *"$libraries:web".group(
+    * "$libraries:web".group(
         "waltid-ktor-notifications",
         "waltid-ktor-notifications-core"
     ),
