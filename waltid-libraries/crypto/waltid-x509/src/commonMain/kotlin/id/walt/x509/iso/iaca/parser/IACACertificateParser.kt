@@ -3,9 +3,13 @@ package id.walt.x509.iso.iaca.parser
 import id.walt.x509.CertificateDer
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 
-expect class IACACertificateParser(
-    certificate: CertificateDer,
+class IACACertificateParser(
+    val certificate: CertificateDer,
 ) {
 
-    suspend fun parse(): IACADecodedCertificate
+    suspend fun parse() = platformParseIACACertificate(certificate)
 }
+
+internal expect suspend fun platformParseIACACertificate(
+    certificate: CertificateDer,
+): IACADecodedCertificate

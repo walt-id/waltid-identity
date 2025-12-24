@@ -16,42 +16,41 @@ import org.bouncycastle.cert.jcajce.JcaX500NameUtil
 import kotlin.time.ExperimentalTime
 import kotlin.time.toKotlinInstant
 
-actual class DocumentSignerCertificateParser actual constructor(val certificate: CertificateDer) {
+internal actual suspend fun platformParseDocumentSignerCertificate(
+    certificate: CertificateDer,
+): DocumentSignerDecodedCertificate {
 
-    actual suspend fun parse(): DocumentSignerDecodedCertificate {
+    val cert = X509CertUtils.parse(certificate.bytes)
 
-        val cert = X509CertUtils.parse(certificate.bytes)
+    val principalName = DocumentSignerPrincipalName.parseFromJcaX500Name(
+        name = JcaX500NameUtil.getSubject(cert),
+    )
 
-        val principalName = DocumentSignerPrincipalName.parseFromJcaX500Name(
-            name = JcaX500NameUtil.getSubject(cert),
-        )
-
-        val crlDistributionPointUri = requireNotNull(
-            parseCrlDistributionPointUriFromCert(cert)
-        ) {
-            "CRL distribution point URI must exist as part of the X509 certificate but was found missing"
-        }
-
-        val keyUsageSet = mustParseCertificateKeyUsageSetFromX509Certificate(cert)
-
-        //TODO: Bale ta parakatw sto decoded certificate
-        //kapws to AKI
-        //kai to SKI antistoixa me tin IACA
-        //principal name tou issuer (IACA)
-        //issuerAlternativeName
-        //extended Key Usage Set of ASN1 object identifier strings
-
-        return DocumentSignerDecodedCertificate(
-            principalName = principalName,
-            validityPeriod = CertificateValidityPeriod(
-                notBefore = cert.notBefore.toInstant().toKotlinInstant(),
-                notAfter = cert.notAfter.toInstant().toKotlinInstant(),
-            ),
-            crlDistributionPointUri = crlDistributionPointUri,
-            serialNumber = cert.serialNumber.toByteArray().toByteString(),
-            keyUsage = keyUsageSet,
-            isCA = (cert.basicConstraints != -1),
-            publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
-        )
+    val crlDistributionPointUri = requireNotNull(
+        parseCrlDistributionPointUriFromCert(cert)
+    ) {
+        "CRL distribution point URI must exist as part of the X509 certificate but was found missing"
     }
+
+    val keyUsageSet = mustParseCertificateKeyUsageSetFromX509Certificate(cert)
+
+    //TODO: Bale ta parakatw sto decoded certificate
+    //kapws to AKI
+    //kai to SKI antistoixa me tin IACA
+    //principal name tou issuer (IACA)
+    //issuerAlternativeName
+    //extended Key Usage Set of ASN1 object identifier strings
+
+    return DocumentSignerDecodedCertificate(
+        principalName = principalName,
+        validityPeriod = CertificateValidityPeriod(
+            notBefore = cert.notBefore.toInstant().toKotlinInstant(),
+            notAfter = cert.notAfter.toInstant().toKotlinInstant(),
+        ),
+        crlDistributionPointUri = crlDistributionPointUri,
+        serialNumber = cert.serialNumber.toByteArray().toByteString(),
+        keyUsage = keyUsageSet,
+        isCA = (cert.basicConstraints != -1),
+        publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
+    )
 }

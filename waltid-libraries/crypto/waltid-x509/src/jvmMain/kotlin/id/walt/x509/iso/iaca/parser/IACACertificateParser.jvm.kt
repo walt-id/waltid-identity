@@ -18,35 +18,33 @@ import org.bouncycastle.cert.jcajce.JcaX500NameUtil
 import kotlin.time.ExperimentalTime
 import kotlin.time.toKotlinInstant
 
-actual class IACACertificateParser actual constructor(val certificate: CertificateDer) {
+internal actual suspend fun platformParseIACACertificate(
+    certificate: CertificateDer,
+): IACADecodedCertificate {
 
-    actual suspend fun parse(): IACADecodedCertificate {
+    val cert = X509CertUtils.parse(certificate.bytes)
 
-        val cert = X509CertUtils.parse(certificate.bytes)
+    val principalName = IACAPrincipalName.parseFromJcaX500Name(
+        name = JcaX500NameUtil.getIssuer(cert),
+    )
 
-        val principalName = IACAPrincipalName.parseFromJcaX500Name(
-            name = JcaX500NameUtil.getIssuer(cert),
-        )
+    val keyUsageSet = mustParseCertificateKeyUsageSetFromX509Certificate(cert)
 
-        val keyUsageSet = mustParseCertificateKeyUsageSetFromX509Certificate(cert)
+    //TODO: Bale ta parakatw sto decoded certificate
+    //subject key identifier kapws
 
-        //TODO: Bale ta parakatw sto decoded certificate
-        //subject key identifier kapws
-
-        return IACADecodedCertificate(
-            principalName = principalName,
-            validityPeriod = CertificateValidityPeriod(
-                notBefore = cert.notBefore.toInstant().toKotlinInstant(),
-                notAfter = cert.notAfter.toInstant().toKotlinInstant(),
-            ),
-            issuerAlternativeName = IssuerAlternativeName.parseFromX509Certificate(cert),
-            serialNumber = cert.serialNumber.toByteArray().toByteString(),
-            isCA = (cert.basicConstraints != -1),
-            pathLengthConstraint = cert.basicConstraints,
-            keyUsage = keyUsageSet,
-            crlDistributionPointUri = parseCrlDistributionPointUriFromCert(cert),
-            publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
-        )
-    }
-
+    return IACADecodedCertificate(
+        principalName = principalName,
+        validityPeriod = CertificateValidityPeriod(
+            notBefore = cert.notBefore.toInstant().toKotlinInstant(),
+            notAfter = cert.notAfter.toInstant().toKotlinInstant(),
+        ),
+        issuerAlternativeName = IssuerAlternativeName.parseFromX509Certificate(cert),
+        serialNumber = cert.serialNumber.toByteArray().toByteString(),
+        isCA = (cert.basicConstraints != -1),
+        pathLengthConstraint = cert.basicConstraints,
+        keyUsage = keyUsageSet,
+        crlDistributionPointUri = parseCrlDistributionPointUriFromCert(cert),
+        publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
+    )
 }

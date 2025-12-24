@@ -3,9 +3,12 @@ package id.walt.x509.iso.documentsigner.parser
 import id.walt.x509.CertificateDer
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
 
-expect class DocumentSignerCertificateParser(
-    certificate: CertificateDer,
+class DocumentSignerCertificateParser(
+    val certificate: CertificateDer,
 ) {
-
-    suspend fun parse(): DocumentSignerDecodedCertificate
+    suspend fun parse() = platformParseDocumentSignerCertificate(certificate)
 }
+
+internal expect suspend fun platformParseDocumentSignerCertificate(
+    certificate: CertificateDer,
+): DocumentSignerDecodedCertificate
