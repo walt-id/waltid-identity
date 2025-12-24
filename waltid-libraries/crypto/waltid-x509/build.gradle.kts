@@ -73,6 +73,7 @@ kotlin {
             dependencies {
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(libs.okio)
+                implementation(libs.kotlinx.serialization.json)
             }
         }
         val commonTest by getting {
