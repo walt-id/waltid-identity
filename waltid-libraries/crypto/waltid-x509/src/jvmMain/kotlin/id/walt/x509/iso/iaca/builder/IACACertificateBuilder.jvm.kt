@@ -8,7 +8,7 @@ import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.CertificateKeyUsage
 import id.walt.x509.id.walt.x509.KeyContentSignerWrapper
-import id.walt.x509.id.walt.x509.buildX500Name
+import id.walt.x509.id.walt.x509.iso.iaca.certificate.toJcaX500Name
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.generateCertificateSerialNo
 import id.walt.x509.iso.iaca.certificate.IACACertificateBundle
@@ -31,25 +31,18 @@ internal actual suspend fun platformSignIACACertificate(
     signingKey: Key,
 ): IACACertificateBundle {
 
-    val principalName = profileData.principalName
-    val issuerAlternativeName = profileData.issuerAlternativeName
-    val validityPeriod = profileData.validityPeriod
-
     val javaPublicKey = parsePEMEncodedJcaPublicKey(signingKey.getPublicKey().exportPEM())
 
-    val issuer = buildX500Name(
-        country = principalName.country,
-        commonName = principalName.commonName,
-        stateOrProvinceName = principalName.stateOrProvinceName,
-        organizationName = principalName.organizationName,
-    )
+    val issuer = profileData.principalName.toJcaX500Name()
 
-    val altNames = issuerAlternativeNameToGeneralNameArray(issuerAlternativeName)
+    val altNames = issuerAlternativeNameToGeneralNameArray(profileData.issuerAlternativeName)
 
     val serialNo = generateCertificateSerialNo()
 
-    val certNotBeforeDate = Date(Instant.fromEpochSeconds(validityPeriod.notBefore.epochSeconds).toEpochMilliseconds())
-    val certNotAfterDate = Date(Instant.fromEpochSeconds(validityPeriod.notAfter.epochSeconds).toEpochMilliseconds())
+    val certNotBeforeDate =
+        Date(Instant.fromEpochSeconds(profileData.validityPeriod.notBefore.epochSeconds).toEpochMilliseconds())
+    val certNotAfterDate =
+        Date(Instant.fromEpochSeconds(profileData.validityPeriod.notAfter.epochSeconds).toEpochMilliseconds())
 
     val certBuilder = JcaX509v3CertificateBuilder(
         issuer,
@@ -126,12 +119,12 @@ internal actual suspend fun platformSignIACACertificate(
             bytes = certificate.encoded,
         ),
         decodedCertData = IACADecodedCertificate(
-            principalName = principalName,
+            principalName = profileData.principalName,
             validityPeriod = CertificateValidityPeriod(
                 notBefore = Instant.fromEpochSeconds(certNotBeforeDate.toInstant().epochSecond),
                 notAfter = Instant.fromEpochSeconds(certNotAfterDate.toInstant().epochSecond),
             ),
-            issuerAlternativeName = issuerAlternativeName,
+            issuerAlternativeName = profileData.issuerAlternativeName,
             serialNumber = serialNo.toByteArray().toByteString(),
             isCA = true,
             pathLengthConstraint = 0,

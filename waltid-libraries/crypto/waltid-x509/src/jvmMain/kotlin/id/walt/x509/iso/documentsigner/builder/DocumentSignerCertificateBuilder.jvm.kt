@@ -8,7 +8,8 @@ import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.CertificateKeyUsage
 import id.walt.x509.id.walt.x509.KeyContentSignerWrapper
-import id.walt.x509.id.walt.x509.buildX500Name
+import id.walt.x509.id.walt.x509.iso.documentsigner.certificate.toJcaX500Name
+import id.walt.x509.id.walt.x509.iso.iaca.certificate.toJcaX500Name
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.DocumentSignerEkuOid
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
@@ -32,26 +33,13 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
     iacaSignerSpec: IACASignerSpecification,
 ): DocumentSignerCertificateBundle {
 
-    val principalName = profileData.principalName
     val validityPeriod = profileData.validityPeriod
-    val crlDistributionPointUri = profileData.crlDistributionPointUri
 
     val subjectJavaPublicKey = parsePEMEncodedJcaPublicKey(publicKey.exportPEM())
 
-    val iacaName = buildX500Name(
-        country = iacaSignerSpec.profileData.principalName.country,
-        commonName = iacaSignerSpec.profileData.principalName.commonName,
-        stateOrProvinceName = iacaSignerSpec.profileData.principalName.stateOrProvinceName,
-        organizationName = iacaSignerSpec.profileData.principalName.organizationName,
-    )
+    val iacaName = iacaSignerSpec.profileData.principalName.toJcaX500Name()
 
-    val dsName = buildX500Name(
-        country = principalName.country,
-        commonName = principalName.commonName,
-        stateOrProvinceName = principalName.stateOrProvinceName,
-        organizationName = principalName.organizationName,
-        localityName = principalName.localityName,
-    )
+    val dsName = profileData.principalName.toJcaX500Name()
 
     val serialNo = generateCertificateSerialNo()
 
@@ -116,7 +104,7 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
                         GeneralNames(
                             GeneralName(
                                 GeneralName.uniformResourceIdentifier,
-                                crlDistributionPointUri,
+                                profileData.crlDistributionPointUri,
                             )
                         )
                     ),
@@ -140,12 +128,12 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
             bytes = certificate.encoded,
         ),
         decodedCertData = DocumentSignerDecodedCertificate(
-            principalName = principalName,
+            principalName = profileData.principalName,
             validityPeriod = CertificateValidityPeriod(
                 notBefore = Instant.fromEpochSeconds(certNotBeforeDate.toInstant().epochSecond),
                 notAfter = Instant.fromEpochSeconds(certNotAfterDate.toInstant().epochSecond),
             ),
-            crlDistributionPointUri = crlDistributionPointUri,
+            crlDistributionPointUri = profileData.crlDistributionPointUri,
             serialNumber = serialNo,
             keyUsage = setOf(
                 CertificateKeyUsage.DigitalSignature

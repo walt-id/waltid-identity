@@ -28,3 +28,11 @@ fun DocumentSignerPrincipalName.Companion.parseFromJcaX500Name(
         localityName = name.getLocalityName(),
     )
 }
+
+fun DocumentSignerPrincipalName.toJcaX500Name() = buildX500Name(
+    country = country,
+    commonName = commonName,
+    stateOrProvinceName = stateOrProvinceName,
+    organizationName = organizationName,
+    localityName = localityName,
+)

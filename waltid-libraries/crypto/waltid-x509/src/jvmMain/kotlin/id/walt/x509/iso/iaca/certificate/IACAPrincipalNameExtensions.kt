@@ -1,9 +1,6 @@
 package id.walt.x509.id.walt.x509.iso.iaca.certificate
 
-import id.walt.x509.id.walt.x509.getCommonName
-import id.walt.x509.id.walt.x509.getCountryCode
-import id.walt.x509.id.walt.x509.getOrganizationName
-import id.walt.x509.id.walt.x509.getStateOrProvinceName
+import id.walt.x509.id.walt.x509.*
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import org.bouncycastle.asn1.x500.X500Name
 
@@ -30,3 +27,10 @@ fun IACAPrincipalName.Companion.parseFromJcaX500Name(
         organizationName = name.getOrganizationName(),
     )
 }
+
+fun IACAPrincipalName.toJcaX500Name() = buildX500Name(
+    country = country,
+    commonName = commonName,
+    stateOrProvinceName = stateOrProvinceName,
+    organizationName = organizationName,
+)
