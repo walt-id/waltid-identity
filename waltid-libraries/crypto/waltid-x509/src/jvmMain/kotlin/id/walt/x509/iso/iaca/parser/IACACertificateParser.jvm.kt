@@ -30,6 +30,9 @@ actual class IACACertificateParser actual constructor(val certificate: Certifica
 
         val keyUsageSet = mustParseCertificateKeyUsageSetFromX509Certificate(cert)
 
+        //TODO: Bale ta parakatw sto decoded certificate
+        //subject key identifier kapws
+
         return IACADecodedCertificate(
             principalName = principalName,
             validityPeriod = CertificateValidityPeriod(

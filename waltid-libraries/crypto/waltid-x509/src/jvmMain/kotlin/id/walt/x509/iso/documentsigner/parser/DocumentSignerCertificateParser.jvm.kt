@@ -34,6 +34,13 @@ actual class DocumentSignerCertificateParser actual constructor(val certificate:
 
         val keyUsageSet = mustParseCertificateKeyUsageSetFromX509Certificate(cert)
 
+        //TODO: Bale ta parakatw sto decoded certificate
+        //kapws to AKI
+        //kai to SKI antistoixa me tin IACA
+        //principal name tou issuer (IACA)
+        //issuerAlternativeName
+        //extended Key Usage Set of ASN1 object identifier strings
+
         return DocumentSignerDecodedCertificate(
             principalName = principalName,
             validityPeriod = CertificateValidityPeriod(
