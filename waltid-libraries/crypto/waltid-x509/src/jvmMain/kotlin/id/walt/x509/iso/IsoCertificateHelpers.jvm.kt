@@ -23,17 +23,17 @@ internal actual fun generateCertificateSerialNo(): ByteString {
     return BigInteger(randomBytes).abs().toByteArray().toByteString()
 }
 
-//TODO: FIX THIS HERE SO THAT WE ONLY DO SIGNING WITH KEYS THAT ARE ALLOWED BY THE PROFILE
-//TODO: ECDSA ONLY FOR IACA
-//TODO: ECDSA AND EDDSA ALLOWED FOR DOCUMENT SIGNERS
 internal fun getJcaSigningAlgorithmNameFromKeyType(
     keyType: KeyType,
 ) = when (keyType) {
     KeyType.secp256r1 -> DefaultSignatureAlgorithmIdentifierFinder()
         .find("SHA256withECDSA")
 
-    KeyType.Ed25519 -> DefaultSignatureAlgorithmIdentifierFinder()
-        .find("ED25519")
+    KeyType.secp384r1 -> DefaultSignatureAlgorithmIdentifierFinder()
+        .find("SHA384withECDSA")
+
+    KeyType.secp521r1 -> DefaultSignatureAlgorithmIdentifierFinder()
+        .find("SHA512withECDSA")
 
     else -> throw IllegalArgumentException("Unsupported key type $keyType for ISO certificate signing operation")
 }
