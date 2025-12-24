@@ -5,6 +5,7 @@ package id.walt.x509.iso.iaca.builder
 import id.walt.crypto.keys.Key
 import id.walt.x509.iso.iaca.certificate.IACACertificateBundle
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
+import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlin.time.ExperimentalTime
 
 class IACACertificateBuilder(
@@ -12,10 +13,16 @@ class IACACertificateBuilder(
     val signingKey: Key,
 ) {
 
-    suspend fun build() = platformSignIACACertificate(
-        profileData = profileData,
-        signingKey = signingKey,
-    )
+    suspend fun build(): IACACertificateBundle {
+        IACAValidator().validateCertificateBuilderInputs(
+            data = profileData,
+            signingKey = signingKey,
+        )
+        return platformSignIACACertificate(
+            profileData = profileData,
+            signingKey = signingKey,
+        )
+    }
 
 }
 
