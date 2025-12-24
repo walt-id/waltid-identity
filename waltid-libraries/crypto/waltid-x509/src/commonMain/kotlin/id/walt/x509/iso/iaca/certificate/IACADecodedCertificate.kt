@@ -2,6 +2,7 @@
 
 package id.walt.x509.iso.iaca.certificate
 
+import id.walt.crypto.keys.Key
 import id.walt.x509.CertificateKeyUsage
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.IssuerAlternativeName
@@ -18,6 +19,7 @@ data class IACADecodedCertificate(
     val pathLengthConstraint: Int = 0,//
     val keyUsage: Set<CertificateKeyUsage> = setOf(CertificateKeyUsage.KeyCertSign, CertificateKeyUsage.CRLSign),
     val crlDistributionPointUri: String? = null,
+    val publicKey: Key,
 ) {
 
     fun toIACACertificateProfileData() = IACACertificateProfileData(

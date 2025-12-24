@@ -3,6 +3,7 @@
 package id.walt.x509.iso.iaca.builder
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.CertificateKeyUsage
@@ -119,8 +120,6 @@ internal actual suspend fun platformSignIACACertificate(
     val certificateHolder = certBuilder.build(keySignerBuilder)
     val certificate = JcaX509CertificateConverter().getCertificate(certificateHolder)
 
-
-
     return IACACertificateBundle(
         certificateDer = CertificateDer(
             bytes = certificate.encoded,
@@ -140,6 +139,7 @@ internal actual suspend fun platformSignIACACertificate(
                 CertificateKeyUsage.CRLSign,
             ),
             crlDistributionPointUri = crlDistributionPointUri,
+            publicKey = JWKKey.importFromDerCertificate(certificate.encoded).getOrThrow(),
         )
     )
 }

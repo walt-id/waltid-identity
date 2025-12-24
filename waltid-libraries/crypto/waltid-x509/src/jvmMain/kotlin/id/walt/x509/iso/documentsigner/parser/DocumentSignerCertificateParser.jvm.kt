@@ -3,6 +3,7 @@
 package id.walt.x509.iso.documentsigner.parser
 
 import com.nimbusds.jose.util.X509CertUtils
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.id.walt.x509.iso.documentsigner.certificate.parseFromJcaX500Name
 import id.walt.x509.id.walt.x509.mustParseCertificateKeyUsageSetFromX509Certificate
@@ -43,6 +44,7 @@ actual class DocumentSignerCertificateParser actual constructor(val certificate:
             serialNumber = cert.serialNumber.toByteArray().toByteString(),
             keyUsage = keyUsageSet,
             isCA = (cert.basicConstraints != -1),
+            publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
         )
     }
 }

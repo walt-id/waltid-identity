@@ -3,6 +3,7 @@
 package id.walt.x509.iso.documentsigner.builder
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.CertificateKeyUsage
@@ -147,6 +148,7 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
                 CertificateKeyUsage.DigitalSignature
             ),
             isCA = false,
+            publicKey = JWKKey.importFromDerCertificate(certificate.encoded).getOrThrow(),
         ),
     )
 }

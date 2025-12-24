@@ -3,6 +3,7 @@
 package id.walt.x509.iso.iaca.parser
 
 import com.nimbusds.jose.util.X509CertUtils
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.id.walt.x509.iso.iaca.certificate.parseFromJcaX500Name
 import id.walt.x509.id.walt.x509.iso.parseFromX509Certificate
@@ -41,6 +42,7 @@ actual class IACACertificateParser actual constructor(val certificate: Certifica
             pathLengthConstraint = cert.basicConstraints,
             keyUsage = keyUsageSet,
             crlDistributionPointUri = parseCrlDistributionPointUriFromCert(cert),
+            publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
         )
     }
 
