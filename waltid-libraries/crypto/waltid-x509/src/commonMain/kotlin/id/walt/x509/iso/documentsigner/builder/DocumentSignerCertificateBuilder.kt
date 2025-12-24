@@ -22,6 +22,10 @@ class DocumentSignerCertificateBuilder(
         val dsValidator = DocumentSignerValidator()
         dsValidator.validateDocumentSignerPublicKey(publicKey)
         dsValidator.validateDocumentSignerProfileData(profileData)
+        dsValidator.validateProfileDataAgainstIACAProfileData(
+            dsProfileData = profileData,
+            iacaProfileData = iacaSignerSpec.profileData,
+        )
         return platformSignDocumentSignerCertificate(
             profileData = profileData,
             publicKey = publicKey,
