@@ -8,7 +8,9 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.x509.CertificateKeyUsage
 import id.walt.x509.iso.iaca.builder.IACACertificateBuilder
+import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
+import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.bouncycastle.asn1.ASN1OctetString
@@ -45,19 +47,20 @@ class IACACertificateBuilderTest {
             uri = "https://ca.example.com",
         )
         val iacaCertBuilder = IACACertificateBuilder(
-            principalName = id.walt.x509.iso.iaca.certificate.IACAPrincipalName(
-                country = "US",
-                commonName = "Example IACA",
+            profileData = IACACertificateProfileData(
+                principalName = IACAPrincipalName(
+                    country = "US",
+                    commonName = "Example IACA",
+                ),
+                validityPeriod = CertificateValidityPeriod(
+                    notBefore = validNotBefore,
+                    notAfter = validNotAfter,
+                ),
+                issuerAlternativeName = issuerAlternativeName,
+                crlDistributionPointUri = "https://ca.example.com/crl",
             ),
-            validityPeriod = CertificateValidityPeriod(
-                notBefore = validNotBefore,
-                notAfter = validNotAfter,
-            ),
-            issuerAlternativeName = issuerAlternativeName,
             signingKey = signingKey,
-        ).apply {
-            crlDistributionPointUri = "https://ca.example.com/crl"
-        }
+        )
 
         val iacaCertBundle = iacaCertBuilder.build()
 
@@ -134,12 +137,12 @@ class IACACertificateBuilderTest {
         )
 
         assertEquals(
-            expected = builder.issuerAlternativeName,
+            expected = builder.profileData.issuerAlternativeName,
             actual = iacaCertData.issuerAlternativeName,
         )
 
         assertEquals(
-            expected = builder.crlDistributionPointUri,
+            expected = builder.profileData.crlDistributionPointUri,
             actual = iacaCertData.crlDistributionPointUri,
         )
 

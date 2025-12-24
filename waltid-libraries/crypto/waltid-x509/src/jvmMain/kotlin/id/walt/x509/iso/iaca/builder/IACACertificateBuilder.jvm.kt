@@ -14,6 +14,7 @@ import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.generateCertificateSerialNo
 import id.walt.x509.iso.iaca.certificate.IACACertificateBundle
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
+import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import id.walt.x509.iso.issuerAlternativeNameToGeneralNameArray
 import okio.ByteString.Companion.toByteString
@@ -28,12 +29,13 @@ import kotlin.time.Instant
 
 
 internal actual suspend fun platformSignIACACertificate(
-    principalName: IACAPrincipalName,
-    validityPeriod: CertificateValidityPeriod,
-    issuerAlternativeName: IssuerAlternativeName,
+    profileData: IACACertificateProfileData,
     signingKey: Key,
-    crlDistributionPointUri: String?
 ): IACACertificateBundle {
+    val principalName: IACAPrincipalName = profileData.principalName
+    val issuerAlternativeName: IssuerAlternativeName = profileData.issuerAlternativeName
+    val validityPeriod: CertificateValidityPeriod = profileData.validityPeriod
+
     val javaPublicKey = parsePEMEncodedJcaPublicKey(signingKey.getPublicKey().exportPEM())
 
     val issuer = buildX500Name(
@@ -90,7 +92,7 @@ internal actual suspend fun platformSignIACACertificate(
     )
 
     // CRL Distribution point extension
-    crlDistributionPointUri?.let {
+    profileData.crlDistributionPointUri?.let {
         certBuilder.addExtension(
             Extension.cRLDistributionPoints,
             false,
@@ -99,14 +101,14 @@ internal actual suspend fun platformSignIACACertificate(
                     DistributionPoint(
                         DistributionPointName(
                             GeneralNames(
-                                GeneralName(
-                                    GeneralName.uniformResourceIdentifier,
-                                    crlDistributionPointUri
+                                    GeneralName(
+                                        GeneralName.uniformResourceIdentifier,
+                                        profileData.crlDistributionPointUri
+                                    )
                                 )
-                            )
-                        ),
-                        null,
-                        null,
+                            ),
+                            null,
+                            null,
                     )
                 )
             )
@@ -138,7 +140,7 @@ internal actual suspend fun platformSignIACACertificate(
                 CertificateKeyUsage.KeyCertSign,
                 CertificateKeyUsage.CRLSign,
             ),
-            crlDistributionPointUri = crlDistributionPointUri,
+            crlDistributionPointUri = profileData.crlDistributionPointUri,
             publicKey = JWKKey.importFromDerCertificate(certificate.encoded).getOrThrow(),
         )
     )

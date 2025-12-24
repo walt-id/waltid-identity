@@ -10,6 +10,7 @@ import id.walt.x509.iso.documentsigner.builder.IACASignerSpecification
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import id.walt.x509.iso.documentsigner.parser.DocumentSignerCertificateParser
 import id.walt.x509.iso.iaca.builder.IACACertificateBuilder
+import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -47,19 +48,20 @@ class DocumentSignerRoundTripTest {
             uri = "https://ca.example.com",
         )
         val iacaCertBuilder = IACACertificateBuilder(
-            principalName = IACAPrincipalName(
-                country = "US",
-                commonName = "Example IACA",
+            profileData = IACACertificateProfileData(
+                principalName = IACAPrincipalName(
+                    country = "US",
+                    commonName = "Example IACA",
+                ),
+                validityPeriod = CertificateValidityPeriod(
+                    notBefore = iacaValidNotBefore,
+                    notAfter = iacaValidNotAfter,
+                ),
+                issuerAlternativeName = issuerAlternativeName,
+                crlDistributionPointUri = "https://ca.example.com/crl",
             ),
-            validityPeriod = CertificateValidityPeriod(
-                notBefore = iacaValidNotBefore,
-                notAfter = iacaValidNotAfter,
-            ),
-            issuerAlternativeName = issuerAlternativeName,
             signingKey = iacaSigningKey,
-        ).apply {
-            crlDistributionPointUri = "https://ca.example.com/crl"
-        }
+        )
 
         val iacaCertBundle = iacaCertBuilder.build()
 

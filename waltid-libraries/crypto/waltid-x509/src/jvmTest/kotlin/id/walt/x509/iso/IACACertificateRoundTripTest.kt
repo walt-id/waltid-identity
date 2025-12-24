@@ -5,7 +5,9 @@ package id.walt.x509.iso
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
+import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.iaca.builder.IACACertificateBuilder
+import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import id.walt.x509.iso.iaca.parser.IACACertificateParser
 import kotlinx.coroutines.runBlocking
@@ -38,19 +40,20 @@ class IACACertificateRoundTripTest {
             uri = "https://ca.example.com",
         )
         val iacaCertBuilder = IACACertificateBuilder(
-            principalName = IACAPrincipalName(
-                country = "US",
-                commonName = "Example IACA",
+            profileData = IACACertificateProfileData(
+                principalName = IACAPrincipalName(
+                    country = "US",
+                    commonName = "Example IACA",
+                ),
+                validityPeriod = CertificateValidityPeriod(
+                    notBefore = validNotBefore,
+                    notAfter = validNotAfter,
+                ),
+                issuerAlternativeName = issuerAlternativeName,
+                crlDistributionPointUri = "https://ca.example.com/crl",
             ),
-            validityPeriod = CertificateValidityPeriod(
-                notBefore = validNotBefore,
-                notAfter = validNotAfter,
-            ),
-            issuerAlternativeName = issuerAlternativeName,
             signingKey = signingKey,
-        ).apply {
-            crlDistributionPointUri = "https://ca.example.com/crl"
-        }
+        )
 
         val iacaCertBundle = iacaCertBuilder.build()
 
