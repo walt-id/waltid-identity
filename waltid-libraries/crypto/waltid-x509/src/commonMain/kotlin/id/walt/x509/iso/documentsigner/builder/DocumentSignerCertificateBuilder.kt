@@ -17,8 +17,8 @@ class DocumentSignerCertificateBuilder(
 
     suspend fun build(): DocumentSignerCertificateBundle {
         val iacaValidator = IACAValidator()
-        iacaValidator.validateIACASigningKey(iacaSignerSpec.signingKey)
-        iacaValidator.validateIACACertificateProfileData(iacaSignerSpec.profileData)
+        iacaValidator.validateSigningKey(iacaSignerSpec.signingKey)
+        iacaValidator.validateCertificateProfileData(iacaSignerSpec.profileData)
         val dsValidator = DocumentSignerValidator()
         dsValidator.validateDocumentSignerPublicKey(publicKey)
         dsValidator.validateDocumentSignerProfileData(profileData)

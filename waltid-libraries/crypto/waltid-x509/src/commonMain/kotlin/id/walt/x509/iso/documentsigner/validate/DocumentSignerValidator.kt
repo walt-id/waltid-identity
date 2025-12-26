@@ -7,13 +7,22 @@ import id.walt.crypto.keys.KeyType
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.DS_CERT_MAX_VALIDITY_SECONDS
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
+import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
+import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import id.walt.x509.iso.isValidIsoCountryCode
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 internal class DocumentSignerValidator {
+
+    fun validateDecodedCertificate(
+        dsDecodedCert: DocumentSignerDecodedCertificate,
+        iacaDecodedCert: IACADecodedCertificate,
+    ) {
+
+    }
 
     fun validateDocumentSignerPublicKey(
         publicKey: Key,

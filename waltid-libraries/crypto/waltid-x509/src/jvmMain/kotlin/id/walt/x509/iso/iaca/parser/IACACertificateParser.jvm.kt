@@ -46,5 +46,6 @@ internal actual suspend fun platformParseIACACertificate(
         keyUsage = keyUsageSet,
         crlDistributionPointUri = parseCrlDistributionPointUriFromCert(cert),
         publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
+        certificate = certificate.copy(),
     )
 }

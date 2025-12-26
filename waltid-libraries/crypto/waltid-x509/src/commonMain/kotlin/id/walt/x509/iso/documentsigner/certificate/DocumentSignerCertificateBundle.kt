@@ -4,5 +4,5 @@ import id.walt.x509.CertificateDer
 
 data class DocumentSignerCertificateBundle(
     val certificateDer: CertificateDer,
-    val decodedCertData: DocumentSignerDecodedCertificate,
+    val decodedCertificate: DocumentSignerDecodedCertificate,
 )

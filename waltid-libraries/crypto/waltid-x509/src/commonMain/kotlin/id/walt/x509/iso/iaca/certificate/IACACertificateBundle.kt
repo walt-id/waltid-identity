@@ -4,5 +4,5 @@ import id.walt.x509.CertificateDer
 
 data class IACACertificateBundle(
     val certificateDer: CertificateDer,
-    val decodedCertData: IACADecodedCertificate,
+    val decodedCertificate: IACADecodedCertificate,
 )

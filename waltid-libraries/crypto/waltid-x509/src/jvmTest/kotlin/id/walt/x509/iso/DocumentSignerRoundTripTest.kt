@@ -81,7 +81,7 @@ class DocumentSignerRoundTripTest {
             publicKey = dsKey.getPublicKey(),
             iacaSignerSpec = IACASignerSpecification(
                 signingKey = iacaSigningKey,
-                profileData = iacaCertBundle.decodedCertData.toIACACertificateProfileData(),
+                profileData = iacaCertBundle.decodedCertificate.toIACACertificateProfileData(),
             )
         )
 
@@ -94,7 +94,7 @@ class DocumentSignerRoundTripTest {
         val decodedCert = dsCertParser.parse()
 
         assertEquals(
-            expected = dsCertificateBundle.decodedCertData,
+            expected = dsCertificateBundle.decodedCertificate,
             actual = decodedCert,
         )
     }

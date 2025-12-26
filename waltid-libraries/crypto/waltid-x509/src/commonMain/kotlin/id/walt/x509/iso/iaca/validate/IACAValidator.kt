@@ -8,6 +8,7 @@ import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.IACA_CERT_MAX_VALIDITY_SECONDS
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
+import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import id.walt.x509.iso.isValidIsoCountryCode
 import kotlin.time.Clock
@@ -15,7 +16,13 @@ import kotlin.time.ExperimentalTime
 
 internal class IACAValidator {
 
-    fun validateIACASigningKey(
+    fun validateDecodedCertificate(
+        decodedCert: IACADecodedCertificate,
+    ) {
+
+    }
+
+    fun validateSigningKey(
         signingKey: Key,
     ) {
 
@@ -29,7 +36,7 @@ internal class IACAValidator {
 
     }
 
-    fun validateIACACertificateProfileData(
+    fun validateCertificateProfileData(
         data: IACACertificateProfileData,
     ) {
 
@@ -37,7 +44,7 @@ internal class IACAValidator {
 
         validateIssuerAlternativeName(data.issuerAlternativeName)
 
-        validateValidityPeriod(data.validityPeriod)
+        validateCertificateValidityPeriod(data.validityPeriod)
 
         data.crlDistributionPointUri?.let {
             require(it.isNotBlank()) {
@@ -64,7 +71,7 @@ internal class IACAValidator {
 
     }
 
-    private fun validateValidityPeriod(
+    private fun validateCertificateValidityPeriod(
         validityPeriod: CertificateValidityPeriod,
     ) {
 

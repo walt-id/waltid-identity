@@ -122,12 +122,13 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
 
     val certificateHolder = certBuilder.build(keySignerBuilder)
     val certificate = JcaX509CertificateConverter().getCertificate(certificateHolder)
+    val certificateDer = CertificateDer(
+        bytes = certificate.encoded,
+    )
 
     return DocumentSignerCertificateBundle(
-        certificateDer = CertificateDer(
-            bytes = certificate.encoded,
-        ),
-        decodedCertData = DocumentSignerDecodedCertificate(
+        certificateDer = certificateDer,
+        decodedCertificate = DocumentSignerDecodedCertificate(
             principalName = profileData.principalName,
             validityPeriod = CertificateValidityPeriod(
                 notBefore = Instant.fromEpochSeconds(certNotBeforeDate.toInstant().epochSecond),
@@ -140,6 +141,7 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
             ),
             isCA = false,
             publicKey = JWKKey.importFromDerCertificate(certificate.encoded).getOrThrow(),
+            certificate = certificateDer.copy(),
         ),
     )
 }

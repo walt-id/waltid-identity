@@ -66,7 +66,7 @@ class IACACertificateBuilderTest {
 
         assertIACABuilderDataEqualsCertificateData(
             builder = iacaCertBuilder,
-            iacaCertData = iacaCertBundle.decodedCertData,
+            iacaCertData = iacaCertBundle.decodedCertificate,
         )
 
         val cert = X509CertUtils.parse(iacaCertBundle.certificateDer.bytes)
@@ -110,7 +110,7 @@ class IACACertificateBuilderTest {
         val uriName = uri.names!!.find { it.tagNo == GeneralName.uniformResourceIdentifier }
         val crlUriValue = (uriName!!.name as DERIA5String).string
         assertEquals(
-            expected = iacaCertBundle.decodedCertData.crlDistributionPointUri,
+            expected = iacaCertBundle.decodedCertificate.crlDistributionPointUri,
             actual = crlUriValue,
             message = "CRL distribution point URI must match expected value",
         )

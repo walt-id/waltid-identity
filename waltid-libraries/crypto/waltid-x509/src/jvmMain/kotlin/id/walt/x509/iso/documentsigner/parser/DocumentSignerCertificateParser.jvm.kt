@@ -52,5 +52,6 @@ internal actual suspend fun platformParseDocumentSignerCertificate(
         keyUsage = keyUsageSet,
         isCA = (cert.basicConstraints != -1),
         publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
+        certificate = certificate.copy(),
     )
 }

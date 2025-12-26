@@ -63,7 +63,7 @@ class IACACertificateRoundTripTest {
         val decodedCert = iacaCertParser.parse()
 
         assertEquals(
-            expected = iacaCertBundle.decodedCertData,
+            expected = iacaCertBundle.decodedCertificate,
             actual = decodedCert,
         )
 

@@ -87,7 +87,7 @@ class DocumentSignerCertificateBuilderTest {
             publicKey = dsKey.getPublicKey(),
             iacaSignerSpec = IACASignerSpecification(
                 signingKey = iacaSigningKey,
-                profileData = iacaCertBundle.decodedCertData.toIACACertificateProfileData(),
+                profileData = iacaCertBundle.decodedCertificate.toIACACertificateProfileData(),
             )
         )
 
@@ -137,7 +137,7 @@ class DocumentSignerCertificateBuilderTest {
         val uriName = uri.names!!.find { it.tagNo == GeneralName.uniformResourceIdentifier }
         val crlUriValue = (uriName!!.name as DERIA5String).string
         assertEquals(
-            expected = dsCertificateBundle.decodedCertData.crlDistributionPointUri,
+            expected = dsCertificateBundle.decodedCertificate.crlDistributionPointUri,
             actual = crlUriValue,
             message = "CRL distribution point URI must match expected value",
         )
