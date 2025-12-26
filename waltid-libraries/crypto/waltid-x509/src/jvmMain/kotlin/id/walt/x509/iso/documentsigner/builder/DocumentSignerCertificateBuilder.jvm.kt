@@ -142,6 +142,7 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
             keyUsage = setOf(
                 CertificateKeyUsage.DigitalSignature
             ),
+            extendedKeyUsage = setOf(DocumentSignerEkuOid),
             isCA = false,
             publicKey = JWKKey.importFromDerCertificate(certificate.encoded).getOrThrow(),
             certificate = JcaX509CertificateHandle(certificate),

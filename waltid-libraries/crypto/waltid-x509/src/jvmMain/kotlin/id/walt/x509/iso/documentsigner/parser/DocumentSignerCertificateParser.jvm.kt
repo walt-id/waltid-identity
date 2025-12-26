@@ -17,6 +17,9 @@ import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import id.walt.x509.iso.parseCrlDistributionPointUriFromCert
 import okio.ByteString.Companion.toByteString
+import org.bouncycastle.asn1.ASN1OctetString
+import org.bouncycastle.asn1.x509.ExtendedKeyUsage
+import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.cert.jcajce.JcaX500NameUtil
 import kotlin.time.ExperimentalTime
 import kotlin.time.toKotlinInstant
@@ -43,10 +46,19 @@ internal actual suspend fun platformParseDocumentSignerCertificate(
 
     val keyUsageSet = mustParseCertificateKeyUsageSetFromX509Certificate(cert)
 
+    val ekuSet = requireNotNull(
+        cert.getExtensionValue(Extension.extendedKeyUsage.id)
+    ).let { extKeyUsageRaw ->
+        ExtendedKeyUsage.getInstance(ASN1OctetString.getInstance(extKeyUsageRaw).octets).run {
+            usages.map { usage ->
+                usage.id
+            }.toSet()
+        }
+    }
+
     //TODO: Bale ta parakatw sto decoded certificate
     //kapws to AKI
     //kai to SKI antistoixa me tin IACA
-    //extended Key Usage Set of ASN1 object identifier strings
 
     return DocumentSignerDecodedCertificate(
         issuerPrincipalName = iacaPrincipalName,
@@ -59,6 +71,7 @@ internal actual suspend fun platformParseDocumentSignerCertificate(
         crlDistributionPointUri = crlDistributionPointUri,
         serialNumber = cert.serialNumber.toByteArray().toByteString(),
         keyUsage = keyUsageSet,
+        extendedKeyUsage = ekuSet,
         isCA = (cert.basicConstraints != -1),
         publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
         certificate = JcaX509CertificateHandle(cert),

@@ -21,6 +21,7 @@ data class DocumentSignerDecodedCertificate internal constructor(
     val crlDistributionPointUri: String,
     val serialNumber: ByteString, //
     val keyUsage: Set<CertificateKeyUsage>, //
+    val extendedKeyUsage: Set<String>,
     val isCA: Boolean,
     val publicKey: Key,
     private val certificate: X509CertificateHandle,
