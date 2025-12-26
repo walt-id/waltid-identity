@@ -6,14 +6,18 @@ import id.walt.crypto.keys.Key
 import id.walt.x509.CertificateKeyUsage
 import id.walt.x509.X509CertificateHandle
 import id.walt.x509.iso.CertificateValidityPeriod
+import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
+import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import okio.ByteString
 import kotlin.time.ExperimentalTime
 
 @ConsistentCopyVisibility
 data class DocumentSignerDecodedCertificate internal constructor(
+    val issuerPrincipalName: IACAPrincipalName,
     val principalName: DocumentSignerPrincipalName,
     val validityPeriod: CertificateValidityPeriod,
+    val issuerAlternativeName: IssuerAlternativeName,
     val crlDistributionPointUri: String,
     val serialNumber: ByteString, //
     val keyUsage: Set<CertificateKeyUsage>, //

@@ -130,11 +130,13 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
     return DocumentSignerCertificateBundle(
         certificateDer = certificateDer,
         decodedCertificate = DocumentSignerDecodedCertificate(
+            issuerPrincipalName = iacaSignerSpec.profileData.principalName,
             principalName = profileData.principalName,
             validityPeriod = CertificateValidityPeriod(
                 notBefore = Instant.fromEpochSeconds(certNotBeforeDate.toInstant().epochSecond),
                 notAfter = Instant.fromEpochSeconds(certNotAfterDate.toInstant().epochSecond),
             ),
+            issuerAlternativeName = iacaSignerSpec.profileData.issuerAlternativeName,
             crlDistributionPointUri = profileData.crlDistributionPointUri,
             serialNumber = serialNo,
             keyUsage = setOf(
