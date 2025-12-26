@@ -7,6 +7,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.CertificateKeyUsage
+import id.walt.x509.id.walt.x509.JcaX509CertificateHandle
 import id.walt.x509.id.walt.x509.KeyContentSignerWrapper
 import id.walt.x509.id.walt.x509.iso.iaca.certificate.toJcaX500Name
 import id.walt.x509.iso.CertificateValidityPeriod
@@ -135,7 +136,7 @@ internal actual suspend fun platformSignIACACertificate(
             ),
             crlDistributionPointUri = profileData.crlDistributionPointUri,
             publicKey = JWKKey.importFromDerCertificate(certificate.encoded).getOrThrow(),
-            certificate = certificateDer.copy(),
+            certificate = JcaX509CertificateHandle(certificate),
         )
     )
 }

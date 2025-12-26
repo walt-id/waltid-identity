@@ -5,6 +5,7 @@ package id.walt.x509.iso.documentsigner.parser
 import com.nimbusds.jose.util.X509CertUtils
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.x509.CertificateDer
+import id.walt.x509.id.walt.x509.JcaX509CertificateHandle
 import id.walt.x509.id.walt.x509.iso.documentsigner.certificate.parseFromJcaX500Name
 import id.walt.x509.id.walt.x509.mustParseCertificateKeyUsageSetFromX509Certificate
 import id.walt.x509.iso.CertificateValidityPeriod
@@ -52,6 +53,6 @@ internal actual suspend fun platformParseDocumentSignerCertificate(
         keyUsage = keyUsageSet,
         isCA = (cert.basicConstraints != -1),
         publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
-        certificate = certificate.copy(),
+        certificate = JcaX509CertificateHandle(cert),
     )
 }

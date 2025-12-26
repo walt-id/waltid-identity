@@ -3,8 +3,8 @@
 package id.walt.x509.iso.documentsigner.certificate
 
 import id.walt.crypto.keys.Key
-import id.walt.x509.CertificateDer
 import id.walt.x509.CertificateKeyUsage
+import id.walt.x509.X509CertificateHandle
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import okio.ByteString
@@ -19,7 +19,7 @@ data class DocumentSignerDecodedCertificate internal constructor(
     val keyUsage: Set<CertificateKeyUsage>, //
     val isCA: Boolean,
     val publicKey: Key,
-    private val certificate: CertificateDer,
+    private val certificate: X509CertificateHandle,
 ) {
 
     fun toDocumentSignerCertificateProfileData() = DocumentSignerCertificateProfileData(
