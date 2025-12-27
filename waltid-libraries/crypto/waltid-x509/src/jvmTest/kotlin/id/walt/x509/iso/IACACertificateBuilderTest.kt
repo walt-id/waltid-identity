@@ -87,7 +87,10 @@ class IACACertificateBuilderTest {
         // 5. Should contain at least 71 bits (recommended)
         assertTrue(cert.serialNumber.bitLength() >= 71, "Serial number should contain at least 71 bits of entropy")
 
-        assertEquals(iacaCertBuilder.profileData.principalName.country, cert.issuerX500Principal.name.substringAfter("C=").take(2))
+        assertEquals(
+            iacaCertBuilder.profileData.principalName.country,
+            cert.issuerX500Principal.name.substringAfter("C=").take(2)
+        )
         assertEquals(cert.subjectX500Principal, cert.issuerX500Principal) // self-signed
         assertEquals(cert.basicConstraints, 0) // Is a CA
         assertTrue(cert.keyUsage[5]) // keyCertSign
@@ -148,12 +151,12 @@ class IACACertificateBuilderTest {
 
         assertEquals(
             expected = true,
-            actual = iacaCertData.isCA,
+            actual = iacaCertData.basicConstraints.isCA,
         )
 
         assertEquals(
             expected = 0,
-            actual = iacaCertData.pathLengthConstraint,
+            actual = iacaCertData.basicConstraints.pathLengthConstraint,
         )
 
         assertEquals(

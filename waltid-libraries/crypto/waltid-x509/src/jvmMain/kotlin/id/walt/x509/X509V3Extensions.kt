@@ -37,7 +37,7 @@ val X509Certificate.authorityKeyIdentifier: ByteString?
 val X509Certificate.certificateKeyUsages: Set<CertificateKeyUsage>
     get() = getExtensionValue(Extension.keyUsage.id)?.let { kuExtRaw ->
         KeyUsage.getInstance(
-            ASN1OctetString.getInstance(kuExtRaw)
+            ASN1OctetString.getInstance(kuExtRaw).octets
         ).toCertificateKeyUsages()
     } ?: emptySet()
 
