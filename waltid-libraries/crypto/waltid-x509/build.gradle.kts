@@ -102,16 +102,13 @@ kotlin {
                 implementation(libs.nimbus.jose.jwt)
             }
         }
+
         val jsMain by getting {
             dependencies {
 
             }
         }
-        val jsTest by getting {
-            dependencies {
-                implementation(kotlin("test-js"))
-            }
-        }
+
         if (enableIosBuild) {
             val iosArm64Main by getting
             val iosSimulatorArm64Main by getting
