@@ -4,6 +4,7 @@ package id.walt.x509.iso.iaca.validate
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.x509.X509V3ExtensionOID
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.IACA_CERT_MAX_VALIDITY_SECONDS
 import id.walt.x509.iso.IssuerAlternativeName
@@ -108,8 +109,13 @@ internal class IACAValidator {
             KeyType.secp521r1,
         )
 
-        //TODO: Add values here
-        private val requiredCriticalOIDs = emptySet<String>()
-        private val requiredNonCriticalOIDs = emptySet<String>()
+        private val requiredCriticalOIDs = setOf(
+            X509V3ExtensionOID.BasicConstraints,
+            X509V3ExtensionOID.KeyUsage,
+        )
+        private val requiredNonCriticalOIDs = setOf(
+            X509V3ExtensionOID.SubjectKeyIdentifier,
+            X509V3ExtensionOID.IssuerAlternativeName,
+        )
     }
 }

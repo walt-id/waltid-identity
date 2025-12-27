@@ -4,6 +4,7 @@ package id.walt.x509.iso.documentsigner.validate
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.x509.X509V3ExtensionOID
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.DS_CERT_MAX_VALIDITY_SECONDS
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
@@ -121,9 +122,16 @@ internal class DocumentSignerValidator {
             KeyType.Ed25519,
         )
 
-        //TODO: Add values here
-        private val requiredCriticalOIDs = emptySet<String>()
-        private val requiredNonCriticalOIDs = emptySet<String>()
+        private val requiredCriticalOIDs = setOf(
+            X509V3ExtensionOID.KeyUsage,
+            X509V3ExtensionOID.ExtendedKeyUsage,
+        )
+        private val requiredNonCriticalOIDs = setOf(
+            X509V3ExtensionOID.SubjectKeyIdentifier,
+            X509V3ExtensionOID.AuthorityKeyIdentifier,
+            X509V3ExtensionOID.IssuerAlternativeName,
+            X509V3ExtensionOID.CrlDistributionPoints,
+        )
     }
 
 }
