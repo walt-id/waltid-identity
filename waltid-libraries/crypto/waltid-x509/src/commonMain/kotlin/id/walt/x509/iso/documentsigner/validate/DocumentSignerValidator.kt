@@ -120,6 +120,10 @@ internal class DocumentSignerValidator {
             KeyType.secp521r1,
             KeyType.Ed25519,
         )
+
+        //TODO: Add values here
+        private val requiredCriticalOIDs = emptySet<String>()
+        private val requiredNonCriticalOIDs = emptySet<String>()
     }
 
 }

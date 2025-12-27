@@ -97,5 +97,6 @@ class DocumentSignerRoundTripTest {
             expected = dsCertificateBundle.decodedCertificate,
             actual = decodedCert,
         )
+
     }
 }

@@ -60,18 +60,20 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
 
     val extUtils = JcaX509ExtensionUtils()
 
+    val akiExt = extUtils.createAuthorityKeyIdentifier(
+        parsePEMEncodedJcaPublicKey(iacaSignerSpec.signingKey.getPublicKey().exportPEM())
+    )
     certBuilder.addExtension(
         Extension.authorityKeyIdentifier,
         false,
-        extUtils.createAuthorityKeyIdentifier(
-            parsePEMEncodedJcaPublicKey(iacaSignerSpec.signingKey.getPublicKey().exportPEM())
-        )
+        akiExt,
     )
 
+    val skiExt = extUtils.createSubjectKeyIdentifier(subjectJavaPublicKey)
     certBuilder.addExtension(
         Extension.subjectKeyIdentifier,
         false,
-        extUtils.createSubjectKeyIdentifier(subjectJavaPublicKey)
+        skiExt,
     )
 
     // Key Usage: Digital Signature only
@@ -143,6 +145,8 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
                 CertificateKeyUsage.DigitalSignature
             ),
             extendedKeyUsage = setOf(DocumentSignerEkuOid),
+            akiHex = akiExt.keyIdentifierOctets.toHexString(),
+            skiHex = skiExt.keyIdentifier.toHexString(),
             isCA = false,
             publicKey = JWKKey.importFromDerCertificate(certificate.encoded).getOrThrow(),
             certificate = JcaX509CertificateHandle(certificate),

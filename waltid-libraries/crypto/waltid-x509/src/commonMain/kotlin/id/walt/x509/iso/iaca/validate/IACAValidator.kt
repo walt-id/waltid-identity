@@ -107,5 +107,9 @@ internal class IACAValidator {
             KeyType.secp384r1,
             KeyType.secp521r1,
         )
+
+        //TODO: Add values here
+        private val requiredCriticalOIDs = emptySet<String>()
+        private val requiredNonCriticalOIDs = emptySet<String>()
     }
 }
