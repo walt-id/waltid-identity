@@ -5,6 +5,7 @@ package id.walt.x509.iso.documentsigner.certificate
 import id.walt.crypto.keys.Key
 import id.walt.x509.CertificateKeyUsage
 import id.walt.x509.X509CertificateHandle
+import id.walt.x509.X509V3ExtensionOID
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
@@ -26,6 +27,8 @@ data class DocumentSignerDecodedCertificate internal constructor(
     val skiHex: String,
     val isCA: Boolean,
     val publicKey: Key,
+    val criticalExtensionOIDs: Set<X509V3ExtensionOID>,
+    val nonCriticalExtensionOIDs: Set<X509V3ExtensionOID>,
     private val certificate: X509CertificateHandle,
 ) {
 

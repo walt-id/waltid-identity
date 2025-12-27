@@ -6,10 +6,12 @@ import com.nimbusds.jose.util.X509CertUtils
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.id.walt.x509.JcaX509CertificateHandle
+import id.walt.x509.id.walt.x509.criticalX509V3ExtensionOIDs
 import id.walt.x509.id.walt.x509.iso.documentsigner.certificate.parseFromJcaX500Name
 import id.walt.x509.id.walt.x509.iso.iaca.certificate.parseFromJcaX500Name
 import id.walt.x509.id.walt.x509.iso.parseFromX509Certificate
 import id.walt.x509.id.walt.x509.mustParseCertificateKeyUsageSetFromX509Certificate
+import id.walt.x509.id.walt.x509.nonCriticalX509V3ExtensionOIDs
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
@@ -84,6 +86,8 @@ internal actual suspend fun platformParseDocumentSignerCertificate(
         skiHex = skiHex,
         isCA = (cert.basicConstraints != -1),
         publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
+        criticalExtensionOIDs = cert.criticalX509V3ExtensionOIDs(),
+        nonCriticalExtensionOIDs = cert.nonCriticalX509V3ExtensionOIDs(),
         certificate = JcaX509CertificateHandle(cert),
     )
 }

@@ -67,5 +67,7 @@ class IACACertificateRoundTripTest {
             actual = decodedCert,
         )
 
+        println(decodedCert)
+
     }
 }

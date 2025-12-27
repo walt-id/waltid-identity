@@ -9,8 +9,10 @@ import id.walt.x509.CertificateDer
 import id.walt.x509.CertificateKeyUsage
 import id.walt.x509.id.walt.x509.JcaX509CertificateHandle
 import id.walt.x509.id.walt.x509.KeyContentSignerWrapper
+import id.walt.x509.id.walt.x509.criticalX509V3ExtensionOIDs
 import id.walt.x509.id.walt.x509.iso.documentsigner.certificate.toJcaX500Name
 import id.walt.x509.id.walt.x509.iso.iaca.certificate.toJcaX500Name
+import id.walt.x509.id.walt.x509.nonCriticalX509V3ExtensionOIDs
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.DocumentSignerEkuOid
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
@@ -149,6 +151,8 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
             skiHex = skiExt.keyIdentifier.toHexString(),
             isCA = false,
             publicKey = JWKKey.importFromDerCertificate(certificate.encoded).getOrThrow(),
+            criticalExtensionOIDs = certificate.criticalX509V3ExtensionOIDs(),
+            nonCriticalExtensionOIDs = certificate.nonCriticalX509V3ExtensionOIDs(),
             certificate = JcaX509CertificateHandle(certificate),
         ),
     )

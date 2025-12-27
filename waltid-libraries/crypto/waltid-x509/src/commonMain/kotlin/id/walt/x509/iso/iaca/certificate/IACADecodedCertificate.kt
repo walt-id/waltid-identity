@@ -5,6 +5,7 @@ package id.walt.x509.iso.iaca.certificate
 import id.walt.crypto.keys.Key
 import id.walt.x509.CertificateKeyUsage
 import id.walt.x509.X509CertificateHandle
+import id.walt.x509.X509V3ExtensionOID
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.IssuerAlternativeName
 import okio.ByteString
@@ -22,6 +23,8 @@ data class IACADecodedCertificate internal constructor(
     val pathLengthConstraint: Int,//
     val keyUsage: Set<CertificateKeyUsage>,
     val skiHex: String,
+    val criticalExtensionOIDs: Set<X509V3ExtensionOID>,
+    val nonCriticalExtensionOIDs: Set<X509V3ExtensionOID>,
     val crlDistributionPointUri: String? = null,
     private val certificate: X509CertificateHandle,
 ) {
