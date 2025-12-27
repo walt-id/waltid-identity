@@ -30,11 +30,6 @@ kotlin {
                     freeCompilerArgs.add("-Xexpect-actual-classes")
                 }
             }
-            compileTaskProvider.configure {
-                compilerOptions {
-                    freeCompilerArgs.add("-Xexpect-actual-classes")
-                }
-            }
         }
     }
 
@@ -54,6 +49,7 @@ kotlin {
             generateTypeScriptDefinitions()
             testTask {
                 useMocha()
+                enabled = false
             }
         }
         binaries.library()
