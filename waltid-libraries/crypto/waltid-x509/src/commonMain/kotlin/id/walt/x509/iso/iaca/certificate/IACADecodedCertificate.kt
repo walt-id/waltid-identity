@@ -21,6 +21,7 @@ data class IACADecodedCertificate internal constructor(
     val isCA: Boolean,//
     val pathLengthConstraint: Int,//
     val keyUsage: Set<CertificateKeyUsage>,
+    val skiHex: String,
     val crlDistributionPointUri: String? = null,
     private val certificate: X509CertificateHandle,
 ) {

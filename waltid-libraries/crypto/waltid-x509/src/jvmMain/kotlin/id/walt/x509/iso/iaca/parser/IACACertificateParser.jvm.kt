@@ -15,6 +15,9 @@ import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import id.walt.x509.iso.parseCrlDistributionPointUriFromCert
 import okio.ByteString.Companion.toByteString
+import org.bouncycastle.asn1.ASN1OctetString
+import org.bouncycastle.asn1.x509.Extension
+import org.bouncycastle.asn1.x509.SubjectKeyIdentifier
 import org.bouncycastle.cert.jcajce.JcaX500NameUtil
 import kotlin.time.ExperimentalTime
 import kotlin.time.toKotlinInstant
@@ -31,6 +34,14 @@ internal actual suspend fun platformParseIACACertificate(
 
     val keyUsageSet = mustParseCertificateKeyUsageSetFromX509Certificate(cert)
 
+    val skiHex = requireNotNull(
+        cert.getExtensionValue(Extension.subjectKeyIdentifier.id)
+    ).let {
+        SubjectKeyIdentifier.getInstance(
+            ASN1OctetString.getInstance(it).octets
+        ).keyIdentifier.toHexString()
+    }
+
     //TODO: Bale ta parakatw sto decoded certificate
     //subject key identifier kapws
 
@@ -45,6 +56,7 @@ internal actual suspend fun platformParseIACACertificate(
         isCA = (cert.basicConstraints != -1),
         pathLengthConstraint = cert.basicConstraints,
         keyUsage = keyUsageSet,
+        skiHex = skiHex,
         crlDistributionPointUri = parseCrlDistributionPointUriFromCert(cert),
         publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
         certificate = JcaX509CertificateHandle(cert),

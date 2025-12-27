@@ -57,10 +57,11 @@ internal actual suspend fun platformSignIACACertificate(
     // Extensions
     val extUtils = JcaX509ExtensionUtils()
 
+    val skiExt = extUtils.createSubjectKeyIdentifier(javaPublicKey)
     certBuilder.addExtension(
         Extension.subjectKeyIdentifier,
         false,
-        extUtils.createSubjectKeyIdentifier(javaPublicKey)
+        skiExt,
     )
 
     // Basic constraints: CA=true, pathLen=0
@@ -134,6 +135,7 @@ internal actual suspend fun platformSignIACACertificate(
                 CertificateKeyUsage.KeyCertSign,
                 CertificateKeyUsage.CRLSign,
             ),
+            skiHex = skiExt.keyIdentifier.toHexString(),
             crlDistributionPointUri = profileData.crlDistributionPointUri,
             publicKey = JWKKey.importFromDerCertificate(certificate.encoded).getOrThrow(),
             certificate = JcaX509CertificateHandle(certificate),
