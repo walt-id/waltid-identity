@@ -23,6 +23,28 @@ internal class DocumentSignerValidator {
         iacaDecodedCert: IACADecodedCertificate,
     ) {
 
+        validateDocumentSignerPublicKey(dsDecodedCert.publicKey)
+
+        val dsProfileData = dsDecodedCert.toDocumentSignerCertificateProfileData()
+        validateDocumentSignerProfileData(
+            data = dsProfileData,
+        )
+
+        validateProfileDataAgainstIACAProfileData(
+            dsProfileData = dsProfileData,
+            iacaProfileData = iacaDecodedCert.toIACACertificateProfileData(),
+        )
+
+        require(dsDecodedCert.criticalExtensionOIDs.containsAll(requiredCriticalOIDs)) {
+            "Document signer certificate was not found to contain all required critical extension oids, " +
+                    "missing oids are: ${requiredCriticalOIDs.minus(dsDecodedCert.criticalExtensionOIDs)}"
+        }
+
+        require(dsDecodedCert.nonCriticalExtensionOIDs.containsAll(requiredNonCriticalOIDs)) {
+            "Document signer certificate was not found to contain all required non critical extension oids, " +
+                    "missing oids are: ${requiredNonCriticalOIDs.minus(dsDecodedCert.nonCriticalExtensionOIDs)}"
+        }
+
     }
 
     fun validateDocumentSignerPublicKey(
@@ -33,9 +55,8 @@ internal class DocumentSignerValidator {
             "Document signer key must be a public key, but instead was found to have hasPrivateKey: ${publicKey.hasPrivateKey}"
         }
 
-        require(allowedDocumentSignerKeyTypes.contains(publicKey.keyType)) {
-            "Document signer public key type must be one of ${allowedDocumentSignerKeyTypes}, but was found to be ${publicKey.keyType}"
-        }
+        validateKeyType(publicKey.keyType)
+
     }
 
     fun validateDocumentSignerProfileData(
@@ -70,6 +91,16 @@ internal class DocumentSignerValidator {
         require(iacaProfileData.validityPeriod.notAfter >= dsProfileData.validityPeriod.notAfter) {
             "IACA certificate not after must be after the document signer's not after"
         }
+    }
+
+    private fun validateKeyType(
+        keyType: KeyType,
+    ) {
+
+        require(allowedDocumentSignerKeyTypes.contains(keyType)) {
+            "Document signer public key type must be one of ${allowedDocumentSignerKeyTypes}, but was found to be $keyType"
+        }
+
     }
 
     private fun validatePrincipalName(

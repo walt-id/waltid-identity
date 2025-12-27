@@ -72,7 +72,7 @@ internal class IACAValidator {
     ) {
 
         require(allowedSigningKeyTypes.contains(keyType)) {
-            "IACA signing key type must be one of ${allowedSigningKeyTypes}, but was found to be ${keyType}"
+            "IACA signing key type must be one of ${allowedSigningKeyTypes}, but was found to be $keyType"
         }
     }
 
