@@ -21,6 +21,20 @@ internal class IACAValidator {
         decodedCert: IACADecodedCertificate,
     ) {
 
+        validateKeyType(decodedCert.publicKey.keyType)
+
+        validateCertificateProfileData(decodedCert.toIACACertificateProfileData())
+
+        require(decodedCert.criticalExtensionOIDs.containsAll(requiredCriticalOIDs)) {
+            "IACA certificate was not found to contain all required critical extension oids, " +
+                    "missing oids are: ${requiredCriticalOIDs.minus(decodedCert.criticalExtensionOIDs)}"
+        }
+
+        require(decodedCert.nonCriticalExtensionOIDs.containsAll(requiredNonCriticalOIDs)) {
+            "IACA certificate was not found to contain all required non critical extension oids, " +
+                    "missing oids are: ${requiredNonCriticalOIDs.minus(decodedCert.nonCriticalExtensionOIDs)}"
+        }
+
     }
 
     fun validateSigningKey(
@@ -31,9 +45,7 @@ internal class IACAValidator {
             "IACA signing key must have a private key."
         }
 
-        require(allowedSigningKeyTypes.contains(signingKey.keyType)) {
-            "IACA signing key type must be one of ${allowedSigningKeyTypes}, but was found to be ${signingKey.keyType}"
-        }
+        validateKeyType(signingKey.keyType)
 
     }
 
@@ -53,6 +65,15 @@ internal class IACAValidator {
             }
         }
 
+    }
+
+    private fun validateKeyType(
+        keyType: KeyType,
+    ) {
+
+        require(allowedSigningKeyTypes.contains(keyType)) {
+            "IACA signing key type must be one of ${allowedSigningKeyTypes}, but was found to be ${keyType}"
+        }
     }
 
     private fun validatePrincipalName(
