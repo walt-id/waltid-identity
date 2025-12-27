@@ -76,10 +76,10 @@ internal actual suspend fun platformParseDocumentSignerCertificate(
         extendedKeyUsage = eku.toSet(),
         akiHex = akiHex,
         skiHex = skiHex,
-        isCA = (cert.basicConstraints != -1),
+        basicConstraints = cert.certificateBasicConstraints,
         publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
-        criticalExtensionOIDs = cert.criticalX509V3ExtensionOIDs(),
-        nonCriticalExtensionOIDs = cert.nonCriticalX509V3ExtensionOIDs(),
+        criticalExtensionOIDs = cert.criticalX509V3ExtensionOIDs,
+        nonCriticalExtensionOIDs = cert.nonCriticalX509V3ExtensionOIDs,
         certificate = JcaX509CertificateHandle(cert),
     )
 }

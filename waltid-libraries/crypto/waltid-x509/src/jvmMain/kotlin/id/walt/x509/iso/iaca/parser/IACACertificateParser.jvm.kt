@@ -47,14 +47,13 @@ internal actual suspend fun platformParseIACACertificate(
         ),
         issuerAlternativeName = IssuerAlternativeName.parseFromX509Certificate(cert),
         serialNumber = cert.serialNumber.toByteArray().toByteString(),
-        isCA = (cert.basicConstraints != -1),
-        pathLengthConstraint = cert.basicConstraints,
+        basicConstraints = cert.certificateBasicConstraints,
         keyUsage = certificateKeyUsages,
         skiHex = skiHex,
         crlDistributionPointUri = parseCrlDistributionPointUriFromCert(cert),
         publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
-        criticalExtensionOIDs = cert.criticalX509V3ExtensionOIDs(),
-        nonCriticalExtensionOIDs = cert.nonCriticalX509V3ExtensionOIDs(),
+        criticalExtensionOIDs = cert.criticalX509V3ExtensionOIDs,
+        nonCriticalExtensionOIDs = cert.nonCriticalX509V3ExtensionOIDs,
         certificate = JcaX509CertificateHandle(cert),
     )
 }

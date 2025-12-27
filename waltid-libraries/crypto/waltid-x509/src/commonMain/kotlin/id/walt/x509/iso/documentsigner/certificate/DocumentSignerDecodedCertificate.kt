@@ -3,6 +3,7 @@
 package id.walt.x509.iso.documentsigner.certificate
 
 import id.walt.crypto.keys.Key
+import id.walt.x509.CertificateBasicConstraints
 import id.walt.x509.CertificateKeyUsage
 import id.walt.x509.X509CertificateHandle
 import id.walt.x509.X509V3ExtensionOID
@@ -26,8 +27,7 @@ data class DocumentSignerDecodedCertificate internal constructor(
     val extendedKeyUsage: Set<String>,
     val akiHex: String,
     val skiHex: String,
-    //TODO: REFACTOR BASIC CONSTRAINTS
-    val isCA: Boolean,
+    val basicConstraints: CertificateBasicConstraints,
     val publicKey: Key,
     val criticalExtensionOIDs: Set<X509V3ExtensionOID>,
     val nonCriticalExtensionOIDs: Set<X509V3ExtensionOID>,
