@@ -1,6 +1,6 @@
 package id.walt.x509.iso
 
-const val DocumentSignerEkuOid = "1.0.18013.5.1.2"
+const val DocumentSignerEkuOID = "1.0.18013.5.1.2"
 
 const val ISO_CERT_SERIAL_NUMBER_REQUIRED_LENGTH = 20
 

@@ -13,7 +13,7 @@ import id.walt.x509.id.walt.x509.criticalX509V3ExtensionOIDs
 import id.walt.x509.id.walt.x509.iso.iaca.certificate.toJcaX500Name
 import id.walt.x509.id.walt.x509.nonCriticalX509V3ExtensionOIDs
 import id.walt.x509.iso.CertificateValidityPeriod
-import id.walt.x509.iso.generateCertificateSerialNo
+import id.walt.x509.iso.generateIsoCompliantX509CertificateSerialNo
 import id.walt.x509.iso.iaca.certificate.IACACertificateBundle
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
@@ -40,7 +40,7 @@ internal actual suspend fun platformSignIACACertificate(
 
     val altNames = issuerAlternativeNameToGeneralNameArray(profileData.issuerAlternativeName)
 
-    val serialNo = generateCertificateSerialNo()
+    val serialNo = generateIsoCompliantX509CertificateSerialNo()
 
     val certNotBeforeDate =
         Date(Instant.fromEpochSeconds(profileData.validityPeriod.notBefore.epochSeconds).toEpochMilliseconds())

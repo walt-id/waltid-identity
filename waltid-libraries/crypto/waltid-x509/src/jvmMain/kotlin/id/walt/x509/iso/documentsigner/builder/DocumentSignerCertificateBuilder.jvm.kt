@@ -14,11 +14,11 @@ import id.walt.x509.id.walt.x509.iso.documentsigner.certificate.toJcaX500Name
 import id.walt.x509.id.walt.x509.iso.iaca.certificate.toJcaX500Name
 import id.walt.x509.id.walt.x509.nonCriticalX509V3ExtensionOIDs
 import id.walt.x509.iso.CertificateValidityPeriod
-import id.walt.x509.iso.DocumentSignerEkuOid
+import id.walt.x509.iso.DocumentSignerEkuOID
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
-import id.walt.x509.iso.generateCertificateSerialNo
+import id.walt.x509.iso.generateIsoCompliantX509CertificateSerialNo
 import id.walt.x509.iso.issuerAlternativeNameToGeneralNameArray
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x509.*
@@ -44,7 +44,7 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
 
     val dsName = profileData.principalName.toJcaX500Name()
 
-    val serialNo = generateCertificateSerialNo()
+    val serialNo = generateIsoCompliantX509CertificateSerialNo()
 
     val altNames = issuerAlternativeNameToGeneralNameArray(iacaSignerSpec.profileData.issuerAlternativeName)
 
@@ -95,7 +95,7 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
     certBuilder.addExtension(
         Extension.extendedKeyUsage,
         true,
-        ExtendedKeyUsage(KeyPurposeId.getInstance(ASN1ObjectIdentifier(DocumentSignerEkuOid))),
+        ExtendedKeyUsage(KeyPurposeId.getInstance(ASN1ObjectIdentifier(DocumentSignerEkuOID))),
     )
 
     // CRL distribution points is mandatory
@@ -146,7 +146,7 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
             keyUsage = setOf(
                 CertificateKeyUsage.DigitalSignature
             ),
-            extendedKeyUsage = setOf(DocumentSignerEkuOid),
+            extendedKeyUsage = setOf(DocumentSignerEkuOID),
             akiHex = akiExt.keyIdentifierOctets.toHexString(),
             skiHex = skiExt.keyIdentifier.toHexString(),
             isCA = false,

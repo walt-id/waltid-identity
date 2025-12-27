@@ -21,11 +21,12 @@ data class DocumentSignerDecodedCertificate internal constructor(
     val validityPeriod: CertificateValidityPeriod,
     val issuerAlternativeName: IssuerAlternativeName,
     val crlDistributionPointUri: String,
-    val serialNumber: ByteString, //
-    val keyUsage: Set<CertificateKeyUsage>, //
+    val serialNumber: ByteString,
+    val keyUsage: Set<CertificateKeyUsage>,
     val extendedKeyUsage: Set<String>,
     val akiHex: String,
     val skiHex: String,
+    //TODO: REFACTOR BASIC CONSTRAINTS
     val isCA: Boolean,
     val publicKey: Key,
     val criticalExtensionOIDs: Set<X509V3ExtensionOID>,

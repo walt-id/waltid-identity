@@ -42,7 +42,7 @@ internal class IACAValidator {
     ) {
 
         require(signingKey.hasPrivateKey) {
-            "IACA signing key must have a private key."
+            "IACA signing key must have a private key, but was found to have hasPrivateKey: ${signingKey.hasPrivateKey}"
         }
 
         validateKeyType(signingKey.keyType)

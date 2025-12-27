@@ -5,21 +5,15 @@ package id.walt.x509.iso.iaca.parser
 import com.nimbusds.jose.util.X509CertUtils
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.x509.CertificateDer
-import id.walt.x509.id.walt.x509.JcaX509CertificateHandle
-import id.walt.x509.id.walt.x509.criticalX509V3ExtensionOIDs
+import id.walt.x509.id.walt.x509.*
 import id.walt.x509.id.walt.x509.iso.iaca.certificate.parseFromJcaX500Name
 import id.walt.x509.id.walt.x509.iso.parseFromX509Certificate
-import id.walt.x509.id.walt.x509.mustParseCertificateKeyUsageSetFromX509Certificate
-import id.walt.x509.id.walt.x509.nonCriticalX509V3ExtensionOIDs
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import id.walt.x509.iso.parseCrlDistributionPointUriFromCert
 import okio.ByteString.Companion.toByteString
-import org.bouncycastle.asn1.ASN1OctetString
-import org.bouncycastle.asn1.x509.Extension
-import org.bouncycastle.asn1.x509.SubjectKeyIdentifier
 import org.bouncycastle.cert.jcajce.JcaX500NameUtil
 import kotlin.time.ExperimentalTime
 import kotlin.time.toKotlinInstant
@@ -34,15 +28,16 @@ internal actual suspend fun platformParseIACACertificate(
         name = JcaX500NameUtil.getIssuer(cert),
     )
 
-    val keyUsageSet = mustParseCertificateKeyUsageSetFromX509Certificate(cert)
+    val certificateKeyUsages = cert.certificateKeyUsages
+    require(certificateKeyUsages.isNotEmpty()) {
+        "KeyUsage extension must exist as part of the IACA X509 certificate, but was found missing (or empty)"
+    }
 
     val skiHex = requireNotNull(
-        cert.getExtensionValue(Extension.subjectKeyIdentifier.id)
-    ).let {
-        SubjectKeyIdentifier.getInstance(
-            ASN1OctetString.getInstance(it).octets
-        ).keyIdentifier.toHexString()
-    }
+        cert.subjectKeyIdentifier
+    ) {
+        "Subject key identifier must exist as part of the IACA X509 certificate, but was found missing"
+    }.hex()
 
     return IACADecodedCertificate(
         principalName = principalName,
@@ -54,7 +49,7 @@ internal actual suspend fun platformParseIACACertificate(
         serialNumber = cert.serialNumber.toByteArray().toByteString(),
         isCA = (cert.basicConstraints != -1),
         pathLengthConstraint = cert.basicConstraints,
-        keyUsage = keyUsageSet,
+        keyUsage = certificateKeyUsages,
         skiHex = skiHex,
         crlDistributionPointUri = parseCrlDistributionPointUriFromCert(cert),
         publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),

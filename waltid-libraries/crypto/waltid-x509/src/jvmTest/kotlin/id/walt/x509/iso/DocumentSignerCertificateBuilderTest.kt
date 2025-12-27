@@ -120,7 +120,7 @@ class DocumentSignerCertificateBuilderTest {
         val ekuBytes = cert.getExtensionValue(Extension.extendedKeyUsage.id)
         val ekuOctet = ASN1OctetString.getInstance(ekuBytes).octets
         val eku = ExtendedKeyUsage.getInstance(ASN1Sequence.fromByteArray(ekuOctet))
-        val expectedOID = KeyPurposeId.getInstance(ASN1ObjectIdentifier(DocumentSignerEkuOid))
+        val expectedOID = KeyPurposeId.getInstance(ASN1ObjectIdentifier(DocumentSignerEkuOID))
         assertTrue(eku.hasKeyPurposeId(expectedOID))
 
         // === CRL Distribution Point URI check ===

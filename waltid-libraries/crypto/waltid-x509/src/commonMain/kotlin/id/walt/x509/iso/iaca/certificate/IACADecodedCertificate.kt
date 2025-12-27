@@ -18,10 +18,10 @@ data class IACADecodedCertificate internal constructor(
     val validityPeriod: CertificateValidityPeriod,
     val issuerAlternativeName: IssuerAlternativeName,
     val publicKey: Key,
-    val serialNumber: ByteString, //
-    //TODO: Add SKI stuff? And if so, in what format?
-    val isCA: Boolean,//
-    val pathLengthConstraint: Int,//
+    val serialNumber: ByteString,
+    //TODO: REFACTOR BASIC CONSTRAINTS
+    val isCA: Boolean,
+    val pathLengthConstraint: Int,
     val keyUsage: Set<CertificateKeyUsage>,
     val skiHex: String,
     val criticalExtensionOIDs: Set<X509V3ExtensionOID>,

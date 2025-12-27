@@ -16,7 +16,7 @@ import java.security.cert.X509Certificate
 import java.util.*
 
 
-internal actual fun generateCertificateSerialNo(): ByteString {
+internal actual fun generateIsoCompliantX509CertificateSerialNo(): ByteString {
     val random = SecureRandom()
     val randomBytes = ByteArray(ISO_CERT_SERIAL_NUMBER_REQUIRED_LENGTH)
     random.nextBytes(randomBytes)

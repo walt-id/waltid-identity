@@ -1,10 +1,7 @@
 package id.walt.x509.id.walt.x509
 
 import id.walt.x509.CertificateKeyUsage
-import org.bouncycastle.asn1.ASN1OctetString
-import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.asn1.x509.KeyUsage
-import java.security.cert.X509Certificate
 
 fun KeyUsage.toCertificateKeyUsages(): Set<CertificateKeyUsage> {
     val usages = mutableSetOf<CertificateKeyUsage>()
@@ -33,18 +30,6 @@ fun CertificateKeyUsage.toBCKeyUsage() = when (this) {
     CertificateKeyUsage.CRLSign -> KeyUsage.cRLSign
     CertificateKeyUsage.EncipherOnly -> KeyUsage.encipherOnly
     CertificateKeyUsage.DecipherOnly -> KeyUsage.decipherOnly
-}
-
-fun mustParseCertificateKeyUsageSetFromX509Certificate(
-    cert: X509Certificate,
-): Set<CertificateKeyUsage> {
-    return requireNotNull(
-        cert.getExtensionValue(Extension.keyUsage.id)
-    ) {
-        "KeyUsage extension must exist as part of the X509 certificate, but was found missing"
-    }.let { keyUsageExtRaw ->
-        KeyUsage.getInstance(ASN1OctetString.getInstance(keyUsageExtRaw).octets).toCertificateKeyUsages()
-    }
 }
 
 fun Iterable<CertificateKeyUsage>.toBouncyCastleKeyUsage(): KeyUsage {
