@@ -10,11 +10,14 @@ import kotlin.time.ExperimentalTime
 
 class IACACertificateBuilder {
 
+    private val validator by lazy {
+        IACAValidator()
+    }
+
     suspend fun build(
         profileData: IACACertificateProfileData,
         signingKey: Key,
     ): IACACertificateBundle {
-        val validator = IACAValidator()
         validator.validateSigningKey(signingKey)
         validator.validateCertificateProfileData(profileData)
         return platformSignIACACertificate(

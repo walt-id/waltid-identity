@@ -7,7 +7,6 @@ package id.walt.x509.iso.iaca.validate
  * Callers can selectively disable checks (e.g., for parsing/inspection use-cases).
  */
 data class IACAValidationConfig(
-    val signingKeyHasPrivateKey: Boolean = true,
     val keyType: Boolean = true,
     val principalName: Boolean = true,
     val issuerAlternativeName: Boolean = true,

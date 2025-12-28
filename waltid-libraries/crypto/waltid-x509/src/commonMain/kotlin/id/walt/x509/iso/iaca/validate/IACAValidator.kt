@@ -16,72 +16,70 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 class IACAValidator(
-    private val validationConfig: IACAValidationConfig = IACAValidationConfig(),
+    val config: IACAValidationConfig = IACAValidationConfig(),
 ) {
 
     suspend fun validate(
         decodedCert: IACADecodedCertificate,
     ) {
 
-        if (validationConfig.keyType) {
+        if (config.keyType) {
             validateKeyType(decodedCert.publicKey.keyType)
         }
 
         validateCertificateProfileData(decodedCert.toIACACertificateProfileData())
 
-        if (validationConfig.requiredCriticalExtensionOIDs) {
+        if (config.requiredCriticalExtensionOIDs) {
             require(decodedCert.criticalExtensionOIDs.containsAll(requiredCriticalOIDs)) {
                 "IACA certificate was not found to contain all required critical extension oids, " +
                         "missing oids are: ${requiredCriticalOIDs.minus(decodedCert.criticalExtensionOIDs)}"
             }
         }
 
-        if (validationConfig.requiredNonCriticalExtensionOIDs) {
+        if (config.requiredNonCriticalExtensionOIDs) {
             require(decodedCert.nonCriticalExtensionOIDs.containsAll(requiredNonCriticalOIDs)) {
                 "IACA certificate was not found to contain all required non critical extension oids, " +
                         "missing oids are: ${requiredNonCriticalOIDs.minus(decodedCert.nonCriticalExtensionOIDs)}"
             }
         }
 
-        if (validationConfig.signature) {
+        if (config.signature) {
             decodedCert.verifySignature(decodedCert.publicKey)
         }
 
     }
 
-    fun validateSigningKey(
+    internal fun validateSigningKey(
         signingKey: Key,
     ) {
 
-        if (validationConfig.signingKeyHasPrivateKey) {
-            require(signingKey.hasPrivateKey) {
-                "IACA signing key must have a private key, but was found to have hasPrivateKey: ${signingKey.hasPrivateKey}"
-            }
+        require(signingKey.hasPrivateKey) {
+            "IACA signing key must have a private key, but was found to have hasPrivateKey: ${signingKey.hasPrivateKey}"
         }
 
-        if (validationConfig.keyType) {
+        if (config.keyType) {
             validateKeyType(signingKey.keyType)
         }
 
     }
 
-    fun validateCertificateProfileData(
+    internal fun validateCertificateProfileData(
         data: IACACertificateProfileData,
     ) {
 
-        if (validationConfig.principalName) {
+        if (config.principalName) {
             validatePrincipalName(data.principalName)
         }
 
-        if (validationConfig.issuerAlternativeName) {
+        if (config.issuerAlternativeName) {
             validateIssuerAlternativeName(data.issuerAlternativeName)
         }
 
-        if (validationConfig.validityPeriod) {
+        if (config.validityPeriod) {
             validateCertificateValidityPeriod(data.validityPeriod)
         }
 
-        if (validationConfig.crlDistributionPointUri) {
+        if (config.crlDistributionPointUri) {
             data.crlDistributionPointUri?.let {
                 require(it.isNotBlank()) {
                     "IACA CRL distribution point, when optionally specified, must not be blank."
