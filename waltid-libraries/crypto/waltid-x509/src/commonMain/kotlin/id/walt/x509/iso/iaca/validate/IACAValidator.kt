@@ -106,8 +106,10 @@ internal class IACAValidator {
             "IACA certificate data notBefore must be before (and not equal to) notAfter"
         }
 
-        require(validityPeriod.notAfter.minus(validityPeriod.notBefore).inWholeSeconds < IACA_CERT_MAX_VALIDITY_SECONDS) {
-            "IACA certificates should not have a validity that is larger than 15 years" +
+        require(
+            validityPeriod.notAfter.minus(validityPeriod.notBefore).inWholeSeconds < IACA_CERT_MAX_VALIDITY_SECONDS
+        ) {
+            "IACA certificates should not have a validity that is larger than 20 years, " +
                     "notAfter: ${validityPeriod.notAfter}, notBefore: ${validityPeriod.notBefore} " +
                     "and difference in whole days is: ${validityPeriod.notAfter.minus(validityPeriod.notBefore).inWholeDays}"
         }

@@ -137,8 +137,10 @@ internal class DocumentSignerValidator {
             "Document signer certificate data notBefore must be before (and not equal to) notAfter"
         }
 
-        require(validityPeriod.notAfter.minus(validityPeriod.notBefore).inWholeSeconds <= DS_CERT_MAX_VALIDITY_SECONDS) {
-            "Document signer certificates should not have a validity that is larger than 457 days" +
+        require(
+            validityPeriod.notAfter.minus(validityPeriod.notBefore).inWholeSeconds <= DS_CERT_MAX_VALIDITY_SECONDS
+        ) {
+            "Document signer certificates should not have a validity that is larger than 457 days, " +
                     "notAfter: ${validityPeriod.notAfter}, notBefore: ${validityPeriod.notBefore} " +
                     "and difference in whole days is: ${validityPeriod.notAfter.minus(validityPeriod.notBefore).inWholeDays}"
         }
@@ -150,7 +152,6 @@ internal class DocumentSignerValidator {
             KeyType.secp256r1,
             KeyType.secp384r1,
             KeyType.secp521r1,
-            KeyType.Ed25519,
         )
 
         private val requiredCriticalOIDs = setOf(
