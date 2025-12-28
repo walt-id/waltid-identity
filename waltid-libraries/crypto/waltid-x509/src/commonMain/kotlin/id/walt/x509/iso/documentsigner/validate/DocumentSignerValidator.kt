@@ -16,9 +16,11 @@ import id.walt.x509.iso.isValidIsoCountryCode
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
-internal class DocumentSignerValidator {
+class DocumentSignerValidator(
+    val config: DocumentSignerValidationConfig = DocumentSignerValidationConfig(),
+) {
 
-    fun validateDecodedCertificate(
+    suspend fun validate(
         dsDecodedCert: DocumentSignerDecodedCertificate,
         iacaDecodedCert: IACADecodedCertificate,
     ) {
@@ -30,24 +32,34 @@ internal class DocumentSignerValidator {
             data = dsProfileData,
         )
 
-        validateProfileDataAgainstIACAProfileData(
-            dsProfileData = dsProfileData,
-            iacaProfileData = iacaDecodedCert.toIACACertificateProfileData(),
-        )
-
-        require(dsDecodedCert.criticalExtensionOIDs.containsAll(requiredCriticalOIDs)) {
-            "Document signer certificate was not found to contain all required critical extension oids, " +
-                    "missing oids are: ${requiredCriticalOIDs.minus(dsDecodedCert.criticalExtensionOIDs)}"
+        if (config.profileDataAgainstIACAProfileData) {
+            validateProfileDataAgainstIACAProfileData(
+                dsProfileData = dsProfileData,
+                iacaProfileData = iacaDecodedCert.toIACACertificateProfileData(),
+            )
         }
 
-        require(dsDecodedCert.nonCriticalExtensionOIDs.containsAll(requiredNonCriticalOIDs)) {
-            "Document signer certificate was not found to contain all required non critical extension oids, " +
-                    "missing oids are: ${requiredNonCriticalOIDs.minus(dsDecodedCert.nonCriticalExtensionOIDs)}"
+        if (config.requiredCriticalExtensionOIDs) {
+            require(dsDecodedCert.criticalExtensionOIDs.containsAll(requiredCriticalOIDs)) {
+                "Document signer certificate was not found to contain all required critical extension oids, " +
+                        "missing oids are: ${requiredCriticalOIDs.minus(dsDecodedCert.criticalExtensionOIDs)}"
+            }
+        }
+
+        if (config.requiredNonCriticalExtensionOIDs) {
+            require(dsDecodedCert.nonCriticalExtensionOIDs.containsAll(requiredNonCriticalOIDs)) {
+                "Document signer certificate was not found to contain all required non critical extension oids, " +
+                        "missing oids are: ${requiredNonCriticalOIDs.minus(dsDecodedCert.nonCriticalExtensionOIDs)}"
+            }
+        }
+
+        if (config.signature) {
+            dsDecodedCert.verifySignature(iacaDecodedCert.publicKey)
         }
 
     }
 
-    fun validateDocumentSignerPublicKey(
+    internal fun validateDocumentSignerPublicKey(
         publicKey: Key,
     ) {
 
@@ -55,24 +67,32 @@ internal class DocumentSignerValidator {
             "Document signer key must be a public key, but instead was found to have hasPrivateKey: ${publicKey.hasPrivateKey}"
         }
 
-        validateKeyType(publicKey.keyType)
+        if (config.keyType) {
+            validateKeyType(publicKey.keyType)
+        }
 
     }
 
-    fun validateDocumentSignerProfileData(
+    internal fun validateDocumentSignerProfileData(
         data: DocumentSignerCertificateProfileData,
     ) {
 
-        validatePrincipalName(data.principalName)
+        if (config.principalName) {
+            validatePrincipalName(data.principalName)
+        }
 
-        validateValidityPeriod(data.validityPeriod)
+        if (config.validityPeriod) {
+            validateValidityPeriod(data.validityPeriod)
+        }
 
-        require(data.crlDistributionPointUri.isNotBlank()) {
-            "Document signer CRL distribution point uri must not be blank"
+        if (config.crlDistributionPointUri) {
+            require(data.crlDistributionPointUri.isNotBlank()) {
+                "Document signer CRL distribution point uri must not be blank"
+            }
         }
     }
 
-    fun validateProfileDataAgainstIACAProfileData(
+    internal fun validateProfileDataAgainstIACAProfileData(
         dsProfileData: DocumentSignerCertificateProfileData,
         iacaProfileData: IACACertificateProfileData,
     ) {

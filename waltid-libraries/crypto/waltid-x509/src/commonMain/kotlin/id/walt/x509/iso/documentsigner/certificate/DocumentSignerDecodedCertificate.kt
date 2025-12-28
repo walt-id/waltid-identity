@@ -9,8 +9,6 @@ import id.walt.x509.X509CertificateHandle
 import id.walt.x509.X509V3ExtensionOID
 import id.walt.x509.iso.CertificateValidityPeriod
 import id.walt.x509.iso.IssuerAlternativeName
-import id.walt.x509.iso.documentsigner.validate.DocumentSignerValidator
-import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import okio.ByteString
 import kotlin.time.ExperimentalTime
@@ -40,20 +38,10 @@ data class DocumentSignerDecodedCertificate internal constructor(
         crlDistributionPointUri = crlDistributionPointUri,
     )
 
-    suspend fun validate(
-        validIACADecodedCert: IACADecodedCertificate,
+    internal suspend fun verifySignature(
+        verificationKey: Key,
     ) {
-        _validator.validateDecodedCertificate(
-            dsDecodedCert = this,
-            iacaDecodedCert = validIACADecodedCert,
-        )
-        certificate.verifySignature(validIACADecodedCert.publicKey)
+        certificate.verifySignature(verificationKey)
     }
 
-    companion object {
-
-        private val _validator by lazy {
-            DocumentSignerValidator()
-        }
-    }
 }

@@ -6,20 +6,19 @@ import id.walt.crypto.keys.Key
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
 import id.walt.x509.iso.documentsigner.validate.DocumentSignerValidator
-import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlin.time.ExperimentalTime
 
 class DocumentSignerCertificateBuilder {
+
+    private val dsValidator by lazy {
+        DocumentSignerValidator()
+    }
 
     suspend fun build(
         profileData: DocumentSignerCertificateProfileData,
         publicKey: Key,
         iacaSignerSpec: IACASignerSpecification,
     ): DocumentSignerCertificateBundle {
-        val iacaValidator = IACAValidator()
-        iacaValidator.validateSigningKey(iacaSignerSpec.signingKey)
-        iacaValidator.validateCertificateProfileData(iacaSignerSpec.profileData)
-        val dsValidator = DocumentSignerValidator()
         dsValidator.validateDocumentSignerPublicKey(publicKey)
         dsValidator.validateDocumentSignerProfileData(profileData)
         dsValidator.validateProfileDataAgainstIACAProfileData(
