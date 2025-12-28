@@ -4,10 +4,8 @@ import java.io.ByteArrayInputStream
 import java.io.FileInputStream
 import java.security.KeyStore
 import java.security.cert.*
-import java.util.*
-import kotlin.collections.ArrayList
 
-
+//TODO: Check if this is correct: X.509 vs X509
 fun CertificateDer.toX509(): X509Certificate =
     CertificateFactory.getInstance("X.509").generateCertificate(ByteArrayInputStream(this.bytes)) as X509Certificate
 

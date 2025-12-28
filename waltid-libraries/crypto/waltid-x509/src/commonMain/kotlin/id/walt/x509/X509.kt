@@ -1,5 +1,7 @@
 package id.walt.x509
 
+
+//TODO: Change to ByteString
 /**
  * DER encoded X.509 certificate as platform-agnostic wrapper.
  */
