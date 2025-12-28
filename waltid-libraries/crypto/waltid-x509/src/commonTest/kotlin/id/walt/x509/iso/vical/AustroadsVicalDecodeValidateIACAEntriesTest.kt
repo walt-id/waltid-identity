@@ -3,6 +3,7 @@ package id.walt.x509.iso.vical
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.iso.iaca.parser.IACACertificateParser
+import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Ignore
@@ -63,6 +64,7 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
     @Test
     @Ignore
     fun `must be able to decode and validate all IACA certificate entries of the Austroads VICAL`() = runTest {
+        val validator = IACAValidator()
         iacaPemEncodedCertificates.map { pemEncodedCertificate ->
             JWKKey.convertDERorPEMtoByteArray(pemEncodedCertificate)
         }.forEach { derEncodedCertificate ->
@@ -94,7 +96,7 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
 
             * */
             if (iacaDecodedCertificate.principalName.country != "ZZ") {
-                iacaDecodedCertificate.validate()
+                validator.validate(iacaDecodedCertificate)
             }
         }
     }

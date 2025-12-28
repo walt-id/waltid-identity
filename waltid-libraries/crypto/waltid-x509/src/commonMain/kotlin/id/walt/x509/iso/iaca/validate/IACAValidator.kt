@@ -15,24 +15,36 @@ import id.walt.x509.iso.isValidIsoCountryCode
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
-internal class IACAValidator {
+class IACAValidator(
+    private val validationConfig: IACAValidationConfig = IACAValidationConfig(),
+) {
 
-    fun validateDecodedCertificate(
+    suspend fun validate(
         decodedCert: IACADecodedCertificate,
     ) {
 
-        validateKeyType(decodedCert.publicKey.keyType)
+        if (validationConfig.keyType) {
+            validateKeyType(decodedCert.publicKey.keyType)
+        }
 
         validateCertificateProfileData(decodedCert.toIACACertificateProfileData())
 
-        require(decodedCert.criticalExtensionOIDs.containsAll(requiredCriticalOIDs)) {
-            "IACA certificate was not found to contain all required critical extension oids, " +
-                    "missing oids are: ${requiredCriticalOIDs.minus(decodedCert.criticalExtensionOIDs)}"
+        if (validationConfig.requiredCriticalExtensionOIDs) {
+            require(decodedCert.criticalExtensionOIDs.containsAll(requiredCriticalOIDs)) {
+                "IACA certificate was not found to contain all required critical extension oids, " +
+                        "missing oids are: ${requiredCriticalOIDs.minus(decodedCert.criticalExtensionOIDs)}"
+            }
         }
 
-        require(decodedCert.nonCriticalExtensionOIDs.containsAll(requiredNonCriticalOIDs)) {
-            "IACA certificate was not found to contain all required non critical extension oids, " +
-                    "missing oids are: ${requiredNonCriticalOIDs.minus(decodedCert.nonCriticalExtensionOIDs)}"
+        if (validationConfig.requiredNonCriticalExtensionOIDs) {
+            require(decodedCert.nonCriticalExtensionOIDs.containsAll(requiredNonCriticalOIDs)) {
+                "IACA certificate was not found to contain all required non critical extension oids, " +
+                        "missing oids are: ${requiredNonCriticalOIDs.minus(decodedCert.nonCriticalExtensionOIDs)}"
+            }
+        }
+
+        if (validationConfig.signature) {
+            decodedCert.verifySignature(decodedCert.publicKey)
         }
 
     }
@@ -41,11 +53,15 @@ internal class IACAValidator {
         signingKey: Key,
     ) {
 
-        require(signingKey.hasPrivateKey) {
-            "IACA signing key must have a private key, but was found to have hasPrivateKey: ${signingKey.hasPrivateKey}"
+        if (validationConfig.signingKeyHasPrivateKey) {
+            require(signingKey.hasPrivateKey) {
+                "IACA signing key must have a private key, but was found to have hasPrivateKey: ${signingKey.hasPrivateKey}"
+            }
         }
 
-        validateKeyType(signingKey.keyType)
+        if (validationConfig.keyType) {
+            validateKeyType(signingKey.keyType)
+        }
 
     }
 
@@ -53,15 +69,23 @@ internal class IACAValidator {
         data: IACACertificateProfileData,
     ) {
 
-        validatePrincipalName(data.principalName)
+        if (validationConfig.principalName) {
+            validatePrincipalName(data.principalName)
+        }
 
-        validateIssuerAlternativeName(data.issuerAlternativeName)
+        if (validationConfig.issuerAlternativeName) {
+            validateIssuerAlternativeName(data.issuerAlternativeName)
+        }
 
-        validateCertificateValidityPeriod(data.validityPeriod)
+        if (validationConfig.validityPeriod) {
+            validateCertificateValidityPeriod(data.validityPeriod)
+        }
 
-        data.crlDistributionPointUri?.let {
-            require(it.isNotBlank()) {
-                "IACA CRL distribution point, when optionally specified, must not be blank."
+        if (validationConfig.crlDistributionPointUri) {
+            data.crlDistributionPointUri?.let {
+                require(it.isNotBlank()) {
+                    "IACA CRL distribution point, when optionally specified, must not be blank."
+                }
             }
         }
 
