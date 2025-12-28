@@ -38,23 +38,24 @@ class IACACertificateRoundTripTest {
         val issuerAlternativeName = IssuerAlternativeName(
             uri = "https://ca.example.com",
         )
-        val iacaCertBuilder = IACACertificateBuilder(
-            profileData = IACACertificateProfileData(
-                principalName = IACAPrincipalName(
-                    country = "US",
-                    commonName = "Example IACA",
-                ),
-                validityPeriod = CertificateValidityPeriod(
-                    notBefore = validNotBefore,
-                    notAfter = validNotAfter,
-                ),
-                issuerAlternativeName = issuerAlternativeName,
-                crlDistributionPointUri = "https://ca.example.com/crl",
+        val profileData = IACACertificateProfileData(
+            principalName = IACAPrincipalName(
+                country = "US",
+                commonName = "Example IACA",
             ),
-            signingKey = signingKey,
+            validityPeriod = CertificateValidityPeriod(
+                notBefore = validNotBefore,
+                notAfter = validNotAfter,
+            ),
+            issuerAlternativeName = issuerAlternativeName,
+            crlDistributionPointUri = "https://ca.example.com/crl",
         )
 
-        val iacaCertBundle = iacaCertBuilder.build()
+        val iacaCertBuilder = IACACertificateBuilder()
+        val iacaCertBundle = iacaCertBuilder.build(
+            profileData = profileData,
+            signingKey = signingKey,
+        )
 
         val iacaCertParser = IACACertificateParser(
             certificate = iacaCertBundle.certificateDer,

@@ -54,44 +54,46 @@ class DocumentSignerCertificateBuilderTest {
         val issuerAlternativeName = IssuerAlternativeName(
             uri = "https://ca.example.com",
         )
-        val iacaCertBuilder = IACACertificateBuilder(
-            profileData = IACACertificateProfileData(
-                principalName = IACAPrincipalName(
-                    country = "US",
-                    commonName = "Example IACA",
-                ),
-                validityPeriod = CertificateValidityPeriod(
-                    notBefore = iacaValidNotBefore,
-                    notAfter = iacaValidNotAfter,
-                ),
-                issuerAlternativeName = issuerAlternativeName,
-                crlDistributionPointUri = "https://ca.example.com/crl",
+        val iacaProfileData = IACACertificateProfileData(
+            principalName = IACAPrincipalName(
+                country = "US",
+                commonName = "Example IACA",
             ),
+            validityPeriod = CertificateValidityPeriod(
+                notBefore = iacaValidNotBefore,
+                notAfter = iacaValidNotAfter,
+            ),
+            issuerAlternativeName = issuerAlternativeName,
+            crlDistributionPointUri = "https://ca.example.com/crl",
+        )
+
+        val iacaCertBuilder = IACACertificateBuilder()
+        val iacaCertBundle = iacaCertBuilder.build(
+            profileData = iacaProfileData,
             signingKey = iacaSigningKey,
         )
 
-        val iacaCertBundle = iacaCertBuilder.build()
-
-        val dsCertBuilder = DocumentSignerCertificateBuilder(
-            profileData = DocumentSignerCertificateProfileData(
-                principalName = DocumentSignerPrincipalName(
-                    country = "US",
-                    commonName = "Example DS",
-                ),
-                validityPeriod = CertificateValidityPeriod(
-                    notBefore = iacaValidNotBefore.plus(1.days),
-                    notAfter = iacaValidNotAfter.minus(1.days),
-                ),
-                crlDistributionPointUri = "https://ca.example.com/crl",
+        val dsProfileData = DocumentSignerCertificateProfileData(
+            principalName = DocumentSignerPrincipalName(
+                country = "US",
+                commonName = "Example DS",
             ),
+            validityPeriod = CertificateValidityPeriod(
+                notBefore = iacaValidNotBefore.plus(1.days),
+                notAfter = iacaValidNotAfter.minus(1.days),
+            ),
+            crlDistributionPointUri = "https://ca.example.com/crl",
+        )
+
+        val dsCertBuilder = DocumentSignerCertificateBuilder()
+        val dsCertificateBundle = dsCertBuilder.build(
+            profileData = dsProfileData,
             publicKey = dsKey.getPublicKey(),
             iacaSignerSpec = IACASignerSpecification(
                 signingKey = iacaSigningKey,
                 profileData = iacaCertBundle.decodedCertificate.toIACACertificateProfileData(),
-            )
+            ),
         )
-
-        val dsCertificateBundle = dsCertBuilder.build()
 
         val cert = X509CertUtils.parse(dsCertificateBundle.certificateDer.bytes)
 

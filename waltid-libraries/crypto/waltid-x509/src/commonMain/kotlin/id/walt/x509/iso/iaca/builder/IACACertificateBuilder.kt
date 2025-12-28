@@ -8,12 +8,12 @@ import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlin.time.ExperimentalTime
 
-class IACACertificateBuilder(
-    val profileData: IACACertificateProfileData,
-    val signingKey: Key,
-) {
+class IACACertificateBuilder {
 
-    suspend fun build(): IACACertificateBundle {
+    suspend fun build(
+        profileData: IACACertificateProfileData,
+        signingKey: Key,
+    ): IACACertificateBundle {
         val validator = IACAValidator()
         validator.validateSigningKey(signingKey)
         validator.validateCertificateProfileData(profileData)

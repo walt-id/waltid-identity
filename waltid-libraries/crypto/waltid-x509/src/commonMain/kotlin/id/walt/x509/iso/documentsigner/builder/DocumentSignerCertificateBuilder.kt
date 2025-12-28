@@ -9,13 +9,13 @@ import id.walt.x509.iso.documentsigner.validate.DocumentSignerValidator
 import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlin.time.ExperimentalTime
 
-class DocumentSignerCertificateBuilder(
-    val profileData: DocumentSignerCertificateProfileData,
-    val publicKey: Key,
-    val iacaSignerSpec: IACASignerSpecification,
-) {
+class DocumentSignerCertificateBuilder {
 
-    suspend fun build(): DocumentSignerCertificateBundle {
+    suspend fun build(
+        profileData: DocumentSignerCertificateProfileData,
+        publicKey: Key,
+        iacaSignerSpec: IACASignerSpecification,
+    ): DocumentSignerCertificateBundle {
         val iacaValidator = IACAValidator()
         iacaValidator.validateSigningKey(iacaSignerSpec.signingKey)
         iacaValidator.validateCertificateProfileData(iacaSignerSpec.profileData)

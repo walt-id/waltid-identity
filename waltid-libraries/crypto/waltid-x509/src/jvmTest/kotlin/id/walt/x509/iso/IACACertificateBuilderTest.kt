@@ -46,26 +46,27 @@ class IACACertificateBuilderTest {
         val issuerAlternativeName = IssuerAlternativeName(
             uri = "https://ca.example.com",
         )
-        val iacaCertBuilder = IACACertificateBuilder(
-            profileData = IACACertificateProfileData(
-                principalName = IACAPrincipalName(
-                    country = "US",
-                    commonName = "Example IACA",
-                ),
-                validityPeriod = CertificateValidityPeriod(
-                    notBefore = validNotBefore,
-                    notAfter = validNotAfter,
-                ),
-                issuerAlternativeName = issuerAlternativeName,
-                crlDistributionPointUri = "https://ca.example.com/crl",
+        val profileData = IACACertificateProfileData(
+            principalName = IACAPrincipalName(
+                country = "US",
+                commonName = "Example IACA",
             ),
+            validityPeriod = CertificateValidityPeriod(
+                notBefore = validNotBefore,
+                notAfter = validNotAfter,
+            ),
+            issuerAlternativeName = issuerAlternativeName,
+            crlDistributionPointUri = "https://ca.example.com/crl",
+        )
+
+        val iacaCertBuilder = IACACertificateBuilder()
+        val iacaCertBundle = iacaCertBuilder.build(
+            profileData = profileData,
             signingKey = signingKey,
         )
 
-        val iacaCertBundle = iacaCertBuilder.build()
-
         assertIACABuilderDataEqualsCertificateData(
-            builder = iacaCertBuilder,
+            profileData = profileData,
             iacaCertData = iacaCertBundle.decodedCertificate,
         )
 
@@ -87,10 +88,7 @@ class IACACertificateBuilderTest {
         // 5. Should contain at least 71 bits (recommended)
         assertTrue(cert.serialNumber.bitLength() >= 71, "Serial number should contain at least 71 bits of entropy")
 
-        assertEquals(
-            iacaCertBuilder.profileData.principalName.country,
-            cert.issuerX500Principal.name.substringAfter("C=").take(2)
-        )
+        assertEquals(profileData.principalName.country, cert.issuerX500Principal.name.substringAfter("C=").take(2))
         assertEquals(cert.subjectX500Principal, cert.issuerX500Principal) // self-signed
         assertEquals(cert.basicConstraints, 0) // Is a CA
         assertTrue(cert.keyUsage[5]) // keyCertSign
@@ -120,32 +118,32 @@ class IACACertificateBuilderTest {
     }
 
     private fun assertIACABuilderDataEqualsCertificateData(
-        builder: IACACertificateBuilder,
+        profileData: IACACertificateProfileData,
         iacaCertData: IACADecodedCertificate,
     ) {
 
         assertEquals(
-            expected = builder.profileData.principalName,
+            expected = profileData.principalName,
             actual = iacaCertData.principalName,
         )
 
         assertEquals(
-            expected = builder.profileData.validityPeriod.notAfter,
+            expected = profileData.validityPeriod.notAfter,
             actual = iacaCertData.validityPeriod.notAfter,
         )
 
         assertEquals(
-            expected = builder.profileData.validityPeriod.notBefore,
+            expected = profileData.validityPeriod.notBefore,
             actual = iacaCertData.validityPeriod.notBefore,
         )
 
         assertEquals(
-            expected = builder.profileData.issuerAlternativeName,
+            expected = profileData.issuerAlternativeName,
             actual = iacaCertData.issuerAlternativeName,
         )
 
         assertEquals(
-            expected = builder.profileData.crlDistributionPointUri,
+            expected = profileData.crlDistributionPointUri,
             actual = iacaCertData.crlDistributionPointUri,
         )
 

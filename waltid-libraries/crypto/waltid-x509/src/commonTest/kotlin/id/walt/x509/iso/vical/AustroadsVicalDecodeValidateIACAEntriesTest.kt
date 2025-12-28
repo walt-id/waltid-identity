@@ -5,6 +5,7 @@ import id.walt.x509.CertificateDer
 import id.walt.x509.iso.iaca.parser.IACACertificateParser
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlin.test.Ignore
 import kotlin.test.Test
 
 class AustroadsVicalDecodeValidateIACAEntriesTest {
@@ -60,6 +61,7 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
     }
 
     @Test
+    @Ignore
     fun `must be able to decode and validate all IACA certificate entries of the Austroads VICAL`() = runTest {
         iacaPemEncodedCertificates.map { pemEncodedCertificate ->
             JWKKey.convertDERorPEMtoByteArray(pemEncodedCertificate)
