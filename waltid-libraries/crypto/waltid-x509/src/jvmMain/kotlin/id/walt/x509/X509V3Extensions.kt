@@ -1,7 +1,7 @@
 package id.walt.x509.id.walt.x509
 
-import id.walt.x509.CertificateBasicConstraints
-import id.walt.x509.CertificateKeyUsage
+import id.walt.x509.X509BasicConstraints
+import id.walt.x509.X509KeyUsage
 import id.walt.x509.X509V3ExtensionOID
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
@@ -34,15 +34,15 @@ val X509Certificate.authorityKeyIdentifier: ByteString?
         ).keyIdentifierOctets?.toByteString()
     }
 
-val X509Certificate.certificateKeyUsages: Set<CertificateKeyUsage>
+val X509Certificate.x509KeyUsages: Set<X509KeyUsage>
     get() = getExtensionValue(Extension.keyUsage.id)?.let { kuExtRaw ->
         KeyUsage.getInstance(
             ASN1OctetString.getInstance(kuExtRaw).octets
         ).toCertificateKeyUsages()
     } ?: emptySet()
 
-val X509Certificate.certificateBasicConstraints
-    get() = CertificateBasicConstraints(
+val X509Certificate.x509BasicConstraints
+    get() = X509BasicConstraints(
         isCA = (basicConstraints != -1),
         pathLengthConstraint = basicConstraints,
     )

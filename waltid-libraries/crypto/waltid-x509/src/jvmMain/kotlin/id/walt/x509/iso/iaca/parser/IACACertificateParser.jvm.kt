@@ -28,7 +28,7 @@ internal actual suspend fun platformParseIACACertificate(
         name = JcaX500NameUtil.getIssuer(cert),
     )
 
-    val certificateKeyUsages = cert.certificateKeyUsages
+    val certificateKeyUsages = cert.x509KeyUsages
     require(certificateKeyUsages.isNotEmpty()) {
         "KeyUsage extension must exist as part of the IACA X509 certificate, but was found missing (or empty)"
     }
@@ -47,7 +47,7 @@ internal actual suspend fun platformParseIACACertificate(
         ),
         issuerAlternativeName = IssuerAlternativeName.parseFromX509Certificate(cert),
         serialNumber = cert.serialNumber.toByteArray().toByteString(),
-        basicConstraints = cert.certificateBasicConstraints,
+        basicConstraints = cert.x509BasicConstraints,
         keyUsage = certificateKeyUsages,
         skiHex = skiHex,
         crlDistributionPointUri = parseCrlDistributionPointUriFromCert(cert),

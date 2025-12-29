@@ -6,7 +6,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
 import id.walt.x509.CertificateDer
-import id.walt.x509.CertificateKeyUsage
+import id.walt.x509.X509KeyUsage
 import id.walt.x509.id.walt.x509.*
 import id.walt.x509.id.walt.x509.iso.documentsigner.certificate.toJcaX500Name
 import id.walt.x509.id.walt.x509.iso.iaca.certificate.toJcaX500Name
@@ -141,12 +141,12 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
             crlDistributionPointUri = profileData.crlDistributionPointUri,
             serialNumber = serialNo,
             keyUsage = setOf(
-                CertificateKeyUsage.DigitalSignature
+                X509KeyUsage.DigitalSignature
             ),
             extendedKeyUsage = setOf(DocumentSignerEkuOID),
             akiHex = akiExt.keyIdentifierOctets.toHexString(),
             skiHex = skiExt.keyIdentifier.toHexString(),
-            basicConstraints = certificate.certificateBasicConstraints,
+            basicConstraints = certificate.x509BasicConstraints,
             publicKey = JWKKey.importFromDerCertificate(certificate.encoded).getOrThrow(),
             criticalExtensionOIDs = certificate.criticalX509V3ExtensionOIDs,
             nonCriticalExtensionOIDs = certificate.nonCriticalX509V3ExtensionOIDs,

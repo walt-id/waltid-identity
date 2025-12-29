@@ -40,7 +40,7 @@ internal actual suspend fun platformParseDocumentSignerCertificate(
         "CRL distribution point URI must exist as part of the Document Signer X509 certificate,  but was found missing"
     }
 
-    val certificateKeyUsages = cert.certificateKeyUsages
+    val certificateKeyUsages = cert.x509KeyUsages
     require(certificateKeyUsages.isNotEmpty()) {
         "KeyUsage extension must exist as part of the Document Signer X509 certificate, but was found missing (or empty)"
     }
@@ -76,7 +76,7 @@ internal actual suspend fun platformParseDocumentSignerCertificate(
         extendedKeyUsage = eku.toSet(),
         akiHex = akiHex,
         skiHex = skiHex,
-        basicConstraints = cert.certificateBasicConstraints,
+        basicConstraints = cert.x509BasicConstraints,
         publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
         criticalExtensionOIDs = cert.criticalX509V3ExtensionOIDs,
         nonCriticalExtensionOIDs = cert.nonCriticalX509V3ExtensionOIDs,

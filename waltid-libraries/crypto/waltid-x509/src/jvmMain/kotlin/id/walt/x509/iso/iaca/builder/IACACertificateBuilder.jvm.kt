@@ -6,7 +6,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
 import id.walt.x509.CertificateDer
-import id.walt.x509.CertificateKeyUsage
+import id.walt.x509.X509KeyUsage
 import id.walt.x509.id.walt.x509.*
 import id.walt.x509.id.walt.x509.iso.iaca.certificate.toJcaX500Name
 import id.walt.x509.iso.CertificateValidityPeriod
@@ -128,10 +128,10 @@ internal actual suspend fun platformSignIACACertificate(
             ),
             issuerAlternativeName = profileData.issuerAlternativeName,
             serialNumber = serialNo.toByteArray().toByteString(),
-            basicConstraints = certificate.certificateBasicConstraints,
+            basicConstraints = certificate.x509BasicConstraints,
             keyUsage = setOf(
-                CertificateKeyUsage.KeyCertSign,
-                CertificateKeyUsage.CRLSign,
+                X509KeyUsage.KeyCertSign,
+                X509KeyUsage.CRLSign,
             ),
             skiHex = skiExt.keyIdentifier.toHexString(),
             crlDistributionPointUri = profileData.crlDistributionPointUri,

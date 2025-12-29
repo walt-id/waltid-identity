@@ -1,7 +1,6 @@
 package id.walt.x509
 
-//TODO: Figure out a better name for this
-enum class CertificateKeyUsage {
+enum class X509KeyUsage {
     DigitalSignature,
     NonRepudiation,
     KeyEncipherment,

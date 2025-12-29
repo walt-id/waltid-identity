@@ -3,8 +3,8 @@
 package id.walt.x509.iso.iaca.certificate
 
 import id.walt.crypto.keys.Key
-import id.walt.x509.CertificateBasicConstraints
-import id.walt.x509.CertificateKeyUsage
+import id.walt.x509.X509BasicConstraints
+import id.walt.x509.X509KeyUsage
 import id.walt.x509.X509CertificateHandle
 import id.walt.x509.X509V3ExtensionOID
 import id.walt.x509.iso.CertificateValidityPeriod
@@ -19,8 +19,8 @@ data class IACADecodedCertificate internal constructor(
     val issuerAlternativeName: IssuerAlternativeName,
     val publicKey: Key,
     val serialNumber: ByteString,
-    val basicConstraints: CertificateBasicConstraints,
-    val keyUsage: Set<CertificateKeyUsage>,
+    val basicConstraints: X509BasicConstraints,
+    val keyUsage: Set<X509KeyUsage>,
     val skiHex: String,
     val criticalExtensionOIDs: Set<X509V3ExtensionOID>,
     val nonCriticalExtensionOIDs: Set<X509V3ExtensionOID>,

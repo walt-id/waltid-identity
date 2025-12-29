@@ -6,7 +6,7 @@ import com.nimbusds.jose.util.X509CertUtils
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
-import id.walt.x509.CertificateKeyUsage
+import id.walt.x509.X509KeyUsage
 import id.walt.x509.iso.iaca.builder.IACACertificateBuilder
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
@@ -158,7 +158,7 @@ class IACACertificateBuilderTest {
         )
 
         assertEquals(
-            expected = setOf(CertificateKeyUsage.CRLSign, CertificateKeyUsage.KeyCertSign),
+            expected = setOf(X509KeyUsage.CRLSign, X509KeyUsage.KeyCertSign),
             actual = iacaCertData.keyUsage,
         )
 

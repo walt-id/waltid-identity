@@ -14,7 +14,7 @@ class BouncyCastleUtilitiesTest {
 
     @Test
     fun certificateKeyUsageToBcKeyUsageSingleRoundTrip() {
-        CertificateKeyUsage.entries.forEach { usage ->
+        X509KeyUsage.entries.forEach { usage ->
             val bcBit = usage.toBCKeyUsage()
             val converted = KeyUsage(bcBit).toCertificateKeyUsages()
             assertEquals(setOf(usage), converted, "Roundtrip failed for $usage")
@@ -24,10 +24,10 @@ class BouncyCastleUtilitiesTest {
     @Test
     fun certificateKeyUsageIterableToBouncyCastleKeyUsageMultipleRoundTrip() {
         val expected = setOf(
-            CertificateKeyUsage.DigitalSignature,
-            CertificateKeyUsage.KeyCertSign,
-            CertificateKeyUsage.CRLSign,
-            CertificateKeyUsage.KeyAgreement,
+            X509KeyUsage.DigitalSignature,
+            X509KeyUsage.KeyCertSign,
+            X509KeyUsage.CRLSign,
+            X509KeyUsage.KeyAgreement,
         )
         val bc = expected.toBouncyCastleKeyUsage()
         val converted = bc.toCertificateKeyUsages()
