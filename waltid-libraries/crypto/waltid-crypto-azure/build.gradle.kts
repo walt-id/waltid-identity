@@ -17,7 +17,8 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.7.3")
+    
     // Azure Identity (for Managed Identity authentication)
     implementation("com.azure:azure-identity:1.15.1")
 
