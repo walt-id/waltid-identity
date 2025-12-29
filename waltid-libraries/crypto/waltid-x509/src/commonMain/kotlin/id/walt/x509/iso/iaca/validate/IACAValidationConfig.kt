@@ -9,6 +9,8 @@ package id.walt.x509.iso.iaca.validate
 data class IACAValidationConfig(
     val keyType: Boolean = true,
     val principalName: Boolean = true,
+    val serialNo: Boolean = true,
+    val basicConstraints: Boolean = true,
     val issuerAlternativeName: Boolean = true,
     val validityPeriod: Boolean = true,
     val crlDistributionPointUri: Boolean = true,

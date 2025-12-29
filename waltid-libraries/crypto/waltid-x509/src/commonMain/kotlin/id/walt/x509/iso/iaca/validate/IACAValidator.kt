@@ -4,14 +4,12 @@ package id.walt.x509.iso.iaca.validate
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.x509.X509BasicConstraints
 import id.walt.x509.X509V3ExtensionOID
-import id.walt.x509.iso.CertificateValidityPeriod
-import id.walt.x509.iso.IACA_CERT_MAX_VALIDITY_SECONDS
-import id.walt.x509.iso.IssuerAlternativeName
+import id.walt.x509.iso.*
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
-import id.walt.x509.iso.isValidIsoCountryCode
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -19,7 +17,6 @@ class IACAValidator(
     val config: IACAValidationConfig = IACAValidationConfig(),
 ) {
 
-    //TODO: check if all validations are correct
     suspend fun validate(
         decodedCert: IACADecodedCertificate,
     ) {
@@ -29,6 +26,12 @@ class IACAValidator(
         }
 
         validateCertificateProfileData(decodedCert.toIACACertificateProfileData())
+
+        if (config.serialNo)
+            validateSerialNo(decodedCert.serialNumber)
+
+        if (config.basicConstraints)
+            validateX509BasicConstraints(decodedCert.basicConstraints)
 
         if (config.requiredCriticalExtensionOIDs) {
             require(decodedCert.criticalExtensionOIDs.containsAll(requiredCriticalOIDs)) {
@@ -144,6 +147,19 @@ class IACAValidator(
     ) {
         require(!issAltName.email.isNullOrBlank() || !issAltName.uri.isNullOrBlank()) {
             "IACA issuer alternative name must have at least one of 'email' or 'uri' specified with a non-null, or blank value"
+        }
+    }
+
+    private fun validateX509BasicConstraints(
+        basicConstraints: X509BasicConstraints
+    ) {
+
+        require(basicConstraints.isCA) {
+            "IACA basic constraints isCA flag must be set to true, but was found to be false"
+        }
+
+        require(basicConstraints.pathLengthConstraint == 0) {
+            "IACA basic constraints pathLengthConstraint must be 0, but was found to be ${basicConstraints.pathLengthConstraint}"
         }
     }
 
