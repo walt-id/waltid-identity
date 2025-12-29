@@ -6,9 +6,13 @@ import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.x509.iso.IsoSharedTestHarnessValidResources
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertTrue
 import kotlin.time.ExperimentalTime
 
 class IACACertificateBuilderMPTest {
@@ -25,6 +29,27 @@ class IACACertificateBuilderMPTest {
                     signingKey = validSigningKey,
                 )
             }
+    }
+
+    @Test
+    fun `build should be safe when called concurrently`() = runTest {
+        val bundles = List(20) {
+            async {
+                IsoSharedTestHarnessValidResources.iacaBuilder.build(
+                    profileData = IsoSharedTestHarnessValidResources.iacaProfileData,
+                    signingKey = IsoSharedTestHarnessValidResources.iacaSecp256r1SigningKey(),
+                )
+            }
+        }.awaitAll()
+
+        assertTrue {
+            bundles.all { it.certificateDer.bytes.isNotEmpty() }
+        }
+        //all serial numbers are unique -> hence all generated certificates different
+        assertEquals(
+            expected = bundles.size,
+            actual = bundles.map { it.decodedCertificate.serialNumber }.toSet().size,
+        )
     }
 
     @Test
