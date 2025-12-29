@@ -1,7 +1,6 @@
 package id.walt.crypto.keys.azure
 
 import com.azure.core.exception.ResourceNotFoundException
-import com.azure.security.keyvault.keys.cryptography.models.SignResult
 import com.azure.security.keyvault.keys.cryptography.models.SignatureAlgorithm
 import com.azure.security.keyvault.keys.models.CreateEcKeyOptions
 import com.azure.security.keyvault.keys.models.CreateRsaKeyOptions
@@ -11,6 +10,7 @@ import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -82,7 +82,7 @@ class AzureKey(
             val digest = hashFunction(plaintext)
 
             val cryptoClient = KeyVaultClientFactory.cryptoClient(config.vaultUrl, id)
-            val signResult: SignResult = cryptoClient.sign(azureSignatureAlgorithm, digest)
+            val signResult = cryptoClient!!.sign(azureSignatureAlgorithm, digest).awaitSingle()
 
             signResult.signature ?: throw SigningException("Azure Key Vault returned null signature")
         } catch (e: ResourceNotFoundException) {
@@ -96,7 +96,6 @@ class AzureKey(
             throw SigningException("Failed to sign with Azure Key Vault: ${e.message}", e)
         }
     }
-
     override suspend fun signJws(
         plaintext: ByteArray,
         headers: Map<String, JsonElement>,
@@ -131,7 +130,7 @@ class AzureKey(
             val digest = hashFunction(messageToVerify)
 
             val cryptoClient = KeyVaultClientFactory.cryptoClient(config.vaultUrl, id)
-            val verifyResult = cryptoClient.verify(azureSignatureAlgorithm, digest, signed)
+            val verifyResult = cryptoClient!!.verify(azureSignatureAlgorithm, digest, signed).awaitSingle()
 
             if (verifyResult.isValid) {
                 Result.success(messageToVerify)
@@ -149,7 +148,6 @@ class AzureKey(
             Result.failure(VerificationException("Failed to verify with Azure Key Vault: ${e.message}", e))
         }
     }
-
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
         val publicKey = getPublicKey()
         return publicKey.verifyJws(signedJws)
