@@ -160,6 +160,16 @@ class DocumentSignerCertificateBuilderTest {
             }
         }
 
+        assertEquals(
+            expected = dsProfileData.validityPeriod.notBefore.epochSeconds,
+            actual = cert.notBefore.toInstant().epochSecond,
+        )
+        assertEquals(
+            expected = dsProfileData.validityPeriod.notAfter.epochSeconds,
+            actual = cert.notAfter.toInstant().epochSecond,
+        )
+
+
         val dsPrincipalName = dsProfileData.principalName
         assertEquals(
             dsPrincipalName.country,

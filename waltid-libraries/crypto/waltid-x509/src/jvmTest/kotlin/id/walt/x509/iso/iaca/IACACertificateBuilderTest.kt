@@ -140,6 +140,16 @@ class IACACertificateBuilderTest {
                 cert.issuerX500Principal.name.contains("ST=$stateName")
             }
         }
+
+        assertEquals(
+            expected = profileData.validityPeriod.notBefore.epochSeconds,
+            actual = cert.notBefore.toInstant().epochSecond,
+        )
+        assertEquals(
+            expected = profileData.validityPeriod.notAfter.epochSeconds,
+            actual = cert.notAfter.toInstant().epochSecond,
+        )
+
         assertNotNull(
             cert.getExtensionValue(Extension.subjectKeyIdentifier.id)
         )
