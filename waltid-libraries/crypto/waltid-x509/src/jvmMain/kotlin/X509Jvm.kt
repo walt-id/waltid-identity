@@ -5,7 +5,7 @@ import java.io.FileInputStream
 import java.security.KeyStore
 import java.security.cert.*
 
-fun CertificateDer.toX509(): X509Certificate = X509CertUtils.parse(bytes)
+fun CertificateDer.toJcaX509Certificate(): X509Certificate = X509CertUtils.parse(bytes)
 
 @Throws(X509ValidationException::class)
 actual fun validateCertificateChain(
@@ -18,8 +18,8 @@ actual fun validateCertificateChain(
 ) {
     try {
 
-        val leafCert = CertificateDer(leaf.bytes).toX509()
-        val all = chain.map { it.toX509() }.toMutableList()
+        val leafCert = CertificateDer(leaf.bytes).toJcaX509Certificate()
+        val all = chain.map { it.toJcaX509Certificate() }.toMutableList()
 
         // Remove leaf if passed both as leaf and in chain
         all.removeIf { it == leafCert }
@@ -81,7 +81,7 @@ private fun buildTrustAnchors(
 
     // Adding provided trust anchors
     trustAnchors?.forEach { der ->
-        anchors.add(TrustAnchor(der.toX509(), null))
+        anchors.add(TrustAnchor(der.toJcaX509Certificate(), null))
     }
 
     // Adding system trust anchors
@@ -92,7 +92,7 @@ private fun buildTrustAnchors(
             System.getProperty("waltid.keystore.password")?.toCharArray()
         )
         loadTrustAnchorsFromKeyStore(keyStore).forEach { der ->
-            anchors.add(TrustAnchor(der.toX509(), null))
+            anchors.add(TrustAnchor(der.toJcaX509Certificate(), null))
         }
     }
 

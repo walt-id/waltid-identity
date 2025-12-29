@@ -14,7 +14,7 @@ import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertific
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import id.walt.x509.iso.parseCrlDistributionPointUriFromCert
-import id.walt.x509.toX509
+import id.walt.x509.toJcaX509Certificate
 import okio.ByteString.Companion.toByteString
 import org.bouncycastle.cert.jcajce.JcaX500NameUtil
 import kotlin.time.ExperimentalTime
@@ -24,7 +24,7 @@ internal actual suspend fun platformParseDocumentSignerCertificate(
     certificate: CertificateDer,
 ): DocumentSignerDecodedCertificate {
 
-    val cert = certificate.toX509()
+    val cert = certificate.toJcaX509Certificate()
 
     val principalName = DocumentSignerPrincipalName.parseFromJcaX500Name(
         name = JcaX500NameUtil.getSubject(cert),
