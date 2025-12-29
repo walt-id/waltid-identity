@@ -89,7 +89,7 @@ object IsoSharedTestHarnessValidResources {
                 _dsKeyMap != null -> _dsKeyMap!!
 
                 else -> {
-                    listOf(
+                    _dsKeyMap = listOf(
                         KeyManager.createKey(
                             generationRequest = KeyGenerationRequest(
                                 keyType = KeyType.secp256r1,
@@ -108,6 +108,7 @@ object IsoSharedTestHarnessValidResources {
                     ).associateBy {
                         it.keyType
                     }
+                    _dsKeyMap!!
                 }
             }
 
