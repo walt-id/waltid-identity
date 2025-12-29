@@ -5,10 +5,10 @@ package id.walt.crypto.keys.azure
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.KeyUtils.rawSignaturePayloadForJws
 import id.walt.crypto.keys.KeyUtils.signJwsWithRawSignature
-import id.walt.crypto.keys.azure.AzureKey.AzureKeyFunctions.azureJsonDataBody
-import id.walt.crypto.keys.azure.AzureKey.AzureKeyFunctions.fetchAccessToken
-import id.walt.crypto.keys.azure.AzureKey.AzureKeyFunctions.keyTypeToAzureKeyMapping
-import id.walt.crypto.keys.azure.AzureKey.AzureKeyFunctions.parseAzurePublicKey
+import id.walt.crypto.keys.azure.AzureKeyRestApi.AzureKeyFunctions.azureJsonDataBody
+import id.walt.crypto.keys.azure.AzureKeyRestApi.AzureKeyFunctions.fetchAccessToken
+import id.walt.crypto.keys.azure.AzureKeyRestApi.AzureKeyFunctions.keyTypeToAzureKeyMapping
+import id.walt.crypto.keys.azure.AzureKeyRestApi.AzureKeyFunctions.parseAzurePublicKey
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -43,11 +43,11 @@ private val logger = KotlinLogging.logger { }
 @JsExport
 @Serializable
 @SerialName("azure-rest-api")
-class AzureKey(
+class AzureKeyRestApi(
     val id: String,
     val auth: AzureAuth,
     private var _keyType: KeyType? = null,
-    private var _publicKey: DirectSerializedKey? = null
+    private var _publicKey: DirectSerializedKey? = null,
 ) : Key() {
 
     @Transient
@@ -379,7 +379,7 @@ class AzureKey(
         }
 
         @JsExport.Ignore
-        override suspend fun generate(type: KeyType, metadata: AzureKeyMetadata): AzureKey {
+        override suspend fun generate(type: KeyType, metadata: AzureKeyMetadata): AzureKeyRestApi {
             val keyName = metadata.name ?: Random.nextInt().toString()
 
             val accessTokenResponse = fetchAccessToken(metadata.auth)
@@ -408,7 +408,7 @@ class AzureKey(
 
             val keyId = parsedAzurePublicKey.kid
 
-            return AzureKey(
+            return AzureKeyRestApi(
                 id = keyId,
                 auth = metadata.auth,
                 _keyType = parsedAzurePublicKey.keyType,
