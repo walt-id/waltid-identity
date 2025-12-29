@@ -2,7 +2,6 @@
 
 package id.walt.x509.iso.iaca.parser
 
-import com.nimbusds.jose.util.X509CertUtils
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.id.walt.x509.*
@@ -13,6 +12,7 @@ import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import id.walt.x509.iso.parseCrlDistributionPointUriFromCert
+import id.walt.x509.toX509
 import okio.ByteString.Companion.toByteString
 import org.bouncycastle.cert.jcajce.JcaX500NameUtil
 import kotlin.time.ExperimentalTime
@@ -22,7 +22,7 @@ internal actual suspend fun platformParseIACACertificate(
     certificate: CertificateDer,
 ): IACADecodedCertificate {
 
-    val cert = X509CertUtils.parse(certificate.bytes)
+    val cert = certificate.toX509()
 
     val principalName = IACAPrincipalName.parseFromJcaX500Name(
         name = JcaX500NameUtil.getIssuer(cert),
