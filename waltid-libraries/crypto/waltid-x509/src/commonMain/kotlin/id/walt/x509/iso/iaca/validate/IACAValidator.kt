@@ -5,6 +5,7 @@ package id.walt.x509.iso.iaca.validate
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.x509.X509BasicConstraints
+import id.walt.x509.X509KeyUsage
 import id.walt.x509.X509V3ExtensionOID
 import id.walt.x509.iso.*
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
@@ -46,6 +47,9 @@ class IACAValidator(
                         "missing oids are: ${requiredNonCriticalOIDs.minus(decodedCert.nonCriticalExtensionOIDs)}"
             }
         }
+
+        if (config.keyUsage)
+            validateKeyUsage(decodedCert.keyUsage)
 
         if (config.signature) {
             decodedCert.verifySignature(decodedCert.publicKey)
@@ -163,6 +167,15 @@ class IACAValidator(
         }
     }
 
+    private fun validateKeyUsage(
+        keyUsage: Set<X509KeyUsage>
+    ) {
+
+        require(expectedKeyUsageSet == keyUsage) {
+            "IACA key usage must be equal to the set: ${expectedKeyUsageSet.joinToString()}, but instead is: ${keyUsage.joinToString()}"
+        }
+    }
+
     companion object {
 
         private val allowedSigningKeyTypes = setOf(
@@ -179,5 +192,11 @@ class IACAValidator(
             X509V3ExtensionOID.SubjectKeyIdentifier,
             X509V3ExtensionOID.IssuerAlternativeName,
         )
+
+        private val expectedKeyUsageSet = setOf(
+            X509KeyUsage.KeyCertSign,
+            X509KeyUsage.CRLSign,
+        )
+
     }
 }

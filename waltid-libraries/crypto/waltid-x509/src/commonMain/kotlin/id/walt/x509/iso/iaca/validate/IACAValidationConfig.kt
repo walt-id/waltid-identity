@@ -11,6 +11,7 @@ data class IACAValidationConfig(
     val principalName: Boolean = true,
     val serialNo: Boolean = true,
     val basicConstraints: Boolean = true,
+    val keyUsage: Boolean = true,
     val issuerAlternativeName: Boolean = true,
     val validityPeriod: Boolean = true,
     val crlDistributionPointUri: Boolean = true,

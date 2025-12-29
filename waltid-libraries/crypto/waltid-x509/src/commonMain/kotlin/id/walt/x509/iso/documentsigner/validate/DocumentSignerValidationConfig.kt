@@ -9,6 +9,11 @@ package id.walt.x509.iso.documentsigner.validate
 data class DocumentSignerValidationConfig(
     val keyType: Boolean = true,
     val principalName: Boolean = true,
+    val serialNo: Boolean = true,
+    val keyUsage: Boolean = true,
+    val extendedKeyUsage: Boolean = true,
+    val authorityKeyIdentifier: Boolean = true,
+    val basicConstraints: Boolean = true,
     val validityPeriod: Boolean = true,
     val crlDistributionPointUri: Boolean = true,
     val profileDataAgainstIACAProfileData: Boolean = true,

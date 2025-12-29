@@ -4,15 +4,15 @@ package id.walt.x509.iso.documentsigner.validate
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.x509.X509BasicConstraints
+import id.walt.x509.X509KeyUsage
 import id.walt.x509.X509V3ExtensionOID
-import id.walt.x509.iso.CertificateValidityPeriod
-import id.walt.x509.iso.DS_CERT_MAX_VALIDITY_SECONDS
+import id.walt.x509.iso.*
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
-import id.walt.x509.iso.isValidIsoCountryCode
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -20,7 +20,6 @@ class DocumentSignerValidator(
     val config: DocumentSignerValidationConfig = DocumentSignerValidationConfig(),
 ) {
 
-    //TODO: check if all validations are correct
     suspend fun validate(
         dsDecodedCert: DocumentSignerDecodedCertificate,
         iacaDecodedCert: IACADecodedCertificate,
@@ -40,6 +39,18 @@ class DocumentSignerValidator(
             )
         }
 
+        if (config.authorityKeyIdentifier)
+            require(iacaDecodedCert.skiHex == dsDecodedCert.akiHex) {
+                "Document signer certificate authority key identifier (hex): ${dsDecodedCert.akiHex} does not match " +
+                        "IACA certificate subject key identifier (hex): ${iacaDecodedCert.skiHex}"
+            }
+
+        if (config.serialNo)
+            validateSerialNo(dsDecodedCert.serialNumber)
+
+        if (config.basicConstraints)
+            validateX509BasicConstraints(dsDecodedCert.basicConstraints)
+
         if (config.requiredCriticalExtensionOIDs) {
             require(dsDecodedCert.criticalExtensionOIDs.containsAll(requiredCriticalOIDs)) {
                 "Document signer certificate was not found to contain all required critical extension oids, " +
@@ -53,6 +64,12 @@ class DocumentSignerValidator(
                         "missing oids are: ${requiredNonCriticalOIDs.minus(dsDecodedCert.nonCriticalExtensionOIDs)}"
             }
         }
+
+        if (config.keyUsage)
+            validateKeyUsage(dsDecodedCert.keyUsage)
+
+        if (config.extendedKeyUsage)
+            validateExtendedKeyUsage(dsDecodedCert.extendedKeyUsage)
 
         if (config.signature) {
             dsDecodedCert.verifySignature(iacaDecodedCert.publicKey)
@@ -168,6 +185,35 @@ class DocumentSignerValidator(
 
     }
 
+    private fun validateX509BasicConstraints(
+        basicConstraints: X509BasicConstraints
+    ) {
+
+        require(!basicConstraints.isCA) {
+            "Document signer basic constraints isCA flag must be set to false, but was found to be true"
+        }
+
+    }
+
+    private fun validateKeyUsage(
+        keyUsage: Set<X509KeyUsage>
+    ) {
+
+        require(expectedKeyUsageSet == keyUsage) {
+            "Document signer key usage must be equal to the set: ${expectedKeyUsageSet.joinToString()}, " +
+                    "but instead is: ${keyUsage.joinToString()}"
+        }
+    }
+
+    private fun validateExtendedKeyUsage(
+        extKeyUsage: Set<String>,
+    ) {
+
+        require(extKeyUsage.contains(DocumentSignerEkuOID)) {
+            "Document signer extended key usage must contain OID: ${DocumentSignerEkuOID}, but was found missing"
+        }
+    }
+
     companion object {
         private val allowedDocumentSignerKeyTypes = setOf(
             KeyType.secp256r1,
@@ -185,6 +231,11 @@ class DocumentSignerValidator(
             X509V3ExtensionOID.IssuerAlternativeName,
             X509V3ExtensionOID.CrlDistributionPoints,
         )
+
+        private val expectedKeyUsageSet = setOf(
+            X509KeyUsage.DigitalSignature,
+        )
+
     }
 
 }
