@@ -3,7 +3,7 @@ package id.walt.crypto.keys.azure
 import com.azure.identity.DefaultAzureCredentialBuilder
 import com.azure.security.keyvault.keys.KeyClient
 import com.azure.security.keyvault.keys.KeyClientBuilder
-import com.azure.security.keyvault.keys.cryptography.CryptographyClient
+import com.azure.security.keyvault.keys.cryptography.CryptographyAsyncClient
 import com.azure.security.keyvault.keys.cryptography.CryptographyClientBuilder
 
 internal object KeyVaultClientFactory {
@@ -16,9 +16,9 @@ internal object KeyVaultClientFactory {
             .buildClient()
 
 
-    fun cryptoClient(vaultUrl: String, keyName: String): CryptographyClient =
+    fun cryptoClient(vaultUrl: String, keyName: String): CryptographyAsyncClient? =
         CryptographyClientBuilder()
-            .keyIdentifier("$vaultUrl/keys/$keyName")
+            .keyIdentifier("$vaultUrl/$keyName")
             .credential(DefaultAzureCredentialBuilder().build())
-            .buildClient()
+            .buildAsyncClient()
 }
