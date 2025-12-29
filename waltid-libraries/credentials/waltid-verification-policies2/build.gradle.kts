@@ -83,6 +83,8 @@ kotlin {
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))// for Base64Utils
 
                 implementation("com.soywiz:korlibs-io:6.0.2")
+
+                implementation(libs.okio)
             }
         }
         val commonTest by getting {
