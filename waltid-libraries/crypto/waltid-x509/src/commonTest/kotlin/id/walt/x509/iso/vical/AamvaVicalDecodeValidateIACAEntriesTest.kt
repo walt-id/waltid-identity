@@ -36,17 +36,16 @@ class AamvaVicalDecodeValidateIACAEntriesTest {
 
     @Test
     fun `must be able to decode and validate all IACA certificate entries of the AAMVA VICAL`() = runTest {
+        val iacaParser = IACACertificateParser()
         val validator = IACAValidator()
         iacaPemEncodedCertificates.map { pemEncodedCertificate ->
             JWKKey.convertDERorPEMtoByteArray(pemEncodedCertificate)
         }.forEach { derEncodedCertificate ->
-            val iacaParser = IACACertificateParser(
+            val iacaDecodedCertificate = iacaParser.parse(
                 certificate = CertificateDer(
                     bytes = derEncodedCertificate,
                 ),
             )
-
-            val iacaDecodedCertificate = iacaParser.parse()
 
             validator.validate(iacaDecodedCertificate)
         }

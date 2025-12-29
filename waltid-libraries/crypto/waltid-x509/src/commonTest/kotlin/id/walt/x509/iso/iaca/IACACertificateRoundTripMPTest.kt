@@ -3,6 +3,7 @@ package id.walt.x509.iso.iaca
 import id.walt.x509.iso.IsoSharedTestHarnessValidResources
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class IACACertificateRoundTripMPTest {
 
@@ -11,14 +12,30 @@ class IACACertificateRoundTripMPTest {
         IsoSharedTestHarnessValidResources
             .iacaSigningKeyMap()
             .values
-            .forEach { validIacaKey ->
+            .forEach { validIACAKey ->
 
                 val iacaCertBundle = IsoSharedTestHarnessValidResources
                     .iacaBuilder
                     .build(
-                    profileData = IsoSharedTestHarnessValidResources.iacaProfileData,
-                    signingKey = validIacaKey,
+                        profileData = IsoSharedTestHarnessValidResources.iacaProfileData,
+                        signingKey = validIACAKey,
+                    )
+
+                val decodedCert = IsoSharedTestHarnessValidResources
+                    .iacaParser
+                    .parse(
+                        certificate = iacaCertBundle.certificateDer,
+                    )
+
+                assertEquals(
+                    expected = iacaCertBundle.decodedCertificate,
+                    actual = decodedCert,
                 )
+
+                IsoSharedTestHarnessValidResources.iacaValidator.validate(
+                    decodedCert = decodedCert,
+                )
+
             }
     }
 }

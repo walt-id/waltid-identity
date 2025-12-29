@@ -57,11 +57,11 @@ class IACACertificateRoundTripTest {
             signingKey = signingKey,
         )
 
-        val iacaCertParser = IACACertificateParser(
+        val iacaCertParser = IACACertificateParser()
+
+        val decodedCert = iacaCertParser.parse(
             certificate = iacaCertBundle.certificateDer,
         )
-
-        val decodedCert = iacaCertParser.parse()
 
         assertEquals(
             expected = iacaCertBundle.decodedCertificate,

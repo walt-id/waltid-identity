@@ -89,11 +89,11 @@ class DocumentSignerRoundTripTest {
             ),
         )
 
-        val dsCertParser = DocumentSignerCertificateParser(
+        val dsCertParser = DocumentSignerCertificateParser()
+
+        val decodedCert = dsCertParser.parse(
             certificate = dsCertificateBundle.certificateDer,
         )
-
-        val decodedCert = dsCertParser.parse()
 
         assertEquals(
             expected = dsCertificateBundle.decodedCertificate,

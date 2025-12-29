@@ -9,16 +9,18 @@ import id.walt.crypto.keys.KeyType
 import id.walt.x509.iso.documentsigner.builder.DocumentSignerCertificateBuilder
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
+import id.walt.x509.iso.documentsigner.parser.DocumentSignerCertificateParser
+import id.walt.x509.iso.documentsigner.validate.DocumentSignerValidator
 import id.walt.x509.iso.iaca.builder.IACACertificateBuilder
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
+import id.walt.x509.iso.iaca.parser.IACACertificateParser
+import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.ExperimentalTime
 
 object IsoSharedTestHarnessValidResources {
-
-    val iacaBuilder = IACACertificateBuilder()
 
     private var _iacaKeyMap: Map<KeyType, Key>? = null
 
@@ -28,7 +30,7 @@ object IsoSharedTestHarnessValidResources {
                 _iacaKeyMap != null -> _iacaKeyMap!!
 
                 else -> {
-                    listOf(
+                    _iacaKeyMap = listOf(
                         KeyManager.createKey(
                             generationRequest = KeyGenerationRequest(
                                 keyType = KeyType.secp256r1,
@@ -47,6 +49,7 @@ object IsoSharedTestHarnessValidResources {
                     ).associateBy {
                         it.keyType
                     }
+                    _iacaKeyMap!!
                 }
             }
         }
@@ -73,7 +76,11 @@ object IsoSharedTestHarnessValidResources {
         )
     )
 
-    val dsBuilder = DocumentSignerCertificateBuilder()
+    val iacaBuilder = IACACertificateBuilder()
+
+    val iacaParser = IACACertificateParser()
+
+    val iacaValidator = IACAValidator()
 
     private var _dsKeyMap: Map<KeyType, Key>? = null
     val dsKeyMap by lazy {
@@ -122,4 +129,11 @@ object IsoSharedTestHarnessValidResources {
         validityPeriod = dsValidityPeriod,
         crlDistributionPointUri = "https://iaca.example.com/crl",
     )
+
+    val dsBuilder = DocumentSignerCertificateBuilder()
+
+    val dsParser = DocumentSignerCertificateParser()
+
+    val dsValidator = DocumentSignerValidator()
+
 }
