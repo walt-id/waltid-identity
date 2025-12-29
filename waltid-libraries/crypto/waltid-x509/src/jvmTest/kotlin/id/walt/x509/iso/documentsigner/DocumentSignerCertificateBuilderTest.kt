@@ -2,13 +2,9 @@
 
 package id.walt.x509.iso.documentsigner
 
-import com.nimbusds.jose.util.X509CertUtils
-import id.walt.crypto.keys.KeyGenerationRequest
-import id.walt.crypto.keys.KeyManager
-import id.walt.crypto.keys.KeyType
-import id.walt.x509.iso.CertificateValidityPeriod
-import id.walt.x509.iso.DocumentSignerEkuOID
-import id.walt.x509.iso.IssuerAlternativeName
+import id.walt.crypto.keys.Key
+import id.walt.x509.CertificateDer
+import id.walt.x509.iso.*
 import id.walt.x509.iso.documentsigner.builder.DocumentSignerCertificateBuilder
 import id.walt.x509.iso.documentsigner.builder.IACASignerSpecification
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
@@ -16,119 +12,219 @@ import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import id.walt.x509.iso.iaca.builder.IACACertificateBuilder
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
-import kotlinx.coroutines.runBlocking
+import id.walt.x509.toJcaX509Certificate
 import kotlinx.coroutines.test.runTest
+import okio.ByteString.Companion.toByteString
 import org.bouncycastle.asn1.*
 import org.bouncycastle.asn1.x509.*
-import java.math.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.time.*
 import kotlin.time.Duration.Companion.days
+import kotlin.time.ExperimentalTime
 
+/*
+The "main" purpose of this test is to check that the data that was input in the
+builder actually end up in the DER-encoded certificate
+* */
 class DocumentSignerCertificateBuilderTest {
 
-    private val iacaSigningKey = runBlocking {
-        KeyManager.createKey(
-            generationRequest = KeyGenerationRequest(
-                backend = "jwk",
-                keyType = KeyType.secp256r1,
-            )
-        )
-    }
+    private val iacaCertBuilder = IACACertificateBuilder()
 
-    private val iacaValidNotBefore = Instant.fromEpochSeconds(Clock.System.now().epochSeconds)
-    private val iacaValidNotAfter = iacaValidNotBefore.plus((365).toDuration(DurationUnit.DAYS))
+    private val iacaFullProfileData = IACACertificateProfileData(
+        principalName = IACAPrincipalName(
+            country = "US",
+            commonName = "Example IACAAAAAAAAAAA",
+            stateOrProvinceName = "Texas",
+            organizationName = "Some Org",
+        ),
+        validityPeriod = IsoSharedTestHarnessValidResources.iacaValidityPeriod,
+        issuerAlternativeName = IssuerAlternativeName(
+            uri = "https://iaca.example.com",
+            email = "iaca@example.com",
+        ),
+        crlDistributionPointUri = "https://iaca.example.com/crl"
+    )
 
-    private val dsKey = runBlocking {
-        KeyManager.createKey(
-            generationRequest = KeyGenerationRequest(
-                backend = "jwk",
-                keyType = KeyType.secp256r1,
-            )
-        )
-    }
+    private val dsBuilder = DocumentSignerCertificateBuilder()
+
+    private val requiredOnlyDSProfileData = DocumentSignerCertificateProfileData(
+        principalName = DocumentSignerPrincipalName(
+            country = "US",
+            commonName = "Example Docu Signah!",
+            stateOrProvinceName = "Texas",
+        ),
+        validityPeriod = CertificateValidityPeriod(
+            notBefore = IsoSharedTestHarnessValidResources.iacaValidityPeriod.notBefore.plus(1.days),
+            notAfter = IsoSharedTestHarnessValidResources.iacaValidityPeriod.notBefore.plus(400.days),
+        ),
+        crlDistributionPointUri = "https://iaca.example.com/crl"
+    )
+
+    private val dsFullProfileData = DocumentSignerCertificateProfileData(
+        principalName = DocumentSignerPrincipalName(
+            country = "US",
+            commonName = "Example Docu Signah!",
+            stateOrProvinceName = "Texas",
+            organizationName = "Docu Signah Orgah!",
+            localityName = "Texan?",
+        ),
+        validityPeriod = CertificateValidityPeriod(
+            notBefore = IsoSharedTestHarnessValidResources.iacaValidityPeriod.notBefore.plus(1.days),
+            notAfter = IsoSharedTestHarnessValidResources.iacaValidityPeriod.notBefore.plus(400.days),
+        ),
+        crlDistributionPointUri = "https://iaca.example.com/crl"
+    )
+
 
     @Test
-    fun `builder generates valid Document Signer certificate`() = runTest {
+    fun `builder input data actually end-up in the created Document Signer certificate`() = runTest {
+        val testVectorList = mutableListOf<DocumentSignerBuilderInputTestVector>()
+        IsoSharedTestHarnessValidResources
+            .iacaSigningKeyMap()
+            .values
+            .forEach { iacaSigningKey ->
+                IsoSharedTestHarnessValidResources
+                    .dsKeyMap()
+                    .values
+                    .forEach { dsKey ->
+                        testVectorList.addAll(
+                            listOf(
+                                DocumentSignerBuilderInputTestVector(
+                                    profileData = requiredOnlyDSProfileData,
+                                    publicKey = dsKey.getPublicKey(),
+                                    iacaSignerSpec = IACASignerSpecification(
+                                        profileData = iacaFullProfileData,
+                                        signingKey = iacaSigningKey,
+                                    ),
+                                ),
+                                DocumentSignerBuilderInputTestVector(
+                                    profileData = dsFullProfileData,
+                                    publicKey = dsKey.getPublicKey(),
+                                    iacaSignerSpec = IACASignerSpecification(
+                                        profileData = iacaFullProfileData,
+                                        signingKey = iacaSigningKey,
+                                    ),
+                                ),
+                            )
+                        )
 
-        val issuerAlternativeName = IssuerAlternativeName(
-            uri = "https://ca.example.com",
+                    }
+            }
+        testVectorList.forEach { vector ->
+            dsBuilder.build(
+                profileData = vector.profileData,
+                publicKey = vector.publicKey,
+                iacaSignerSpec = vector.iacaSignerSpec,
+            ).run {
+                assertDSBuilderInputDataEndUpInGeneratedCertificate(
+                    iacaSignerSpec = vector.iacaSignerSpec,
+                    generatedCertificate = certificateDer,
+                    dsProfileData = vector.profileData,
+                    dsPublicKey = vector.publicKey,
+                )
+            }
+        }
+    }
+
+    private fun assertDSBuilderInputDataEndUpInGeneratedCertificate(
+        iacaSignerSpec: IACASignerSpecification,
+        generatedCertificate: CertificateDer,
+        dsProfileData: DocumentSignerCertificateProfileData,
+        dsPublicKey: Key,
+    ) {
+
+        val cert = generatedCertificate.toJcaX509Certificate()
+
+        assertBuildersSerialNoCompliance(
+            serialNo = cert.serialNumber.toByteArray().toByteString(),
         )
-        val iacaProfileData = IACACertificateProfileData(
-            principalName = IACAPrincipalName(
-                country = "US",
-                commonName = "Example IACA",
-            ),
-            validityPeriod = CertificateValidityPeriod(
-                notBefore = iacaValidNotBefore,
-                notAfter = iacaValidNotAfter,
-            ),
-            issuerAlternativeName = issuerAlternativeName,
-            crlDistributionPointUri = "https://ca.example.com/crl",
+
+        val iacaPrincipalName = iacaSignerSpec.profileData.principalName
+        assertEquals(
+            iacaPrincipalName.country,
+            cert.issuerX500Principal.name.substringAfter("C=").take(2)
+        )
+        assertTrue {
+            cert.issuerX500Principal.name.contains("CN=${iacaPrincipalName.commonName}")
+        }
+        iacaPrincipalName.organizationName?.let { orgName ->
+            assertTrue {
+                cert.issuerX500Principal.name.contains("O=$orgName")
+            }
+        }
+        iacaPrincipalName.stateOrProvinceName?.let { stateName ->
+            assertTrue {
+                cert.issuerX500Principal.name.contains("ST=$stateName")
+            }
+        }
+
+        val dsPrincipalName = dsProfileData.principalName
+        assertEquals(
+            dsPrincipalName.country,
+            cert.subjectX500Principal.name.substringAfter("C=").take(2)
+        )
+        assertTrue {
+            cert.subjectX500Principal.name.contains("CN=${dsPrincipalName.commonName}")
+        }
+        dsPrincipalName.organizationName?.let { orgName ->
+            assertTrue {
+                cert.subjectX500Principal.name.contains("O=$orgName")
+            }
+        }
+        dsPrincipalName.stateOrProvinceName?.let { stateName ->
+            assertTrue {
+                cert.subjectX500Principal.name.contains("ST=$stateName")
+            }
+        }
+        dsPrincipalName.localityName?.let { localityName ->
+            assertTrue {
+                cert.subjectX500Principal.name.contains("L=$localityName")
+            }
+        }
+
+        assertNotNull(
+            cert.getExtensionValue(Extension.authorityKeyIdentifier.id)
         )
 
-        val iacaCertBuilder = IACACertificateBuilder()
-        val iacaCertBundle = iacaCertBuilder.build(
-            profileData = iacaProfileData,
-            signingKey = iacaSigningKey,
+        assertNotNull(
+            cert.getExtensionValue(Extension.subjectKeyIdentifier.id)
         )
+        assertEquals(cert.basicConstraints, -1) // Is not a CA
+        assertTrue(cert.keyUsage[0]) // Digital Signature
 
-        val dsProfileData = DocumentSignerCertificateProfileData(
-            principalName = DocumentSignerPrincipalName(
-                country = "US",
-                commonName = "Example DS",
-            ),
-            validityPeriod = CertificateValidityPeriod(
-                notBefore = iacaValidNotBefore.plus(1.days),
-                notAfter = iacaValidNotAfter.minus(1.days),
-            ),
-            crlDistributionPointUri = "https://ca.example.com/crl",
-        )
-
-        val dsCertBuilder = DocumentSignerCertificateBuilder()
-        val dsCertificateBundle = dsCertBuilder.build(
-            profileData = dsProfileData,
-            publicKey = dsKey.getPublicKey(),
-            iacaSignerSpec = IACASignerSpecification(
-                signingKey = iacaSigningKey,
-                profileData = iacaCertBundle.decodedCertificate.toIACACertificateProfileData(),
-            ),
-        )
-
-        val cert = X509CertUtils.parse(dsCertificateBundle.certificateDer.bytes)
-
-        // === Serial Number checks ===
-        // 1. Must be positive
-        assertTrue(cert.serialNumber.signum() > 0, "Serial number must be positive")
-
-        // 2. Must be non-zero
-        assertTrue(cert.serialNumber != BigInteger.ZERO, "Serial number must not be zero")
-
-        // 3. Must be <= 20 octets (160 bits)
-        assertTrue(cert.serialNumber.bitLength() <= 160, "Serial number must not exceed 20 bytes (160 bits)")
-
-        // 4. Must contain at least 63 bits (required)
-        assertTrue(cert.serialNumber.bitLength() >= 63, "Serial number must contain at least 63 bits of entropy")
-
-        // 5. Should contain at least 71 bits (recommended)
-        assertTrue(cert.serialNumber.bitLength() >= 71, "Serial number should contain at least 71 bits of entropy")
-
-        assertEquals("US", cert.subjectX500Principal.name.substringAfter("C=").take(2))
-        assertEquals(cert.basicConstraints, -1) // not a CA
-        assertTrue(cert.keyUsage[0]) // digitalSignature
-        assertFalse(cert.keyUsage[5]) // Not a cert signer
-
-        // === Extended Key Usage check ===
         val ekuBytes = cert.getExtensionValue(Extension.extendedKeyUsage.id)
         val ekuOctet = ASN1OctetString.getInstance(ekuBytes).octets
         val eku = ExtendedKeyUsage.getInstance(ASN1Sequence.fromByteArray(ekuOctet))
         val expectedOID = KeyPurposeId.getInstance(ASN1ObjectIdentifier(DocumentSignerEkuOID))
         assertTrue(eku.hasKeyPurposeId(expectedOID))
 
-        // === CRL Distribution Point URI check ===
+        assertNotNull(cert.issuerAlternativeNames)
+        assertEquals(
+            expected = when {
+                iacaSignerSpec.profileData.issuerAlternativeName.email != null &&
+                        iacaSignerSpec.profileData.issuerAlternativeName.uri != null -> 2
+
+                else -> 1
+            },
+            actual = cert.issuerAlternativeNames.size,
+        )
+        iacaSignerSpec.profileData.issuerAlternativeName.uri?.let { uri ->
+            assertTrue {
+                cert.issuerAlternativeNames.any {
+                    it[1] == uri
+                }
+            }
+        }
+        iacaSignerSpec.profileData.issuerAlternativeName.email?.let { email ->
+            assertTrue {
+                cert.issuerAlternativeNames.any {
+                    it[1] == email
+                }
+            }
+        }
+
         val crlBytes = cert.getExtensionValue(Extension.cRLDistributionPoints.id)
         val crlOctet = ASN1OctetString.getInstance(crlBytes).octets
         val crlDist = CRLDistPoint.getInstance(ASN1Primitive.fromByteArray(crlOctet))
@@ -142,9 +238,14 @@ class DocumentSignerCertificateBuilderTest {
         val uriName = uri.names!!.find { it.tagNo == GeneralName.uniformResourceIdentifier }
         val crlUriValue = (uriName!!.name as DERIA5String).string
         assertEquals(
-            expected = dsCertificateBundle.decodedCertificate.crlDistributionPointUri,
+            expected = dsProfileData.crlDistributionPointUri,
             actual = crlUriValue,
             message = "CRL distribution point URI must match expected value",
+        )
+
+        assertEquals(
+            expected = getJcaSigningAlgorithmNameFromKeyType(iacaSignerSpec.signingKey.keyType).algorithm.id,
+            actual = cert.sigAlgOID,
         )
 
     }
