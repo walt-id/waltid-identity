@@ -3,6 +3,7 @@
 package id.walt.x509.iso.iaca
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.iso.IsoSharedTestHarnessValidResources
 import id.walt.x509.iso.IssuerAlternativeName
@@ -21,10 +22,7 @@ import org.bouncycastle.asn1.x509.CRLDistPoint
 import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.asn1.x509.GeneralName
 import org.bouncycastle.asn1.x509.GeneralNames
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.ExperimentalTime
 
 /*
@@ -111,7 +109,7 @@ class IACACertificateBuilderTest {
 
     }
 
-    private fun assertIACABuilderInputDataEndUpInGeneratedCertificate(
+    private suspend fun assertIACABuilderInputDataEndUpInGeneratedCertificate(
         generatedCertificate: CertificateDer,
         profileData: IACACertificateProfileData,
         signingKey: Key,
@@ -120,6 +118,11 @@ class IACACertificateBuilderTest {
 
         assertBuildersSerialNoCompliance(
             serialNo = cert.serialNumber.toByteArray().toByteString(),
+        )
+
+        assertContentEquals(
+            expected = parsePEMEncodedJcaPublicKey(signingKey.getPublicKey().exportPEM()).encoded,
+            actual = cert.publicKey.encoded,
         )
 
         val iacaPrincipalName = profileData.principalName

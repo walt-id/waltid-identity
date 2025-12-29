@@ -3,13 +3,13 @@
 package id.walt.x509.iso.documentsigner
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.iso.*
 import id.walt.x509.iso.documentsigner.builder.DocumentSignerCertificateBuilder
 import id.walt.x509.iso.documentsigner.builder.IACASignerSpecification
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
-import id.walt.x509.iso.iaca.builder.IACACertificateBuilder
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import id.walt.x509.toJcaX509Certificate
@@ -17,10 +17,7 @@ import kotlinx.coroutines.test.runTest
 import okio.ByteString.Companion.toByteString
 import org.bouncycastle.asn1.*
 import org.bouncycastle.asn1.x509.*
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Duration.Companion.days
 import kotlin.time.ExperimentalTime
 
@@ -29,8 +26,6 @@ The "main" purpose of this test is to check that the data that was input in the
 builder actually end up in the DER-encoded certificate
 * */
 class DocumentSignerCertificateBuilderTest {
-
-    private val iacaCertBuilder = IACACertificateBuilder()
 
     private val iacaFullProfileData = IACACertificateProfileData(
         principalName = IACAPrincipalName(
@@ -128,7 +123,7 @@ class DocumentSignerCertificateBuilderTest {
         }
     }
 
-    private fun assertDSBuilderInputDataEndUpInGeneratedCertificate(
+    private suspend fun assertDSBuilderInputDataEndUpInGeneratedCertificate(
         iacaSignerSpec: IACASignerSpecification,
         generatedCertificate: CertificateDer,
         dsProfileData: DocumentSignerCertificateProfileData,
@@ -139,6 +134,11 @@ class DocumentSignerCertificateBuilderTest {
 
         assertBuildersSerialNoCompliance(
             serialNo = cert.serialNumber.toByteArray().toByteString(),
+        )
+
+        assertContentEquals(
+            expected = parsePEMEncodedJcaPublicKey(dsPublicKey.exportPEM()).encoded,
+            actual = cert.publicKey.encoded,
         )
 
         val iacaPrincipalName = iacaSignerSpec.profileData.principalName
