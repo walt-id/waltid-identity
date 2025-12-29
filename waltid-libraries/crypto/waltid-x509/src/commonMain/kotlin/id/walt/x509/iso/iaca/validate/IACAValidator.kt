@@ -19,6 +19,7 @@ class IACAValidator(
     val config: IACAValidationConfig = IACAValidationConfig(),
 ) {
 
+    //TODO: check if all validations are correct
     suspend fun validate(
         decodedCert: IACADecodedCertificate,
     ) {

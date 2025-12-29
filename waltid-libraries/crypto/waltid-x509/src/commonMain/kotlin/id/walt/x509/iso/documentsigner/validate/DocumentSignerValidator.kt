@@ -20,6 +20,7 @@ class DocumentSignerValidator(
     val config: DocumentSignerValidationConfig = DocumentSignerValidationConfig(),
 ) {
 
+    //TODO: check if all validations are correct
     suspend fun validate(
         dsDecodedCert: DocumentSignerDecodedCertificate,
         iacaDecodedCert: IACADecodedCertificate,
