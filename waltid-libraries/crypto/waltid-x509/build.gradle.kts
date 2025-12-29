@@ -109,6 +109,12 @@ kotlin {
             }
         }
 
+        val jsTest by getting {
+            dependencies {
+
+            }
+        }
+
         if (enableIosBuild) {
             val iosArm64Main by getting
             val iosSimulatorArm64Main by getting

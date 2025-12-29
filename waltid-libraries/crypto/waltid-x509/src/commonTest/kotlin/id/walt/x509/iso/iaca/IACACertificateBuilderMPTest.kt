@@ -6,6 +6,7 @@ import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.x509.iso.IsoSharedTestHarnessValidResources
+import id.walt.x509.iso.assertIACABuilderDataEqualsCertificateData
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
@@ -23,11 +24,16 @@ class IACACertificateBuilderMPTest {
             .iacaSigningKeyMap()
             .values
             .forEach { validSigningKey ->
-                //implicit success
+
                 IsoSharedTestHarnessValidResources.iacaBuilder.build(
                     profileData = IsoSharedTestHarnessValidResources.iacaProfileData,
                     signingKey = validSigningKey,
-                )
+                ).run {
+                    assertIACABuilderDataEqualsCertificateData(
+                        profileData = IsoSharedTestHarnessValidResources.iacaProfileData,
+                        decodedCert = this.decodedCertificate,
+                    )
+                }
             }
     }
 

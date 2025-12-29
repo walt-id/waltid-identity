@@ -1,11 +1,14 @@
 @file:OptIn(ExperimentalTime::class)
 
-package id.walt.x509.iso
+package id.walt.x509.iso.documentsigner
 
 import com.nimbusds.jose.util.X509CertUtils
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
+import id.walt.x509.iso.CertificateValidityPeriod
+import id.walt.x509.iso.DocumentSignerEkuOID
+import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.documentsigner.builder.DocumentSignerCertificateBuilder
 import id.walt.x509.iso.documentsigner.builder.IACASignerSpecification
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
