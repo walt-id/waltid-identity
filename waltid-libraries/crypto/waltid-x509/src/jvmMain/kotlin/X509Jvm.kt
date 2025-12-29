@@ -1,13 +1,11 @@
 package id.walt.x509
 
-import java.io.ByteArrayInputStream
+import com.nimbusds.jose.util.X509CertUtils
 import java.io.FileInputStream
 import java.security.KeyStore
 import java.security.cert.*
 
-//TODO: Check if this is correct: X.509 vs X509
-fun CertificateDer.toX509(): X509Certificate =
-    CertificateFactory.getInstance("X.509").generateCertificate(ByteArrayInputStream(this.bytes)) as X509Certificate
+fun CertificateDer.toX509(): X509Certificate = X509CertUtils.parse(bytes)
 
 @Throws(X509ValidationException::class)
 actual fun validateCertificateChain(
