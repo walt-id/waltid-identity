@@ -2,9 +2,12 @@ package id.walt.x509.iso.documentsigner
 
 import id.walt.x509.iso.IsoSharedTestHarnessValidResources
 import id.walt.x509.iso.documentsigner.builder.IACASignerSpecification
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class DocumentSignerCertificateRoundTripMPTest {
 
@@ -52,4 +55,50 @@ class DocumentSignerCertificateRoundTripMPTest {
 
                 }
         }
+
+    @Test
+    fun `roundtrip should be safe when called concurrently`() = runTest {
+        val iacaSignerSpec = IACASignerSpecification(
+            profileData = IsoSharedTestHarnessValidResources.iacaProfileData,
+            signingKey = IsoSharedTestHarnessValidResources.iacaSecp256r1SigningKey(),
+        )
+
+        val dsBundles = List(20) {
+            async {
+                val iacaCertBundle = IsoSharedTestHarnessValidResources.iacaBuilder.build(
+                    profileData = IsoSharedTestHarnessValidResources.iacaProfileData,
+                    signingKey = iacaSignerSpec.signingKey,
+                )
+
+                val dsCertBundle = IsoSharedTestHarnessValidResources.dsBuilder.build(
+                    profileData = IsoSharedTestHarnessValidResources.dsProfileData,
+                    publicKey = IsoSharedTestHarnessValidResources.dsSecp256r1PublicKey(),
+                    iacaSignerSpec = iacaSignerSpec,
+                )
+
+                val dsDecodedCert = IsoSharedTestHarnessValidResources.dsParser.parse(
+                    certificate = dsCertBundle.certificateDer,
+                )
+
+                assertEquals(dsCertBundle.decodedCertificate, dsDecodedCert)
+
+                IsoSharedTestHarnessValidResources.dsValidator.validate(
+                    dsDecodedCert = dsDecodedCert,
+                    iacaDecodedCert = iacaCertBundle.decodedCertificate,
+                )
+
+                dsCertBundle
+            }
+        }.awaitAll()
+
+        assertTrue {
+            dsBundles.all { it.certificateDer.bytes.isNotEmpty() }
+        }
+
+        //all serial numbers are unique -> hence all generated certificates different
+        assertEquals(
+            expected = dsBundles.size,
+            actual = dsBundles.map { it.decodedCertificate.serialNumber }.toSet().size,
+        )
+    }
 }
