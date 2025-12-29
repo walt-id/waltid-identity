@@ -1,30 +1,33 @@
+import com.github.jk1.license.filter.DependencyFilter
+import com.github.jk1.license.filter.LicenseBundleNormalizer
+import com.github.jk1.license.render.JsonReportRenderer
+import com.github.jk1.license.render.ReportRenderer
+import com.github.jk1.license.render.SimpleHtmlReportRenderer
 import groovy.json.JsonSlurper
 
 plugins {
     id("com.github.jk1.dependency-license-report")
 }
+// Run: ./gradlew -p waltid-identity aggregateDependencyNotices --no-configuration-cache
+configure<com.github.jk1.license.LicenseReportExtension> {
+    // Keep each report scoped to the current project to avoid cross-project resolution locks.
+    projects = arrayOf(project)
 
-/*configure<com.github.jk1.license.LicenseReportExtension> {
-    // Collect from this project + all subprojects (typical for multi-module)
-    projects = (listOf(project) + project.subprojects).toTypedArray()
+    // Prefer a runtime classpath when present; otherwise let the plugin pick defaults.
+    val preferredRuntimeConfig = listOf("runtimeClasspath", "jvmRuntimeClasspath", "releaseRuntimeClasspath")
+        .firstOrNull { project.configurations.findByName(it) != null }
+    if (preferredRuntimeConfig != null) {
+        configurations = arrayOf(preferredRuntimeConfig)
+    }
 
-    // Only runtime artifacts (what you really ship)
-    configurations = arrayOf("runtimeClasspath")
-
-    // Where to put reports
+    // Write JSON so aggregateDependencyNotices can build THIRD-PARTY-NOTICE.md files.
     outputDir = layout.buildDirectory.dir("licenses").get().asFile.path
-
-    // Render as HTML + JSON so we can consolidate later
     renderers = arrayOf<ReportRenderer>(
         SimpleHtmlReportRenderer("THIRD-PARTY-NOTICE.html"),
         JsonReportRenderer("THIRD-PARTY-NOTICE.json")
     )
-
-    // Optional but nice: normalize “Apache 2”, “Apache-2.0”, etc.
-    filters = arrayOf<DependencyFilter>(
-        LicenseBundleNormalizer()
-    )
-}*/
+    filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
+}
 
 // Collect NOTICE/LICENSE files from all runtime dependencies so they can be merged into a root NOTICE later
 val collectDependencyNotices = tasks.register("collectDependencyNotices") {
