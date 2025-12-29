@@ -1,62 +1,7 @@
-# Third-Party Software for :waltid-libraries:crypto:waltid-crypto-aws
+# Third-Party Software for :waltid-libraries:crypto:waltid-crypto-oci
 
-This document lists third-party libraries used by :waltid-libraries:crypto:waltid-crypto-aws.
+This document lists third-party libraries used by :waltid-libraries:crypto:waltid-crypto-oci.
 
-* [aws.sdk.kotlin:aws-config 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:aws-config-jvm 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:aws-core 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:aws-core-jvm 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:aws-endpoint 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:aws-endpoint-jvm 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:aws-http 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:aws-http-jvm 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:kms-jvm 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-credentials 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-credentials-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-json-protocols 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-json-protocols-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-protocol-core 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-protocol-core-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-signing-common 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-signing-common-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-signing-default 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-signing-default-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-xml-protocols 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-xml-protocols-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-auth 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-auth-api 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-auth-api-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-auth-aws 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-auth-aws-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-auth-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-client 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-client-engine-default 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-client-engine-default-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-client-engine-okhttp 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-client-engine-okhttp-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-client-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:identity-api 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:identity-api-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:logging-slf4j2 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:logging-slf4j2-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:runtime-core 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:runtime-core-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde-form-url 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde-form-url-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde-json 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde-json-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde-xml 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde-xml-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:smithy-client 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:smithy-client-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:telemetry-api 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:telemetry-api-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:telemetry-defaults 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:telemetry-defaults-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
 * [co.touchlab:stately-common 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
 * [co.touchlab:stately-common-jvm 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
 * [co.touchlab:stately-concurrency 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
@@ -73,13 +18,13 @@ This document lists third-party libraries used by :waltid-libraries:crypto:walti
 * [com.google.errorprone:error_prone_annotations 2.22.0](https://errorprone.info/error_prone_annotations). Apache License, Version 2.0.
 * [com.google.protobuf:protobuf-java 4.28.2](https://developers.google.com/protocol-buffers/). The 3-Clause BSD License.
 * [com.nimbusds:nimbus-jose-jwt 10.6](https://connect2id.com). Apache License, Version 2.0.
+* [com.oracle.oci.sdk:oci-java-sdk-shaded-full 3.57.1](https://docs.cloud.oracle.com/Content/API/SDKDocs/javasdk.htm). The Universal Permissive License (UPL), Version 1.0.
 * [com.squareup.okhttp3:okhttp 5.2.1](https://square.github.io/okhttp/). Apache License, Version 2.0.
-* [com.squareup.okhttp3:okhttp-coroutines 5.1.0](https://square.github.io/okhttp/). Apache License, Version 2.0.
 * [com.squareup.okhttp3:okhttp-jvm 5.2.1](https://square.github.io/okhttp/). Apache License, Version 2.0.
 * [com.squareup.okio:okio 3.16.2](https://github.com/square/okio/). Apache License, Version 2.0.
 * [com.squareup.okio:okio-jvm 3.16.2](https://github.com/square/okio/). Apache License, Version 2.0.
-* [io.github.oshai:kotlin-logging 7.0.5](https://github.com/oshai/kotlin-logging). Apache License, Version 2.0.
-* [io.github.oshai:kotlin-logging-jvm 7.0.5](https://github.com/oshai/kotlin-logging). Apache License, Version 2.0.
+* [io.github.oshai:kotlin-logging 7.0.13](https://github.com/oshai/kotlin-logging). Apache License, Version 2.0.
+* [io.github.oshai:kotlin-logging-jvm 7.0.13](https://github.com/oshai/kotlin-logging). Apache License, Version 2.0.
 * [io.github.reactivecircus.cache4k:cache4k 0.14.0](https://github.com/reactivecircus/cache4k). Apache License, Version 2.0.
 * [io.github.reactivecircus.cache4k:cache4k-jvm 0.14.0](https://github.com/reactivecircus/cache4k). Apache License, Version 2.0.
 * [io.ktor:ktor-client-content-negotiation 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
@@ -133,8 +78,6 @@ This document lists third-party libraries used by :waltid-libraries:crypto:walti
 * [org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm 1.10.2](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-coroutines-jdk8 1.10.2](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-coroutines-slf4j 1.10.2](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
-* [org.jetbrains.kotlinx:kotlinx-coroutines-test 1.10.2](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
-* [org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm 1.10.2](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-datetime 0.7.1](https://github.com/Kotlin/kotlinx-datetime). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-datetime-jvm 0.7.1](https://github.com/Kotlin/kotlinx-datetime). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-io-bytestring 0.8.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.

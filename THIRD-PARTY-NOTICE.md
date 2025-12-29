@@ -4,85 +4,96 @@ This document lists third-party libraries used by walt.id identity.
 
 * [antlr:antlr 2.7.7](http://www.antlr.org/). BSD Zero Clause License.
 * [app.softwork:kotlinx-uuid-core 0.1.6](https://github.com/hfhbd/kotlinx-uuid). Apache License, Version 2.0.
+* [app.softwork:kotlinx-uuid-core-js 0.1.6](https://github.com/hfhbd/kotlinx-uuid). Apache License, Version 2.0.
 * [app.softwork:kotlinx-uuid-core-jvm 0.1.6](https://github.com/hfhbd/kotlinx-uuid). Apache License, Version 2.0.
-* [aws.sdk.kotlin:aws-config 1.4.22](https://github.com/awslabs/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:aws-config-jvm 1.4.22](https://github.com/awslabs/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:aws-core 1.4.22](https://github.com/awslabs/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:aws-core-jvm 1.4.22](https://github.com/awslabs/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:aws-endpoint 1.4.22](https://github.com/awslabs/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:aws-endpoint-jvm 1.4.22](https://github.com/awslabs/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:aws-http 1.4.22](https://github.com/awslabs/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:aws-http-jvm 1.4.22](https://github.com/awslabs/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:kms 1.4.22](https://github.com/awslabs/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.sdk.kotlin:kms-jvm 1.4.22](https://github.com/awslabs/aws-sdk-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-credentials 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-credentials-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-json-protocols 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-json-protocols-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-protocol-core 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-protocol-core-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-signing-common 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-signing-common-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-signing-default 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-signing-default-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-xml-protocols 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:aws-xml-protocols-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-auth 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-auth-api 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-auth-api-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-auth-aws 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-auth-aws-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-auth-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-client 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-client-engine-default 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-client-engine-default-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-client-engine-okhttp 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-client-engine-okhttp-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-client-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:http-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:identity-api 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:identity-api-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:logging-slf4j2 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:logging-slf4j2-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:runtime-core 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:runtime-core-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde-form-url 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde-form-url-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde-json 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde-json-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde-xml 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:serde-xml-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:smithy-client 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:smithy-client-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:telemetry-api 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:telemetry-api-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:telemetry-defaults 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
-* [aws.smithy.kotlin:telemetry-defaults-jvm 1.4.3](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.sdk.kotlin:aws-config 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
+* [aws.sdk.kotlin:aws-config-jvm 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
+* [aws.sdk.kotlin:aws-core 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
+* [aws.sdk.kotlin:aws-core-jvm 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
+* [aws.sdk.kotlin:aws-endpoint 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
+* [aws.sdk.kotlin:aws-endpoint-jvm 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
+* [aws.sdk.kotlin:aws-http 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
+* [aws.sdk.kotlin:aws-http-jvm 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
+* [aws.sdk.kotlin:kms-jvm 1.5.103](https://github.com/aws/aws-sdk-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:aws-credentials 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:aws-credentials-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:aws-json-protocols 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:aws-json-protocols-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:aws-protocol-core 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:aws-protocol-core-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:aws-signing-common 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:aws-signing-common-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:aws-signing-default 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:aws-signing-default-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:aws-xml-protocols 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:aws-xml-protocols-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:http 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:http-auth 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:http-auth-api 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:http-auth-api-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:http-auth-aws 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:http-auth-aws-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:http-auth-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:http-client 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:http-client-engine-default 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:http-client-engine-default-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:http-client-engine-okhttp 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:http-client-engine-okhttp-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:http-client-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:http-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:identity-api 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:identity-api-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:logging-slf4j2 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:logging-slf4j2-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:runtime-core 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:runtime-core-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:serde 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:serde-form-url 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:serde-form-url-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:serde-json 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:serde-json-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:serde-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:serde-xml 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:serde-xml-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:smithy-client 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:smithy-client-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:telemetry-api 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:telemetry-api-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:telemetry-defaults 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
+* [aws.smithy.kotlin:telemetry-defaults-jvm 1.5.22](https://github.com/smithy-lang/smithy-kotlin). Apache License, Version 2.0.
 * [co.touchlab:stately-common 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
+* [co.touchlab:stately-common-js 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
 * [co.touchlab:stately-common-jvm 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
 * [co.touchlab:stately-concurrency 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
+* [co.touchlab:stately-concurrency-js 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
 * [co.touchlab:stately-concurrency-jvm 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
 * [co.touchlab:stately-iso-collections 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
+* [co.touchlab:stately-iso-collections-js 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
 * [co.touchlab:stately-iso-collections-jvm 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
 * [co.touchlab:stately-isolate 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
+* [co.touchlab:stately-isolate-js 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
 * [co.touchlab:stately-isolate-jvm 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
 * [co.touchlab:stately-strict 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
+* [co.touchlab:stately-strict-js 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
 * [co.touchlab:stately-strict-jvm 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
 * [com.atlassian:onetime 2.1.2](https://github.com/atlassian/1time). Apache License, Version 2.0.
 * [com.auth0:java-jwt 4.5.0](https://github.com/auth0/java-jwt). MIT License.
+* [com.auth0:jwks-rsa 0.23.0](https://github.com/auth0/jwks-rsa-java). MIT License.
 * [com.auth0:jwks-rsa 0.22.2](https://github.com/auth0/jwks-rsa-java). MIT License.
 * [com.doist.x:normalize 1.1.1](https://github.com/Doist/doistx-normalize). MIT License.
 * [com.doist.x:normalize 1.2.0](https://github.com/Doist/doistx-normalize). MIT License.
+* [com.doist.x:normalize-js 1.1.1](https://github.com/Doist/doistx-normalize). MIT License.
+* [com.doist.x:normalize-js 1.2.0](https://github.com/Doist/doistx-normalize). MIT License.
 * [com.doist.x:normalize-jvm 1.1.1](https://github.com/Doist/doistx-normalize). MIT License.
 * [com.doist.x:normalize-jvm 1.2.0](https://github.com/Doist/doistx-normalize). MIT License.
 * [com.eygraber:jsonpathkt-core 3.0.2](https://github.com/eygraber/JsonPathKt/). The 3-Clause BSD License.
+* [com.eygraber:jsonpathkt-core-js 3.0.2](https://github.com/eygraber/JsonPathKt/). The 3-Clause BSD License.
 * [com.eygraber:jsonpathkt-core-jvm 3.0.2](https://github.com/eygraber/JsonPathKt/). The 3-Clause BSD License.
 * [com.eygraber:jsonpathkt-kotlinx 3.0.2](https://github.com/eygraber/JsonPathKt/). The 3-Clause BSD License.
+* [com.eygraber:jsonpathkt-kotlinx-js 3.0.2](https://github.com/eygraber/JsonPathKt/). The 3-Clause BSD License.
 * [com.eygraber:jsonpathkt-kotlinx-jvm 3.0.2](https://github.com/eygraber/JsonPathKt/). The 3-Clause BSD License.
 * [com.eygraber:uri-kmp 0.0.19](https://github.com/eygraber/uri-kmp/). Apache License, Version 2.0.
+* [com.eygraber:uri-kmp-js 0.0.19](https://github.com/eygraber/uri-kmp/). Apache License, Version 2.0.
 * [com.eygraber:uri-kmp-jvm 0.0.19](https://github.com/eygraber/uri-kmp/). Apache License, Version 2.0.
 * [com.fasterxml.jackson.core:jackson-annotations 2.19.0](https://github.com/FasterXML/jackson). Apache License, Version 2.0.
   - Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
@@ -101,6 +112,8 @@ This document lists third-party libraries used by walt.id identity.
 * [com.github.ajalt.clikt:clikt-core 5.0.3](https://github.com/ajalt/clikt/). Apache License, Version 2.0.
 * [com.github.ajalt.clikt:clikt-core-jvm 5.0.3](https://github.com/ajalt/clikt/). Apache License, Version 2.0.
 * [com.github.ajalt.clikt:clikt-jvm 5.0.3](https://github.com/ajalt/clikt/). Apache License, Version 2.0.
+* [com.github.ajalt.clikt:clikt-markdown 5.0.3](https://github.com/ajalt/clikt/). Apache License, Version 2.0.
+* [com.github.ajalt.clikt:clikt-markdown-jvm 5.0.3](https://github.com/ajalt/clikt/). Apache License, Version 2.0.
 * [com.github.ajalt.colormath:colormath 3.6.0](https://github.com/ajalt/colormath/). MIT License.
 * [com.github.ajalt.colormath:colormath-jvm 3.6.0](https://github.com/ajalt/colormath/). MIT License.
 * [com.github.ajalt.mordant:mordant 3.0.2](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
@@ -123,6 +136,8 @@ This document lists third-party libraries used by walt.id identity.
 * [com.github.ajalt.mordant:mordant-jvm-jna 3.0.1](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
 * [com.github.ajalt.mordant:mordant-jvm-jna-jvm 3.0.2](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
 * [com.github.ajalt.mordant:mordant-jvm-jna-jvm 3.0.1](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
+* [com.github.ajalt.mordant:mordant-markdown 3.0.2](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
+* [com.github.ajalt.mordant:mordant-markdown-jvm 3.0.2](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
 * [com.github.ben-manes.caffeine:caffeine 2.9.3](https://github.com/ben-manes/caffeine). Apache License, Version 2.0.
 * [com.github.java-json-tools:btf 1.3](https://github.com/java-json-tools/btf). GNU LESSER GENERAL PUBLIC LICENSE, Version 3.
 * [com.github.java-json-tools:jackson-coreutils 2.0](https://github.com/java-json-tools/jackson-coreutils). GNU LESSER GENERAL PUBLIC LICENSE, Version 3.
@@ -143,22 +158,23 @@ This document lists third-party libraries used by walt.id identity.
 * [com.github.peteroupc:datautilities 1.1.0](https://github.com/peteroupc/DataUtilities). Creative Commons Legal Code.
 * [com.github.peteroupc:numbers 1.8.2](https://github.com/peteroupc/Numbers-Java). Creative Commons Legal Code.
 * [com.google.code.findbugs:jsr305 3.0.2](http://findbugs.sourceforge.net/). Apache License, Version 2.0.
-* [com.google.code.gson:gson 2.11.0](https://github.com/google/gson). Apache License, Version 2.0.
+* [com.google.code.gson:gson 2.12.1](https://github.com/google/gson). Apache License, Version 2.0.
 * [com.google.code.gson:gson 2.10.1](https://github.com/google/gson/gson). Apache License, Version 2.0.
+* [com.google.code.gson:gson 2.11.0](https://github.com/google/gson). Apache License, Version 2.0.
 * [com.google.crypto.tink:tink 1.16.0](http://github.com/tink-crypto/tink-java). Apache License, Version 2.0.
-* [com.google.errorprone:error_prone_annotations 2.27.0](https://errorprone.info/error_prone_annotations). Apache License, Version 2.0.
+* [com.google.errorprone:error_prone_annotations 2.36.0](https://errorprone.info/error_prone_annotations). Apache License, Version 2.0.
 * [com.google.errorprone:error_prone_annotations 2.22.0](https://errorprone.info/error_prone_annotations). Apache License, Version 2.0.
+* [com.google.errorprone:error_prone_annotations 2.27.0](https://errorprone.info/error_prone_annotations). Apache License, Version 2.0.
 * [com.google.guava:failureaccess 1.0.1](https://github.com/google/guava/). Apache License, Version 2.0.
 * [com.google.guava:guava 32.1.3-android](https://github.com/google/guava/). Apache License, Version 2.0.
 * com.google.guava:listenablefuture 9999.0-empty-to-avoid-conflict-with-guava. Apache License, Version 2.0.
-* [com.google.protobuf:protobuf-java 4.29.0](https://developers.google.com/protocol-buffers/). The 3-Clause BSD License.
 * [com.google.protobuf:protobuf-java 4.28.2](https://developers.google.com/protocol-buffers/). The 3-Clause BSD License.
+* [com.google.protobuf:protobuf-java 4.29.0](https://developers.google.com/protocol-buffers/). The 3-Clause BSD License.
 * [com.googlecode.libphonenumber:libphonenumber 8.11.1](https://github.com/google/libphonenumber/). Apache License, Version 2.0.
 * [com.interaso:webpush 1.2.0](https://github.com/interaso/webpush). MIT License.
 * [com.microsoft.sqlserver:mssql-jdbc 12.8.1.jre11](https://github.com/Microsoft/mssql-jdbc). MIT License.
 * [com.mysql:mysql-connector-j 9.2.0](http://dev.mysql.com/doc/connector-j/en/). The GNU General Public License, v2 with Universal FOSS Exception, v1.0.
-* [com.nimbusds:nimbus-jose-jwt 10.0.1](https://connect2id.com). Apache License, Version 2.0.
-* [com.nimbusds:nimbus-jose-jwt 10.5](https://connect2id.com). Apache License, Version 2.0.
+* [com.nimbusds:nimbus-jose-jwt 10.6](https://connect2id.com). Apache License, Version 2.0.
 * [com.oracle.oci.sdk:oci-java-sdk-shaded-full 3.57.1](https://docs.cloud.oracle.com/Content/API/SDKDocs/javasdk.htm). The Universal Permissive License (UPL), Version 1.0.
   - Copyright 2003-2014 The Apache Software Foundation
   - Copyright: (C) 2009 The Guava Authors
@@ -172,67 +188,93 @@ This document lists third-party libraries used by walt.id identity.
 * [com.sksamuel.hoplite:hoplite-yaml 2.8.0](http://www.github.com/sksamuel/hoplite). Apache License, Version 2.0.
 * [com.sksamuel.tabby:tabby-fp 2.2.11](http://www.github.com/sksamuel/tabby). Apache License, Version 2.0.
 * [com.soywiz.korlibs.krypto:krypto 4.0.10](https://github.com/korlibs/korge-next). MIT License.
+* [com.soywiz.korlibs.krypto:krypto-js 4.0.10](https://github.com/korlibs/korge-next). MIT License.
 * [com.soywiz.korlibs.krypto:krypto-jvm 4.0.10](https://github.com/korlibs/korge-next). MIT License.
 * [com.soywiz:korlibs-annotations 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-annotations-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-annotations-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-checksum 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-checksum-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-checksum-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-compression 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-compression-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-compression-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-concurrent 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-concurrent-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-concurrent-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-crypto 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-crypto-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-crypto-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-datastructure 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-datastructure-core 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-datastructure-core-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-datastructure-core-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-datastructure-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-datastructure-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-dyn 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-dyn-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-dyn-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-encoding 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-encoding-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-encoding-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-ffi-legacy 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-ffi-legacy-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-ffi-legacy-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-io 6.0.2](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-io-fs 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-io-fs-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-io-fs-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-io-js 6.0.2](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-io-jvm 6.0.2](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-io-network-core 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-io-network-core-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-io-network-core-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-io-stream 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-io-stream-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-io-stream-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-io-vfs 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-io-vfs-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-io-vfs-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-jseval 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-jseval-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-jseval-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-logger 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-logger-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-logger-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-math-core 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-math-core-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-math-core-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-math-vector 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-math-vector-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-math-vector-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-memory 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-memory-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-memory-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-number 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-number-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-number-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-platform 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-platform-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-platform-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-serialization 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-serialization-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-serialization-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-string 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-string-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-string-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-time 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-time-core 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-time-core-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-time-core-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
+* [com.soywiz:korlibs-time-js 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.soywiz:korlibs-time-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
 * [com.squareup.okhttp3:logging-interceptor 4.12.0](https://square.github.io/okhttp/). Apache License, Version 2.0.
-* [com.squareup.okhttp3:okhttp 5.0.0-alpha.14](https://square.github.io/okhttp/). Apache License, Version 2.0.
-* [com.squareup.okhttp3:okhttp 4.12.0](https://square.github.io/okhttp/). Apache License, Version 2.0.
-* [com.squareup.okhttp3:okhttp-coroutines 5.0.0-alpha.14](https://square.github.io/okhttp/). Apache License, Version 2.0.
-* [com.squareup.okhttp3:okhttp-sse 4.12.0](https://square.github.io/okhttp/). Apache License, Version 2.0.
-* [com.squareup.okio:okio 3.12.0](https://github.com/square/okio/). Apache License, Version 2.0.
-* [com.squareup.okio:okio-jvm 3.12.0](https://github.com/square/okio/). Apache License, Version 2.0.
-* [com.typesafe:config 1.4.3](https://github.com/lightbend/config). Apache License, Version 2.0.
+* [com.squareup.okhttp3:okhttp 5.2.1](https://square.github.io/okhttp/). Apache License, Version 2.0.
+* [com.squareup.okhttp3:okhttp-coroutines 5.1.0](https://square.github.io/okhttp/). Apache License, Version 2.0.
+* [com.squareup.okhttp3:okhttp-jvm 5.2.1](https://square.github.io/okhttp/). Apache License, Version 2.0.
+* [com.squareup.okio:okio 3.16.2](https://github.com/square/okio/). Apache License, Version 2.0.
+* [com.squareup.okio:okio-jvm 3.16.2](https://github.com/square/okio/). Apache License, Version 2.0.
+* [com.typesafe:config 1.4.5](https://github.com/lightbend/config). Apache License, Version 2.0.
 * [com.upokecenter:cbor 5.0.0-alpha2](https://github.com/peteroupc/CBOR-Java). Creative Commons Legal Code.
 * [com.zaxxer:HikariCP 6.2.1](https://github.com/brettwooldridge/HikariCP). Apache License, Version 2.0.
 * [com.zaxxer:HikariCP 5.1.0](https://github.com/brettwooldridge/HikariCP). Apache License, Version 2.0.
@@ -248,38 +290,16 @@ This document lists third-party libraries used by walt.id identity.
   - Copyright 2003-2014 The Apache Software Foundation
 * [de.cketti.unicode:kotlin-codepoints 0.9.0](https://github.com/cketti/kotlin-codepoints). MIT License.
 * [de.cketti.unicode:kotlin-codepoints 0.10.0](https://github.com/cketti/kotlin-codepoints). MIT License.
+* [de.cketti.unicode:kotlin-codepoints-js 0.9.0](https://github.com/cketti/kotlin-codepoints). MIT License.
+* [de.cketti.unicode:kotlin-codepoints-js 0.10.0](https://github.com/cketti/kotlin-codepoints). MIT License.
 * [de.cketti.unicode:kotlin-codepoints-jvm 0.9.0](https://github.com/cketti/kotlin-codepoints). MIT License.
 * [de.cketti.unicode:kotlin-codepoints-jvm 0.10.0](https://github.com/cketti/kotlin-codepoints). MIT License.
 * [de.mkammerer:argon2-jvm 2.11](https://github.com/phxql/argon2-jvm). GNU LESSER GENERAL PUBLIC LICENSE, Version 3.
 * [de.mkammerer:argon2-jvm-nolibs 2.11](https://github.com/phxql/argon2-jvm). GNU LESSER GENERAL PUBLIC LICENSE, Version 3.
 * [dev.whyoleg.cryptography:cryptography-bom 0.5.0](https://github.com/whyoleg/cryptography-kotlin). Apache License, Version 2.0.
 * [dev.whyoleg.cryptography:cryptography-random 0.5.0](https://github.com/whyoleg/cryptography-kotlin). Apache License, Version 2.0.
+* [dev.whyoleg.cryptography:cryptography-random-js 0.5.0](https://github.com/whyoleg/cryptography-kotlin). Apache License, Version 2.0.
 * [dev.whyoleg.cryptography:cryptography-random-jvm 0.5.0](https://github.com/whyoleg/cryptography-kotlin). Apache License, Version 2.0.
-* [id.walt.credentials:waltid-digital-credentials 1.0.0-SNAPSHOT](https://walt.id). Apache License, Version 2.0.
-* id.walt.credentials:waltid-mdoc-credentials2 1.0.0-SNAPSHOT. License not specified.
-* id.walt.credentials:waltid-verification-policies2 1.0.0-SNAPSHOT. License not specified.
-* id.walt.credentials:waltid-vical 1.0.0-SNAPSHOT. License not specified.
-* [id.walt.credentials:waltid-w3c-credentials 1.0.0-SNAPSHOT](https://walt.id). Apache License, Version 2.0.
-* id.walt.credentials:waltid-x509 1.0.0-SNAPSHOT. License not specified.
-* id.walt.crypto:waltid-cose 1.0.0-SNAPSHOT. License not specified.
-* [id.walt.crypto:waltid-crypto 1.0.0-SNAPSHOT](https://walt.id). Apache License, Version 2.0.
-* [id.walt.crypto:waltid-crypto-aws 1.0.0-SNAPSHOT](https://walt.id). Apache License, Version 2.0.
-* [id.walt.crypto:waltid-crypto-oci 1.0.0-SNAPSHOT](https://walt.id). Apache License, Version 2.0.
-* id.walt.dcql:waltid-dcql 1.0.0-SNAPSHOT. License not specified.
-* [id.walt.did:waltid-did 1.0.0-SNAPSHOT](https://walt.id). Apache License, Version 2.0.
-* [id.walt.dif-definitions-parser:waltid-dif-definitions-parser 1.0.0-SNAPSHOT](https://walt.id). Apache License, Version 2.0.
-* [id.walt.library-commons:waltid-library-commons 1.0.0-SNAPSHOT](https://walt.id). Apache License, Version 2.0.
-* [id.walt.mdoc-credentials:waltid-mdoc-credentials 1.0.0-SNAPSHOT](https://walt.id). Apache License, Version 2.0.
-* [id.walt.openid4vc:waltid-openid4vc 1.0.0-SNAPSHOT](https://walt.id). Apache License, Version 2.0.
-* [id.walt.policies:waltid-verification-policies 1.0.0-SNAPSHOT](https://walt.id). Apache License, Version 2.0.
-* id.walt.protocols:waltid-openid4vp 1.0.0-SNAPSHOT. License not specified.
-* id.walt.protocols:waltid-openid4vp-verifier 1.0.0-SNAPSHOT. License not specified.
-* id.walt.protocols:waltid-openid4vp-verifier-openapi 1.0.0-SNAPSHOT. License not specified.
-* [id.walt.sdjwt:waltid-sdjwt 1.0.0-SNAPSHOT](https://walt.id). Apache License, Version 2.0.
-* [id.walt.wallet:waltid-core-wallet 1.0.0-SNAPSHOT](https://walt.id). Apache License, Version 2.0.
-* id.walt.web:waltid-ktor-notifications 1.0.0-SNAPSHOT. License not specified.
-* id.walt.web:waltid-ktor-notifications-core 1.0.0-SNAPSHOT. License not specified.
-* [id.walt:waltid-service-commons 1.0.0-SNAPSHOT](https://walt.id). Apache License, Version 2.0.
 * [io.consensys.protocols:jc-kzg-4844 2.0.0](http://github.com/Consensys/jc-kzg-4844). Apache License, Version 2.0.
 * [io.consensys.tuweni:tuweni-bytes 2.7.0](https://github.com/consensys/tuweni). PUBLIC DOMAIN.
   - Copyright 2024-2025 Consensys Software Inc
@@ -298,17 +318,24 @@ This document lists third-party libraries used by walt.id identity.
 * [io.github.erdtman:java-json-canonicalization 1.1](https://github.com/erdtman/java-json-canonicalization). Apache License, Version 2.0.
 * [io.github.optimumcode:json-schema-validator 0.4.0](https://github.com/OptimumCode/json-schema-validator). MIT License.
 * [io.github.optimumcode:json-schema-validator 0.5.2](https://github.com/OptimumCode/json-schema-validator). MIT License.
+* [io.github.optimumcode:json-schema-validator-js 0.4.0](https://github.com/OptimumCode/json-schema-validator). MIT License.
+* [io.github.optimumcode:json-schema-validator-js 0.5.2](https://github.com/OptimumCode/json-schema-validator). MIT License.
 * [io.github.optimumcode:json-schema-validator-jvm 0.4.0](https://github.com/OptimumCode/json-schema-validator). MIT License.
 * [io.github.optimumcode:json-schema-validator-jvm 0.5.2](https://github.com/OptimumCode/json-schema-validator). MIT License.
 * [io.github.optimumcode:karacteristics 0.0.3](https://github.com/OptimumCode/karacteristics). MIT License.
 * [io.github.optimumcode:karacteristics 0.0.6](https://github.com/OptimumCode/karacteristics). MIT License.
+* [io.github.optimumcode:karacteristics-js 0.0.3](https://github.com/OptimumCode/karacteristics). MIT License.
+* [io.github.optimumcode:karacteristics-js 0.0.6](https://github.com/OptimumCode/karacteristics). MIT License.
 * [io.github.optimumcode:karacteristics-jvm 0.0.3](https://github.com/OptimumCode/karacteristics). MIT License.
 * [io.github.optimumcode:karacteristics-jvm 0.0.6](https://github.com/OptimumCode/karacteristics). MIT License.
-* [io.github.oshai:kotlin-logging 7.0.5](https://github.com/oshai/kotlin-logging). Apache License, Version 2.0.
 * [io.github.oshai:kotlin-logging 7.0.13](https://github.com/oshai/kotlin-logging). Apache License, Version 2.0.
-* [io.github.oshai:kotlin-logging-jvm 7.0.5](https://github.com/oshai/kotlin-logging). Apache License, Version 2.0.
+* [io.github.oshai:kotlin-logging 7.0.5](https://github.com/oshai/kotlin-logging). Apache License, Version 2.0.
+* [io.github.oshai:kotlin-logging-js 7.0.13](https://github.com/oshai/kotlin-logging). Apache License, Version 2.0.
+* [io.github.oshai:kotlin-logging-js 7.0.5](https://github.com/oshai/kotlin-logging). Apache License, Version 2.0.
 * [io.github.oshai:kotlin-logging-jvm 7.0.13](https://github.com/oshai/kotlin-logging). Apache License, Version 2.0.
+* [io.github.oshai:kotlin-logging-jvm 7.0.5](https://github.com/oshai/kotlin-logging). Apache License, Version 2.0.
 * [io.github.reactivecircus.cache4k:cache4k 0.14.0](https://github.com/reactivecircus/cache4k). Apache License, Version 2.0.
+* [io.github.reactivecircus.cache4k:cache4k-js 0.14.0](https://github.com/reactivecircus/cache4k). Apache License, Version 2.0.
 * [io.github.reactivecircus.cache4k:cache4k-jvm 0.14.0](https://github.com/reactivecircus/cache4k). Apache License, Version 2.0.
 * [io.github.smiley4:ktor-openapi 5.3.0](https://github.com/SMILEY4/). Apache License, Version 2.0.
 * [io.github.smiley4:ktor-redoc 5.3.0](https://github.com/SMILEY4/ktor-redoc). Apache License, Version 2.0.
@@ -320,146 +347,168 @@ This document lists third-party libraries used by walt.id identity.
 * [io.klogging:klogging 0.11.6](https://klogging.io). Apache License, Version 2.0.
 * [io.klogging:klogging-jvm 0.11.6](https://klogging.io). Apache License, Version 2.0.
 * [io.klogging:slf4j-klogging 0.11.6](https://klogging.io). Apache License, Version 2.0.
+* [io.ktor:ktor-bom 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-bom 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-call-id 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-call-id-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-call-id 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-call-id-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-apache 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-client-apache 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-apache-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-client-apache-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-apache5 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-apache5 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-client-apache5 3.0.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-apache5-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-apache5 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-apache5-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-client-apache5-jvm 3.0.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-apache5-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-cio 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-client-cio 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-cio-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-client-cio-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-content-negotiation 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-content-negotiation-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-core 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-core 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-core-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-core-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-encoding 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-encoding-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-java 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-java-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-json 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-json-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-logging 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-logging-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-okhttp 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-okhttp-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-serialization 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-client-serialization-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-events 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-events 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-events-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-events-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-http 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-http 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-http-cio 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-http-cio 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-http-cio-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-http-cio-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-http-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-http-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-io 3.3.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-io 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-io 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-io-jvm 3.3.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-io-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-io-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-network 3.3.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-network 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-network 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-network-jvm 3.3.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-network-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-network-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-content-negotiation 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-content-negotiation-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-content-negotiation-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-core 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-core-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-core-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-encoding 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-encoding-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-java 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-java-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-js-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-json 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-json-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-json-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-logging 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-logging-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-logging-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-okhttp 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-okhttp-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-serialization 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-serialization-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-serialization-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-events 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-events-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-events-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-http 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-http-cio 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-http-cio-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-http-cio-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-http-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-http-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-io 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-io-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-io-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-network 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-network-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-network-tls 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-network-tls 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-network-tls-certificates 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-network-tls-certificates-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-network-tls-certificates 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-network-tls-certificates-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-network-tls-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-network-tls-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-resources 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-resources 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-resources-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-resources-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-serialization 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-serialization 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-serialization-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-serialization-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-serialization-kotlinx 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-serialization-kotlinx-json 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-serialization-kotlinx-json-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-serialization-kotlinx-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-kotlinx 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-kotlinx-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-kotlinx-json 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-kotlinx-json-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-kotlinx-json-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-kotlinx-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-auth 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-auth 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-auth-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-auth-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-auth-jwt 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-auth-jwt 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-auth-jwt-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-auth-jwt-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-auto-head-response 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-auto-head-response 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-auto-head-response-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-auto-head-response-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-call-id-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-call-id-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-call-logging 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-call-logging 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-call-logging-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-call-logging-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-cio 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-cio 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-cio-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-compression-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-cio-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-compression-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-content-negotiation 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-content-negotiation 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-content-negotiation 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-content-negotiation-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-content-negotiation-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-core 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-core 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-core-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-core-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-content-negotiation-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-core 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-core-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-core-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-cors 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-cors 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-cors-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-cors-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-default-headers 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-default-headers 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-default-headers-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-default-headers-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-double-receive 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-double-receive 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-double-receive-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-double-receive-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-forwarded-header 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-forwarded-header 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-forwarded-header-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-forwarded-header-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-host-common 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-host-common 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-host-common 3.0.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-host-common-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-host-common 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-host-common-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-host-common-jvm 3.0.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-host-common-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-html-builder 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-html-builder 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-html-builder-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-html-builder-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-method-override 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-method-override-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-rate-limit 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-rate-limit-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-method-override 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-method-override-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-rate-limit 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-rate-limit-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-resources 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-resources 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-resources-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-resources-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-sessions 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-sessions 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-sessions-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-sessions-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-sse-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-sessions 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-sessions-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-sse-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-status-pages 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-status-pages 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-status-pages-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-test-host 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-test-host-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-status-pages-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-test-host 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-test-host-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-webjars 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-webjars 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-webjars-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.ktor:ktor-server-webjars-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-websockets 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-server-websockets-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-sse 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-sse 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-sse-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-sse-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-test-dispatcher 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-test-dispatcher-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-utils 3.3.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-utils 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-utils 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-utils-jvm 3.3.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-utils-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-utils-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-websocket-serialization 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-websocket-serialization 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-websocket-serialization-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-websocket-serialization-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-websockets 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-websockets 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-websockets-jvm 3.2.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-* [io.ktor:ktor-websockets-jvm 3.2.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-websockets 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-websockets-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-sse 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-sse-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-sse-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-test-dispatcher 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-test-dispatcher-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-utils 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-utils-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-utils-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-websocket-serialization 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-websocket-serialization-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-websocket-serialization-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-websockets 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-websockets-js 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-websockets-jvm 3.3.3](https://github.com/ktorio/ktor). Apache License, Version 2.0.
 * [io.netty:netty-buffer 4.1.115.Final](https://netty.io/). Apache License, Version 2.0.
 * [io.netty:netty-codec 4.1.115.Final](https://netty.io/). Apache License, Version 2.0.
 * [io.netty:netty-codec-dns 4.1.115.Final](https://netty.io/). Apache License, Version 2.0.
@@ -498,10 +547,12 @@ This document lists third-party libraries used by walt.id identity.
 * [jakarta.xml.bind:jakarta.xml.bind-api 2.3.3](https://www.eclipse.org). GNU GENERAL PUBLIC LICENSE, Version 2 + Classpath Exception.
 * [javax.validation:validation-api 1.1.0.Final](http://beanvalidation.org). Apache License, Version 2.0.
 * [joda-time:joda-time 2.10.5](https://www.joda.org/joda-time/). Apache License, Version 2.0.
-* [love.forte.plugin.suspend-transform:suspend-transform-annotation 2.2.20-0.13.1](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
-* [love.forte.plugin.suspend-transform:suspend-transform-annotation-jvm 2.2.20-0.13.1](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
-* [love.forte.plugin.suspend-transform:suspend-transform-runtime 2.2.20-0.13.1](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
-* [love.forte.plugin.suspend-transform:suspend-transform-runtime-jvm 2.2.20-0.13.1](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-annotation 2.3.0-0.13.2](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-annotation-js 2.3.0-0.13.2](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-annotation-jvm 2.3.0-0.13.2](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-runtime 2.3.0-0.13.2](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-runtime-js 2.3.0-0.13.2](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-runtime-jvm 2.3.0-0.13.2](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
 * net.bytebuddy:byte-buddy 1.10.9. Apache License, Version 2.0.
   - Copyright 2014 - 2020 Rafael Winterhalter
 * net.bytebuddy:byte-buddy-agent 1.10.9. Apache License, Version 2.0.
@@ -509,9 +560,11 @@ This document lists third-party libraries used by walt.id identity.
 * [net.java.dev.jna:jna 5.14.0](https://github.com/java-native-access/jna). GNU LESSER GENERAL PUBLIC LICENSE, Version 2.1.
 * [net.java.dev.jna:jna-platform 5.14.0](https://github.com/java-native-access/jna). GNU LESSER GENERAL PUBLIC LICENSE, Version 2.1.
 * [net.orandja.obor:obor 2.1.3](https://github.com/L-Briand/obor). Creative Commons Legal Code.
+* [net.orandja.obor:obor-js 2.1.3](https://github.com/L-Briand/obor). Creative Commons Legal Code.
 * [net.orandja.obor:obor-jvm 2.1.3](https://github.com/L-Briand/obor). Creative Commons Legal Code.
 * [net.sf.jopt-simple:jopt-simple 5.0.4](http://jopt-simple.github.io/jopt-simple). MIT License.
 * [net.thauvin.erik.urlencoder:urlencoder-lib 1.6.0](https://github.com/ethauvin/urlencoder). Apache License, Version 2.0.
+* [net.thauvin.erik.urlencoder:urlencoder-lib-js 1.6.0](https://github.com/ethauvin/urlencoder). Apache License, Version 2.0.
 * [net.thauvin.erik.urlencoder:urlencoder-lib-jvm 1.6.0](https://github.com/ethauvin/urlencoder). Apache License, Version 2.0.
 * org.aaa4j.radius:aaa4j-radius-client 0.4.0. Apache License, Version 2.0.
 * org.aaa4j.radius:aaa4j-radius-core 0.4.0. Apache License, Version 2.0.
@@ -552,17 +605,23 @@ This document lists third-party libraries used by walt.id identity.
   - Copyright 2003-2024 The Apache Software Foundation
 * [org.apache.directory.api:api-util 2.1.7](https://www.apache.org/). Apache License, Version 2.0.
   - Copyright 2003-2024 The Apache Software Foundation
-* org.apache.httpcomponents.client5:httpclient5 5.5. Apache License, Version 2.0.
+* org.apache.httpcomponents.client5:httpclient5 5.5.1. Apache License, Version 2.0.
   - Copyright 1999-2021 The Apache Software Foundation
 * org.apache.httpcomponents.client5:httpclient5 5.3.1. Apache License, Version 2.0.
   - Copyright 1999-2021 The Apache Software Foundation
-* org.apache.httpcomponents.core5:httpcore5 5.3.4. Apache License, Version 2.0.
+* org.apache.httpcomponents.client5:httpclient5 5.5. Apache License, Version 2.0.
+  - Copyright 1999-2021 The Apache Software Foundation
+* org.apache.httpcomponents.core5:httpcore5 5.3.6. Apache License, Version 2.0.
   - Copyright 2005-2021 The Apache Software Foundation
 * org.apache.httpcomponents.core5:httpcore5 5.2.4. Apache License, Version 2.0.
   - Copyright 2005-2021 The Apache Software Foundation
-* org.apache.httpcomponents.core5:httpcore5-h2 5.3.4. Apache License, Version 2.0.
+* org.apache.httpcomponents.core5:httpcore5 5.3.4. Apache License, Version 2.0.
+  - Copyright 2005-2021 The Apache Software Foundation
+* org.apache.httpcomponents.core5:httpcore5-h2 5.3.6. Apache License, Version 2.0.
   - Copyright 2005-2021 The Apache Software Foundation
 * org.apache.httpcomponents.core5:httpcore5-h2 5.2.4. Apache License, Version 2.0.
+  - Copyright 2005-2021 The Apache Software Foundation
+* org.apache.httpcomponents.core5:httpcore5-h2 5.3.4. Apache License, Version 2.0.
   - Copyright 2005-2021 The Apache Software Foundation
 * [org.apache.httpcomponents:httpasyncclient 4.1.5](http://hc.apache.org/httpcomponents-asyncclient). Apache License, Version 2.0.
   - Copyright 2010-2021 The Apache Software Foundation
@@ -580,13 +639,13 @@ This document lists third-party libraries used by walt.id identity.
   - Copyright 2005-2023 The Apache Software Foundation
 * [org.apache.servicemix.bundles:org.apache.servicemix.bundles.xpp3 1.1.4c_7](http://www.apache.org/). Apache License, Version 2.0.
   - Copyright 2005-2014 The Apache Software Foundation
-* [org.bouncycastle:bcpkix-lts8on 2.73.7](https://www.bouncycastle.org/lts-java). Bouncy Castle Licence.
 * [org.bouncycastle:bcpkix-lts8on 2.73.8](https://www.bouncycastle.org/lts-java). Bouncy Castle Licence.
+* [org.bouncycastle:bcpkix-lts8on 2.73.7](https://www.bouncycastle.org/lts-java). Bouncy Castle Licence.
 * [org.bouncycastle:bcprov-jdk18on 1.80](https://www.bouncycastle.org/download/bouncy-castle-java/). Bouncy Castle Licence.
-* [org.bouncycastle:bcprov-lts8on 2.73.9](https://www.bouncycastle.org/lts-java). Bouncy Castle Licence.
 * [org.bouncycastle:bcprov-lts8on 2.73.8](https://www.bouncycastle.org/lts-java). Bouncy Castle Licence.
-* [org.bouncycastle:bcutil-lts8on 2.73.9](https://www.bouncycastle.org/lts-java). Bouncy Castle Licence.
+* [org.bouncycastle:bcprov-lts8on 2.73.10](https://www.bouncycastle.org/lts-java). Bouncy Castle Licence.
 * [org.bouncycastle:bcutil-lts8on 2.73.8](https://www.bouncycastle.org/lts-java). Bouncy Castle Licence.
+* [org.bouncycastle:bcutil-lts8on 2.73.10](https://www.bouncycastle.org/lts-java). Bouncy Castle Licence.
 * [org.checkerframework:checker-qual 3.48.3](https://checkerframework.org/). MIT License.
 * [org.checkerframework:checker-qual 3.37.0](https://checkerframework.org/). MIT License.
 * org.connid:framework 1.3.2. COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.0.
@@ -599,128 +658,171 @@ This document lists third-party libraries used by walt.id identity.
 * [org.jetbrains.exposed:exposed-java-time 1.0.0-rc-1](https://github.com/JetBrains/Exposed). Apache License, Version 2.0.
 * [org.jetbrains.exposed:exposed-jdbc 1.0.0-rc-1](https://github.com/JetBrains/Exposed). Apache License, Version 2.0.
 * [org.jetbrains.exposed:exposed-json 1.0.0-rc-1](https://github.com/JetBrains/Exposed). Apache License, Version 2.0.
-* [org.jetbrains.kotlin:kotlin-reflect 2.2.10](https://kotlinlang.org/). Apache License, Version 2.0.
-* [org.jetbrains.kotlin:kotlin-stdlib 2.2.20](https://kotlinlang.org/). Apache License, Version 2.0.
-* [org.jetbrains.kotlin:kotlin-stdlib-common 2.2.20](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-dom-api-compat 2.3.0](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-reflect 2.2.21](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-stdlib 2.3.0](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-stdlib-common 2.3.0](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-stdlib-jdk7 1.9.0](https://kotlinlang.org/). Apache License, Version 2.0.
 * [org.jetbrains.kotlin:kotlin-stdlib-jdk7 2.2.0](https://kotlinlang.org/). Apache License, Version 2.0.
-* [org.jetbrains.kotlin:kotlin-stdlib-jdk7 1.8.21](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-stdlib-jdk8 1.9.0](https://kotlinlang.org/). Apache License, Version 2.0.
 * [org.jetbrains.kotlin:kotlin-stdlib-jdk8 2.2.0](https://kotlinlang.org/). Apache License, Version 2.0.
-* [org.jetbrains.kotlin:kotlin-stdlib-jdk8 1.8.21](https://kotlinlang.org/). Apache License, Version 2.0.
-* [org.jetbrains.kotlin:kotlin-test 2.2.20](https://kotlinlang.org/). Apache License, Version 2.0.
-* [org.jetbrains.kotlinx:atomicfu 0.29.0](https://github.com/Kotlin/kotlinx.atomicfu). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-stdlib-js 2.3.0](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-test 2.3.0](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlinx-atomicfu-runtime 1.9.21](https://kotlinlang.org/). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:atomicfu 0.27.0](https://github.com/Kotlin/kotlinx.atomicfu). Apache License, Version 2.0.
-* [org.jetbrains.kotlinx:atomicfu-jvm 0.29.0](https://github.com/Kotlin/kotlinx.atomicfu). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:atomicfu 0.29.0](https://github.com/Kotlin/kotlinx.atomicfu). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:atomicfu 0.26.1](https://github.com/Kotlin/kotlinx.atomicfu). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:atomicfu-js 0.29.0](https://github.com/Kotlin/kotlinx.atomicfu). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:atomicfu-js 0.23.1](https://github.com/Kotlin/kotlinx.atomicfu). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:atomicfu-js 0.26.1](https://github.com/Kotlin/kotlinx.atomicfu). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:atomicfu-jvm 0.27.0](https://github.com/Kotlin/kotlinx.atomicfu). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:atomicfu-jvm 0.29.0](https://github.com/Kotlin/kotlinx.atomicfu). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-coroutines-bom 1.10.2](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-coroutines-bom 1.8.0](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-coroutines-core 1.10.2](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-coroutines-core 1.8.0](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-coroutines-core-js 1.10.2](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-coroutines-core-js 1.8.0](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm 1.10.2](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm 1.8.0](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-coroutines-debug 1.10.2](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-coroutines-jdk8 1.10.2](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-coroutines-jdk8 1.8.0](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-coroutines-slf4j 1.10.2](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-coroutines-test 1.10.2](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm 1.10.2](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
-* [org.jetbrains.kotlinx:kotlinx-datetime 0.7.1-0.6.x-compat](https://github.com/Kotlin/kotlinx-datetime). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-datetime 0.7.1](https://github.com/Kotlin/kotlinx-datetime). Apache License, Version 2.0.
-* [org.jetbrains.kotlinx:kotlinx-datetime-jvm 0.7.1-0.6.x-compat](https://github.com/Kotlin/kotlinx-datetime). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-datetime 0.7.1-0.6.x-compat](https://github.com/Kotlin/kotlinx-datetime). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-datetime-js 0.7.1](https://github.com/Kotlin/kotlinx-datetime). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-datetime-jvm 0.7.1](https://github.com/Kotlin/kotlinx-datetime). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-datetime-jvm 0.7.1-0.6.x-compat](https://github.com/Kotlin/kotlinx-datetime). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-html 0.12.0](https://github.com/Kotlin/kotlinx.html). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-html-jvm 0.12.0](https://github.com/Kotlin/kotlinx.html). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-io-bytestring 0.8.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
-* [org.jetbrains.kotlinx:kotlinx-io-bytestring 0.7.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-io-bytestring-js 0.8.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-io-bytestring-jvm 0.8.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
-* [org.jetbrains.kotlinx:kotlinx-io-bytestring-jvm 0.7.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-io-core 0.8.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
-* [org.jetbrains.kotlinx:kotlinx-io-core 0.7.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-io-core-js 0.8.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-io-core-jvm 0.8.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
-* [org.jetbrains.kotlinx:kotlinx-io-core-jvm 0.7.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-serialization-bom 1.9.0](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-serialization-cbor 1.9.0](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-serialization-cbor-js 1.9.0](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-serialization-cbor-jvm 1.9.0](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-serialization-core 1.9.0](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-serialization-core-js 1.9.0](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-serialization-core-jvm 1.9.0](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-serialization-hocon 1.9.0](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-serialization-json 1.9.0](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-serialization-json-io 1.9.0](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-serialization-json-io-js 1.9.0](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-serialization-json-io-jvm 1.9.0](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-serialization-json-js 1.9.0](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
 * [org.jetbrains.kotlinx:kotlinx-serialization-json-jvm 1.9.0](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
-* [org.jetbrains:annotations 13.0](http://www.jetbrains.org). Apache License, Version 2.0.
 * [org.jetbrains:annotations 23.0.0](https://github.com/JetBrains/java-annotations). Apache License, Version 2.0.
+* [org.jetbrains:annotations 13.0](http://www.jetbrains.org). Apache License, Version 2.0.
+* [org.jetbrains:markdown 0.7.3](https://github.com/JetBrains/markdown). Apache License, Version 2.0.
+* [org.jetbrains:markdown-jvm 0.7.3](https://github.com/JetBrains/markdown). Apache License, Version 2.0.
 * [org.json:json 20240303](https://github.com/douglascrockford/JSON-java). PUBLIC DOMAIN.
-* [org.junit.jupiter:junit-jupiter 5.13.3](https://junit.org/). Eclipse Public License - v 2.0.
+* [org.junit.jupiter:junit-jupiter 5.14.0](https://junit.org/). Eclipse Public License - v 2.0.
   - copyright notices and license terms. Your use of the source code for
-* [org.junit.jupiter:junit-jupiter-api 5.13.3](https://junit.org/). Eclipse Public License - v 2.0.
+* [org.junit.jupiter:junit-jupiter-api 5.14.0](https://junit.org/). Eclipse Public License - v 2.0.
   - copyright notices and license terms. Your use of the source code for
-* [org.junit.jupiter:junit-jupiter-engine 5.13.3](https://junit.org/). Eclipse Public License - v 2.0.
+* [org.junit.jupiter:junit-jupiter-engine 5.14.0](https://junit.org/). Eclipse Public License - v 2.0.
   - copyright notices and license terms. Your use of the source code for
-* [org.junit.jupiter:junit-jupiter-params 5.13.3](https://junit.org/). Eclipse Public License - v 2.0.
+* [org.junit.jupiter:junit-jupiter-params 5.14.0](https://junit.org/). Eclipse Public License - v 2.0.
   - copyright notices and license terms. Your use of the source code for
-* [org.junit.platform:junit-platform-commons 1.13.3](https://junit.org/). Eclipse Public License - v 2.0.
+* [org.junit.platform:junit-platform-commons 1.14.0](https://junit.org/). Eclipse Public License - v 2.0.
   - copyright notices and license terms. Your use of the source code for
-* [org.junit.platform:junit-platform-console 1.13.3](https://junit.org/). Eclipse Public License - v 2.0.
+* [org.junit.platform:junit-platform-console 1.14.0](https://junit.org/). Eclipse Public License - v 2.0.
   - copyright notices and license terms. Your use of the source code for
-* [org.junit.platform:junit-platform-engine 1.13.3](https://junit.org/). Eclipse Public License - v 2.0.
+* [org.junit.platform:junit-platform-engine 1.14.0](https://junit.org/). Eclipse Public License - v 2.0.
   - copyright notices and license terms. Your use of the source code for
-* [org.junit.platform:junit-platform-launcher 1.13.3](https://junit.org/). Eclipse Public License - v 2.0.
+* [org.junit.platform:junit-platform-launcher 1.14.0](https://junit.org/). Eclipse Public License - v 2.0.
   - copyright notices and license terms. Your use of the source code for
-* [org.junit.platform:junit-platform-reporting 1.13.3](https://junit.org/). Eclipse Public License - v 2.0.
+* [org.junit.platform:junit-platform-reporting 1.14.0](https://junit.org/). Eclipse Public License - v 2.0.
   - copyright notices and license terms. Your use of the source code for
-* [org.junit:junit-bom 5.13.3](https://junit.org/). Eclipse Public License - v 2.0.
-* [org.kotlincrypto.bitops:bits 0.3.0](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
+* [org.junit:junit-bom 5.14.0](https://junit.org/). Eclipse Public License - v 2.0.
 * [org.kotlincrypto.bitops:bits 0.1.2](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
+* [org.kotlincrypto.bitops:bits 0.3.0](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
 * [org.kotlincrypto.bitops:bits 0.2.1](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
-* [org.kotlincrypto.bitops:bits-jvm 0.3.0](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
+* [org.kotlincrypto.bitops:bits-js 0.1.2](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
+* [org.kotlincrypto.bitops:bits-js 0.2.1](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
+* [org.kotlincrypto.bitops:bits-js 0.3.0](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
 * [org.kotlincrypto.bitops:bits-jvm 0.1.2](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
+* [org.kotlincrypto.bitops:bits-jvm 0.3.0](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
 * [org.kotlincrypto.bitops:bits-jvm 0.2.1](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
-* [org.kotlincrypto.bitops:endian 0.3.0](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
 * [org.kotlincrypto.bitops:endian 0.1.2](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
+* [org.kotlincrypto.bitops:endian 0.3.0](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
 * [org.kotlincrypto.bitops:endian 0.2.1](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
-* [org.kotlincrypto.bitops:endian-jvm 0.3.0](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
+* [org.kotlincrypto.bitops:endian-js 0.1.2](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
+* [org.kotlincrypto.bitops:endian-js 0.2.1](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
+* [org.kotlincrypto.bitops:endian-js 0.3.0](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
 * [org.kotlincrypto.bitops:endian-jvm 0.1.2](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
+* [org.kotlincrypto.bitops:endian-jvm 0.3.0](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
 * [org.kotlincrypto.bitops:endian-jvm 0.2.1](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
-* [org.kotlincrypto.core:core 0.8.0](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
 * [org.kotlincrypto.core:core 0.6.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
+* [org.kotlincrypto.core:core 0.8.0](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
 * [org.kotlincrypto.core:core 0.7.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
-* [org.kotlincrypto.core:core-jvm 0.8.0](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
+* [org.kotlincrypto.core:core-js 0.6.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
+* [org.kotlincrypto.core:core-js 0.7.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
+* [org.kotlincrypto.core:core-js 0.8.0](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
 * [org.kotlincrypto.core:core-jvm 0.6.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
+* [org.kotlincrypto.core:core-jvm 0.8.0](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
 * [org.kotlincrypto.core:core-jvm 0.7.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
-* [org.kotlincrypto.core:digest 0.8.0](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
 * [org.kotlincrypto.core:digest 0.6.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
+* [org.kotlincrypto.core:digest 0.8.0](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
 * [org.kotlincrypto.core:digest 0.7.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
-* [org.kotlincrypto.core:digest-jvm 0.8.0](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
+* [org.kotlincrypto.core:digest-js 0.6.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
+* [org.kotlincrypto.core:digest-js 0.7.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
+* [org.kotlincrypto.core:digest-js 0.8.0](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
 * [org.kotlincrypto.core:digest-jvm 0.6.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
+* [org.kotlincrypto.core:digest-jvm 0.8.0](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
 * [org.kotlincrypto.core:digest-jvm 0.7.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
 * [org.kotlincrypto.core:mac 0.6.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
 * [org.kotlincrypto.core:mac 0.7.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
+* [org.kotlincrypto.core:mac-js 0.6.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
+* [org.kotlincrypto.core:mac-js 0.7.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
 * [org.kotlincrypto.core:mac-jvm 0.6.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
 * [org.kotlincrypto.core:mac-jvm 0.7.1](https://github.com/KotlinCrypto/core/). Apache License, Version 2.0.
-* [org.kotlincrypto.hash:bom 0.8.0](https://github.com/KotlinCrypto/hash/). Apache License, Version 2.0.
 * [org.kotlincrypto.hash:bom 0.6.1](https://github.com/KotlinCrypto/hash/). Apache License, Version 2.0.
+* [org.kotlincrypto.hash:bom 0.8.0](https://github.com/KotlinCrypto/hash/). Apache License, Version 2.0.
 * [org.kotlincrypto.hash:bom 0.7.1](https://github.com/KotlinCrypto/hash/). Apache License, Version 2.0.
-* [org.kotlincrypto.hash:sha2 0.8.0](https://github.com/KotlinCrypto/hash/). Apache License, Version 2.0.
 * [org.kotlincrypto.hash:sha2 0.6.1](https://github.com/KotlinCrypto/hash/). Apache License, Version 2.0.
+* [org.kotlincrypto.hash:sha2 0.8.0](https://github.com/KotlinCrypto/hash/). Apache License, Version 2.0.
 * [org.kotlincrypto.hash:sha2 0.7.1](https://github.com/KotlinCrypto/hash/). Apache License, Version 2.0.
-* [org.kotlincrypto.hash:sha2-jvm 0.8.0](https://github.com/KotlinCrypto/hash/). Apache License, Version 2.0.
+* [org.kotlincrypto.hash:sha2-js 0.6.1](https://github.com/KotlinCrypto/hash/). Apache License, Version 2.0.
+* [org.kotlincrypto.hash:sha2-js 0.7.1](https://github.com/KotlinCrypto/hash/). Apache License, Version 2.0.
+* [org.kotlincrypto.hash:sha2-js 0.8.0](https://github.com/KotlinCrypto/hash/). Apache License, Version 2.0.
 * [org.kotlincrypto.hash:sha2-jvm 0.6.1](https://github.com/KotlinCrypto/hash/). Apache License, Version 2.0.
+* [org.kotlincrypto.hash:sha2-jvm 0.8.0](https://github.com/KotlinCrypto/hash/). Apache License, Version 2.0.
 * [org.kotlincrypto.hash:sha2-jvm 0.7.1](https://github.com/KotlinCrypto/hash/). Apache License, Version 2.0.
 * [org.kotlincrypto.macs:bom 0.6.1](https://github.com/KotlinCrypto/MACs/). Apache License, Version 2.0.
 * [org.kotlincrypto.macs:bom 0.7.1](https://github.com/KotlinCrypto/MACs/). Apache License, Version 2.0.
 * [org.kotlincrypto.macs:hmac 0.6.1](https://github.com/KotlinCrypto/MACs/). Apache License, Version 2.0.
 * [org.kotlincrypto.macs:hmac 0.7.1](https://github.com/KotlinCrypto/MACs/). Apache License, Version 2.0.
+* [org.kotlincrypto.macs:hmac-js 0.6.1](https://github.com/KotlinCrypto/MACs/). Apache License, Version 2.0.
+* [org.kotlincrypto.macs:hmac-js 0.7.1](https://github.com/KotlinCrypto/MACs/). Apache License, Version 2.0.
 * [org.kotlincrypto.macs:hmac-jvm 0.6.1](https://github.com/KotlinCrypto/MACs/). Apache License, Version 2.0.
 * [org.kotlincrypto.macs:hmac-jvm 0.7.1](https://github.com/KotlinCrypto/MACs/). Apache License, Version 2.0.
 * [org.kotlincrypto.macs:hmac-sha2 0.6.1](https://github.com/KotlinCrypto/MACs/). Apache License, Version 2.0.
 * [org.kotlincrypto.macs:hmac-sha2 0.7.1](https://github.com/KotlinCrypto/MACs/). Apache License, Version 2.0.
+* [org.kotlincrypto.macs:hmac-sha2-js 0.6.1](https://github.com/KotlinCrypto/MACs/). Apache License, Version 2.0.
+* [org.kotlincrypto.macs:hmac-sha2-js 0.7.1](https://github.com/KotlinCrypto/MACs/). Apache License, Version 2.0.
 * [org.kotlincrypto.macs:hmac-sha2-jvm 0.6.1](https://github.com/KotlinCrypto/MACs/). Apache License, Version 2.0.
 * [org.kotlincrypto.macs:hmac-sha2-jvm 0.7.1](https://github.com/KotlinCrypto/MACs/). Apache License, Version 2.0.
 * [org.kotlincrypto.random:crypto-rand 0.6.0](https://github.com/KotlinCrypto/random/). Apache License, Version 2.0.
 * [org.kotlincrypto.random:crypto-rand 0.5.2](https://github.com/KotlinCrypto/random/). Apache License, Version 2.0.
+* [org.kotlincrypto.random:crypto-rand-js 0.5.2](https://github.com/KotlinCrypto/random/). Apache License, Version 2.0.
 * [org.kotlincrypto.random:crypto-rand-jvm 0.6.0](https://github.com/KotlinCrypto/random/). Apache License, Version 2.0.
 * [org.kotlincrypto.random:crypto-rand-jvm 0.5.2](https://github.com/KotlinCrypto/random/). Apache License, Version 2.0.
-* [org.kotlincrypto:error 0.4.0](https://github.com/KotlinCrypto/error/). Apache License, Version 2.0.
 * [org.kotlincrypto:error 0.2.0](https://github.com/KotlinCrypto/error/). Apache License, Version 2.0.
+* [org.kotlincrypto:error 0.4.0](https://github.com/KotlinCrypto/error/). Apache License, Version 2.0.
 * [org.kotlincrypto:error 0.3.1](https://github.com/KotlinCrypto/error/). Apache License, Version 2.0.
-* [org.kotlincrypto:error-jvm 0.4.0](https://github.com/KotlinCrypto/error/). Apache License, Version 2.0.
+* [org.kotlincrypto:error-js 0.2.0](https://github.com/KotlinCrypto/error/). Apache License, Version 2.0.
+* [org.kotlincrypto:error-js 0.3.1](https://github.com/KotlinCrypto/error/). Apache License, Version 2.0.
+* [org.kotlincrypto:error-js 0.4.0](https://github.com/KotlinCrypto/error/). Apache License, Version 2.0.
 * [org.kotlincrypto:error-jvm 0.2.0](https://github.com/KotlinCrypto/error/). Apache License, Version 2.0.
+* [org.kotlincrypto:error-jvm 0.4.0](https://github.com/KotlinCrypto/error/). Apache License, Version 2.0.
 * [org.kotlincrypto:error-jvm 0.3.1](https://github.com/KotlinCrypto/error/). Apache License, Version 2.0.
 * [org.mozilla:rhino 1.7.7.2](https://developer.mozilla.org/en/Rhino). Mozilla Public License, Version 2.0.
 * [org.opentest4j.reporting:open-test-reporting-tooling-spi 0.2.3](https://github.com/ota4j-team/open-test-reporting). Apache License, Version 2.0.
@@ -736,6 +838,7 @@ This document lists third-party libraries used by walt.id identity.
 * [org.slf4j:jul-to-slf4j 2.0.17](http://www.slf4j.org). MIT License.
 * [org.slf4j:slf4j-api 2.1.0-alpha1](http://www.slf4j.org). MIT License.
 * [org.slf4j:slf4j-api 2.0.17](http://www.slf4j.org). MIT License.
+* [org.slf4j:slf4j-simple 2.0.17](http://www.slf4j.org). MIT License.
 * [org.web3j:abi 4.14.0](https://web3j.io). Apache License, Version 2.0.
 * [org.web3j:core 4.14.0](https://web3j.io). Apache License, Version 2.0.
 * [org.web3j:crypto 4.14.0](https://web3j.io). Apache License, Version 2.0.
