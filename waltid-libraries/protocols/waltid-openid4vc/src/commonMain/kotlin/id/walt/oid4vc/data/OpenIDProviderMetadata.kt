@@ -356,7 +356,7 @@ sealed class OpenIDProviderMetadata : JsonDataObject() {
         @SerialName("userinfo_endpoint") override val userinfoEndpoint: String? = null,
         @SerialName("jwks_uri") override val jwksUri: String? = null,
         @SerialName("registration_endpoint") override val registrationEndpoint: String? = null,
-        @EncodeDefault @SerialName("scopes_supported") override val scopesSupported: Set<String> = setOf("openid"),
+        @EncodeDefault @SerialName("scopes_supported") override val scopesSupported: Set<String> = setOf("openid", "org.iso.23220.photoid.1"),
         @SerialName("response_types_supported") override val responseTypesSupported: Set<String>? = null,
         @EncodeDefault @SerialName("response_modes_supported") override val responseModesSupported: Set<ResponseMode> = setOf(
             ResponseMode.query,
@@ -415,6 +415,7 @@ sealed class OpenIDProviderMetadata : JsonDataObject() {
         @SerialName("credential_configurations_supported") @Serializable(CredentialSupportedMapSerializer::class) val credentialConfigurationsSupported: Map<String, CredentialSupported>? = null,
         @SerialName("authorization_servers") val authorizationServers: Set<String>? = null,
         @SerialName("pre-authorized_grant_anonymous_access_supported") val preAuthorizedGrantAnonymousAccessSupport: Boolean? = null,
+        @SerialName("nonce_endpoint") val nonceEndpoint: String? = null,
 
         override val customParameters: Map<String, JsonElement>? = mapOf()
 

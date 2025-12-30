@@ -182,3 +182,6 @@ enum class ProofType {
 data class ProofTypeMetadata(
     @SerialName("proof_signing_alg_values_supported") val proofSigningAlgValuesSupported: Set<String>
 )
+
+object ProofOfPossessionSerializerExternal :
+    JsonDataObjectSerializer<ProofOfPossession>(ProofOfPossession.generatedSerializer())

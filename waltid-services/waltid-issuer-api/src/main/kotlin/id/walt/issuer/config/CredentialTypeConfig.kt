@@ -88,7 +88,12 @@ data class CredentialTypeConfig(
             CredentialSupported(
                 format = CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"),
-                credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
+                credentialSigningAlgValuesSupported = setOf(
+                    CredSignAlgValues.Named("EdDSA"),
+                    CredSignAlgValues.Named("ES256"),
+                    CredSignAlgValues.Named("ES256K"),
+                    CredSignAlgValues.Named("RSA")
+                ),
 
                 display = listOf(
                     DisplayProperties(
@@ -120,7 +125,7 @@ data class CredentialTypeConfig(
             CredentialSupported(
                 format = CredentialFormat.mso_mdoc,
                 cryptographicBindingMethodsSupported = setOf("cose_key"),
-                credentialSigningAlgValuesSupported = setOf("ES256"),
+                credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256")),
                 proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
                 credentialDefinition = CredentialDefinition(type = listOf(MDocTypes.ISO_MDL)),
                 docType = MDocTypes.ISO_MDL
@@ -130,7 +135,7 @@ data class CredentialTypeConfig(
             CredentialSupported(
                 format = CredentialFormat.sd_jwt_vc,
                 cryptographicBindingMethodsSupported = setOf("jwk"),
-                credentialSigningAlgValuesSupported = setOf("ES256"),
+                credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256")),
                 vct = baseUrl.plus("/urn:eu.europa.ec.eudi:pid:1")
             )
         ),
@@ -138,7 +143,7 @@ data class CredentialTypeConfig(
             CredentialSupported(
                 format = CredentialFormat.sd_jwt_vc,
                 cryptographicBindingMethodsSupported = setOf("jwk"),
-                credentialSigningAlgValuesSupported = setOf("ES256"),
+                credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256")),
                 vct = baseUrl.plus("/identity_credential"),
                 /*display = listOf( // <-- Breaks EBSI draft11 compatibility. Instead, configure in credential-issuer-metadata.conf
                     DisplayProperties(
@@ -163,7 +168,7 @@ data class CredentialTypeConfig(
             CredentialSupported(
                 format = CredentialFormat.sd_jwt_vc,
                 cryptographicBindingMethodsSupported = setOf("did", "jwk"),
-                credentialSigningAlgValuesSupported = setOf("ES256"),
+                credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256")),
                 vct = "https://example.com/my_custom_vct",
                 sdJwtVcTypeMetadata = SdJwtVcTypeMetadataDraft04(
                     name = "THE vct VALUE SHOULD BE UPDATED TO A RESOLVABLE AUTHORITY DOMAIN",
@@ -178,7 +183,7 @@ data class CredentialTypeConfig(
             CredentialSupported(
                 format = CredentialFormat.sd_jwt_vc,
                 cryptographicBindingMethodsSupported = setOf("jwk"),
-                credentialSigningAlgValuesSupported = setOf("ES256"),
+                credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256")),
                 vct = baseUrl + "/PhotoIDCredential",
                 sdJwtVcTypeMetadata = SdJwtVcTypeMetadataDraft04(
                     name = "PhotoID VC (ISO 23220‑4)",
@@ -209,7 +214,12 @@ data class CredentialTypeConfig(
                             cryptographicBindingMethodsSupported = if (format == CredentialFormat.sd_jwt_vc) setOf("jwk") else setOf(
                                 "did"
                             ),
-                            credentialSigningAlgValuesSupported = setOf("EdDSA", "ES256", "ES256K", "RSA"),
+                            credentialSigningAlgValuesSupported = setOf(
+                                CredSignAlgValues.Named("EdDSA"),
+                                CredSignAlgValues.Named("ES256"),
+                                CredSignAlgValues.Named("ES256K"),
+                                CredSignAlgValues.Named("RSA")
+                            ),
                             credentialDefinition = if (format != CredentialFormat.sd_jwt_vc && format != CredentialFormat.mso_mdoc) CredentialDefinition(
                                 type = type
                             ) else null,
