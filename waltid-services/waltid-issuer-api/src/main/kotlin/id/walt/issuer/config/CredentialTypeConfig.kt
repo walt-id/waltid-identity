@@ -2,12 +2,16 @@ package id.walt.issuer.config
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.WaltConfig
-import id.walt.mdoc.doc.MDocTypes
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.data.*
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+
+
+private const val ISO_MDL = "org.iso.18013.5.1.mDL"
+private const val ISO_PHOTO_ID = "org.iso.23220.photoid.1.photoID"
+private const val ISO_PHOTO_ID_NAMESPACE = "org.iso.23220.photoid.1"
 
 private fun vc(vararg extra: String) = JsonArray(listOf(*extra).map { JsonPrimitive(it) })
 private fun vc(credentialSupported: CredentialSupported) = Json.encodeToJsonElement(credentialSupported)
@@ -116,14 +120,24 @@ data class CredentialTypeConfig(
                 )
             )
         ),
-        MDocTypes.ISO_MDL to vc(
+        ISO_MDL to vc(
             CredentialSupported(
                 format = CredentialFormat.mso_mdoc,
                 cryptographicBindingMethodsSupported = setOf("cose_key"),
                 credentialSigningAlgValuesSupported = setOf("ES256"),
                 proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
-                credentialDefinition = CredentialDefinition(type = listOf(MDocTypes.ISO_MDL)),
-                docType = MDocTypes.ISO_MDL
+                credentialDefinition = CredentialDefinition(type = listOf(ISO_MDL)),
+                docType = ISO_MDL
+            )
+        ),
+        ISO_PHOTO_ID to vc(
+            CredentialSupported(
+                format = CredentialFormat.mso_mdoc,
+                cryptographicBindingMethodsSupported = setOf("cose_key"),
+                credentialSigningAlgValuesSupported = setOf("ES256"),
+                proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
+                credentialDefinition = CredentialDefinition(type = listOf(ISO_PHOTO_ID)),
+                docType = ISO_PHOTO_ID_NAMESPACE
             )
         ),
         "urn:eu.eur1opa.ec.eudi:pid:1" to vc(

@@ -1,12 +1,10 @@
 package id.walt.webwallet.service.exchange
 
-import cbor.Cbor
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.JwsUtils.decodeJwsOrSdjwt
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
-import id.walt.mdoc.dataelement.toDataElement
-import id.walt.mdoc.doc.MDoc
-import id.walt.mdoc.issuersigned.IssuerSigned
+import id.walt.mdoc.encoding.MdocCbor
+import id.walt.mdoc.objects.document.Document
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.OfferedCredential
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
@@ -72,19 +70,22 @@ abstract class IssuanceServiceBase {
                 ?: throw IllegalArgumentException("Credential request has no docType property")
         logger.debug { "Parsed docType: $docType" }
 
-        val mDoc = when (credentialEncoding) {
-            "issuer-signed" -> MDoc(
-                docType.toDataElement(), IssuerSigned.fromMapElement(
-                    Cbor.decodeFromByteArray(credential.base64UrlDecode())
-                ), null
-            )
+        val document = when (credentialEncoding) {
+            "issuer-signed" -> {
+                val cborBytes = credential.base64UrlDecode()
+                MdocCbor.decodeFromByteArray<Document>(cborBytes)
+            }
 
             else -> throw IllegalArgumentException("Invalid credential encoding: $credentialEncoding")
         }
         // TODO: review ID generation for mdoc
+        // Convert Document to CBOR hex string
+        val documentCbor = MdocCbor.encodeToByteArray(Document.serializer(), document)
+        val documentHex = documentCbor.joinToString("") { byte -> "%02x".format(byte) }
+        
         return CredentialDataResult(
             id = randomUUIDString(),
-            document = mDoc.toCBORHex(),
+            document = documentHex,
             type = docType,
             format = CredentialFormat.mso_mdoc,
         )
@@ -135,9 +136,14 @@ abstract class IssuanceServiceBase {
     }
 
     fun isKeyProofRequiredForOfferedCredential(offeredCredential: OfferedCredential) =
-        // Use key proof if the supported cryptographic binding method is not empty, doesn't contain DID and contains cose_key or jwk
-        (offeredCredential.cryptographicBindingMethodsSupported != null &&
-                (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
-                        offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
-                !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
+        // For mdoc credentials, always use key proof (cose_key) as per ISO 18013-5 specification
+        if (offeredCredential.format == CredentialFormat.mso_mdoc) {
+            true
+        } else {
+            // Use key proof if the supported cryptographic binding method is not empty, doesn't contain DID and contains cose_key or jwk
+            (offeredCredential.cryptographicBindingMethodsSupported != null &&
+                    (offeredCredential.cryptographicBindingMethodsSupported!!.contains("cose_key") ||
+                            offeredCredential.cryptographicBindingMethodsSupported!!.contains("jwk")) &&
+                    !offeredCredential.cryptographicBindingMethodsSupported!!.contains("did"))
+        }
 }

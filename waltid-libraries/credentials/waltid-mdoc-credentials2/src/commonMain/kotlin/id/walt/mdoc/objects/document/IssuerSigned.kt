@@ -4,6 +4,7 @@ import id.walt.cose.CoseSign1
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.mdoc.encoding.MdocCbor
 import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.elements.IssuerSignedList
@@ -13,6 +14,7 @@ import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
@@ -50,11 +52,29 @@ data class IssuerSigned private constructor(
      * A convenience function to decode the CBOR payload of the `issuerAuth` signature
      * structure into a [MobileSecurityObject].
      *
+     * Uses MdocCbor to ensure proper handling of CBOR tag 0 for dates in ValidityInfo.
+     *
      * @return The parsed [MobileSecurityObject].
      * @throws Exception if the payload cannot be decoded.
      */
-    fun decodeMobileSecurityObject() =
-        issuerAuth.decodeIsoPayload<MobileSecurityObject>()
+    fun decodeMobileSecurityObject(): MobileSecurityObject {
+        // 1. Strip the outer tag (e.g., #6.24) from the payload.
+        val taggedContent = issuerAuth.payload!!.let { payload ->
+            val tagBytes = byteArrayOf(0xd8.toByte(), 24.toByte())
+            if (payload.size >= 2 && payload[0] == tagBytes[0] && payload[1] == tagBytes[1]) {
+                payload.drop(2).toByteArray()
+            } else {
+                payload
+            }
+        }
+        
+        // 2. Decode the now-exposed byte string (bstr) to get its inner content.
+        val msoBytes = MdocCbor.decodeFromByteArray(ByteArraySerializer(), taggedContent)
+        
+        // 3. Decode the actual MobileSecurityObject from the inner content bytes using MdocCbor.
+        // This ensures that @ValueTags(0u) annotations on ValidityInfo dates are handled correctly.
+        return MdocCbor.decodeFromByteArray(MobileSecurityObject.serializer(), msoBytes)
+    }
 
     /**
      * A utility function to convert the structured, CBOR-oriented `namespaces` map into a

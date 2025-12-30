@@ -86,10 +86,12 @@ dependencies {
 
     // SSI Kit 2
     api(project(":waltid-libraries:crypto:waltid-crypto"))
+    api(project(":waltid-libraries:crypto:waltid-cose"))
     api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
     api(project(":waltid-libraries:credentials:waltid-verification-policies"))
     api(project(":waltid-libraries:waltid-did"))
     api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
+    api(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
 }
 
 application {
