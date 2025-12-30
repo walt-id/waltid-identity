@@ -13,6 +13,10 @@ import kotlin.time.ExperimentalTime
  *
  * The builder validates profile data, the public key, and
  * the issuing IACA profile data before delegating to platform-specific signing.
+ *
+ * Validity period precision: input [kotlin.time.Instant] values are truncated
+ * to whole seconds when encoded. Sub-second precision is discarded and the
+ * returned decoded certificate reflects this truncation.
  */
 class DocumentSignerCertificateBuilder {
 
@@ -26,6 +30,10 @@ class DocumentSignerCertificateBuilder {
      * @param profileData ISO profile inputs for generating the Document Signer X.509 certificate.
      * @param publicKey Document Signer public key (must not include a private key).
      * @param iacaSignerSpec Issuing IACA profile data and key for signing the Document Signer's X.509 certificate.
+     *
+     * Note: Validity period instants are stored with second-level precision;
+     * any milliseconds or nanoseconds in the input are discarded. The decoded
+     * certificate returned by this builder exposes the truncated values.
      */
     suspend fun build(
         profileData: DocumentSignerCertificateProfileData,
