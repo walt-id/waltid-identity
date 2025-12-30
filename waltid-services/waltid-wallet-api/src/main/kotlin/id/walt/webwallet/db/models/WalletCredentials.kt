@@ -74,11 +74,32 @@ data class WalletCredential @OptIn(ExperimentalUuidApi::class) constructor(
 
                     CredentialFormat.mso_mdoc -> {
                         val parsedDoc = MdocParser.parseToDocument(document)
+                        // Transform mdoc structure to flatten namespaces for presentation definition matching
+                        // The field paths expect structure like: $['org.iso.18013.5.1']['family_name']
+                        // namespacesToJson() already returns the correct structure: { "namespace": { "elementId": value, ... } }
+                        val issuerNamespaces = parsedDoc.issuerSigned.namespacesToJson()
+                        val deviceNamespaces = parsedDoc.deviceSigned?.namespaces?.value?.namespacesToJson()
+                        
+                        // Build the result JSON object, merging issuer and device namespaces
                         buildJsonObject {
-                            put("docType", parsedDoc.docType)
-                            put("issuerSigned", parsedDoc.issuerSigned.namespacesToJson())
-                            parsedDoc.deviceSigned?.let {
-                                put("deviceSigned", it.namespaces?.value?.namespacesToJson() ?: buildJsonObject { })
+                            put("docType", JsonPrimitive(parsedDoc.docType))
+                            // Add issuer-signed namespaces
+                            issuerNamespaces.forEach { (namespace, namespaceData) ->
+                                put(namespace, namespaceData)
+                            }
+                            // Merge device-signed data if present
+                            deviceNamespaces?.forEach { (namespace, namespaceData) ->
+                                val existing = issuerNamespaces[namespace] as? JsonObject
+                                if (existing != null) {
+                                    // Merge with existing namespace
+                                    putJsonObject(namespace) {
+                                        existing.forEach { put(it.key, it.value) }
+                                        namespaceData.jsonObject.forEach { put(it.key, it.value) }
+                                    }
+                                } else {
+                                    // Create new namespace from device-signed data
+                                    put(namespace, namespaceData)
+                                }
                             }
                         }
                     }

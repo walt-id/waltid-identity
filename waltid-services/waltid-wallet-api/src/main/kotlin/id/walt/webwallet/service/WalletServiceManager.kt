@@ -61,6 +61,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
@@ -243,10 +244,16 @@ object WalletServiceManager {
             Stopwatch.startTimer(timerId)
             val fullDoc = WalletCredential.parseFullDocument(cred.document, cred.disclosures, cred.id, cred.format)
             Stopwatch.addTiming(timerId, "parseCredential")
-            val result = fullDoc != null &&
-                    pd.inputDescriptors.any { inputDesc ->
-                        PresentationDefinitionParser.matchCredentialsForInputDescriptor(flowOf(fullDoc), inputDesc).toList().isNotEmpty()
-                    }
+            val result = fullDoc != null && pd.inputDescriptors.any { inputDesc ->
+                // First check if format matches (if format is specified in input descriptor)
+                val formatMatches = inputDesc.format?.let { formatJsonElement ->
+                    (formatJsonElement as? JsonObject)?.keys?.any { formatKey ->
+                        cred.format.value == formatKey
+                    } ?: false
+                } ?: true // If no format is specified in the input descriptor, assume it matches
+                
+                formatMatches && PresentationDefinitionParser.matchCredentialsForInputDescriptor(flowOf(fullDoc), inputDesc).toList().isNotEmpty()
+            }
             Stopwatch.addTiming(timerId, "matched")
             result
         }

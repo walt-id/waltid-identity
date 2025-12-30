@@ -40,6 +40,7 @@ import id.walt.verifier.openapi.VerifierApiExamples
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.ktor.http.*
+import io.ktor.server.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -1163,6 +1164,81 @@ class MdocIntegrationTest : AbstractIntegrationTest() {
             presentationRequest = VerifierApiExamples.mDLBirthDateSelectiveDisclosureExample,
         )
 
+    }
+
+    @Test
+    fun e2eMatchMdocCredentialsWithPresentationDefinition() = runTest {
+        // Issue two different mdoc credentials:
+        // 1. One with age_over_18 attestation
+        // 2. One without age_over_18 (base issuance)
+        
+        val mDLWithAgeAttestationRequest = MdocDocs.mDLSingleAgeAttestation
+        val mDLBaseRequest = MdocDocs.mdlBaseIssuanceExample
+
+        // Issue and claim both credentials
+        val offerUrlWithAge = issuerApi.issueMdocCredential(mDLWithAgeAttestationRequest)
+        val (mDLWithAge, mDLCredentialIdWithAge) = mDocWallet.claimCredential(offerUrlWithAge).let {
+            mDLHandleOfferWalletRetrievedCredentials(it) to it.first().id
+        }
+
+        val offerUrlBase = issuerApi.issueMdocCredential(mDLBaseRequest)
+        val (mDLBase, mDLCredentialIdBase) = mDocWallet.claimCredential(offerUrlBase).let {
+            mDLHandleOfferWalletRetrievedCredentials(it) to it.first().id
+        }
+
+        // Verify both credentials are in the wallet
+        val allCredentials = mDocWallet.listCredentials()
+        assertTrue(allCredentials.any { it.id == mDLCredentialIdWithAge }, "Credential with age attestation should be in wallet")
+        assertTrue(allCredentials.any { it.id == mDLCredentialIdBase }, "Base credential should be in wallet")
+
+        // Create a presentation definition that requires age_over_18 field
+        // This should only match the credential with age_over_18
+        val presentationUrl = verifierApi.verify(
+            payload = VerifierApiExamples.mDLAgeOver18AttestationExample,
+            sessionId = Uuid.random().toString(),
+            responseMode = ResponseMode.direct_post_jwt
+        )
+
+        // Resolve the presentation request to get the presentation definition
+        val resolvedPresentationRequest = mDocWallet.resolvePresentationRequest(presentationUrl)
+        val presentationDefinitionJson = Url(resolvedPresentationRequest).parameters.getOrFail("presentation_definition")
+
+        // Match credentials against the presentation definition
+        val matchedCredentials = mDocWallet.matchCredentialsForPresentationDefinition(presentationDefinitionJson)
+
+        // Verify only one credential is matched (the one with age_over_18)
+        assertEquals(
+            expected = 1,
+            actual = matchedCredentials.size,
+            message = "Only the credential with age_over_18 should match the presentation definition"
+        )
+
+        // Verify it's the correct credential (the one with age attestation)
+        assertEquals(
+            expected = mDLCredentialIdWithAge,
+            actual = matchedCredentials.first().id,
+            message = "The matched credential should be the one with age_over_18 attestation"
+        )
+
+        // Verify the base credential (without age_over_18) is NOT matched
+        assertFalse(
+            matchedCredentials.any { it.id == mDLCredentialIdBase },
+            message = "The base credential without age_over_18 should not match"
+        )
+
+        // Verify the matched credential has the age_over_18 field
+        val matchedCredential = matchedCredentials.first()
+        assertEquals(CredentialFormat.mso_mdoc, matchedCredential.format)
+        val parsedDoc = matchedCredential.parsedDocument
+        assertNotNull(parsedDoc, "Parsed document should not be null")
+        
+        // Check that the matched credential has age_over_18 field
+        val namespaces = parsedDoc[ISO_IEC_MDL_NAMESPACE_ID] as? JsonObject
+        assertNotNull(namespaces, "Namespaces should not be null")
+        assertTrue(
+            namespaces.containsKey("age_over_18"),
+            "Matched credential should contain age_over_18 field"
+        )
     }
 
     private data class MDLIssuanceRequestDecodedParameters(
