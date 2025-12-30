@@ -1,4 +1,5 @@
 plugins {
+    id("waltid.repositories")
     kotlin("jvm") version "2.0.0"
     id("io.ktor.plugin") version "3.3.3"
     id("org.jetbrains.kotlin.plugin.serialization") version "2.0.0"

@@ -10,6 +10,10 @@
 //    }
 //}
 
+plugins {
+    id("waltid.repositories")
+}
+
 allprojects {
     version = "1.0.0-SNAPSHOT"
 
