@@ -25,18 +25,18 @@ internal actual fun generateIsoCompliantX509CertificateSerialNo(): ByteString {
 
 internal fun getJcaSigningAlgorithmNameFromKeyType(
     keyType: KeyType,
-) = when (keyType) {
-    KeyType.secp256r1 -> DefaultSignatureAlgorithmIdentifierFinder()
-        .find("SHA256withECDSA")
+) = DefaultSignatureAlgorithmIdentifierFinder().run {
+    when (keyType) {
+        KeyType.secp256r1 -> find("SHA256withECDSA")
 
-    KeyType.secp384r1 -> DefaultSignatureAlgorithmIdentifierFinder()
-        .find("SHA384withECDSA")
+        KeyType.secp384r1 -> find("SHA384withECDSA")
 
-    KeyType.secp521r1 -> DefaultSignatureAlgorithmIdentifierFinder()
-        .find("SHA512withECDSA")
+        KeyType.secp521r1 -> find("SHA512withECDSA")
 
-    else -> throw IllegalArgumentException("Unsupported key type $keyType for ISO certificate signing operation")
+        else -> throw IllegalArgumentException("Unsupported key type $keyType for ISO certificate signing operation")
+    }
 }
+
 
 internal actual fun isValidIsoCountryCode(countryCode: String): Boolean {
     return Locale.getISOCountries().find { it == countryCode }?.let {
