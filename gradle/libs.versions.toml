@@ -35,6 +35,7 @@ bouncycastle = "2.73.8"
 nimbus-jose = "10.6"
 jose-npm = "5.10.0"
 bcprov = "2.73.9"
+bcpkix = "2.73.9"
 kotlincrypto = "0.6.1"
 tink = "1.16.0"
 
@@ -83,6 +84,7 @@ kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-j
 
 ## Crypto
 bcprov-lts8on = { group = "org.bouncycastle", name = "bcprov-lts8on", version.ref = "bcprov" }
+bcpkix-lts8on = { group = "org.bouncycastle", name = "bcpkix-lts8on", version.ref = "bcpkix" }
 kotlincrypto-hash-bom = { module = "org.kotlincrypto.hash:bom", version.ref = "kotlincrypto" }
 kotlincrypto-hash-sha2 = { module = "org.kotlincrypto.hash:sha2", version.ref = "kotlincrypto" }
 kotlincrypto-macs-bom = { module = "org.kotlincrypto.macs:bom", version.ref = "kotlincrypto" }
@@ -93,6 +95,7 @@ bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-lts8on", version.ref = "
 nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbus-jose" }
 
 ## Testing
+kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
 junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit-jupiter" }
 junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit-jupiter" }
 junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit-jupiter" }
