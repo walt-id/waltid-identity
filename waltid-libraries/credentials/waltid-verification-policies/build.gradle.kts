@@ -1,5 +1,3 @@
-import love.forte.plugin.suspendtrans.gradle.SuspendTransPluginConstants
-
 plugins {
     id("waltid.multiplatform.library")
     id("waltid.publish.maven")
@@ -34,7 +32,7 @@ kotlin {
             implementation(identityLibs.bundles.waltid.ktor.client)
 
             // Loggin
-            implementation("io.github.oshai:kotlin-logging:7.0.5")
+            implementation("io.github.oshai:kotlin-logging:7.0.13")
 
             // Coroutines
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")

@@ -1,4 +1,5 @@
 .gradle
+.gradle-user-home
 **/.gradle
 .gradle-user-home/
 build/

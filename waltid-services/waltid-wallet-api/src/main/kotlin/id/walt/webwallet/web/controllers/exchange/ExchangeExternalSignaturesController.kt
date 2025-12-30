@@ -56,6 +56,8 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlin.uuid.ExperimentalUuidApi
 
+private const val W_3_C_VERIFIABLE_CREDENTIAL = "W3C Verifiable Credential"
+
 @OptIn(ExperimentalUuidApi::class)
 fun Application.exchangeExternalSignatures() = walletRoute {
     val logger = KotlinLogging.logger { }
@@ -70,7 +72,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 body<PrepareOID4VPRequest> {
                     required = true
                     example(
-                        "W3C Verifiable Credential",
+                        W_3_C_VERIFIABLE_CREDENTIAL,
                         ExchangeExternalSignaturesExamples.prepareOid4vpRequestW3CVCExample(),
                     )
                     example(
@@ -91,7 +93,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     body<PrepareOID4VPResponse> {
                         required = true
                         example(
-                            "W3C Verifiable Credential",
+                            W_3_C_VERIFIABLE_CREDENTIAL,
                             ExchangeExternalSignaturesExamples.prepareOid4vpResponseW3CVCExample(),
                         )
                         example(
@@ -242,7 +244,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 body<SubmitOID4VPRequest> {
                     required = true
                     example(
-                        "W3C Verifiable Credential",
+                        W_3_C_VERIFIABLE_CREDENTIAL,
                         ExchangeExternalSignaturesExamples.submitOid4vpRequestW3CVCExample(),
                     )
                     example(
@@ -441,7 +443,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                     body<PrepareOID4VCIResponse> {
                         required = true
                         example(
-                            "W3C Verifiable Credential",
+                            W_3_C_VERIFIABLE_CREDENTIAL,
                             ExchangeExternalSignaturesExamples.prepareOid4vciResponseW3CVCExample(),
                         )
                         example(
@@ -521,7 +523,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 body<SubmitOID4VCIRequest> {
                     required = true
                     example(
-                        "W3C Verifiable Credential",
+                        W_3_C_VERIFIABLE_CREDENTIAL,
                         ExchangeExternalSignaturesExamples.submitOid4vciRequestW3CVCExample(),
                     )
                     example(

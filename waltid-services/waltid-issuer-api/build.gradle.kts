@@ -1,5 +1,4 @@
-import io.ktor.plugin.features.DockerPortMapping
-import io.ktor.plugin.features.DockerPortMappingProtocol
+import io.ktor.plugin.features.*
 
 object Versions {
     const val KTOR_VERSION = "3.3.3" // also change 1 plugin
