@@ -218,53 +218,71 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
     }
 
     private fun verifyMdoc(tokenResponse: TokenResponse, session: PresentationSession): Boolean {
-        val mdocString = tokenResponse.vpToken!!.jsonPrimitive.content
+        try {
+            val authorizationRequest = session.authorizationRequest
+                ?: throw BadRequestException("Authorization request is missing from the session.")
+            
+            // Check for apu header in JWT
+            val apuHeader = tokenResponse.jwsParts?.header?.get("apu")?.jsonPrimitive?.content
+                ?: throw BadRequestException("Missing 'apu' (mdoc nonce) in JWT header of token response.")
+            
+            val mdocNonce = try {
+                Base64.getUrlDecoder().decode(apuHeader).decodeToString()
+            } catch (e: Exception) {
+                throw BadRequestException("Failed to decode 'apu' header: ${e.message}", e)
+            }
+            
+            val vpTokenContent = tokenResponse.vpToken?.jsonPrimitive?.content
+                ?: throw BadRequestException("Missing 'vp_token' in token response.")
+            
+            val mdocString = vpTokenContent
+            
+            // Construct verification context from session data
+            val verificationContext = MdocVerificationContext(
+                expectedNonce = mdocNonce,
+                expectedAudience = authorizationRequest.clientId,
+                responseUri = authorizationRequest.responseUri
+            )
+            
+            // Use the new library's verifier
+            val verificationResult = runBlocking {
+                MdocVerifier.verify(mdocString, verificationContext)
+            }
         
-        // Extract nonce from the JWT header
-        val mdocNonce = Base64.getUrlDecoder().decode(tokenResponse.jwsParts!!.header["apu"]!!.jsonPrimitive.content)
-            .decodeToString()
-        
-        // Construct verification context from session data
-        val verificationContext = MdocVerificationContext(
-            expectedNonce = mdocNonce,
-            expectedAudience = session.authorizationRequest?.clientId,
-            responseUri = session.authorizationRequest?.responseUri
-        )
-        
-        // Use the new library's verifier
-        val verificationResult = runBlocking {
-            MdocVerifier.verify(mdocString, verificationContext)
-        }
-        
-        // Store verification errors in policyResults for better error reporting
-        if (!verificationResult.valid && verificationResult.errors.isNotEmpty()) {
-            // Create a minimal policy result structure with mdoc verification errors
-            val mdocPolicyResults = verificationResult.errors.map { error ->
-                PolicyResultSurrogate(
-                    policy = "mdoc-verification",
-                    description = error,
-                    args = null,
-                    isSuccess = false,
-                    result = null,
-                    error = JsonPrimitive(error)
+            // Store verification errors in policyResults for better error reporting
+            if (!verificationResult.valid && verificationResult.errors.isNotEmpty()) {
+                logger.error { "Mdoc verification failed with errors: ${verificationResult.errors.joinToString(", ")}" }
+                // Create a minimal policy result structure with mdoc verification errors
+                val mdocPolicyResults = verificationResult.errors.map { error ->
+                    PolicyResultSurrogate(
+                        policy = "mdoc-verification",
+                        description = error,
+                        args = null,
+                        isSuccess = false,
+                        result = null,
+                        error = JsonPrimitive(error)
+                    )
+                }
+                
+                val mdocPresentationResult = PresentationResultEntrySurrogate(
+                    credential = verificationResult.docType,
+                    policyResults = mdocPolicyResults
+                )
+                
+                policyResults[session.id] = PresentationVerificationResponseSurrogate(
+                    results = listOf(mdocPresentationResult),
+                    time = kotlin.time.Duration.ZERO,
+                    policiesRun = verificationResult.errors.size,
+                    policiesSuccessful = 0,
+                    policiesFailed = verificationResult.errors.size
                 )
             }
             
-            val mdocPresentationResult = PresentationResultEntrySurrogate(
-                credential = verificationResult.docType,
-                policyResults = mdocPolicyResults
-            )
-            
-            policyResults[session.id] = PresentationVerificationResponseSurrogate(
-                results = listOf(mdocPresentationResult),
-                time = kotlin.time.Duration.ZERO,
-                policiesRun = verificationResult.errors.size,
-                policiesSuccessful = 0,
-                policiesFailed = verificationResult.errors.size
-            )
+            return verificationResult.valid
+        } catch (e: Exception) {
+            logger.error(e) { "Error during mdoc verification: ${e.message ?: e.javaClass.simpleName}" }
+            throw e
         }
-        
-        return verificationResult.valid
     }
 
     override fun initializeAuthorization(

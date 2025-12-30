@@ -198,10 +198,15 @@ object VerifierService {
         val maybePresentationSessionResult = runCatching { OIDCVerifierService.verify(tokenResponse, session) }
 
         if (maybePresentationSessionResult.isFailure) {
+            val exception: Throwable? = maybePresentationSessionResult.exceptionOrNull()
+            val errorMessage = exception?.message 
+                ?: exception?.let { it::class.simpleName + ": " + it.toString() } 
+                ?: "Unknown verification error"
+            logger.error(exception!!) { "Verification failed for session ${session.id}: $errorMessage" }
             return Result.failure(
                 CryptoArgumentException(
-                    "Verification failed (VerificationUseCase): ${maybePresentationSessionResult.exceptionOrNull()!!.message}",
-                    maybePresentationSessionResult.exceptionOrNull()
+                    "Verification failed (VerificationUseCase): $errorMessage",
+                    exception
                 )
             )
         }
