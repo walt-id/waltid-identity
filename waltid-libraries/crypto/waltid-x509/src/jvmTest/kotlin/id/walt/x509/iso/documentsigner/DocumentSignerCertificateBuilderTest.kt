@@ -5,6 +5,7 @@ package id.walt.x509.iso.documentsigner
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
 import id.walt.x509.CertificateDer
+import id.walt.x509.X509ValidityPeriod
 import id.walt.x509.iso.*
 import id.walt.x509.iso.documentsigner.builder.DocumentSignerCertificateBuilder
 import id.walt.x509.iso.documentsigner.builder.IACASignerSpecification
@@ -50,7 +51,7 @@ class DocumentSignerCertificateBuilderTest {
             commonName = "Example Docu Signah!",
             stateOrProvinceName = "Texas",
         ),
-        validityPeriod = CertificateValidityPeriod(
+        validityPeriod = X509ValidityPeriod(
             notBefore = IsoSharedTestHarnessValidResources.iacaValidityPeriod.notBefore.plus(1.days),
             notAfter = IsoSharedTestHarnessValidResources.iacaValidityPeriod.notBefore.plus(400.days),
         ),
@@ -65,7 +66,7 @@ class DocumentSignerCertificateBuilderTest {
             organizationName = "Docu Signah Orgah!",
             localityName = "Texan?",
         ),
-        validityPeriod = CertificateValidityPeriod(
+        validityPeriod = X509ValidityPeriod(
             notBefore = IsoSharedTestHarnessValidResources.iacaValidityPeriod.notBefore.plus(1.days),
             notAfter = IsoSharedTestHarnessValidResources.iacaValidityPeriod.notBefore.plus(400.days),
         ),

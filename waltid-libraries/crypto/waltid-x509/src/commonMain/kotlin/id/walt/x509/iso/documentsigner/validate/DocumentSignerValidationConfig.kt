@@ -4,7 +4,11 @@ package id.walt.x509.iso.documentsigner.validate
  * Configuration for [DocumentSignerValidator].
  *
  * By default, all validations required by the ISO profile are enabled.
- * Callers can selectively disable checks (e.g., for parsing/inspection use-cases).
+ * Callers can selectively disable checks (for example, for parsing or inspection
+ * use cases) by setting the corresponding flags to false.
+ *
+ * Each flag controls a cohesive group of validations. This keeps the configuration
+ * manageable while still allowing targeted relaxation of profile requirements when needed.
  */
 data class DocumentSignerValidationConfig(
     val keyType: Boolean = true,
@@ -21,4 +25,3 @@ data class DocumentSignerValidationConfig(
     val requiredNonCriticalExtensionOIDs: Boolean = true,
     val signature: Boolean = true,
 )
-

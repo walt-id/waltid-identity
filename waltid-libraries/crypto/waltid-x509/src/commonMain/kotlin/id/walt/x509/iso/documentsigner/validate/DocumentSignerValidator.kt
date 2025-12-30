@@ -7,19 +7,34 @@ import id.walt.crypto.keys.KeyType
 import id.walt.x509.X509BasicConstraints
 import id.walt.x509.X509KeyUsage
 import id.walt.x509.X509V3ExtensionOID
-import id.walt.x509.iso.*
+import id.walt.x509.X509ValidityPeriod
+import id.walt.x509.iso.DS_CERT_MAX_VALIDITY_SECONDS
+import id.walt.x509.iso.DocumentSignerEkuOID
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
+import id.walt.x509.iso.isValidIsoCountryCode
+import id.walt.x509.iso.validateSerialNo
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
+/**
+ * ISO 18013-5 profile validator for decoded Document Signer X.509 certificates.
+ *
+ * Validations can be toggled using [DocumentSignerValidationConfig]. Failures
+ * throw [IllegalArgumentException] with descriptive messages.
+ */
 class DocumentSignerValidator(
     val config: DocumentSignerValidationConfig = DocumentSignerValidationConfig(),
 ) {
 
+    /**
+     * Validate a decoded Document Signer X.509 certificate against that of its issuing IACA.
+     *
+     * The decoded IACA certificate is not validated in the context of this function.
+     */
     suspend fun validate(
         dsDecodedCert: DocumentSignerDecodedCertificate,
         iacaDecodedCert: IACADecodedCertificate,
@@ -77,6 +92,9 @@ class DocumentSignerValidator(
 
     }
 
+    /**
+     * Validate the Document Signer public key prior to certificate creation.
+     */
     internal fun validateDocumentSignerPublicKey(
         publicKey: Key,
     ) {
@@ -91,6 +109,9 @@ class DocumentSignerValidator(
 
     }
 
+    /**
+     * Validate profile data prior to certificate creation.
+     */
     internal fun validateDocumentSignerProfileData(
         data: DocumentSignerCertificateProfileData,
     ) {
@@ -110,24 +131,30 @@ class DocumentSignerValidator(
         }
     }
 
+    /**
+     * Validate Document Signer profile data against the issuing IACA profile data.
+     *
+     * This enforces shared fields such as country and ensures the Document Signer
+     * validity window is within the IACA validity window.
+     */
     internal fun validateProfileDataAgainstIACAProfileData(
         dsProfileData: DocumentSignerCertificateProfileData,
         iacaProfileData: IACACertificateProfileData,
     ) {
         require(iacaProfileData.principalName.country == dsProfileData.principalName.country) {
-            "IACA and document signer country names must be the same"
+            "IACA and Document Signer country names must be the same"
         }
 
         require(iacaProfileData.principalName.stateOrProvinceName == dsProfileData.principalName.stateOrProvinceName) {
-            "IACA and document signer state/province names must be the same"
+            "IACA and Document Signer state/province names must be the same"
         }
 
         require(iacaProfileData.validityPeriod.notBefore <= dsProfileData.validityPeriod.notBefore) {
-            "IACA certificate not before must be before the document signer's not before"
+            "IACA certificate not before must be before the Document Signer's not before"
         }
 
         require(iacaProfileData.validityPeriod.notAfter >= dsProfileData.validityPeriod.notAfter) {
-            "IACA certificate not after must be after the document signer's not after"
+            "IACA certificate not after must be after the Document Signer's not after"
         }
     }
 
@@ -163,7 +190,7 @@ class DocumentSignerValidator(
     }
 
     private fun validateValidityPeriod(
-        validityPeriod: CertificateValidityPeriod,
+        validityPeriod: X509ValidityPeriod,
     ) {
 
         val timeNow = Clock.System.now()

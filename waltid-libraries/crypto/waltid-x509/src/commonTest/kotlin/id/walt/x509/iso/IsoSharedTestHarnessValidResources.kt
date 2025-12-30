@@ -6,6 +6,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
+import id.walt.x509.X509ValidityPeriod
 import id.walt.x509.iso.documentsigner.builder.DocumentSignerCertificateBuilder
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
@@ -58,7 +59,7 @@ object IsoSharedTestHarnessValidResources {
     suspend fun iacaSecp256r1SigningKey() = iacaSigningKeyMap()[KeyType.secp256r1]!!
 
     val iacaValidityPeriod = Clock.System.now().let { now ->
-        CertificateValidityPeriod(
+        X509ValidityPeriod(
             notBefore = now.minus(5.days),
             notAfter = now.plus((20 * 360).days),
         )
@@ -117,7 +118,7 @@ object IsoSharedTestHarnessValidResources {
 
     suspend fun dsSecp256r1PublicKey() = dsKeyMap()[KeyType.secp256r1]!!.getPublicKey()
 
-    val dsValidityPeriod = CertificateValidityPeriod(
+    val dsValidityPeriod = X509ValidityPeriod(
         notBefore = iacaValidityPeriod.notBefore.plus(1.days),
         notAfter = iacaValidityPeriod.notBefore.plus(457.days),
     )

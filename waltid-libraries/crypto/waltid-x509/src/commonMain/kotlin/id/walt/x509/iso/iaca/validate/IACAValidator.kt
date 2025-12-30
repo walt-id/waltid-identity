@@ -7,17 +7,30 @@ import id.walt.crypto.keys.KeyType
 import id.walt.x509.X509BasicConstraints
 import id.walt.x509.X509KeyUsage
 import id.walt.x509.X509V3ExtensionOID
-import id.walt.x509.iso.*
+import id.walt.x509.X509ValidityPeriod
+import id.walt.x509.iso.IACA_CERT_MAX_VALIDITY_SECONDS
+import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
+import id.walt.x509.iso.isValidIsoCountryCode
+import id.walt.x509.iso.validateSerialNo
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
+/**
+ * ISO 18013-5 profile validator for decoded IACA X.509 certificates.
+ *
+ * Validations can be toggled using [IACAValidationConfig]. Failures
+ * throw [IllegalArgumentException] with descriptive messages.
+ */
 class IACAValidator(
     val config: IACAValidationConfig = IACAValidationConfig(),
 ) {
 
+    /**
+     * Validate a decoded IACA X.509 certificate.
+     */
     suspend fun validate(
         decodedCert: IACADecodedCertificate,
     ) {
@@ -57,6 +70,9 @@ class IACAValidator(
 
     }
 
+    /**
+     * Validate a signing key intended for building an IACA certificate.
+     */
     internal fun validateSigningKey(
         signingKey: Key,
     ) {
@@ -71,6 +87,9 @@ class IACAValidator(
 
     }
 
+    /**
+     * Validate profile data prior to certificate creation.
+     */
     internal fun validateCertificateProfileData(
         data: IACACertificateProfileData,
     ) {
@@ -124,7 +143,7 @@ class IACAValidator(
     }
 
     private fun validateCertificateValidityPeriod(
-        validityPeriod: CertificateValidityPeriod,
+        validityPeriod: X509ValidityPeriod,
     ) {
 
         val timeNow = Clock.System.now()

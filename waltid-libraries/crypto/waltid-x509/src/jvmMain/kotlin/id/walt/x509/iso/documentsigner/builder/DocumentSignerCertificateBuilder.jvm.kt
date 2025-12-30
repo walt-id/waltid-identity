@@ -10,7 +10,7 @@ import id.walt.x509.X509KeyUsage
 import id.walt.x509.id.walt.x509.*
 import id.walt.x509.id.walt.x509.iso.documentsigner.certificate.toJcaX500Name
 import id.walt.x509.id.walt.x509.iso.iaca.certificate.toJcaX500Name
-import id.walt.x509.iso.CertificateValidityPeriod
+import id.walt.x509.X509ValidityPeriod
 import id.walt.x509.iso.DocumentSignerEkuOID
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
@@ -134,7 +134,7 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
         decodedCertificate = DocumentSignerDecodedCertificate(
             issuerPrincipalName = iacaSignerSpec.profileData.principalName,
             principalName = profileData.principalName,
-            validityPeriod = CertificateValidityPeriod(
+            validityPeriod = X509ValidityPeriod(
                 notBefore = Instant.fromEpochSeconds(certNotBeforeDate.toInstant().epochSecond),
                 notAfter = Instant.fromEpochSeconds(certNotAfterDate.toInstant().epochSecond),
             ),

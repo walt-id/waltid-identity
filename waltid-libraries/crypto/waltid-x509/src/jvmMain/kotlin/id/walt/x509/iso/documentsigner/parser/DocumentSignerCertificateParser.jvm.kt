@@ -8,7 +8,7 @@ import id.walt.x509.id.walt.x509.*
 import id.walt.x509.id.walt.x509.iso.documentsigner.certificate.parseFromJcaX500Name
 import id.walt.x509.id.walt.x509.iso.iaca.certificate.parseFromJcaX500Name
 import id.walt.x509.id.walt.x509.iso.parseFromX509Certificate
-import id.walt.x509.iso.CertificateValidityPeriod
+import id.walt.x509.X509ValidityPeriod
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
@@ -65,7 +65,7 @@ internal actual suspend fun platformParseDocumentSignerCertificate(
     return DocumentSignerDecodedCertificate(
         issuerPrincipalName = iacaPrincipalName,
         principalName = principalName,
-        validityPeriod = CertificateValidityPeriod(
+        validityPeriod = X509ValidityPeriod(
             notBefore = cert.notBefore.toInstant().toKotlinInstant(),
             notAfter = cert.notAfter.toInstant().toKotlinInstant(),
         ),

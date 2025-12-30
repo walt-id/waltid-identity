@@ -4,11 +4,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Standard X.509 v3 Certificate Extension OIDs.
+ * Standard X.509 v3 certificate extension OIDs.
  *
- * Enum entries use human-readable names and serialize as their OID string.
+ * This enum provides a curated set of commonly used extension OIDs. Entries use
+ * human-readable names and serialize to their dotted-decimal OID string.
  *
- * This is **not an exhaustive list** of every single OID out there (nor is it meant to be).
+ * Note: This list is intentionally not exhaustive.
  */
 @Serializable
 enum class X509V3ExtensionOID(val oid: String) {
@@ -59,6 +60,11 @@ enum class X509V3ExtensionOID(val oid: String) {
     FreshestCrl("2.5.29.46");
 
     companion object {
+        /**
+         * Resolve a known enum entry from a dotted-decimal OID string.
+         *
+         * Returns null when the OID is not part of this curated set.
+         */
         fun fromOID(oid: String) = entries.firstOrNull { it.oid == oid }
     }
 }
