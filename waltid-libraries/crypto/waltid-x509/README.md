@@ -18,39 +18,61 @@
   </p>
 </div>
 
-A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 certificates** across JVM/Android, iOS, and JS.  
-It focuses on developer-friendly APIs for parsing `x5c` JWT headers and validating a leaf certificate against a provided chain and trust anchors—using platform-native validation where possible.
+A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 certificates** across JVM/Android, iOS, and JS.
 
 ---
 
 ## Features
 
 - **KMP-first API**: common `expect/actual` with a consistent developer experience.
-- **PKIX validation (JVM/Android)**: order-independent path building & validation using the platform PKI.
-- **Pluggable trust model**: validate against:
-  - your **organization trust store** (recommended), or
-  - an explicit **pinned root** included in the `x5c` chain (private PKI / pinning).
+- **PKIX chain validation (JVM/Android)**: 
+  - Order-independent path building & validation using the platform PKI.
+  - **Pluggable trust model**: validate against:
+    - your **organization trust store** (recommended), or
+    - an explicit **pinned root** included in the `x5c` chain (private PKI / pinning).
+- **ISO/IEC 18013-5 X.509 certificate tooling (JVM)**:
+  - IACA and Document Signer X.509 certificate generation and parsing.
+  - Configurable validators with profile-compliant defaults.
+- **JVM extensions**: helpers for `X500Name`, `KeyUsage`, and `X509Certificate` v3 extension extraction.
 - **Clear exceptions**: failures raise `X509ValidationException` with context.
 
 ---
 
 ## Targets
 
-- **JVM / Android**: Full implementation via `PKIX` path builder/validator.
-- **iOS**: Stub provided; intended to use `SecTrust` in a follow-up implementation.
-- **JS**: Stub provided; intended to integrate with a JS PKI lib or Web APIs.
+- **JVM / Android**: Full chain validation, ISO/IEC 18013-5 build/parse/validate, JVM extensions.
+- **iOS**: Chain validation stub; ISO tooling not implemented yet.
+- **JS**: Chain validation stub; ISO tooling not implemented yet.
 
 > If you only need JVM/Android today, you can use it immediately. iOS/JS will throw `X509ValidationException("Not implemented…")` until completed.
 
 ---
 
-## Minimal API surface
+## Installation
+
+Add the module as a dependency to your multiplatform project:
+
+```kotlin
+// build.gradle.kts
+
+implementation("id.walt:waltid-x509:<version>") // when published
+
+OR
+
+include(":waltid-libraries:crypto:waltid-x509") // if used as a composite build/module
+```
+
+---
+
+## PKIX Certificate Chain Validation
 
 > Namespaces may differ slightly in your repo; adjust imports to your package.
 
 ```kotlin
 // Common API (expect)
-data class CertificateDer(val bytes: ByteArray)
+import okio.ByteString
+
+data class CertificateDer(val bytes: ByteString)
 
 /** Validate a leaf X.509 cert against a provided chain and trust anchors. */
 @Throws(X509ValidationException::class)
@@ -66,29 +88,12 @@ expect fun validateCertificateChain(
 class X509ValidationException(message: String, cause: Throwable? = null) : Exception(message, cause)
 ```
 
----
-
-## 📦 Installation
-
-Add the module as a dependency to your multiplatform project:
+### Quick start (JVM/Android)
 
 ```kotlin
-// build.gradle.kts
-
-implementation("id.walt:waltid-x509:<version>") //when published
-
-OR
-
-include(":waltid-libraries:crypto:waltid-x509")  // if used as a composite build/module
-
-```
-
----
-
-## Quick start (JVM/Android)
-
-```kotlin
-import waltid.x509.* // adjust to your actual package name
+import id.walt.x509.CertificateDer
+import id.walt.x509.validateCertificateChain
+import okio.ByteString.Companion.toByteString
 import java.util.Base64
 
 fun validateFromX5cExample(
@@ -96,16 +101,10 @@ fun validateFromX5cExample(
     trustAnchorsDer: List<ByteArray>?,   // null = use self-signed root from chain (pinning/private PKI)
     enableRevocation: Boolean = false
 ) {
-    // 1) Parse the x5c array into DER bytes (platform-agnostic wrapper)
-    val chain = x5cBase64.map { CertificateDer(Base64.getDecoder().decode(it)) }
-
-    // 2) The leaf is usually the first element in x5c (but you can pick explicitly)
+    val chain = x5cBase64.map { CertificateDer(Base64.getDecoder().decode(it).toByteString()) }
     val leaf = chain.first()
+    val anchors = trustAnchorsDer?.map { CertificateDer(it.toByteString()) }
 
-    // 3) Convert DER roots (if you use a custom trust store)
-    val anchors = trustAnchorsDer?.map { CertificateDer(it) }
-
-    // 4) Validate: leaf -> intermediates -> trust anchors
     validateCertificateChain(
         leaf = leaf,
         chain = chain,
@@ -114,37 +113,118 @@ fun validateFromX5cExample(
         enableSystemTrustAnchors = false,
         enableRevocation = enableRevocation
     )
-    // If no exception is thrown, validation succeeded.
 }
 ```
 
 ### Loading trust anchors from a JVM KeyStore (JVM helper)
 
 ```kotlin
-import waltid.x509.*
+import id.walt.x509.CertificateDer
+import id.walt.x509.loadTrustAnchorsFromKeyStore
 import java.security.KeyStore
 
 fun anchorsFromKeyStore(ks: KeyStore): List<CertificateDer> {
-    // Helper is JVM-only
     return loadTrustAnchorsFromKeyStore(ks)
 }
 ```
 
 ---
 
-JVM extras:
+## ISO/IEC 18013-5 X.509 certificate tooling (IACA and Document Signer)
+
+The `id.walt.x509.iso` package provides the following:
+
+- Builder classes for IACA (via `IACACertificateBuilder`) and Document Signer (via `DocumentSignerCertificateBuilder`) X.509 certificates.
+- Parser classes for IACA (via `IACACertificateParser`) and Document Signer (via `DocumentSignerCertificateParser`) DER-encoded (via the `CertificateDer` platform-agnostic wrapper) X.509 certificates. **Note:** Decoded certificates **are not validate
+- Validator classes for IACA (via `IACAValidator`) and Document Signer (via `DocumentSignerValidator`) decoded certificate instances (`IACADecodedCertificate` and `DocumentSignerDecodedCertificate` respectively) with a simple and flexible validation configuration tuning (refer to `IACAValidationConfig` and `DocumentSignerValidationConfig` for the respective configuration options).
+
+### IACA X.509 Certificate Generation
+
+Generating an IACA X.509 certificate with all the mandatory fields is achieved as follows: 
 
 ```kotlin
-// JVM-only helper to turn a KeyStore into DER roots (TrustAnchors)
-fun loadTrustAnchorsFromKeyStore(ks: KeyStore): List<CertificateDer>
+@OptIn(ExperimentalTime::class)
+suspend fun buildIaca(signingKey: Key) = IACACertificateBuilder().build(
+    profileData = IACACertificateProfileData(
+        principalName = IACAPrincipalName(
+            country = "AT",
+            commonName = "Example IACA",
+            organizationName = "Example Org",
+        ),
+        validityPeriod = X509ValidityPeriod(
+            notBefore = Clock.System.now(),
+            notAfter = Clock.System.now() + 365.days,
+        ),
+        issuerAlternativeName = IssuerAlternativeName(
+            uri = "https://issuer.example"
+        ),
+        crlDistributionPointUri = "https://issuer.example/crl",
+    ),
+    signingKey = signingKey,
+)
+```
+
+### Document Signer X.509 Certificate Generation
+
+Generating Document Signer X.509 certificate with all the mandatory fields is achieved as follows:
+
+```kotlin
+@OptIn(ExperimentalTime::class)
+suspend fun buildDocumentSigner(
+    dsPublicKey: Key,
+    iacaProfileData: IACACertificateProfileData,
+    iacaSigningKey: Key,
+) = DocumentSignerCertificateBuilder().build(
+    profileData = DocumentSignerCertificateProfileData(
+        principalName = DocumentSignerPrincipalName(
+            country = "AT",
+            commonName = "Example DS",
+            organizationName = "Example Org",
+        ),
+        validityPeriod = X509ValidityPeriod(
+            notBefore = Clock.System.now(),
+            notAfter = Clock.System.now() + 180.days,
+        ),
+        crlDistributionPointUri = "https://issuer.example/crl",
+    ),
+    publicKey = dsPublicKey,
+    iacaSignerSpec = IACASignerSpecification(
+        profileData = iacaProfileData,
+        signingKey = iacaSigningKey,
+    ),
+)
+```
+
+> Notes:
+> - Builder classes always generate profile compliant X.509 certificates. To achieve this, they perform internally all
+> the necessary validations and throw with an appropriate error message indicating the issue.
+> - Input certificate validity instants are stored with second-level precision. Any sub-second
+> precision (e.g., milliseconds) is discarded during certificate generation,
+> a fact that is also reflected in the decoded certificate returned by the builders.
+
+### Parsing \& Validation
+
+
+
+```kotlin
+suspend fun parseAndValidate(
+    iacaDer: CertificateDer,
+    dsDer: CertificateDer,
+) {
+    val iacaDecoded = IACACertificateParser().parse(iacaDer)
+    IACAValidator().validate(iacaDecoded)
+
+    val dsDecoded = DocumentSignerCertificateParser().parse(dsDer)
+    DocumentSignerValidator().validate(dsDecoded, iacaDecoded)
+}
 ```
 
 ---
 
-## 📱 Platform notes
+## Platform notes
 
 - **JVM / Android**
-  - Uses `PKIX` builder/validator. Order of `chain` doesn’t matter.
+  - Uses `PKIX` builder/validator. Order of `chain` does not matter.
   - **Revocation**: If you pass `enableRevocation = true`, enable CRL/OCSP in the JVM:
     ```
     -Dcom.sun.security.enableCRLDP=true
@@ -159,17 +239,16 @@ fun loadTrustAnchorsFromKeyStore(ks: KeyStore): List<CertificateDer>
   - Current actual throws `X509ValidationException("Not implemented on iOS yet")`.
 
 - **JavaScript (planned)**
-  - WebCrypto doesn’t expose a PKIX path builder; integrate a JS PKI lib or a WASM backend.
+  - WebCrypto does not expose a PKIX path builder; integrate a JS PKI lib or a WASM backend.
   - Current actual throws `X509ValidationException("Not implemented on JS yet")`.
 
 ---
 
 ## Best practices
 
-- Prefer **known trust anchors** (system/org CA store) for public PKI.
-- Use pinned roots from `x5c` only for **explicit trust** scenarios (private PKI / trusted issuer).
-- Consider checking **key usage / EKU / policies** as required by your application.
-
+- Prefer known trust anchors (system/org CA store) for public PKI.
+- Use pinned roots from `x5c` only for explicit trust scenarios (private PKI / trusted issuer).
+- For ISO/IEC 18013-5 X.509 certificates, **always** validate IACA and Document Signer certificate data.
 
 ---
 
