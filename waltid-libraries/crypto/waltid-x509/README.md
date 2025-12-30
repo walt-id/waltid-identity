@@ -255,7 +255,7 @@ DocumentSignerValidator(relaxedDs).validate(dsDecoded, iacaDecoded)
 
 - Prefer known trust anchors (system/org CA store) for public PKI.
 - Use pinned roots from `x5c` only for explicit trust scenarios (private PKI / trusted issuer).
-- For ISO/IEC 18013-5 X.509 certificates, **always** validate IACA and Document Signer certificate data.
+- For ISO/IEC 18013-5 X.509 certificates, **always** validate IACA and Document Signer certificates.
 
 ---
 
