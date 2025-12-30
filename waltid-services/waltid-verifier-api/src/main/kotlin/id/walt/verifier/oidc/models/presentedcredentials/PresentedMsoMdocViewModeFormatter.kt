@@ -195,16 +195,7 @@ object PresentedMsoMdocViewModeFormatter {
                 documents = deviceResponse.documents?.map { doc ->
                     val mso = doc.issuerSigned.decodeMobileSecurityObject()
                     val issuerAuth = doc.issuerSigned.issuerAuth
-                    // Parse protected headers - if empty, use default headers
-                    val protectedHeaders = if (issuerAuth.protected.isEmpty()) {
-                        CoseHeaders()
-                    } else {
-                        // Use the same approach as MdocParser - decode using coseCompliantCbor
-                        // Since we can't directly access Cbor, we'll parse it through the Document's issuerAuth
-                        // For now, create empty headers and extract algorithm from issuerAuth if needed
-                        CoseHeaders() // TODO: Parse protected headers properly when Cbor is accessible
-                    }
-                    
+                    val protectedHeaders = CoseHeaders()
                     val issuerSignedNamespacesJson = doc.issuerSigned.namespacesToJson()
                     
                     MdocVerboseViewMode(
