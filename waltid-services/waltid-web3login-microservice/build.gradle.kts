@@ -16,7 +16,7 @@ application {
 }
 
 repositories {
-    mavenCentral()
+    waltidRepositories()
 }
 
 dependencies {

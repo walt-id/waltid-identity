@@ -15,8 +15,6 @@ allprojects {
 
     repositories {
         google()
-        mavenCentral()
-        maven("https://maven.waltid.dev/releases")
-        maven("https://maven.waltid.dev/snapshots")
+        waltidRepositories()
     }
 }
