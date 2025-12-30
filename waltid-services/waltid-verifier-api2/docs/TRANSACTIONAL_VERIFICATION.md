@@ -31,7 +31,8 @@ Edit the file: `waltid-services/waltid-verifier-api2/src/main/kotlin/id/walt/ope
 
 ```kotlin
 val updateSessionCallback: suspend (
-    session: Verification2Session,
+    session: Verification2Session,rification results are retained
+- ✅ Complies with data governance
     event: SessionEvent,
     block: Verification2Session.() -> Unit
 ) -> Unit = { session, event, block ->
