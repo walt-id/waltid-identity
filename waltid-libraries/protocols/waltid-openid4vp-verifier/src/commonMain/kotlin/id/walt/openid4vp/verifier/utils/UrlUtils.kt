@@ -1,7 +1,6 @@
 package id.walt.openid4vp.verifier.utils
 
-import io.ktor.http.URLProtocol
-import io.ktor.http.Url
+import io.ktor.http.*
 
 object UrlUtils {
 

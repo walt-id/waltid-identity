@@ -83,13 +83,13 @@ data class ValueDigest(
  *
  * The on-the-wire format in CBOR is a map (`DigestID => Digest`), but this class provides a more
  * object-oriented `List<ValueDigest>` API in Kotlin. The transformation is handled by the
- * custom [ValueDigestListSerializer].
+ * custom [CborValueDigestListSerializer].
  *
  * @see ISO/IEC 18013-5:2021, 9.1.2.4
  *
  * @property entries The list of digest entries.
  */
-@Serializable(with = ValueDigestList.ValueDigestListSerializer::class)
+@Serializable(with = ValueDigestList.CborValueDigestListSerializer::class)
 data class ValueDigestList(
     val entries: List<ValueDigest>
 ) {
@@ -98,10 +98,12 @@ data class ValueDigestList(
      * This allows the Kotlin code to use a list of objects while adhering to the
      * map-based format defined in the ISO standard.
      */
-    object ValueDigestListSerializer : KSerializer<ValueDigestList> {
+    object CborValueDigestListSerializer : KSerializer<ValueDigestList> {
 
         @OptIn(ExperimentalSerializationApi::class)
         override val descriptor: SerialDescriptor = mapSerialDescriptor(
+            //JsonBsonEncoder doesn't like the int value as map key
+            //StreamingJsonEncoder seems to ignore this PrimitiveKind.INT and writes map key as String
             keyDescriptor = PrimitiveSerialDescriptor("key", PrimitiveKind.INT),
             valueDescriptor = listSerialDescriptor<Byte>(),
         )
@@ -137,4 +139,47 @@ data class ValueDigestList(
         }
     }
 
+    /**
+     *  This serializer is needed for JsonBsonEncoder (persisting this in Mongo DB)
+     *  Maybe this should be the default serializer, but at the moment it is not
+     *  so easy to register contextual serializers in the waltid-cose lib
+     */
+    object ValueDigestListSerializer : KSerializer<ValueDigestList> {
+
+        @OptIn(ExperimentalSerializationApi::class)
+        override val descriptor: SerialDescriptor = mapSerialDescriptor(
+            keyDescriptor = PrimitiveSerialDescriptor("key", PrimitiveKind.STRING),
+            valueDescriptor = listSerialDescriptor<Byte>(),
+        )
+
+        override fun serialize(encoder: Encoder, value: ValueDigestList) {
+            encoder.encodeStructure(descriptor) {
+                var index = 0
+                value.entries.forEach {
+                    this.encodeStringElement(descriptor, index++, it.key.toString())
+                    this.encodeSerializableElement(descriptor, index++, ByteArraySerializer(), it.value)
+                }
+            }
+        }
+
+        override fun deserialize(decoder: Decoder): ValueDigestList {
+            val entries = mutableListOf<ValueDigest>()
+            decoder.decodeStructure(descriptor) {
+                var key = 0
+                var value: ByteArray
+                while (true) {
+                    val index = decodeElementIndex(descriptor)
+                    if (index == CompositeDecoder.DECODE_DONE) {
+                        break
+                    } else if (index % 2 == 0) {
+                        key = decodeStringElement(descriptor, index).toInt()
+                    } else if (index % 2 == 1) {
+                        value = decodeSerializableElement(descriptor, index, ByteArraySerializer())
+                        entries += ValueDigest(key.toUInt(), value)
+                    }
+                }
+            }
+            return ValueDigestList(entries)
+        }
+    }
 }

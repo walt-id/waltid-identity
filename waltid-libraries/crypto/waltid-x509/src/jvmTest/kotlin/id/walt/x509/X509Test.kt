@@ -2,9 +2,11 @@ package id.walt.x509
 
 import java.security.KeyStore
 import java.security.cert.X509Certificate
-import java.util.Base64
-import kotlin.test.*
+import java.util.*
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class X509Test {
 

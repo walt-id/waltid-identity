@@ -28,7 +28,7 @@ kotlin {
             implementation("app.softwork:kotlinx-uuid-core:0.1.6")
 
             // Logging
-            implementation("io.github.oshai:kotlin-logging:7.0.5")
+            implementation("io.github.oshai:kotlin-logging:7.0.13")
 
             // walt.id
             api(project(":waltid-libraries:crypto:waltid-crypto"))
