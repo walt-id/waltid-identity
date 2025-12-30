@@ -204,21 +204,28 @@ suspend fun buildDocumentSigner(
 
 ### Parsing \& Validation
 
-
+Parsing yields decoded data only. Validation is explicit via the validators.  
+By default, **all ISO profile constraints are enforced**. Clients can relax checks
+with the validation config classes (see their KDocs for each flag).
 
 ```kotlin
-suspend fun parseAndValidate(
-    iacaDer: CertificateDer,
-    dsDer: CertificateDer,
-) {
-    val iacaDecoded = IACACertificateParser().parse(iacaDer)
-    IACAValidator().validate(iacaDecoded)
+val iacaDecoded = IACACertificateParser().parse(iacaDer) // certificate data decoding only - no validation performed here
+IACAValidator().validate(iacaDecoded) // strict ISO profile by default
 
-    val dsDecoded = DocumentSignerCertificateParser().parse(dsDer)
-    DocumentSignerValidator().validate(dsDecoded, iacaDecoded)
-}
+val relaxedIaca = IACAValidationConfig(signature = false) // turn-off certificate signature validation
+IACAValidator(relaxedIaca).validate(iacaDecoded)
 ```
 
+```kotlin
+val dsDecoded = DocumentSignerCertificateParser().parse(dsDer) // certificate data decoding only - no validation performed here
+DocumentSignerValidator().validate(dsDecoded, iacaDecoded) // strict ISO profile by default
+
+val relaxedDs = DocumentSignerValidationConfig(
+    signature = false,
+    profileDataAgainstIACAProfileData = false,
+) //turn-off certificate signature validation and cross-checking of profile data against that of the IACA
+DocumentSignerValidator(relaxedDs).validate(dsDecoded, iacaDecoded)
+```
 ---
 
 ## Platform notes
