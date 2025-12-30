@@ -226,6 +226,34 @@ val relaxedDs = DocumentSignerValidationConfig(
 ) //turn-off certificate signature validation and cross-checking of profile data against that of the IACA
 DocumentSignerValidator(relaxedDs).validate(dsDecoded, iacaDecoded)
 ```
+
+---
+
+## JVM X.509 Extensions Overview
+
+The JVM-only extensions bridge common JCA/Bouncy Castle types to the multiplatform models:
+
+- **X500Name utilities**: read or build X.500 rDNs (C, CN, ST, O, L).
+- **X509 v3 parsing**: extract SKI/AKI, key usage, basic constraints, and known extension OIDs from `X509Certificate`.
+- **KeyUsage conversions**: convert between Bouncy Castle `KeyUsage` and `X509KeyUsage`.
+
+```kotlin
+fun jvmExtensionsExample(cert: X509Certificate) {
+    val name = buildX500Name(country = "AT", commonName = "Example")
+    val country = name.getCountryCode()
+    val commonName = name.getCommonName()
+
+    val keyUsages = cert.x509KeyUsages
+    val basicConstraints = cert.x509BasicConstraints
+    val ski = cert.subjectKeyIdentifier
+    val aki = cert.authorityKeyIdentifier
+    val criticalOids = cert.criticalX509V3ExtensionOIDs
+    val nonCriticalOids = cert.nonCriticalX509V3ExtensionOIDs
+
+    val bcKeyUsage = setOf(X509KeyUsage.DigitalSignature).toBouncyCastleKeyUsage()
+}
+```
+
 ---
 
 ## Platform notes
