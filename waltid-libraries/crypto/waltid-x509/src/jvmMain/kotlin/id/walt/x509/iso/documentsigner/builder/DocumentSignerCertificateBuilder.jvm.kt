@@ -17,6 +17,7 @@ import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProf
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
 import id.walt.x509.iso.generateIsoCompliantX509CertificateSerialNo
 import id.walt.x509.iso.issuerAlternativeNameToGeneralNameArray
+import okio.ByteString.Companion.toByteString
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x509.*
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
@@ -125,7 +126,7 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
     val certificateHolder = certBuilder.build(keySignerBuilder)
     val certificate = JcaX509CertificateConverter().getCertificate(certificateHolder)
     val certificateDer = CertificateDer(
-        bytes = certificate.encoded,
+        bytes = certificate.encoded.toByteString(),
     )
 
     return DocumentSignerCertificateBundle(

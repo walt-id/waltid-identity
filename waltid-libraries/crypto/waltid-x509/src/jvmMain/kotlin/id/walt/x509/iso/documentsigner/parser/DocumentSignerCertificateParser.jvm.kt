@@ -77,7 +77,7 @@ internal actual suspend fun platformParseDocumentSignerCertificate(
         akiHex = akiHex,
         skiHex = skiHex,
         basicConstraints = cert.x509BasicConstraints,
-        publicKey = JWKKey.importFromDerCertificate(certificate.bytes).getOrThrow(),
+        publicKey = JWKKey.importFromDerCertificate(certificate.bytes.toByteArray()).getOrThrow(),
         criticalExtensionOIDs = cert.criticalX509V3ExtensionOIDs,
         nonCriticalExtensionOIDs = cert.nonCriticalX509V3ExtensionOIDs,
         certificate = JcaX509CertificateHandle(cert),

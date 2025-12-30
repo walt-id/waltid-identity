@@ -1,11 +1,12 @@
 package id.walt.x509
 
 import com.nimbusds.jose.util.X509CertUtils
+import okio.ByteString.Companion.toByteString
 import java.io.FileInputStream
 import java.security.KeyStore
 import java.security.cert.*
 
-fun CertificateDer.toJcaX509Certificate(): X509Certificate = X509CertUtils.parse(bytes)
+fun CertificateDer.toJcaX509Certificate(): X509Certificate = X509CertUtils.parse(bytes.toByteArray())
 
 @Throws(X509ValidationException::class)
 actual fun validateCertificateChain(
@@ -114,7 +115,7 @@ fun loadTrustAnchorsFromKeyStore(ks: KeyStore): List<CertificateDer> {
     while (aliases.hasMoreElements()) {
         val alias = aliases.nextElement()
         val cert = ks.getCertificate(alias) as? X509Certificate ?: continue
-        list.add(CertificateDer(cert.encoded))
+        list.add(CertificateDer(cert.encoded.toByteString()))
     }
     return list
 }

@@ -4,13 +4,14 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.X509CertificateHandle
+import okio.ByteString.Companion.toByteString
 import java.security.cert.X509Certificate
 
 data class JcaX509CertificateHandle(
     val certificate: X509Certificate,
 ) : X509CertificateHandle {
 
-    override fun getCertificateDer() = CertificateDer(certificate.encoded)
+    override fun getCertificateDer() = CertificateDer(certificate.encoded.toByteString())
 
     override suspend fun verifySignature(verificationKey: Key) {
         require(!verificationKey.hasPrivateKey) {

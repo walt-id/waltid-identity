@@ -115,7 +115,7 @@ internal actual suspend fun platformSignIACACertificate(
     val certificateHolder = certBuilder.build(keySignerBuilder)
     val certificate = JcaX509CertificateConverter().getCertificate(certificateHolder)
     val certificateDer = CertificateDer(
-        bytes = certificate.encoded,
+        bytes = certificate.encoded.toByteString(),
     )
 
     return IACACertificateBundle(

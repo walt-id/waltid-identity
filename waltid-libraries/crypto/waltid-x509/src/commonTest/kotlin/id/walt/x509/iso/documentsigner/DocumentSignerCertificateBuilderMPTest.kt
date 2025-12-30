@@ -52,7 +52,7 @@ class DocumentSignerCertificateBuilderMPTest {
         }.awaitAll()
 
         assertTrue {
-            bundles.all { it.certificateDer.bytes.isNotEmpty() }
+            bundles.all { it.certificateDer.bytes.size != 0 }
         }
         //all serial numbers are unique -> hence all generated certificates different
         assertEquals(

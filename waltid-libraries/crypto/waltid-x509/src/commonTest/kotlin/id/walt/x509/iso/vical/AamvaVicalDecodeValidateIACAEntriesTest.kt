@@ -6,6 +6,7 @@ import id.walt.x509.iso.iaca.parser.IACACertificateParser
 import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import okio.ByteString.Companion.toByteString
 import kotlin.test.Test
 
 class AamvaVicalDecodeValidateIACAEntriesTest {
@@ -43,7 +44,7 @@ class AamvaVicalDecodeValidateIACAEntriesTest {
         }.forEach { derEncodedCertificate ->
             val iacaDecodedCertificate = iacaParser.parse(
                 certificate = CertificateDer(
-                    bytes = derEncodedCertificate,
+                    bytes = derEncodedCertificate.toByteString(),
                 ),
             )
 
