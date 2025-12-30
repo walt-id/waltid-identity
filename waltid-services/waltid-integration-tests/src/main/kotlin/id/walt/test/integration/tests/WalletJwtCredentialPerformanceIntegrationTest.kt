@@ -51,7 +51,7 @@ class WalletJwtCredentialPerformanceIntegrationTest : AbstractIntegrationTest(),
                 assertTrue(offerUrl.contains("draft13"))
                 assertFalse(offerUrl.contains("draft11"))
             }
-            val result = defaultWalletApi.resolveCredentialOffer(offerUrl!!)
+            val result = defaultWalletApi.resolveCredentialOffer(offerUrl)
             assertNotNull(result).also {
                 assertNotNull(
                     it["grants"]?.jsonObject["urn:ietf:params:oauth:grant-type:pre-authorized_code"]
@@ -62,7 +62,7 @@ class WalletJwtCredentialPerformanceIntegrationTest : AbstractIntegrationTest(),
                     it["credential_configuration_ids"]?.jsonArray?.first()?.jsonPrimitive?.content
                 )
             }
-            val claimedCredentials = defaultWalletApi.claimCredential(offerUrl!!)
+            val claimedCredentials = defaultWalletApi.claimCredential(offerUrl)
             assertNotNull(claimedCredentials).also {
                 assertEquals(1, it.size)
                 assertNotNull(it[0]).also { credential ->

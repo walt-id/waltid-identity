@@ -33,6 +33,11 @@ spec:
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: verifier2
           args:
@@ -40,6 +45,11 @@ spec:
             - "trace"
           image: waltid/verifier-api2
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           volumeMounts:
             - name: verifier2-web-config
               mountPath: "/waltid-verifier-api2/config/"

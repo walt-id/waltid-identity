@@ -203,9 +203,9 @@ fun Application.test() {
 
             val verificationRequest = config.verifierRequest
 
-            val (url, token) = Verifier.verify(verificationRequest, redirectUrl = "${config.redirectUrl}?state=${req.state!!}")
-            reqCache[req.state!!] = token
-            urlCache[req.state!!] = url
+            val (url, token) = Verifier.verify(verificationRequest, redirectUrl = "${config.redirectUrl}?state=${req.state}")
+            reqCache[req.state] = token
+            urlCache[req.state] = url
 
 
             val walletUrl = config.walletUrl + "?" + url.substringAfter("?")
@@ -218,10 +218,10 @@ fun Application.test() {
                     <p>Present your credential: <code>$url</code></p>
                     <div id="qrcode"></div>
                     <p>
-                    <a href="/login?state=${req.state!!}"><button>Click here when presented</button></a> (todo: make automatic)
+                    <a href="/login?state=${req.state}"><button>Click here when presented</button></a> (todo: make automatic)
                     </p>
                     <p>
-                    <a href="/login?state=${req.state!!}&debug=autologin"><button>Debug autologin</button> (enabled=${config.enableDebug})</a>
+                    <a href="/login?state=${req.state}&debug=autologin"><button>Debug autologin</button> (enabled=${config.enableDebug})</a>
                     </p>
                     <p>
                     <a href="$walletUrl"><button>Present with web wallet</button></a>
@@ -348,8 +348,8 @@ fun Application.test() {
                         iss = config.issuer,
                         sub = "x",
                         aud = listOf("my-client-id"), // TODO: OIDC client id
-                        exp = kotlin.time.Clock.System.now().plus(365.days),
-                        iat = kotlin.time.Clock.System.now(),
+                        exp = Clock.System.now().plus(365.days),
+                        iat = Clock.System.now(),
                         nonce = req.nonce,
                     )
                 ).jsonObject

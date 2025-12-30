@@ -56,7 +56,7 @@ import kotlinx.serialization.json.*
  * @param opTosUri OPTIONAL. URL that the OpenID Provider provides to the person registering the Client to read about OpenID Provider's terms of service. The registration process SHOULD display this URL to the person registering the Client if it is given.
  */
 @Serializable(with = OpenIDProviderMetadataSerializer::class)
-sealed class OpenIDProviderMetadata() : JsonDataObject() {
+sealed class OpenIDProviderMetadata : JsonDataObject() {
     abstract val issuer: String?
     abstract val authorizationEndpoint: String?
     abstract val pushedAuthorizationRequestEndpoint: String?
@@ -124,7 +124,7 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
     @OptIn(ExperimentalSerializationApi::class)
     @KeepGeneratedSerializer
     @Serializable(with = Draft11OpenIDProviderMetadataSerializer::class)
-    data class Draft11 private constructor(
+    data class Draft11(
         @SerialName("issuer") override val issuer: String? = null,
         @SerialName("authorization_endpoint") override val authorizationEndpoint: String? = null,
         @SerialName("pushed_authorization_request_endpoint") override val pushedAuthorizationRequestEndpoint: String? = null,

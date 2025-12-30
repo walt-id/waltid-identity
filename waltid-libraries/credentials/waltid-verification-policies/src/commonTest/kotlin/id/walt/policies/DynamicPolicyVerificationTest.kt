@@ -37,6 +37,8 @@ class DynamicPolicyTest {
         }
     }
 
+    private val json = Json { prettyPrint = true }
+
 
     @Test
     fun testPresentationVerificationWithDynamicPolicy() = runTest {
@@ -111,11 +113,7 @@ class DynamicPolicyTest {
             )
         )
 
-        println(
-            Json { prettyPrint = true }.encodeToString(
-                r
-            )
-        )
+        println(json.encodeToString(r))
 
         val x = r.results.flatMap { it.policyResults }
         println("Results: " + x.size)

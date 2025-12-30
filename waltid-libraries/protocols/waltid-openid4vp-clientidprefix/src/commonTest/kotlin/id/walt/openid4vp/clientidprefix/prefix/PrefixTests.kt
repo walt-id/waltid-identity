@@ -1,6 +1,6 @@
 package id.walt.openid4vp.clientidprefix.prefix
 
-import id.walt.did.helpers.WaltidServices
+import id.walt.did.dids.DidService
 import id.walt.openid4vp.clientidprefix.*
 import id.walt.openid4vp.clientidprefix.prefixes.*
 import io.ktor.http.*
@@ -88,7 +88,7 @@ class PrefixTests {
 
     @Test
     fun `did should succeed with valid signature from a resolved key`() = runTest {
-        WaltidServices.minimalInit()
+        DidService.minimalInit()
 
         // Setup realistic DID
         val signedJws = "eyJraWQiOiJQQnYzVHh2NnRhWE5zMTBZNUcyOW1kUmFiMzBMVWljN21ubFNSOUxqaVVNIiwiYWxnIjoiRVMyNTYifQ.eyJyZXNwb25zZV90eXBlIjoidnBfdG9rZW4iLCJub25jZSI6Inh5eiJ9.MLhDuXg5uOvgWkRJoTwnWZY7Ump9-TeGLyMWDlxGNCOVBgS6mPyKKd2H8jrcDGvW3BASKo4jJi4MhHgrvCcUsA"

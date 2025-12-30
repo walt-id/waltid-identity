@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.credsdata
 
 import id.walt.mdoc.credsdata.isoshared.IsoSexEnum
@@ -5,6 +7,7 @@ import id.walt.mdoc.credsdata.isoshared.IsoSexEnumSerializer
 import id.walt.mdoc.encoding.ByteArrayBase64UrlSerializer
 import id.walt.mdoc.objects.MdocsCborSerializer
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

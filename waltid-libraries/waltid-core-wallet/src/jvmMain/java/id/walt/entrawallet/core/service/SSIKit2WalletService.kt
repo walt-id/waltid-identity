@@ -76,14 +76,6 @@ class SSIKit2WalletService(
         val rp_response: String?,
     )
 
-    @Serializable
-    data class SIOPv2Response(
-        val vp_token: String,
-        val presentation_submission: String,
-        val id_token: String?,
-        val state: String?,
-    )
-
     data class PresentationError(override val message: String, val redirectUri: String?) :
         IllegalArgumentException(message)
 
@@ -114,11 +106,11 @@ class SSIKit2WalletService(
 
 
         if (parameter.disclosures != null) {
-            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[presentationSession.authorizationRequest!!.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
+            SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession[presentationSession.authorizationRequest.state + presentationSession.authorizationRequest.presentationDefinition?.id] =
                 parameter.disclosures
         }
 
-        val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest!!)
+        val tokenResponse = credentialWallet.processImplicitFlowAuthorization(presentationSession.authorizationRequest)
         val submitFormParams = getFormParameters(presentationSession.authorizationRequest, tokenResponse, presentationSession)
 
         val resp = this.http.submitForm(
@@ -183,7 +175,7 @@ class SSIKit2WalletService(
 
     suspend fun resolveVct(vct: String) = IssuanceService.resolveVct(vct)
 
-    suspend fun resolveCredentialOffer(
+    fun resolveCredentialOffer(
         offerRequest: CredentialOfferRequest,
     ): CredentialOffer {
         return getAnyCredentialWallet().resolveCredentialOffer(offerRequest)

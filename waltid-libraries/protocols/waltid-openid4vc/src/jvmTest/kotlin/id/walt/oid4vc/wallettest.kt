@@ -96,23 +96,23 @@ class wallettest {
         println("parsedOfferReq: $parsedOfferReq")
 
         assertNotNull(actual = parsedOfferReq.credentialOffer)
-        assertNotNull(actual = parsedOfferReq.credentialOffer!!.credentialIssuer)
+        assertNotNull(actual = parsedOfferReq.credentialOffer.credentialIssuer)
         assertContains(
-            iterable = parsedOfferReq.credentialOffer!!.grants.keys,
+            iterable = parsedOfferReq.credentialOffer.grants.keys,
             element = GrantType.pre_authorized_code.value
         )
-        assertNotNull(actual = parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]?.preAuthorizedCode)
+        assertNotNull(actual = parsedOfferReq.credentialOffer.grants[GrantType.pre_authorized_code.value]?.preAuthorizedCode)
 
         println("// get issuer metadata")
         val providerMetadataUri =
-            credentialWallet.getCIProviderMetadataUrl(parsedOfferReq.credentialOffer!!.credentialIssuer)
+            credentialWallet.getCIProviderMetadataUrl(parsedOfferReq.credentialOffer.credentialIssuer)
         val providerMetadata = ktorClient.get(providerMetadataUri).call.body<OpenIDProviderMetadata>() as OpenIDProviderMetadata.Draft13
         println("providerMetadata: $providerMetadata")
 
         assertNotNull(actual = providerMetadata.credentialConfigurationsSupported)
 
         println("// resolve offered credentials")
-        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOfferReq.credentialOffer!!, providerMetadata)
+        val offeredCredentials = OpenID4VCI.resolveOfferedCredentials(parsedOfferReq.credentialOffer, providerMetadata)
         println("offeredCredentials: $offeredCredentials")
         assertEquals(expected = 1, actual = offeredCredentials.size)
         assertEquals(expected = CredentialFormat.jwt_vc_json, actual = offeredCredentials.first().format)
@@ -122,7 +122,7 @@ class wallettest {
         println("// fetch access token using pre-authorized code (skipping authorization step)")
         val tokenReq = TokenRequest.PreAuthorizedCode(
             clientId = testCIClientConfig.clientID,
-            preAuthorizedCode = parsedOfferReq.credentialOffer!!.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!,
+            preAuthorizedCode = parsedOfferReq.credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!,
         )
 
         println("tokenReq: $tokenReq")
@@ -138,7 +138,7 @@ class wallettest {
         assertNotNull(actual = tokenResp.cNonce)
 
         println("// receive credential")
-        val nonce = tokenResp.cNonce!!
+        val nonce = tokenResp.cNonce
 
         val credReq = CredentialRequest.forOfferedCredential(
             offeredCredential = offeredCredential,
@@ -148,7 +148,7 @@ class wallettest {
 
         val credentialResp = ktorClient.post(providerMetadata.credentialEndpoint!!) {
             contentType(ContentType.Application.Json)
-            bearerAuth(tokenResp.accessToken!!)
+            bearerAuth(tokenResp.accessToken)
             setBody(credReq.toJSON())
         }.body<JsonObject>().let { CredentialResponse.fromJSON(it) }
         println("credentialResp: $credentialResp")
@@ -159,7 +159,7 @@ class wallettest {
         assertTrue(actual = credentialResp.credential!!.instanceOf(JsonPrimitive::class))
 
         println("// parse and verify credential")
-        val credential = credentialResp.credential!!.jsonPrimitive.content
+        val credential = credentialResp.credential.jsonPrimitive.content
         println(">>> Issued credential: $credential")
         assertTrue(actual = JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess)
     }

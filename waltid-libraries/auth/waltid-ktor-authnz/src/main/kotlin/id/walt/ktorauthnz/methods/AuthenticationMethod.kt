@@ -7,7 +7,10 @@ import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
-import id.walt.ktorauthnz.sessions.*
+import id.walt.ktorauthnz.sessions.AuthSession
+import id.walt.ktorauthnz.sessions.AuthSessionNextStep
+import id.walt.ktorauthnz.sessions.SessionManager
+import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
 import id.walt.ktorauthnz.utils.HtmlRedirect.htmlBasedRedirect
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -45,7 +48,7 @@ abstract class AuthenticationMethod(open val id: String) {
         accountId?.let { session.accountId = it }
         session.progressFlow(this@AuthenticationMethod)
 
-        if (session.status == AuthSessionStatus.SUCCESS || session.status == AuthSessionStatus.OK) {
+        if (session.status.isSuccess()) {
             session.currentlyActiveMethod = null // No longer any method active, authentication is done for this session
             check(session.token != null) { "Session token does not exist after successful authentication?" }
 

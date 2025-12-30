@@ -1,6 +1,5 @@
 package id.walt.x509
 
-
 actual fun validateCertificateChain(
     leaf: CertificateDer,
     chain: List<CertificateDer>,

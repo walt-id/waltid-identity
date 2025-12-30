@@ -28,7 +28,7 @@ class EBSIVectorInteropTest(
 ) {
 
     private val keysApi: KeysApi = KeysApi(e2e, httpClient)
-    private lateinit var keyId: String
+    private var keyId: String
     private var did: String
 
     init {

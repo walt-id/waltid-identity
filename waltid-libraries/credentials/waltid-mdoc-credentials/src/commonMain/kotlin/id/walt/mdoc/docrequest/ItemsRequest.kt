@@ -12,6 +12,7 @@ import kotlinx.serialization.Serializable
  * @param docType Document type requested
  * @param nameSpaces Name spaces and requested data elements
  */
+@ConsistentCopyVisibility
 @Serializable
 data class ItemsRequest internal constructor(
     val docType: StringElement,

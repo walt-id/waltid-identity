@@ -15,10 +15,20 @@ spec:
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: web-portal
           image: waltid/portal:__DEFAULT_IMAGE_TAG__
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: NEXT_PUBLIC_VC_REPO
               value: "https://credentials.test.waltid.cloud"

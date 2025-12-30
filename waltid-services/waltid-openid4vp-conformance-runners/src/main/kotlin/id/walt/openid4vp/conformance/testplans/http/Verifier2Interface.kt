@@ -1,8 +1,8 @@
 package id.walt.openid4vp.conformance.testplans.http
 
-import id.walt.openid4vp.verifier.data.VerificationSessionSetup
 import id.walt.openid4vp.verifier.data.CrossDeviceFlowSetup
 import id.walt.openid4vp.verifier.data.Verification2Session
+import id.walt.openid4vp.verifier.data.VerificationSessionSetup
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator
 import io.ktor.client.*
 import io.ktor.client.call.*
