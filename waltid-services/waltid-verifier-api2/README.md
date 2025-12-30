@@ -95,6 +95,12 @@ VICAL utilities:
 - `POST /vical/fetch` — Fetch remote/file VICAL and return Base64
 - `POST /vical/validate` — Validate VICAL with provided verification key
 
+Annex C (ISO 18013-7 DC API / Apple Wallet compatible):
+- `POST /annex-c/create` — Create a short-lived Annex C session (stores origin, nonce, HPKE keypair)
+- `POST /annex-c/request` — Build `{ deviceRequest, encryptionInfo }` for the browser-facing DC API request
+- `POST /annex-c/response` — Store wallet `response` and start async decrypt + mdoc verification
+- `GET /annex-c/info?sessionId=...` — Get session status + decrypted `DeviceResponse` + verification result (when available)
+
 ## Quick start
 
 Run locally (development):
