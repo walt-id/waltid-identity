@@ -3,6 +3,9 @@ package id.walt.x509.id.walt.x509
 import id.walt.x509.X509KeyUsage
 import org.bouncycastle.asn1.x509.KeyUsage
 
+/**
+ * Convert a Bouncy Castle [KeyUsage] bitset into the multiplatform [X509KeyUsage] set.
+ */
 fun KeyUsage.toCertificateKeyUsages(): Set<X509KeyUsage> {
     val usages = mutableSetOf<X509KeyUsage>()
     fun addIf(bit: Int, usage: X509KeyUsage) {
@@ -20,6 +23,9 @@ fun KeyUsage.toCertificateKeyUsages(): Set<X509KeyUsage> {
     return usages
 }
 
+/**
+ * Map a single multiplatform [X509KeyUsage] value to its Bouncy Castle bit flag.
+ */
 fun X509KeyUsage.toBCKeyUsage() = when (this) {
     X509KeyUsage.DigitalSignature -> KeyUsage.digitalSignature
     X509KeyUsage.NonRepudiation -> KeyUsage.nonRepudiation
@@ -32,6 +38,9 @@ fun X509KeyUsage.toBCKeyUsage() = when (this) {
     X509KeyUsage.DecipherOnly -> KeyUsage.decipherOnly
 }
 
+/**
+ * Combine multiple [X509KeyUsage] values into a Bouncy Castle [KeyUsage] bitset.
+ */
 fun Iterable<X509KeyUsage>.toBouncyCastleKeyUsage(): KeyUsage {
     var bits = 0
     this.forEach { certKeyUsage ->
