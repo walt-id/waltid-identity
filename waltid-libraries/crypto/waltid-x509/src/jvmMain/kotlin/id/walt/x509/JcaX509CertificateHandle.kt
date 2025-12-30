@@ -7,7 +7,7 @@ import id.walt.x509.X509CertificateHandle
 import okio.ByteString.Companion.toByteString
 import java.security.cert.X509Certificate
 
-data class JcaX509CertificateHandle(
+internal data class JcaX509CertificateHandle(
     val certificate: X509Certificate,
 ) : X509CertificateHandle {
 
