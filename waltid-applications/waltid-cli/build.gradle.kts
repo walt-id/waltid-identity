@@ -48,7 +48,7 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
             // Logging
-            implementation("io.github.oshai:kotlin-logging:7.0.5")
+            implementation("io.github.oshai:kotlin-logging:7.0.13")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
