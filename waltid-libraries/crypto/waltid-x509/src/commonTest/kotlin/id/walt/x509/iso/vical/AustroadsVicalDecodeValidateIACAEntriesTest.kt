@@ -62,6 +62,7 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
         )
     }
 
+    //TODO: Fix this test case somehow...
     @Test
     @Ignore
     fun `must be able to decode and validate all IACA certificate entries of the Austroads VICAL`() = runTest {
