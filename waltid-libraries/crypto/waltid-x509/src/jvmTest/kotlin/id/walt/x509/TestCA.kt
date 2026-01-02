@@ -155,7 +155,7 @@ object TestCA {
 
     private fun generateSerial(): BigInteger = BigInteger(160, SecureRandom())
 
-    private fun sign(
+    fun sign(
         issuerKey: PrivateKey,
         builder: X509v3CertificateBuilder
     ): X509Certificate {

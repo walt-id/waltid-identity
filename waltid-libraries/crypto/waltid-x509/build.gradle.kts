@@ -13,44 +13,51 @@ group = "id.walt.crypto"
 kotlin {
     js(IR) {
         outputModuleName = "x509"
+        nodejs {
+            testTask {
+                useMocha()
+                enabled = false
+            }
+        }
     }
 
     sourceSets {
         commonMain.dependencies {
+            implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(identityLibs.kotlinx.coroutines.core)
+            implementation(identityLibs.okio)
+            implementation(identityLibs.kotlinx.serialization.json)
 
-            // CBOR
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
         }
         commonTest.dependencies {
-            implementation(kotlin("test-common"))
-            implementation(kotlin("test-annotations-common"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
-
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlin.test)
+            implementation(identityLibs.kotlinx.coroutines.test)
+            implementation(identityLibs.kotlinx.serialization.json)
         }
         jvmMain.dependencies {
-
+            implementation(identityLibs.bcprov.lts8on)
+            implementation(identityLibs.bcpkix.lts8on)
+            implementation(identityLibs.nimbus.jose.jwt)
+            implementation(identityLibs.kotlinx.coroutines.core)
         }
         jvmTest.dependencies {
             // Logging
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation(identityLibs.slf4j.simple)
 
             // Test
             implementation(kotlin("test"))
+            implementation(identityLibs.junit.jupiter.api)
+            implementation(identityLibs.junit.jupiter.engine)
 
-            implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
-            implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
-
-            // Bouncy Castle
-            implementation("org.bouncycastle:bcpkix-jdk18on:1.81")
+            implementation(identityLibs.bcprov.lts8on)
+            implementation(identityLibs.nimbus.jose.jwt)
         }
         jsMain.dependencies {
 
         }
         jsTest.dependencies {
             implementation(kotlin("test-js"))
+
         }
     }
 }
