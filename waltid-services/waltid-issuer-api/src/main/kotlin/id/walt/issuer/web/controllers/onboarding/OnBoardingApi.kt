@@ -166,6 +166,10 @@ fun Application.onboardingApi() {
                             "did:jwk + AWS SDK key  (AWS - Secp256r1)",
                             IssuanceExamples.issuerOnboardingRequestAwsSdkExample
                         )
+                        example(
+                            "did:jwk + Azure SDK key  (Azure - Secp256r1)",
+                            IssuanceExamples.issuerOnboardingRequestAzureSdkExample
+                        )
                         required = true
                     }
                 }

@@ -7,6 +7,7 @@ import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.WebService
 import id.walt.crypto.keys.aws.WaltCryptoAws
+import id.walt.crypto.keys.azure.WaltCryptoAzure
 import id.walt.did.dids.DidService
 import id.walt.issuer.entra.entraIssuance
 import id.walt.issuer.issuance.OidcApi.oidcApi
@@ -28,6 +29,7 @@ suspend fun main(args: Array<String>) {
             init = {
                 DidService.minimalInit()
                 WaltCryptoAws.init()
+                WaltCryptoAzure.init()
             },
             run = WebService(Application::issuerModule).run()
         )
