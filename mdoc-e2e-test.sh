@@ -345,8 +345,7 @@ echo "  Session ID: $SESSION_ID"
 echo -e "${YELLOW}Step 7: Using presentation request in wallet...${NC}"
 USE_PRESENTATION_REQUEST=$(cat <<EOF
 {
-  "presentationRequest": "$PRESENTATION_URL",
-  "selectedCredentials": ["$CREDENTIAL_ID"]
+  "presentationRequest": "$PRESENTATION_URL"
 }
 EOF
 )
