@@ -1,6 +1,6 @@
 package id.walt.openid4vci.granttypehandlers
 
-import id.walt.openid4vci.GRANT_TYPE_PRE_AUTHORIZED_CODE
+import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.TokenEndpointHandler
 import id.walt.openid4vci.TokenEndpointResult
 import id.walt.openid4vci.DefaultClient
@@ -25,14 +25,14 @@ class PreAuthorizedCodeTokenHandler(
 ) : TokenEndpointHandler {
 
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
-        request.getGrantTypes().contains(GRANT_TYPE_PRE_AUTHORIZED_CODE)
+        request.getGrantTypes().contains(GrantType.PreAuthorizedCode.value)
 
     @OptIn(ExperimentalTime::class)
     override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): TokenEndpointResult {
         if (!canHandleTokenEndpointRequest(request)) {
             return TokenEndpointResult.Failure(
                 error = "unsupported_grant_type",
-                description = "$GRANT_TYPE_PRE_AUTHORIZED_CODE grant not requested",
+                description = "${GrantType.PreAuthorizedCode.value} grant not requested",
             )
         }
 
@@ -68,7 +68,7 @@ class PreAuthorizedCodeTokenHandler(
 
         val session = consumed.session.cloneSession()
         request.setSession(session)
-        request.markGrantTypeHandled(GRANT_TYPE_PRE_AUTHORIZED_CODE)
+        request.markGrantTypeHandled(GrantType.PreAuthorizedCode.value)
 
         consumed.grantedScopes.forEach(request::grantScope)
         consumed.grantedAudience.forEach(request::grantAudience)
@@ -79,7 +79,7 @@ class PreAuthorizedCodeTokenHandler(
             request.setClient(
                 DefaultClient(
                     id = clientId,
-                    grantTypes = argumentsOf(GRANT_TYPE_PRE_AUTHORIZED_CODE),
+                    grantTypes = argumentsOf(GrantType.PreAuthorizedCode.value),
                     responseTypes = newArguments(),
                 ),
             )

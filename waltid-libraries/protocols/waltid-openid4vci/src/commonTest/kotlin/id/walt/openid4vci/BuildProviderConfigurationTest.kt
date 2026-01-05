@@ -65,8 +65,8 @@ class BuildProviderConfigurationTest {
                 accessRequestValidator = DefaultAccessRequestValidator(),
                 authorizeEndpointHandlers = AuthorizeEndpointHandlers(),
                 tokenEndpointHandlers = TokenEndpointHandlers().apply {
-                    appendForGrant("custom_grant", duplicateGrantHandlerA)
-                    appendForGrant("custom_grant", duplicateGrantHandlerB)
+                    appendForGrant(GrantType.fromValue("custom_grant"), duplicateGrantHandlerA)
+                    appendForGrant(GrantType.fromValue("custom_grant"), duplicateGrantHandlerB)
                 },
                 authorizationCodeRepository = authorizationCodeRepository,
                 preAuthorizedCodeRepository = preAuthorizedCodeRepository,
@@ -82,10 +82,44 @@ class BuildProviderConfigurationTest {
         }
     }
 
+    @Test
+    fun `buildProvider allows custom grant handlers`() {
+        val authorizationCodeRepository = defaultAuthorizationCodeRepository()
+        val preAuthorizedCodeRepository = defaultPreAuthorizedCodeRepository()
+
+        val config = OAuth2ProviderConfig(
+            authorizeRequestValidator = DefaultAuthorizeRequestValidator(),
+            accessRequestValidator = DefaultAccessRequestValidator(),
+            authorizeEndpointHandlers = AuthorizeEndpointHandlers(),
+            tokenEndpointHandlers = TokenEndpointHandlers().apply {
+                appendForGrant(GrantType.Custom("custom_grant"), CustomGrantHandler())
+            },
+            authorizationCodeRepository = authorizationCodeRepository,
+            preAuthorizedCodeRepository = preAuthorizedCodeRepository,
+            preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
+            tokenService = StubTokenService(),
+        )
+
+        assertIs<OAuth2Provider>(
+            buildOAuth2Provider(
+                config = config,
+                includeAuthorizationCodeDefaultHandlers = false,
+                includePreAuthorizedCodeDefaultHandlers = false,
+            )
+        )
+    }
+
     private class DuplicateGrantHandler : TokenEndpointHandler {
         override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean = true
         override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): TokenEndpointResult =
             TokenEndpointResult.Failure("unsupported_grant_type")
+    }
+
+    private class CustomGrantHandler : TokenEndpointHandler {
+        override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
+            request.getGrantTypes().contains("custom_grant")
+        override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): TokenEndpointResult =
+            TokenEndpointResult.Success(accessToken = "custom")
     }
 
     private fun stubAuthorizeValidator(): AuthorizeRequestValidator = AuthorizeRequestValidator {

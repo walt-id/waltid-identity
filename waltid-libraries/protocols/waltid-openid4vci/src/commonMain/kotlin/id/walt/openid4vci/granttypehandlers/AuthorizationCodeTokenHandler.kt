@@ -1,6 +1,6 @@
 package id.walt.openid4vci.granttypehandlers
 
-import id.walt.openid4vci.GRANT_TYPE_AUTHORIZATION_CODE
+import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.TokenEndpointHandler
 import id.walt.openid4vci.TokenEndpointResult
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
@@ -21,7 +21,7 @@ class AuthorizationCodeTokenHandler(
 ) : TokenEndpointHandler {
 
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
-        request.getGrantTypes().contains(GRANT_TYPE_AUTHORIZATION_CODE)
+        request.getGrantTypes().contains(GrantType.AuthorizationCode.value)
 
     @OptIn(ExperimentalTime::class)
 
@@ -51,7 +51,7 @@ class AuthorizationCodeTokenHandler(
 
         // Restore session, scopes, and audience from the original authorize request.
         request.setSession(record.session.cloneSession())
-        request.markGrantTypeHandled(GRANT_TYPE_AUTHORIZATION_CODE)
+        request.markGrantTypeHandled(GrantType.AuthorizationCode.value)
         record.grantedScopes.forEach(request::grantScope)
         record.grantedAudience.forEach(request::grantAudience)
 

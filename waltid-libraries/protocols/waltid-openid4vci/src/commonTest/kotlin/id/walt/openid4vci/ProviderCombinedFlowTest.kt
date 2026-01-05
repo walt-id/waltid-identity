@@ -48,7 +48,7 @@ class ProviderCombinedFlowTest {
 
         val accessResult = provider.createAccessRequest(
             mapOf(
-                "grant_type" to GRANT_TYPE_AUTHORIZATION_CODE,
+                "grant_type" to GrantType.AuthorizationCode.value,
                 "client_id" to "demo-client",
                 "code" to code,
                 "redirect_uri" to "https://openid4vci.walt.id/callback",
@@ -79,7 +79,7 @@ class ProviderCombinedFlowTest {
 
         val preAccessResult = provider.createAccessRequest(
             mapOf(
-                "grant_type" to GRANT_TYPE_PRE_AUTHORIZED_CODE,
+                "grant_type" to GrantType.PreAuthorizedCode.value,
                 "pre-authorized_code" to preCode,
             ),
             DefaultSession(),

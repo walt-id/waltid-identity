@@ -53,7 +53,7 @@ class ProviderAuthorizationOnlyFlowTest {
         // 3) Parse the token request from the wallet, supplying a fresh session container.
         val accessResult = provider.createAccessRequest(
             mapOf(
-                "grant_type" to GRANT_TYPE_AUTHORIZATION_CODE,
+                "grant_type" to GrantType.AuthorizationCode.value,
                 "client_id" to "demo-client",
                 "code" to code,
                 "redirect_uri" to "https://openid4vci.walt.id/callback",
@@ -72,7 +72,7 @@ class ProviderAuthorizationOnlyFlowTest {
 
         val preAccessRequestResult = provider.createAccessRequest(
             mapOf(
-                "grant_type" to GRANT_TYPE_PRE_AUTHORIZED_CODE,
+                "grant_type" to GrantType.PreAuthorizedCode.value,
                 "pre-authorized_code" to "pre-code",
             ),
             DefaultSession(),

@@ -3,8 +3,7 @@ package id.walt.openid4vci.core
 import id.walt.openid4vci.granttypehandlers.AuthorizationCodeAuthorizeHandler
 import id.walt.openid4vci.granttypehandlers.AuthorizationCodeTokenHandler
 import id.walt.openid4vci.granttypehandlers.PreAuthorizedCodeTokenHandler
-import id.walt.openid4vci.GRANT_TYPE_AUTHORIZATION_CODE
-import id.walt.openid4vci.GRANT_TYPE_PRE_AUTHORIZED_CODE
+import id.walt.openid4vci.GrantType
 
 /**
  * Entry point for consumers to obtain the OAuth provider.
@@ -33,13 +32,13 @@ import id.walt.openid4vci.GRANT_TYPE_PRE_AUTHORIZED_CODE
  *   builders, losing a central “state of the world.”
  * - `extra*Handlers` are for customization. We always register the defaults,
  *   then optionally append caller-supplied handlers flows. When we later adopt
- *   factory/strategy bundles, these arguments can become somekind of wrappers.
+ *   factory/strategy bundles, these arguments can become some kind of wrappers.
  * - `includeAuthorizationCodeDefaultHandlers` / `includePreAuthorizedCodeDefaultHandlers` give flags for
  *   composing providers (handy for tests) until the handler factory story evolves, needs revisited.
  */
 fun buildOAuth2Provider(
     config: OAuth2ProviderConfig,
-//    extraTokenEndpointHandlers: List<Pair<String, TokenEndpointHandler>> = emptyList(),
+//    extraTokenEndpointHandlers: List<Pair<GrantType, TokenEndpointHandler>> = emptyList(),
 //    extraAuthorizeHandlers: List<AuthorizeEndpointHandler> = emptyList(),
     includeAuthorizationCodeDefaultHandlers: Boolean = true,
     includePreAuthorizedCodeDefaultHandlers: Boolean = true,
@@ -72,7 +71,7 @@ private fun registerDefaultHandlers(
             tokenService = config.tokenService,
         )
         config.tokenEndpointHandlers.appendForGrant(
-            grantType = GRANT_TYPE_AUTHORIZATION_CODE,
+            grantType = GrantType.AuthorizationCode,
             handler = authorizeTokenHandler,
         )
     }
@@ -83,7 +82,7 @@ private fun registerDefaultHandlers(
             tokenService = config.tokenService,
         )
         config.tokenEndpointHandlers.appendForGrant(
-            grantType = GRANT_TYPE_PRE_AUTHORIZED_CODE,
+            grantType = GrantType.PreAuthorizedCode,
             handler = preAuthorizedTokenHandler,
         )
     }

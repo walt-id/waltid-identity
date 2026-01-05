@@ -1,8 +1,7 @@
 package id.walt.openid4vci.validation
 
 import id.walt.openid4vci.DefaultClient
-import id.walt.openid4vci.GRANT_TYPE_AUTHORIZATION_CODE
-import id.walt.openid4vci.GRANT_TYPE_PRE_AUTHORIZED_CODE
+import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.argumentsOf
 import id.walt.openid4vci.newArguments
@@ -17,15 +16,15 @@ class DefaultAccessRequestValidator : AccessRequestValidator {
             ?: return AccessRequestResult.Failure(
                 OAuthError("invalid_request", "Missing grant_type"),
             )
-        val grantType = grantTypeRaw.lowercase()
+        val grantType = GrantType.fromValue(grantTypeRaw)
 
         return when (grantType) {
-            GRANT_TYPE_AUTHORIZATION_CODE -> validateAuthorizationCodeGrant(parameters, session)
-            GRANT_TYPE_PRE_AUTHORIZED_CODE -> validatePreAuthorizedCodeGrant(parameters, session)
+            GrantType.AuthorizationCode -> validateAuthorizationCodeGrant(parameters, session)
+            GrantType.PreAuthorizedCode -> validatePreAuthorizedCodeGrant(parameters, session)
             else -> AccessRequestResult.Failure(
                 OAuthError(
                     "unsupported_grant_type",
-                    "Supported grants: authorization_code, $GRANT_TYPE_PRE_AUTHORIZED_CODE",
+                    "Supported grants: authorization_code, ${GrantType.PreAuthorizedCode.value}",
                 ),
             )
         }
@@ -37,14 +36,14 @@ class DefaultAccessRequestValidator : AccessRequestValidator {
     ): AccessRequestResult {
         val clientId = parameters["client_id"]?.takeIf { it.isNotBlank() } ?: ""
 //            ?: return AccessRequestResult.Failure(
-//                OAuthError("invalid_client", "Missing client_id"),
+//                OAuthError("invalid_client", "Missing client_id")
 //            )
 
         val client = DefaultClient(
             id = clientId,
             redirectUris = listOfNotNull(parameters["redirect_uri"]?.takeIf { it.isNotBlank() }),
             responseTypes = argumentsOf("code"),
-            grantTypes = argumentsOf(GRANT_TYPE_AUTHORIZATION_CODE),
+            grantTypes = argumentsOf(GrantType.AuthorizationCode.value),
         )
 
         val code = parameters["code"]?.takeIf { it.isNotBlank() }
@@ -54,7 +53,7 @@ class DefaultAccessRequestValidator : AccessRequestValidator {
 
         val request = AccessTokenRequest(session = session)
         request.setClient(client)
-        request.appendGrantType(GRANT_TYPE_AUTHORIZATION_CODE)
+        request.appendGrantType(GrantType.AuthorizationCode.value)
         populateCommonRequestData(request, parameters)
         request.getRequestForm().set("code", code)
 
@@ -74,13 +73,13 @@ class DefaultAccessRequestValidator : AccessRequestValidator {
 
         val client = DefaultClient(
             id = clientId ?: "",
-            grantTypes = argumentsOf(GRANT_TYPE_PRE_AUTHORIZED_CODE),
+            grantTypes = argumentsOf(GrantType.PreAuthorizedCode.value),
             responseTypes = newArguments(),
         )
 
         val request = AccessTokenRequest(session = session)
         request.setClient(client)
-        request.appendGrantType(GRANT_TYPE_PRE_AUTHORIZED_CODE)
+        request.appendGrantType(GrantType.PreAuthorizedCode.value)
         populateCommonRequestData(request, parameters)
         request.getRequestForm().set("pre-authorized_code", code)
 

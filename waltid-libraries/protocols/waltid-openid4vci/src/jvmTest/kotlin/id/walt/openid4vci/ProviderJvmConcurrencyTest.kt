@@ -74,7 +74,7 @@ internal suspend fun executeAuthorizationCodeFlow(
         "response_type" to "code",
         "client_id" to clientId,
         "redirect_uri" to "https://client.example/callback",
-        "scope" to "myscope",
+        "scope" to "my_scope",
         "state" to state,
     )
 
@@ -91,7 +91,7 @@ internal suspend fun executeAuthorizationCodeFlow(
 
     val accessRequestResult = provider.createAccessRequest(
         mapOf(
-            "grant_type" to GRANT_TYPE_AUTHORIZATION_CODE,
+            "grant_type" to GrantType.AuthorizationCode.value,
             "client_id" to clientId,
             "code" to code,
             "redirect_uri" to "https://client.example/callback",

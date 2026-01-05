@@ -21,7 +21,7 @@ import id.walt.openid4vci.core.AuthorizeRequestResult
 import id.walt.openid4vci.core.AccessRequestResult
 import id.walt.openid4vci.core.AccessResponseResult
 import id.walt.openid4vci.core.AuthorizeResponseResult
-import id.walt.openid4vci.GRANT_TYPE_AUTHORIZATION_CODE
+import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.createTestConfig
 import kotlin.time.ExperimentalTime
@@ -125,7 +125,7 @@ class TokenServiceTest {
 
             val accessRequestResult = provider.createAccessRequest(
                 mapOf(
-                    "grant_type" to GRANT_TYPE_AUTHORIZATION_CODE,
+                    "grant_type" to GrantType.AuthorizationCode.value,
                     "client_id" to "client-$issuerId",
                     "code" to code,
                     "redirect_uri" to "https://client.example/callback",

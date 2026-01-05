@@ -2,7 +2,7 @@ package id.walt.openid4vci.granttypehandlers
 
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.DefaultSession
-import id.walt.openid4vci.GRANT_TYPE_PRE_AUTHORIZED_CODE
+import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.StubTokenService
 import id.walt.openid4vci.TokenEndpointResult
 import id.walt.openid4vci.argumentsOf
@@ -50,11 +50,10 @@ class PreAuthorizedCodeTokenHandlerTest {
 
         val result = handler.handleTokenEndpointRequest(request)
         assertTrue(result is TokenEndpointResult.Success)
-        val success = result
-        assertNotNull(success.extra["c_nonce"])
-        assertTrue((success.extra["c_nonce_expires_in"] as? Long ?: 0) >= 0)
+        assertNotNull(result.extra["c_nonce"])
+        assertTrue((result.extra["c_nonce_expires_in"] as? Long ?: 0) >= 0)
         assertEquals("credential-subject", request.getSession()?.getSubject())
-        assertTrue(request.hasHandledGrantType(GRANT_TYPE_PRE_AUTHORIZED_CODE))
+        assertTrue(request.hasHandledGrantType(GrantType.PreAuthorizedCode.value))
         assertEquals("client-pre", request.getClient().id)
         assertNull(repository.get(code))
     }
@@ -120,10 +119,10 @@ class PreAuthorizedCodeTokenHandlerTest {
             setClient(
                 DefaultClient(
                     id = "",
-                    grantTypes = argumentsOf(GRANT_TYPE_PRE_AUTHORIZED_CODE),
+                    grantTypes = argumentsOf(GrantType.PreAuthorizedCode.value),
                 ),
             )
-            appendGrantType(GRANT_TYPE_PRE_AUTHORIZED_CODE)
+            appendGrantType(GrantType.PreAuthorizedCode.value)
         }
 
     private class InMemoryPreAuthorizedCodeRepository : PreAuthorizedCodeRepository {
