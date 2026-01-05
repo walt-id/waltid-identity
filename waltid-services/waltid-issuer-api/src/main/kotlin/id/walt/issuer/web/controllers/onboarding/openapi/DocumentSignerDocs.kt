@@ -64,7 +64,8 @@ object DocumentSignerDocs {
                                 "commonName": "Example IACA",
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
-                                }
+                                },
+                                "notBefore": "2025-01-01T00:00:00Z"
                             },
                             "iacaKey": {
                                 "type": "jwk",
