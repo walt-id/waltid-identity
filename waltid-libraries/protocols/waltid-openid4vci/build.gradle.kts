@@ -12,15 +12,12 @@ object Versions {
 }
 
 kotlin {
-    val ktor_version = "3.3.3"
-
     sourceSets {
         all {
             languageSettings.optIn("kotlinx.serialization.ExperimentalSerializationApi")
         }
         commonMain.dependencies {
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES_VERSION}")
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES_VERSION}")
 
             // walt.id

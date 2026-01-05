@@ -15,11 +15,11 @@ import id.walt.openid4vci.GrantType
  * - Central composition: as more handlers (for grant types)
  *   implement, they can be registered here so applications get defaults implementations.
  * - Strategy injection: future refactors can accept a strategy bundle (e.g. credential formats, signature algorithms, code/access token
- *   generation, etc) without changing call sites, just extend the parameters of this function.
+ *   generation, etc.) without changing call sites, just extend the parameters of this function.
  * - Factory ecosystem: handler factories can be introduced later, allowing modules to register
  *   one or more handlers. Keeping callers behind `buildOAuth2Provider` makes that evolution backwards compatible.?!?
  *
- * For now it stays intentionally simple, callers can supply extra handlers for customization,
+ * For now, it stays intentionally simple, callers can supply extra handlers for customization,
  * while the function guarantees deduplication and returns the OAuthProvider used by the HTTP
  * layer. The defaults currently generate codes and tokens. Once proper strategies exist
  * we will lift that logic out into injectable services. Because extensions enter through this
