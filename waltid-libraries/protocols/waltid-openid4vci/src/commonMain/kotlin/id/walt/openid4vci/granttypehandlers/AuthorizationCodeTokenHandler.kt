@@ -7,8 +7,8 @@ import id.walt.openid4vci.TokenEndpointHandler
 import id.walt.openid4vci.TokenEndpointResult
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.request.AccessTokenRequest
-import id.walt.openid4vci.tokens.TokenService
-import id.walt.openid4vci.tokens.defaultAccessTokenClaims
+import id.walt.openid4vci.tokens.AccessTokenService
+import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import kotlin.time.Clock
 
 /**
@@ -16,10 +16,10 @@ import kotlin.time.Clock
  *
  * Returns a lightweight [TokenEndpointResult] instead of mutating a responder in place.
  */
-class AuthorizationCodeTokenHandler(
-    private val codeRepository: AuthorizationCodeRepository,
-    private val tokenService: TokenService,
-) : TokenEndpointHandler {
+    class AuthorizationCodeTokenHandler(
+        private val codeRepository: AuthorizationCodeRepository,
+        private val tokenService: AccessTokenService,
+    ) : TokenEndpointHandler {
 
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
         request.getGrantTypes().contains(GrantType.AuthorizationCode.value)

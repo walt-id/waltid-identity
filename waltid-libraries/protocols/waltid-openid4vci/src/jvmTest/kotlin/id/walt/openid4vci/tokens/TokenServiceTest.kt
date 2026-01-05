@@ -3,6 +3,8 @@ package id.walt.openid4vci.tokens
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.openid4vci.tokens.jwt.JwtAccessTokenService
+import id.walt.openid4vci.tokens.jwt.JwtSigningKeyResolver
 import kotlin.io.encoding.Base64
 import java.lang.ThreadLocal
 import kotlinx.coroutines.async
@@ -31,7 +33,7 @@ class TokenServiceTest {
     @Test
     fun `resolves key from resolver and signs token`() = runBlocking {
         val key = JWKKey.generate(KeyType.Ed25519)
-        val service = TokenService({ key })
+        val service = JwtAccessTokenService ({ key })
 
         val token = service.createAccessToken(mapOf("sub" to "alice"))
         assertTrue(token.isNotBlank())
@@ -50,7 +52,7 @@ class TokenServiceTest {
         )
 
         val currentKey = ThreadLocal<Key?>()
-        val service = TokenService({ currentKey.get() ?: error("No key in context") })
+        val service = JwtAccessTokenService ({ currentKey.get() ?: error("No key in context") })
 
         val tokens = keys.map { key ->
             async(currentKey.asContextElement(value = key)) {
@@ -72,8 +74,8 @@ class TokenServiceTest {
         val issuerBKey = JWKKey.generate(KeyType.secp256r1)
 
         val currentKey = ThreadLocal<Key?>()
-        val resolver = SigningKeyResolver { resolveCurrentKey(currentKey) }
-        val service = TokenService(resolver)
+        val resolver = JwtSigningKeyResolver { resolveCurrentKey(currentKey) }
+        val service = JwtAccessTokenService(resolver)
 
         suspend fun signFor(key: Key): String = withContext(currentKey.asContextElement(key)) {
             service.createAccessToken(mapOf("sub" to "demo"))
@@ -101,7 +103,7 @@ class TokenServiceTest {
         )
 
         val currentKey = ThreadLocal<Key?>()
-        val tokenService = TokenService(SigningKeyResolver { resolveCurrentKey(currentKey) })
+        val tokenService = JwtAccessTokenService(JwtSigningKeyResolver { resolveCurrentKey(currentKey) })
         val provider = buildOAuth2Provider(createTestConfig(tokenService = tokenService))
 
         suspend fun runFlow(issuerId: String): String = withContext(currentKey.asContextElement(keysByIssuer.getValue(issuerId))) {

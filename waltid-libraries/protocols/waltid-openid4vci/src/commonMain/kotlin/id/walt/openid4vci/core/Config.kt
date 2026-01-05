@@ -5,7 +5,7 @@ import id.walt.openid4vci.TokenEndpointHandlers
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
-import id.walt.openid4vci.tokens.TokenService
+import id.walt.openid4vci.tokens.AccessTokenService
 import id.walt.openid4vci.validation.AccessRequestValidator
 import id.walt.openid4vci.validation.AuthorizeRequestValidator
 
@@ -30,5 +30,5 @@ data class OAuth2ProviderConfig(
     val authorizationCodeRepository: AuthorizationCodeRepository,
     val preAuthorizedCodeRepository: PreAuthorizedCodeRepository,
     val preAuthorizedCodeIssuer: PreAuthorizedCodeIssuer,
-    val tokenService: TokenService,
+    val tokenService: AccessTokenService,
 )
