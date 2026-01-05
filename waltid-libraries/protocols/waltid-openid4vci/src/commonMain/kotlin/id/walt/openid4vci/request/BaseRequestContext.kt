@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.io.encoding.ExperimentalEncodingApi::class)
+
 package id.walt.openid4vci.request
 
 import id.walt.openid4vci.Arguments
@@ -8,16 +10,14 @@ import id.walt.openid4vci.Session
 import id.walt.openid4vci.append
 import id.walt.openid4vci.newArguments
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.random.Random
 import kotlin.time.Instant
-import kotlin.time.ExperimentalTime
 
 /**
  * Will be updated
  * Base implementation for [RequestContext].
  */
-open class BaseRequestContext @OptIn(ExperimentalTime::class) constructor(
+open class BaseRequestContext constructor(
     private var requestId: String? = null,
     private var requestedAt: Instant = kotlin.time.Clock.System.now(),
     private var client: Client = DefaultClient(),
@@ -41,10 +41,8 @@ open class BaseRequestContext @OptIn(ExperimentalTime::class) constructor(
         this.requestId = id
     }
 
-    @OptIn(ExperimentalTime::class)
     override fun getRequestedAt(): Instant = requestedAt
 
-    @OptIn(ExperimentalTime::class)
     override fun setRequestedAt(requestedAt: Instant) {
         this.requestedAt = requestedAt
     }
@@ -98,7 +96,6 @@ open class BaseRequestContext @OptIn(ExperimentalTime::class) constructor(
         issuerId = id
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     private fun generateId(): String =
         Base64.UrlSafe.encode(Random.nextBytes(16))
 }

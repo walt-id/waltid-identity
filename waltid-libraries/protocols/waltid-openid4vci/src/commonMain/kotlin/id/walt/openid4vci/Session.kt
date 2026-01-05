@@ -1,7 +1,8 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package id.walt.openid4vci
 
 import kotlin.time.Instant
-import kotlin.time.ExperimentalTime
 
 /**
  * Session is a per-request container that carries subject context and token expirations
@@ -10,9 +11,7 @@ import kotlin.time.ExperimentalTime
  * inherits subject/expiry info before minting tokens.
  */
 interface Session {
-    @OptIn(ExperimentalTime::class)
     fun setExpiresAt(tokenType: TokenType, expiresAt: Instant)
-    @OptIn(ExperimentalTime::class)
     fun getExpiresAt(tokenType: TokenType): Instant?
     fun setSubject(subject: String)
     fun getSubject(): String?
@@ -25,17 +24,15 @@ enum class TokenType {
     AUTHORIZATION_CODE,
 }
 
-class DefaultSession @OptIn(ExperimentalTime::class) constructor(
+class DefaultSession constructor(
     private val expiresAt: MutableMap<TokenType, Instant> = mutableMapOf(),
     private var subject: String? = null,
 ) : Session {
 
-    @OptIn(ExperimentalTime::class)
     override fun setExpiresAt(tokenType: TokenType, expiresAt: Instant) {
         this.expiresAt[tokenType] = expiresAt
     }
 
-    @OptIn(ExperimentalTime::class)
     override fun getExpiresAt(tokenType: TokenType): Instant? = expiresAt[tokenType]
 
     override fun setSubject(subject: String) {
@@ -44,7 +41,6 @@ class DefaultSession @OptIn(ExperimentalTime::class) constructor(
 
     override fun getSubject(): String? = subject
 
-    @OptIn(ExperimentalTime::class)
     override fun cloneSession(): Session = DefaultSession(
         expiresAt = expiresAt.toMutableMap(),
         subject = subject,

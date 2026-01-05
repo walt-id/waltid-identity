@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.io.encoding.ExperimentalEncodingApi::class)
+
 package id.walt.openid4vci.preauthorized
 
 import id.walt.openid4vci.Session
@@ -5,11 +7,9 @@ import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
-import kotlin.time.ExperimentalTime
 
 /**
  * Service API for issuing OpenID4VCI pre-authorized codes.
@@ -31,7 +31,7 @@ interface PreAuthorizedCodeIssuer {
     suspend fun issue(request: PreAuthorizedCodeIssueRequest): PreAuthorizedCodeIssueResult
 }
 
-data class PreAuthorizedCodeIssueRequest @OptIn(ExperimentalTime::class) constructor(
+data class PreAuthorizedCodeIssueRequest constructor(
     val clientId: String? = null,
     val userPinRequired: Boolean = false,
     val userPin: String? = null,
@@ -42,7 +42,7 @@ data class PreAuthorizedCodeIssueRequest @OptIn(ExperimentalTime::class) constru
     val credentialNonceExpiresAt: Instant? = null,
 )
 
-data class PreAuthorizedCodeIssueResult @OptIn(ExperimentalTime::class) constructor(
+data class PreAuthorizedCodeIssueResult constructor(
     val code: String,
     val expiresAt: Instant,
     val credentialNonce: String? = null,
@@ -54,7 +54,6 @@ class DefaultPreAuthorizedCodeIssuer(
     private val codeLifetimeSeconds: Long = 300,
 ) : PreAuthorizedCodeIssuer {
 
-    @OptIn(ExperimentalTime::class)
     override suspend fun issue(request: PreAuthorizedCodeIssueRequest): PreAuthorizedCodeIssueResult {
         val code = generateCode()
         val now = kotlin.time.Clock.System.now()
@@ -86,6 +85,5 @@ class DefaultPreAuthorizedCodeIssuer(
         )
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     private fun generateCode(): String = Base64.UrlSafe.encode(Random.nextBytes(32))
 }

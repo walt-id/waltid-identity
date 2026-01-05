@@ -1,8 +1,9 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package id.walt.openid4vci.tokens
 
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
@@ -41,7 +42,6 @@ open class TokenService(
 /**
  * Build a simple JWT claim set with common fields.
  */
-@OptIn(ExperimentalTime::class)
 fun defaultAccessTokenClaims(
     subject: String,
     issuer: String,

@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class, ExperimentalEncodingApi::class)
+
 package id.walt.openid4vci.granttypehandlers
 
 import id.walt.openid4vci.AuthorizeEndpointHandler
@@ -13,7 +15,6 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 
 /**
  * Authorize endpoint handler that issues authorization codes. The handler:
@@ -26,7 +27,6 @@ class AuthorizationCodeAuthorizeHandler(
     private val codeLifetimeSeconds: Long = 300,
 ) : AuthorizeEndpointHandler {
 
-    @OptIn(ExperimentalTime::class)
     override suspend fun handleAuthorizeEndpointRequest(request: AuthorizationRequest, session: Session): AuthorizeResponseResult {
         if (!request.getResponseTypes().contains("code")) {
             return AuthorizeResponseResult.Failure(
@@ -82,7 +82,6 @@ class AuthorizationCodeAuthorizeHandler(
         )
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     private fun generateCode(): String {
         val bytes = Random.nextBytes(33) //to prevent padding
         return Base64.UrlSafe.encode(bytes)

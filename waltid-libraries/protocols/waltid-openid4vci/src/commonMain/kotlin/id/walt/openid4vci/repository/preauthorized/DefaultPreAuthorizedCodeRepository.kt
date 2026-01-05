@@ -1,10 +1,10 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package id.walt.openid4vci.repository.preauthorized
 
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
-import kotlin.time.ExperimentalTime
 
-@OptIn(ExperimentalTime::class)
 internal fun defaultPreAuthorizedCodeRepository(): PreAuthorizedCodeRepository =
     object : PreAuthorizedCodeRepository {
         private val records = mutableMapOf<String, PreAuthorizedCodeRecord>()

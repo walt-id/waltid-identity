@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package id.walt.openid4vci.granttypehandlers
 
 import id.walt.openid4vci.GrantType
@@ -8,7 +10,6 @@ import id.walt.openid4vci.request.AccessTokenRequest
 import id.walt.openid4vci.tokens.TokenService
 import id.walt.openid4vci.tokens.defaultAccessTokenClaims
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 
 /**
  * Token endpoint handler for the authorization-code/preauthorized code grant.
@@ -22,8 +23,6 @@ class AuthorizationCodeTokenHandler(
 
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
         request.getGrantTypes().contains(GrantType.AuthorizationCode.value)
-
-    @OptIn(ExperimentalTime::class)
 
     override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): TokenEndpointResult {
         if (!canHandleTokenEndpointRequest(request)) {

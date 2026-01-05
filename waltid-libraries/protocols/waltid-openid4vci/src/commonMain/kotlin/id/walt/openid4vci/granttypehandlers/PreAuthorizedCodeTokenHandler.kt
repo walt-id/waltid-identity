@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package id.walt.openid4vci.granttypehandlers
 
 import id.walt.openid4vci.GrantType
@@ -10,9 +12,8 @@ import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.request.AccessTokenRequest
 import id.walt.openid4vci.tokens.TokenService
 import id.walt.openid4vci.tokens.defaultAccessTokenClaims
-import kotlin.time.Instant
-import kotlin.time.ExperimentalTime
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
  * Token endpoint handler for the OpenID4VCI pre-authorized code grant.
@@ -27,7 +28,6 @@ class PreAuthorizedCodeTokenHandler(
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
         request.getGrantTypes().contains(GrantType.PreAuthorizedCode.value)
 
-    @OptIn(ExperimentalTime::class)
     override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): TokenEndpointResult {
         if (!canHandleTokenEndpointRequest(request)) {
             return TokenEndpointResult.Failure(
@@ -115,7 +115,6 @@ class PreAuthorizedCodeTokenHandler(
         )
     }
 
-    @OptIn(ExperimentalTime::class)
     private fun computeRemainingSeconds(expiresAt: Instant): Long {
         val remaining = expiresAt - Clock.System.now()
         return if (remaining.isNegative()) 0 else remaining.inWholeSeconds

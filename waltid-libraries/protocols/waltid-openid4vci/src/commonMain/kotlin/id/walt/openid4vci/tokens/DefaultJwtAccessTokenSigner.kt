@@ -1,10 +1,11 @@
+@file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+
 package id.walt.openid4vci.tokens
 
 import io.ktor.utils.io.core.toByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Default JWT signer that follows callback-based key resolution. It chooses the JWS alg
@@ -15,7 +16,6 @@ open class DefaultJwtAccessTokenSigner(
     private val json: Json = Json { encodeDefaults = true },
 ) : AccessTokenSigner {
 
-    @OptIn(ExperimentalEncodingApi::class)
     override suspend fun sign(
         claims: Map<String, Any?>,
         header: Map<String, Any?>,

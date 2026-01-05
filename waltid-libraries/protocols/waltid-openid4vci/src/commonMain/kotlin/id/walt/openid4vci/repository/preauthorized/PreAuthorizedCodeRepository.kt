@@ -1,8 +1,9 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package id.walt.openid4vci.repository.preauthorized
 
 import id.walt.openid4vci.Session
 import kotlin.time.Instant
-import kotlin.time.ExperimentalTime
 
 /**
  * Storage abstraction for OpenID4VCI pre-authorized code sessions.
@@ -13,7 +14,7 @@ interface PreAuthorizedCodeRepository {
     suspend fun consume(code: String): PreAuthorizedCodeRecord?
 }
 
-data class PreAuthorizedCodeRecord @OptIn(ExperimentalTime::class) constructor(
+data class PreAuthorizedCodeRecord constructor(
     val code: String,
     val clientId: String?,
     val userPinRequired: Boolean,

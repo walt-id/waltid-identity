@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package id.walt.openid4vci.request
 
 import id.walt.openid4vci.Arguments
@@ -6,7 +8,6 @@ import id.walt.openid4vci.Parameters
 import id.walt.openid4vci.ResponseModeType
 import id.walt.openid4vci.Session
 import kotlin.time.Instant
-import kotlin.time.ExperimentalTime
 
 /**
  * Will be updated
@@ -16,9 +17,7 @@ interface RequestContext {
     fun getID(): String
     fun setID(id: String)
 
-    @OptIn(ExperimentalTime::class)
     fun getRequestedAt(): Instant
-    @OptIn(ExperimentalTime::class)
     fun setRequestedAt(requestedAt: Instant)
 
     fun getClient(): Client
