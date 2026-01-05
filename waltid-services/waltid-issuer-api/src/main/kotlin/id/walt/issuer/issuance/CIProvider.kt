@@ -20,6 +20,7 @@ import id.walt.issuer.config.CredentialTypeConfig
 import id.walt.issuer.config.OIDCIssuerServiceConfig
 import id.walt.mdoc.credsdata.CredentialManager
 import id.walt.mdoc.encoding.MdocCbor
+import id.walt.mdoc.objects.MdocJsonConverter
 import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.objects.digest.ValueDigest
 import id.walt.mdoc.objects.digest.ValueDigestList
@@ -499,152 +500,6 @@ open class CIProvider(
         }
     }
 
-    /**
-     * Converts a JsonElement to the appropriate Kotlin type for use in IssuerSignedItem.
-     * This extracts the actual value from JsonPrimitive, converts dates to LocalDate,
-     * converts number arrays to ByteArray when appropriate, and passes through complex types
-     * for custom serializers to handle.
-     * 
-     * @param namespace The namespace of the data element (e.g., "org.iso.18013.5.1")
-     * @param elementIdentifier The identifier of the data element (e.g., "birth_date", "portrait")
-     */
-    private fun JsonElement.toMdocValue(namespace: String, elementIdentifier: String): Any {
-        return when (this) {
-            is JsonPrimitive -> {
-                when {
-                    isString -> {
-                        // Check if this is a date field and convert to LocalDate
-                        // Date fields in mDL: birth_date, issue_date, expiry_date, portrait_capture_date
-                        val dateFields = setOf("birth_date", "issue_date", "expiry_date", "portrait_capture_date")
-                        if (dateFields.contains(elementIdentifier)) {
-                            try {
-                                // Parse date string in format "YYYY-MM-DD" to LocalDate
-                                LocalDate.parse(content)
-                            } catch (e: Exception) {
-                                // If parsing fails, keep as string and let serializer handle it
-                                log.warn(e) { "Failed to parse date string '$content' for $elementIdentifier, keeping as string" }
-                                content
-                            }
-                        } else {
-                            content
-                        }
-                    }
-                    booleanOrNull != null -> boolean
-                    intOrNull != null -> intOrNull!!
-                    longOrNull != null -> longOrNull!!
-                    doubleOrNull != null -> doubleOrNull!!.toLong() // Convert to Long for consistency
-                    else -> content // Fallback to string content
-                }
-            }
-            is JsonArray -> {
-                // Check if this is a ByteArray field (like "portrait")
-                // If all elements are numbers, convert to ByteArray
-                val byteArrayFields = setOf("portrait", "signature_usual_mark", 
-                    "biometric_template_face", "biometric_template_finger", 
-                    "biometric_template_signature_sign", "biometric_template_iris")
-                
-                if (byteArrayFields.contains(elementIdentifier)) {
-                    // Convert array of numbers to ByteArray
-                    try {
-                        mapNotNull { 
-                            when (it) {
-                                is JsonPrimitive -> it.intOrNull?.toByte() ?: it.longOrNull?.toByte()
-                                else -> null
-                            }
-                        }.toByteArray()
-                    } catch (e: Exception) {
-                        log.warn(e) { "Failed to convert array to ByteArray for $elementIdentifier, keeping as List" }
-                        // Fallback: convert array elements recursively
-                        map { it.toMdocValue(namespace, elementIdentifier) }
-                    }
-                } else {
-                    // Check if there's a registered serializer for this element
-                    val serializer = MdocsCborSerializer.lookupSerializer(namespace, elementIdentifier)
-                    if (serializer != null && serializer.descriptor.kind is StructureKind.LIST) {
-                        // This is a list of complex objects (e.g., driving_privileges)
-                        // Get the element descriptor to find the inner serializer
-                        val elementDescriptor = serializer.descriptor.getElementDescriptor(0)
-                        try {
-                            // Try to deserialize using the registered serializer directly
-                            // The serializer knows how to handle the list structure
-                            @Suppress("UNCHECKED_CAST")
-                            Json.decodeFromJsonElement(serializer as kotlinx.serialization.KSerializer<Any>, this)
-                        } catch (e: Exception) {
-                            log.warn(e) { "Failed to deserialize array using registered serializer for $elementIdentifier, falling back to element-by-element conversion" }
-                            // Fallback: try to deserialize each element individually
-                            // We need to find the element serializer - try to get it from the descriptor
-                            try {
-                                map { it.toMdocValue(namespace, elementIdentifier) }
-                            } catch (e2: Exception) {
-                                log.warn(e2) { "Failed to deserialize array elements for $elementIdentifier, keeping as List" }
-                                // Final fallback: convert array elements recursively
-                                map { it.toMdocValue(namespace, elementIdentifier) }
-                            }
-                        }
-                    } else {
-                        // For other arrays without registered serializers, convert elements recursively
-                        map { it.toMdocValue(namespace, elementIdentifier) }
-                    }
-                }
-            }
-            is JsonObject -> {
-                // Check if there's a registered serializer for this element
-                val serializer = MdocsCborSerializer.lookupSerializer(namespace, elementIdentifier)
-                if (serializer != null) {
-                    // Deserialize the JsonObject to the actual type
-                    try {
-                        @Suppress("UNCHECKED_CAST")
-                        Json.decodeFromJsonElement(serializer as kotlinx.serialization.KSerializer<Any>, this)
-                    } catch (e: Exception) {
-                        log.warn(e) { "Failed to deserialize JsonObject for $elementIdentifier, falling back to Map conversion" }
-                        // Fallback: convert to Map
-                        mapValues { it.value.toMdocValue(namespace, elementIdentifier) }
-                    }
-                } else {
-                    // No registered serializer, convert to Map
-                    mapValues { it.value.toMdocValue(namespace, elementIdentifier) }
-                }
-            }
-            is JsonNull -> throw IllegalArgumentException("Null values are not supported in mdoc data")
-        }
-    }
-
-    /**
-     * Converts a Key to a CoseKey by extracting the JWK parameters and mapping them to COSE format.
-     */
-    private suspend fun Key.toCoseKey(): CoseKey {
-        val jwk = exportJWKObject()
-        val kty = jwk["kty"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing kty in JWK")
-        val crv = jwk["crv"]?.jsonPrimitive?.content
-        
-        val coseKty = when (kty) {
-            "EC" -> Cose.KeyTypes.EC2
-            "OKP" -> Cose.KeyTypes.OKP
-            else -> throw IllegalArgumentException("Unsupported key type: $kty")
-        }
-        
-        val coseCrv = when (crv) {
-            "P-256" -> Cose.EllipticCurves.P_256
-            "P-384" -> Cose.EllipticCurves.P_384
-            "P-521" -> Cose.EllipticCurves.P_521
-            "Ed25519" -> Cose.EllipticCurves.Ed25519
-            "Ed448" -> Cose.EllipticCurves.Ed448
-            "secp256k1" -> Cose.EllipticCurves.secp256k1
-            else -> throw IllegalArgumentException("Unsupported curve: $crv")
-        }
-        
-        val x = jwk["x"]?.jsonPrimitive?.content?.base64UrlDecode()
-            ?: throw IllegalArgumentException("Missing x coordinate in JWK")
-        val y = jwk["y"]?.jsonPrimitive?.content?.base64UrlDecode()
-        
-        return CoseKey(
-            kty = coseKty,
-            crv = coseCrv,
-            x = x,
-            y = y
-        )
-    }
-
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun doGenerateMDoc(
         credentialRequest: CredentialRequest,
@@ -709,9 +564,7 @@ open class CIProvider(
         issuerSignedItemsData.forEach { (namespace, properties) ->
             val items = mutableListOf<IssuerSignedItem>()
             properties.forEach { (elementIdentifier, elementValue) ->
-                // Convert JsonElement to appropriate Kotlin type
-                // Pass namespace and elementIdentifier for smart conversion (dates, ByteArrays, etc.)
-                val convertedValue = elementValue.toMdocValue(namespace, elementIdentifier)
+                val convertedValue = MdocJsonConverter.toMdocValue(elementValue, namespace, elementIdentifier)
                 items.add(
                     IssuerSignedItem(
                         digestId = digestIdCounter++,
@@ -801,30 +654,15 @@ open class CIProvider(
         )
 
         // Sign the MSO
-        // Create a CoseSigner that works with cloud keys (AWS, Azure, etc.)
-        // Cloud keys may have hasPrivateKey = false but can still sign via signRaw()
-        val coseSigner = if (issuerKey.hasPrivateKey) {
-            // Standard key with private key - use the standard converter
-            issuerKey.toCoseSigner()
-        } else {
-            // Cloud key - create custom signer that uses signRaw directly
-            // Cloud keys (AWS, Azure, etc.) can sign even without hasPrivateKey = true
-            CoseSigner { dataToSign ->
-                val customSignatureScheme = algorithm?.let { algo ->
-                    when (algo) {
-                        Cose.Algorithm.PS256 -> "SHA256withRSA/PSS"
-                        Cose.Algorithm.PS384 -> "SHA384withRSA/PSS"
-                        Cose.Algorithm.PS512 -> "SHA512withRSA/PSS"
-                        else -> null
-                    }
-                }
-                var signature = issuerKey.signRaw(dataToSign, customSignatureScheme) as ByteArray
-                if (issuerKey.keyType in KeyTypes.EC_KEYS) {
-                    signature = EccUtils.convertDERtoIEEEP1363(signature)
-                }
-                signature
+        // The toCoseSigner() extension now supports cloud keys automatically
+        val coseSigner = issuerKey.toCoseSigner(algorithm?.let { algo ->
+            when (algo) {
+                Cose.Algorithm.PS256 -> "PS256"
+                Cose.Algorithm.PS384 -> "PS384"
+                Cose.Algorithm.PS512 -> "PS512"
+                else -> null
             }
-        }
+        })
         
         val issuerAuth = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
