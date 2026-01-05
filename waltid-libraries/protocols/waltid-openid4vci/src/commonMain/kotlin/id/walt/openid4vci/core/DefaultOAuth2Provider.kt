@@ -16,8 +16,11 @@ import id.walt.openid4vci.request.AuthorizationRequest
  * after `buildProvider` completes. Supplied validators/handlers/repositories must therefore be
  * concurrency-safe; the bundled in-memory repositories use synchronization so a single provider
  * instance can serve concurrent requests safely.
+ *
+ * Constructors are public so advanced consumers can bypass [buildProvider] and wire handlers manually,
+ * but typical callers should prefer [buildProvider] which registers the default handlers.
  */
-class DefaultOAuth2Provider internal constructor(
+class DefaultOAuth2Provider(
     val config: Config,
 ) : OAuth2Provider {
 
