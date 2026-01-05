@@ -1,13 +1,22 @@
 package id.walt.openid4vci
 
-import id.walt.openid4vci.core.OAuth2Provider
-import id.walt.openid4vci.core.buildOAuth2Provider
+import id.walt.openid4vci.core.AccessRequestResult
 import id.walt.openid4vci.core.AuthorizeRequestResult
+import id.walt.openid4vci.core.buildOAuth2Provider
+import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.OAuthError
+import id.walt.openid4vci.core.OAuth2ProviderConfig
+import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
+import id.walt.openid4vci.repository.authorization.defaultAuthorizationCodeRepository
+import id.walt.openid4vci.repository.preauthorized.defaultPreAuthorizedCodeRepository
+import id.walt.openid4vci.request.AccessTokenRequest
 import id.walt.openid4vci.validation.AccessRequestValidator
 import id.walt.openid4vci.validation.AuthorizeRequestValidator
+import id.walt.openid4vci.validation.DefaultAccessRequestValidator
+import id.walt.openid4vci.validation.DefaultAuthorizeRequestValidator
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -42,11 +51,48 @@ class BuildProviderConfigurationTest {
         assertEquals("invalid_client", result.error.error)
     }
 
+    @Test
+    fun `buildProvider rejects duplicate grant handlers should fail`() {
+        val authorizationCodeRepository = defaultAuthorizationCodeRepository()
+        val preAuthorizedCodeRepository = defaultPreAuthorizedCodeRepository()
+
+        assertFailsWith<IllegalStateException> {
+            val duplicateGrantHandlerA = DuplicateGrantHandler()
+            val duplicateGrantHandlerB = DuplicateGrantHandler()
+
+            val config = OAuth2ProviderConfig(
+                authorizeRequestValidator = DefaultAuthorizeRequestValidator(),
+                accessRequestValidator = DefaultAccessRequestValidator(),
+                authorizeEndpointHandlers = AuthorizeEndpointHandlers(),
+                tokenEndpointHandlers = TokenEndpointHandlers().apply {
+                    appendForGrant("custom_grant", duplicateGrantHandlerA)
+                    appendForGrant("custom_grant", duplicateGrantHandlerB)
+                },
+                authorizationCodeRepository = authorizationCodeRepository,
+                preAuthorizedCodeRepository = preAuthorizedCodeRepository,
+                preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
+                tokenService = StubTokenService(),
+            )
+
+            buildOAuth2Provider(
+                config = config,
+                includeAuthorizationCodeDefaultHandlers = false,
+                includePreAuthorizedCodeDefaultHandlers = false,
+            )
+        }
+    }
+
+    private class DuplicateGrantHandler : TokenEndpointHandler {
+        override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean = true
+        override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): TokenEndpointResult =
+            TokenEndpointResult.Failure("unsupported_grant_type")
+    }
+
     private fun stubAuthorizeValidator(): AuthorizeRequestValidator = AuthorizeRequestValidator {
         AuthorizeRequestResult.Failure(OAuthError("unsupported_response_type"))
     }
 
     private fun stubAccessValidator(): AccessRequestValidator = AccessRequestValidator { _, _ ->
-        id.walt.openid4vci.core.AccessRequestResult.Failure(OAuthError("unsupported_grant_type"))
+        AccessRequestResult.Failure(OAuthError("unsupported_grant_type"))
     }
 }

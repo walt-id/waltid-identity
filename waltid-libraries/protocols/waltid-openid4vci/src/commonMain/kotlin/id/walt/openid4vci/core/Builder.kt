@@ -3,6 +3,8 @@ package id.walt.openid4vci.core
 import id.walt.openid4vci.granttypehandlers.AuthorizationCodeAuthorizeHandler
 import id.walt.openid4vci.granttypehandlers.AuthorizationCodeTokenHandler
 import id.walt.openid4vci.granttypehandlers.PreAuthorizedCodeTokenHandler
+import id.walt.openid4vci.GRANT_TYPE_AUTHORIZATION_CODE
+import id.walt.openid4vci.GRANT_TYPE_PRE_AUTHORIZED_CODE
 
 /**
  * Entry point for consumers to obtain the OAuth provider.
@@ -37,7 +39,7 @@ import id.walt.openid4vci.granttypehandlers.PreAuthorizedCodeTokenHandler
  */
 fun buildOAuth2Provider(
     config: OAuth2ProviderConfig,
-//    extraTokenEndpointHandlers: List<TokenEndpointHandler> = emptyList(),
+//    extraTokenEndpointHandlers: List<Pair<String, TokenEndpointHandler>> = emptyList(),
 //    extraAuthorizeHandlers: List<AuthorizeEndpointHandler> = emptyList(),
     includeAuthorizationCodeDefaultHandlers: Boolean = true,
     includePreAuthorizedCodeDefaultHandlers: Boolean = true,
@@ -47,7 +49,9 @@ fun buildOAuth2Provider(
         includeAuthorizationCodeDefaultHandlers = includeAuthorizationCodeDefaultHandlers,
         includePreAuthorizedCodeDefaultHandlers = includePreAuthorizedCodeDefaultHandlers,
     )
-//    extraTokenEndpointHandlers.forEach { config.tokenEndpointHandlers.append(it) }
+//    extraTokenEndpointHandlers.forEach { (grantType, handler) ->
+//        config.tokenEndpointHandlers.appendForGrant(grantType, handler)
+//    }
 //    extraAuthorizeHandlers.forEach { config.authorizeEndpointHandlers.append(it) }
     return DefaultOAuth2Provider(config)
 }
@@ -67,7 +71,10 @@ private fun registerDefaultHandlers(
             codeRepository = config.authorizationCodeRepository,
             tokenService = config.tokenService,
         )
-        config.tokenEndpointHandlers.append(authorizeTokenHandler)
+        config.tokenEndpointHandlers.appendForGrant(
+            grantType = GRANT_TYPE_AUTHORIZATION_CODE,
+            handler = authorizeTokenHandler,
+        )
     }
 
     if (includePreAuthorizedCodeDefaultHandlers) {
@@ -75,6 +82,9 @@ private fun registerDefaultHandlers(
             codeRepository = config.preAuthorizedCodeRepository,
             tokenService = config.tokenService,
         )
-        config.tokenEndpointHandlers.append(preAuthorizedTokenHandler)
+        config.tokenEndpointHandlers.appendForGrant(
+            grantType = GRANT_TYPE_PRE_AUTHORIZED_CODE,
+            handler = preAuthorizedTokenHandler,
+        )
     }
 }
