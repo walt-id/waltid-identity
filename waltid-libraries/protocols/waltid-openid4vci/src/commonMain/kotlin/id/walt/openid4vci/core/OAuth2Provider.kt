@@ -78,8 +78,6 @@ data class AccessTokenResponse(
     val extra: Map<String, Any?> = emptyMap(),
 )
 
-const val TOKEN_TYPE_BEARER: String = "bearer"
-
 sealed class AccessResponseResult {
     data class Success(val response: AccessTokenResponse) : AccessResponseResult()
     data class Failure(val error: OAuthError) : AccessResponseResult()
