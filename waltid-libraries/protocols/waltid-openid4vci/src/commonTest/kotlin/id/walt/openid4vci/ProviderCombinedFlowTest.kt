@@ -4,7 +4,7 @@ import id.walt.openid4vci.core.AccessRequestResult
 import id.walt.openid4vci.core.AccessResponseResult
 import id.walt.openid4vci.core.AuthorizeRequestResult
 import id.walt.openid4vci.core.AuthorizeResponseResult
-import id.walt.openid4vci.core.buildProvider
+import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -23,7 +23,7 @@ class ProviderCombinedFlowTest {
         val config = createTestConfig()
         val issuerId = "test-issuer"
 
-        val provider = buildProvider(config)
+        val provider = buildOAuth2Provider(config)
 
         // Authorization code flow
         val authorizeRequestResult = provider.createAuthorizeRequest(

@@ -1,7 +1,7 @@
 package id.walt.openid4vci
 
 import id.walt.openid4vci.core.OAuth2Provider
-import id.walt.openid4vci.core.buildProvider
+import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.core.AuthorizeRequestResult
 import id.walt.openid4vci.core.OAuthError
 import id.walt.openid4vci.validation.AccessRequestValidator
@@ -20,7 +20,7 @@ class BuildProviderConfigurationTest {
             accessRequestValidator = stubAccessValidator(),
         )
 
-        val provider = buildProvider(config)
+        val provider = buildOAuth2Provider(config)
         assertIs<OAuth2Provider>(provider)
         assertEquals(1, config.authorizeEndpointHandlers.count())
         assertEquals(2, config.tokenEndpointHandlers.count())
@@ -36,7 +36,7 @@ class BuildProviderConfigurationTest {
             accessRequestValidator = stubAccessValidator(),
         )
 
-        val provider = buildProvider(config)
+        val provider = buildOAuth2Provider(config)
         val result = provider.createAuthorizeRequest(emptyMap())
         assertTrue(result is AuthorizeRequestResult.Failure)
         assertEquals("invalid_client", result.error.error)

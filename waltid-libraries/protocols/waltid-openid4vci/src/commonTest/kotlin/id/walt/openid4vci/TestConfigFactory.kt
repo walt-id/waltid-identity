@@ -1,6 +1,6 @@
 package id.walt.openid4vci
 
-import id.walt.openid4vci.core.Config
+import id.walt.openid4vci.core.OAuth2ProviderConfig
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.defaultAuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.defaultPreAuthorizedCodeRepository
@@ -15,10 +15,10 @@ internal fun createTestConfig(
     authorizeRequestValidator: AuthorizeRequestValidator = DefaultAuthorizeRequestValidator(),
     accessRequestValidator: AccessRequestValidator = DefaultAccessRequestValidator(),
     tokenService: TokenService = StubTokenService(),
-): Config {
+): OAuth2ProviderConfig {
     val authorizationCodeRepository = defaultAuthorizationCodeRepository()
     val preAuthorizedCodeRepository = defaultPreAuthorizedCodeRepository()
-    return Config(
+    return OAuth2ProviderConfig(
         authorizeRequestValidator = authorizeRequestValidator,
         accessRequestValidator = accessRequestValidator,
         authorizeEndpointHandlers = AuthorizeEndpointHandlers(),

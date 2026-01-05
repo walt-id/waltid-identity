@@ -16,7 +16,7 @@ import id.walt.openid4vci.granttypehandlers.PreAuthorizedCodeTokenHandler
  * - Strategy injection: future refactors can accept a strategy bundle (e.g. credential formats, signature algorithms, code/access token
  *   generation, etc) without changing call sites, just extend the parameters of this function.
  * - Factory ecosystem: handler factories can be introduced later, allowing modules to register
- *   one or more handlers. Keeping callers behind `buildProvider` makes that evolution backwards compatible.?!?
+ *   one or more handlers. Keeping callers behind `buildOAuth2Provider` makes that evolution backwards compatible.?!?
  *
  * For now it stays intentionally simple, callers can supply extra handlers for customization,
  * while the function guarantees deduplication and returns the OAuthProvider used by the HTTP
@@ -25,7 +25,7 @@ import id.walt.openid4vci.granttypehandlers.PreAuthorizedCodeTokenHandler
  * single hook, we can later switch to handler lists for factory registration or split registries
  * (authorize/token endpoint).
  *
- * - `Config` remains the canonical place to stash shared collaborators (e.g. validators, token service,
+ * - `OAuth2ProviderConfig` remains the canonical place to stash shared collaborators (e.g. validators, token service,
  *   handler registries). Pass it around, and the provider reads from it each request.
  *   Without this indirection, callers would have to thread every dependency through their own
  *   builders, losing a central “state of the world.”
@@ -35,8 +35,8 @@ import id.walt.openid4vci.granttypehandlers.PreAuthorizedCodeTokenHandler
  * - `includeAuthorizationCodeDefaultHandlers` / `includePreAuthorizedCodeDefaultHandlers` give flags for
  *   composing providers (handy for tests) until the handler factory story evolves, needs revisited.
  */
-fun buildProvider(
-    config: Config,
+fun buildOAuth2Provider(
+    config: OAuth2ProviderConfig,
 //    extraTokenEndpointHandlers: List<TokenEndpointHandler> = emptyList(),
 //    extraAuthorizeHandlers: List<AuthorizeEndpointHandler> = emptyList(),
     includeAuthorizationCodeDefaultHandlers: Boolean = true,
@@ -53,7 +53,7 @@ fun buildProvider(
 }
 
 private fun registerDefaultHandlers(
-    config: Config,
+    config: OAuth2ProviderConfig,
     includeAuthorizationCodeDefaultHandlers: Boolean,
     includePreAuthorizedCodeDefaultHandlers: Boolean,
 ) {

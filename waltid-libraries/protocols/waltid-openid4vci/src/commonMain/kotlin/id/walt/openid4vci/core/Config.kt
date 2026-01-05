@@ -22,7 +22,7 @@ import id.walt.openid4vci.validation.AuthorizeRequestValidator
  * All dependencies are supplied explicitly when building the config. The bundled in-memory
  * repositories stay internal to the DI layer so applications pass in their own implementations.
  */
-data class Config(
+data class OAuth2ProviderConfig(
     val authorizeRequestValidator: AuthorizeRequestValidator,
     val accessRequestValidator: AccessRequestValidator,
     val authorizeEndpointHandlers: AuthorizeEndpointHandlers,

@@ -16,7 +16,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import id.walt.openid4vci.core.buildProvider
+import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.core.AuthorizeRequestResult
 import id.walt.openid4vci.core.AccessRequestResult
 import id.walt.openid4vci.core.AccessResponseResult
@@ -102,7 +102,7 @@ class TokenServiceTest {
 
         val currentKey = ThreadLocal<Key?>()
         val tokenService = TokenService(SigningKeyResolver { resolveCurrentKey(currentKey) })
-        val provider = buildProvider(createTestConfig(tokenService = tokenService))
+        val provider = buildOAuth2Provider(createTestConfig(tokenService = tokenService))
 
         suspend fun runFlow(issuerId: String): String = withContext(currentKey.asContextElement(keysByIssuer.getValue(issuerId))) {
             val authorizeRequestResult = provider.createAuthorizeRequest(

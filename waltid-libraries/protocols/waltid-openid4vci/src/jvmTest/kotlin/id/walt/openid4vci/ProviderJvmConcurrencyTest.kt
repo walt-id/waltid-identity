@@ -1,8 +1,8 @@
 package id.walt.openid4vci
 
-import id.walt.openid4vci.core.Config
+import id.walt.openid4vci.core.OAuth2ProviderConfig
 import id.walt.openid4vci.core.OAuth2Provider
-import id.walt.openid4vci.core.buildProvider
+import id.walt.openid4vci.core.buildOAuth2Provider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -23,9 +23,9 @@ class ProviderJvmConcurrencyTest {
 
     @Test
     fun `authorization code flow handles real dispatcher concurrency`() = runBlocking {
-        val provider = buildProvider(defaultConcurrencyTestConfig())
-        // Uncomment to experiment with unsafe repositories and observe race conditions:
-//         val provider = buildProvider(defaultConcurrencyTestConfig().copy(authorizationCodeRepository = UnsafeAuthorizationCodeRepository()))
+        val provider = buildOAuth2Provider(defaultConcurrencyTestConfig())
+// Uncomment to experiment with unsafe repositories and observe race conditions:
+//         val provider = buildOAuth2Provider(defaultConcurrencyTestConfig().copy(authorizationCodeRepository = UnsafeAuthorizationCodeRepository()))
 
         runConcurrentAuthCodeFlows(
             provider = provider,
@@ -36,7 +36,7 @@ class ProviderJvmConcurrencyTest {
     }
 }
 
-internal fun defaultConcurrencyTestConfig(): Config = createTestConfig()
+internal fun defaultConcurrencyTestConfig(): OAuth2ProviderConfig = createTestConfig()
 
 internal suspend fun runConcurrentAuthCodeFlows(
     provider: OAuth2Provider,

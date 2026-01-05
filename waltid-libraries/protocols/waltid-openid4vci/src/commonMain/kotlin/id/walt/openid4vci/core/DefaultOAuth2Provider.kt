@@ -12,16 +12,16 @@ import id.walt.openid4vci.request.AuthorizationRequest
  * Keeping this class clean ensures that composition/config tests can stub collaborators without
  * pulling HTTP frameworks into the mix.
  *
- * Thread-safety: the provider stores the immutable [Config] and does not mutate handler registries
+ * Thread-safety: the provider stores the immutable [OAuth2ProviderConfig] and does not mutate handler registries
  * after `buildProvider` completes. Supplied validators/handlers/repositories must therefore be
  * concurrency-safe; the bundled in-memory repositories use synchronization so a single provider
  * instance can serve concurrent requests safely.
  *
- * Constructors are public so advanced consumers can bypass [buildProvider] and wire handlers manually,
- * but typical callers should prefer [buildProvider] which registers the default handlers.
+ * Constructors are public so advanced consumers can bypass [buildOAuth2Provider] and wire handlers manually,
+ * but typical callers should prefer [buildOAuth2Provider] which registers the default handlers.
  */
 class DefaultOAuth2Provider(
-    val config: Config,
+    val config: OAuth2ProviderConfig,
 ) : OAuth2Provider {
 
     override fun createAuthorizeRequest(parameters: Map<String, String>): AuthorizeRequestResult =
