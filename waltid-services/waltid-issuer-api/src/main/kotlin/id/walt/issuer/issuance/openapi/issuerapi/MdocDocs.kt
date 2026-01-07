@@ -130,7 +130,6 @@ object MdocDocs {
             this[ISO_IEC_MDL_NAMESPACE_ID] = JsonObject(
                 (this[ISO_IEC_MDL_NAMESPACE_ID] as JsonObject).toMutableMap().apply {
                     put("age_over_18", true.toJsonElement())
-                    put("age_over_24", true.toJsonElement())
                     put("age_over_60", false.toJsonElement())
                 }
             )
@@ -142,7 +141,6 @@ object MdocDocs {
             this[ISO_IEC_MDL_NAMESPACE_ID] = JsonObject(
                 (this[ISO_IEC_MDL_NAMESPACE_ID] as JsonObject).toMutableMap().apply {
                     put("age_over_18", true.toJsonElement())
-                    put("age_over_24", true.toJsonElement())
                     put("age_over_60", false.toJsonElement())
 
                     put("administrative_number", "123456789".toJsonElement())

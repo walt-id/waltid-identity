@@ -24,6 +24,9 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-issuer-api"))
     testImplementation(project(":waltid-services:waltid-verifier-api"))
     testImplementation(project(":waltid-services:waltid-wallet-api"))
+    
+    // New mdoc library for e2e tests
+    testImplementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
 
     testImplementation("app.softwork:kotlinx-uuid-core:0.1.6")
     testImplementation("com.nimbusds:nimbus-jose-jwt:10.6")
