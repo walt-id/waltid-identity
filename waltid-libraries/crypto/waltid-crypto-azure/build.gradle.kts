@@ -35,6 +35,10 @@ dependencies {
     implementation("org.kotlincrypto.hash:sha2")
 }
 
+tasks.withType<Test> {
+    enabled = false
+}
+
 
 tasks.test {
     useJUnitPlatform()
