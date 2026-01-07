@@ -22,7 +22,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.7.3")
     
     // Azure Identity (for Managed Identity authentication)
-    implementation("com.azure:azure-identity:1.18.1")
+    implementation("com.azure:azure-identity:1.19.0-beta.1")
 
     // Azure Key Vault Keys (for cryptographic operations)
     implementation("com.azure:azure-security-keyvault-keys:4.9.1")
