@@ -1,5 +1,6 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.TokenEndpointResult
 import id.walt.openid4vci.platform.urlEncode
@@ -27,7 +28,10 @@ class DefaultOAuth2Provider(
     override fun createAuthorizeRequest(parameters: Map<String, String>): AuthorizeRequestResult =
         config.authorizeRequestValidator.validate(parameters)
 
-    override suspend fun createAuthorizeResponse(request: AuthorizationRequest, session: Session): AuthorizeResponseResult {
+    override suspend fun createAuthorizeResponse(
+        request: AuthorizationRequest,
+        session: Session
+    ): AuthorizeResponseResult {
         request.setSession(session)
         val responses = mutableListOf<AuthorizeResponseResult>()
         for (handler in config.authorizeEndpointHandlers) {
@@ -76,7 +80,10 @@ class DefaultOAuth2Provider(
         }
     }
 
-    override fun writeAuthorizeResponse(request: AuthorizationRequest, response: AuthorizeResponse): AuthorizeHttpResponse {
+    override fun writeAuthorizeResponse(
+        request: AuthorizationRequest,
+        response: AuthorizeResponse
+    ): AuthorizeHttpResponse {
         val location = appendParams(response.redirectUri, response.parameters)
         val headers = response.headers.toMutableMap()
         headers["Location"] = location
@@ -88,8 +95,12 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override fun createAccessRequest(parameters: Map<String, String>, session: Session): AccessRequestResult =
-        config.accessRequestValidator.validate(parameters, session)
+    override fun createAccessRequest(parameters: Map<String, String>, session: Session?): AccessRequestResult {
+        return config.accessRequestValidator.validate(
+            parameters = parameters,
+            session = session ?: DefaultSession()
+        )
+    }
 
     override suspend fun createAccessResponse(request: AccessTokenRequest): AccessResponseResult {
         for (handler in config.tokenEndpointHandlers.toList()) {

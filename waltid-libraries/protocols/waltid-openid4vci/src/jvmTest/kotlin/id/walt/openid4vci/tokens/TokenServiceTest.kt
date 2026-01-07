@@ -132,7 +132,6 @@ class TokenServiceTest {
                     "code" to code,
                     "redirect_uri" to "https://client.example/callback",
                 ),
-                DefaultSession(),
             )
             require(accessRequestResult is AccessRequestResult.Success)
             val accessRequest = accessRequestResult.request.also { it.setIssuerId(issuerId) }

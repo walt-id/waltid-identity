@@ -96,10 +96,11 @@ internal suspend fun executeAuthorizationCodeFlow(
             "code" to code,
             "redirect_uri" to "https://client.example/callback",
         ),
-        DefaultSession(),
     )
     require(accessRequestResult is AccessRequestResult.Success)
+
     accessRequestResult.request.setIssuerId(issuerId)
+
     val accessResponse = provider.createAccessResponse(accessRequestResult.request)
     require(accessResponse is AccessResponseResult.Success)
 
@@ -109,5 +110,6 @@ internal suspend fun executeAuthorizationCodeFlow(
 
     val token = accessResponse.response.accessToken
     assertTrue(token.startsWith("access-$clientId-$code"))
+
     return token
 }

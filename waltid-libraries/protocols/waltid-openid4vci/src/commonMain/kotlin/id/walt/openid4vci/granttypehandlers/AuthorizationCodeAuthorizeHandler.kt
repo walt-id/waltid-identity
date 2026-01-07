@@ -51,6 +51,11 @@ class AuthorizationCodeAuthorizeHandler(
         val code = generateCode()
         val expiresAt = kotlin.time.Clock.System.now() + codeLifetimeSeconds.seconds
 
+        val subject = session.getSubject()?.takeIf { it.isNotBlank() }
+            ?: return AuthorizeResponseResult.Failure(
+                OAuthError("invalid_request", "Session subject is required"),
+            )
+
         codeRepository.save(
             AuthorizationCodeRecord(
                 code = code,
@@ -59,6 +64,7 @@ class AuthorizationCodeAuthorizeHandler(
                 grantedScopes = request.getGrantedScopes().toSet(),
                 grantedAudience = request.getGrantedAudience().toSet(),
                 session = session.cloneSession().apply {
+                    setSubject(subject)
                     setExpiresAt(TokenType.AUTHORIZATION_CODE, expiresAt)
                 },
                 expiresAt = expiresAt,

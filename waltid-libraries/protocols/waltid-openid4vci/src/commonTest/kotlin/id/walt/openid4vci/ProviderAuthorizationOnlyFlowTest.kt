@@ -58,7 +58,6 @@ class ProviderAuthorizationOnlyFlowTest {
                 "code" to code,
                 "redirect_uri" to "https://openid4vci.walt.id/callback",
             ),
-            DefaultSession(),
         )
         assertTrue(accessResult.isSuccess())
         val accessRequest = (accessResult as AccessRequestResult.Success).request.also {
@@ -75,7 +74,6 @@ class ProviderAuthorizationOnlyFlowTest {
                 "grant_type" to GrantType.PreAuthorizedCode.value,
                 "pre-authorized_code" to "pre-code",
             ),
-            DefaultSession(),
         )
 
         when (preAccessRequestResult) {
@@ -86,9 +84,39 @@ class ProviderAuthorizationOnlyFlowTest {
                     ?: error("Expected pre-authorized flow to be rejected at token endpoint")
                 assertEquals("unsupported_grant_type", failure.error.error)
             }
+
             is AccessRequestResult.Failure -> {
                 assertEquals("unsupported_grant_type", preAccessRequestResult.error.error)
             }
         }
+    }
+
+    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
+    @Test
+    fun `authorize response fails when session has no subject`() = runTest {
+        val config = createTestConfig()
+        val provider = buildOAuth2Provider(
+            config = config,
+            includeAuthorizationCodeDefaultHandlers = true,
+            includePreAuthorizedCodeDefaultHandlers = false,
+        )
+
+        val authorizeRequestResult = provider.createAuthorizeRequest(
+            mapOf(
+                "response_type" to "code",
+                "client_id" to "demo-client",
+                "redirect_uri" to "https://openid4vci.walt.id/callback",
+            ),
+        )
+
+        assertTrue(authorizeRequestResult.isSuccess())
+        val authorizeRequest = (authorizeRequestResult as AuthorizeRequestResult.Success).request
+
+        val authorizeResponse = provider.createAuthorizeResponse(
+            authorizeRequest,
+            DefaultSession(subject = "")
+        )
+
+        assertTrue(authorizeResponse is AuthorizeResponseResult.Failure)
     }
 }

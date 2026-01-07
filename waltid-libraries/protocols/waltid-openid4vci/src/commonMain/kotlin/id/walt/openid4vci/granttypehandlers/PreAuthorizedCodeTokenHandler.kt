@@ -88,8 +88,11 @@ import kotlin.time.Instant
         val expiresAt = request.getSession()?.getExpiresAt(id.walt.openid4vci.TokenType.ACCESS_TOKEN)
             ?: Clock.System.now()
 
+        val subject = request.getSession()?.getSubject()?.takeIf { it.isNotBlank() }
+            ?: return TokenEndpointResult.Failure("invalid_request", "subject is required in session")
+
         val claims = defaultAccessTokenClaims(
-            subject = request.getSession()?.getSubject() ?: clientId,
+            subject = subject,
             issuer = request.getIssuerId() ?: clientId,
             audience = request.getGrantedAudience().toSet().firstOrNull(),
             scopes = request.getGrantedScopes().toSet(),

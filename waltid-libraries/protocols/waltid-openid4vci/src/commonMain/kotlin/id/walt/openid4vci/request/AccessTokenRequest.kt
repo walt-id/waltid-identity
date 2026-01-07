@@ -12,7 +12,8 @@ import id.walt.openid4vci.newArguments
  */
 class AccessTokenRequest(
     session: Session? = null,
-) : BaseRequestContext(session = session), AccessRequester {
+) : BaseRequestContext(session = session),
+    AccessRequester {
 
     private val grantTypes = newArguments()
     private val handledGrantTypes = newArguments()

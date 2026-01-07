@@ -30,7 +30,7 @@ class PreAuthorizedCodeTokenHandlerTest {
     @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
     @Test
     fun `handles pre-authorized code successfully`() = runTest {
-        val credentialSession = DefaultSession().apply { setSubject("credential-subject") }
+        val credentialSession = DefaultSession(subject = "credential-subject")
         val issued = issuer.issue(
             PreAuthorizedCodeIssueRequest(
                 clientId = "client-pre",
@@ -66,7 +66,7 @@ class PreAuthorizedCodeTokenHandlerTest {
                 clientId = "client-pin",
                 userPinRequired = true,
                 userPin = "4321",
-                session = DefaultSession(),
+                session = DefaultSession(subject = "pin-subject"),
             ),
         )
         val code = issued.code
@@ -96,7 +96,7 @@ class PreAuthorizedCodeTokenHandlerTest {
             PreAuthorizedCodeIssueRequest(
                 clientId = "client-reuse",
                 userPinRequired = false,
-                session = DefaultSession(),
+                session = DefaultSession(subject = "reuse-subject"),
             ),
         )
         val code = issued.code
@@ -114,8 +114,8 @@ class PreAuthorizedCodeTokenHandlerTest {
     }
 
     @OptIn(ExperimentalTime::class)
-    private fun createAccessRequestWithGrant(): AccessTokenRequest =
-        AccessTokenRequest(session = DefaultSession()).apply {
+        private fun createAccessRequestWithGrant(): AccessTokenRequest =
+            AccessTokenRequest(session = DefaultSession(subject = "access-subject")).apply {
             setClient(
                 DefaultClient(
                     id = "",

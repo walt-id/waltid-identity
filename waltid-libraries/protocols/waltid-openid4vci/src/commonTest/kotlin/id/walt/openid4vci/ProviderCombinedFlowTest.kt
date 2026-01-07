@@ -53,7 +53,6 @@ class ProviderCombinedFlowTest {
                 "code" to code,
                 "redirect_uri" to "https://openid4vci.walt.id/callback",
             ),
-            DefaultSession(),
         )
         assertTrue(accessResult.isSuccess())
         val accessRequest = (accessResult as AccessRequestResult.Success).request.also {
@@ -70,7 +69,7 @@ class ProviderCombinedFlowTest {
                 clientId = "pre-client",
                 scopes = setOf("openid"),
                 audience = setOf("aud:issuer"),
-                session = DefaultSession().apply { setSubject("pre-subject") },
+                session = DefaultSession(subject = "pre-subject"),
                 credentialNonce = "nonce-pre",
                 credentialNonceExpiresAt = kotlin.time.Clock.System.now() + 600.seconds,
             ),
@@ -82,7 +81,6 @@ class ProviderCombinedFlowTest {
                 "grant_type" to GrantType.PreAuthorizedCode.value,
                 "pre-authorized_code" to preCode,
             ),
-            DefaultSession(),
         )
         assertTrue(preAccessResult.isSuccess())
         val preAccessRequest = (preAccessResult as AccessRequestResult.Success).request.also {

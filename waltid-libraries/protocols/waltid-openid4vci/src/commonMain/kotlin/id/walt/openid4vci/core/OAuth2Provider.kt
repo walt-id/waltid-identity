@@ -23,7 +23,7 @@ interface OAuth2Provider {
     suspend fun createAuthorizeResponse(request: AuthorizationRequest, session: Session): AuthorizeResponseResult
     fun writeAuthorizeError(request: AuthorizationRequest, error: OAuthError): AuthorizeHttpResponse
     fun writeAuthorizeResponse(request: AuthorizationRequest, response: AuthorizeResponse): AuthorizeHttpResponse
-    fun createAccessRequest(parameters: Map<String, String>, session: Session): AccessRequestResult
+    fun createAccessRequest(parameters: Map<String, String>, session: Session? = null): AccessRequestResult
     suspend fun createAccessResponse(request: AccessTokenRequest): AccessResponseResult
     fun writeAccessError(request: AccessTokenRequest, error: OAuthError): AccessHttpResponse
     fun writeAccessResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessHttpResponse

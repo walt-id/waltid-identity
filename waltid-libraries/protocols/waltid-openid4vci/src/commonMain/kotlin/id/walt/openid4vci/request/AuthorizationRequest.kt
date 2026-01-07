@@ -10,7 +10,9 @@ import id.walt.openid4vci.newArguments
  * Will be updated
  * Authorization endpoint request object shared by authorize handlers.
  */
-class AuthorizationRequest : BaseRequestContext(), AuthorizeRequester {
+class AuthorizationRequest : BaseRequestContext(),
+    AuthorizeRequester {
+
     private val responseTypesInternal = newArguments()
     private val handledResponseTypesInternal = newArguments()
 
@@ -27,7 +29,7 @@ class AuthorizationRequest : BaseRequestContext(), AuthorizeRequester {
 
     override fun didHandleAllResponseTypes(): Boolean =
         responseTypesInternal.isNotEmpty() &&
-            responseTypesInternal.all { handledResponseTypesInternal.has(it) }
+                responseTypesInternal.all { handledResponseTypesInternal.has(it) }
 
     override var redirectUri: String? = null
     override var state: String? = null
