@@ -4,7 +4,7 @@ package id.walt.openid4vci.preauthorized
 
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.TokenType
-import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
+import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import kotlin.io.encoding.Base64
 import kotlin.random.Random
@@ -31,7 +31,7 @@ interface PreAuthorizedCodeIssuer {
     suspend fun issue(request: PreAuthorizedCodeIssueRequest): PreAuthorizedCodeIssueResult
 }
 
-data class PreAuthorizedCodeIssueRequest constructor(
+data class PreAuthorizedCodeIssueRequest(
     val clientId: String? = null,
     val userPinRequired: Boolean = false,
     val userPin: String? = null,
@@ -42,7 +42,7 @@ data class PreAuthorizedCodeIssueRequest constructor(
     val credentialNonceExpiresAt: Instant? = null,
 )
 
-data class PreAuthorizedCodeIssueResult constructor(
+data class PreAuthorizedCodeIssueResult(
     val code: String,
     val expiresAt: Instant,
     val credentialNonce: String? = null,
@@ -67,7 +67,7 @@ class DefaultPreAuthorizedCodeIssuer(
         }
 
         repository.save(
-            PreAuthorizedCodeRecord(
+            DefaultPreAuthorizedCodeRecord(
                 code = code,
                 clientId = request.clientId,
                 userPinRequired = request.userPinRequired,

@@ -97,7 +97,7 @@ import kotlin.time.Instant
             audience = request.getGrantedAudience().toSet().firstOrNull(),
             scopes = request.getGrantedScopes().toSet(),
             expiresAt = expiresAt,
-            additional = buildMap<String, Any?> {
+            additional = buildMap {
                 put("client_id", clientId)
                 put("pre_authorized_code", code)
             },

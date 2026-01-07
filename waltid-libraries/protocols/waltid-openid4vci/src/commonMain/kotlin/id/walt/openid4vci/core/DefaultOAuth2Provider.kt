@@ -64,7 +64,7 @@ class DefaultOAuth2Provider(
                 request.state?.let { put("state", it) }
             }
             val location = appendParams(baseRedirect, parameters)
-            val headers = mutableMapOf<String, String>("Location" to location)
+            val headers = mutableMapOf("Location" to location)
             AuthorizeHttpResponse(
                 status = 302,
                 redirectUri = location,
@@ -108,8 +108,7 @@ class DefaultOAuth2Provider(
                 continue
             }
 
-            val result = handler.handleTokenEndpointRequest(request)
-            return when (result) {
+            return when (val result = handler.handleTokenEndpointRequest(request)) {
                 is TokenEndpointResult.Success -> AccessResponseResult.Success(
                     AccessTokenResponse(
                         tokenType = result.tokenType,
@@ -142,7 +141,7 @@ class DefaultOAuth2Provider(
     override fun writeAccessResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessHttpResponse =
         AccessHttpResponse(
             status = 200,
-            payload = buildMap<String, Any?> {
+            payload = buildMap {
                 put("token_type", response.tokenType)
                 put("access_token", response.accessToken)
                 response.expiresIn?.let { put("expires_in", it) }

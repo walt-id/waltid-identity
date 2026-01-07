@@ -17,7 +17,7 @@ import kotlin.time.Instant
  * Will be updated
  * Base implementation for [RequestContext].
  */
-open class BaseRequestContext constructor(
+open class BaseRequestContext(
     private var requestId: String? = null,
     private var requestedAt: Instant = kotlin.time.Clock.System.now(),
     private var client: Client = DefaultClient(),

@@ -8,7 +8,7 @@ import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.core.AuthorizeResponse
 import id.walt.openid4vci.core.AuthorizeResponseResult
 import id.walt.openid4vci.core.OAuthError
-import id.walt.openid4vci.repository.authorization.AuthorizationCodeRecord
+import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.request.AuthorizationRequest
 import kotlin.io.encoding.Base64
@@ -57,7 +57,7 @@ class AuthorizationCodeAuthorizeHandler(
             )
 
         codeRepository.save(
-            AuthorizationCodeRecord(
+            DefaultAuthorizationCodeRecord(
                 code = code,
                 clientId = request.getClient().id,
                 redirectUri = redirectUri,

@@ -24,7 +24,7 @@ enum class TokenType {
     AUTHORIZATION_CODE,
 }
 
-class DefaultSession constructor(
+class DefaultSession(
     private val expiresAt: MutableMap<TokenType, Instant> = mutableMapOf(),
     private var subject: String? = null,
 ) : Session {
