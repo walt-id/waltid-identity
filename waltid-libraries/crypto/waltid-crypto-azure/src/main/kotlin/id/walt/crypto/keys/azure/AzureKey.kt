@@ -19,8 +19,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import org.kotlincrypto.hash.sha2.SHA256
-import org.kotlincrypto.hash.sha2.SHA384
-import org.kotlincrypto.hash.sha2.SHA512
 
 @Serializable
 @SerialName("azure")
@@ -59,21 +57,19 @@ class AzureKey(
     private val azureSignatureAlgorithm: SignatureAlgorithm
         get() = when (keyType) {
             KeyType.secp256r1 -> SignatureAlgorithm.ES256
-            KeyType.secp384r1 -> SignatureAlgorithm.ES384
-            KeyType.secp521r1 -> SignatureAlgorithm.ES512
             KeyType.secp256k1 -> SignatureAlgorithm.ES256K
             KeyType.RSA -> SignatureAlgorithm.RS256
-            KeyType.RSA3072 -> SignatureAlgorithm.RS384
-            KeyType.RSA4096 -> SignatureAlgorithm.RS512
-            KeyType.Ed25519 -> throw KeyTypeNotSupportedException(keyType.name)
+            else -> {
+                throw KeyTypeNotSupportedException(keyType.name)
+            }
         }
 
 
     private fun getHashFunction(): (ByteArray) -> ByteArray = when (keyType) {
         KeyType.secp256r1, KeyType.secp256k1, KeyType.RSA -> { data -> SHA256().digest(data) }
-        KeyType.secp384r1, KeyType.RSA3072 -> { data -> SHA384().digest(data) }
-        KeyType.secp521r1, KeyType.RSA4096 -> { data -> SHA512().digest(data) }
-        KeyType.Ed25519 -> throw KeyTypeNotSupportedException(keyType.name)
+        else -> {
+            throw KeyTypeNotSupportedException(keyType.name)
+        }
     }
 
     override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
