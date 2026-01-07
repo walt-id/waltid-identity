@@ -7,6 +7,8 @@ group = "id.walt.crypto"
 
 dependencies {
     testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+ 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 
     // walt.id
@@ -33,10 +35,10 @@ dependencies {
     implementation("org.kotlincrypto.hash:sha2")
 }
 
-tasks.withType<Test> {
-    enabled = false
-}
 
+tasks.test {
+    useJUnitPlatform()
+}
 mavenPublishing {
     pom {
         name.set("Walt.id Crypto Azure")
