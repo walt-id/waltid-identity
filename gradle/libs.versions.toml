@@ -24,7 +24,7 @@ kotlinx-datetime = "0.7.1"
 kotlinx-coroutines = "1.10.2"
 
 # Logging
-kotlinlogging = "7.0.5"
+kotlinlogging = "7.0.14"
 slf4j-simple = "2.0.17"
 
 # Misc
@@ -58,14 +58,17 @@ jib-gradle-plugin = { module = "com.google.cloud.tools:jib-gradle-plugin", versi
 vanniktech-publish-plugin = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "vanniktech-publish" }
 petuska-npm-publish-plugin = { module = "dev.petuska.npm.publish:dev.petuska.npm.publish.gradle.plugin", version.ref = "npm-publish" }
 loveforte-suspendtransform = { module = "love.forte.plugin.suspend-transform:love.forte.plugin.suspend-transform.gradle.plugin", version.ref = "suspendtransform" }
-powerassert = { module = "org.jetbrains.kotlin.plugin.power-assert:org.jetbrains.kotlin.plugin.power-assert.gradle.plugin", version.ref="kotlin" }
+powerassert = { module = "org.jetbrains.kotlin.plugin.power-assert:org.jetbrains.kotlin.plugin.power-assert.gradle.plugin", version.ref = "kotlin" }
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle" }
 jetbrains-compose = { module = "org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin", version.ref = "kotlin" }
-mokkery-gradle-plugin =  { module = "dev.mokkery:dev.mokkery.gradle.plugin", version.ref="mokkery" }
+mokkery-gradle-plugin = { module = "dev.mokkery:dev.mokkery.gradle.plugin", version.ref = "mokkery" }
 
 # Libraries
 
-## Ktor
+## Kotlin Test
+kotlintest = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+
+## Ktor Client
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-serialization = { module = "io.ktor:ktor-client-serialization", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
@@ -73,6 +76,9 @@ ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx
 ktor-client-json = { module = "io.ktor:ktor-client-json", version.ref = "ktor" }
 ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+
+## Ktor Server
+ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
 
 ## Kotlinx
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
@@ -101,8 +107,9 @@ junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-para
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
 
 ## Logging
-kotlinlogging = { module = "io.github.oshai:kotlin-logging", version.ref = "kotlinlogging" }
+oshai-kotlinlogging = { module = "io.github.oshai:kotlin-logging", version.ref = "kotlinlogging" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j-simple" }
+
 
 ## Misc
 cache4k = { module = "io.github.reactivecircus.cache4k:cache4k", version.ref = "cache4k" }
@@ -115,6 +122,16 @@ waltid-ktor-client = [
     "ktor-serialization-kotlinx-json",
     "ktor-client-json",
     "ktor-client-logging",
+]
+
+waltid-kotlintesting = [
+    "kotlintest",
+    "kotlinx-coroutines-test"
+]
+waltid-ktortesting = [
+    "kotlintest",
+    "kotlinx-coroutines-test",
+    "ktor-server-test-host"
 ]
 
 [plugins]

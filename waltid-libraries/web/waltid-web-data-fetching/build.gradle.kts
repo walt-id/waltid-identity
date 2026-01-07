@@ -1,7 +1,6 @@
 plugins {
     id("waltid.multiplatform.library")
     id("waltid.publish.maven")
-    id("waltid.publish.npm")
 }
 
 group = "id.walt.web"
@@ -18,19 +17,21 @@ kotlin {
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
 
-            // Kotlinx
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-            implementation("app.softwork:kotlinx-uuid-core:0.1.6")
-
             // JSON
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+
+            implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")
+            // For in-memory cache
+            //implementation("com.mayakapps.kache:kache:2.1.1")
+            // For persistent cache
+            //implementation("com.mayakapps.kache:file-kache:<version>")
         }
     }
 }
 
 mavenPublishing {
     pom {
-        name.set("walt.id Ktor Server Notifications Library - Core")
-        description.set("walt.id Kotlin/Java Ktor Server Notifications Library - Core")
+        name.set("walt.id Web Data Fetching")
+        description.set("walt.id Kotlin/Java Web Data Fetching Library")
     }
 }

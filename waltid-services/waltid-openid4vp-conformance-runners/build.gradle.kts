@@ -79,9 +79,9 @@ dependencies {
 
     implementation("com.nimbusds:nimbus-jose-jwt:10.6")
 
-    testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
-    testApi(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
+    implementation(identityLibs.kotlintest)
+    testImplementation(identityLibs.kotlinx.coroutines.test)
+    testImplementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
     testImplementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
 
     implementation(project(":waltid-services:waltid-service-commons-test"))
