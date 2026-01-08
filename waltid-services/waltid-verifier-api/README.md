@@ -1,4 +1,4 @@
-<div style="text-align: center;">
+<div align="center">
  <h1>Verifier service</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
   <p>Credential verification using the
@@ -13,7 +13,7 @@ protocol.</p>
 </a>
   
   <h2>Status</h2>
-  <p style="text-align: center;">
+  <p align="center">
     <img src="https://img.shields.io/badge/🟠%20Planned%20Deprecation-orange?style=for-the-badge&logo=clock" alt="Status: Planned Deprecation" />
   <br/>
   <em>This project is still supported by the development team at walt.id, but is planned for deprecation sometime in Q2 2026.<br />We encourage users to migrate to using alternative libraries listed below.</em>
@@ -176,6 +176,6 @@ https://verifier.portal.walt-test.cloud/swagger/index.html
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div style="text-align: center;">
+<div align="center">
 <img src="../../assets/walt-banner.png" alt="walt.id banner" />
 </div>

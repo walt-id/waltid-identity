@@ -1,4 +1,4 @@
-<div style="text-align: center;">
+<div align="center">
     <h1>Kotlin Multiplatform Verification Policies library</h1>
     <span>by </span><a href="https://walt.id">walt.id</a>
     <p>Composable verification policies for digital credentials</p>
@@ -9,7 +9,7 @@
     <img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
     </a>
     <h2>Status</h2>
-    <p style="text-align: center;">
+    <p align="center">
         <img src="https://img.shields.io/badge/🟠%20Planned%20Deprecation-orange?style=for-the-badge&logo=clock" alt="Status: Planned Deprecation" />
         <br/>
         <em>This project is still supported by the development team at walt.id, but is planned for deprecation sometime in Q2 2026.<br />We encourage users to migrate to using alternative libraries listed below.</em>
@@ -362,7 +362,7 @@ PolicyManager.registerPolicies(CustomPolicy())
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div style="text-align: center;">
+<div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
 

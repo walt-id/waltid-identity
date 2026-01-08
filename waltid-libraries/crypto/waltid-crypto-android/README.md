@@ -1,4 +1,4 @@
-<div style="text-align: center;">
+<div align="center">
 <h1>walt.id Crypto Android</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
  <p>Android-specific cryptographic key operations using Android Keystore</p>
@@ -153,6 +153,6 @@ val jwk = key.exportJWK()
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div style="text-align: center;">
+<div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>

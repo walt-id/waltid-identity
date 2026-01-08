@@ -1,4 +1,4 @@
-<div style="text-align: center;">
+<div align="center">
 <h1>walt.id Libraries</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
  <p>Comprehensive collection of multiplatform libraries for digital identity, credentials, and cryptography</p>
@@ -132,7 +132,7 @@ Platform-specific implementations are provided where needed (e.g., `waltid-crypt
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div style="text-align: center;">
+<div align="center">
 <img src="../assets/walt-banner.png" alt="walt.id banner" />
 </div>
 

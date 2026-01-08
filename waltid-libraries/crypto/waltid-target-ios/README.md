@@ -1,4 +1,4 @@
-<div style="text-align: center;">
+<div align="center">
     <h1>walt.id Target iOS</h1>
     <span>by </span><a href="https://walt.id">walt.id</a>
     <p>iOS-specific cryptographic key operations using iOS Keychain and Secure Enclave</p>
@@ -9,7 +9,7 @@
     <img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
     </a>
     <h2>Status</h2>
-    <p style="text-align: center;">
+    <p align="center">
         <img src="https://img.shields.io/badge/🟡%20Unmaintained-yellow?style=for-the-badge&logo=warning" alt="Status: Unmaintained" />
         <br/>
         <em>This project is not actively maintained. Certain features may be outdated or not working as expected.<br />We encourage users to contribute to the project to help keep it up to date.</em>
@@ -161,6 +161,6 @@ The library provides low-level keychain operations that are wrapped by higher-le
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div style="text-align: center;">
+<div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>

@@ -1,4 +1,4 @@
-<div style="text-align: center;">
+<div align="center">
 <h1>walt.id Integration Tests</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
  <p>Integration test suite for walt.id Community Stack services</p>
@@ -11,7 +11,7 @@
 </a>
   
   <h2>Status</h2>
-  <p style="text-align: center;">
+  <p align="center">
     <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
     <br/>
     <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
@@ -145,6 +145,6 @@ Tests are organized by functionality:
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div style="text-align: center;">
+<div align="center">
 <img src="../../assets/walt-banner.png" alt="walt.id banner" />
 </div>

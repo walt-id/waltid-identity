@@ -1,4 +1,4 @@
-<div style="text-align: center;">
+<div align="center">
 <h1>walt.id Web Libraries</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
  <p>Libraries for web server functionality and notifications</p>
@@ -65,7 +65,7 @@ Ktor plugin for session notifications. Provides ready-to-use Ktor routes and plu
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div style="text-align: center;">
+<div align="center">
 <img src="../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
 

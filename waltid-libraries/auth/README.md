@@ -1,5 +1,5 @@
 
-<div style="text-align: center;">
+<div align="center">
 <h1>walt.id Authentication & Authorization Libraries</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
  <p>Libraries for implementing authentication and authorization systems</p>
@@ -71,7 +71,7 @@ Identity Provider toolkit for OIDC-based authentication with verifiable credenti
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div style="text-align: center;">
+<div align="center">
 <img src="../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
 
