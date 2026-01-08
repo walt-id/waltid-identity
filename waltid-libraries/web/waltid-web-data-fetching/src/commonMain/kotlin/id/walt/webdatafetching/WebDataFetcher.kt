@@ -4,16 +4,19 @@ import id.walt.webdatafetching.utils.UrlUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.plugins.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 
 class WebDataFetcher<T : Any>(id: String) {
 
-    //private val log = KotlinLogging.logger("WebDataFetcher[$id]")
+    private val log = KotlinLogging.logger("WebDataFetcher[$id]")
 
     val dataFetcherConfiguration = WebDataFetcherManager.getConfigurationForId(id)
-    val httpClient = HttpClient()
+
+    val httpClient = HttpClient() {
+        dataFetcherConfiguration.applyConfigurationToHttpClient(this)
+    }
 
     val cache = dataFetcherConfiguration.cache?.buildCache<T>()
 
@@ -30,12 +33,24 @@ class WebDataFetcher<T : Any>(id: String) {
 
         val requestConfig = dataFetcherConfiguration.request
 
-        val httpResponse = httpClient.get(url) {
-            requestConfig?.expectSuccess?.let { expectSuccess = it }
-            requestConfig?.headers?.forEach { (key, value) -> header(key, value) }
-        } // TODO: More graceful error handling
+        val httpResponseResult = runCatching {
+            httpClient.request(url) {
+                requestConfig?.applyConfiguration(this)
+            }
+        }
 
-        val parsedResponse: T = httpResponse.body<Res>()
+        val httpResponse = httpResponseResult.getOrElse { ex ->
+            throw IllegalArgumentException("Could not send request to: $url (${ex.message ?: "unkown error"})", ex)
+        }
+
+        val parsedResponse: T = if (httpResponse.contentType()?.match(ContentType.Text.Plain) == true) {
+            val body = httpResponse.bodyAsText()
+            runCatching {
+                dataFetcherConfiguration.decoding.json.decodeFromString<Res>(body)
+            }.getOrElse { ex -> throw IllegalArgumentException("Server answered request with non-/invalid JSON: $body (to request to $url)", ex) }
+        } else {
+            httpResponse.body<Res>()
+        }
 
         cache?.put(cacheId, parsedResponse)
 

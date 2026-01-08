@@ -26,6 +26,10 @@ kotlin {
             // For persistent cache
             //implementation("com.mayakapps.kache:file-kache:<version>")
         }
+        commonTest.dependencies {
+            implementation(identityLibs.bundles.waltid.kotlintesting)
+            implementation(identityLibs.ktor.client.cio)
+        }
     }
 }
 
