@@ -1,4 +1,4 @@
-<div align="center">
+<div style="text-align: center;">
     <h1>walt.id Web3 Login</h1>
     <span>by </span><a href="https://walt.id">walt.id</a>
     <p>Reference implementation for Web3 wallet-based authentication using signature verification</p>
@@ -9,7 +9,7 @@
     <img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
     </a>
     <h2>Status</h2>
-    <p align="center">
+    <p style="text-align: center;">
         <img src="https://img.shields.io/badge/🟡%20Unmaintained-yellow?style=for-the-badge&logo=warning" alt="Status: Unmaintained" />
         <br/>
         <em>This project is not actively maintained. Certain features may be outdated or not working as expected.<br />We encourage users to contribute to the project to help keep it up to date.</em>
@@ -183,6 +183,6 @@ This is a minimal starter application. To build a complete Web3 login solution:
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div align="center">
+<div style="text-align: center;">
 <img src="../../assets/walt-banner.png" alt="walt.id banner" />
 </div>

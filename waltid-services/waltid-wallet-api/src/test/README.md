@@ -1,4 +1,4 @@
-<div align="center">
+<div style="text-align: center;">
  <h1>Ktor e2e Test Framework</h1>
  <p>Automates the Testing of all <b>Walt.Id</b> Rest API endpoints and use cases.</p>
 

@@ -1,4 +1,4 @@
-<div align="center">
+<div style="text-align: center;">
  <h1>Wallet API</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
  <p>Identity wallets to manage Keys, DIDs, Credentials, and NFTs/SBTs</p>
@@ -11,7 +11,7 @@
 </a>
   
   <h2>Status</h2>
-  <p align="center">
+  <p style="text-align: center;">
     <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
     <br/>
     <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
@@ -64,11 +64,23 @@ docker run \
 
 ***Build the container***
 
-Update the wallet-api container by running the following commands from the root folder:
+Update the wallet-api container by running the following commands from the waltid-identity root path:
 
 ```bash
-docker build -t waltid/wallet-api -f waltid-services/waltid-wallet-api/Dockerfile .
+# Development (local Docker daemon, single-arch)
+./gradlew :waltid-services:waltid-wallet-api:publishImageToLocalRegistry
+# image: waltid/wallet-api:<version>
 ```
+
+```bash
+# Production (multi-arch push to your registry)
+export DOCKER_USERNAME=<your-dockerhub-namespace>
+export DOCKER_PASSWORD=<your-dockerhub-token>
+./gradlew :waltid-services:waltid-wallet-api:publishImage
+# image: docker.io/<DOCKER_USERNAME>/wallet-api:<version>
+```
+
+Note: multi-arch images require a registry push. Local tar output is single-arch only.
 
 # Database configuration
 
@@ -138,6 +150,6 @@ docker run --name mssql -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=p@ssw0rd" -p 14
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div align="center">
+<div style="text-align: center;">
 <img src="../../assets/walt-banner.png" alt="walt.id banner" />
 </div>

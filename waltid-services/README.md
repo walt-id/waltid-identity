@@ -1,4 +1,4 @@
-<div align="center">
+<div style="text-align: center;">
 <h1>walt.id Services</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
  <p>Production-ready services for credential issuance, verification, and wallet management</p>
@@ -125,7 +125,7 @@ All services are built with Ktor and can be deployed as standalone JVM applicati
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div align="center">
+<div style="text-align: center;">
 <img src="../assets/walt-banner.png" alt="walt.id banner" />
 </div>
 

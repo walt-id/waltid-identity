@@ -1,4 +1,4 @@
-<div align="center">
+<div style="text-align: center;">
  <h1>Verifier service</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
   <p>Credential verification using the
@@ -13,7 +13,7 @@ protocol.</p>
 </a>
   
   <h2>Status</h2>
-  <p align="center">
+  <p style="text-align: center;">
     <img src="https://img.shields.io/badge/🟠%20Planned%20Deprecation-orange?style=for-the-badge&logo=clock" alt="Status: Planned Deprecation" />
   <br/>
   <em>This project is still supported by the development team at walt.id, but is planned for deprecation sometime in Q2 2026.<br />We encourage users to migrate to using alternative libraries listed below.</em>
@@ -42,35 +42,35 @@ can be found in the table below:
         <!-- header -->
         <tr>
             <td align="center" colspan="2">Format</td>
-            <td align="center">OID4VC</td>
-            <td align="center">DIDComm</td>
+            <td align="center" >OID4VC</td>
+            <td align="center" >DIDComm</td>
         </tr>
         <!-- content -->
         <!-- w3c -->
         <!-- jwt -->
         <tr>
             <td align="center" rowspan="2">W3C</td>
-            <td align="center">jwt</td>
-            <td align="center">&check;</td>
-            <td align="center">&cross;</td>
+            <td align="center" >jwt</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&cross;</td>
         </tr>
         <!-- sdjwt -->
         <tr>
-            <td align="center">sd-jwt</td>
-            <td align="center">&check;</td>
-            <td align="center">&cross;</td>
+            <td align="center" >sd-jwt</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&cross;</td>
         </tr>
         <!-- SD-JWT VC (IETF) -->
         <tr>
             <td align="center" colspan="2">SD-JWT VC (IETF)</td>
-            <td align="center">&check;</td>
-            <td align="center">&cross;</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&cross;</td>
         </tr>
         <!-- mdoc -->
         <tr>
             <td align="center" colspan="2">mDL/mdoc</td>
-            <td align="center">&cross;</td>
-            <td align="center">&dash;</td>
+            <td align="center" >&cross;</td>
+            <td align="center" >&dash;</td>
         </tr>
   </tbody>
 </table>
@@ -102,12 +102,29 @@ Verifier service relies on the following walt.id libraries:
 1. run the `id.walt.verifier.Mainkt` file
 2. the verifier backend is available at: http://localhost:7003
 
-### Using docker
+### Docker images
 
 Run the following commands from the waltid-identity root path:
 
-```shell
-docker build -t waltid/verifier-api -f waltid-services/waltid-verifier-api/Dockerfile .
+```bash
+# Development (local Docker daemon, single-arch)
+./gradlew :waltid-services:waltid-verifier-api:publishImageToLocalRegistry
+# image: waltid/verifier-api:<version>
+```
+
+```bash
+# Production (multi-arch push to your registry)
+export DOCKER_USERNAME=<your-dockerhub-namespace>
+export DOCKER_PASSWORD=<your-dockerhub-token>
+./gradlew :waltid-services:waltid-verifier-api:publishImage
+# image: docker.io/<DOCKER_USERNAME>/verifier-api:<version>
+```
+
+Note: multi-arch images require a registry push. Local tar output is single-arch only.
+
+Run the container:
+
+```bash
 docker run -p 7003:7003 waltid/verifier-api -- --webPort=7003 --baseUrl=http://localhost:7003
 ```
 
@@ -159,6 +176,6 @@ https://verifier.portal.walt-test.cloud/swagger/index.html
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div align="center">
+<div style="text-align: center;">
 <img src="../../assets/walt-banner.png" alt="walt.id banner" />
 </div>

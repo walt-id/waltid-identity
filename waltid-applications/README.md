@@ -1,4 +1,4 @@
-<div align="center">
+<div style="text-align: center;">
 <h1>walt.id Applications</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
  <p>End-user applications and development tools for digital identity and credentials</p>
@@ -117,7 +117,7 @@ Reusable Digital Credentials API web component plus a minimal demo backend. Incl
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div align="center">
+<div style="text-align: center;">
 <img src="../assets/walt-banner.png" alt="walt.id banner" />
 </div>
 

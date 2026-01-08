@@ -1,4 +1,4 @@
-<div align="center">
+<div style="text-align: center;">
 <img src="assets/walt-banner.png" alt="walt.id banner" />
  
   <p>Multi-Platform libraries, powerful APIs and easy-to-use white label apps to build identity and wallet solutions <span>by </span><a href="https://walt.id">walt.id</a></p>

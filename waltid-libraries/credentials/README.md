@@ -1,4 +1,4 @@
-<div align="center">
+<div style="text-align: center;">
 <h1>walt.id Credentials Libraries</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
  <p>Libraries for working with digital credentials across multiple formats and use cases</p>
@@ -244,6 +244,6 @@ The libraries have the following dependency relationships:
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div align="center">
+<div style="text-align: center;">
 <img src="../../assets/walt-banner.png" alt="walt.id banner" />
 </div>

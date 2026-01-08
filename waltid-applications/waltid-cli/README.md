@@ -1,4 +1,4 @@
-<div align="center">
+<div style="text-align: center;">
  <h1>walt.id CLI</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
   <p>Manage keys, DIDs, issue W3C Verifiable Credentials, and verify them using the command line tool</p>
@@ -11,7 +11,7 @@
   </a>
 
   <h2>Status</h2>
-  <p align="center">
+  <p style="text-align: center;">
     <img src="https://img.shields.io/badge/🟡%20Unmaintained-yellow?style=for-the-badge&logo=warning" alt="Status: Unmaintained" />
     <br/>
     <em>This project is not actively maintained. Certain features may be outdated or not working as expected.<br />We encourage users to contribute to the project to help keep it up to date.</em>
@@ -793,6 +793,6 @@ This project is still a work in progress. As such, not all features are already 
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div align="center">
+<div style="text-align: center;">
 <img src="../../assets/walt-banner.png" alt="walt.id banner" />
 </div>

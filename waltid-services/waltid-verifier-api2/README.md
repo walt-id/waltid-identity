@@ -1,4 +1,4 @@
-<div align="center">
+<div style="text-align: center;">
 <h1>walt.id Verifier API 2</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
  <p>Ktor-based Verifier REST service implementing OpenID4VP 1.0 with DCQL and modern policy engine</p>
@@ -11,7 +11,7 @@
 </a>
   
   <h2>Status</h2>
-  <p align="center">
+  <p style="text-align: center;">
     <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
     <br/>
     <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
@@ -103,12 +103,23 @@ Run locally (development):
 ./gradlew :waltid-services:waltid-verifier-api2:run
 ```
 
-Docker image:
+Docker images:
 
 ```bash
-./gradlew :waltid-services:waltid-verifier-api2:docker
+# Development (local Docker daemon, single-arch)
+./gradlew :waltid-services:waltid-verifier-api2:publishImageToLocalRegistry
 # image: waltid/verifier-api2:<version>
 ```
+
+```bash
+# Production (multi-arch push to your registry)
+export DOCKER_USERNAME=<your-dockerhub-namespace>
+export DOCKER_PASSWORD=<your-dockerhub-token>
+./gradlew :waltid-services:waltid-verifier-api2:publishImage
+# image: docker.io/<DOCKER_USERNAME>/verifier-api2:<version>
+```
+
+Note: multi-arch images require a registry push. Local tar output is single-arch only.
 
 Create a session (example payloads available via OpenAPI helper):
 
@@ -163,6 +174,6 @@ See `config/` for service, web, and feature toggles. SSE and webhook delivery ca
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-<div align="center">
+<div style="text-align: center;">
 <img src="../../assets/walt-banner.png" alt="walt.id banner" />
 </div>

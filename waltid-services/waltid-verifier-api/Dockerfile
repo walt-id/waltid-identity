@@ -1,3 +1,5 @@
+# NOTE: Prefer Gradle Ktor/Jib tasks (publishImageToLocalRegistry/publishImage) for builds.
+# This Dockerfile is for manual/custom Docker workflows.
 FROM gradle:latest AS pre-cache
 COPY . /home/src
 COPY gradle.properties settings.gradle.kts /home/app/
