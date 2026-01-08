@@ -6,41 +6,73 @@ import id.walt.commons.fetchBinaryFile
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
-import id.walt.openid4vp.verifier.data.SessionEvent
-import id.walt.openid4vp.verifier.data.Verification2Session
+import id.walt.ktornotifications.core.KtorSessionUpdate
+import id.walt.openid4vp.verifier.annexc.AnnexCService
+import id.walt.openid4vp.verifier.data.*
 import id.walt.openid4vp.verifier.data.Verification2Session.VerificationSessionStatus
-import id.walt.openid4vp.verifier.data.VerificationSessionSetup
-import id.walt.openid4vp.verifier.data.Verifier2SessionUpdate
-import id.walt.openid4vp.verifier.handlers.authrequest.Verifier2AuthorizationRequestHandler.respondAuthorizationRequest
-import id.walt.openid4vp.verifier.handlers.vpresponse.Verifier2VPDirectPostHandler.respondHandleDirectPostResponse
+import id.walt.openid4vp.verifier.handlers.authrequest.Verifier2AuthorizationRequestHandler
+import id.walt.openid4vp.verifier.handlers.vpresponse.Verifier2VPDirectPostHandler
 import id.walt.openid4vp.verifier.openapi.VerificationSessionCreateOpenApi
-import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.openid4vp.verifier.openapi.VerificationSessionUnifiedOpenApi
 import id.walt.vical.*
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
 import io.klogging.logger
 import io.ktor.http.*
+import io.ktor.server.application.*
 import io.ktor.server.plugins.doublereceive.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.server.util.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.*
 import kotlinx.serialization.serializer
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.uuid.ExperimentalUuidApi
 
 
 private val log = logger("Verifier2Service")
 private const val VERIFICATION_SESSION = "verification-session"
 private const val VICAL = "vical"
+private const val ENVELOPE_QUERY_PARAM = "envelope"
+
+@Serializable
+data class UnifiedEnvelope(
+    val sessionId: String,
+    @SerialName("flow_type")
+    val flowType: String,
+    val data: JsonElement,
+    val error: UnifiedError? = null
+)
+
+@Serializable
+data class UnifiedError(
+    val message: String,
+    val code: String? = null
+)
+
+@Serializable
+data class AnnexCResponsePayload(
+    val response: String
+)
+
+private fun ApplicationCall.useUnifiedEnvelope(): Boolean {
+    val envelopeParam = request.queryParameters[ENVELOPE_QUERY_PARAM]
+    return envelopeParam?.equals("true", ignoreCase = true) == true
+}
+
+private inline fun <reified T> jsonElement(value: T): JsonElement =
+    Json.encodeToJsonElement(value)
 
 
 object Verifier2Service {
 
     val sessions = HashMap<String, Verification2Session>()
+    private val sessionFlowTypes = ConcurrentHashMap<String, String>()
 
     /**
      * Update data for this session and send session update notifications
@@ -74,50 +106,142 @@ object Verifier2Service {
         }
     }
 
+    private fun flowTypeForSetup(setup: VerificationSessionSetup): String = when (setup) {
+        is CrossDeviceFlowSetup -> "cross_device"
+        is SameDeviceFlowSetup -> "same_device"
+        is DcApiFlowSetup -> "dc_api"
+        is DcApiAnnexCFlowSetup -> AnnexCService.FLOW_TYPE
+    }
+
+    private fun flowTypeForSession(sessionId: String): String? =
+        sessionFlowTypes[sessionId] ?: AnnexCService.sessions[sessionId]?.flowType
+
+    private fun wrapEnvelope(sessionId: String, flowType: String, data: JsonElement, error: UnifiedError? = null) =
+        UnifiedEnvelope(sessionId = sessionId, flowType = flowType, data = data, error = error)
+
+    private fun wrapSseUpdate(sessionId: String, flowType: String, update: KtorSessionUpdate): KtorSessionUpdate {
+        val envelope = wrapEnvelope(sessionId, flowType, update.session)
+        val envelopeJson = Json.encodeToJsonElement(envelope).jsonObject
+        return KtorSessionUpdate(target = update.target, event = update.event, session = envelopeJson)
+    }
+
     fun Route.registerRoute() {
         route(VERIFICATION_SESSION) {
             route("", {
                 tags("Verification Session Management")
             }) {
                 post<VerificationSessionSetup>("create", VerificationSessionCreateOpenApi.createDocs) { sessionSetup ->
-                    val newSession = OSSVerifier2Manager.createVerificationSession(sessionSetup)
-                    sessions[newSession.id] = newSession
-                    val creationResponse = newSession.toSessionCreationResponse()
-                    call.respond(creationResponse)
+                    val useEnvelope = call.useUnifiedEnvelope()
+
+                    when (sessionSetup) {
+                        is DcApiAnnexCFlowSetup -> {
+                            val session = AnnexCService.createSession(
+                                docType = sessionSetup.docType,
+                                requestedElements = sessionSetup.requestedElements,
+                                policies = sessionSetup.policies,
+                                origin = sessionSetup.origin,
+                                ttlSeconds = sessionSetup.ttlSeconds
+                            )
+                            sessionFlowTypes[session.id] = session.flowType
+                            AnnexCService.publishSessionUpdate(session)
+
+                            val response = AnnexCService.AnnexCCreateResponse(
+                                sessionId = session.id,
+                                expiresAt = session.expiresAt.toString()
+                            )
+
+                            if (useEnvelope) {
+                                call.respond(
+                                    wrapEnvelope(
+                                        sessionId = session.id,
+                                        flowType = session.flowType,
+                                        data = jsonElement(response)
+                                    )
+                                )
+                            } else {
+                                call.respond(response)
+                            }
+                        }
+
+                        else -> {
+                            val newSession = OSSVerifier2Manager.createVerificationSession(sessionSetup)
+                            sessions[newSession.id] = newSession
+                            sessionFlowTypes[newSession.id] = flowTypeForSetup(sessionSetup)
+
+                            val creationResponse = newSession.toSessionCreationResponse()
+                            if (useEnvelope) {
+                                call.respond(
+                                    wrapEnvelope(
+                                        sessionId = newSession.id,
+                                        flowType = sessionFlowTypes[newSession.id] ?: "unknown",
+                                        data = jsonElement(creationResponse)
+                                    )
+                                )
+                            } else {
+                                call.respond(creationResponse)
+                            }
+                        }
+                    }
                 }
 
                 route("{$VERIFICATION_SESSION}") {
 
-                    get("info", {
-                        summary = "View data of existing verification session"
-                        request { pathParameter<String>(VERIFICATION_SESSION) }
-                        response { HttpStatusCode.OK to { body<Verification2Session>() } }
-                    }
-                    ) {
-                        val verifierSession =
-                            sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
-                                ?: throw IllegalArgumentException("Unknown session id")
-                        call.respond(verifierSession)
+                    get("info", VerificationSessionUnifiedOpenApi.infoDocs) {
+                        val sessionId = call.parameters.getOrFail(VERIFICATION_SESSION)
+                        val useEnvelope = call.useUnifiedEnvelope()
+
+                        val verifierSession = sessions[sessionId]
+                        if (verifierSession != null) {
+                            if (useEnvelope) {
+                                val flowType = flowTypeForSession(sessionId) ?: "unknown"
+                                call.respond(
+                                    wrapEnvelope(
+                                        sessionId = sessionId,
+                                        flowType = flowType,
+                                        data = jsonElement(verifierSession)
+                                    )
+                                )
+                            } else {
+                                call.respond(verifierSession)
+                            }
+                            return@get
+                        }
+
+                        val annexSession = AnnexCService.sessions[sessionId]
+                            ?: throw IllegalArgumentException("Unknown session id")
+                        val info = AnnexCService.buildInfoResponse(annexSession)
+                        if (useEnvelope) {
+                            call.respond(
+                                wrapEnvelope(
+                                    sessionId = sessionId,
+                                    flowType = annexSession.flowType,
+                                    data = jsonElement(info)
+                                )
+                            )
+                        } else {
+                            call.respond(info)
+                        }
                     }
 
-                    route({
-                        summary = "Receive update events via SSE about the verification session"
-                        request { pathParameter<String>(VERIFICATION_SESSION) }
-                    }) {
+                    route(VerificationSessionUnifiedOpenApi.eventsDocs) {
                         sse("$VERIFICATION_SESSION/events", serialize = { typeInfo, it ->
                             val serializer = Json.serializersModule.serializer(typeInfo.kotlinType!!)
                             Json.encodeToString(serializer, it)
                         }) {
-                            val verifierSession =
-                                sessions[call.parameters.getOrFail("sessionId")]
-                                    ?: throw IllegalArgumentException("Unknown session id")
+                            val sessionId = call.parameters.getOrFail(VERIFICATION_SESSION)
+                            val flowType = flowTypeForSession(sessionId)
+                                ?: throw IllegalArgumentException("Unknown session id")
+                            val useEnvelope = call.useUnifiedEnvelope()
 
                             // Get the flow for this specific target.
-                            val sseFlow = SseNotifier.getSseFlow(verifierSession.id)
+                            val sseFlow = SseNotifier.getSseFlow(sessionId)
 
                             // This will suspend until the client disconnects.
                             send(JsonObject(emptyMap()))
-                            sseFlow.collect { event -> send(event) }
+                            sseFlow.collect { event ->
+                                val outbound = if (useEnvelope) wrapSseUpdate(sessionId, flowType, event) else event
+                                send(outbound)
+                            }
                         }
                     }
                 }
@@ -127,42 +251,124 @@ object Verifier2Service {
             }) {
                 get(
                     "request",
-                    {
-                        summary = "Wallets lookup the AuthorizationRequest here"
-                        request { pathParameter<String>(VERIFICATION_SESSION) }
-                        response { HttpStatusCode.OK to { body<AuthorizationRequest>() } }
-                    }) {
-                    val verificationSession =
-                        sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
-                            ?: throw IllegalArgumentException("Unknown session id")
+                    VerificationSessionUnifiedOpenApi.requestDocs
+                ) {
+                    val sessionId = call.parameters.getOrFail(VERIFICATION_SESSION)
+                    val useEnvelope = call.useUnifiedEnvelope()
 
-                    call.respondAuthorizationRequest(
-                        verificationSession = verificationSession,
-                        updateSessionCallback = updateSessionCallback
-                    )
+                    val verificationSession = sessions[sessionId]
+                    if (verificationSession != null) {
+                        val formatted = Verifier2AuthorizationRequestHandler.handleAuthorizationRequestRequest(
+                            verificationSession = verificationSession,
+                            updateSessionCallback = updateSessionCallback
+                        )
+
+                        if (useEnvelope) {
+                            val data = when (formatted) {
+                                is Verifier2AuthorizationRequestHandler.JWTStringResponse ->
+                                    JsonPrimitive(formatted.jwt)
+                                is Verifier2AuthorizationRequestHandler.JsonObjectResponse ->
+                                    formatted.json
+                                is Verifier2AuthorizationRequestHandler.RawAuthorizationRequestResponse ->
+                                    jsonElement(formatted.authorizationRequest)
+                            }
+                            val flowType = flowTypeForSession(sessionId) ?: "unknown"
+                            call.respond(
+                                wrapEnvelope(
+                                    sessionId = sessionId,
+                                    flowType = flowType,
+                                    data = data
+                                )
+                            )
+                        } else {
+                            when (formatted) {
+                                is Verifier2AuthorizationRequestHandler.JWTStringResponse -> call.respond(formatted.jwt)
+                                is Verifier2AuthorizationRequestHandler.JsonObjectResponse -> call.respond(formatted.json)
+                                is Verifier2AuthorizationRequestHandler.RawAuthorizationRequestResponse ->
+                                    call.respond(formatted.authorizationRequest)
+                            }
+                        }
+                        return@get
+                    }
+
+                    val annexSession = AnnexCService.sessions[sessionId]
+                        ?: throw IllegalArgumentException("Unknown session id")
+                    val intentToRetain = call.request.queryParameters["intentToRetain"]?.equals("true", ignoreCase = true) == true
+                    val response = AnnexCService.buildRequest(annexSession, intentToRetain)
+                    AnnexCService.publishSessionUpdate(annexSession)
+
+                    if (useEnvelope) {
+                        call.respond(
+                            wrapEnvelope(
+                                sessionId = sessionId,
+                                flowType = annexSession.flowType,
+                                data = jsonElement(response)
+                            )
+                        )
+                    } else {
+                        call.respond(response)
+                    }
                 }
 
                 route("") {
                     install(DoubleReceive)
 
-                    post<String>(
+                    post(
                         "response",
-                        {
-                            summary = "Wallets respond to an AuthorizationRequest here"
-                            request {
-                                pathParameter<String>(VERIFICATION_SESSION)
-                                body<String> { description = "" /* TODO */ }
-                            }
-                        }) { body ->
+                        VerificationSessionUnifiedOpenApi.responseDocs
+                    ) {
                         val sessionId = call.parameters.getOrFail(VERIFICATION_SESSION)
+                        val useEnvelope = call.useUnifiedEnvelope()
                         log.trace { "Received verification session response to session: $sessionId" }
-                        val verificationSession = sessions[sessionId]
 
-                        call.respondHandleDirectPostResponse(
-                            verificationSession = verificationSession,
-                            updateSessionCallback = updateSessionCallback,
-                            failSessionCallback = failSessionCallback
-                        )
+                        val verificationSession = sessions[sessionId]
+                        if (verificationSession != null) {
+                            if (useEnvelope) {
+                                val responseData = Verifier2VPDirectPostHandler.run {
+                                    call.parseHttpRequestToDirectPostResponse()
+                                }
+                                val result = Verifier2VPDirectPostHandler.handleDirectPost(
+                                    verificationSession = verificationSession,
+                                    responseData = responseData,
+                                    updateSessionCallback = updateSessionCallback,
+                                    failSessionCallback = failSessionCallback
+                                )
+                                val flowType = flowTypeForSession(sessionId) ?: "unknown"
+                                call.respond(
+                                    wrapEnvelope(
+                                        sessionId = sessionId,
+                                        flowType = flowType,
+                                        data = jsonElement(result)
+                                    )
+                                )
+                            } else {
+                                Verifier2VPDirectPostHandler.run {
+                                    call.respondHandleDirectPostResponse(
+                                        verificationSession = verificationSession,
+                                        updateSessionCallback = updateSessionCallback,
+                                        failSessionCallback = failSessionCallback
+                                    )
+                                }
+                            }
+                            return@post
+                        }
+
+                        val annexSession = AnnexCService.sessions[sessionId]
+                            ?: throw IllegalArgumentException("Unknown session id")
+                        val annexResponse = call.receive<AnnexCResponsePayload>()
+                        val ack = AnnexCService.acceptResponse(annexSession, annexResponse.response)
+
+                        if (useEnvelope) {
+                            call.respond(
+                                wrapEnvelope(
+                                    sessionId = sessionId,
+                                    flowType = annexSession.flowType,
+                                    data = jsonElement(ack)
+                                )
+                            )
+                        } else {
+                            call.respond(ack)
+                        }
                     }
                 }
             }
