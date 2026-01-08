@@ -15,8 +15,8 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 @SerialName("schema")
 data class JsonSchemaPolicy(
-    val schema: JsonObject?,
-    val schemaUrl: String?,
+    val schema: JsonObject? = null,
+    val schemaUrl: String? = null,
     val defaultType: SchemaType? = null
 ) : CredentialVerificationPolicy2() {
     override val id = "schema"
