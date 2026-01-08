@@ -112,7 +112,7 @@ Run locally (development):
 Docker image:
 
 ```bash
-./gradlew :waltid-services:waltid-verifier-api2:docker
+./gradlew :waltid-services:waltid-verifier-api2:publishImageToLocalRegistry
 # image: waltid/verifier-api2:<version>
 ```
 

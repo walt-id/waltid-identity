@@ -2,6 +2,7 @@ package id.walt.openid4vp.verifier.annexc.openapi
 
 import id.walt.iso18013.annexc.AnnexC
 import id.walt.openid4vp.verifier.annexc.AnnexCService
+import id.walt.openid4vp.verifier.data.Verification2Session
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.*
 
@@ -13,7 +14,7 @@ object AnnexCOpenApi {
     private val createRequestExample = AnnexCService.AnnexCCreateRequest(
         docType = "org.iso.18013.5.1.mDL",
         requestedElements = mapOf("org.iso.18013.5.1" to listOf("age_over_18")),
-        policies = emptyList(),
+        policies = Verification2Session.DefinedVerificationPolicies(),
         origin = "https://digital-credentials.walt.id",
         ttlSeconds = 300,
     )
@@ -50,6 +51,7 @@ object AnnexCOpenApi {
     private val infoResponseExample = AnnexCService.AnnexCInfoResponse(
         sessionId = createResponseExample.sessionId,
         status = AnnexCService.AnnexCSessionStatus.processing,
+        flowType = AnnexCService.FLOW_TYPE,
         origin = createRequestExample.origin,
         expiresAt = createResponseExample.expiresAt,
         docType = createRequestExample.docType,
@@ -160,4 +162,3 @@ object AnnexCOpenApi {
         }
     }
 }
-

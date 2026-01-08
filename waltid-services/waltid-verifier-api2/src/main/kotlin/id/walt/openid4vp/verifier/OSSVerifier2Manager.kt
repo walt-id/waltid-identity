@@ -2,10 +2,7 @@ package id.walt.openid4vp.verifier
 
 import id.walt.commons.config.ConfigManager
 import id.walt.crypto.keys.KeyManager
-import id.walt.openid4vp.verifier.data.DcApiFlowSetup
-import id.walt.openid4vp.verifier.data.UrlBearingDeviceFlowSetup
-import id.walt.openid4vp.verifier.data.Verification2Session
-import id.walt.openid4vp.verifier.data.VerificationSessionSetup
+import id.walt.openid4vp.verifier.data.*
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator
 
 object OSSVerifier2Manager {
@@ -23,6 +20,7 @@ object OSSVerifier2Manager {
             urlHost = when (setup) {
                 is UrlBearingDeviceFlowSetup -> setup.urlConfig.urlHost ?: config.urlHost
                 is DcApiFlowSetup -> setup.expectedOrigins.firstOrNull() ?: throw IllegalArgumentException("Missing expected origins (at '$.expectedOrigins')")
+                is DcApiAnnexCFlowSetup -> throw IllegalArgumentException("Annex C flows must be created via Annex C session handling")
             },
             key = setup.core.key?.key ?: config.key?.let { KeyManager.resolveSerializedKey(it) },
             x5c = setup.core.x5c ?: config.x5c,
