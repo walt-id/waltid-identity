@@ -49,13 +49,13 @@ kind: Ingress
 metadata:
     name: credentials-prod-ingress
     annotations:
-        kubernetes.io/ingress.class: "nginx"
         cert-manager.io/cluster-issuer: letsencrypt-prod
         ingress.kubernetes.io/configuration-snippet: |
             if ($host ~ ^(.+)\.waltid\.org$) {
               return 301 https://$1.walt-test.cloud$request_uri;
             }
 spec:
+    ingressClassName: nginx
     tls:
         - hosts:
               - credentials.walt.id
