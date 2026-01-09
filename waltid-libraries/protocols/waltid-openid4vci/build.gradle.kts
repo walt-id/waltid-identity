@@ -13,9 +13,6 @@ object Versions {
 
 kotlin {
     sourceSets {
-        all {
-            languageSettings.optIn("kotlinx.serialization.ExperimentalSerializationApi")
-        }
         commonMain.dependencies {
             // Coroutines
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES_VERSION}")
@@ -27,7 +24,7 @@ kotlin {
             implementation(identityLibs.bundles.waltid.ktor.client)
             implementation("io.ktor:ktor-http:${Versions.KTOR_VERSION}")
 
-            implementation("io.github.oshai:kotlin-logging:7.0.5")
+            implementation("io.github.oshai:kotlin-logging:7.0.13")
 
             // JSON
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
