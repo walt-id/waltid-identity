@@ -43,6 +43,9 @@ kotlin {
             implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
             implementation("org.kotlincrypto.hash:sha2")
 
+            // Multiplatform / Secure Random
+            implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
+
             implementation("org.jetbrains.kotlinx:atomicfu:0.24.0")
         }
         commonTest.dependencies {

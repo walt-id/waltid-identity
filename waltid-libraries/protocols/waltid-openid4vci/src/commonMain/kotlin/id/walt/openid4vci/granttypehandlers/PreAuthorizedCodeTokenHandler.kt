@@ -12,6 +12,7 @@ import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.request.AccessTokenRequest
 import id.walt.openid4vci.tokens.AccessTokenService
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
+import id.walt.openid4vci.preauthorized.hashPin
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -53,7 +54,7 @@ import kotlin.time.Instant
             )
         }
 
-        if (!record.userPin.isNullOrBlank() && record.userPin != providedPin) {
+        if (!record.userPin.isNullOrBlank() && providedPin != null && record.userPin != hashPin(providedPin)) {
             return TokenEndpointResult.Failure(
                 "invalid_grant",
                 "user_pin is invalid",

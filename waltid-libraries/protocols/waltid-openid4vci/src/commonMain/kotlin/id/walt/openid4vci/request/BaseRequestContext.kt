@@ -10,8 +10,8 @@ import id.walt.openid4vci.Session
 import id.walt.openid4vci.append
 import id.walt.openid4vci.newArguments
 import kotlin.io.encoding.Base64
-import kotlin.random.Random
 import kotlin.time.Instant
+import korlibs.crypto.SecureRandom
 
 /**
  * Will be updated
@@ -97,5 +97,5 @@ open class BaseRequestContext(
     }
 
     private fun generateId(): String =
-        Base64.UrlSafe.encode(Random.nextBytes(16))
+        Base64.UrlSafe.encode(ByteArray(16).also { SecureRandom.nextBytes(it) })
 }

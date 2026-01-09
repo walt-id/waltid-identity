@@ -7,9 +7,10 @@ import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import kotlin.io.encoding.Base64
-import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import korlibs.crypto.SecureRandom
+import org.kotlincrypto.hash.sha2.SHA256
 
 /**
  * Service API for issuing OpenID4VCI pre-authorized codes.
@@ -58,6 +59,10 @@ class DefaultPreAuthorizedCodeIssuer(
         val subject = request.session.getSubject()?.takeIf { it.isNotBlank() }
             ?: throw IllegalArgumentException("Session subject is required for pre-authorized code issuance")
 
+        if (request.userPinRequired && request.userPin.isNullOrBlank()) {
+            throw IllegalArgumentException("userPin is required when userPinRequired=true")
+        }
+
         val code = generateCode()
         val now = kotlin.time.Clock.System.now()
         val expiresAt = now + codeLifetimeSeconds.seconds
@@ -71,7 +76,7 @@ class DefaultPreAuthorizedCodeIssuer(
                 code = code,
                 clientId = request.clientId,
                 userPinRequired = request.userPinRequired,
-                userPin = request.userPin,
+                userPin = request.userPin?.let { hashPin(it) },
                 grantedScopes = request.scopes,
                 grantedAudience = request.audience,
                 session = sessionSnapshot,
@@ -89,5 +94,10 @@ class DefaultPreAuthorizedCodeIssuer(
         )
     }
 
-    private fun generateCode(): String = Base64.UrlSafe.encode(Random.nextBytes(32))
+    private fun generateCode(): String = Base64.UrlSafe.encode(secureRandomBytes(32))
 }
+
+internal fun hashPin(pin: String): String =
+    Base64.UrlSafe.encode(SHA256().digest(pin.encodeToByteArray()))
+
+internal fun secureRandomBytes(size: Int): ByteArray = ByteArray(size).also { SecureRandom.nextBytes(it) }
