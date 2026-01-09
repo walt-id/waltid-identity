@@ -50,43 +50,43 @@ can be found in the table below:
         </tr>
         <!-- OID4VC sub-header -->
         <tr>
-            <td align="center">single</td>
-            <td align="center">batch</td>
+            <td align="center" >single</td>
+            <td align="center" >batch</td>
         </tr>
         <!-- content -->
         <!-- w3c -->
         <!-- jwt -->
         <tr>
             <td align="center" rowspan="2">W3C</td>
-            <td align="center">jwt</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&cross;</td>
+            <td align="center" >jwt</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&cross;</td>
         </tr>
         <!-- sdjwt -->
         <tr>
-            <td align="center">sd-jwt</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
+            <td align="center" >sd-jwt</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&cross;</td>
+            <td align="center" >&cross;</td>
         </tr>
         <!-- SD-JWT VC (IETF) -->
         <tr>
             <td align="center" colspan="2">SD-JWT VC (IETF)</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&cross;</td>
+            <td align="center" >&cross;</td>
         </tr>
         <!-- mdoc -->
         <tr>
             <td align="center" colspan="2">mDL/mdoc</td>
-            <td align="center">&dash;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&dash;</td>
+            <td align="center" >&dash;</td>
+            <td align="center" >&dash;</td>
+            <td align="center" >&cross;</td>
+            <td align="center" >&dash;</td>
         </tr>
   </tbody>
 </table>
@@ -123,17 +123,35 @@ Issuer service relies on the following walt.id libraries:
 1. run the `id.walt.issuer.Mainkt` file
 2. the issuer backend is available at: http://localhost:7002
 
-### Using docker
+### Docker images
 
 Run the following commands from the waltid-identity root path:
 
-```shell
-docker build -t waltid/issuer-api -f waltid-services/waltid-issuer-api/Dockerfile .
+```bash
+# Development (local Docker daemon, single-arch)
+./gradlew :waltid-services:waltid-issuer-api:publishImageToLocalRegistry
+# image: waltid/issuer-api:<version>
+```
+
+```bash
+# Production (multi-arch push to your registry)
+export DOCKER_USERNAME=<your-dockerhub-namespace>
+export DOCKER_PASSWORD=<your-dockerhub-token>
+./gradlew :waltid-services:waltid-issuer-api:publishImage
+# image: docker.io/<DOCKER_USERNAME>/issuer-api:<version>
+```
+
+Note: multi-arch images require a registry push. Local tar output is single-arch only.
+
+Run the container:
+
+```bash
 docker run -p 7002:7002 waltid/issuer-api -- --webPort=7002 --baseUrl=http://localhost:7002
 ```
 
 Or, run with local config directory:
-```shell
+
+```bash
 docker run -p 7002:7002 -v $PWD/waltid-services/waltid-issuer-api/config:/waltid-issuer-api/config -t waltid/issuer-api
 ```
 
