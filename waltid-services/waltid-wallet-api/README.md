@@ -64,11 +64,23 @@ docker run \
 
 ***Build the container***
 
-Update the wallet-api container by running the following commands from the root folder:
+Update the wallet-api container by running the following commands from the waltid-identity root path:
 
 ```bash
-docker build -t waltid/wallet-api -f waltid-services/waltid-wallet-api/Dockerfile .
+# Development (local Docker daemon, single-arch)
+./gradlew :waltid-services:waltid-wallet-api:publishImageToLocalRegistry
+# image: waltid/wallet-api:<version>
 ```
+
+```bash
+# Production (multi-arch push to your registry)
+export DOCKER_USERNAME=<your-dockerhub-namespace>
+export DOCKER_PASSWORD=<your-dockerhub-token>
+./gradlew :waltid-services:waltid-wallet-api:publishImage
+# image: docker.io/<DOCKER_USERNAME>/wallet-api:<version>
+```
+
+Note: multi-arch images require a registry push. Local tar output is single-arch only.
 
 # Database configuration
 
