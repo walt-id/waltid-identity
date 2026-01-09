@@ -60,7 +60,7 @@ class AnnexCTestVectorHarnessTest {
     fun `ANNEXC-REAL-001 transcript hash matches expected (if provided)`() {
         val v = loadVector("annex-c/ANNEXC-REAL-001.json")
         val hpkeInfo = AnnexCTranscriptBuilder.computeHpkeInfo(v.encryptionInfoB64, v.origin)
-        val transcriptHashHex = hpkeInfo.sha256().joinToString("") { "%02x".format(it) }
+        val transcriptHashHex = hpkeInfo.sha256().joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
         if (v.expected.sessionTranscriptCborSha256Hex.isNotBlank()) {
             assertEquals(v.expected.sessionTranscriptCborSha256Hex, transcriptHashHex)
@@ -81,7 +81,7 @@ class AnnexCTestVectorHarnessTest {
             origin = v.origin,
             recipientPrivateKey = hexToBytes(v.recipientPrivateKeyHex),
         )
-        val hashHex = plaintext.sha256().joinToString("") { "%02x".format(it) }
+        val hashHex = plaintext.sha256().joinToString("") { "%02x".format(it.toInt() and 0xff) }
         assertEquals(v.expected.deviceResponseCborSha256Hex, hashHex)
     }
 

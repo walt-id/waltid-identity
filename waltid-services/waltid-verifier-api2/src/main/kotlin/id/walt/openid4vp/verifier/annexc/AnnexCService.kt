@@ -31,18 +31,36 @@ import java.security.SecureRandom
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
 
 private val log = logger("AnnexCService")
 
 object AnnexCService {
     private const val ANNEX_C = "annex-c"
+    private const val CLEANUP_INTERVAL_SECONDS = 60L
+    private val terminalRetention = 5.minutes
+    private val includeDeviceResponseCbor =
+        System.getenv("ANNEXC_INCLUDE_DEVICE_RESPONSE")?.toBoolean() ?: false
 
     private val random = SecureRandom()
     private val processingScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private val sessions = ConcurrentHashMap<String, AnnexCSession>()
+    private val sessionLocks = ConcurrentHashMap<String, Mutex>()
+
+    init {
+        cleanupScope.launch {
+            while (true) {
+                evictExpiredSessions()
+                delay(CLEANUP_INTERVAL_SECONDS.seconds)
+            }
+        }
+    }
 
     @Serializable
     data class AnnexCCreateRequest(
@@ -146,12 +164,24 @@ object AnnexCService {
         var deviceResponseCborBytes: ByteArray? = null,
         var verificationResult: id.walt.mdoc.verification.VerificationResult? = null,
         var error: String? = null,
+        var completedAt: Instant? = null,
+    )
+
+    private data class AnnexCProcessingContext(
+        val sessionId: String,
+        val origin: String,
+        val encryptionInfoB64: String,
+        val recipientPrivateKey: ByteArray,
+        val responseB64: String,
     )
 
     fun Route.registerRoute() {
         route(ANNEX_C) {
             route("", { tags("Annex C (ISO 18013-7)") }) {
                 post<AnnexCCreateRequest>("create", AnnexCOpenApi.createDocs) { request ->
+                    require(request.ttlSeconds == null || request.ttlSeconds > 0) {
+                        "ttlSeconds must be > 0"
+                    }
                     val ttl = (request.ttlSeconds?.seconds ?: 5.minutes)
                     val now = Clock.System.now()
                     val expiresAt = now + ttl
@@ -172,26 +202,35 @@ object AnnexCService {
                         recipientPublicKey = keyPair.recipientPublicKey,
                     )
                     sessions[session.id] = session
+                    sessionLocks[session.id] = Mutex()
 
                     call.respond(AnnexCCreateResponse(sessionId = session.id, expiresAt = session.expiresAt.toString()))
                 }
 
                 post<AnnexCRequestRequest>("request", AnnexCOpenApi.requestDocs) { request ->
-                    val session = getSessionOrThrow(request.sessionId)
+                    val session = sessions[request.sessionId]
+                        ?: return@post call.respond(HttpStatusCode.NotFound, "Unknown Annex C session id")
+                    val lock = getSessionLock(request.sessionId)
 
-                    require(!isExpired(session)) { "Session expired" }
+                    val annexRequest = lock.withLock {
+                        if (isExpired(session)) {
+                            session.status = AnnexCSessionStatus.expired
+                            markCompleted(session)
+                            throw IllegalArgumentException("Session expired")
+                        }
 
-                    val annexRequest = AnnexCRequestBuilder.build(
-                        docType = session.docType,
-                        requestedElements = session.requestedElements,
-                        nonce = session.nonce,
-                        recipientPublicKey = session.recipientPublicKey,
-                        intentToRetain = request.intentToRetain,
-                    )
-
-                    session.deviceRequestB64 = annexRequest.deviceRequestB64
-                    session.encryptionInfoB64 = annexRequest.encryptionInfoB64
-                    session.status = AnnexCSessionStatus.request_built
+                        AnnexCRequestBuilder.build(
+                            docType = session.docType,
+                            requestedElements = session.requestedElements,
+                            nonce = session.nonce,
+                            recipientPublicKey = session.recipientPublicKey,
+                            intentToRetain = request.intentToRetain,
+                        ).also {
+                            session.deviceRequestB64 = it.deviceRequestB64
+                            session.encryptionInfoB64 = it.encryptionInfoB64
+                            session.status = AnnexCSessionStatus.request_built
+                        }
+                    }
 
                     call.respond(
                         AnnexCRequestResponse(
@@ -209,47 +248,33 @@ object AnnexCService {
                 }
 
                 post<AnnexCResponseRequest>("response", AnnexCOpenApi.responseDocs) { request ->
-                    val session = getSessionOrThrow(request.sessionId)
-                    require(!isExpired(session)) { "Session expired" }
+                    val session = sessions[request.sessionId]
+                        ?: return@post call.respond(HttpStatusCode.NotFound, "Unknown Annex C session id")
+                    val lock = getSessionLock(request.sessionId)
 
-                    session.encryptedResponseB64 = request.response
-                    session.status = AnnexCSessionStatus.response_received
-                    session.error = null
+                    val context = lock.withLock {
+                        if (isExpired(session)) {
+                            session.status = AnnexCSessionStatus.expired
+                            markCompleted(session)
+                            throw IllegalArgumentException("Session expired")
+                        }
+                        val encryptionInfoB64 = requireNotNull(session.encryptionInfoB64) {
+                            "Missing encryptionInfo (call /annex-c/request first)"
+                        }
+                        session.encryptedResponseB64 = request.response
+                        session.status = AnnexCSessionStatus.response_received
+                        session.error = null
+                        AnnexCProcessingContext(
+                            sessionId = session.id,
+                            origin = session.origin,
+                            encryptionInfoB64 = encryptionInfoB64,
+                            recipientPrivateKey = session.recipientPrivateKey.copyOf(),
+                            responseB64 = request.response
+                        )
+                    }
 
                     processingScope.launch {
-                        try {
-                            session.status = AnnexCSessionStatus.processing
-                            val encryptionInfoB64 = requireNotNull(session.encryptionInfoB64) {
-                                "Missing encryptionInfo (call /annex-c/request first)"
-                            }
-                            val deviceResponseBytes = AnnexCResponseVerifierJvm.decryptToDeviceResponse(
-                                encryptedResponseB64 = request.response,
-                                encryptionInfoB64 = encryptionInfoB64,
-                                origin = session.origin,
-                                recipientPrivateKey = session.recipientPrivateKey
-                            )
-                            session.deviceResponseCborBytes = deviceResponseBytes
-                            session.status = AnnexCSessionStatus.decrypted
-
-                            val sessionTranscript = AnnexCTranscriptBuilder.buildSessionTranscript(
-                                encryptionInfoB64 = encryptionInfoB64,
-                                origin = session.origin
-                            )
-
-                            val deviceResponseB64 = Base64UrlNoPad.encode(deviceResponseBytes)
-                            val document = MdocParser.parseToDocument(deviceResponseB64)
-
-                            session.verificationResult = MdocVerifier.verify(document, sessionTranscript)
-                            session.status = if (session.verificationResult?.valid == true) {
-                                AnnexCSessionStatus.verified
-                            } else {
-                                AnnexCSessionStatus.failed
-                            }
-                        } catch (e: Exception) {
-                            session.error = e.message ?: e.toString()
-                            session.status = AnnexCSessionStatus.failed
-                            log.warn(e) { "Annex C processing failed for session ${session.id}" }
-                        }
+                        processResponse(context)
                     }
 
                     call.respond(AnnexCResponseAck())
@@ -258,15 +283,18 @@ object AnnexCService {
                 get("info", AnnexCOpenApi.infoDocs) {
                     val sessionId = call.request.queryParameters["sessionId"]
                         ?: throw IllegalArgumentException("Missing query parameter: sessionId")
-                    val session = getSessionOrThrow(sessionId)
+                    val session = sessions[sessionId]
+                        ?: return@get call.respond(HttpStatusCode.NotFound, "Unknown Annex C session id")
+                    val lock = getSessionLock(sessionId)
 
-                    if (isExpired(session) && session.status != AnnexCSessionStatus.verified && session.status != AnnexCSessionStatus.failed) {
-                        session.status = AnnexCSessionStatus.expired
-                    }
+                    val response = lock.withLock {
+                        if (isExpired(session) && session.status != AnnexCSessionStatus.verified && session.status != AnnexCSessionStatus.failed) {
+                            session.status = AnnexCSessionStatus.expired
+                            markCompleted(session)
+                        }
 
-                    val deviceResponseB64 = session.deviceResponseCborBytes?.let { Base64UrlNoPad.encode(it) }
-
-                    call.respond(
+                        val deviceResponseB64 =
+                            if (includeDeviceResponseCbor) session.deviceResponseCborBytes?.let { Base64UrlNoPad.encode(it) } else null
                         AnnexCInfoResponse(
                             sessionId = session.id,
                             status = session.status,
@@ -282,14 +310,109 @@ object AnnexCService {
                             mdocVerificationResult = session.verificationResult,
                             error = session.error
                         )
+                    }
+
+                    call.respond(
+                        response
                     )
                 }
             }
         }
     }
 
-    private fun getSessionOrThrow(sessionId: String): AnnexCSession =
-        sessions[sessionId] ?: throw IllegalArgumentException("Unknown Annex C session id")
-
     private fun isExpired(session: AnnexCSession): Boolean = Clock.System.now() > session.expiresAt
+
+    private fun getSessionLock(sessionId: String): Mutex =
+        sessionLocks.computeIfAbsent(sessionId) { Mutex() }
+
+    private suspend fun processResponse(context: AnnexCProcessingContext) {
+        val session = sessions[context.sessionId] ?: return
+        val lock = getSessionLock(context.sessionId)
+
+        try {
+            lock.withLock {
+                if (isExpired(session)) {
+                    session.status = AnnexCSessionStatus.expired
+                    markCompleted(session)
+                    return
+                }
+                session.status = AnnexCSessionStatus.processing
+            }
+
+            val deviceResponseBytes = AnnexCResponseVerifierJvm.decryptToDeviceResponse(
+                encryptedResponseB64 = context.responseB64,
+                encryptionInfoB64 = context.encryptionInfoB64,
+                origin = context.origin,
+                recipientPrivateKey = context.recipientPrivateKey
+            )
+
+            lock.withLock {
+                session.deviceResponseCborBytes = deviceResponseBytes
+                session.status = AnnexCSessionStatus.decrypted
+            }
+
+            val sessionTranscript = AnnexCTranscriptBuilder.buildSessionTranscript(
+                encryptionInfoB64 = context.encryptionInfoB64,
+                origin = context.origin
+            )
+
+            val deviceResponseB64 = Base64UrlNoPad.encode(deviceResponseBytes)
+            val document = MdocParser.parseToDocument(deviceResponseB64)
+            val verificationResult = MdocVerifier.verify(document, sessionTranscript)
+
+            lock.withLock {
+                session.verificationResult = verificationResult
+                session.status = if (verificationResult.valid) {
+                    AnnexCSessionStatus.verified
+                } else {
+                    AnnexCSessionStatus.failed
+                }
+                markCompleted(session)
+                wipeSensitive(session)
+            }
+        } catch (e: Exception) {
+            lock.withLock {
+                session.error = e.message ?: e.toString()
+                session.status = AnnexCSessionStatus.failed
+                markCompleted(session)
+                wipeSensitive(session)
+            }
+            log.warn(e) { "Annex C processing failed for session ${context.sessionId}" }
+        }
+    }
+
+    private fun markCompleted(session: AnnexCSession) {
+        if (session.completedAt == null) {
+            session.completedAt = Clock.System.now()
+        }
+    }
+
+    private fun wipeSensitive(session: AnnexCSession) {
+        session.recipientPrivateKey.fill(0)
+        if (!includeDeviceResponseCbor) {
+            session.deviceResponseCborBytes?.fill(0)
+            session.deviceResponseCborBytes = null
+        }
+    }
+
+    private fun evictExpiredSessions() {
+        val now = Clock.System.now()
+        sessions.entries.removeIf { (sessionId, session) ->
+            val lock = sessionLocks[sessionId] ?: return@removeIf false
+            if (!lock.tryLock()) return@removeIf false
+            try {
+                val terminalExpired = session.completedAt?.let { now > it + terminalRetention } == true
+                val expired = now > session.expiresAt
+                if (expired || terminalExpired) {
+                    wipeSensitive(session)
+                    sessionLocks.remove(sessionId)
+                    true
+                } else {
+                    false
+                }
+            } finally {
+                lock.unlock()
+            }
+        }
+    }
 }

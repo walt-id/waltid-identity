@@ -19,7 +19,7 @@ object SkrGenerator {
         // ECPrivateKey.s is the private scalar (BigInteger)
         val d = priv.s.toByteArray()
 
-        return normalizeToP256Scalar(d).joinToString("") { "%02x".format(it) }
+        return normalizeToP256Scalar(d).joinToString("") { "%02x".format(it.toInt() and 0xff) }
     }
 
     /**
@@ -31,7 +31,7 @@ object SkrGenerator {
         val digest = MessageDigest.getInstance("SHA-256").digest(testVectorId.toByteArray(Charsets.UTF_8))
         val x = BigInteger(1, digest)
         val d = x.mod(p256Order.subtract(BigInteger.ONE)).add(BigInteger.ONE)
-        return normalizeToP256Scalar(d.toByteArray()).joinToString("") { "%02x".format(it) }
+        return normalizeToP256Scalar(d.toByteArray()).joinToString("") { "%02x".format(it.toInt() and 0xff) }
     }
 
     private fun normalizeToP256Scalar(d: ByteArray): ByteArray {

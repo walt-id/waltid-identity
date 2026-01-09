@@ -60,20 +60,23 @@ object AnnexCResponseVerifierJvm : AnnexCResponseVerifier {
         }
     }
 
-    private fun buildRecipientKeyPair(recipientPrivateKey: ByteArray, recipientPublicKey: CoseKey) =
-        hpke.deserializePrivateKey(recipientPrivateKey.normalizeP256Scalar(), recipientPublicKey.toUncompressedP256Point())
-            .also { keyPair ->
-                val expectedPublicKeyBytes = recipientPublicKey.toUncompressedP256Point()
-                val derivedPublicKeyBytes = p256.g.multiply(BigInteger(1, recipientPrivateKey.normalizeP256Scalar()))
-                    .normalize()
-                    .getEncoded(false)
-                require(derivedPublicKeyBytes.contentEquals(expectedPublicKeyBytes)) {
-                    "recipientPrivateKey does not match encryptionInfo.recipientPublicKey"
-                }
-                require(expectedPublicKeyBytes.contentEquals(hpke.serializePublicKey(keyPair.public))) {
-                    "HPKE keypair construction mismatch (recipient public key encoding differs)"
-                }
+    private fun buildRecipientKeyPair(
+        recipientPrivateKey: ByteArray,
+        recipientPublicKey: CoseKey
+    ) = recipientPrivateKey.normalizeP256Scalar().let { normalized ->
+        val expectedPublicKeyBytes = recipientPublicKey.toUncompressedP256Point()
+        hpke.deserializePrivateKey(normalized, expectedPublicKeyBytes).also { keyPair ->
+            val derivedPublicKeyBytes = p256.g.multiply(BigInteger(1, normalized))
+                .normalize()
+                .getEncoded(false)
+            require(derivedPublicKeyBytes.contentEquals(expectedPublicKeyBytes)) {
+                "recipientPrivateKey does not match encryptionInfo.recipientPublicKey"
             }
+            require(expectedPublicKeyBytes.contentEquals(hpke.serializePublicKey(keyPair.public))) {
+                "HPKE keypair construction mismatch (recipient public key encoding differs)"
+            }
+        }
+    }
 
     private fun CoseKey.toUncompressedP256Point(): ByteArray {
         require(kty == Cose.KeyTypes.EC2) { "recipientPublicKey must be EC2" }
@@ -88,6 +91,8 @@ object AnnexCResponseVerifierJvm : AnnexCResponseVerifier {
     private fun ByteArray.normalizeP256Scalar(): ByteArray {
         // Ensure unsigned (BigInteger may add a leading 0x00 when serializing).
         val bi = BigInteger(1, this)
+        require(bi.signum() == 1) { "recipientPrivateKey must be non-zero" }
+        require(bi < p256.n) { "recipientPrivateKey must be < curve order" }
         val bytes = bi.toByteArray()
         return when {
             bytes.size == 32 -> bytes
