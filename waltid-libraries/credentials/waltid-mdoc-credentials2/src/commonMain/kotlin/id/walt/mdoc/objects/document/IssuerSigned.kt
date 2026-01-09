@@ -50,11 +50,14 @@ data class IssuerSigned private constructor(
      * A convenience function to decode the CBOR payload of the `issuerAuth` signature
      * structure into a [MobileSecurityObject].
      *
+     * Uses MdocCbor to ensure proper handling of CBOR tag 0 for dates in ValidityInfo.
+     *
      * @return The parsed [MobileSecurityObject].
      * @throws Exception if the payload cannot be decoded.
      */
-    fun decodeMobileSecurityObject() =
-        issuerAuth.decodeIsoPayload<MobileSecurityObject>()
+    fun decodeMobileSecurityObject(): MobileSecurityObject {
+        return issuerAuth.decodeIsoPayload<MobileSecurityObject>()
+    }
 
     /**
      * A utility function to convert the structured, CBOR-oriented `namespaces` map into a
