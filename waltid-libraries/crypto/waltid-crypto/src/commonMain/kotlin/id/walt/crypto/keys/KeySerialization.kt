@@ -1,7 +1,7 @@
 package id.walt.crypto.keys
 
 import id.walt.crypto.keys.aws.AWSKeyRestAPI
-import id.walt.crypto.keys.azure.AzureKey
+import id.walt.crypto.keys.azure.AzureKeyRestApi
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.oci.OCIKeyRestApi
 import id.walt.crypto.keys.tse.TSEKey
@@ -31,7 +31,7 @@ object KeySerialization {
             subclass(TSEKey::class)
             subclass(OCIKeyRestApi::class)
             subclass(AWSKeyRestAPI::class)
-            subclass(AzureKey::class)
+            subclass(AzureKeyRestApi::class)
         }
 
     }
@@ -49,7 +49,7 @@ object KeySerialization {
                 subclass(TSEKey::class)
                 subclass(OCIKeyRestApi::class)
                 subclass(AWSKeyRestAPI::class)
-                subclass(AzureKey::class)
+                subclass(AzureKeyRestApi::class)
                 subclass(keyClass, keyClass.serializer())
             }
         }
