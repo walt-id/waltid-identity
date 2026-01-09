@@ -23,6 +23,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.bouncycastle.crypto.hpke.HPKE
 import java.io.File
+import java.net.ServerSocket
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -44,92 +45,101 @@ class AnnexCUnifiedEndpointIntegrationTest {
     @Test
     fun annexCFlowThroughUnifiedEndpoints() {
         val host = "127.0.0.1"
-        val port = 17041
+        val port = findAvailablePort()
 
-        E2ETest(host, port, true).testBlock(
-            features = listOf(OSSVerifier2FeatureCatalog),
-            preload = {
-                ConfigManager.preloadConfig(
-                    "verifier-service",
-                    OSSVerifier2ServiceConfig(
-                        clientId = "verifier2",
-                        clientMetadata = ClientMetadata(
-                            clientName = "Verifier2",
-                            logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
-                        ),
-                        urlPrefix = "http://$host:$port/verification-session",
-                        urlHost = "openid4vp://authorize"
+        val previousResolvers = DidService.didResolvers.toList()
+        val previousResolverMethods = DidService.resolverMethods.toMap()
+
+        try {
+            E2ETest(host, port, true).testBlock(
+                features = listOf(OSSVerifier2FeatureCatalog),
+                preload = {
+                    ConfigManager.preloadConfig(
+                        "verifier-service",
+                        OSSVerifier2ServiceConfig(
+                            clientId = "verifier2",
+                            clientMetadata = ClientMetadata(
+                                clientName = "Verifier2",
+                                logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
+                            ),
+                            urlPrefix = "http://$host:$port/verification-session",
+                            urlHost = "openid4vp://authorize"
+                        )
                     )
+                },
+                init = {
+                    if (DidService.didResolvers.none { it is LocalResolver }) {
+                        DidService.registerResolver(LocalResolver())
+                    }
+                    DidService.updateResolversForMethods()
+                },
+                module = Application::verifierModule
+            ) {
+                val http = testHttpClient()
+                val vector = loadVector()
+
+                val setup: id.walt.openid4vp.verifier.data.VerificationSessionSetup = DcApiAnnexCFlowSetup(
+                    docType = "org.iso.18013.5.1.mDL",
+                    requestedElements = mapOf("org.iso.18013.5.1" to listOf("age_over_18")),
+                    origin = vector.origin,
+                    ttlSeconds = 300
                 )
-            },
-            init = {
-                DidService.apply {
-                    registerResolver(LocalResolver())
-                    updateResolversForMethods()
+
+                val createEnvelope = testAndReturn("Create Annex C session (v2 envelope)") {
+                    http.post("/verification-session/create?envelope=true") {
+                        setBody(setup)
+                    }.body<UnifiedEnvelope>()
                 }
-            },
-            module = Application::verifierModule
-        ) {
-            val http = testHttpClient()
-            val vector = loadVector()
 
-            val setup: id.walt.openid4vp.verifier.data.VerificationSessionSetup = DcApiAnnexCFlowSetup(
-                docType = "org.iso.18013.5.1.mDL",
-                requestedElements = mapOf("org.iso.18013.5.1" to listOf("age_over_18")),
-                origin = vector.origin,
-                ttlSeconds = 300
-            )
+                assertTrue { createEnvelope.flowType == AnnexCService.FLOW_TYPE }
+                val sessionId = createEnvelope.sessionId
 
-            val createEnvelope = testAndReturn("Create Annex C session (v2 envelope)") {
-                http.post("/verification-session/create?envelope=true") {
-                    setBody(setup)
-                }.body<UnifiedEnvelope>()
+                val requestEnvelope = testAndReturn("Fetch Annex C request (v2 envelope)") {
+                    http.get("/verification-session/$sessionId/request?envelope=true").body<UnifiedEnvelope>()
+                }
+
+                val requestData = json.decodeFromJsonElement(
+                    AnnexCService.AnnexCRequestResponse.serializer(),
+                    requestEnvelope.data
+                )
+                assertTrue { requestData.protocol == AnnexC.PROTOCOL }
+
+                val deviceResponseBytes = AnnexCResponseVerifierJvm.decryptToDeviceResponse(
+                    encryptedResponseB64 = vector.encryptedResponseB64,
+                    encryptionInfoB64 = vector.encryptionInfoB64,
+                    origin = vector.origin,
+                    recipientPrivateKey = hexToBytes(vector.recipientPrivateKeyHex)
+                )
+
+                val encryptedResponseB64 = buildEncryptedResponse(
+                    encryptionInfoB64 = requestData.data.encryptionInfo,
+                    origin = vector.origin,
+                    deviceResponseBytes = deviceResponseBytes
+                )
+
+                testAndReturn("Submit Annex C response (v2 envelope)") {
+                    http.post("/verification-session/$sessionId/response?envelope=true") {
+                        setBody(AnnexCResponsePayload(response = encryptedResponseB64))
+                    }.body<UnifiedEnvelope>()
+                }
+
+                val info = awaitTerminalInfo(http, sessionId)
+                assertTrue { info.flowType == AnnexCService.FLOW_TYPE }
+                assertTrue {
+                    info.status == AnnexCService.AnnexCSessionStatus.verified ||
+                        info.status == AnnexCService.AnnexCSessionStatus.failed
+                }
+                if (info.status == AnnexCService.AnnexCSessionStatus.verified) {
+                    assertNotNull(info.mdocVerificationResult)
+                } else {
+                    assertNotNull(info.error)
+                }
             }
-
-            assertTrue { createEnvelope.flowType == AnnexCService.FLOW_TYPE }
-            val sessionId = createEnvelope.sessionId
-
-            val requestEnvelope = testAndReturn("Fetch Annex C request (v2 envelope)") {
-                http.get("/verification-session/$sessionId/request?envelope=true").body<UnifiedEnvelope>()
-            }
-
-            val requestData = json.decodeFromJsonElement(
-                AnnexCService.AnnexCRequestResponse.serializer(),
-                requestEnvelope.data
-            )
-            assertTrue { requestData.protocol == AnnexC.PROTOCOL }
-
-            val deviceResponseBytes = AnnexCResponseVerifierJvm.decryptToDeviceResponse(
-                encryptedResponseB64 = vector.encryptedResponseB64,
-                encryptionInfoB64 = vector.encryptionInfoB64,
-                origin = vector.origin,
-                recipientPrivateKey = hexToBytes(vector.recipientPrivateKeyHex)
-            )
-
-            val encryptedResponseB64 = buildEncryptedResponse(
-                encryptionInfoB64 = requestData.data.encryptionInfo,
-                origin = vector.origin,
-                deviceResponseBytes = deviceResponseBytes
-            )
-
-            testAndReturn("Submit Annex C response (v2 envelope)") {
-                http.post("/verification-session/$sessionId/response?envelope=true") {
-                    setBody(AnnexCResponsePayload(response = encryptedResponseB64))
-                }.body<UnifiedEnvelope>()
-            }
-
-            val info = awaitTerminalInfo(http, sessionId)
-            assertTrue { info.flowType == AnnexCService.FLOW_TYPE }
-            assertNotNull(info.deviceResponseCbor)
-            assertTrue {
-                info.status == AnnexCService.AnnexCSessionStatus.verified ||
-                    info.status == AnnexCService.AnnexCSessionStatus.failed
-            }
-            if (info.status == AnnexCService.AnnexCSessionStatus.verified) {
-                assertNotNull(info.mdocVerificationResult)
-            } else {
-                assertNotNull(info.error)
-            }
+        } finally {
+            DidService.didResolvers.clear()
+            DidService.didResolvers.addAll(previousResolvers)
+            DidService.resolverMethods.clear()
+            DidService.resolverMethods.putAll(previousResolverMethods)
         }
     }
 
@@ -188,7 +198,7 @@ class AnnexCUnifiedEndpointIntegrationTest {
             AnnexCEncryptedResponse.serializer(),
             AnnexCEncryptedResponse(
                 type = "dcapi",
-                response = AnnexCEncryptedResponseData(enc = sealed[1], cipherText = sealed[0])
+                response = AnnexCEncryptedResponseData(enc = sealed[0], cipherText = sealed[1])
             )
         )
 
@@ -219,5 +229,8 @@ class AnnexCUnifiedEndpointIntegrationTest {
             clean.substring(i * 2, i * 2 + 2).toInt(16).toByte()
         }
     }
+
+    private fun findAvailablePort(): Int =
+        ServerSocket(0).use { it.localPort }
 
 }

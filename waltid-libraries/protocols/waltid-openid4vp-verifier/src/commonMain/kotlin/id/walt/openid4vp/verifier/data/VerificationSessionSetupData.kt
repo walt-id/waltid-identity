@@ -245,11 +245,17 @@ data class DcApiAnnexCFlowSetup(
     override val core: GeneralFlowConfig = buildAnnexCCore(docType, requestedElements, policies)
 ) : VerificationSessionSetup {
     init {
+        if (ttlSeconds != null) require(ttlSeconds > 0) { "ttlSeconds must be > 0" }
+
         val parsedOrigin = UrlUtils.checkDcApiOriginUrl(origin)
         require(parsedOrigin.secureContext) { "Provided origin \"$origin\" is not a secure context. Use of HTTPS is required!" }
         require(!parsedOrigin.nonComplexTrailingSlash) {
             "Your provided origin \"$origin\" has a trailing slash ('/' at the end), this will be silently dropped by OS handlers when using DC API. Remove the trailing slash to avoid errors."
         }
+
+        val expectedCore = buildAnnexCCore(docType, requestedElements, policies)
+        require(core.dcqlQuery == expectedCore.dcqlQuery) { "core_flow.dcql_query must match docType/requestedElements" }
+        require(core.policies == expectedCore.policies) { "core_flow.policies must match policies" }
     }
 
     companion object {
@@ -260,8 +266,10 @@ data class DcApiAnnexCFlowSetup(
             requestedElements: Map<String, List<String>>,
             policies: DefinedVerificationPolicies
         ): GeneralFlowConfig {
-            val claims = requestedElements.flatMap { (namespace, elements) ->
-                elements.distinct().map { elementId ->
+            val claims = requestedElements
+                .toSortedMap()
+                .flatMap { (namespace, elements) ->
+                elements.distinct().sorted().map { elementId ->
                     ClaimsQuery(path = listOf(namespace, elementId))
                 }
             }

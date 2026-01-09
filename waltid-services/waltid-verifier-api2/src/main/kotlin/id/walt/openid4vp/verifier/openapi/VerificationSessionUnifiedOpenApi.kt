@@ -12,7 +12,7 @@ import kotlinx.serialization.json.encodeToJsonElement
 
 object VerificationSessionUnifiedOpenApi {
 
-    private const val SESSION_ID = "verification-session"
+    private const val SESSION_ID = "sessionId"
 
     private val annexCRequestExample = AnnexCService.AnnexCRequestResponse(
         protocol = AnnexC.PROTOCOL,
