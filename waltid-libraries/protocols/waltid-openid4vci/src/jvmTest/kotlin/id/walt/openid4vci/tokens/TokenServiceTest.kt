@@ -5,7 +5,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vci.tokens.jwt.JwtAccessTokenService
 import id.walt.openid4vci.tokens.jwt.JwtSigningKeyResolver
-import kotlin.io.encoding.Base64
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import java.lang.ThreadLocal
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -18,6 +18,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertNotNull
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.core.AuthorizeRequestResult
 import id.walt.openid4vci.core.AccessRequestResult
@@ -41,6 +42,58 @@ class TokenServiceTest {
         val header = decodeHeader(token)
         assertEquals(key.keyType.jwsAlg, header["alg"])
         assertEquals(key.getKeyId(), header["kid"])
+    }
+
+    @Test
+    fun `authorization code flow embeds granted scopes into JWT scope claim`(): Unit = runBlocking {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val tokenService = JwtAccessTokenService( { key })
+        val provider = buildOAuth2Provider(createTestConfig(tokenService = tokenService))
+
+        val issuerId = "issuer-scope"
+        val scope = "openid email profile"
+        val clientId = "client-scope"
+        val redirectUri = "https://client.example/callback"
+
+        val authorizeResult = provider.createAuthorizeRequest(
+            mapOf(
+                "response_type" to "code",
+                "client_id" to clientId,
+                "redirect_uri" to redirectUri,
+                "scope" to scope,
+            ),
+        )
+        require(authorizeResult is AuthorizeRequestResult.Success)
+        val authorizeRequest = authorizeResult.request.also { it.setIssuerId(issuerId) }
+
+        val authorizeResponse = provider.createAuthorizeResponse(
+            authorizeRequest,
+            DefaultSession(subject = "alice"),
+        )
+        require(authorizeResponse is AuthorizeResponseResult.Success)
+        val code = authorizeResponse.response.parameters.getValue("code")
+
+        val accessRequestResult = provider.createAccessRequest(
+            mapOf(
+                "grant_type" to GrantType.AuthorizationCode.value,
+                "client_id" to clientId,
+                "code" to code,
+                "redirect_uri" to redirectUri,
+            ),
+        )
+        require(accessRequestResult is AccessRequestResult.Success)
+        val accessRequest = accessRequestResult.request.also { it.setIssuerId(issuerId) }
+
+        val accessResponse = provider.createAccessResponse(accessRequest)
+        require(accessResponse is AccessResponseResult.Success)
+        val token = accessResponse.response.accessToken
+
+        val payload = decodePayload(token)
+        assertEquals("alice", payload["sub"])
+        assertEquals(issuerId, payload["iss"])
+        assertEquals(scope, payload["scope"])
+        assertNotNull(payload["exp"])
+        assertNotNull(payload["iat"])
     }
 
     @Test
@@ -103,7 +156,7 @@ class TokenServiceTest {
         )
 
         val currentKey = ThreadLocal<Key?>()
-        val tokenService = JwtAccessTokenService(JwtSigningKeyResolver { resolveCurrentKey(currentKey) })
+        val tokenService = JwtAccessTokenService( { resolveCurrentKey(currentKey) })
         val provider = buildOAuth2Provider(createTestConfig(tokenService = tokenService))
 
         suspend fun runFlow(issuerId: String): String = withContext(currentKey.asContextElement(keysByIssuer.getValue(issuerId))) {
@@ -156,10 +209,15 @@ class TokenServiceTest {
 
     private fun decodeHeader(jwt: String): Map<String, String> {
         val headerSegment = jwt.substringBefore(".")
-        // JWT segments are base64url without padding, add padding for decoding.
-        val padded = headerSegment.padEnd((headerSegment.length + 3) / 4 * 4, '=')
-        val json = Base64.UrlSafe.decode(padded).decodeToString()
-        val obj = Json.parseToJsonElement(json).jsonObject
-        return obj.mapValues { it.value.jsonPrimitive.content }
+        val json = headerSegment.decodeFromBase64Url().decodeToString()
+        return Json.parseToJsonElement(json).jsonObject
+            .mapValues { it.value.jsonPrimitive.content }
+    }
+
+    private fun decodePayload(jwt: String): Map<String, String> {
+        val payloadSegment = jwt.substringAfter(".").substringBefore(".")
+        val json = payloadSegment.decodeFromBase64Url().decodeToString()
+        return Json.parseToJsonElement(json).jsonObject
+            .mapValues { it.value.jsonPrimitive.content }
     }
 }
