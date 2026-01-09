@@ -20,8 +20,11 @@ import kotlin.js.JsExport
 object DirectKeySerializer : KSerializer<DirectSerializedKey> {
 
     override val descriptor: SerialDescriptor = JsonObject.serializer().descriptor
-    override fun deserialize(decoder: Decoder): DirectSerializedKey = DirectSerializedKey(resolveSerializedKeyBlocking(decoder.decodeSerializableValue(JsonObject.serializer())))
-    override fun serialize(encoder: Encoder, value: DirectSerializedKey) = encoder.encodeSerializableValue(JsonElement.serializer(), KeySerialization.serializeKeyToJson(value.key))
+    override fun deserialize(decoder: Decoder): DirectSerializedKey =
+        DirectSerializedKey(resolveSerializedKeyBlocking(decoder.decodeSerializableValue(JsonObject.serializer())))
+
+    override fun serialize(encoder: Encoder, value: DirectSerializedKey) =
+        encoder.encodeSerializableValue(JsonElement.serializer(), KeySerialization.serializeKeyToJson(value.key))
 }
 
 @Serializable(with = DirectKeySerializer::class)
@@ -127,7 +130,11 @@ abstract class Key {
     @JsPromise
     @JsExport.Ignore
     @Throws(Exception::class)
-    abstract suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray? = null, customSignatureAlgorithm: String? = null): Result<ByteArray>
+    abstract suspend fun verifyRaw(
+        signed: ByteArray,
+        detachedPlaintext: ByteArray? = null,
+        customSignatureAlgorithm: String? = null
+    ): Result<ByteArray>
 
     @JvmBlocking
     @JvmAsync
@@ -193,6 +200,18 @@ abstract class Key {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    open suspend fun init() {}
+    open suspend fun init() {
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Key) return false
+        if (keyType != other.keyType) return false
+        return KeySerialization.serializeKeyToJson(this) == KeySerialization.serializeKeyToJson(other)
+    }
+
+    override fun hashCode(): Int =
+        31 * keyType.hashCode() + KeySerialization.serializeKeyToJson(this).hashCode()
+
 }
 
