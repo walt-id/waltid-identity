@@ -29,7 +29,7 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
             // Logging
-            implementation("io.github.oshai:kotlin-logging:7.0.13")
+            implementation(identityLibs.oshai.kotlinlogging)
 
             // walt.id
             api(project(":waltid-libraries:credentials:waltid-digital-credentials"))

@@ -35,7 +35,7 @@ kotlin {
             implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.6.0")
 
             // Logging
-            implementation("io.github.oshai:kotlin-logging:7.0.13")
+            implementation(identityLibs.oshai.kotlinlogging)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

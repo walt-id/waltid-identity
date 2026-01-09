@@ -13,9 +13,9 @@ dependencies {
     api(project(":waltid-services:waltid-service-commons"))
 
     // Testing
-    api(kotlin("test"))
-    api("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    implementation(kotlin("test"))
+    implementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")

@@ -23,7 +23,7 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.core)
 
             // Logging
-            implementation(identityLibs.kotlinlogging)
+            implementation(identityLibs.oshai.kotlinlogging)
 
             // Ktor client
             implementation(identityLibs.bundles.waltid.ktor.client)

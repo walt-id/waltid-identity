@@ -19,7 +19,7 @@ kotlin {
             implementation("org.kotlincrypto.hash:sha2")
 
             // Logging
-            implementation("io.github.oshai:kotlin-logging:7.0.13")
+            implementation(identityLibs.oshai.kotlinlogging)
 
             // walt.id
             api(project(":waltid-libraries:crypto:waltid-crypto"))
