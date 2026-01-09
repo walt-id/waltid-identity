@@ -14,7 +14,7 @@ class UnsafeAuthorizationCodeRepository : AuthorizationCodeRepository {
     @OptIn(ExperimentalTime::class)
     override suspend fun consume(code: String): AuthorizationCodeRecord? {
         val record = records.remove(code) ?: return null
-        if (kotlin.time.Clock.System.now() > record.expiresAt) {
+        if (kotlin.time.Clock.System.now() >= record.expiresAt) {
             return null
         }
         return record
