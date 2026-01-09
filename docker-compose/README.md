@@ -72,7 +72,7 @@ Ensure you have the following tools installed:
 Before building locally, ensure the correct version is specified in the `.env` file.
 Update the `VERSION_TAG` variable to version `1.0.0-SNAPSHOT`
 
-### Build API Services Docker Images Locally
+### Build API Services Docker Images Locally (development)
 
 API Services Docker Images are build with the ktor gradle plugin. This
 requires Java SDK 21 installed. You build the images by
