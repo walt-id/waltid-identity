@@ -7,7 +7,7 @@ plugins {
 group = "id.walt.openid4vci"
 
 object Versions {
-    const val KTOR_VERSION = "3.3.3" // also change 1 plugin
+    const val KTOR_VERSION = "3.3.3"
     const val COROUTINES_VERSION = "1.10.2"
 }
 
@@ -52,8 +52,6 @@ kotlin {
         }
         jvmMain.dependencies {
             implementation("io.ktor:ktor-client-okhttp:${Versions.KTOR_VERSION}")
-            implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
-            implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
         }
         jvmTest.dependencies {
             implementation(kotlin("test-junit5"))
