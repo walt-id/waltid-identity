@@ -3,6 +3,7 @@
 package id.walt.openid4vp.verifier
 
 import id.walt.commons.fetchBinaryFile
+import id.walt.commons.web.plugins.httpJson
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
@@ -35,6 +36,7 @@ import kotlin.uuid.ExperimentalUuidApi
 
 private val log = logger("Verifier2Service")
 private const val VERIFICATION_SESSION = "verification-session"
+private const val SESSION_ID = "sessionId"
 private const val VICAL = "vical"
 
 
@@ -86,31 +88,31 @@ object Verifier2Service {
                     call.respond(creationResponse)
                 }
 
-                route("{$VERIFICATION_SESSION}") {
+                route("{$SESSION_ID}") {
 
                     get("info", {
                         summary = "View data of existing verification session"
-                        request { pathParameter<String>(VERIFICATION_SESSION) }
+                        request { pathParameter<String>(SESSION_ID) }
                         response { HttpStatusCode.OK to { body<Verification2Session>() } }
                     }
                     ) {
                         val verifierSession =
-                            sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
-                                ?: throw IllegalArgumentException("Unknown session id")
+                            sessions[call.parameters.getOrFail(SESSION_ID)]
+                                ?: return@get call.respond(HttpStatusCode.NotFound, "Unknown session id")
                         call.respond(verifierSession)
                     }
 
                     route({
                         summary = "Receive update events via SSE about the verification session"
-                        request { pathParameter<String>(VERIFICATION_SESSION) }
+                        request { pathParameter<String>(SESSION_ID) }
                     }) {
                         sse("$VERIFICATION_SESSION/events", serialize = { typeInfo, it ->
-                            val serializer = Json.serializersModule.serializer(typeInfo.kotlinType!!)
-                            Json.encodeToString(serializer, it)
+                            val serializer = httpJson.serializersModule.serializer(typeInfo.kotlinType!!)
+                            httpJson.encodeToString(serializer, it)
                         }) {
                             val verifierSession =
-                                sessions[call.parameters.getOrFail("sessionId")]
-                                    ?: throw IllegalArgumentException("Unknown session id")
+                                sessions[call.parameters.getOrFail(SESSION_ID)]
+                                    ?: return@sse call.respond(HttpStatusCode.NotFound, "Unknown session id")
 
                             // Get the flow for this specific target.
                             val sseFlow = SseNotifier.getSseFlow(verifierSession.id)
@@ -122,19 +124,19 @@ object Verifier2Service {
                     }
                 }
             }
-            route("{$VERIFICATION_SESSION}", {
+            route("{$SESSION_ID}", {
                 tags("Client endpoints")
             }) {
                 get(
                     "request",
                     {
                         summary = "Wallets lookup the AuthorizationRequest here"
-                        request { pathParameter<String>(VERIFICATION_SESSION) }
+                        request { pathParameter<String>(SESSION_ID) }
                         response { HttpStatusCode.OK to { body<AuthorizationRequest>() } }
                     }) {
                     val verificationSession =
-                        sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
-                            ?: throw IllegalArgumentException("Unknown session id")
+                        sessions[call.parameters.getOrFail(SESSION_ID)]
+                            ?: return@get call.respond(HttpStatusCode.NotFound, "Unknown session id")
 
                     call.respondAuthorizationRequest(
                         verificationSession = verificationSession,
@@ -150,13 +152,14 @@ object Verifier2Service {
                         {
                             summary = "Wallets respond to an AuthorizationRequest here"
                             request {
-                                pathParameter<String>(VERIFICATION_SESSION)
+                                pathParameter<String>(SESSION_ID)
                                 body<String> { description = "" /* TODO */ }
                             }
                         }) { body ->
-                        val sessionId = call.parameters.getOrFail(VERIFICATION_SESSION)
+                        val sessionId = call.parameters.getOrFail(SESSION_ID)
                         log.trace { "Received verification session response to session: $sessionId" }
                         val verificationSession = sessions[sessionId]
+                            ?: return@post call.respond(HttpStatusCode.NotFound, "Unknown session id")
 
                         call.respondHandleDirectPostResponse(
                             verificationSession = verificationSession,
