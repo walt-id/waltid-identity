@@ -6,12 +6,15 @@ plugins {
 
 group = "id.walt.policies"
 
+object Versions {
+    const val KTOR_VERSION = "3.3.3"
+}
+
 kotlin {
     js(IR) {
         outputModuleName = "verification-policies"
     }
-
-    val ktor_version = "3.3.3"
+    
     sourceSets {
         commonMain.dependencies {
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
@@ -50,9 +53,9 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
             implementation("org.slf4j:slf4j-simple:2.0.17")
             implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
-            implementation("io.ktor:ktor-server-test-host:$ktor_version")
-            implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
-            implementation("io.ktor:ktor-server-netty:$ktor_version")
+            implementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-server-content-negotiation:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-server-netty:${Versions.KTOR_VERSION}")
             implementation("io.mockk:mockk:1.14.2")
         }
     }

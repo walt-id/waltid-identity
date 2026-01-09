@@ -6,9 +6,12 @@ plugins {
 
 group = "id.walt.credentials"
 
-kotlin {
-    val ktor_version = "3.3.3"
+object Versions {
+    const val KTOR_VERSION = "3.3.3"
+}
 
+kotlin {
+  
     sourceSets {
         commonMain.dependencies {
             // Coroutines
@@ -49,9 +52,9 @@ kotlin {
             implementation("org.slf4j:slf4j-simple:2.0.17")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
             implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
-            implementation("io.ktor:ktor-server-test-host:$ktor_version")
-            implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
-            implementation("io.ktor:ktor-server-netty:$ktor_version")
+            implementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-server-content-negotiation:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-server-netty:${Versions.KTOR_VERSION}")
             implementation("io.mockk:mockk:1.14.2")
         }
     }

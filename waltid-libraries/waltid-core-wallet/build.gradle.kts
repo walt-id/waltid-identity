@@ -5,9 +5,12 @@ plugins {
 
 group = "id.walt.wallet"
 
+object Versions {
+    const val KTOR_VERSION = "3.3.3"
+}
+
 kotlin {
     sourceSets {
-        val ktor_version = "3.3.3"
 
         commonMain.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
@@ -38,7 +41,7 @@ kotlin {
         }
         jvmMain.dependencies {
             // Ktor client
-            implementation("io.ktor:ktor-client-okhttp-jvm:$ktor_version")
+            implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
