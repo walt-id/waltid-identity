@@ -32,13 +32,13 @@ class DefaultAuthorizeRequestValidator : AuthorizeRequestValidator {
             )
         }
 
+        val redirect = parameters["redirect_uri"]?.takeIf { it.isNotBlank() }
         val client = DefaultClient(
             id = clientId,
-            redirectUris = listOfNotNull(parameters["redirect_uri"]?.takeIf { it.isNotBlank() }),
+            redirectUris = listOfNotNull(redirect),
             grantTypes = argumentsOf("authorization_code"),
         )
 
-        val redirectUri = parameters["redirect_uri"]
         val request = AuthorizationRequest()
         request.setClient(client)
         request.getRequestForm().addAll(parameters)
@@ -47,7 +47,7 @@ class DefaultAuthorizeRequestValidator : AuthorizeRequestValidator {
         responseTypes.forEach { arguments.append(it) }
         request.setResponseTypes(arguments)
 
-        request.redirectUri = redirectUri
+        request.redirectUri = redirect
         request.state = parameters["state"]
         request.defaultResponseMode = ResponseModeType.QUERY
         request.responseMode = ResponseModeType.QUERY
