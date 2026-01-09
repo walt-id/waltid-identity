@@ -16,8 +16,6 @@ import id.walt.openid4vci.core.AuthorizeResponseResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.time.ExperimentalTime
-
 
 class ProviderJvmConcurrencyTest {
 
@@ -60,7 +58,6 @@ internal suspend fun runConcurrentAuthCodeFlows(
     }
 }
 
-@OptIn(ExperimentalTime::class)
 internal suspend fun executeAuthorizationCodeFlow(
     provider: OAuth2Provider,
     iteration: Int,

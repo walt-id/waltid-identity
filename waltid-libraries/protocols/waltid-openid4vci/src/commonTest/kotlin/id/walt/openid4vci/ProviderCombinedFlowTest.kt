@@ -20,11 +20,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.assertNotEquals
-import kotlin.time.ExperimentalTime
 
 class ProviderCombinedFlowTest {
 
-    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `provider with both handlers supports authorization and pre-authorized flows`() = runTest {
         val config = createTestConfig()

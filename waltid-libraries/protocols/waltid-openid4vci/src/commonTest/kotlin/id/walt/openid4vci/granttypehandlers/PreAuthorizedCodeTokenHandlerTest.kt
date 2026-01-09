@@ -19,7 +19,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlin.time.ExperimentalTime
 
 class PreAuthorizedCodeTokenHandlerTest {
 
@@ -27,7 +26,7 @@ class PreAuthorizedCodeTokenHandlerTest {
     private val handler = PreAuthorizedCodeTokenHandler(repository, StubTokenService())
     private val issuer = DefaultPreAuthorizedCodeIssuer(repository)
 
-    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `handles pre-authorized code successfully`() = runTest {
         val credentialSession = DefaultSession(subject = "credential-subject")
@@ -58,7 +57,7 @@ class PreAuthorizedCodeTokenHandlerTest {
         assertNull(repository.get(code))
     }
 
-    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `rejects invalid PIN and allows retry`() = runTest {
         val issued = issuer.issue(
@@ -89,7 +88,7 @@ class PreAuthorizedCodeTokenHandlerTest {
         assertNull(repository.get(code))
     }
 
-    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `rejects code reuse`() = runTest {
         val issued = issuer.issue(
@@ -113,7 +112,6 @@ class PreAuthorizedCodeTokenHandlerTest {
         assertTrue(failure is TokenEndpointResult.Failure)
     }
 
-    @OptIn(ExperimentalTime::class)
         private fun createAccessRequestWithGrant(): AccessTokenRequest =
             AccessTokenRequest(session = DefaultSession(subject = "access-subject")).apply {
             setClient(
@@ -135,7 +133,6 @@ class PreAuthorizedCodeTokenHandlerTest {
         override suspend fun get(code: String): PreAuthorizedCodeRecord? =
             records[code]
 
-        @OptIn(ExperimentalTime::class)
         override suspend fun consume(code: String): PreAuthorizedCodeRecord? {
             val record = records.remove(code) ?: return null
             if (kotlin.time.Clock.System.now() > record.expiresAt) {

@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package id.walt.openid4vci.granttypehandlers
 
 import id.walt.openid4vci.GrantType

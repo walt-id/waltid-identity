@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, ExperimentalEncodingApi::class)
+@file:OptIn(ExperimentalEncodingApi::class)
 
 package id.walt.openid4vci.granttypehandlers
 

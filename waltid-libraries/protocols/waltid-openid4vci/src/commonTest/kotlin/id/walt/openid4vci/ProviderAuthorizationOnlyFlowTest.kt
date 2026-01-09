@@ -11,11 +11,10 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.time.ExperimentalTime
 
 class ProviderAuthorizationOnlyFlowTest {
 
-    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
+    @OptIn( ExperimentalCoroutinesApi::class)
     @Test
     fun `provider supporting only authorization code flow succeeds and rejects pre-authorized grant`() = runTest {
         val config = createTestConfig()
@@ -92,7 +91,7 @@ class ProviderAuthorizationOnlyFlowTest {
         }
     }
 
-    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `authorize response fails when session has no subject`() = runTest {
         val config = createTestConfig()

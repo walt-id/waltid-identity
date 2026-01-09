@@ -27,7 +27,6 @@ import id.walt.openid4vci.core.AuthorizeResponseResult
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.createTestConfig
-import kotlin.time.ExperimentalTime
 
 class TokenServiceTest {
 
@@ -146,7 +145,6 @@ class TokenServiceTest {
         assertEquals(issuerBKey.getKeyId(), headerB["kid"])
     }
 
-    @OptIn(ExperimentalTime::class)
     @Test
     fun `single provider handles multiple issuers end-to-end with context-based key selection`() = runBlocking {
         val keysByIssuer = mapOf(

@@ -5,13 +5,11 @@ import id.walt.openid4vci.validation.DefaultAccessRequestValidator
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.time.ExperimentalTime
 
 class DefaultAccessRequestValidatorTest {
 
     private val validator = DefaultAccessRequestValidator()
 
-    @OptIn(ExperimentalTime::class)
     @Test
     fun `validate accepts authorization code grant`() {
         val session = DefaultSession()
@@ -32,7 +30,6 @@ class DefaultAccessRequestValidatorTest {
         assertEquals("client-123", request.getClient().id)
     }
 
-    @OptIn(ExperimentalTime::class)
     @Test
     fun `validate accepts pre-authorized code grant without client id`() {
         val session = DefaultSession()
@@ -54,7 +51,6 @@ class DefaultAccessRequestValidatorTest {
         assertTrue(request.getRequestedScopes().contains("openid"))
     }
 
-    @OptIn(ExperimentalTime::class)
     @Test
     fun `validate rejects pre-authorized code grant missing code`() {
         val result = validator.validate(
@@ -69,7 +65,6 @@ class DefaultAccessRequestValidatorTest {
         assertEquals("invalid_request", error.error)
     }
 
-    @OptIn(ExperimentalTime::class)
     @Test
     fun `validate rejects unsupported grant type`() {
         val result = validator.validate(

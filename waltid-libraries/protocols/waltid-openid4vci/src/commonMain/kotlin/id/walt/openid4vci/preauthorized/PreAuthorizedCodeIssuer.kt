@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.io.encoding.ExperimentalEncodingApi::class)
+@file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
 
 package id.walt.openid4vci.preauthorized
 

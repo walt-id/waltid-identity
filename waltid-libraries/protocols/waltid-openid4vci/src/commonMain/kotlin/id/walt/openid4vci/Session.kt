@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package id.walt.openid4vci
 
 import kotlin.time.Instant
