@@ -1,9 +1,11 @@
 package id.walt.openid4vci.repository.preauthorized
 
 import id.walt.openid4vci.Session
+import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import kotlin.time.Instant
 
 interface PreAuthorizedCodeRepository {
+    @Throws(DuplicateCodeException::class)
     suspend fun save(record: PreAuthorizedCodeRecord)
     suspend fun get(code: String): PreAuthorizedCodeRecord?
     suspend fun consume(code: String): PreAuthorizedCodeRecord?

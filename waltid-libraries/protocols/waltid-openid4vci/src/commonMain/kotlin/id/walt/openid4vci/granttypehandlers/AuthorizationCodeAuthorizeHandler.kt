@@ -11,6 +11,7 @@ import id.walt.openid4vci.core.OAuthError
 import korlibs.crypto.SecureRandom
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
+import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.request.AuthorizationRequest
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -25,6 +26,7 @@ import kotlin.time.Duration.Companion.seconds
 class AuthorizationCodeAuthorizeHandler(
     private val codeRepository: AuthorizationCodeRepository,
     private val codeLifetimeSeconds: Long = 300,
+    private val maxGenerateAttempts: Int = 3,
 ) : AuthorizeEndpointHandler {
 
     override suspend fun handleAuthorizeEndpointRequest(request: AuthorizationRequest, session: Session): AuthorizeResponseResult {
@@ -48,7 +50,6 @@ class AuthorizationCodeAuthorizeHandler(
         request.getRequestedAudience().forEach { request.grantAudience(it) }
         request.getResponseTypes().forEach { request.setResponseTypeHandled(it) }
 
-        val code = generateCode()
         val expiresAt = kotlin.time.Clock.System.now() + codeLifetimeSeconds.seconds
 
         val subject = session.getSubject()?.takeIf { it.isNotBlank() }
@@ -56,9 +57,9 @@ class AuthorizationCodeAuthorizeHandler(
                 OAuthError("invalid_request", "Session subject is required"),
             )
 
-        codeRepository.save(
+        val (code, _) = generateAndSaveUnique {
             DefaultAuthorizationCodeRecord(
-                code = code,
+                code = it,
                 clientId = request.getClient().id,
                 redirectUri = redirectUri,
                 grantedScopes = request.getGrantedScopes().toSet(),
@@ -68,8 +69,8 @@ class AuthorizationCodeAuthorizeHandler(
                     setExpiresAt(TokenType.AUTHORIZATION_CODE, expiresAt)
                 },
                 expiresAt = expiresAt,
-            ),
-        )
+            )
+        }
 
         val parameters = buildMap {
             put("code", code)
@@ -86,6 +87,22 @@ class AuthorizationCodeAuthorizeHandler(
                 parameters = parameters,
             ),
         )
+    }
+
+    private suspend fun generateAndSaveUnique(
+        buildRecord: (String) -> DefaultAuthorizationCodeRecord,
+    ): Pair<String, DefaultAuthorizationCodeRecord> {
+        repeat(maxGenerateAttempts) { attempt ->
+            val code = generateCode()
+            try {
+                val record = buildRecord(code)
+                codeRepository.save(record)
+                return code to record
+            } catch (e: DuplicateCodeException) {
+                if (attempt == maxGenerateAttempts - 1) throw e
+            }
+        }
+        throw IllegalStateException("Failed to generate unique authorization code after $maxGenerateAttempts attempts")
     }
 
     private fun generateCode(): String {

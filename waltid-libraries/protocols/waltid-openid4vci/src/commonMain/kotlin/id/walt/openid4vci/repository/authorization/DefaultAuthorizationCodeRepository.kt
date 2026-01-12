@@ -10,6 +10,9 @@ internal fun defaultAuthorizationCodeRepository(): AuthorizationCodeRepository =
 
         override suspend fun save(record: AuthorizationCodeRecord) {
             synchronized(lock) {
+                if (records.containsKey(record.code)) {
+                    throw DuplicateCodeException(record.code)
+                }
                 records[record.code] = record
             }
         }

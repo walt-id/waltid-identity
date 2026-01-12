@@ -1,5 +1,6 @@
 package id.walt.openid4vci.repository.preauthorized
 
+import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
@@ -10,6 +11,9 @@ internal fun defaultPreAuthorizedCodeRepository(): PreAuthorizedCodeRepository =
 
         override suspend fun save(record: PreAuthorizedCodeRecord) {
             synchronized(lock) {
+                if (records.containsKey(record.code)) {
+                    throw DuplicateCodeException(record.code)
+                }
                 records[record.code] = record
             }
         }
