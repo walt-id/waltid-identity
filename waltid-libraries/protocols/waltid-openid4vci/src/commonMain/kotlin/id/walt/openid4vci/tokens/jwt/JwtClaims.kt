@@ -1,6 +1,7 @@
 package id.walt.openid4vci.tokens.jwt
 
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
@@ -12,16 +13,29 @@ fun defaultAccessTokenClaims(
     audience: String? = null,
     scopes: Set<String> = emptySet(),
     issuedAt: Instant = Clock.System.now(),
-    expiresAt: Instant = issuedAt,
+    expiresAt: Instant = issuedAt + 3600.seconds,
     additional: Map<String, Any?> = emptyMap(),
-): Map<String, Any?> = buildMap {
-    put(JwtPayloadClaims.SUBJECT, subject)
-    put(JwtPayloadClaims.ISSUER, issuer)
-    audience?.let { put(JwtPayloadClaims.AUDIENCE, it) }
-    put(JwtPayloadClaims.ISSUED_AT, issuedAt.epochSeconds)
-    put(JwtPayloadClaims.EXPIRATION, expiresAt.epochSeconds)
-    if (scopes.isNotEmpty()) put(JwtPayloadClaims.SCOPE, scopes.joinToString(" "))
-    putAll(additional)
+): Map<String, Any?> {
+    val reserved = setOf(
+        JwtPayloadClaims.SUBJECT,
+        JwtPayloadClaims.ISSUER,
+        JwtPayloadClaims.AUDIENCE,
+        JwtPayloadClaims.ISSUED_AT,
+        JwtPayloadClaims.EXPIRATION,
+        JwtPayloadClaims.SCOPE,
+    )
+
+    return buildMap {
+        put(JwtPayloadClaims.SUBJECT, subject)
+        put(JwtPayloadClaims.ISSUER, issuer)
+        audience?.let { put(JwtPayloadClaims.AUDIENCE, it) }
+        put(JwtPayloadClaims.ISSUED_AT, issuedAt.epochSeconds)
+        put(JwtPayloadClaims.EXPIRATION, expiresAt.epochSeconds)
+        if (scopes.isNotEmpty()) put(JwtPayloadClaims.SCOPE, scopes.joinToString(" "))
+        additional.forEach { (k, v) ->
+            if (k !in reserved) put(k, v)
+        }
+    }
 }
 
 /**
@@ -46,4 +60,3 @@ object JwtHeaderParams {
     const val ALGORITHM = "alg"
     const val KEY_ID = "kid"
 }
-
