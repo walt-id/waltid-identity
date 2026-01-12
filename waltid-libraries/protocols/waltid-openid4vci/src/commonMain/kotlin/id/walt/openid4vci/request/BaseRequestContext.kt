@@ -75,7 +75,7 @@ open class BaseRequestContext(
 
     override fun getSession(): Session? = session
 
-    override fun setSession(session: Session) {
+    override fun setSession(session: Session?) {
         this.session = session
     }
 

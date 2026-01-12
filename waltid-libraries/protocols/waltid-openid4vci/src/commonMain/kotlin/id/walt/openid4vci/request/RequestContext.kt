@@ -31,7 +31,7 @@ interface RequestContext {
     fun getRequestForm(): Parameters
 
     fun getSession(): Session?
-    fun setSession(session: Session)
+    fun setSession(session: Session?)
 
     fun getRequestedAudience(): Arguments
     fun appendRequestedAudience(audience: String)
