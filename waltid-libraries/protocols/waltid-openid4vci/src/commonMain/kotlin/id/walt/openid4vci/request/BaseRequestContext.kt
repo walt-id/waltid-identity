@@ -55,8 +55,10 @@ open class BaseRequestContext(
     override fun getRequestedScopes(): Arguments = requestedScope
 
     override fun setRequestedScopes(scopes: Arguments) {
+        if (scopes === requestedScope) return
+        val copy = scopes.toList()
         requestedScope.clear()
-        scopes.forEach { appendRequestedScope(it) }
+        copy.forEach { appendRequestedScope(it) }
     }
 
     override fun appendRequestedScope(scope: String) {
