@@ -4,6 +4,7 @@ package id.walt.openid4vci.preauthorized
 
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.TokenType
+import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import kotlin.io.encoding.Base64
@@ -53,6 +54,7 @@ data class PreAuthorizedCodeIssueResult(
 class DefaultPreAuthorizedCodeIssuer(
     private val repository: PreAuthorizedCodeRepository,
     private val codeLifetimeSeconds: Long = 300,
+    private val maxGenerateAttempts: Int = 3,
 ) : PreAuthorizedCodeIssuer {
 
     init {
@@ -67,7 +69,6 @@ class DefaultPreAuthorizedCodeIssuer(
             throw IllegalArgumentException("userPin is required when userPinRequired=true")
         }
 
-        val code = generateCode()
         val now = kotlin.time.Clock.System.now()
         val expiresAt = now + codeLifetimeSeconds.seconds
         val sessionSnapshot = request.session.cloneSession().apply {
@@ -75,12 +76,13 @@ class DefaultPreAuthorizedCodeIssuer(
             setExpiresAt(TokenType.ACCESS_TOKEN, expiresAt)
         }
 
-        repository.save(
+        val hashedPin = request.userPin?.let { hashPin(it) }
+        val (code, _) = generateAndSaveUnique { generatedCode ->
             DefaultPreAuthorizedCodeRecord(
-                code = code,
+                code = generatedCode,
                 clientId = request.clientId,
                 userPinRequired = request.userPinRequired,
-                userPin = request.userPin?.let { hashPin(it) },
+                userPin = hashedPin,
                 grantedScopes = request.scopes,
                 grantedAudience = request.audience,
                 session = sessionSnapshot,
@@ -88,7 +90,7 @@ class DefaultPreAuthorizedCodeIssuer(
                 credentialNonce = request.credentialNonce,
                 credentialNonceExpiresAt = request.credentialNonceExpiresAt,
             )
-        )
+        }
 
         return PreAuthorizedCodeIssueResult(
             code = code,
@@ -98,7 +100,23 @@ class DefaultPreAuthorizedCodeIssuer(
         )
     }
 
-    private fun generateCode(): String = Base64.UrlSafe.encode(secureRandomBytes(33))
+    private suspend fun generateAndSaveUnique(
+        buildRecord: (String) -> DefaultPreAuthorizedCodeRecord,
+    ): Pair<String, DefaultPreAuthorizedCodeRecord> {
+        repeat(maxGenerateAttempts) { attempt ->
+            val code = Base64.UrlSafe.encode(secureRandomBytes(33))
+            try {
+                val record = buildRecord(code)
+                repository.save(record)
+                return code to record
+            } catch (e: DuplicateCodeException) {
+                if (attempt == maxGenerateAttempts - 1) throw e
+            }
+        }
+        throw IllegalStateException(
+            "Failed to generate a unique pre-authorized code after $maxGenerateAttempts attempts"
+        )
+    }
 }
 
 internal fun hashPin(pin: String): String =

@@ -7,9 +7,12 @@ import kotlin.time.Instant
  * Storage abstraction for authorization code sessions.
  */
 interface AuthorizationCodeRepository {
+    @Throws(DuplicateCodeException::class)
     suspend fun save(record: AuthorizationCodeRecord)
     suspend fun consume(code: String): AuthorizationCodeRecord?
 }
+
+class DuplicateCodeException : IllegalStateException("Code collision detected")
 
 /**
  * Authorization code payload. Applications can supply custom implementations if they need extra fields.
