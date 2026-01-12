@@ -266,13 +266,13 @@ data class DcApiAnnexCFlowSetup(
             requestedElements: Map<String, List<String>>,
             policies: DefinedVerificationPolicies
         ): GeneralFlowConfig {
-            val claims = requestedElements
-                .toSortedMap()
+            val claims = requestedElements.entries
+                .sortedBy { it.key }
                 .flatMap { (namespace, elements) ->
-                elements.distinct().sorted().map { elementId ->
-                    ClaimsQuery(path = listOf(namespace, elementId))
+                    elements.distinct().sorted().map { elementId ->
+                        ClaimsQuery(path = listOf(namespace, elementId))
+                    }
                 }
-            }
 
             val dcqlQuery = DcqlQuery(
                 credentials = listOf(
