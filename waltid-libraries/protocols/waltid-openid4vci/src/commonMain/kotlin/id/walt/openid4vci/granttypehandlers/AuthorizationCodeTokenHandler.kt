@@ -10,7 +10,7 @@ import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import kotlin.time.Clock
 
 /**
- * Token endpoint handler for the authorization-code/preauthorized code grant.
+ * Token endpoint handler for the authorization-code code grant.
  *
  * Returns a lightweight [TokenEndpointResult] instead of mutating a responder in place.
  */
