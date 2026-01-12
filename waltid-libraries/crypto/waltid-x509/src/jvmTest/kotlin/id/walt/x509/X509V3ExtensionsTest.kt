@@ -1,6 +1,5 @@
 package id.walt.x509
 
-import id.walt.x509.id.walt.x509.*
 import okio.ByteString.Companion.toByteString
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.DEROctetString

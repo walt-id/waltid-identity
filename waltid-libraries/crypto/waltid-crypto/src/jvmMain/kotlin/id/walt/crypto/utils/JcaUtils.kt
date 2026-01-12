@@ -7,8 +7,10 @@ import java.io.StringReader
 import java.security.PublicKey
 
 fun parsePEMEncodedJcaPublicKey(pemPubKey: String): PublicKey {
-    val reader = PemReader(StringReader(pemPubKey))
-    val pemObject = reader.readPemObject()
-    val spki = SubjectPublicKeyInfo.getInstance(pemObject.content)
-    return JcaPEMKeyConverter().getPublicKey(spki)
+    return PemReader(StringReader(pemPubKey)).use { reader ->
+        val pemObject = reader.readPemObject()
+            ?: throw IllegalArgumentException("Invalid or empty PEM content")
+        val spki = SubjectPublicKeyInfo.getInstance(pemObject.content)
+        JcaPEMKeyConverter().getPublicKey(spki)
+    }
 }

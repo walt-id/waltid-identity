@@ -4,17 +4,23 @@ package id.walt.x509.iso.documentsigner.parser
 
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.x509.CertificateDer
-import id.walt.x509.id.walt.x509.*
-import id.walt.x509.id.walt.x509.iso.documentsigner.certificate.parseFromJcaX500Name
-import id.walt.x509.id.walt.x509.iso.iaca.certificate.parseFromJcaX500Name
-import id.walt.x509.id.walt.x509.iso.parseFromX509Certificate
+import id.walt.x509.JcaX509CertificateHandle
+import id.walt.x509.iso.documentsigner.certificate.parseFromJcaX500Name
+import id.walt.x509.iso.iaca.certificate.parseFromJcaX500Name
+import id.walt.x509.iso.parseFromX509Certificate
 import id.walt.x509.X509ValidityPeriod
+import id.walt.x509.authorityKeyIdentifier
+import id.walt.x509.criticalX509V3ExtensionOIDs
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import id.walt.x509.iso.parseCrlDistributionPointUriFromCert
+import id.walt.x509.nonCriticalX509V3ExtensionOIDs
+import id.walt.x509.subjectKeyIdentifier
 import id.walt.x509.toJcaX509Certificate
+import id.walt.x509.x509BasicConstraints
+import id.walt.x509.x509KeyUsages
 import okio.ByteString.Companion.toByteString
 import org.bouncycastle.cert.jcajce.JcaX500NameUtil
 import kotlin.time.ExperimentalTime

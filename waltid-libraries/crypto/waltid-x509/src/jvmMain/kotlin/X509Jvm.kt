@@ -6,7 +6,9 @@ import java.io.FileInputStream
 import java.security.KeyStore
 import java.security.cert.*
 
-fun CertificateDer.toJcaX509Certificate(): X509Certificate = X509CertUtils.parse(bytes.toByteArray())
+fun CertificateDer.toJcaX509Certificate(): X509Certificate =
+    X509CertUtils.parse(bytes.toByteArray())
+        ?: throw IllegalArgumentException("Failed to parse DER bytes as X.509 certificate")
 
 @Throws(X509ValidationException::class)
 actual fun validateCertificateChain(

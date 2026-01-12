@@ -1,4 +1,4 @@
-package id.walt.x509.id.walt.x509
+package id.walt.x509
 
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.X500NameBuilder

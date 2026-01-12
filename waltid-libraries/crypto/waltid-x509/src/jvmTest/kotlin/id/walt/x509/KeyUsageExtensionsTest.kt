@@ -1,8 +1,5 @@
 package id.walt.x509
 
-import id.walt.x509.id.walt.x509.toBCKeyUsage
-import id.walt.x509.id.walt.x509.toBouncyCastleKeyUsage
-import id.walt.x509.id.walt.x509.toCertificateKeyUsages
 import org.bouncycastle.asn1.x509.KeyUsage
 import kotlin.test.Test
 import kotlin.test.assertEquals

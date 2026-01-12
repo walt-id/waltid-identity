@@ -1,8 +1,13 @@
 package id.walt.x509.iso.documentsigner
 
-import id.walt.x509.id.walt.x509.*
-import id.walt.x509.id.walt.x509.iso.documentsigner.certificate.parseFromJcaX500Name
-import id.walt.x509.id.walt.x509.iso.documentsigner.certificate.toJcaX500Name
+import id.walt.x509.buildX500Name
+import id.walt.x509.getCommonName
+import id.walt.x509.getCountryCode
+import id.walt.x509.getLocalityName
+import id.walt.x509.getOrganizationName
+import id.walt.x509.getStateOrProvinceName
+import id.walt.x509.iso.documentsigner.certificate.parseFromJcaX500Name
+import id.walt.x509.iso.documentsigner.certificate.toJcaX500Name
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.X500NameBuilder

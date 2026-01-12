@@ -63,7 +63,7 @@ internal fun parseCrlDistributionPointUriFromCert(
 )?.let { crlDistributionPointBytes ->
     val crlDistPoint = CRLDistPoint.getInstance(
         requireNotNull(ASN1OctetString.getInstance(crlDistributionPointBytes).octets) {
-            "CRL distribution point uri extension but be specified in X509 certificate, but was found missing"
+            "CRL distribution point uri extension must be specified in X509 certificate, but was found missing"
         }
     )
     require(crlDistPoint.distributionPoints.size == 1) {

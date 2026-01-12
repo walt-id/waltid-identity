@@ -135,7 +135,7 @@ fun anchorsFromKeyStore(ks: KeyStore): List<CertificateDer> {
 The `id.walt.x509.iso` package provides the following:
 
 - Builder classes for IACA (via `IACACertificateBuilder`) and Document Signer (via `DocumentSignerCertificateBuilder`) X.509 certificates.
-- Parser classes for IACA (via `IACACertificateParser`) and Document Signer (via `DocumentSignerCertificateParser`) DER-encoded (via the `CertificateDer` platform-agnostic wrapper) X.509 certificates. **Note:** Decoded certificates **are not validate
+- Parser classes for IACA (via `IACACertificateParser`) and Document Signer (via `DocumentSignerCertificateParser`) DER-encoded (via the `CertificateDer` platform-agnostic wrapper) X.509 certificates. **Note:** Decoded certificates **are not validated** by the parsers; use the validator classes for validation.
 - Validator classes for IACA (via `IACAValidator`) and Document Signer (via `DocumentSignerValidator`) decoded certificate instances (`IACADecodedCertificate` and `DocumentSignerDecodedCertificate` respectively) with a simple and flexible validation configuration tuning (refer to `IACAValidationConfig` and `DocumentSignerValidationConfig` for the respective configuration options).
 
 ### IACA X.509 Certificate Generation

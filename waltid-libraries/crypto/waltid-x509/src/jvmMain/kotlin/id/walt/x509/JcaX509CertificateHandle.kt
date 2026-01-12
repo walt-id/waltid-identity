@@ -1,9 +1,7 @@
-package id.walt.x509.id.walt.x509
+package id.walt.x509
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
-import id.walt.x509.CertificateDer
-import id.walt.x509.X509CertificateHandle
 import okio.ByteString.Companion.toByteString
 import java.security.cert.X509Certificate
 

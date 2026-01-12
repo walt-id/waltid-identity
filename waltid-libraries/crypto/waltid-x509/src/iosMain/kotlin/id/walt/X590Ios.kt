@@ -1,7 +1,7 @@
 package id.walt.x509
 
 actual fun parseX5cBase64(x5cBase64: List<String>): List<CertificateDer> =
-    x5cBase64.map { CertificateDer(kotlin.io.encoding.Base64.Default.decode(it)) }
+    x5cBase64.map { CertificateDer(kotlin.io.encoding.Base64.Default.decode(it).toByteString()) }
 
 actual fun validateCertificateChain(
     leaf: CertificateDer,
