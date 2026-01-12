@@ -80,6 +80,10 @@ data class Mdl(
     @SerialName("age_over_21")
     val ageOver21: Boolean? = null,
 
+    /** Age attestation: Over 24 years old? */
+    @SerialName("age_over_24")
+    val ageOver24: Boolean? = null,
+
     /** Age attestation: Over 25 years old? */
     @SerialName("age_over_25")
     val ageOver25: Boolean? = null,
@@ -166,6 +170,7 @@ data class Mdl(
                     "age_over_16" to boolean,
                     "age_over_18" to boolean,
                     "age_over_21" to boolean,
+                    "age_over_24" to boolean,
                     "age_over_25" to boolean,
                     "age_over_60" to boolean,
                     "age_over_62" to boolean,
