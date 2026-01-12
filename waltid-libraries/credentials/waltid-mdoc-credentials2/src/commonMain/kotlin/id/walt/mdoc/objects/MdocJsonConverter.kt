@@ -195,13 +195,31 @@ object MdocJsonConverter {
                     // Legacy: array of numbers
                     json.all { it is JsonPrimitive && (it.intOrNull != null || it.longOrNull != null) } -> {
                         try {
-                            json.mapNotNull {
-                                when (it) {
-                                    is JsonPrimitive -> it.intOrNull?.toByte() ?: it.longOrNull?.toByte()
+                            json.mapIndexedNotNull { index, element ->
+                                when (element) {
+                                    is JsonPrimitive -> {
+                                        val value = element.intOrNull ?: element.longOrNull
+                                        if (value == null) {
+                                            null
+                                        } else {
+                                            // Validate value is within Byte range before conversion
+                                            if (value < Byte.MIN_VALUE || value > Byte.MAX_VALUE) {
+                                                throw IllegalArgumentException(
+                                                    "Value $value at index $index is out of Byte range (${Byte.MIN_VALUE}..${Byte.MAX_VALUE}) " +
+                                                            "for ByteArray field $namespace.$elementIdentifier. " +
+                                                            "Cannot convert to ByteArray without data loss."
+                                                )
+                                            }
+                                            value.toByte()
+                                        }
+                                    }
                                     else -> null
                                 }
                             }.toByteArray()
                         } catch (e: Exception) {
+                            if (e is IllegalArgumentException) {
+                                throw e
+                            }
                             throw IllegalArgumentException(
                                 "Failed to convert array to ByteArray for $namespace.$elementIdentifier: ${e.message}",
                                 e
