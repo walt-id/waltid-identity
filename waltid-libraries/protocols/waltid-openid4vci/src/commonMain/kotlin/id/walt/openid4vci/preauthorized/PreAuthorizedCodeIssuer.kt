@@ -98,7 +98,7 @@ class DefaultPreAuthorizedCodeIssuer(
         )
     }
 
-    private fun generateCode(): String = Base64.UrlSafe.encode(secureRandomBytes(32))
+    private fun generateCode(): String = Base64.UrlSafe.encode(secureRandomBytes(33))
 }
 
 internal fun hashPin(pin: String): String =
