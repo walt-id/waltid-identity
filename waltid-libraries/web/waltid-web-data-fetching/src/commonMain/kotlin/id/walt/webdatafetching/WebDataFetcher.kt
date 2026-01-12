@@ -25,6 +25,8 @@ class WebDataFetcher<T : Any>(id: String) {
     suspend inline fun <reified Res : T> fetch(url: Url): T {
         val cacheId = url.toString()
 
+        dataFetcherConfiguration.url?.requireUrlAllowed(cacheId)
+
         val cachedValue = cache?.get(cacheId)
 
         if (cachedValue != null) {
@@ -40,14 +42,14 @@ class WebDataFetcher<T : Any>(id: String) {
         }
 
         val httpResponse = httpResponseResult.getOrElse { ex ->
-            throw IllegalArgumentException("Could not send request to: $url (${ex.message ?: "unkown error"})", ex)
+            throw DataFetchingException("Could not send request to: $url (${ex.message ?: "unkown error"})", ex)
         }
 
         val parsedResponse: T = if (httpResponse.contentType()?.match(ContentType.Text.Plain) == true) {
             val body = httpResponse.bodyAsText()
             runCatching {
                 dataFetcherConfiguration.decoding.json.decodeFromString<Res>(body)
-            }.getOrElse { ex -> throw IllegalArgumentException("Server answered request with non-/invalid JSON: $body (to request to $url)", ex) }
+            }.getOrElse { ex -> throw DataFetchingException("Server answered request with non-/invalid JSON: $body (to request to $url)", ex) }
         } else {
             httpResponse.body<Res>()
         }

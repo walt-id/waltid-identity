@@ -7,10 +7,10 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class UrlConfiguration(
-    val protocols: UrlProtocols?,
-    val ports: AllowList<Int>?,
-    val hosts: AllowList<String>?,
-    val urls: AllowList<Url>?,
+    val protocols: UrlProtocols? = null,
+    val ports: AllowList<Int>? = null,
+    val hosts: AllowList<String>? = null,
+    val urls: AllowList<Url>? = null
 ) {
 
     fun requireUrlAllowed(url: String) {

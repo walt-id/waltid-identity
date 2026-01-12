@@ -12,4 +12,8 @@ object WebDataFetcherManager {
     fun applyConfigurations(configs: Map<String, WebDataFetchingConfiguration>) {
         fetcherConfigurations.putAll(configs)
     }
+
+    fun appendConfiguration(id: String, configuration: WebDataFetchingConfiguration) {
+        fetcherConfigurations[id] = configuration
+    }
 }
