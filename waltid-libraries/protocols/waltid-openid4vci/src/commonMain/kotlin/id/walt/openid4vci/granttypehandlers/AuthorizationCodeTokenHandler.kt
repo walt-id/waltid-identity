@@ -66,7 +66,6 @@ import kotlin.time.Clock
             expiresAt = expiresAt,
             additional = mapOf(
                 "client_id" to client.id,
-                "code" to code,
             ),
         )
 

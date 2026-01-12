@@ -106,7 +106,7 @@ internal suspend fun executeAuthorizationCodeFlow(
     assertEquals(state, authorizeRequest.request.state)
 
     val token = accessResponse.response.accessToken
-    assertTrue(token.startsWith("access-$clientId-$code"))
+    assertTrue(token.startsWith("access-$clientId"))
 
     return token
 }

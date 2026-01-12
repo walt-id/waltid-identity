@@ -224,8 +224,6 @@ class ProviderCombinedFlowTest {
         assertTrue(tokenA.accessToken.isNotBlank())
         assertTrue(tokenB.accessToken.isNotBlank())
         assertNotEquals(tokenA.accessToken, tokenB.accessToken, "tokens must differ per client")
-        assertEquals("access-${accessReqA.getClient().id}-$codeA", tokenA.accessToken)
-        assertEquals("access-${accessReqB.getClient().id}-$codeB", tokenB.accessToken)
 
         // Codes are one-time use
         assertNull(config.authorizationCodeRepository.consume(codeA))
