@@ -33,6 +33,9 @@ kotlin {
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)
         }
+        jsTest.dependencies {
+            implementation(identityLibs.ktor.client.js)
+        }
     }
 }
 
