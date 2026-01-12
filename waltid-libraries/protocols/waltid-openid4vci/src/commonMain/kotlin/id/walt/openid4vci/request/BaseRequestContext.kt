@@ -31,13 +31,12 @@ open class BaseRequestContext(
 ) : RequestContext {
 
     override fun getID(): String {
-        if (requestId.isNullOrEmpty()) {
-            requestId = generateId()
-        }
-        return requestId!!
+        val current = requestId?.takeIf { it.isNotBlank() }
+        return current ?: generateId().also { requestId = it }
     }
 
     override fun setID(id: String) {
+        require(id.isNotBlank()) { "id must not be blank" }
         this.requestId = id
     }
 
