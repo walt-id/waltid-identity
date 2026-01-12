@@ -1,11 +1,14 @@
 package id.walt.oid4vc.data
 
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
-import kotlinx.serialization.*
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.KeepGeneratedSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
-import kotlinx.serialization.descriptors.buildSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
@@ -198,9 +201,8 @@ internal object CredentialSupportedArraySerializer : KSerializer<Map<String, Cre
 
 object FlexibleAlgSetSerializer : KSerializer<Set<CredSignAlgValues>> {
 
-    @OptIn(InternalSerializationApi::class)
     override val descriptor: SerialDescriptor =
-        buildSerialDescriptor("FlexibleAlgSet", StructureKind.LIST)
+        buildClassSerialDescriptor("FlexibleAlgSet")
 
     override fun deserialize(decoder: Decoder): Set<CredSignAlgValues> {
         val jsonDecoder = decoder as? JsonDecoder
