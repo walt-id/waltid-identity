@@ -55,6 +55,10 @@ class DefaultPreAuthorizedCodeIssuer(
     private val codeLifetimeSeconds: Long = 300,
 ) : PreAuthorizedCodeIssuer {
 
+    init {
+        require(codeLifetimeSeconds > 0) { "codeLifetimeSeconds must be positive" }
+    }
+
     override suspend fun issue(request: PreAuthorizedCodeIssueRequest): PreAuthorizedCodeIssueResult {
         val subject = request.session.getSubject()?.takeIf { it.isNotBlank() }
             ?: throw IllegalArgumentException("Session subject is required for pre-authorized code issuance")
@@ -68,7 +72,7 @@ class DefaultPreAuthorizedCodeIssuer(
         val expiresAt = now + codeLifetimeSeconds.seconds
         val sessionSnapshot = request.session.cloneSession().apply {
             setSubject(subject)
-            setExpiresAt(TokenType.AUTHORIZATION_CODE, expiresAt)
+            setExpiresAt(TokenType.ACCESS_TOKEN, expiresAt)
         }
 
         repository.save(
