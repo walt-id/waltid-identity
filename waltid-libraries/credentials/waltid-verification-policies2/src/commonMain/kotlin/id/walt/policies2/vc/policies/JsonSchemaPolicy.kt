@@ -6,6 +6,7 @@ import id.walt.webdatafetching.WebDataFetcher
 import io.github.optimumcode.json.schema.JsonSchema
 import io.github.optimumcode.json.schema.SchemaType
 import io.github.optimumcode.json.schema.ValidationError
+import io.ktor.http.Url
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -16,7 +17,7 @@ import kotlinx.serialization.json.JsonObject
 @SerialName("schema")
 data class JsonSchemaPolicy(
     val schema: JsonObject? = null,
-    val schemaUrl: String? = null,
+    val schemaUrl: Url? = null,
     val defaultType: SchemaType? = null
 ) : CredentialVerificationPolicy2() {
     override val id = "schema"
@@ -26,7 +27,7 @@ data class JsonSchemaPolicy(
     }
 
     @Transient
-    private val schemaFetcher = schemaUrl?.let { WebDataFetcher<JsonObject>(it) }
+    private val schemaFetcher = schemaUrl?.let { WebDataFetcher<JsonObject>("schema-policy") }
 
     suspend fun getCurrentSchema(): JsonObject {
         return when {
