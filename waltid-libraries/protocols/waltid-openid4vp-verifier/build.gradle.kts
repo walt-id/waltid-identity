@@ -6,16 +6,19 @@ plugins {
 
 group = "id.walt.protocols"
 
-kotlin {
-    val ktor_version = "3.3.3"
+object Versions {
+    const val KTOR_VERSION = "3.3.3"
+}
 
+kotlin {
+  
     sourceSets {
         commonMain.dependencies {
             // Coroutines
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
             // HTTP
-            implementation("io.ktor:ktor-server-core:$ktor_version")
+            implementation("io.ktor:ktor-server-core:${Versions.KTOR_VERSION}")
 
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
