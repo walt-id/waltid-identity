@@ -5,5 +5,11 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class AzureKeyMetadataSDK(
-    val vaultUrl: String,
+    val auth: AzureSDKAuth,
+    val keyName: String? = null,
+)
+
+@Serializable
+data class AzureSDKAuth(
+    val keyVaultUrl: String,
 )
