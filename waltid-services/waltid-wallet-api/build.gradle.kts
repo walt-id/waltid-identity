@@ -11,39 +11,42 @@ application {
     mainClass.set("id.walt.webwallet.MainKt")
 }
 
+object Versions {
+    const val KTOR_VERSION = "3.3.3"
+}
+
 dependencies {
     implementation(project(":waltid-services:waltid-service-commons"))
 
     /* -- KTOR -- */
 
-    val ktor_version = "3.3.3"
     // Ktor server
-    implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-auth-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-sessions-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-auth-jwt-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-auto-head-response-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-double-receive-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-host-common-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-status-pages-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-compression-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-cors-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-forwarded-header-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-call-logging-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-call-id-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-content-negotiation-jvm:$ktor_version")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
-    implementation("io.ktor:ktor-server-cio-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-method-override:$ktor_version")
-    implementation("io.ktor:ktor-server-rate-limit:$ktor_version")
+    implementation("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-auth-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-sessions-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-auth-jwt-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-auto-head-response-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-double-receive-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-host-common-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-status-pages-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-compression-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-cors-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-forwarded-header-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-call-logging-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-call-id-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-method-override:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-rate-limit:${Versions.KTOR_VERSION}")
 
     // Ktor client
-    implementation("io.ktor:ktor-client-core-jvm:$ktor_version")
-    implementation("io.ktor:ktor-client-serialization:$ktor_version")
-    implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
-    implementation("io.ktor:ktor-client-json-jvm:$ktor_version")
-    implementation("io.ktor:ktor-client-okhttp-jvm:$ktor_version")
-    implementation("io.ktor:ktor-client-logging-jvm:$ktor_version")
+    implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-serialization:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-json-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-logging-jvm:${Versions.KTOR_VERSION}")
 
     /* -- Kotlin -- */
 
@@ -96,7 +99,7 @@ dependencies {
     implementation("com.nimbusds:nimbus-jose-jwt:10.6")
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
 
-    implementation("io.ktor:ktor-client-java:$ktor_version")
+    implementation("io.ktor:ktor-client-java:${Versions.KTOR_VERSION}")
 
     /* -- Misc --*/
 
@@ -143,7 +146,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-    testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
+    testImplementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
     testImplementation("io.mockk:mockk:1.13.16")
     testImplementation("io.klogging:klogging-jvm:0.11.6")
 }
