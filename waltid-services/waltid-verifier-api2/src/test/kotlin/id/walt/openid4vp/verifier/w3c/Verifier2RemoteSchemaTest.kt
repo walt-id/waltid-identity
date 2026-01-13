@@ -342,7 +342,6 @@ class Verifier2RemoteSchemaTest {
 
             // Check created session
             test("Check Verification Session after presentation") {
-                println()
                 assertTrue { info2.attempted }
                 assertTrue { info2.status == Verification2Session.VerificationSessionStatus.SUCCESSFUL }
 
