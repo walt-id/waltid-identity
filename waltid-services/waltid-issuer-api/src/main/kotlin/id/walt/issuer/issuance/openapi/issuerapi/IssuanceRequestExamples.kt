@@ -972,8 +972,9 @@ object IssuanceExamples {
                     "keyType": "secp256r1",
                     "config":
                     {
-                       "vaultUrl" : "url to the vault"
-                      
+                      "auth": {
+                         "keyVaultUrl" : "url to the vault"
+                      }
                     }
                 },
                 "did":
