@@ -242,7 +242,7 @@ class Verifier2RemoteSchemaTest {
     @Test
     fun test() {
         val host = "127.0.0.1"
-        val port = 17031
+        val port = 17032
 
         E2ETest(host, port, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
