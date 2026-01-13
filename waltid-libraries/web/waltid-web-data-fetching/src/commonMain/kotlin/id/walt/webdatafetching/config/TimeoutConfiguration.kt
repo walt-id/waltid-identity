@@ -2,6 +2,7 @@ package id.walt.webdatafetching.config
 
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 @Serializable
 data class TimeoutConfiguration(
@@ -13,4 +14,12 @@ data class TimeoutConfiguration(
 
     /** a maximum time of inactivity between two data packets when exchanging data with a server. */
     val socketTimeout: Duration? = null,
-)
+) {
+    companion object {
+        val Example = TimeoutConfiguration(
+            requestTimeout = 30.seconds,
+            connectTimeout = 10.seconds,
+            socketTimeout = 5.seconds,
+        )
+    }
+}

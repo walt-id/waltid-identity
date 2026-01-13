@@ -33,4 +33,13 @@ data class UrlConfiguration(
         }
     }
 
+    companion object {
+        val Example = UrlConfiguration(
+            protocols = UrlProtocols.Default,
+            ports = AllowList(whitelist = listOf(80, 443), blacklist = listOf(25)),
+            hosts = AllowList(whitelist = listOf("localhost", "127.0.0.1"), blacklist = listOf("google.com")),
+            urls = AllowList(whitelist = listOf(Url("https://example.org/allowed")), blacklist = listOf(Url("https://example.org/disallowed")),)
+        )
+    }
+
 }

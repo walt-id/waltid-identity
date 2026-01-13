@@ -54,4 +54,16 @@ data class ResponseBodyDecodingConfiguration(
             allowComments = ignoreComments
         }
     }
+
+    companion object {
+        val Example = ResponseBodyDecodingConfiguration(
+            allowUnknownFields = true,
+            caseInsensitiveEnums = true,
+            lenientParsing = false,
+            coerce = false,
+            explicitNullValues = true,
+            allowTrailingCommas = true,
+            ignoreComments = true
+        )
+    }
 }

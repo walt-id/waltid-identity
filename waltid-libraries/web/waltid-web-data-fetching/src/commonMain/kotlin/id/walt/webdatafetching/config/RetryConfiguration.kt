@@ -83,4 +83,13 @@ data class RetryConfiguration(
             }
         }
     }
+
+    companion object {
+        val Example = RetryConfiguration(
+            retryOn = RetrySetting.RETRY_ON_EXCEPTION_OR_SERVER_ERRORS,
+            maxRetryCount = 3,
+            delay = DelaySetting.ExponentialBackoff(),
+            addRetryCountHeader = true
+        )
+    }
 }

@@ -24,6 +24,17 @@ data class WebDataFetchingConfiguration(
 ) {
     companion object {
         val Default = WebDataFetchingConfiguration()
+
+        val Example = WebDataFetchingConfiguration(
+            url = UrlConfiguration.Example,
+            cache = CacheConfiguration.Example,
+            timeouts = TimeoutConfiguration.Example,
+            retry = RetryConfiguration.Example,
+            request = RequestConfiguration.Example,
+            engine = RequestEngineConfiguration.Example,
+            decoding = ResponseBodyDecodingConfiguration.Example,
+            logging = LoggingConfiguration.Example
+        )
     }
 
 
@@ -70,4 +81,3 @@ data class WebDataFetchingConfiguration(
 
 
 }
-

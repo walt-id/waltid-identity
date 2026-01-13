@@ -62,4 +62,15 @@ data class RequestConfiguration(
         @SerialName("browser")
         class BrowserUserAgent : UserAgentConfiguration()
     }
+
+    companion object {
+        val Example = RequestConfiguration(
+            method = HttpMethod.Get,
+            headers = mapOf("X-Requested-By" to "walt.id"),
+            cookies = mapOf("my_login" to "123456"),
+            auth = HttpAuthConfiguration.BearerAuth("my-token"),
+            userAgent = UserAgentConfiguration.CustomUserAgent("custom user agent"),
+            expectSuccess = false
+        )
+    }
 }
