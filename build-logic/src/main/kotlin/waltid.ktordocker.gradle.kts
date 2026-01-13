@@ -7,7 +7,6 @@ plugins {
     id("com.google.cloud.tools.jib") // Automatically applied by ktor, applying it here just so that IntelliJ knows what's going on
 }
 
-
 fun getDockerCredentials(rootDir: File): Pair<String, String> {
     val envUsername = providers.environmentVariable("DOCKER_USERNAME").getOrNull()
     val envPassword = providers.environmentVariable("DOCKER_PASSWORD").getOrNull()
@@ -25,9 +24,6 @@ ktor {
     docker {
         jreVersion.set(JavaVersion.VERSION_21)
 
-        localImageName.set(project.name.replaceFirst("waltid-", "waltid/")) // waltid-verifier-api2 -> waltid/verifier-api2
-        imageTag.set("${project.version}")
-
         val (user, pass) = getDockerCredentials(rootDir)
 
         externalRegistry.set(
@@ -39,8 +35,6 @@ ktor {
         )
     }
 }
-
-
 
 configure<JibExtension> {
     container {
@@ -57,5 +51,9 @@ configure<JibExtension> {
                 os = "linux"
             }
         }
+    }
+    to {
+        image = project.name.replaceFirst("waltid-", "waltid/") // waltid-verifier-api2 -> waltid/verifier-api2
+        tags = setOf("${project.version}", "latest")
     }
 }
