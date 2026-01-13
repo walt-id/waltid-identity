@@ -14,10 +14,7 @@ import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
 
 @Serializable
@@ -25,7 +22,7 @@ import org.kotlincrypto.hash.sha2.SHA256
 class AzureKey(
     val config: AzureKeyMetadataSDK,
     val id: String,
-    private var _publicKey: String? = null,
+    private var _publicKey: DirectSerializedKey? = null,
     private var _keyType: KeyType? = null,
 ) : Key() {
 
@@ -49,7 +46,7 @@ class AzureKey(
 
     override suspend fun exportJWK(): String = throw NotImplementedError("JWK export is not available for remote keys.")
 
-    override suspend fun exportJWKObject(): JsonObject = Json.parseToJsonElement(_publicKey!!).jsonObject
+    override suspend fun exportJWKObject(): JsonObject = Json.parseToJsonElement(_publicKey!!.toString()).jsonObject
 
     override suspend fun exportPEM(): String = throw NotImplementedError("PEM export is not available for remote keys.")
 
@@ -77,8 +74,8 @@ class AzureKey(
             val hashFunction = getHashFunction()
             val digest = hashFunction(plaintext)
 
-            val cryptoClient = KeyVaultClientFactory.cryptoClient(config.vaultUrl, id)
-            val signResult = cryptoClient!!.sign(azureSignatureAlgorithm, digest).awaitSingle()
+            val cryptoClient = KeyVaultClientFactory.cryptoClient(config.auth.keyVaultUrl, id)
+            val signResult = cryptoClient.sign(azureSignatureAlgorithm, digest).awaitSingle()
 
             signResult.signature ?: throw SigningException("Azure Key Vault returned null signature")
         } catch (e: ResourceNotFoundException) {
@@ -105,10 +102,6 @@ class AzureKey(
 
         var rawSignature = signRaw("$header.$payload".encodeToByteArray())
 
-        if (keyType in KeyTypes.EC_KEYS) {
-            rawSignature = EccUtils.convertDERtoIEEEP1363(rawSignature)
-        }
-
         val encodedSignature = rawSignature.encodeToBase64Url()
         return "$header.$payload.$encodedSignature"
     }
@@ -125,8 +118,8 @@ class AzureKey(
             val hashFunction = getHashFunction()
             val digest = hashFunction(messageToVerify)
 
-            val cryptoClient = KeyVaultClientFactory.cryptoClient(config.vaultUrl, id)
-            val verifyResult = cryptoClient!!.verify(azureSignatureAlgorithm, digest, signed).awaitSingle()
+            val cryptoClient = KeyVaultClientFactory.cryptoClient(config.auth.keyVaultUrl, id)
+            val verifyResult = cryptoClient.verify(azureSignatureAlgorithm, digest, signed).awaitSingle()
 
             if (verifyResult.isValid) {
                 Result.success(messageToVerify)
@@ -153,13 +146,13 @@ class AzureKey(
     private var backedKey: Key? = null
 
     override suspend fun getPublicKey(): Key = backedKey ?: when {
-        _publicKey != null -> _publicKey!!.let { JWKKey.importJWK(it).getOrThrow() }
+        _publicKey != null -> _publicKey!!.key
         else -> retrievePublicKey()
     }.also { newBackedKey -> backedKey = newBackedKey }
 
     private suspend fun retrievePublicKey(): Key {
         val publicKey = getAzurePublicKey(config, id)
-        _publicKey = publicKey.exportJWK()
+        _publicKey = DirectSerializedKey(publicKey)
         return publicKey
     }
 
@@ -173,7 +166,7 @@ class AzureKey(
 
     override suspend fun deleteKey(): Boolean {
         return try {
-            val keyClient = KeyVaultClientFactory.keyClient(config.vaultUrl)
+            val keyClient = KeyVaultClientFactory.keyClient(config.auth.keyVaultUrl)
             val poller = keyClient.beginDeleteKey(id)
             poller.waitForCompletion()
             true
@@ -185,28 +178,55 @@ class AzureKey(
                 else -> throw KeyVaultUnavailable("Failed to delete key: ${e.message}", e)
             }
         } catch (e: Exception) {
-            throw KeyCreationFailed("Failed to delete key: ${e.message}", e)
+            throw CryptoStateException("Failed to delete key: ${e.message}", e)
         }
     }
 
+
     companion object {
+        data class ParsedAzurePublicKey(
+            val kid: String,
+            val azureKeyType: String,
+            val curve: String?,
+            val keyType: KeyType,
+            val publicKey: JWKKey,
+        )
+
+        internal fun azureKeyToKeyTypeMapping(crv: String, kty: String): KeyType =
+            KeyTypes.getKeyTypeByJwkId(jwkKty = kty, jwkCrv = crv)
+
+        internal suspend fun parseAzurePublicKey(publicKeyJson: JsonObject): ParsedAzurePublicKey {
+            val kid = publicKeyJson["kid"]?.jsonPrimitive?.content ?: error("No key id in key response")
+            val azureKeyType =
+                publicKeyJson["kty"]?.jsonPrimitive?.content ?: error("Missing key type in public key response")
+            val crvFromResponse = publicKeyJson["crv"]?.jsonPrimitive?.content
+            val publicKeyJsonModified = publicKeyJson.toMutableMap()
+            publicKeyJsonModified.remove("key_ops")
+            val publicKey = JWKKey.importJWK(publicKeyJsonModified.toMap().toJsonElement().toString())
+                .getOrElse { exception ->
+                    throw IllegalArgumentException(
+                        "Invalid JWK in public key: $publicKeyJson",
+                        exception
+                    )
+                }
+
+            val keyType = azureKeyToKeyTypeMapping(crvFromResponse ?: "", azureKeyType)
+
+            return ParsedAzurePublicKey(kid, azureKeyType, crvFromResponse, keyType, publicKey)
+        }
 
         suspend fun generateKey(keyType: KeyType, config: AzureKeyMetadataSDK): AzureKey {
             return try {
-                val keyClient = KeyVaultClientFactory.keyClient(config.vaultUrl)
-                val keyName = "key-${System.currentTimeMillis()}"
+                val keyClient = KeyVaultClientFactory.keyClient(config.auth.keyVaultUrl)
+
+                val keyName = config.keyName
+                    ?.takeIf { it.isNotBlank() }
+                    ?: "key-${System.currentTimeMillis()}"
+
 
                 val createKeyOptions = when (keyType) {
                     KeyType.secp256r1 -> CreateEcKeyOptions(keyName).apply {
                         curveName = KeyCurveName.P_256
-                    }
-
-                    KeyType.secp384r1 -> CreateEcKeyOptions(keyName).apply {
-                        curveName = KeyCurveName.P_384
-                    }
-
-                    KeyType.secp521r1 -> CreateEcKeyOptions(keyName).apply {
-                        curveName = KeyCurveName.P_521
                     }
 
                     KeyType.secp256k1 -> CreateEcKeyOptions(keyName).apply {
@@ -217,24 +237,23 @@ class AzureKey(
                         keySize = 2048
                     }
 
-                    KeyType.RSA3072 -> CreateRsaKeyOptions(keyName).apply {
-                        keySize = 3072
+                    else -> {
+                        throw KeyTypeNotSupportedException(keyType.name)
                     }
-
-                    KeyType.RSA4096 -> CreateRsaKeyOptions(keyName).apply {
-                        keySize = 4096
-                    }
-
-                    KeyType.Ed25519 -> throw KeyTypeNotSupportedException(keyType.name)
                 }
 
                 val keyVaultKey = keyClient.createKey(createKeyOptions)
+                println("Created key : ${keyVaultKey.key}")
                 val publicKey = getAzurePublicKey(config, keyVaultKey.name)
+                println("Public key: $publicKey")
 
+                val normalizedPublicKey = parseAzurePublicKey(publicKey.exportJWKObject()).publicKey
+                println("normalized public key: $normalizedPublicKey")
+                
                 AzureKey(
                     config = config,
                     id = keyVaultKey.name,
-                    _publicKey = publicKey.exportJWK(),
+                    _publicKey = DirectSerializedKey(normalizedPublicKey),
                     _keyType = keyType
                 )
             } catch (e: com.azure.core.exception.HttpResponseException) {
@@ -252,7 +271,7 @@ class AzureKey(
 
         suspend fun getAzurePublicKey(config: AzureKeyMetadataSDK, keyName: String): Key {
             return try {
-                val keyClient = KeyVaultClientFactory.keyClient(config.vaultUrl)
+                val keyClient = KeyVaultClientFactory.keyClient(config.auth.keyVaultUrl)
                 val keyVaultKey = keyClient.getKey(keyName)
 
                 val jwk = keyVaultKey.key
@@ -267,7 +286,7 @@ class AzureKey(
                     else -> throw KeyVaultUnavailable("Failed to retrieve key: ${e.message}", e)
                 }
             } catch (e: Exception) {
-                throw KeyCreationFailed("Failed to retrieve Azure public key: ${e.message}", e)
+                throw CryptoStateException("Failed to retrieve Azure public key: ${e.message}", e)
             }
         }
     }
