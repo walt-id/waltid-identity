@@ -29,6 +29,10 @@ object OidcIssuance {
             OpenID4VCIVersion.DRAFT11 -> {
                 CredentialOffer.Draft11.Builder(OidcApi.baseUrlDraft11)
             }
+
+            OpenID4VCIVersion.V1 -> {
+                throw IllegalArgumentException("Unsupported standard version: V1")
+            }
         }
 
         if (standardVersion == OpenID4VCIVersion.DRAFT11 && issuanceRequests.first().draft11EncodeOfferedCredentialsByReference == false) {
