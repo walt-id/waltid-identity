@@ -33,10 +33,10 @@ kotlin {
 
 mavenPublishing {
     pom {
-        name.set("walt.id DIF Definitions Parser")
+        name.set("walt.id DCQL library")
         description.set(
             """
-            Kotlin/Java library for DIF definitions parsing
+            Kotlin/Java library for DCQL matching
             """.trimIndent()
         )
     }

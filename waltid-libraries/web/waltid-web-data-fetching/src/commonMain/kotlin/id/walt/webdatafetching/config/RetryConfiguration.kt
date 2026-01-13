@@ -2,6 +2,7 @@ package id.walt.webdatafetching.config
 
 import io.ktor.client.*
 import io.ktor.client.plugins.*
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -15,6 +16,7 @@ data class RetryConfiguration(
     val addRetryCountHeader: Boolean = true
 ) {
 
+    @Serializable
     enum class RetrySetting {
         NO_RETRY,
         RETRY_ON_SERVER_ERRORS,
@@ -27,6 +29,8 @@ data class RetryConfiguration(
         abstract val randomization: Duration
         abstract val respectRetryAfterHeader: Boolean
 
+        @Serializable
+        @SerialName("exponential")
         data class ExponentialBackoff(
             val base: Double = 2.0,
             val baseDelay: Duration = 1.seconds,
@@ -35,6 +39,8 @@ data class RetryConfiguration(
             override val respectRetryAfterHeader: Boolean = true
         ) : DelaySetting()
 
+        @Serializable
+        @SerialName("constant")
         data class ConstantDelay(
             val delay: Duration = 1.seconds,
             override val randomization: Duration = 1.seconds,

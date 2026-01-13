@@ -42,7 +42,7 @@ class WebDataFetcher<T : Any>(id: String) {
         }
 
         val httpResponse = httpResponseResult.getOrElse { ex ->
-            throw DataFetchingException("Could not send request to: $url (${ex.message ?: "unkown error"})", ex)
+            throw DataFetchingException("Could not send request to: $url (${ex.message ?: "unknown error"})", ex)
         }
 
         val parsedResponse: T = if (httpResponse.contentType()?.match(ContentType.Text.Plain) == true) {
