@@ -17,7 +17,8 @@ data class WebDataFetchingConfiguration(
     val retry: RetryConfiguration? = RetryConfiguration(),
     val request: RequestConfiguration? = null,
     val engine: RequestEngineConfiguration? = null,
-    val decoding: ResponseBodyDecodingConfiguration = ResponseBodyDecodingConfiguration()
+    val decoding: ResponseBodyDecodingConfiguration = ResponseBodyDecodingConfiguration(),
+    val logging: LoggingConfiguration = LoggingConfiguration()
 
     //val defaultOnError: JsonElement?,
 ) {
@@ -43,7 +44,12 @@ data class WebDataFetchingConfiguration(
                 socketTimeout?.let { socketTimeoutMillis = it.inWholeMilliseconds }
             }
         }
-        http.install(Logging)
+        if (logging.enable) {
+            http.install(Logging) {
+                format = logging.format
+                level = logging.level
+            }
+        }
         //http.install(io.ktor.client.plugins.compression.ContentEncoding)
 
         request?.userAgent.let {

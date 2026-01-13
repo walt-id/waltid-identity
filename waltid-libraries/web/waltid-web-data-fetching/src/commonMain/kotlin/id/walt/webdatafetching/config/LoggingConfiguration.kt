@@ -1,0 +1,12 @@
+package id.walt.webdatafetching.config
+
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.LoggingFormat
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class LoggingConfiguration(
+    val enable: Boolean = true,
+    val format: LoggingFormat = LoggingFormat.Default,
+    val level: LogLevel = LogLevel.HEADERS
+)
