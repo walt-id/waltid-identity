@@ -36,6 +36,7 @@ kotlin {
 
             // walt.id
             api(project(":waltid-libraries:crypto:waltid-crypto"))
+            implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
             api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
             api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
             api(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
@@ -49,7 +50,6 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-            implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
         }
         jvmMain.dependencies {
