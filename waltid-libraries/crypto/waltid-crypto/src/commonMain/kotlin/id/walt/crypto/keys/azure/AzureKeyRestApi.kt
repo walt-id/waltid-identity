@@ -12,6 +12,7 @@ import id.walt.crypto.keys.azure.AzureKeyRestApi.AzureKeyFunctions.parseAzurePub
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -253,9 +254,8 @@ class AzureKeyRestApi(
         val crv: String? = null,
         @SerialName("key_size")
         val keySize: Int? = null,
-        @SerialName("key_ops")
-        val keyOps: List<String>,
-    )
+
+        )
 
 
     @JsExport.Ignore
@@ -294,8 +294,9 @@ class AzureKeyRestApi(
             val kid = publicKeyJson["kid"]?.jsonPrimitive?.content ?: error("No key id in key response")
             val azureKeyType = publicKeyJson["kty"]?.jsonPrimitive?.content ?: error("Missing key type in public key response")
             val crvFromResponse = publicKeyJson["crv"]?.jsonPrimitive?.content
-
-            val publicKey = JWKKey.importJWK(publicKeyJson.toString())
+            val publicKeyJsonModified = publicKeyJson.toMutableMap()
+            publicKeyJsonModified.remove("key_ops")
+            val publicKey = JWKKey.importJWK(publicKeyJsonModified.toMap().toJsonElement().toString())
                 .getOrElse { exception -> throw IllegalArgumentException("Invalid JWK in public key: $publicKeyJson", exception) }
 
             val keyType = azureKeyToKeyTypeMapping(crvFromResponse ?: "", azureKeyType)
@@ -388,14 +389,12 @@ class AzureKeyRestApi(
             val keyRequestBody = if (kty == "RSA") {
                 KeyCreateRequest(
                     kty = kty,
-                    keyOps = listOf("sign", "verify"),
                     keySize = 2048
                 )
             } else {
                 KeyCreateRequest(
                     kty = kty,
-                    crv = crv!!,
-                    keyOps = listOf("sign", "verify")
+                    crv = crv!!
                 )
             }
             val response = client.post("${metadata.auth.keyVaultUrl}/keys/$keyName/create?api-version=7.4") {
