@@ -8,8 +8,8 @@ group = "id.walt.crypto"
 dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter")
- 
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 
     // walt.id
     api(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -19,7 +19,7 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.10.2")
     
     // Azure Identity (for Managed Identity authentication)
     implementation("com.azure:azure-identity:1.19.0-beta.1")
