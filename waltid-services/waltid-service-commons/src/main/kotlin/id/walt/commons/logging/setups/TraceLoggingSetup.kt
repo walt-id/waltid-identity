@@ -12,7 +12,7 @@ data object TraceLoggingSetup : LoggingSetup("trace", {
     fun loggerBaseToMinimum(base: String, minLevel: Level = Level.DEBUG) {
         logging {
             fromLoggerBase(base, stopOnMatch = true)
-            fromMinLevel(Level.INFO) { toSink("stdout") }
+            fromMinLevel(minLevel) { toSink("stdout") }
         }
     }
 
