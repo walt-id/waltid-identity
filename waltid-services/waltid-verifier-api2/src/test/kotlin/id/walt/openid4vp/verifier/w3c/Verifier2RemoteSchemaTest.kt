@@ -25,10 +25,12 @@ import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCr
 import id.walt.openid4vp.verifier.verifierModule
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
+import id.walt.policies2.vc.policies.JsonSchemaPolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.http.*
 import io.ktor.server.application.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
@@ -44,7 +46,7 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 @OptIn(ExperimentalTime::class)
-class W3CVerifier2IntegrationTest {
+class Verifier2RemoteSchemaTest {
 
     private val w3cDcqlQuery = DcqlQuery(
         credentials = listOf(
@@ -55,21 +57,7 @@ class W3CVerifier2IntegrationTest {
                     typeValues = listOf(listOf("VerifiableCredential", "OpenBadgeCredential"))
                 ),
                 claims = listOf(
-                    //         ClaimsQuery(path = listOf("issuer", "name") ),
                     ClaimsQuery(path = listOf("credentialSubject", "achievement", "name")),
-                    //ClaimsQuery(path = listOf("credentialSubject", "achievement", "description", "narrative")),
-                )
-            ),
-            CredentialQuery(
-                id = "universitydegree",
-                format = CredentialFormat.JWT_VC_JSON,
-                meta = JwtVcJsonMeta(
-                    typeValues = listOf(listOf("VerifiableCredential", "UniversityDegreeCredential"))
-                ),
-                claims = listOf(
-                    ClaimsQuery(path = listOf("issuer", "id")),
-                    ClaimsQuery(path = listOf("credentialSubject", "id")),
-                    ClaimsQuery(path = listOf("credentialSubject", "degree", "type")),
                 )
             )
         )
@@ -78,7 +66,8 @@ class W3CVerifier2IntegrationTest {
     private val w3cPolicies = Verification2Session.DefinedVerificationPolicies(
         vc_policies = VCPolicyList(
             listOf(
-                CredentialSignaturePolicy()
+                CredentialSignaturePolicy(),
+                JsonSchemaPolicy(schemaUrl = Url("https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json"))
             )
         )
     )
@@ -93,27 +82,28 @@ class W3CVerifier2IntegrationTest {
     private val walletCredentials = listOf(
         Json.decodeFromString<DigitalCredential>(
             """
-            {
-      "type": "vc-w3c_1_1",
+    {
+      "type": "vc-w3c_2",
       "disclosables": {},
       "credentialData": {
         "@context": [
-          "https://www.w3.org/2018/credentials/v1",
+          "https://www.w3.org/ns/credentials/v2",
           "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
         ],
-        "id": "urn:uuid:98a8e420-d85e-4a1f-9a2b-d99a89c42bb4",
+        "id": "urn:uuid:b16045cb-a2bb-472d-bc6b-5d7cd1fdc436",
         "type": [
           "VerifiableCredential",
           "OpenBadgeCredential"
         ],
         "name": "JFF x vc-edu PlugFest 3 Interoperability",
         "issuer": {
-          "type": [
-            "Profile"
-          ],
+          "type": "Profile",
           "name": "Jobs for the Future (JFF)",
           "url": "https://www.jff.org/",
-          "image": "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png",
+          "image": {
+            "id": "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png",
+            "type": "Image"
+          },
           "id": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"
         },
         "credentialSubject": {
@@ -138,21 +128,21 @@ class W3CVerifier2IntegrationTest {
           },
           "id": "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17"
         },
-        "issuanceDate": "2025-10-20T06:22:37.444427698Z",
-        "expirationDate": "2026-10-20T06:22:37.444457898Z"
+        "validFrom": "2026-01-13T21:38:31.810337493Z",
+        "validUntil": "2027-01-13T21:38:31.810366593Z"
       },
       "issuer": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
       "subject": "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17",
       "signature": {
         "type": "signature-jwt",
-        "signature": "GETFmX9JOGDmTe8k3t1i4gVA3PzQGi_WNb6zXEIxavoZSYsxJcyiJ8pZ_jEjvIUFfFPBvJLVJqb4Mcgwc09fAQ",
+        "signature": "sHYRH4U0Fi80OP9jjSu4ZF9EtdFZ8YddI9Mhyqu-2IdAI3T8T12c7RDcl6cdIlAh5OeqJ6yicBV6PuKH2HgVDQ",
         "jwtHeader": {
           "kid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp#z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
           "typ": "JWT",
           "alg": "EdDSA"
         }
       },
-      "signed": "eyJraWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCN6Nk1ram9SaHExalNOSmRMaXJ1U1hyRkZ4YWdxcnp0WmFYSHFIR1VUS0piY055d3AiLCJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSJ9.eyJpc3MiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCIsInN1YiI6ImRpZDprZXk6ekRuYWVZYjdEYWtRV21Za3JMa21zVkVSQWF6RjVZYTFHNW54YlNuUWNMSlo4Q3IxNyIsInZjIjp7IkBjb250ZXh0IjpbImh0dHBzOi8vd3d3LnczLm9yZy8yMDE4L2NyZWRlbnRpYWxzL3YxIiwiaHR0cHM6Ly9wdXJsLmltc2dsb2JhbC5vcmcvc3BlYy9vYi92M3AwL2NvbnRleHQuanNvbiJdLCJpZCI6InVybjp1dWlkOjk4YThlNDIwLWQ4NWUtNGExZi05YTJiLWQ5OWE4OWM0MmJiNCIsInR5cGUiOlsiVmVyaWZpYWJsZUNyZWRlbnRpYWwiLCJPcGVuQmFkZ2VDcmVkZW50aWFsIl0sIm5hbWUiOiJKRkYgeCB2Yy1lZHUgUGx1Z0Zlc3QgMyBJbnRlcm9wZXJhYmlsaXR5IiwiaXNzdWVyIjp7InR5cGUiOlsiUHJvZmlsZSJdLCJuYW1lIjoiSm9icyBmb3IgdGhlIEZ1dHVyZSAoSkZGKSIsInVybCI6Imh0dHBzOi8vd3d3LmpmZi5vcmcvIiwiaW1hZ2UiOiJodHRwczovL3czYy1jY2cuZ2l0aHViLmlvL3ZjLWVkL3BsdWdmZXN0LTEtMjAyMi9pbWFnZXMvSkZGX0xvZ29Mb2NrdXAucG5nIiwiaWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCJ9LCJjcmVkZW50aWFsU3ViamVjdCI6eyJ0eXBlIjpbIkFjaGlldmVtZW50U3ViamVjdCJdLCJhY2hpZXZlbWVudCI6eyJpZCI6InVybjp1dWlkOmFjMjU0YmQ1LThmYWQtNGJiMS05ZDI5LWVmZDkzODUzNjkyNiIsInR5cGUiOlsiQWNoaWV2ZW1lbnQiXSwibmFtZSI6IkpGRiB4IHZjLWVkdSBQbHVnRmVzdCAzIEludGVyb3BlcmFiaWxpdHkiLCJkZXNjcmlwdGlvbiI6IlRoaXMgd2FsbGV0IHN1cHBvcnRzIHRoZSB1c2Ugb2YgVzNDIFZlcmlmaWFibGUgQ3JlZGVudGlhbHMgYW5kIGhhcyBkZW1vbnN0cmF0ZWQgaW50ZXJvcGVyYWJpbGl0eSBkdXJpbmcgdGhlIHByZXNlbnRhdGlvbiByZXF1ZXN0IHdvcmtmbG93IGR1cmluZyBKRkYgeCBWQy1FRFUgUGx1Z0Zlc3QgMy4iLCJjcml0ZXJpYSI6eyJ0eXBlIjoiQ3JpdGVyaWEiLCJuYXJyYXRpdmUiOiJXYWxsZXQgc29sdXRpb25zIHByb3ZpZGVycyBlYXJuZWQgdGhpcyBiYWRnZSBieSBkZW1vbnN0cmF0aW5nIGludGVyb3BlcmFiaWxpdHkgZHVyaW5nIHRoZSBwcmVzZW50YXRpb24gcmVxdWVzdCB3b3JrZmxvdy4gVGhpcyBpbmNsdWRlcyBzdWNjZXNzZnVsbHkgcmVjZWl2aW5nIGEgcHJlc2VudGF0aW9uIHJlcXVlc3QsIGFsbG93aW5nIHRoZSBob2xkZXIgdG8gc2VsZWN0IGF0IGxlYXN0IHR3byB0eXBlcyBvZiB2ZXJpZmlhYmxlIGNyZWRlbnRpYWxzIHRvIGNyZWF0ZSBhIHZlcmlmaWFibGUgcHJlc2VudGF0aW9uLCByZXR1cm5pbmcgdGhlIHByZXNlbnRhdGlvbiB0byB0aGUgcmVxdWVzdG9yLCBhbmQgcGFzc2luZyB2ZXJpZmljYXRpb24gb2YgdGhlIHByZXNlbnRhdGlvbiBhbmQgdGhlIGluY2x1ZGVkIGNyZWRlbnRpYWxzLiJ9LCJpbWFnZSI6eyJpZCI6Imh0dHBzOi8vdzNjLWNjZy5naXRodWIuaW8vdmMtZWQvcGx1Z2Zlc3QtMy0yMDIzL2ltYWdlcy9KRkYtVkMtRURVLVBMVUdGRVNUMy1iYWRnZS1pbWFnZS5wbmciLCJ0eXBlIjoiSW1hZ2UifX0sImlkIjoiZGlkOmtleTp6RG5hZVliN0Rha1FXbVlrckxrbXNWRVJBYXpGNVlhMUc1bnhiU25RY0xKWjhDcjE3In0sImlzc3VhbmNlRGF0ZSI6IjIwMjUtMTAtMjBUMDY6MjI6MzcuNDQ0NDI3Njk4WiIsImV4cGlyYXRpb25EYXRlIjoiMjAyNi0xMC0yMFQwNjoyMjozNy40NDQ0NTc4OThaIn0sImp0aSI6InVybjp1dWlkOjk4YThlNDIwLWQ4NWUtNGExZi05YTJiLWQ5OWE4OWM0MmJiNCIsImV4cCI6MTc5MjQ3NzM1NywiaWF0IjoxNzYwOTQxMzU3LCJuYmYiOjE3NjA5NDEzNTd9.GETFmX9JOGDmTe8k3t1i4gVA3PzQGi_WNb6zXEIxavoZSYsxJcyiJ8pZ_jEjvIUFfFPBvJLVJqb4Mcgwc09fAQ",
+      "signed": "eyJraWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCN6Nk1ram9SaHExalNOSmRMaXJ1U1hyRkZ4YWdxcnp0WmFYSHFIR1VUS0piY055d3AiLCJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSJ9.eyJpc3MiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCIsInN1YiI6ImRpZDprZXk6ekRuYWVZYjdEYWtRV21Za3JMa21zVkVSQWF6RjVZYTFHNW54YlNuUWNMSlo4Q3IxNyIsInZjIjp7IkBjb250ZXh0IjpbImh0dHBzOi8vd3d3LnczLm9yZy9ucy9jcmVkZW50aWFscy92MiIsImh0dHBzOi8vcHVybC5pbXNnbG9iYWwub3JnL3NwZWMvb2IvdjNwMC9jb250ZXh0Lmpzb24iXSwiaWQiOiJ1cm46dXVpZDpiMTYwNDVjYi1hMmJiLTQ3MmQtYmM2Yi01ZDdjZDFmZGM0MzYiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiT3BlbkJhZGdlQ3JlZGVudGlhbCJdLCJuYW1lIjoiSkZGIHggdmMtZWR1IFBsdWdGZXN0IDMgSW50ZXJvcGVyYWJpbGl0eSIsImlzc3VlciI6eyJ0eXBlIjoiUHJvZmlsZSIsIm5hbWUiOiJKb2JzIGZvciB0aGUgRnV0dXJlIChKRkYpIiwidXJsIjoiaHR0cHM6Ly93d3cuamZmLm9yZy8iLCJpbWFnZSI6eyJpZCI6Imh0dHBzOi8vdzNjLWNjZy5naXRodWIuaW8vdmMtZWQvcGx1Z2Zlc3QtMS0yMDIyL2ltYWdlcy9KRkZfTG9nb0xvY2t1cC5wbmciLCJ0eXBlIjoiSW1hZ2UifSwiaWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCJ9LCJjcmVkZW50aWFsU3ViamVjdCI6eyJ0eXBlIjpbIkFjaGlldmVtZW50U3ViamVjdCJdLCJhY2hpZXZlbWVudCI6eyJpZCI6InVybjp1dWlkOmFjMjU0YmQ1LThmYWQtNGJiMS05ZDI5LWVmZDkzODUzNjkyNiIsInR5cGUiOlsiQWNoaWV2ZW1lbnQiXSwibmFtZSI6IkpGRiB4IHZjLWVkdSBQbHVnRmVzdCAzIEludGVyb3BlcmFiaWxpdHkiLCJkZXNjcmlwdGlvbiI6IlRoaXMgd2FsbGV0IHN1cHBvcnRzIHRoZSB1c2Ugb2YgVzNDIFZlcmlmaWFibGUgQ3JlZGVudGlhbHMgYW5kIGhhcyBkZW1vbnN0cmF0ZWQgaW50ZXJvcGVyYWJpbGl0eSBkdXJpbmcgdGhlIHByZXNlbnRhdGlvbiByZXF1ZXN0IHdvcmtmbG93IGR1cmluZyBKRkYgeCBWQy1FRFUgUGx1Z0Zlc3QgMy4iLCJjcml0ZXJpYSI6eyJ0eXBlIjoiQ3JpdGVyaWEiLCJuYXJyYXRpdmUiOiJXYWxsZXQgc29sdXRpb25zIHByb3ZpZGVycyBlYXJuZWQgdGhpcyBiYWRnZSBieSBkZW1vbnN0cmF0aW5nIGludGVyb3BlcmFiaWxpdHkgZHVyaW5nIHRoZSBwcmVzZW50YXRpb24gcmVxdWVzdCB3b3JrZmxvdy4gVGhpcyBpbmNsdWRlcyBzdWNjZXNzZnVsbHkgcmVjZWl2aW5nIGEgcHJlc2VudGF0aW9uIHJlcXVlc3QsIGFsbG93aW5nIHRoZSBob2xkZXIgdG8gc2VsZWN0IGF0IGxlYXN0IHR3byB0eXBlcyBvZiB2ZXJpZmlhYmxlIGNyZWRlbnRpYWxzIHRvIGNyZWF0ZSBhIHZlcmlmaWFibGUgcHJlc2VudGF0aW9uLCByZXR1cm5pbmcgdGhlIHByZXNlbnRhdGlvbiB0byB0aGUgcmVxdWVzdG9yLCBhbmQgcGFzc2luZyB2ZXJpZmljYXRpb24gb2YgdGhlIHByZXNlbnRhdGlvbiBhbmQgdGhlIGluY2x1ZGVkIGNyZWRlbnRpYWxzLiJ9LCJpbWFnZSI6eyJpZCI6Imh0dHBzOi8vdzNjLWNjZy5naXRodWIuaW8vdmMtZWQvcGx1Z2Zlc3QtMy0yMDIzL2ltYWdlcy9KRkYtVkMtRURVLVBMVUdGRVNUMy1iYWRnZS1pbWFnZS5wbmciLCJ0eXBlIjoiSW1hZ2UifX0sImlkIjoiZGlkOmtleTp6RG5hZVliN0Rha1FXbVlrckxrbXNWRVJBYXpGNVlhMUc1bnhiU25RY0xKWjhDcjE3In0sInZhbGlkRnJvbSI6IjIwMjYtMDEtMTNUMjE6Mzg6MzEuODEwMzM3NDkzWiIsInZhbGlkVW50aWwiOiIyMDI3LTAxLTEzVDIxOjM4OjMxLjgxMDM2NjU5M1oifSwianRpIjoidXJuOnV1aWQ6YjE2MDQ1Y2ItYTJiYi00NzJkLWJjNmItNWQ3Y2QxZmRjNDM2IiwiZXhwIjoxNzk5ODc2MzExfQ.sHYRH4U0Fi80OP9jjSu4ZF9EtdFZ8YddI9Mhyqu-2IdAI3T8T12c7RDcl6cdIlAh5OeqJ6yicBV6PuKH2HgVDQ",
       "format": "jwt_vc_json"
     }
         """.trimIndent()
@@ -161,47 +151,46 @@ class W3CVerifier2IntegrationTest {
         Json.decodeFromString<DigitalCredential>(
             """
             {
-      "type": "vc-w3c_1_1",
-      "disclosables": {},
-      "credentialData": {
-        "@context": [
-          "https://www.w3.org/2018/credentials/v1",
-          "https://www.w3.org/2018/credentials/examples/v1"
-        ],
-        "id": "urn:uuid:cb305da6-5674-484b-b12d-533240ec0129",
-        "type": [
-          "VerifiableCredential",
-          "UniversityDegreeCredential"
-        ],
-        "issuer": {
-          "id": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"
-        },
-        "issuanceDate": "2025-10-20T06:22:58.235375395Z",
-        "credentialSubject": {
-          "id": "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17",
-          "degree": {
-            "type": "BachelorDegree",
-            "name": "Bachelor of Science and Arts"
-          }
-        },
-        "expirationDate": "2026-10-20T06:22:58.235404795Z"
-      },
-      "issuer": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-      "subject": "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17",
-      "signature": {
-        "type": "signature-jwt",
-        "signature": "iEQT-2QvZu-qjUwtU8Ok9ie8SgscU2jbNaO6FsngLdhyUfIdUbYNqi9RQwT8Ht0otskKb08YrjEkVR9cvBLGCw",
-        "jwtHeader": {
-          "kid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp#z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
-          "typ": "JWT",
-          "alg": "EdDSA"
-        }
-      },
-      "signed": "eyJraWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCN6Nk1ram9SaHExalNOSmRMaXJ1U1hyRkZ4YWdxcnp0WmFYSHFIR1VUS0piY055d3AiLCJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSJ9.eyJpc3MiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCIsInN1YiI6ImRpZDprZXk6ekRuYWVZYjdEYWtRV21Za3JMa21zVkVSQWF6RjVZYTFHNW54YlNuUWNMSlo4Q3IxNyIsInZjIjp7IkBjb250ZXh0IjpbImh0dHBzOi8vd3d3LnczLm9yZy8yMDE4L2NyZWRlbnRpYWxzL3YxIiwiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvZXhhbXBsZXMvdjEiXSwiaWQiOiJ1cm46dXVpZDpjYjMwNWRhNi01Njc0LTQ4NGItYjEyZC01MzMyNDBlYzAxMjkiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiVW5pdmVyc2l0eURlZ3JlZUNyZWRlbnRpYWwiXSwiaXNzdWVyIjp7ImlkIjoiZGlkOmtleTp6Nk1ram9SaHExalNOSmRMaXJ1U1hyRkZ4YWdxcnp0WmFYSHFIR1VUS0piY055d3AifSwiaXNzdWFuY2VEYXRlIjoiMjAyNS0xMC0yMFQwNjoyMjo1OC4yMzUzNzUzOTVaIiwiY3JlZGVudGlhbFN1YmplY3QiOnsiaWQiOiJkaWQ6a2V5OnpEbmFlWWI3RGFrUVdtWWtyTGttc1ZFUkFhekY1WWExRzVueGJTblFjTEpaOENyMTciLCJkZWdyZWUiOnsidHlwZSI6IkJhY2hlbG9yRGVncmVlIiwibmFtZSI6IkJhY2hlbG9yIG9mIFNjaWVuY2UgYW5kIEFydHMifX0sImV4cGlyYXRpb25EYXRlIjoiMjAyNi0xMC0yMFQwNjoyMjo1OC4yMzU0MDQ3OTVaIn0sImp0aSI6InVybjp1dWlkOmNiMzA1ZGE2LTU2NzQtNDg0Yi1iMTJkLTUzMzI0MGVjMDEyOSIsImV4cCI6MTc5MjQ3NzM3OCwiaWF0IjoxNzYwOTQxMzc4LCJuYmYiOjE3NjA5NDEzNzh9.iEQT-2QvZu-qjUwtU8Ok9ie8SgscU2jbNaO6FsngLdhyUfIdUbYNqi9RQwT8Ht0otskKb08YrjEkVR9cvBLGCw",
-      "format": "jwt_vc_json"
-    }
-        """.trimIndent()
-
+              "type": "vc-w3c_1_1",
+              "disclosables": {},
+              "credentialData": {
+                "@context": [
+                  "https://www.w3.org/2018/credentials/v1",
+                  "https://www.w3.org/2018/credentials/examples/v1"
+                ],
+                "id": "urn:uuid:cb305da6-5674-484b-b12d-533240ec0129",
+                "type": [
+                  "VerifiableCredential",
+                  "UniversityDegreeCredential"
+                ],
+                "issuer": {
+                  "id": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"
+                },
+                "issuanceDate": "2025-10-20T06:22:58.235375395Z",
+                "credentialSubject": {
+                  "id": "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17",
+                  "degree": {
+                    "type": "BachelorDegree",
+                    "name": "Bachelor of Science and Arts"
+                  }
+                },
+                "expirationDate": "2026-10-20T06:22:58.235404795Z"
+              },
+              "issuer": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
+              "subject": "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17",
+              "signature": {
+                "type": "signature-jwt",
+                "signature": "iEQT-2QvZu-qjUwtU8Ok9ie8SgscU2jbNaO6FsngLdhyUfIdUbYNqi9RQwT8Ht0otskKb08YrjEkVR9cvBLGCw",
+                "jwtHeader": {
+                  "kid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp#z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
+                  "typ": "JWT",
+                  "alg": "EdDSA"
+                }
+              },
+              "signed": "eyJraWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCN6Nk1ram9SaHExalNOSmRMaXJ1U1hyRkZ4YWdxcnp0WmFYSHFIR1VUS0piY055d3AiLCJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSJ9.eyJpc3MiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCIsInN1YiI6ImRpZDprZXk6ekRuYWVZYjdEYWtRV21Za3JMa21zVkVSQWF6RjVZYTFHNW54YlNuUWNMSlo4Q3IxNyIsInZjIjp7IkBjb250ZXh0IjpbImh0dHBzOi8vd3d3LnczLm9yZy8yMDE4L2NyZWRlbnRpYWxzL3YxIiwiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvZXhhbXBsZXMvdjEiXSwiaWQiOiJ1cm46dXVpZDpjYjMwNWRhNi01Njc0LTQ4NGItYjEyZC01MzMyNDBlYzAxMjkiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiVW5pdmVyc2l0eURlZ3JlZUNyZWRlbnRpYWwiXSwiaXNzdWVyIjp7ImlkIjoiZGlkOmtleTp6Nk1ram9SaHExalNOSmRMaXJ1U1hyRkZ4YWdxcnp0WmFYSHFIR1VUS0piY055d3AifSwiaXNzdWFuY2VEYXRlIjoiMjAyNS0xMC0yMFQwNjoyMjo1OC4yMzUzNzUzOTVaIiwiY3JlZGVudGlhbFN1YmplY3QiOnsiaWQiOiJkaWQ6a2V5OnpEbmFlWWI3RGFrUVdtWWtyTGttc1ZFUkFhekY1WWExRzVueGJTblFjTEpaOENyMTciLCJkZWdyZWUiOnsidHlwZSI6IkJhY2hlbG9yRGVncmVlIiwibmFtZSI6IkJhY2hlbG9yIG9mIFNjaWVuY2UgYW5kIEFydHMifX0sImV4cGlyYXRpb25EYXRlIjoiMjAyNi0xMC0yMFQwNjoyMjo1OC4yMzU0MDQ3OTVaIn0sImp0aSI6InVybjp1dWlkOmNiMzA1ZGE2LTU2NzQtNDg0Yi1iMTJkLTUzMzI0MGVjMDEyOSIsImV4cCI6MTc5MjQ3NzM3OCwiaWF0IjoxNzYwOTQxMzc4LCJuYmYiOjE3NjA5NDEzNzh9.iEQT-2QvZu-qjUwtU8Ok9ie8SgscU2jbNaO6FsngLdhyUfIdUbYNqi9RQwT8Ht0otskKb08YrjEkVR9cvBLGCw",
+              "format": "jwt_vc_json"
+            }
+            """.trimIndent()
         )
     )
 
@@ -353,15 +342,9 @@ class W3CVerifier2IntegrationTest {
 
             // Check created session
             test("Check Verification Session after presentation") {
+                println()
                 assertTrue { info2.attempted }
                 assertTrue { info2.status == Verification2Session.VerificationSessionStatus.SUCCESSFUL }
-
-                assertNotNull(info2.presentedCredentials)
-                assertEquals(2, info2.presentedCredentials!!.size)
-                assertNotNull(info2.presentedCredentials!!["openbadge"])
-                assertEquals(1, info2.presentedCredentials!!["openbadge"]!!.size)
-                assertNotNull(info2.presentedCredentials!!["universitydegree"])
-                assertEquals(1, info2.presentedCredentials!!["universitydegree"]!!.size)
 
                 assertNotNull(info2.policyResults)
                 assertTrue { info2.policyResults!!.overallSuccess }
