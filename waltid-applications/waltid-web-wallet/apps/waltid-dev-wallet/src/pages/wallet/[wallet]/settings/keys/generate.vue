@@ -202,7 +202,7 @@ const options = ref([
       ["ECDSA_Secp256k1", "secp256k1"],
       ["RSA", "RSA"]
     ],
-    config: ["vaultUrl"]
+    config: ["keyVaultUrl"]
   },
 ]);
 
@@ -256,8 +256,8 @@ async function generateKey() {
             keyVaultUrl: config?.keyVaultUrl,
         };
     } else if (type === "azure") {
-      body.config = {
-        vaultUrl: config?.vaultUrl,
+      body.config.auth = {
+        keyVaultUrl: config?.keyVaultUrl,
       };
     } else {
         // For other types, just include the config directly
