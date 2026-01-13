@@ -1,6 +1,9 @@
+# NOTE: Prefer Gradle Ktor/Jib tasks (publishImageToLocalRegistry/publishImage) for builds.
+# This Dockerfile is for manual/custom Docker workflows.
 FROM gradle:latest AS pre-cache
 COPY . /home/src
 COPY gradle.properties settings.gradle.kts /home/app/
+COPY build-logic /home/app/build-logic
 COPY gradle /home/app/gradle
 RUN cd /home/src && \
     find . -name "build.gradle.kts" -exec sh -c 'mkdir -p /home/app/$(dirname "$1"); cp "$1" /home/app/$1' _ {} \;
@@ -27,7 +30,10 @@ FROM amazoncorretto:22 AS runtime
 WORKDIR /app
 
 # Create an unprivileged user and group
-RUN groupadd -r app && useradd -r -g app -u 10001 app
+RUN yum install -y shadow-utils \
+ && groupadd -r app \
+ && useradd -r -g app -u 10001 app \
+ && yum clean all
 
 COPY --chown=app:app --from=build \
   /home/gradle/src/waltid-services/waltid-issuer-api/build/libs/*.jar \

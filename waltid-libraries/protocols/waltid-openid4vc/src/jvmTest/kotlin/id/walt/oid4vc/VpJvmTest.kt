@@ -26,9 +26,15 @@ import io.ktor.util.reflect.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Disabled
 import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 
+/*
+ * TODO: remove this test might also be a valid solution - it needs to be verified, if this
+ *       is already be covered in other tests
+ */
+@Disabled("entra.walt.id is not available anymore - need a new did store")
 class VpJvmTest {
 
     val http = HttpClient {

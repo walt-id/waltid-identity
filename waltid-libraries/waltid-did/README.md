@@ -192,41 +192,41 @@ represented as **_walt.id crypto_** `Key`.
         </tr>
         <!-- function sub-header -->
         <tr>
-            <td align="center">create</td>
-            <td align="center">register</td>
-            <td align="center">resolve</td>
+            <td align="center" >create</td>
+            <td align="center" >register</td>
+            <td align="center" >resolve</td>
         </tr>
         <!-- content -->
         <!-- key -->
         <!-- ed25519 -->
         <tr>
             <td align="center" rowspan="4">key*</td>
-            <td align="center">ed25519</td>
-            <td align="center">&check;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&check;</td>
+            <td align="center" >ed25519</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&dash;</td>
+            <td align="center" >&check;</td>
             <td align="center" rowspan="4">&dash;</td>
         </tr>
         <!-- secp256k1 -->
         <tr>
-            <td align="center">secp256k1</td>
-            <td align="center">&check;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&check;</td>
+            <td align="center" >secp256k1</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&dash;</td>
+            <td align="center" >&check;</td>
         </tr>
         <!-- secp256r1 -->
         <tr>
-            <td align="center">secp256r1</td>
-            <td align="center">&check;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&check;</td>
+            <td align="center" >secp256r1</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&dash;</td>
+            <td align="center" >&check;</td>
         </tr>
         <!-- rsa -->
         <tr>
-            <td align="center">rsa</td>
-            <td align="center">&check;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&check;</td>
+            <td align="center" >rsa</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&dash;</td>
+            <td align="center" >&check;</td>
         </tr>
         <!-- end key -->
         <tr><td colspan="6"></td></tr>
@@ -234,32 +234,32 @@ represented as **_walt.id crypto_** `Key`.
         <!-- ed25519 -->
         <tr>
             <td align="center" rowspan="4">jwk</td>
-            <td align="center">ed25519</td>
-            <td align="center">&check;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&check;</td>
+            <td align="center" >ed25519</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&dash;</td>
+            <td align="center" >&check;</td>
             <td align="center" rowspan="4">&dash;</td>
         </tr>
         <!-- secp256k1 -->
         <tr>
-            <td align="center">secp256k1</td>
-            <td align="center">&check;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&check;</td>
+            <td align="center" >secp256k1</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&dash;</td>
+            <td align="center" >&check;</td>
         </tr>
         <!-- secp256r1 -->
         <tr>
-            <td align="center">secp256r1</td>
-            <td align="center">&check;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&check;</td>
+            <td align="center" >secp256r1</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&dash;</td>
+            <td align="center" >&check;</td>
         </tr>
         <!-- rsa -->
         <tr>
-            <td align="center">rsa</td>
-            <td align="center">&check;</td>
-            <td align="center">&dash;</td>
-            <td align="center">&check;</td>
+            <td align="center" >rsa</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&dash;</td>
+            <td align="center" >&check;</td>
         </tr>
         <!-- end jwk -->
         <tr><td colspan="5"></td></tr>
@@ -267,72 +267,72 @@ represented as **_walt.id crypto_** `Key`.
         <!-- ed25519 -->
         <tr>
             <td align="center" rowspan="4">web</td>
-            <td align="center">ed25519</td>
-            <td align="center">&check;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&check;</td>
+            <td align="center" >ed25519</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&cross;</td>
+            <td align="center" >&check;</td>
             <td align="center" rowspan="4">&check;</td>
         </tr>
         <!-- secp256k1 -->
         <tr>
-            <td align="center">secp256k1</td>
-            <td align="center">&check;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&check;</td>
+            <td align="center" >secp256k1</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&cross;</td>
+            <td align="center" >&check;</td>
         </tr>
         <!-- secp256r1 -->
         <tr>
-            <td align="center">secp256r1</td>
-            <td align="center">&check;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&check;</td>
+            <td align="center" >secp256r1</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&cross;</td>
+            <td align="center" >&check;</td>
         </tr>
         <!-- rsa -->
         <tr>
-            <td align="center">rsa</td>
-            <td align="center">&check;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&check;</td>
+            <td align="center" >rsa</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&cross;</td>
+            <td align="center" >&check;</td>
         </tr>
         <!-- end web -->
         <tr><td colspan="5"></td></tr>
         <!-- cheqd -->
         <!-- ed25519 -->
         <tr>
-            <td align="center">cheqd</td>
-            <td align="center">ed25519</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&check;</td>
-            <td align="center">&cross;</td>
+            <td align="center" >cheqd</td>
+            <td align="center" >ed25519</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&check;</td>
+            <td align="center" >&cross;</td>
         </tr>
         <!-- end cheqd -->
         <tr><td colspan="5"></td></tr>
         <!-- ebsi -->
         <tr>
             <td align="center" rowspan="2">ebsi</td>
-            <td align="center">secp256r1</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&check;</td>
+            <td align="center" >secp256r1</td>
+            <td align="center" >&cross;</td>
+            <td align="center" >&cross;</td>
+            <td align="center" >&check;</td>
             <td align="center" rowspan="2">&cross;</td>
         </tr>
         <tr>
-            <td align="center">secp256k1</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&check;</td>
+            <td align="center" >secp256k1</td>
+            <td align="center" >&cross;</td>
+            <td align="center" >&cross;</td>
+            <td align="center" >&check;</td>
         </tr>
         <!-- end ebsi -->
         <tr><td colspan="5"></td></tr>
         <!-- iota -->
         <tr>
-            <td align="center">iota</td>
-            <td align="center">ed25519</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
-            <td align="center">&cross;</td>
+            <td align="center" >iota</td>
+            <td align="center" >ed25519</td>
+            <td align="center" >&cross;</td>
+            <td align="center" >&cross;</td>
+            <td align="center" >&cross;</td>
+            <td align="center" >&cross;</td>
         </tr>
         <!-- end iota -->
     </tbody>

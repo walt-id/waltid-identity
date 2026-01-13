@@ -80,9 +80,20 @@ spec:
   tls:
     - hosts:
         - verifier.demo.walt.id
+        - verifier.portal.walt.id
       secretName: verifier-tls-secret
   rules:
     - host: verifier.demo.walt.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: verifier
+                port:
+                  name: http
+    - host: verifier.portal.walt.id
       http:
         paths:
           - path: /
