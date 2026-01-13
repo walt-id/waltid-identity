@@ -1,6 +1,7 @@
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.azure.AzureKey
 import id.walt.crypto.keys.azure.AzureKeyMetadataSDK
+import id.walt.crypto.keys.azure.AzureSDKAuth
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -43,7 +44,9 @@ class AzureSDKKeyTest {
             AzureKey.generateKey(
                 it,
                 AzureKeyMetadataSDK(
-                    vaultUrl = Config.vaultUrl,
+                    auth = AzureSDKAuth(
+                        keyVaultUrl = Config.vaultUrl
+                    )
                 )
             ).also {
                 println("Generated key: ${it.keyType} - ${it.id}")
