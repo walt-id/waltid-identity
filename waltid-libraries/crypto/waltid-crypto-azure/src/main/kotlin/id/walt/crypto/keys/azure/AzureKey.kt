@@ -243,13 +243,9 @@ class AzureKey(
                 }
 
                 val keyVaultKey = keyClient.createKey(createKeyOptions)
-                println("Created key : ${keyVaultKey.key}")
                 val publicKey = getAzurePublicKey(config, keyVaultKey.name)
-                println("Public key: $publicKey")
 
                 val normalizedPublicKey = parseAzurePublicKey(publicKey.exportJWKObject()).publicKey
-                println("normalized public key: $normalizedPublicKey")
-                
                 AzureKey(
                     config = config,
                     id = keyVaultKey.name,
