@@ -49,9 +49,16 @@ class WebDataFetcher<T : Any>(id: String) {
             val body = httpResponse.bodyAsText()
             runCatching {
                 dataFetcherConfiguration.decoding.json.decodeFromString<Res>(body)
-            }.getOrElse { ex -> throw DataFetchingException("Server answered request with non-/invalid JSON: $body (to request to $url)", ex) }
+            }.getOrElse { ex ->
+                throw DataFetchingException(
+                    "Server answered request with non-/invalid JSON: $body (to request to $url)",
+                    cause = ex
+                )
+            }
         } else {
-            httpResponse.body<Res>()
+            runCatching {
+                httpResponse.body<Res>()
+            }.getOrElse { ex -> throw DataFetchingException("Failed to deserialize response from: $url", ex) }
         }
 
         cache?.put(cacheId, parsedResponse)

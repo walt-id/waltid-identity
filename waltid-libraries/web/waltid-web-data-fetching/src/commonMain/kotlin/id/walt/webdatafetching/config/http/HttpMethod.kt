@@ -1,7 +1,9 @@
 package id.walt.webdatafetching.config.http
 
+import kotlinx.serialization.Serializable
 import io.ktor.http.HttpMethod as KtorHttpMethod
 
+@Serializable
 enum class HttpMethod(val ktorHttpMethod: KtorHttpMethod) {
     Get(KtorHttpMethod.Get),
     Post(KtorHttpMethod.Post),
