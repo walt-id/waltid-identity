@@ -52,7 +52,7 @@ fun main() {
                             // id = activeSessionType.last(),
                             format = CredentialFormat.jwt_vc_json,
                             cryptographicBindingMethodsSupported = setOf("did"),
-                            credentialSigningAlgValuesSupported = setOf("ES256K"),
+                            credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256K")),
                             credentialDefinition = CredentialDefinition(type = activeSessionType)
                         )
                     }

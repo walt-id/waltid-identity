@@ -910,6 +910,7 @@ open class CIProvider(
         return when (version) {
             OpenID4VCIVersion.DRAFT13 -> baseUrl
             OpenID4VCIVersion.DRAFT11 -> baseUrlDraft11
+            OpenID4VCIVersion.V1 -> throw IllegalArgumentException("standardVersion v1 is not supported")
         }
     }
 
@@ -934,6 +935,7 @@ open class CIProvider(
         return when (version) {
             OpenID4VCIVersion.DRAFT11 -> metadataDraft11
             OpenID4VCIVersion.DRAFT13 -> metadata
+            OpenID4VCIVersion.V1 -> throw IllegalArgumentException("standardVersion v1 is not supported")
         }
     }
 
@@ -947,6 +949,7 @@ open class CIProvider(
         return when (version) {
             OpenID4VCIVersion.DRAFT11 -> openIdMetadataDraft11
             OpenID4VCIVersion.DRAFT13 -> openIdMetadata
+            OpenID4VCIVersion.V1 -> throw IllegalArgumentException("standardVersion v1 is not supported")
         }
     }
 
