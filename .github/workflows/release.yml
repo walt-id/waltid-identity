@@ -30,7 +30,7 @@ jobs:
     with:
       images: ${{ needs.docker-matrix.outputs.json }}
       version: ${{ needs.version.outputs.release_version }}
-      tag: '["stable"]'
+      tags: '["stable"]'
       publish: true
   api-docker-matrix:
     uses: walt-id/waltid-identity/.github/workflows/load-json.yml@43ba2cb6031b8001d73d6e6a66e211c18a7a7d12
