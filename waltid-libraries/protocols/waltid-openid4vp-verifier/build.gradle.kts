@@ -21,7 +21,7 @@ kotlin {
             implementation("io.ktor:ktor-server-core:${Versions.KTOR_VERSION}")
 
             // Logging
-            implementation("io.github.oshai:kotlin-logging:7.0.13")
+            implementation(identityLibs.oshai.kotlinlogging)
 
             // Kotlinx
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")

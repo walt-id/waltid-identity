@@ -67,7 +67,8 @@ val modules = listOfNotNull(
 
     * "$libraries:web".group(
         "waltid-ktor-notifications",
-        "waltid-ktor-notifications-core"
+        "waltid-ktor-notifications-core",
+        "waltid-web-data-fetching"
     ),
 
     "$libraries:waltid-core-wallet",
