@@ -11,8 +11,8 @@ fun getDockerCredentials(rootDir: File): Pair<String, String> {
     val passwordFile = File(rootDir, "secret-docker-password.txt")
 
     return Pair(
-        envUsername ?: if (usernameFile.isFile) usernameFile.readLines().first() else "",
-        envPassword ?: if (passwordFile.isFile) passwordFile.readLines().first() else ""
+        envUsername ?: if (usernameFile.isFile) usernameFile.readLines().first() else "DOCKER_IS_UNAUTHENTICATED",
+        envPassword ?: if (passwordFile.isFile) passwordFile.readLines().first() else "DOCKER_IS_UNAUTHENTICATED"
     )
 }
 

@@ -1,5 +1,8 @@
 package id.walt.credentials.examples
 
+import id.walt.credentials.formats.AbstractW3C
+import kotlinx.serialization.json.Json
+
 object W3CExamples {
     //language=JSON
     val w3cCredential = """
@@ -220,5 +223,140 @@ object W3CExamples {
         "subject" to "did:key:z6MkkvXSTYa1ftiSa9ZYviaf3TEPHVyVP1VhB7Msju9Er7LG"
     )
 
+    // language=JSON
+    val compliantOpenBadgeCredential = Json.decodeFromString<AbstractW3C>(
+        """
+    {
+      "type": "vc-w3c_2",
+      "disclosables": {},
+      "credentialData": {
+        "@context": [
+          "https://www.w3.org/ns/credentials/v2",
+          "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
+        ],
+        "id": "urn:uuid:b16045cb-a2bb-472d-bc6b-5d7cd1fdc436",
+        "type": [
+          "VerifiableCredential",
+          "OpenBadgeCredential"
+        ],
+        "name": "JFF x vc-edu PlugFest 3 Interoperability",
+        "issuer": {
+          "type": "Profile",
+          "name": "Jobs for the Future (JFF)",
+          "url": "https://www.jff.org/",
+          "image": {
+            "id": "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png",
+            "type": "Image"
+          },
+          "id": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"
+        },
+        "credentialSubject": {
+          "type": [
+            "AchievementSubject"
+          ],
+          "achievement": {
+            "id": "urn:uuid:ac254bd5-8fad-4bb1-9d29-efd938536926",
+            "type": [
+              "Achievement"
+            ],
+            "name": "JFF x vc-edu PlugFest 3 Interoperability",
+            "description": "This wallet supports the use of W3C Verifiable Credentials and has demonstrated interoperability during the presentation request workflow during JFF x VC-EDU PlugFest 3.",
+            "criteria": {
+              "type": "Criteria",
+              "narrative": "Wallet solutions providers earned this badge by demonstrating interoperability during the presentation request workflow. This includes successfully receiving a presentation request, allowing the holder to select at least two types of verifiable credentials to create a verifiable presentation, returning the presentation to the requestor, and passing verification of the presentation and the included credentials."
+            },
+            "image": {
+              "id": "https://w3c-ccg.github.io/vc-ed/plugfest-3-2023/images/JFF-VC-EDU-PLUGFEST3-badge-image.png",
+              "type": "Image"
+            }
+          },
+          "id": "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17"
+        },
+        "validFrom": "2026-01-13T21:38:31.810337493Z",
+        "validUntil": "2027-01-13T21:38:31.810366593Z"
+      },
+      "issuer": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
+      "subject": "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17",
+      "signature": {
+        "type": "signature-jwt",
+        "signature": "sHYRH4U0Fi80OP9jjSu4ZF9EtdFZ8YddI9Mhyqu-2IdAI3T8T12c7RDcl6cdIlAh5OeqJ6yicBV6PuKH2HgVDQ",
+        "jwtHeader": {
+          "kid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp#z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
+          "typ": "JWT",
+          "alg": "EdDSA"
+        }
+      },
+      "signed": "eyJraWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCN6Nk1ram9SaHExalNOSmRMaXJ1U1hyRkZ4YWdxcnp0WmFYSHFIR1VUS0piY055d3AiLCJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSJ9.eyJpc3MiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCIsInN1YiI6ImRpZDprZXk6ekRuYWVZYjdEYWtRV21Za3JMa21zVkVSQWF6RjVZYTFHNW54YlNuUWNMSlo4Q3IxNyIsInZjIjp7IkBjb250ZXh0IjpbImh0dHBzOi8vd3d3LnczLm9yZy9ucy9jcmVkZW50aWFscy92MiIsImh0dHBzOi8vcHVybC5pbXNnbG9iYWwub3JnL3NwZWMvb2IvdjNwMC9jb250ZXh0Lmpzb24iXSwiaWQiOiJ1cm46dXVpZDpiMTYwNDVjYi1hMmJiLTQ3MmQtYmM2Yi01ZDdjZDFmZGM0MzYiLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiT3BlbkJhZGdlQ3JlZGVudGlhbCJdLCJuYW1lIjoiSkZGIHggdmMtZWR1IFBsdWdGZXN0IDMgSW50ZXJvcGVyYWJpbGl0eSIsImlzc3VlciI6eyJ0eXBlIjoiUHJvZmlsZSIsIm5hbWUiOiJKb2JzIGZvciB0aGUgRnV0dXJlIChKRkYpIiwidXJsIjoiaHR0cHM6Ly93d3cuamZmLm9yZy8iLCJpbWFnZSI6eyJpZCI6Imh0dHBzOi8vdzNjLWNjZy5naXRodWIuaW8vdmMtZWQvcGx1Z2Zlc3QtMS0yMDIyL2ltYWdlcy9KRkZfTG9nb0xvY2t1cC5wbmciLCJ0eXBlIjoiSW1hZ2UifSwiaWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCJ9LCJjcmVkZW50aWFsU3ViamVjdCI6eyJ0eXBlIjpbIkFjaGlldmVtZW50U3ViamVjdCJdLCJhY2hpZXZlbWVudCI6eyJpZCI6InVybjp1dWlkOmFjMjU0YmQ1LThmYWQtNGJiMS05ZDI5LWVmZDkzODUzNjkyNiIsInR5cGUiOlsiQWNoaWV2ZW1lbnQiXSwibmFtZSI6IkpGRiB4IHZjLWVkdSBQbHVnRmVzdCAzIEludGVyb3BlcmFiaWxpdHkiLCJkZXNjcmlwdGlvbiI6IlRoaXMgd2FsbGV0IHN1cHBvcnRzIHRoZSB1c2Ugb2YgVzNDIFZlcmlmaWFibGUgQ3JlZGVudGlhbHMgYW5kIGhhcyBkZW1vbnN0cmF0ZWQgaW50ZXJvcGVyYWJpbGl0eSBkdXJpbmcgdGhlIHByZXNlbnRhdGlvbiByZXF1ZXN0IHdvcmtmbG93IGR1cmluZyBKRkYgeCBWQy1FRFUgUGx1Z0Zlc3QgMy4iLCJjcml0ZXJpYSI6eyJ0eXBlIjoiQ3JpdGVyaWEiLCJuYXJyYXRpdmUiOiJXYWxsZXQgc29sdXRpb25zIHByb3ZpZGVycyBlYXJuZWQgdGhpcyBiYWRnZSBieSBkZW1vbnN0cmF0aW5nIGludGVyb3BlcmFiaWxpdHkgZHVyaW5nIHRoZSBwcmVzZW50YXRpb24gcmVxdWVzdCB3b3JrZmxvdy4gVGhpcyBpbmNsdWRlcyBzdWNjZXNzZnVsbHkgcmVjZWl2aW5nIGEgcHJlc2VudGF0aW9uIHJlcXVlc3QsIGFsbG93aW5nIHRoZSBob2xkZXIgdG8gc2VsZWN0IGF0IGxlYXN0IHR3byB0eXBlcyBvZiB2ZXJpZmlhYmxlIGNyZWRlbnRpYWxzIHRvIGNyZWF0ZSBhIHZlcmlmaWFibGUgcHJlc2VudGF0aW9uLCByZXR1cm5pbmcgdGhlIHByZXNlbnRhdGlvbiB0byB0aGUgcmVxdWVzdG9yLCBhbmQgcGFzc2luZyB2ZXJpZmljYXRpb24gb2YgdGhlIHByZXNlbnRhdGlvbiBhbmQgdGhlIGluY2x1ZGVkIGNyZWRlbnRpYWxzLiJ9LCJpbWFnZSI6eyJpZCI6Imh0dHBzOi8vdzNjLWNjZy5naXRodWIuaW8vdmMtZWQvcGx1Z2Zlc3QtMy0yMDIzL2ltYWdlcy9KRkYtVkMtRURVLVBMVUdGRVNUMy1iYWRnZS1pbWFnZS5wbmciLCJ0eXBlIjoiSW1hZ2UifX0sImlkIjoiZGlkOmtleTp6RG5hZVliN0Rha1FXbVlrckxrbXNWRVJBYXpGNVlhMUc1bnhiU25RY0xKWjhDcjE3In0sInZhbGlkRnJvbSI6IjIwMjYtMDEtMTNUMjE6Mzg6MzEuODEwMzM3NDkzWiIsInZhbGlkVW50aWwiOiIyMDI3LTAxLTEzVDIxOjM4OjMxLjgxMDM2NjU5M1oifSwianRpIjoidXJuOnV1aWQ6YjE2MDQ1Y2ItYTJiYi00NzJkLWJjNmItNWQ3Y2QxZmRjNDM2IiwiZXhwIjoxNzk5ODc2MzExfQ.sHYRH4U0Fi80OP9jjSu4ZF9EtdFZ8YddI9Mhyqu-2IdAI3T8T12c7RDcl6cdIlAh5OeqJ6yicBV6PuKH2HgVDQ",
+      "format": "jwt_vc_json"
+    }
+    """.trimIndent()
+    )
 
+    // language=JSON
+    val noncompliantOpenBadgeCredential = Json.decodeFromString<AbstractW3C>(
+        """
+    {
+      "type": "vc-w3c_1_1",
+      "disclosables": {},
+      "credentialData": {
+        "@context": [
+          "https://www.w3.org/2018/credentials/v1",
+          "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
+        ],
+        "id": "urn:uuid:98a8e420-d85e-4a1f-9a2b-d99a89c42bb4",
+        "type": [
+          "VerifiableCredential",
+          "OpenBadgeCredential"
+        ],
+        "name": "JFF x vc-edu PlugFest 3 Interoperability",
+        "issuer": {
+          "type": [
+            "Profile"
+          ],
+          "name": "Jobs for the Future (JFF)",
+          "url": "https://www.jff.org/",
+          "image": "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/images/JFF_LogoLockup.png",
+          "id": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"
+        },
+        "credentialSubject": {
+          "type": [
+            "AchievementSubject"
+          ],
+          "achievement": {
+            "id": "urn:uuid:ac254bd5-8fad-4bb1-9d29-efd938536926",
+            "type": [
+              "Achievement"
+            ],
+            "name": "JFF x vc-edu PlugFest 3 Interoperability",
+            "description": "This wallet supports the use of W3C Verifiable Credentials and has demonstrated interoperability during the presentation request workflow during JFF x VC-EDU PlugFest 3.",
+            "criteria": {
+              "type": "Criteria",
+              "narrative": "Wallet solutions providers earned this badge by demonstrating interoperability during the presentation request workflow. This includes successfully receiving a presentation request, allowing the holder to select at least two types of verifiable credentials to create a verifiable presentation, returning the presentation to the requestor, and passing verification of the presentation and the included credentials."
+            },
+            "image": {
+              "id": "https://w3c-ccg.github.io/vc-ed/plugfest-3-2023/images/JFF-VC-EDU-PLUGFEST3-badge-image.png",
+              "type": "Image"
+            }
+          },
+          "id": "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17"
+        },
+        "issuanceDate": "2025-10-20T06:22:37.444427698Z",
+        "expirationDate": "2026-10-20T06:22:37.444457898Z"
+      },
+      "issuer": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
+      "subject": "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17",
+      "signature": {
+        "type": "signature-jwt",
+        "signature": "GETFmX9JOGDmTe8k3t1i4gVA3PzQGi_WNb6zXEIxavoZSYsxJcyiJ8pZ_jEjvIUFfFPBvJLVJqb4Mcgwc09fAQ",
+        "jwtHeader": {
+          "kid": "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp#z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp",
+          "typ": "JWT",
+          "alg": "EdDSA"
+        }
+      },
+      "signed": "eyJraWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCN6Nk1ram9SaHExalNOSmRMaXJ1U1hyRkZ4YWdxcnp0WmFYSHFIR1VUS0piY055d3AiLCJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSJ9.eyJpc3MiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCIsInN1YiI6ImRpZDprZXk6ekRuYWVZYjdEYWtRV21Za3JMa21zVkVSQWF6RjVZYTFHNW54YlNuUWNMSlo4Q3IxNyIsInZjIjp7IkBjb250ZXh0IjpbImh0dHBzOi8vd3d3LnczLm9yZy8yMDE4L2NyZWRlbnRpYWxzL3YxIiwiaHR0cHM6Ly9wdXJsLmltc2dsb2JhbC5vcmcvc3BlYy9vYi92M3AwL2NvbnRleHQuanNvbiJdLCJpZCI6InVybjp1dWlkOjk4YThlNDIwLWQ4NWUtNGExZi05YTJiLWQ5OWE4OWM0MmJiNCIsInR5cGUiOlsiVmVyaWZpYWJsZUNyZWRlbnRpYWwiLCJPcGVuQmFkZ2VDcmVkZW50aWFsIl0sIm5hbWUiOiJKRkYgeCB2Yy1lZHUgUGx1Z0Zlc3QgMyBJbnRlcm9wZXJhYmlsaXR5IiwiaXNzdWVyIjp7InR5cGUiOlsiUHJvZmlsZSJdLCJuYW1lIjoiSm9icyBmb3IgdGhlIEZ1dHVyZSAoSkZGKSIsInVybCI6Imh0dHBzOi8vd3d3LmpmZi5vcmcvIiwiaW1hZ2UiOiJodHRwczovL3czYy1jY2cuZ2l0aHViLmlvL3ZjLWVkL3BsdWdmZXN0LTEtMjAyMi9pbWFnZXMvSkZGX0xvZ29Mb2NrdXAucG5nIiwiaWQiOiJkaWQ6a2V5Ono2TWtqb1JocTFqU05KZExpcnVTWHJGRnhhZ3FyenRaYVhIcUhHVVRLSmJjTnl3cCJ9LCJjcmVkZW50aWFsU3ViamVjdCI6eyJ0eXBlIjpbIkFjaGlldmVtZW50U3ViamVjdCJdLCJhY2hpZXZlbWVudCI6eyJpZCI6InVybjp1dWlkOmFjMjU0YmQ1LThmYWQtNGJiMS05ZDI5LWVmZDkzODUzNjkyNiIsInR5cGUiOlsiQWNoaWV2ZW1lbnQiXSwibmFtZSI6IkpGRiB4IHZjLWVkdSBQbHVnRmVzdCAzIEludGVyb3BlcmFiaWxpdHkiLCJkZXNjcmlwdGlvbiI6IlRoaXMgd2FsbGV0IHN1cHBvcnRzIHRoZSB1c2Ugb2YgVzNDIFZlcmlmaWFibGUgQ3JlZGVudGlhbHMgYW5kIGhhcyBkZW1vbnN0cmF0ZWQgaW50ZXJvcGVyYWJpbGl0eSBkdXJpbmcgdGhlIHByZXNlbnRhdGlvbiByZXF1ZXN0IHdvcmtmbG93IGR1cmluZyBKRkYgeCBWQy1FRFUgUGx1Z0Zlc3QgMy4iLCJjcml0ZXJpYSI6eyJ0eXBlIjoiQ3JpdGVyaWEiLCJuYXJyYXRpdmUiOiJXYWxsZXQgc29sdXRpb25zIHByb3ZpZGVycyBlYXJuZWQgdGhpcyBiYWRnZSBieSBkZW1vbnN0cmF0aW5nIGludGVyb3BlcmFiaWxpdHkgZHVyaW5nIHRoZSBwcmVzZW50YXRpb24gcmVxdWVzdCB3b3JrZmxvdy4gVGhpcyBpbmNsdWRlcyBzdWNjZXNzZnVsbHkgcmVjZWl2aW5nIGEgcHJlc2VudGF0aW9uIHJlcXVlc3QsIGFsbG93aW5nIHRoZSBob2xkZXIgdG8gc2VsZWN0IGF0IGxlYXN0IHR3byB0eXBlcyBvZiB2ZXJpZmlhYmxlIGNyZWRlbnRpYWxzIHRvIGNyZWF0ZSBhIHZlcmlmaWFibGUgcHJlc2VudGF0aW9uLCByZXR1cm5pbmcgdGhlIHByZXNlbnRhdGlvbiB0byB0aGUgcmVxdWVzdG9yLCBhbmQgcGFzc2luZyB2ZXJpZmljYXRpb24gb2YgdGhlIHByZXNlbnRhdGlvbiBhbmQgdGhlIGluY2x1ZGVkIGNyZWRlbnRpYWxzLiJ9LCJpbWFnZSI6eyJpZCI6Imh0dHBzOi8vdzNjLWNjZy5naXRodWIuaW8vdmMtZWQvcGx1Z2Zlc3QtMy0yMDIzL2ltYWdlcy9KRkYtVkMtRURVLVBMVUdGRVNUMy1iYWRnZS1pbWFnZS5wbmciLCJ0eXBlIjoiSW1hZ2UifX0sImlkIjoiZGlkOmtleTp6RG5hZVliN0Rha1FXbVlrckxrbXNWRVJBYXpGNVlhMUc1bnhiU25RY0xKWjhDcjE3In0sImlzc3VhbmNlRGF0ZSI6IjIwMjUtMTAtMjBUMDY6MjI6MzcuNDQ0NDI3Njk4WiIsImV4cGlyYXRpb25EYXRlIjoiMjAyNi0xMC0yMFQwNjoyMjozNy40NDQ0NTc4OThaIn0sImp0aSI6InVybjp1dWlkOjk4YThlNDIwLWQ4NWUtNGExZi05YTJiLWQ5OWE4OWM0MmJiNCIsImV4cCI6MTc5MjQ3NzM1NywiaWF0IjoxNzYwOTQxMzU3LCJuYmYiOjE3NjA5NDEzNTd9.GETFmX9JOGDmTe8k3t1i4gVA3PzQGi_WNb6zXEIxavoZSYsxJcyiJ8pZ_jEjvIUFfFPBvJLVJqb4Mcgwc09fAQ",
+      "format": "jwt_vc_json"
+    }
+    """.trimIndent()
+    )
 }
