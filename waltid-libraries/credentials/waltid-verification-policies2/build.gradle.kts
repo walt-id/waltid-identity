@@ -21,7 +21,7 @@ kotlin {
             implementation(identityLibs.bundles.waltid.ktor.client)
 
             // Logging
-            implementation("io.github.oshai:kotlin-logging:7.0.13")
+            implementation(identityLibs.oshai.kotlinlogging)
 
             // Kotlinx
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
@@ -40,7 +40,8 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-vical"))
             implementation(project(":waltid-libraries:credentials:waltid-dcql"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
-            implementation(project(":waltid-libraries:crypto:waltid-crypto"))// for Base64Utils
+            implementation(project(":waltid-libraries:crypto:waltid-crypto")) // for Base64Utils
+            implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
 
             implementation("com.soywiz:korlibs-io:6.0.2")
 

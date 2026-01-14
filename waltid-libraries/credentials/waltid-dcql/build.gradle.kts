@@ -20,7 +20,7 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
             // Logging
-            implementation("io.github.oshai:kotlin-logging:7.0.13")
+            implementation(identityLibs.oshai.kotlinlogging)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
@@ -33,10 +33,10 @@ kotlin {
 
 mavenPublishing {
     pom {
-        name.set("walt.id DIF Definitions Parser")
+        name.set("walt.id DCQL library")
         description.set(
             """
-            Kotlin/Java library for DIF definitions parsing
+            Kotlin/Java library for DCQL matching
             """.trimIndent()
         )
     }
