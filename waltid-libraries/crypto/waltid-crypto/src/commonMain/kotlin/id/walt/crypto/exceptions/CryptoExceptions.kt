@@ -28,3 +28,12 @@ class VerificationException(message: String, cause: Throwable? = null) :
 class MissingSignatureException(message: String, cause: Throwable? = null) :
     CryptoArgumentException("The signature is missing or invalid: $message")
 
+class KeyCreationFailed(message: String, cause: Throwable? = null) :
+    CryptoStateException(message, cause)
+
+class UnauthorizedKeyAccess(message: String, cause: Throwable? = null) :
+    CryptoStateException(message, cause)
+
+class KeyVaultUnavailable(message: String, cause: Throwable? = null) :
+    CryptoStateException(message, cause)
+
