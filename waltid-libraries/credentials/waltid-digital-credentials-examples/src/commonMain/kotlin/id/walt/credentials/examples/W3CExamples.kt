@@ -340,6 +340,10 @@ object W3CExamples {
           },
           "id": "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17"
         },
+        "credentialSchema": [{
+            "id": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+            "type": "1EdTechJsonSchemaValidator2019"
+          }],        
         "issuanceDate": "2025-10-20T06:22:37.444427698Z",
         "expirationDate": "2026-10-20T06:22:37.444457898Z"
       },
