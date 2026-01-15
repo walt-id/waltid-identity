@@ -12,9 +12,9 @@ data class CertificateDer(
     /**
     * Convert certificate DER bytes to PEM-encoded string.
     */
-    fun toPEMEncodedString() = "-----BEGIN CERTIFICATE-----\n" +
-            Base64.Mime.encode(bytes.toByteArray()) +
-            "\n-----END CERTIFICATE-----"
+    fun toPEMEncodedString() = "-----BEGIN CERTIFICATE-----\r\n" +
+            Base64.Pem.encode(bytes.toByteArray()) +
+            "\r\n-----END CERTIFICATE-----"
 }
 
 /**
