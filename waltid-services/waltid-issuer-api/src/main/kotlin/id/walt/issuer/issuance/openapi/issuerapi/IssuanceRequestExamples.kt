@@ -949,7 +949,7 @@ object IssuanceExamples {
             {
                 "key":
                 {
-                    "backend": "azure",
+                    "backend": "azure-rest-api",
                     "keyType": "secp256r1",
                     "config":
                     {
@@ -960,6 +960,29 @@ object IssuanceExamples {
                             "keyVaultUrl": "url to the vault"
                        }
                       
+                    }
+                },
+                "did":
+                {
+                    "method": "jwk"
+                }
+            }
+        """.trimIndent()
+    )
+
+    //language=JSON
+    val issuerOnboardingRequestAzureSdkExample = typedValueExampleDescriptorDsl<OnboardingRequest>(
+        """
+              {
+                "key":
+                {
+                    "backend": "azure",
+                    "keyType": "secp256r1",
+                    "config":
+                    {
+                      "auth": {
+                         "keyVaultUrl" : "url to the vault"
+                      }
                     }
                 },
                 "did":

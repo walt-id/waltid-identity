@@ -1,13 +1,21 @@
 package id.walt.x509
 
 import okio.ByteString
+import kotlin.io.encoding.Base64
 
 /**
  * DER encoded X.509 certificate as platform-agnostic wrapper.
  */
 data class CertificateDer(
-    val bytes: ByteString
-)
+    val bytes: ByteString,
+) {
+    /**
+    * Convert certificate DER bytes to PEM-encoded string.
+    */
+    fun toPEMEncodedString() = "-----BEGIN CERTIFICATE-----\r\n" +
+            Base64.Pem.encode(bytes.toByteArray()) +
+            "\r\n-----END CERTIFICATE-----"
+}
 
 /**
  * Validate a leaf certificate against a provided chain and trust anchors.
