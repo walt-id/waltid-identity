@@ -9,7 +9,9 @@ import kotlin.io.encoding.Base64
 data class CertificateDer(
     val bytes: ByteString,
 ) {
-
+    /**
+    * Convert certificate DER bytes to PEM-encoded string.
+    */
     fun toPEMEncodedString() = "-----BEGIN CERTIFICATE-----\n" +
             Base64.Mime.encode(bytes.toByteArray()) +
             "\n-----END CERTIFICATE-----"
