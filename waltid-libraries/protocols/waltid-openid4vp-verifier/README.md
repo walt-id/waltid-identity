@@ -27,7 +27,7 @@ Learn more about OpenID4VP [here](https://docs.walt.id/concepts/data-exchange-pr
 **This library handles:**
 - Creating and managing verification sessions
 - Generating authorization requests with DCQL queries
-- Validating presentations across multiple credential formats (SD-JWT VC, W3C VC, mdoc)
+- Validating presentations across multiple credential formats (SD-JWT VC, W3C VC, mDL/mDoc ISO/IEC 18013 / 23220 family)
 - Checking DCQL fulfillment and credential set requirements
 - Session state management and lifecycle
 
@@ -72,7 +72,7 @@ The library supports multiple response delivery modes:
 The library validates presentations in multiple formats:
 - **SD-JWT VC** (`dc+sd-jwt`) - Including selective disclosure verification
 - **W3C VC** (`jwt_vc_json`) - JWT-signed Verifiable Credentials
-- **mdoc** (`mso_mdoc`) - ISO mobile documents with full chain validation
+- **mdoc** (`mso_mdoc`) - ISO/IEC 18013-7 mobile documents with full chain validation
 
 ## Assumptions and Dependencies
 
