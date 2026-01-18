@@ -219,6 +219,7 @@ class AzureKey(
             return try {
                 val keyClient = KeyVaultClientFactory.keyClient(config.auth.keyVaultUrl)
 
+
                 val keyName = config.keyName
                     ?.takeIf { it.isNotBlank() }
                     ?: "key-${System.currentTimeMillis()}"
@@ -227,14 +228,17 @@ class AzureKey(
                 val createKeyOptions = when (keyType) {
                     KeyType.secp256r1 -> CreateEcKeyOptions(keyName).apply {
                         curveName = KeyCurveName.P_256
+                        tags = config.tags
                     }
 
                     KeyType.secp256k1 -> CreateEcKeyOptions(keyName).apply {
                         curveName = KeyCurveName.P_256K
+                        tags = config.tags
                     }
 
                     KeyType.RSA -> CreateRsaKeyOptions(keyName).apply {
                         keySize = 2048
+                        tags = config.tags
                     }
 
                     else -> {
@@ -246,8 +250,9 @@ class AzureKey(
                 val publicKey = getAzurePublicKey(config, keyVaultKey.name)
 
                 val normalizedPublicKey = parseAzurePublicKey(publicKey.exportJWKObject()).publicKey
+                val editedConfig = config.copy(tags = null)
                 AzureKey(
-                    config = config,
+                    config = editedConfig,
                     id = keyVaultKey.name,
                     _publicKey = DirectSerializedKey(normalizedPublicKey),
                     _keyType = keyType
