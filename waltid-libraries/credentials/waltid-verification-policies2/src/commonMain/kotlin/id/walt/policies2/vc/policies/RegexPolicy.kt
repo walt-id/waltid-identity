@@ -10,13 +10,13 @@ import kotlinx.serialization.json.encodeToJsonElement
 
 @Serializable
 @SerialName("regex")
-data class CredentialDataMatcherPolicy(
+data class RegexPolicy(
     val path: String,
     val regex: String,
     @SerialName("regex_options")
     val regexOptions: Set<RegexOption>? = null,
     val allowNull: Boolean = false
-) : id.walt.policies2.vc.policies.CredentialVerificationPolicy2() {
+) : CredentialVerificationPolicy2() {
     override val id = "regex"
 
     @Serializable

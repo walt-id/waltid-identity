@@ -15,7 +15,7 @@ import id.walt.openid4vp.verifier.data.Verification2Session
 import id.walt.openid4vp.verifier.data.Verification2Session.DefinedVerificationPolicies
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.AllowedIssuerPolicy
-import id.walt.policies2.vc.policies.CredentialDataMatcherPolicy
+import id.walt.policies2.vc.policies.RegexPolicy
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vc.policies.ExpirationDatePolicy
 import id.walt.policies2.vc.policies.NotBeforePolicy
@@ -82,7 +82,7 @@ object Verifier2OpenApiExamples {
                         ExpirationDatePolicy(),
                         NotBeforePolicy(),
                         AllowedIssuerPolicy(JsonArray(listOf(JsonPrimitive("https://university.example/issuers/565049")))),
-                        CredentialDataMatcherPolicy(
+                        RegexPolicy(
                             path = "$.credentialSubject.degree.name",
                             regex = "^Bachelor of Science and Arts$"
                         )
@@ -292,7 +292,7 @@ object Verifier2OpenApiExamples {
                         ExpirationDatePolicy(),
                         NotBeforePolicy(),
                         AllowedIssuerPolicy(JsonArray(listOf(JsonPrimitive("https://university.example/issuers/565049")))),
-                        CredentialDataMatcherPolicy(
+                        RegexPolicy(
                             path = "$.credentialSubject.degree.name",
                             regex = "^Bachelor of Science and Arts$"
                         )
