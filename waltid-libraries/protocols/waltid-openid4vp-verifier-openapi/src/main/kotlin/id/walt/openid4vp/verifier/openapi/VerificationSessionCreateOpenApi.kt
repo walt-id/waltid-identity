@@ -42,6 +42,8 @@ object VerificationSessionCreateOpenApi {
                 required = true
                 description = "Verification session setup with DCQL query and optional policies"
 
+                // W3C VC Examples
+
                 example("[openid4vp-http][w3c vc] default jwt_vc_json") { value = Verifier2OpenApiExamples.openid4vpHttpW3cVcDefault }
                 example("[openid4vp-http][w3c vc] basic w3c policies (signature, expiration, not-before, allowed-issuer, regex)") { value = Verifier2OpenApiExamples.openid4vpHttpW3cVcBasic }
                 example("[openid4vp-http][w3c vc] credential status for TokenStatusList") {
@@ -57,6 +59,10 @@ object VerificationSessionCreateOpenApi {
 
                 example("[openid4vp-http][w3c vc] presentation policies (jwt_vc_json/*)") { value = Verifier2OpenApiExamples.openid4vpHttpW3cVcPresentation }
 
+                // IETF SD-JWT VC Examples
+                example("[openid4vp-http][ietf sd-jwt vc] default dc+sd-jwt") { value = Verifier2OpenApiExamples.openid4vpHttpSdJwtVcDefault }
+                example("[openid4vp-http][ietf sd-jwt vc] basic w3c policies (signature, expiration, not-before, allowed-issuer, regex)") { value = Verifier2OpenApiExamples.openid4vpHttpSdJwtVcBasic }
+                example("[openid4vp-http][ietf sd-jwt vc] presentation policies (dc+sd-jwt/*)") { value = Verifier2OpenApiExamples.openid4vpHttpSdJwtVcPresentation }
 
                 // OLD EXAMPLES BELOW
                 example("Basic SD-JWT example") { value = Verifier2OpenApiExamples.basicExample }

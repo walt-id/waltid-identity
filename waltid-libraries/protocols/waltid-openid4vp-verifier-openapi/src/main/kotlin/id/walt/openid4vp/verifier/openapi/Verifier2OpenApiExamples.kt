@@ -28,7 +28,11 @@ import id.walt.policies2.vc.policies.status.model.IETFStatusPolicyAttribute
 import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyAttribute
 import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyListArguments
 import id.walt.policies2.vp.policies.AudienceCheckJwtVcJsonVPPolicy
+import id.walt.policies2.vp.policies.AudienceCheckSdJwtVPPolicy
+import id.walt.policies2.vp.policies.KbJwtSignatureSdJwtVPPolicy
 import id.walt.policies2.vp.policies.NonceCheckJwtVcJsonVPPolicy
+import id.walt.policies2.vp.policies.NonceCheckSdJwtVPPolicy
+import id.walt.policies2.vp.policies.SdHashCheckSdJwtVPPolicy
 import id.walt.policies2.vp.policies.SignatureJwtVcJsonVPPolicy
 import id.walt.policies2.vp.policies.VPPolicyList
 import kotlinx.serialization.json.JsonArray
@@ -247,6 +251,84 @@ object Verifier2OpenApiExamples {
         )
     )
 
+    // IETF SD-JWT VC Examples
+    val openid4vpHttpSdJwtVcDefault = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "pid", format = CredentialFormat.DC_SD_JWT, meta = SdJwtVcMeta(
+                            vctValues = listOf("http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential")
+                        ), claims = listOf(
+                            ClaimsQuery(path = listOf("given_name")),
+                            ClaimsQuery(path = listOf("family_name")),
+                            ClaimsQuery(path = listOf("address", "street_address"))
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    val openid4vpHttpSdJwtVcBasic = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "pid", format = CredentialFormat.DC_SD_JWT, meta = SdJwtVcMeta(
+                            vctValues = listOf("http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential")
+                        ), claims = listOf(
+                            ClaimsQuery(path = listOf("given_name")),
+                            ClaimsQuery(path = listOf("family_name")),
+                            ClaimsQuery(path = listOf("address", "street_address"))
+                        )
+                    )
+                )
+            ),
+            policies = DefinedVerificationPolicies(
+                vc_policies = VCPolicyList(
+                    listOf(
+                        CredentialSignaturePolicy(),
+                        ExpirationDatePolicy(),
+                        NotBeforePolicy(),
+                        AllowedIssuerPolicy(JsonArray(listOf(JsonPrimitive("https://university.example/issuers/565049")))),
+                        CredentialDataMatcherPolicy(
+                            path = "$.credentialSubject.degree.name",
+                            regex = "^Bachelor of Science and Arts$"
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    val openid4vpHttpSdJwtVcPresentation = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "pid", format = CredentialFormat.DC_SD_JWT, meta = SdJwtVcMeta(
+                            vctValues = listOf("http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential")
+                        ), claims = listOf(
+                            ClaimsQuery(path = listOf("given_name")),
+                            ClaimsQuery(path = listOf("family_name")),
+                            ClaimsQuery(path = listOf("address", "street_address"))
+                        )
+                    )
+                )
+            ),
+            policies = DefinedVerificationPolicies(
+                vp_policies = VPPolicyList(
+                    jwtVcJson = listOf(),
+                    dcSdJwt = listOf(AudienceCheckSdJwtVPPolicy(),
+                        KbJwtSignatureSdJwtVPPolicy(),
+                        NonceCheckSdJwtVPPolicy(),
+                        SdHashCheckSdJwtVPPolicy()),
+                    msoMdoc = listOf()
+                )
+            )
+        )
+    )
     // OLD EXAMPLES BELOW
 
     val basicExample = CrossDeviceFlowSetup(
