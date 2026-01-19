@@ -982,7 +982,13 @@ object IssuanceExamples {
                     {
                       "auth": {
                          "keyVaultUrl" : "url to the vault"
-                      }
+                      },
+                      "tags": {
+                         
+                            "project": "waltid",
+                            "owner": "identity-team"
+                       
+                            }
                     }
                 },
                 "did":
