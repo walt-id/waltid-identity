@@ -47,10 +47,10 @@ fun Application.onboardingApi() {
                                     "  ### Defaults:\n" +
                                     "  - A local `secp256r1` signing key will be generated if **no** other backend is specified\n" +
                                     "  - If `notBefore` is not provided, the current system time is used\n" +
-                                    "  - If `notAfter` is not provided, it defaults to 15 years after `notBefore`"
+                                    "  - If `notAfter` is not provided, it defaults to 29 years after `notBefore`"
                         "\n" +
                                 "  ### Notes:\n" +
-                                "  - Only `secp256r1` signing keys are supported."
+                                "  - Supported signing keys: `secp256r1`, `secp384r1` and `secp521r1`"
 
                         request(IACADocs.requestConfig())
 
@@ -92,7 +92,7 @@ fun Application.onboardingApi() {
                                 "  - If `notAfter` is not provided, it defaults to 457 days after `notBefore`\n" +
                                 "\n" +
                                 "  ### Notes:\n" +
-                                "  - Only `secp256r1` keys are supported."
+                                "  - Supported signing keys: `secp256r1`, `secp384r1` and `secp521r1`"
 
                         request(DocumentSignerDocs.requestConfig())
 

@@ -10,6 +10,7 @@ import id.walt.x509.X509V3ExtensionOID
 import id.walt.x509.X509ValidityPeriod
 import id.walt.x509.iso.DS_CERT_MAX_VALIDITY_SECONDS
 import id.walt.x509.iso.DocumentSignerEkuOID
+import id.walt.x509.iso.blockingBridge
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
@@ -90,6 +91,19 @@ class DocumentSignerValidator(
             dsDecodedCert.verifySignature(iacaDecodedCert.publicKey)
         }
 
+    }
+
+    /**
+     * Blocking variant of [validate].
+     */
+    fun validateBlocking(
+        dsDecodedCert: DocumentSignerDecodedCertificate,
+        iacaDecodedCert: IACADecodedCertificate,
+    ) = blockingBridge {
+        validate(
+            dsDecodedCert = dsDecodedCert,
+            iacaDecodedCert = iacaDecodedCert,
+        )
     }
 
     /**

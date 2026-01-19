@@ -6,14 +6,15 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 @Serializable
-data class KeyGenerationRequestParams(
+data class KeyGenerationRequestParameters(
     val backend: String,
+    val keyType: KeyType = KeyType.secp256r1,
     val config: JsonObject? = null,
 ) {
 
     fun toKeyGenerationRequest() = KeyGenerationRequest(
         backend = backend,
-        keyType = KeyType.secp256r1,
+        keyType = keyType,
         config = config,
     )
 }

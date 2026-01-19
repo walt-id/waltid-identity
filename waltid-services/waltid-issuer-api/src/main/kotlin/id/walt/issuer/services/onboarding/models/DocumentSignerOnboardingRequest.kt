@@ -8,31 +8,9 @@ import kotlin.time.ExperimentalTime
 @Serializable
 data class DocumentSignerOnboardingRequest(
     val iacaSigner: IACASignerData,
-    val certificateData: DocumentSignerCertificateData,
-    val ecKeyGenRequestParams: KeyGenerationRequestParams = KeyGenerationRequestParams(
+    val certificateData: DocumentSignerCertificateRequestData,
+    val ecKeyGenRequestParams: KeyGenerationRequestParameters = KeyGenerationRequestParameters(
         backend = "jwk",
         config = null,
     ),
-) {
-
-    init {
-
-        require( iacaSigner.certificateData.country == certificateData.country ) {
-            "IACA and document signer country names must be the same"
-        }
-
-        require( iacaSigner.certificateData.stateOrProvinceName == certificateData.stateOrProvinceName ) {
-            "IACA and document signer state/province names must be the same"
-        }
-
-        require( iacaSigner.certificateData.finalNotBefore <= certificateData.finalNotBefore ) {
-            "IACA certificate not before must be before the document signer's not before"
-        }
-
-        require( iacaSigner.certificateData.finalNotAfter >= certificateData.finalNotAfter ) {
-            "IACA certificate not after must be after the document signer's not after"
-        }
-
-    }
-
-}
+)

@@ -76,6 +76,7 @@ dependencies {
 
     // walt.id
     api(project(":waltid-libraries:crypto:waltid-crypto"))
+    implementation(project(":waltid-libraries:crypto:waltid-x509"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-aws"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-azure"))
 

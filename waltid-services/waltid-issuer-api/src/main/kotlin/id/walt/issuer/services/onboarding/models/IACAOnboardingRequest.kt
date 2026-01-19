@@ -4,8 +4,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class IACAOnboardingRequest(
-    val certificateData: IACACertificateData,
-    val ecKeyGenRequestParams: KeyGenerationRequestParams = KeyGenerationRequestParams(
+    val certificateData: IACACertificateRequestData,
+    val ecKeyGenRequestParams: KeyGenerationRequestParameters = KeyGenerationRequestParameters(
         backend = "jwk",
         config = null,
     ),

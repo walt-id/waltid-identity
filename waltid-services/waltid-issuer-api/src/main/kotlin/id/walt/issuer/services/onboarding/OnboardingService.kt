@@ -9,36 +9,13 @@ import id.walt.did.dids.DidService
 import id.walt.issuer.issuance.IssuerOnboardingResponse
 import id.walt.issuer.issuance.OnboardingRequest
 import id.walt.issuer.services.onboarding.models.*
-import kotlinx.coroutines.runBlocking
+import id.walt.x509.iso.documentsigner.builder.DocumentSignerCertificateBuilder
+import id.walt.x509.iso.documentsigner.builder.IACASignerSpecification
+import id.walt.x509.iso.iaca.builder.IACACertificateBuilder
 import kotlinx.serialization.json.*
-import org.bouncycastle.asn1.ASN1ObjectIdentifier
-import org.bouncycastle.asn1.x500.X500Name
-import org.bouncycastle.asn1.x500.X500NameBuilder
-import org.bouncycastle.asn1.x500.style.BCStyle
-import org.bouncycastle.asn1.x509.*
-import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
-import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils
-import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
-import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
-import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder
-import org.bouncycastle.util.io.pem.PemReader
-import java.io.StringReader
-import java.math.BigInteger
-import java.security.PublicKey
-import java.security.SecureRandom
-import java.security.cert.X509Certificate
-import java.util.*
 import kotlin.time.ExperimentalTime
 
 object OnboardingService {
-
-    private const val SERIAL_NUMBER_LENGTH = 20
-
-    private const val SIGNATURE_ALGORITHM_NAME = "SHA256withECDSA"
-
-    private val random = SecureRandom()
-
-    private val mdlKeyPurposeDocumentSignerOID = ASN1ObjectIdentifier("1.0.18013.5.1.2")
 
     suspend fun onboardIACA(
         request: IACAOnboardingRequest,
@@ -48,13 +25,9 @@ object OnboardingService {
             generationRequest = request.ecKeyGenRequestParams.toKeyGenerationRequest(),
         )
 
-        val certificate = generateIACACertificate(
-            iacaSigningKey = iacaKey,
-            notBefore = Date(request.certificateData.finalNotBefore.toEpochMilliseconds()),
-            notAfter = Date(request.certificateData.finalNotAfter.toEpochMilliseconds()),
-            issuer = getIACAX500Name(request.certificateData),
-            altNames = getIssuerAlternativeNames(request.certificateData.issuerAlternativeNameConf),
-            crlDistributionPointUri = request.certificateData.crlDistributionPointUri,
+        val certBundle = IACACertificateBuilder().build(
+            profileData = request.certificateData.toIACACertificateProfileData(),
+            signingKey = iacaKey,
         )
 
         return IACAOnboardingResponse(
@@ -62,8 +35,20 @@ object OnboardingService {
                 backend = request.ecKeyGenRequestParams.backend,
                 key = iacaKey,
             ),
-            certificateData = request.certificateData,
-            certificatePEM = x509CertificateToPEM(certificate),
+            certificateData = IACACertificateData(
+                country = certBundle.decodedCertificate.principalName.country,
+                commonName = certBundle.decodedCertificate.principalName.commonName,
+                notBefore = certBundle.decodedCertificate.validityPeriod.notBefore,
+                notAfter = certBundle.decodedCertificate.validityPeriod.notAfter,
+                issuerAlternativeNameConf = IssuerAlternativeNameConfiguration(
+                    email = certBundle.decodedCertificate.issuerAlternativeName.email,
+                    uri = certBundle.decodedCertificate.issuerAlternativeName.uri,
+                ),
+                stateOrProvinceName = certBundle.decodedCertificate.principalName.stateOrProvinceName,
+                organizationName = certBundle.decodedCertificate.principalName.organizationName,
+                crlDistributionPointUri = certBundle.decodedCertificate.crlDistributionPointUri,
+            ),
+            certificatePEM = certBundle.certificateDer.toPEMEncodedString(),
         )
     }
 
@@ -75,15 +60,15 @@ object OnboardingService {
             generationRequest = request.ecKeyGenRequestParams.toKeyGenerationRequest(),
         )
 
-        val certificate = generateDocumentSignerCertificate(
-            iacaSigningKey = KeyManager.resolveSerializedKey(request.iacaSigner.iacaKey as JsonObject),
-            dsPublicKey = documentSignerKey.getPublicKey(),
-            notBefore = Date(request.certificateData.finalNotBefore.toEpochMilliseconds()),
-            notAfter = Date(request.certificateData.finalNotAfter.toEpochMilliseconds()),
-            iacaName = getIACAX500Name(request.iacaSigner.certificateData),
-            dsName = getDSX500Name(request.certificateData),
-            altNames = getIssuerAlternativeNames(request.iacaSigner.certificateData.issuerAlternativeNameConf),
-            crlDistributionPointUri = request.certificateData.crlDistributionPointUri,
+        val iacaKey = KeyManager.resolveSerializedKey(request.iacaSigner.iacaKey as JsonObject)
+
+        val certBundle = DocumentSignerCertificateBuilder().build(
+            profileData = request.certificateData.toDocumentSignerCertificateProfileData(),
+            publicKey = documentSignerKey.getPublicKey(),
+            iacaSignerSpec = IACASignerSpecification(
+                profileData = request.iacaSigner.certificateData.toIACACertificateProfileData(),
+                signingKey = iacaKey,
+            ),
         )
 
         return DocumentSignerOnboardingResponse(
@@ -91,237 +76,18 @@ object OnboardingService {
                 backend = request.ecKeyGenRequestParams.backend,
                 key = documentSignerKey,
             ),
-            certificatePEM = x509CertificateToPEM(certificate),
-            certificateData = request.certificateData,
+            certificatePEM = certBundle.certificateDer.toPEMEncodedString(),
+            certificateData = DocumentSignerCertificateData(
+                country = certBundle.decodedCertificate.principalName.country,
+                commonName = certBundle.decodedCertificate.principalName.commonName,
+                notBefore = certBundle.decodedCertificate.validityPeriod.notBefore,
+                notAfter = certBundle.decodedCertificate.validityPeriod.notAfter,
+                crlDistributionPointUri = certBundle.decodedCertificate.crlDistributionPointUri,
+                stateOrProvinceName = certBundle.decodedCertificate.principalName.stateOrProvinceName,
+                organizationName = certBundle.decodedCertificate.principalName.organizationName,
+                localityName = certBundle.decodedCertificate.principalName.localityName,
+            ),
         )
-    }
-
-    private fun getIACAX500Name(
-        iacaCertData: IACACertificateData
-    ): X500Name {
-        val nameBuilder = X500NameBuilder()
-
-        nameBuilder.addRDN(BCStyle.C, iacaCertData.country)
-        nameBuilder.addRDN(BCStyle.CN, iacaCertData.commonName)
-
-        iacaCertData.stateOrProvinceName?.let {
-            nameBuilder.addRDN(BCStyle.ST, it)
-        }
-
-        iacaCertData.organizationName?.let {
-            nameBuilder.addRDN(BCStyle.O, it)
-        }
-
-        return nameBuilder.build()
-    }
-
-    private fun getIssuerAlternativeNames(
-        issuerAlternativeNameConf: IssuerAlternativeNameConfiguration,
-    ) = listOfNotNull(
-        issuerAlternativeNameConf.uri?.let {
-            GeneralName(GeneralName.uniformResourceIdentifier, it)
-        },
-        issuerAlternativeNameConf.email?.let {
-            GeneralName(GeneralName.rfc822Name, it)
-        }
-    ).toTypedArray()
-
-    private fun getDSX500Name(
-        dsCertData: DocumentSignerCertificateData,
-    ): X500Name {
-        val nameBuilder = X500NameBuilder()
-
-        nameBuilder.addRDN(BCStyle.C, dsCertData.country)
-        nameBuilder.addRDN(BCStyle.CN, dsCertData.commonName)
-
-        dsCertData.stateOrProvinceName?.let {
-            nameBuilder.addRDN(BCStyle.ST, it)
-        }
-
-        dsCertData.organizationName?.let {
-            nameBuilder.addRDN(BCStyle.O, it)
-        }
-
-        dsCertData.localityName?.let {
-            nameBuilder.addRDN(BCStyle.L, it)
-        }
-
-        return nameBuilder.build()
-    }
-
-    private suspend fun generateDocumentSignerCertificate(
-        iacaSigningKey: Key,
-        dsPublicKey: Key,
-        notBefore: Date,
-        notAfter: Date,
-        iacaName: X500Name,
-        dsName: X500Name,
-        altNames: Array<GeneralName>,
-        crlDistributionPointUri: String,
-    ): X509Certificate {
-
-        val subjectJavaPublicKey = parseJcaPublicKey(dsPublicKey.exportPEM())
-
-        val certBuilder = JcaX509v3CertificateBuilder(
-            iacaName,
-            generateCertificateSerialNo(),
-            notBefore,
-            notAfter,
-            dsName,
-            subjectJavaPublicKey,
-        )
-
-        // Extensions
-        val extUtils = JcaX509ExtensionUtils()
-
-        certBuilder.addExtension(
-            Extension.authorityKeyIdentifier,
-            false,
-            extUtils.createAuthorityKeyIdentifier(parseJcaPublicKey(iacaSigningKey.getPublicKey().exportPEM()))
-        )
-
-        certBuilder.addExtension(
-            Extension.subjectKeyIdentifier,
-            false,
-            extUtils.createSubjectKeyIdentifier(subjectJavaPublicKey)
-        )
-
-        // Key Usage: Digital Signature only
-        certBuilder.addExtension(
-            Extension.keyUsage,
-            true,
-            KeyUsage(KeyUsage.digitalSignature),
-        )
-
-        certBuilder.addExtension(
-            Extension.issuerAlternativeName,
-            false,
-            GeneralNames(altNames),
-        )
-
-        // Extended key usage: mdlDS
-        certBuilder.addExtension(
-            Extension.extendedKeyUsage,
-            true,
-            ExtendedKeyUsage(KeyPurposeId.getInstance(mdlKeyPurposeDocumentSignerOID)),
-        )
-
-        // CRL distribution points is mandatory
-        certBuilder.addExtension(
-            Extension.cRLDistributionPoints,
-            false,
-            CRLDistPoint(
-                arrayOf(
-                    DistributionPoint(
-                        DistributionPointName(
-                            GeneralNames(
-                                GeneralName(
-                                    GeneralName.uniformResourceIdentifier,
-                                    crlDistributionPointUri,
-                                )
-                            )
-                        ),
-                        null,
-                        null,
-                    )
-                )
-            )
-        )
-
-        val keySignerBuilder = KeyContentSignerWrapper(
-            algorithmIdentifier = DefaultSignatureAlgorithmIdentifierFinder().find(SIGNATURE_ALGORITHM_NAME),
-            key = iacaSigningKey,
-        )
-
-        val certificateHolder = certBuilder.build(keySignerBuilder)
-        val certificate = JcaX509CertificateConverter().getCertificate(certificateHolder)
-
-        return certificate
-    }
-
-    private suspend fun generateIACACertificate(
-        iacaSigningKey: Key,
-        notBefore: Date,
-        notAfter: Date,
-        issuer: X500Name,
-        altNames: Array<GeneralName>,
-        crlDistributionPointUri: String? = null,
-    ): X509Certificate {
-
-        val javaPublicKey = parseJcaPublicKey(iacaSigningKey.getPublicKey().exportPEM())
-
-        val certBuilder = JcaX509v3CertificateBuilder(
-            issuer,
-            generateCertificateSerialNo(),
-            notBefore,
-            notAfter,
-            issuer,
-            javaPublicKey,
-        )
-
-        // Extensions
-        val extUtils = JcaX509ExtensionUtils()
-
-        certBuilder.addExtension(
-            Extension.subjectKeyIdentifier,
-            false,
-            extUtils.createSubjectKeyIdentifier(javaPublicKey)
-        )
-
-        // Basic constraints: CA=true, pathLen=0
-        certBuilder.addExtension(
-            Extension.basicConstraints,
-            true,
-            BasicConstraints(0)
-        )
-
-        // Issuer alternative names extension
-        certBuilder.addExtension(
-            Extension.issuerAlternativeName,
-            false,
-            GeneralNames(altNames),
-        )
-
-        // Key Usage: keyCertSign and cRLSign
-        certBuilder.addExtension(
-            Extension.keyUsage,
-            true,
-            KeyUsage(KeyUsage.keyCertSign or KeyUsage.cRLSign)
-        )
-
-        // CRL Distribution point extension
-        crlDistributionPointUri?.let {
-            certBuilder.addExtension(
-                Extension.cRLDistributionPoints,
-                false,
-                CRLDistPoint(
-                    arrayOf(
-                        DistributionPoint(
-                            DistributionPointName(
-                                GeneralNames(
-                                    GeneralName(
-                                        GeneralName.uniformResourceIdentifier,
-                                        crlDistributionPointUri
-                                    )
-                                )
-                            ),
-                            null,
-                            null,
-                        )
-                    )
-                )
-            )
-        }
-
-        val keySignerBuilder = KeyContentSignerWrapper(
-            algorithmIdentifier = DefaultSignatureAlgorithmIdentifierFinder().find(SIGNATURE_ALGORITHM_NAME),
-            key = iacaSigningKey,
-        )
-
-        val certificateHolder = certBuilder.build(keySignerBuilder)
-        val certificate = JcaX509CertificateConverter().getCertificate(certificateHolder)
-
-        return certificate
     }
 
     suspend fun didIssuerOnboard(
@@ -379,25 +145,6 @@ object OnboardingService {
                 }
             }
         }
-    }
-
-    private fun generateCertificateSerialNo(): BigInteger {
-        val randomBytes = ByteArray(SERIAL_NUMBER_LENGTH)
-        random.nextBytes(randomBytes)
-        return BigInteger(randomBytes).abs()
-    }
-
-    private fun parseJcaPublicKey(pemEncodedPublicKey: String): PublicKey {
-        val reader = PemReader(StringReader(pemEncodedPublicKey))
-        val pemObject = reader.readPemObject()
-        val spki = SubjectPublicKeyInfo.getInstance(pemObject.content)
-        return JcaPEMKeyConverter().setProvider("BC").getPublicKey(spki)
-    }
-
-    private fun x509CertificateToPEM(certificate: X509Certificate) = runBlocking {
-        "-----BEGIN CERTIFICATE-----\n" +
-                Base64.getEncoder().encodeToString(certificate.encoded) +
-                "\n-----END CERTIFICATE-----\n"
     }
 
 }
