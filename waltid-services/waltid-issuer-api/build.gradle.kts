@@ -1,7 +1,7 @@
 import io.ktor.plugin.features.*
 
 object Versions {
-    const val KTOR_VERSION = "3.3.3" // also change 1 plugin
+    const val KTOR_VERSION = "3.3.3"
     const val COROUTINES_VERSION = "1.10.2"
     const val HOPLITE_VERSION = "2.9.0"
 }
@@ -77,6 +77,7 @@ dependencies {
     // walt.id
     api(project(":waltid-libraries:crypto:waltid-crypto"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-aws"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto-azure"))
 
     api(project(":waltid-libraries:waltid-did"))
 

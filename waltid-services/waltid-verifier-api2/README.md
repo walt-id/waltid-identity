@@ -103,12 +103,23 @@ Run locally (development):
 ./gradlew :waltid-services:waltid-verifier-api2:run
 ```
 
-Docker image:
+Docker images:
 
 ```bash
-./gradlew :waltid-services:waltid-verifier-api2:docker
+# Development (local Docker daemon, single-arch)
+./gradlew :waltid-services:waltid-verifier-api2:publishImageToLocalRegistry
 # image: waltid/verifier-api2:<version>
 ```
+
+```bash
+# Production (multi-arch push to your registry)
+export DOCKER_USERNAME=<your-dockerhub-namespace>
+export DOCKER_PASSWORD=<your-dockerhub-token>
+./gradlew :waltid-services:waltid-verifier-api2:publishImage
+# image: docker.io/<DOCKER_USERNAME>/verifier-api2:<version>
+```
+
+Note: multi-arch images require a registry push. Local tar output is single-arch only.
 
 Create a session (example payloads available via OpenAPI helper):
 
@@ -156,7 +167,7 @@ See `config/` for service, web, and feature toggles. SSE and webhook delivery ca
 ## Join the community
 
 * Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
-* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+* Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
 * Find more indepth documentation on our [docs site](https://docs.walt.id)
 
 ## License

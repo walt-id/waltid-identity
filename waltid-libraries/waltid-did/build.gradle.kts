@@ -5,12 +5,15 @@ plugins {
 
 group = "id.walt.did"
 
+object Versions {
+    const val KTOR_VERSION = "3.3.3"
+}
+
 kotlin {
     js(IR) {
         outputModuleName = "dids"
     }
 
-    val ktor_version = "3.3.3"
     sourceSets {
         commonMain.dependencies {
             // JSON
@@ -35,7 +38,7 @@ kotlin {
             implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.6.0")
 
             // Logging
-            implementation("io.github.oshai:kotlin-logging:7.0.13")
+            implementation(identityLibs.oshai.kotlinlogging)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
@@ -43,7 +46,7 @@ kotlin {
         }
         jvmMain.dependencies {
             // Ktor client
-            implementation("io.ktor:ktor-client-okhttp:$ktor_version")
+            implementation("io.ktor:ktor-client-okhttp:${Versions.KTOR_VERSION}")
 
             // Json canonicalization
             implementation("io.github.erdtman:java-json-canonicalization:1.1")
@@ -58,13 +61,13 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
             implementation(kotlin("test"))
             implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
-            implementation("io.ktor:ktor-server-test-host:$ktor_version")
-            implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
-            implementation("io.ktor:ktor-server-netty:$ktor_version")
-            implementation("io.ktor:ktor-network-tls-certificates:${ktor_version}")
+            implementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-server-content-negotiation:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-server-netty:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-network-tls-certificates:${Versions.KTOR_VERSION}")
         }
         jsMain.dependencies {
-            implementation("io.ktor:ktor-client-js:$ktor_version")
+            implementation("io.ktor:ktor-client-js:${Versions.KTOR_VERSION}")
 
             implementation(npm("canonicalize", "2.0.0"))
             implementation(npm("uuid", "9.0.1"))
