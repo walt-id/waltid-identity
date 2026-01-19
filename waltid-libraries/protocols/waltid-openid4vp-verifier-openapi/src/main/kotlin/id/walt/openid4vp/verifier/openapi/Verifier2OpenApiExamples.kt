@@ -14,17 +14,240 @@ import id.walt.openid4vp.verifier.data.UrlConfig
 import id.walt.openid4vp.verifier.data.Verification2Session
 import id.walt.openid4vp.verifier.data.Verification2Session.DefinedVerificationPolicies
 import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vc.policies.AllowedIssuerPolicy
+import id.walt.policies2.vc.policies.CredentialDataMatcherPolicy
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
+import id.walt.policies2.vc.policies.ExpirationDatePolicy
+import id.walt.policies2.vc.policies.NotBeforePolicy
 import id.walt.policies2.vc.policies.RevocationPolicy
 import id.walt.policies2.vc.policies.StatusPolicy
 import id.walt.policies2.vc.policies.VicalPolicy
+import id.walt.policies2.vc.policies.WebhookPolicy
 import id.walt.policies2.vc.policies.status.Values
 import id.walt.policies2.vc.policies.status.model.IETFStatusPolicyAttribute
 import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyAttribute
 import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyListArguments
+import id.walt.policies2.vp.policies.AudienceCheckJwtVcJsonVPPolicy
+import id.walt.policies2.vp.policies.NonceCheckJwtVcJsonVPPolicy
+import id.walt.policies2.vp.policies.SignatureJwtVcJsonVPPolicy
+import id.walt.policies2.vp.policies.VPPolicyList
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 
 object Verifier2OpenApiExamples {
+
+    val openid4vpHttpW3cVcDefault = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "example_openbadge_jwt_vc",
+                        format = CredentialFormat.JWT_VC_JSON,
+                        meta = JwtVcJsonMeta(
+                            typeValues = listOf(listOf("VerifiableCredential", "OpenBadgeCredential"))
+                        ),
+                        claims = listOf(
+                            ClaimsQuery(path = listOf("name"))
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    val openid4vpHttpW3cVcBasic = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "example_openbadge_jwt_vc",
+                        format = CredentialFormat.JWT_VC_JSON,
+                        meta = JwtVcJsonMeta(
+                            typeValues = listOf(listOf("VerifiableCredential", "OpenBadgeCredential"))
+                        ),
+                        claims = listOf(
+                            ClaimsQuery(path = listOf("name"))
+                        )
+                    )
+                )
+            ),
+            policies = DefinedVerificationPolicies(
+                vc_policies = VCPolicyList(
+                    listOf(
+                        CredentialSignaturePolicy(),
+                        ExpirationDatePolicy(),
+                        NotBeforePolicy(),
+                        AllowedIssuerPolicy(JsonArray(listOf(JsonPrimitive("https://university.example/issuers/565049")))),
+                        CredentialDataMatcherPolicy(
+                            path = "$.credentialSubject.degree.name",
+                            regex = "^Bachelor of Science and Arts$"
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    val openid4vpHttpW3cVcCredentialStatusTokenStatusList = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "example_openbadge_jwt_vc",
+                        format = CredentialFormat.JWT_VC_JSON,
+                        meta = JwtVcJsonMeta(
+                            typeValues = listOf(listOf("VerifiableCredential", "OpenBadgeCredential"))
+                        ),
+                        claims = listOf(
+                            ClaimsQuery(path = listOf("name"))
+                        )
+                    )
+                )
+            ),
+            policies = DefinedVerificationPolicies(
+                vc_policies = VCPolicyList(
+                    listOf(
+                        StatusPolicy(
+                            argument = IETFStatusPolicyAttribute(
+                                value = 0u
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    val openid4vpHttpW3cVcCredentialStatusBitstringStatusList = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "example_openbadge_jwt_vc",
+                        format = CredentialFormat.JWT_VC_JSON,
+                        meta = JwtVcJsonMeta(
+                            typeValues = listOf(listOf("VerifiableCredential", "OpenBadgeCredential"))
+                        ),
+                        claims = listOf(
+                            ClaimsQuery(path = listOf("name"))
+                        )
+                    )
+                )
+            ),
+            policies = DefinedVerificationPolicies(
+                vc_policies = VCPolicyList(
+                    listOf(
+                        StatusPolicy(
+                            argument = W3CStatusPolicyAttribute(
+                                value = 0u,
+                                purpose = "Revocation",
+                                type = Values.BITSTRING_STATUS_LIST
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    val openid4vpHttpW3cVcCredentialStatusMultipleBitstringStatusList = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "example_openbadge_jwt_vc",
+                        format = CredentialFormat.JWT_VC_JSON,
+                        meta = JwtVcJsonMeta(
+                            typeValues = listOf(listOf("VerifiableCredential", "OpenBadgeCredential"))
+                        ),
+                        claims = listOf(
+                            ClaimsQuery(path = listOf("name"))
+                        )
+                    )
+                )
+            ),
+            policies = DefinedVerificationPolicies(
+                vc_policies = VCPolicyList(
+                    listOf(
+                        StatusPolicy(
+                            argument = W3CStatusPolicyListArguments(
+                                list = listOf(
+                                    W3CStatusPolicyAttribute(
+                                        value = 0u,
+                                        purpose = "Revocation",
+                                        type = Values.BITSTRING_STATUS_LIST
+                                    ),
+                                    W3CStatusPolicyAttribute(
+                                        value = 0u,
+                                        purpose = "Suspension",
+                                        type = Values.BITSTRING_STATUS_LIST
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    val openid4vpHttpW3cVcWebhook = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "example_openbadge_jwt_vc",
+                        format = CredentialFormat.JWT_VC_JSON,
+                        meta = JwtVcJsonMeta(
+                            typeValues = listOf(listOf("VerifiableCredential", "OpenBadgeCredential"))
+                        ),
+                        claims = listOf(
+                            ClaimsQuery(path = listOf("name"))
+                        )
+                    )
+                )
+            ),
+            policies = DefinedVerificationPolicies(
+                vc_policies = VCPolicyList(
+                    listOf(
+                        WebhookPolicy("http://your-backend.com")
+                    )
+                )
+            )
+        )
+    )
+
+    val openid4vpHttpW3cVcPresentation = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "example_openbadge_jwt_vc",
+                        format = CredentialFormat.JWT_VC_JSON,
+                        meta = JwtVcJsonMeta(
+                            typeValues = listOf(listOf("VerifiableCredential", "OpenBadgeCredential"))
+                        ),
+                        claims = listOf(
+                            ClaimsQuery(path = listOf("name"))
+                        )
+                    )
+                )
+            ),
+            policies = DefinedVerificationPolicies(
+                vp_policies = VPPolicyList(
+                    jwtVcJson = listOf(
+                        AudienceCheckJwtVcJsonVPPolicy(),
+                        NonceCheckJwtVcJsonVPPolicy(),
+                        SignatureJwtVcJsonVPPolicy()
+                    ),
+                    dcSdJwt = listOf(),
+                    msoMdoc = listOf()
+                )
+            )
+        )
+    )
+
+    // OLD EXAMPLES BELOW
 
     val basicExample = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
@@ -47,6 +270,7 @@ object Verifier2OpenApiExamples {
             successRedirectUri = "https://example.com/verification-successful"
         )
     )
+
 
     val w3cPlusPath = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(

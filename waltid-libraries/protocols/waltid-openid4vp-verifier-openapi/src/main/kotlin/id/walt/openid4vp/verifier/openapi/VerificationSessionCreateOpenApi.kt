@@ -42,6 +42,23 @@ object VerificationSessionCreateOpenApi {
                 required = true
                 description = "Verification session setup with DCQL query and optional policies"
 
+                example("[openid4vp-http][w3c vc] default jwt_vc_json") { value = Verifier2OpenApiExamples.openid4vpHttpW3cVcDefault }
+                example("[openid4vp-http][w3c vc] basic w3c policies (signature, expiration, not-before, allowed-issuer, regex)") { value = Verifier2OpenApiExamples.openid4vpHttpW3cVcBasic }
+                example("[openid4vp-http][w3c vc] credential status for TokenStatusList") {
+                    value = Verifier2OpenApiExamples.openid4vpHttpW3cVcCredentialStatusTokenStatusList
+                }
+                example("[openid4vp-http][w3c vc] credential status for BitstringStatusList") {
+                    value = Verifier2OpenApiExamples.openid4vpHttpW3cVcCredentialStatusBitstringStatusList
+                }
+                example("[openid4vp-http][w3c vc] credential status for multiple BitstringStatusList") {
+                    value = Verifier2OpenApiExamples.openid4vpHttpW3cVcCredentialStatusMultipleBitstringStatusList
+                }
+                example("[openid4vp-http][w3c vc] webhook") { value = Verifier2OpenApiExamples.openid4vpHttpW3cVcWebhook }
+
+                example("[openid4vp-http][w3c vc] presentation policies (jwt_vc_json/*)") { value = Verifier2OpenApiExamples.openid4vpHttpW3cVcPresentation }
+
+
+                // OLD EXAMPLES BELOW
                 example("Basic SD-JWT example") { value = Verifier2OpenApiExamples.basicExample }
 
                 example("Cross device flow: mDL or Photo ID") { value = CrossDeviceFlowSetup.EXAMPLE_MDL_OR_PHOTOID }
