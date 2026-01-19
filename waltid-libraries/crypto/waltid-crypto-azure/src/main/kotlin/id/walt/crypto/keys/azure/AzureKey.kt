@@ -34,7 +34,7 @@ class AzureKey(
         }
 
     override val hasPrivateKey: Boolean
-        get() = false
+        get() = true
 
     override fun toString(): String = "[Azure ${keyType.name} key @KeyVault - $id]"
 
