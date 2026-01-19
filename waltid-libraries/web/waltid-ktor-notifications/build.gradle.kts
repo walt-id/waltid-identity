@@ -15,7 +15,7 @@ kotlin {
             implementation(identityLibs.bundles.waltid.ktor.client)
 
             // Logging
-            implementation("io.github.oshai:kotlin-logging:7.0.13")
+            implementation(identityLibs.oshai.kotlinlogging)
 
             // JSON
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")

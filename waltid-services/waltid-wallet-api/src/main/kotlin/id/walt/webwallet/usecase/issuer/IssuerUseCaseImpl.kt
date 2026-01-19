@@ -19,7 +19,7 @@ class IssuerUseCaseImpl(
     private val http: HttpClient,
 ) : IssuerUseCase {
     private val json = Json {
-        ignoreUnknownKeys
+        ignoreUnknownKeys = true
     }
 
     override fun get(wallet: Uuid, did: String): Result<IssuerDataTransferObject> = runCatching {
