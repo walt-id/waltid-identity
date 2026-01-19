@@ -898,8 +898,16 @@ object IssuanceExamples {
                     "keyType": "secp256r1",
                     "config":
                     {
-                        "region": "eu-central-1"
-                      
+                        "auth": {
+                            "region": "eu-central-1"
+                       },
+                       "keyName" : "waltid-key",
+                        "tags": {
+                         
+                            "project": "waltid",
+                            "owner": "identity-team"
+                       
+                            }
                     }
                 },
                 "did":
@@ -974,7 +982,13 @@ object IssuanceExamples {
                     {
                       "auth": {
                          "keyVaultUrl" : "url to the vault"
-                      }
+                      },
+                      "tags": {
+                         
+                            "project": "waltid",
+                            "owner": "identity-team"
+                       
+                            }
                     }
                 },
                 "did":
