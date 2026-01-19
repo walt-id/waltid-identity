@@ -59,6 +59,20 @@ object VerificationSessionCreateOpenApi {
 
                 example("[openid4vp-http][w3c vc] presentation policies (jwt_vc_json/*)") { value = Verifier2OpenApiExamples.openid4vpHttpW3cVcPresentation }
 
+                example("[openid4vp-http][w3c vc] DCQL: W3C credential with path-based claims") { value = Verifier2OpenApiExamples.w3cPlusPath }
+                example("[openid4vp-http][w3c vc] DCQL: W3C credential with empty meta") { value = Verifier2OpenApiExamples.emptyMeta }
+                example("[openid4vp-http][w3c vc] DCQL: Nested presentation request for W3C credentials") {
+                    value = Verifier2OpenApiExamples.nestedPresentationRequestW3C
+                }
+                example("[openid4vp-http][w3c vc] DCQL: Nested presentation request with multiple claims") {
+                    value = nestedPresentationRequestWithMultipleClaims
+                }
+                example("[openid4vp-http][w3c vc] DCQL: W3C credential with type values only") { value = Verifier2OpenApiExamples.w3cTypeValues }
+                example("[openid4vp-http][w3c vc] DCQL: W3C credential without claims") { value = Verifier2OpenApiExamples.W3CWithoutClaims }
+                example("[openid4vp-http][w3c vc] DCQL: W3C credential with claims and value constraints") {
+                    value = Verifier2OpenApiExamples.W3CWithClaimsAndValues
+                }
+
                 // IETF SD-JWT VC Examples
                 example("[openid4vp-http][ietf sd-jwt vc] default dc+sd-jwt") { value = Verifier2OpenApiExamples.openid4vpHttpSdJwtVcDefault }
                 example("[openid4vp-http][ietf sd-jwt vc] basic w3c policies (signature, expiration, not-before, allowed-issuer, regex)") { value = Verifier2OpenApiExamples.openid4vpHttpSdJwtVcBasic }
@@ -77,22 +91,6 @@ object VerificationSessionCreateOpenApi {
                 // TODO: Add Annex-C examples
                 //[iso-18013-7-dc_api][iso mdl] default
                 //[iso-18013-7-dc_api][iso photo-id] default
-
-                // TODO: Move DCQL examples to docs
-//                example("DCQL example: Basic example") { value = Verifier2OpenApiExamples.basicExample }
-//                example("DCQL example: W3C credential with path-based claims") { value = Verifier2OpenApiExamples.w3cPlusPath }
-//                example("DCQL example: W3C credential with empty meta") { value = Verifier2OpenApiExamples.emptyMeta }
-//                example("DCQL example: Nested presentation request for W3C credentials") {
-//                    value = Verifier2OpenApiExamples.nestedPresentationRequestW3C
-//                }
-//                example("DCQL example: Nested presentation request with multiple claims") {
-//                    value = nestedPresentationRequestWithMultipleClaims
-//                }
-//                example("DCQL example: W3C credential with type values only") { value = Verifier2OpenApiExamples.w3cTypeValues }
-//                example("DCQL example: W3C credential without claims") { value = Verifier2OpenApiExamples.W3CWithoutClaims }
-//                example("DCQL example: W3C credential with claims and value constraints") {
-//                    value = Verifier2OpenApiExamples.W3CWithClaimsAndValues
-//                }
 
             }
         }
