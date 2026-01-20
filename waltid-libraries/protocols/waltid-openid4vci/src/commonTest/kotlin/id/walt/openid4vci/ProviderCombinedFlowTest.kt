@@ -26,7 +26,7 @@ class ProviderCombinedFlowTest {
     @Test
     fun `provider with both handlers supports authorization and pre-authorized flows`() = runTest {
         val config = createTestConfig()
-        val issuerId = "test-issuer"
+        val issClaim = "test-issuer"
 
         val provider = buildOAuth2Provider(config)
 
@@ -41,7 +41,7 @@ class ProviderCombinedFlowTest {
             ),
         )
         assertTrue(authorizeRequestResult.isSuccess())
-        val authorizeRequest = (authorizeRequestResult as AuthorizeRequestResult.Success).request.withIssuer(issuerId)
+        val authorizeRequest = (authorizeRequestResult as AuthorizeRequestResult.Success).request.withIssuer(issClaim)
 
         val session = DefaultSession(subject = "demo-subject")
         val authorizeResponse = provider.createAuthorizeResponse(authorizeRequest, session)
@@ -58,7 +58,7 @@ class ProviderCombinedFlowTest {
             ),
         )
         assertTrue(accessResult.isSuccess())
-        val accessRequest = (accessResult as AccessRequestResult.Success).request.withIssuer(issuerId)
+        val accessRequest = (accessResult as AccessRequestResult.Success).request.withIssuer(issClaim)
         val accessResponse = provider.createAccessResponse(accessRequest)
         assertTrue(accessResponse.isSuccess())
         val tokenResponse = (accessResponse as AccessResponseResult.Success).response
@@ -84,7 +84,7 @@ class ProviderCombinedFlowTest {
             ),
         )
         assertTrue(preAccessResult.isSuccess())
-        val preAccessRequest = (preAccessResult as AccessRequestResult.Success).request.withIssuer(issuerId)
+        val preAccessRequest = (preAccessResult as AccessRequestResult.Success).request.withIssuer(issClaim)
         val preAccessResponse = provider.createAccessResponse(preAccessRequest)
         assertTrue(preAccessResponse.isSuccess())
         val preTokenResponse = (preAccessResponse as AccessResponseResult.Success).response
@@ -98,7 +98,7 @@ class ProviderCombinedFlowTest {
         val config = createTestConfig()
         val provider = buildOAuth2Provider(config)
 
-        val issuerId = "issuer-multi"
+        val issClaim = "issuer-multi"
         val subject = "user-123"
 
         suspend fun authorizeFor(clientId: String, redirectUri: String, scope: String, state: String): Pair<String, AuthorizationRequest> {
@@ -112,11 +112,11 @@ class ProviderCombinedFlowTest {
                 ),
             )
             assertTrue(authorizeResult is AuthorizeRequestResult.Success, "authorize request failed for $clientId")
-            val authorizeReq = authorizeResult.request.withIssuer(issuerId)
+            val authorizeReq = authorizeResult.request.withIssuer(issClaim)
             val expectedScopes = scope.split(" ").filter { it.isNotBlank() }.toSet()
 
             // Request assertions
-            assertEquals(issuerId, authorizeReq.issuerId, "issuer must be set on authorize request")
+            assertEquals(issClaim, authorizeReq.issClaim, "issuer must be set on authorize request")
             assertEquals(clientId, authorizeReq.client.id, "client id must be preserved")
             assertEquals(redirectUri, authorizeReq.redirectUri, "redirect_uri must be set on request")
             assertEquals(state, authorizeReq.state, "state must be preserved")
@@ -162,8 +162,8 @@ class ProviderCombinedFlowTest {
                 ),
             )
             assertTrue(accessResult is AccessRequestResult.Success, "access request failed for $clientId")
-            val accessRequest = accessResult.request.withIssuer(issuerId)
-            assertEquals(issuerId, accessRequest.issuerId)
+            val accessRequest = accessResult.request.withIssuer(issClaim)
+            assertEquals(issClaim, accessRequest.issClaim)
             assertEquals(setOf(GrantType.AuthorizationCode.value), accessRequest.grantTypes.toSet())
             assertEquals(code, accessRequest.requestForm["code"]?.firstOrNull())
             assertEquals(redirectUri, accessRequest.requestForm["redirect_uri"]?.firstOrNull())
@@ -229,7 +229,7 @@ class ProviderCombinedFlowTest {
         val config = createTestConfig()
         val provider = buildOAuth2Provider(config)
 
-        val issuerId = "issuer-parallel"
+        val issClaim = "issuer-parallel"
         val subject = "user-parallel"
 
         suspend fun runFlow(clientId: String, redirectUri: String, scope: String, state: String): Pair<String, String> {
@@ -243,7 +243,7 @@ class ProviderCombinedFlowTest {
                 ),
             )
             assertTrue(authorizeResult is AuthorizeRequestResult.Success, "authorize request failed for $clientId")
-            val authorizeReq = authorizeResult.request.withIssuer(issuerId)
+            val authorizeReq = authorizeResult.request.withIssuer(issClaim)
 
         val authorizeResponse = provider.createAuthorizeResponse(
             authorizeReq,
@@ -262,7 +262,7 @@ class ProviderCombinedFlowTest {
                 ),
             )
             assertTrue(accessResult is AccessRequestResult.Success, "access request failed for $clientId")
-            val accessRequest = accessResult.request.withIssuer(issuerId)
+            val accessRequest = accessResult.request.withIssuer(issClaim)
 
             val accessResponse = provider.createAccessResponse(accessRequest)
             assertTrue(accessResponse is AccessResponseResult.Success, "access response failed for $clientId")

@@ -18,7 +18,7 @@ data class DefaultAccessTokenRequest(
     override val grantedAudience: Set<String> = emptySet(),
     override val requestForm: Map<String, List<String>> = emptyMap(),
     override val session: Session? = null,
-    override val issuerId: String? = null,
+    override val issClaim: String? = null,
 ) : AccessTokenRequest {
     override fun markGrantTypeHandled(grantType: String): AccessTokenRequest =
         copy(handledGrantTypes = handledGrantTypes + grantType)
@@ -41,8 +41,8 @@ data class DefaultAccessTokenRequest(
     override fun withSession(session: Session?): AccessTokenRequest =
         copy(session = session)
 
-    override fun withIssuer(id: String?): AccessTokenRequest =
-        copy(issuerId = id)
+    override fun withIssuer(issClaim: String?): AccessTokenRequest =
+        copy(issClaim = issClaim)
 
     fun hasHandledGrantType(grantType: String): Boolean = handledGrantTypes.contains(grantType)
 }

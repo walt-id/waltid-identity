@@ -104,7 +104,7 @@ class PreAuthorizedCodeTokenEndpoint(
 
         val claims = defaultAccessTokenClaims(
             subject = subject,
-            issuer = clientRequest.issuerId ?: clientId,
+            issuer = clientRequest.issClaim ?: clientId,
             audience = consumed.grantedAudience.firstOrNull(),
             scopes = clientRequest.grantedScopes,
             expiresAt = expiresAt,

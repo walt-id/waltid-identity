@@ -70,7 +70,7 @@ class AuthorizationCodeTokenEndpoint(
 
             val claims = defaultAccessTokenClaims(
                 subject = subject,
-                issuer = scopedRequest.issuerId ?: client.id,
+                issuer = scopedRequest.issClaim ?: client.id,
                 audience = record.grantedAudience.firstOrNull(),
                 scopes = scopedRequest.grantedScopes,
                 expiresAt = expiresAt,

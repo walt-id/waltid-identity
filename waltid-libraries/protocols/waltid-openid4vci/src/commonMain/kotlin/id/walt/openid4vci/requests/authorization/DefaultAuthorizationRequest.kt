@@ -21,7 +21,7 @@ data class DefaultAuthorizationRequest(
     override val responseMode: ResponseModeType = ResponseModeType.QUERY,
     override val defaultResponseMode: ResponseModeType = ResponseModeType.QUERY,
     override val requestForm: Map<String, List<String>> = emptyMap(),
-    override val issuerId: String? = null,
+    override val issClaim: String? = null,
 ) : AuthorizationRequest {
     override fun markResponseTypeHandled(responseType: String): AuthorizationRequest =
         copy(handledResponseTypes = handledResponseTypes + responseType)
@@ -32,8 +32,8 @@ data class DefaultAuthorizationRequest(
     override fun grantAudience(audience: Collection<String>): AuthorizationRequest =
         copy(grantedAudience = grantedAudience + audience)
 
-    override fun withIssuer(id: String?): AuthorizationRequest =
-        copy(issuerId = id)
+    override fun withIssuer(issClaim: String?): AuthorizationRequest =
+        copy(issClaim = issClaim)
 
     override fun withRedirectUri(uri: String?): AuthorizationRequest =
         copy(redirectUri = uri)

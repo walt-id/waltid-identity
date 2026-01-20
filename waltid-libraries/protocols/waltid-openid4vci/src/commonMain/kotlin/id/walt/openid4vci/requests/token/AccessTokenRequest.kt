@@ -20,7 +20,7 @@ interface AccessTokenRequest {
     val grantedAudience: Set<String>
     val requestForm: Map<String, List<String>>
     val session: Session?
-    val issuerId: String?
+    val issClaim: String?
 
     fun markGrantTypeHandled(grantType: String): AccessTokenRequest
     fun grantScopes(scopes: Collection<String>): AccessTokenRequest
@@ -29,5 +29,5 @@ interface AccessTokenRequest {
     fun withGrantedAudience(audience: Collection<String>): AccessTokenRequest
     fun withClient(client: Client): AccessTokenRequest
     fun withSession(session: Session?): AccessTokenRequest
-    fun withIssuer(id: String?): AccessTokenRequest
+    fun withIssuer(issClaim: String?): AccessTokenRequest
 }

@@ -23,12 +23,12 @@ interface AuthorizationRequest {
     val responseMode: ResponseModeType
     val defaultResponseMode: ResponseModeType
     val requestForm: Map<String, List<String>>
-    val issuerId: String?
+    val issClaim: String?
 
     fun markResponseTypeHandled(responseType: String): AuthorizationRequest
     fun grantScopes(scopes: Collection<String>): AuthorizationRequest
     fun grantAudience(audience: Collection<String>): AuthorizationRequest
-    fun withIssuer(id: String?): AuthorizationRequest
+    fun withIssuer(issClaim: String?): AuthorizationRequest
     fun withRedirectUri(uri: String?): AuthorizationRequest
     fun didHandleAllResponseTypes(): Boolean =
         responseTypes.isNotEmpty() && responseTypes.all { handledResponseTypes.contains(it) }
