@@ -3,16 +3,16 @@ package id.walt.openid4vci
 import id.walt.openid4vci.core.OAuth2ProviderConfig
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.buildOAuth2Provider
+import id.walt.openid4vci.requests.authorization.AuthorizeRequestResult
+import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
-import id.walt.openid4vci.core.AccessRequestResult
 import id.walt.openid4vci.responses.token.AccessResponseResult
-import id.walt.openid4vci.core.AuthorizeRequestResult
-import id.walt.openid4vci.responses.authorization.AuthorizeResponseResult
+import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -79,14 +79,14 @@ internal suspend fun executeAuthorizationCodeFlow(
     require(authorizeRequest is AuthorizeRequestResult.Success)
     val authorizeReqWithIssuer = authorizeRequest.request.withIssuer(issuerId)
 
-    val authorizeResponse = provider.createAuthorizeResponse(
+    val authorizeResponse = provider.createAuthorizationResponse(
         authorizeReqWithIssuer,
         DefaultSession(subject = expectedSubject),
     )
-    require(authorizeResponse is AuthorizeResponseResult.Success)
+    require(authorizeResponse is AuthorizationResponseResult.Success)
     val code = authorizeResponse.response.code
 
-    val accessRequestResult = provider.createAccessRequest(
+    val AccessTokenRequestResult = provider.createAccessRequest(
         mapOf(
             "grant_type" to listOf(GrantType.AuthorizationCode.value),
             "client_id" to listOf(clientId),
@@ -94,9 +94,9 @@ internal suspend fun executeAuthorizationCodeFlow(
             "redirect_uri" to listOf("https://client.example/callback"),
         ),
     )
-    require(accessRequestResult is AccessRequestResult.Success)
+    require(AccessTokenRequestResult is AccessTokenRequestResult.Success)
 
-    val accessRequestWithIssuer = accessRequestResult.request.withIssuer(issuerId)
+    val accessRequestWithIssuer = AccessTokenRequestResult.request.withIssuer(issuerId)
 
     val accessResponse = provider.createAccessResponse(accessRequestWithIssuer)
     require(accessResponse is AccessResponseResult.Success)

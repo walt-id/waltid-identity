@@ -3,14 +3,14 @@ package id.walt.openid4vci.validation
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.Session
-import id.walt.openid4vci.core.AccessRequestResult
 import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlinx.serialization.SerializationException
 
 class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
 
-    override fun validate(parameters: Map<String, List<String>>, session: Session): AccessRequestResult {
+    override fun validate(parameters: Map<String, List<String>>, session: Session): AccessTokenRequestResult {
         return try {
             // RFC6749: grant_type is required and must be a single value.
             val grantTypeRaw = parameters.requireSingle("grant_type")
@@ -19,7 +19,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
             when (grantType) {
                 GrantType.AuthorizationCode -> validateAuthorizationCodeGrant(parameters, session)
                 GrantType.PreAuthorizedCode -> validatePreAuthorizedCodeGrant(parameters, session)
-                else -> AccessRequestResult.Failure(
+                else -> AccessTokenRequestResult.Failure(
                     OAuthError(
                         error = id.walt.openid4vci.errors.OAuthErrorCodes.UNSUPPORTED_GRANT_TYPE,
                         description = "Supported grants: authorization_code, ${GrantType.PreAuthorizedCode.value}",
@@ -27,7 +27,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
                 )
             }
         } catch (e: SerializationException) {
-            AccessRequestResult.Failure(
+            AccessTokenRequestResult.Failure(
                 OAuthError(
                     error = id.walt.openid4vci.errors.OAuthErrorCodes.INVALID_REQUEST,
                     description = e.message,
@@ -39,7 +39,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
     private fun validateAuthorizationCodeGrant(
         parameters: Map<String, List<String>>,
         session: Session,
-    ): AccessRequestResult {
+    ): AccessTokenRequestResult {
         // RFC6749 §4.1.3: client_id is optional here; if present, it must be single-valued.
         val clientId = parameters.optionalSingle("client_id")?.takeIf { it.isNotBlank() } ?: ""
 
@@ -55,7 +55,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
 
         // RFC6749 §4.1.3: code is required and must be single-valued.
         val code = parameters.requireSingle("code").takeIf { it.isNotBlank() }
-            ?: return AccessRequestResult.Failure(
+            ?: return AccessTokenRequestResult.Failure(
                 OAuthError(
                     error = id.walt.openid4vci.errors.OAuthErrorCodes.INVALID_REQUEST,
                     description = "Missing authorization code",
@@ -75,16 +75,16 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
             session = session,
         )
 
-        return AccessRequestResult.Success(request)
+        return AccessTokenRequestResult.Success(request)
     }
 
     private fun validatePreAuthorizedCodeGrant(
         parameters: Map<String, List<String>>,
         session: Session,
-    ): AccessRequestResult {
+    ): AccessTokenRequestResult {
         // OpenID4VCI: pre-authorized_code is required and must be single-valued.
         val code = parameters.requireSingle("pre-authorized_code").takeIf { it.isNotBlank() }
-            ?: return AccessRequestResult.Failure(
+            ?: return AccessTokenRequestResult.Failure(
                 OAuthError(
                     error = id.walt.openid4vci.errors.OAuthErrorCodes.INVALID_REQUEST,
                     description = "Missing pre-authorized_code",
@@ -114,6 +114,6 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
             session = session,
         )
 
-        return AccessRequestResult.Success(request)
+        return AccessTokenRequestResult.Success(request)
     }
 }

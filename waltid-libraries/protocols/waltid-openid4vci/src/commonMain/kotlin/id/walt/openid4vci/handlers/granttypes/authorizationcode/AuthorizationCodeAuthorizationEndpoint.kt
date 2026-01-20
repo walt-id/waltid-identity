@@ -10,8 +10,8 @@ import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
-import id.walt.openid4vci.responses.authorization.AuthorizeResponse
-import id.walt.openid4vci.responses.authorization.AuthorizeResponseResult
+import id.walt.openid4vci.responses.authorization.AuthorizationResponse
+import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import korlibs.crypto.SecureRandom
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -33,12 +33,12 @@ class AuthorizationCodeAuthorizationEndpoint(
     private val maxGenerateAttempts: Int = 3,
 ) : AuthorizationEndpointHandler {
 
-    override suspend fun handleAuthorizeEndpointRequest(
+    override suspend fun handleAuthorizationEndpointRequest(
         authorizationRequest: AuthorizationRequest,
         session: Session,
-    ): AuthorizeResponseResult {
+    ): AuthorizationResponseResult {
         if (!authorizationRequest.responseTypes.contains("code")) {
-            return AuthorizeResponseResult.Failure(
+            return AuthorizationResponseResult.Failure(
                 OAuthError(
                     error = id.walt.openid4vci.errors.OAuthErrorCodes.UNSUPPORTED_RESPONSE_TYPE,
                     description = "Handler only supports response_type=code",
@@ -53,7 +53,7 @@ class AuthorizationCodeAuthorizationEndpoint(
 //         - If redirect_uri is present, it must be one of the registered URIs; otherwise reject.
         val redirectUri = authorizationRequest.redirectUri
             ?: authorizationRequest.client.redirectUris.firstOrNull()
-            ?: return AuthorizeResponseResult.Failure(
+            ?: return AuthorizationResponseResult.Failure(
                 OAuthError("invalid_request", "Client is missing redirect_uri"),
             )
 
@@ -67,7 +67,7 @@ class AuthorizationCodeAuthorizationEndpoint(
         val expiresAt = kotlin.time.Clock.System.now() + codeLifetimeSeconds.seconds
 
         val subject = session.subject?.takeIf { it.isNotBlank() }
-            ?: return AuthorizeResponseResult.Failure(
+            ?: return AuthorizationResponseResult.Failure(
                 OAuthError("invalid_request", "Session subject is required"),
             )
 
@@ -86,8 +86,8 @@ class AuthorizationCodeAuthorizationEndpoint(
         val grantedScope = updated.grantedScopes.toSet()
         val scopeParam = grantedScope.takeIf { it.isNotEmpty() }?.joinToString(" ")
 
-        return AuthorizeResponseResult.Success(
-            AuthorizeResponse(
+        return AuthorizationResponseResult.Success(
+            AuthorizationResponse(
                 redirectUri = redirectUri,
                 code = code,
                 state = authorizationRequest.state,

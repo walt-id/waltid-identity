@@ -7,12 +7,14 @@ import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.platform.urlEncode
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
+import id.walt.openid4vci.requests.authorization.AuthorizeRequestResult
+import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.token.AccessHttpResponse
 import id.walt.openid4vci.responses.token.AccessResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.authorization.AuthorizeHttpResponse
-import id.walt.openid4vci.responses.authorization.AuthorizeResponse
-import id.walt.openid4vci.responses.authorization.AuthorizeResponseResult
+import id.walt.openid4vci.responses.authorization.AuthorizationResponse
+import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 
 /**
  * Default implementation of [OAuth2Provider] that handles validators and handler registries.
@@ -35,22 +37,22 @@ class DefaultOAuth2Provider(
     override fun createAuthorizeRequest(parameters: Map<String, List<String>>): AuthorizeRequestResult =
         config.authorizeRequestValidator.validate(parameters)
 
-    override suspend fun createAuthorizeResponse(
+    override suspend fun createAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
         session: Session
-    ): AuthorizeResponseResult {
-        val responses = mutableListOf<AuthorizeResponseResult>()
+    ): AuthorizationResponseResult {
+        val responses = mutableListOf<AuthorizationResponseResult>()
         for (handler in config.authorizeEndpointHandlers) {
-            responses += handler.handleAuthorizeEndpointRequest(authorizationRequest, session)
+            responses += handler.handleAuthorizationEndpointRequest(authorizationRequest, session)
         }
 
-        val success = responses.filterIsInstance<AuthorizeResponseResult.Success>().firstOrNull()
+        val success = responses.filterIsInstance<AuthorizationResponseResult.Success>().firstOrNull()
         if (success != null) {
             return success
         }
 
-        val failure = responses.filterIsInstance<AuthorizeResponseResult.Failure>().firstOrNull()
-        return failure ?: AuthorizeResponseResult.Failure(
+        val failure = responses.filterIsInstance<AuthorizationResponseResult.Failure>().firstOrNull()
+        return failure ?: AuthorizationResponseResult.Failure(
             OAuthError(
                 error = id.walt.openid4vci.errors.OAuthErrorCodes.UNSUPPORTED_RESPONSE_TYPE,
                 description = authorizationRequest.responseTypes.joinToString(" ")
@@ -88,7 +90,7 @@ class DefaultOAuth2Provider(
 
     override fun writeAuthorizeResponse(
         authorizationRequest: AuthorizationRequest,
-        response: AuthorizeResponse
+        response: AuthorizationResponse
     ): AuthorizeHttpResponse {
         val params = buildMap {
             put("code", response.code)
@@ -111,7 +113,7 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override fun createAccessRequest(parameters: Map<String, List<String>>, session: Session?): AccessRequestResult {
+    override fun createAccessRequest(parameters: Map<String, List<String>>, session: Session?): AccessTokenRequestResult {
         return config.accessRequestValidator.validate(
             parameters = parameters,
             session = session ?: DefaultSession()

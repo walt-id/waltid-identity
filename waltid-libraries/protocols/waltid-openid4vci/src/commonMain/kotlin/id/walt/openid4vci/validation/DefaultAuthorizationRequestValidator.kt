@@ -3,8 +3,8 @@ package id.walt.openid4vci.validation
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.ResponseModeType
 import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.requests.authorization.AuthorizeRequestResult
 import id.walt.openid4vci.requests.authorization.DefaultAuthorizationRequest
-import id.walt.openid4vci.core.AuthorizeRequestResult
 import kotlinx.serialization.SerializationException
 
 class DefaultAuthorizationRequestValidator : AuthorizationRequestValidator {

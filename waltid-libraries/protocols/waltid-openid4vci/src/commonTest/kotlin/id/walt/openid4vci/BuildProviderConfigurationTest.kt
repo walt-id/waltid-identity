@@ -14,7 +14,9 @@ import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
-import id.walt.openid4vci.handlers.token.TokenEndpointHandler
+import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
+import id.walt.openid4vci.requests.authorization.AuthorizeRequestResult
+import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.token.AccessResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import kotlin.test.Test
@@ -130,6 +132,6 @@ class BuildProviderConfigurationTest {
     }
 
     private fun stubAccessValidator(): AccessTokenRequestValidator = AccessTokenRequestValidator { _, _ ->
-        AccessRequestResult.Failure(OAuthError("unsupported_grant_type"))
+        AccessTokenRequestResult.Failure(OAuthError("unsupported_grant_type"))
     }
 }

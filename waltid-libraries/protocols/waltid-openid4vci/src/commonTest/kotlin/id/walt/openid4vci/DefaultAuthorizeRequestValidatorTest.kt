@@ -1,6 +1,6 @@
 package id.walt.openid4vci
 
-import id.walt.openid4vci.core.AuthorizeRequestResult
+import id.walt.openid4vci.requests.authorization.AuthorizeRequestResult
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 import kotlin.test.Test
 import kotlin.test.assertEquals

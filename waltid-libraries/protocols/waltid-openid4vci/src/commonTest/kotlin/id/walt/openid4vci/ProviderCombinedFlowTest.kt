@@ -1,9 +1,7 @@
 package id.walt.openid4vci
 
-import id.walt.openid4vci.core.AccessRequestResult
 import id.walt.openid4vci.responses.token.AccessResponseResult
-import id.walt.openid4vci.core.AuthorizeRequestResult
-import id.walt.openid4vci.responses.authorization.AuthorizeResponseResult
+import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.core.TOKEN_TYPE_BEARER
@@ -46,9 +44,9 @@ class ProviderCombinedFlowTest {
         val authorizeRequest = (authorizeRequestResult as AuthorizeRequestResult.Success).request.withIssuer(issClaim)
 
         val session = DefaultSession(subject = "demo-subject")
-        val authorizeResponse = provider.createAuthorizeResponse(authorizeRequest, session)
+        val authorizeResponse = provider.createAuthorizationResponse(authorizeRequest, session)
         assertTrue(authorizeResponse.isSuccess())
-        val response = (authorizeResponse as AuthorizeResponseResult.Success).response
+        val response = (authorizeResponse as AuthorizationResponseResult.Success).response
         val code = response.code
 
         val accessResult = provider.createAccessRequest(
@@ -60,7 +58,7 @@ class ProviderCombinedFlowTest {
             ),
         )
         assertTrue(accessResult.isSuccess())
-        val accessRequest = (accessResult as AccessRequestResult.Success).request.withIssuer(issClaim)
+        val accessRequest = (accessResult as AccessTokenRequestResult.Success).request.withIssuer(issClaim)
         val accessResponse = provider.createAccessResponse(accessRequest)
         assertTrue(accessResponse.isSuccess())
         val tokenResponse = (accessResponse as AccessResponseResult.Success).response
@@ -86,7 +84,7 @@ class ProviderCombinedFlowTest {
             ),
         )
         assertTrue(preAccessResult.isSuccess())
-        val preAccessRequest = (preAccessResult as AccessRequestResult.Success).request.withIssuer(issClaim)
+        val preAccessRequest = (preAccessResult as AccessTokenRequestResult.Success).request.withIssuer(issClaim)
         val preAccessResponse = provider.createAccessResponse(preAccessRequest)
         assertTrue(preAccessResponse.isSuccess())
         val preTokenResponse = (preAccessResponse as AccessResponseResult.Success).response
@@ -129,11 +127,11 @@ class ProviderCombinedFlowTest {
             assertEquals(clientId, authorizeReq.requestForm["client_id"]?.firstOrNull())
             assertEquals(redirectUri, authorizeReq.requestForm["redirect_uri"]?.firstOrNull())
 
-            val authorizeResponse = provider.createAuthorizeResponse(
+            val authorizeResponse = provider.createAuthorizationResponse(
                 authorizeReq,
                 DefaultSession(subject = subject),
             )
-            assertTrue(authorizeResponse is AuthorizeResponseResult.Success, "authorize response failed for $clientId")
+            assertTrue(authorizeResponse is AuthorizationResponseResult.Success, "authorize response failed for $clientId")
 
             val response = authorizeResponse.response
             val code = response.code
@@ -163,7 +161,7 @@ class ProviderCombinedFlowTest {
                     "redirect_uri" to listOf(redirectUri),
                 ),
             )
-            assertTrue(accessResult is AccessRequestResult.Success, "access request failed for $clientId")
+            assertTrue(accessResult is AccessTokenRequestResult.Success, "access request failed for $clientId")
             val accessRequest = accessResult.request.withIssuer(issClaim)
             assertEquals(issClaim, accessRequest.issClaim)
             assertEquals(setOf(GrantType.AuthorizationCode.value), accessRequest.grantTypes.toSet())
@@ -247,11 +245,11 @@ class ProviderCombinedFlowTest {
             assertTrue(authorizeResult is AuthorizeRequestResult.Success, "authorize request failed for $clientId")
             val authorizeReq = authorizeResult.request.withIssuer(issClaim)
 
-        val authorizeResponse = provider.createAuthorizeResponse(
+        val authorizeResponse = provider.createAuthorizationResponse(
             authorizeReq,
             DefaultSession(subject = subject),
         )
-        assertTrue(authorizeResponse is AuthorizeResponseResult.Success, "authorize response failed for $clientId")
+        assertTrue(authorizeResponse is AuthorizationResponseResult.Success, "authorize response failed for $clientId")
         val response = authorizeResponse.response
         val code = response.code
 
@@ -263,7 +261,7 @@ class ProviderCombinedFlowTest {
                     "redirect_uri" to listOf(redirectUri),
                 ),
             )
-            assertTrue(accessResult is AccessRequestResult.Success, "access request failed for $clientId")
+            assertTrue(accessResult is AccessTokenRequestResult.Success, "access request failed for $clientId")
             val accessRequest = accessResult.request.withIssuer(issClaim)
 
             val accessResponse = provider.createAccessResponse(accessRequest)

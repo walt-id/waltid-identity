@@ -1,6 +1,6 @@
 package id.walt.openid4vci
 
-import id.walt.openid4vci.core.AccessRequestResult
+import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,7 +24,7 @@ class DefaultAccessRequestValidatorTest {
         )
 
         assertTrue(result.isSuccess())
-        val request = (result as AccessRequestResult.Success).request
+        val request = (result as AccessTokenRequestResult.Success).request
         assertTrue(request.grantTypes.contains(GrantType.AuthorizationCode.value))
         assertEquals("auth-code", request.requestForm["code"]?.firstOrNull())
         assertEquals("client-123", request.client.id)
@@ -44,7 +44,7 @@ class DefaultAccessRequestValidatorTest {
         )
 
         assertTrue(result.isSuccess())
-        val request = (result as AccessRequestResult.Success).request
+        val request = (result as AccessTokenRequestResult.Success).request
         assertTrue(request.grantTypes.contains(GrantType.PreAuthorizedCode.value))
         assertEquals("pre-auth-code", request.requestForm["pre-authorized_code"]?.firstOrNull())
         assertEquals("1234", request.requestForm["user_pin"]?.firstOrNull())
@@ -61,7 +61,7 @@ class DefaultAccessRequestValidatorTest {
         )
 
         assertTrue(!result.isSuccess())
-        val error = (result as AccessRequestResult.Failure).error
+        val error = (result as AccessTokenRequestResult.Failure).error
         assertEquals("invalid_request", error.error)
     }
 
@@ -75,7 +75,7 @@ class DefaultAccessRequestValidatorTest {
         )
 
         assertTrue(!result.isSuccess())
-        val error = (result as AccessRequestResult.Failure).error
+        val error = (result as AccessTokenRequestResult.Failure).error
         assertEquals("unsupported_grant_type", error.error)
     }
 }
