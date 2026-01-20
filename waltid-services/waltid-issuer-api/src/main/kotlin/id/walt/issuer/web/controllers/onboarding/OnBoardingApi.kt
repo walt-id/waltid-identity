@@ -51,7 +51,7 @@ fun Application.onboardingApi() {
                                     "  - If `notAfter` is not provided, it defaults to 20 years after `notBefore`" +
                                     "\n" +
                                     "  ### Notes:\n" +
-                                    "  - Supported signing keys: `secp256r1`, `secp384r1` and `secp521r1`"
+                                    "  - Supported keys: `secp256r1`, `secp384r1` and `secp521r1`"
 
                         request(IACADocs.requestConfig())
 
@@ -93,7 +93,7 @@ fun Application.onboardingApi() {
                                 "  - If `notAfter` is not provided, it defaults to 457 days after `notBefore`\n" +
                                 "\n" +
                                 "  ### Notes:\n" +
-                                "  - Supported signing keys: `secp256r1`, `secp384r1` and `secp521r1`"
+                                "  - Supported keys: `secp256r1`, `secp384r1` and `secp521r1`"
 
                         request(DocumentSignerDocs.requestConfig())
 
