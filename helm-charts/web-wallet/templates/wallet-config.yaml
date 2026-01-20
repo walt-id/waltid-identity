@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "wallet-api.fullname" . }}-wallet-config
+data:
+  _features.conf: {{ .Values.walletConfig.featuresConf | toYaml | indent 1 }}
+  db.conf: {{ .Values.walletConfig.dbConf | toYaml | indent 1 }}
+  web.conf: {{ .Values.walletConfig.webConf | toYaml | indent 1 }}
+  oidc.conf: {{ .Values.walletConfig.oidcConf | toYaml | indent 1 }}

@@ -1,0 +1,28 @@
+api:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http-api
+  replicas: 1
+  type: ClusterIP
+  verifierApi:
+    image:
+      repository: waltid/verifier-api
+      tag: latest
+      imagePullPolicy: Always
+
+webConfig:
+  featuresConf: |-
+    enabledFeatures = [
+        entra
+    ]
+  webConf: |-
+    webHost = "0.0.0.0"
+    webPort = 3000
+  verifierServiceConf: baseUrl = "https://verifier.portal.waltid.cloud"
+  entraConf:  callbackUrl = "https://verifier.portal.waltid.cloud/entra/verification-callback/"
+
+ingress:
+  ingressClassName: "nginx"
+  host: verifier.portal.waltid.cloud
