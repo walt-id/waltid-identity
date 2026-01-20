@@ -13,21 +13,21 @@ import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 
 internal fun createTestConfig(
-    authorizeRequestValidator: AuthorizationRequestValidator = DefaultAuthorizationRequestValidator(),
+    authorizationRequestValidator: AuthorizationRequestValidator = DefaultAuthorizationRequestValidator(),
     accessRequestValidator: AccessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
-    tokenService: AccessTokenService = StubTokenService(),
+    accessTokenService: AccessTokenService = StubTokenService(),
 ): OAuth2ProviderConfig {
     val authorizationCodeRepository = defaultAuthorizationCodeRepository()
     val preAuthorizedCodeRepository = defaultPreAuthorizedCodeRepository()
     return OAuth2ProviderConfig(
-        authorizeRequestValidator = authorizeRequestValidator,
-        accessRequestValidator = accessRequestValidator,
-        authorizeEndpointHandlers = AuthorizationEndpointHandlers(),
+        authorizationRequestValidator = authorizationRequestValidator,
+        accessTokenRequestValidator = accessRequestValidator,
+        authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
         tokenEndpointHandlers = TokenEndpointHandlers(),
         authorizationCodeRepository = authorizationCodeRepository,
         preAuthorizedCodeRepository = preAuthorizedCodeRepository,
         preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
-        tokenService = tokenService,
+        accessTokenService = accessTokenService,
     )
 }
 

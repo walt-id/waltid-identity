@@ -30,13 +30,13 @@ class BuildProviderConfigurationTest {
     @Test
     fun `buildProvider registers default handlers`() {
         val config = createTestConfig(
-            authorizeRequestValidator = stubAuthorizeValidator(),
+            authorizationRequestValidator = stubAuthorizeValidator(),
             accessRequestValidator = stubAccessValidator(),
         )
 
         val provider = buildOAuth2Provider(config)
         assertIs<OAuth2Provider>(provider)
-        assertEquals(1, config.authorizeEndpointHandlers.count())
+        assertEquals(1, config.authorizationEndpointHandlers.count())
         assertEquals(2, config.tokenEndpointHandlers.count())
     }
 
@@ -46,7 +46,7 @@ class BuildProviderConfigurationTest {
             AuthorizationRequestResult.Failure(OAuthError("invalid_client"))
         }
         val config = createTestConfig(
-            authorizeRequestValidator = failingValidator,
+            authorizationRequestValidator = failingValidator,
             accessRequestValidator = stubAccessValidator(),
         )
 
@@ -66,9 +66,9 @@ class BuildProviderConfigurationTest {
             val duplicateGrantHandlerB = DuplicateGrantHandler()
 
             val config = OAuth2ProviderConfig(
-                authorizeRequestValidator = DefaultAuthorizationRequestValidator(),
-                accessRequestValidator = DefaultAccessTokenRequestValidator(),
-                authorizeEndpointHandlers = AuthorizationEndpointHandlers(),
+                authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
+                accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
+                authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
                 tokenEndpointHandlers = TokenEndpointHandlers().apply {
                     appendForGrant(GrantType.fromValue("custom_grant"), duplicateGrantHandlerA)
                     appendForGrant(GrantType.fromValue("custom_grant"), duplicateGrantHandlerB)
@@ -76,7 +76,7 @@ class BuildProviderConfigurationTest {
                 authorizationCodeRepository = authorizationCodeRepository,
                 preAuthorizedCodeRepository = preAuthorizedCodeRepository,
                 preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
-                tokenService = StubTokenService(),
+                accessTokenService = StubTokenService(),
             )
 
             buildOAuth2Provider(
@@ -93,16 +93,16 @@ class BuildProviderConfigurationTest {
         val preAuthorizedCodeRepository = defaultPreAuthorizedCodeRepository()
 
         val config = OAuth2ProviderConfig(
-            authorizeRequestValidator = DefaultAuthorizationRequestValidator(),
-            accessRequestValidator = DefaultAccessTokenRequestValidator(),
-            authorizeEndpointHandlers = AuthorizationEndpointHandlers(),
+            authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
+            accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
+            authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
             tokenEndpointHandlers = TokenEndpointHandlers().apply {
                 appendForGrant(GrantType.Custom("custom_grant"), CustomGrantHandler())
             },
             authorizationCodeRepository = authorizationCodeRepository,
             preAuthorizedCodeRepository = preAuthorizedCodeRepository,
             preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
-            tokenService = StubTokenService(),
+            accessTokenService = StubTokenService(),
         )
 
         assertIs<OAuth2Provider>(

@@ -41,7 +41,7 @@ fun buildOAuth2Provider(
     includeAuthorizationCodeDefaultHandlers: Boolean = true,
     includePreAuthorizedCodeDefaultHandlers: Boolean = true,
 ): OAuth2Provider {
-    registerDefaultHandlers(
+    registerDefaultGrantTypeHandlers(
         config = config,
         includeAuthorizationCodeDefaultHandlers = includeAuthorizationCodeDefaultHandlers,
         includePreAuthorizedCodeDefaultHandlers = includePreAuthorizedCodeDefaultHandlers,
@@ -49,31 +49,32 @@ fun buildOAuth2Provider(
     return DefaultOAuth2Provider(config)
 }
 
-private fun registerDefaultHandlers(
+private fun registerDefaultGrantTypeHandlers(
     config: OAuth2ProviderConfig,
     includeAuthorizationCodeDefaultHandlers: Boolean,
     includePreAuthorizedCodeDefaultHandlers: Boolean,
 ) {
     if (includeAuthorizationCodeDefaultHandlers) {
-        val authorizeEndpointHandler = AuthorizationCodeAuthorizationEndpoint(
+        val authorizationCodeAuthorizationEndpointHandler = AuthorizationCodeAuthorizationEndpoint(
             codeRepository = config.authorizationCodeRepository,
         )
-        config.authorizeEndpointHandlers.append(authorizeEndpointHandler)
+        config.authorizationEndpointHandlers.append(authorizationCodeAuthorizationEndpointHandler)
 
-        val authorizeTokenHandler = AuthorizationCodeTokenEndpoint(
+        val authorizationCodeTokenEndpointHandler = AuthorizationCodeTokenEndpoint(
             codeRepository = config.authorizationCodeRepository,
-            tokenService = config.tokenService,
+            tokenService = config.accessTokenService,
         )
+
         config.tokenEndpointHandlers.appendForGrant(
             grantType = GrantType.AuthorizationCode,
-            handler = authorizeTokenHandler,
+            handler = authorizationCodeTokenEndpointHandler,
         )
     }
 
     if (includePreAuthorizedCodeDefaultHandlers) {
         val preAuthorizedTokenHandler = PreAuthorizedCodeTokenEndpoint(
             codeRepository = config.preAuthorizedCodeRepository,
-            tokenService = config.tokenService,
+            tokenService = config.accessTokenService,
         )
         config.tokenEndpointHandlers.appendForGrant(
             grantType = GrantType.PreAuthorizedCode,

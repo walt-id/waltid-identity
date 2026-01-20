@@ -46,8 +46,8 @@ class TokenServiceTest {
     @Test
     fun `authorization code flow embeds granted scopes into JWT scope claim`(): Unit = runBlocking {
         val key = JWKKey.generate(KeyType.Ed25519)
-        val tokenService = JwtAccessTokenService( { key })
-        val provider = buildOAuth2Provider(createTestConfig(tokenService = tokenService))
+        val accessTokenService = JwtAccessTokenService( { key })
+        val provider = buildOAuth2Provider(createTestConfig(accessTokenService = accessTokenService))
 
         val issuerId = "issuer-scope"
         val scope = "openid email profile"
@@ -154,8 +154,8 @@ class TokenServiceTest {
         )
 
         val currentKey = ThreadLocal<Key?>()
-        val tokenService = JwtAccessTokenService( { resolveCurrentKey(currentKey) })
-        val provider = buildOAuth2Provider(createTestConfig(tokenService = tokenService))
+        val accessTokenService = JwtAccessTokenService( { resolveCurrentKey(currentKey) })
+        val provider = buildOAuth2Provider(createTestConfig(accessTokenService = accessTokenService))
 
         suspend fun runFlow(issuerId: String): String = withContext(currentKey.asContextElement(keysByIssuer.getValue(issuerId))) {
             val AuthorizationRequestResult = provider.createAuthorizationRequest(

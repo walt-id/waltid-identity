@@ -13,9 +13,9 @@ import id.walt.openid4vci.validation.AuthorizationRequestValidator
  * Configuration holds handler registries and injectable objects used by the provider.
  *
  * Roadmap (mirrors the bullets in Builder.kt):
- * - authorizeRequestValidator → parse/validate authorize endpoint input
- * - accessRequestValidator → parse/validate token endpoint input
- * - authorizeEndpointHandlers / tokenEndpointHandlers → the handlers
+ * - authorizationRequestValidator → parse/validate authorize endpoint input
+ * - accessTokenRequestValidator → parse/validate token endpoint input
+ * - authorizationEndpointHandlers / tokenEndpointHandlers → the handlers
  * - repository → placeholder storage until implementation
  * - builder adaptability → expose knobs so advanced callers can replace validators or strategies
  *
@@ -23,12 +23,12 @@ import id.walt.openid4vci.validation.AuthorizationRequestValidator
  * repositories stay internal to the DI layer so applications pass in their own implementations.
  */
 data class OAuth2ProviderConfig(
-    val authorizeRequestValidator: AuthorizationRequestValidator,
-    val accessRequestValidator: AccessTokenRequestValidator,
-    val authorizeEndpointHandlers: AuthorizationEndpointHandlers,
+    val authorizationRequestValidator: AuthorizationRequestValidator,
+    val accessTokenRequestValidator: AccessTokenRequestValidator,
+    val authorizationEndpointHandlers: AuthorizationEndpointHandlers,
     val tokenEndpointHandlers: TokenEndpointHandlers,
     val authorizationCodeRepository: AuthorizationCodeRepository,
     val preAuthorizedCodeRepository: PreAuthorizedCodeRepository,
     val preAuthorizedCodeIssuer: PreAuthorizedCodeIssuer,
-    val tokenService: AccessTokenService,
+    val accessTokenService: AccessTokenService,
 )
