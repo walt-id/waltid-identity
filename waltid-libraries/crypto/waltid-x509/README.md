@@ -227,6 +227,23 @@ val relaxedDs = DocumentSignerValidationConfig(
 DocumentSignerValidator(relaxedDs).validate(dsDecoded, iacaDecoded)
 ```
 
+### Blocking API (JVM)
+
+Blocking variants are available for all ISO builders, parsers, and validators. These call the underlying suspend APIs
+via a platform bridge.
+
+```kotlin
+val iacaBundle = IACACertificateBuilder().buildBlocking(profileData, signingKey)
+val iacaDecoded = IACACertificateParser().parseBlocking(iacaBundle.certificateDer)
+IACAValidator().validateBlocking(iacaDecoded)
+
+val dsBundle = DocumentSignerCertificateBuilder().buildBlocking(dsProfileData, dsPublicKey, iacaSignerSpec)
+val dsDecoded = DocumentSignerCertificateParser().parseBlocking(dsBundle.certificateDer)
+DocumentSignerValidator().validateBlocking(dsDecoded, iacaDecoded)
+```
+
+> Note: blocking APIs are not supported on JS targets. Prefer suspend APIs in asynchronous contexts.
+
 #### Configurable validation system (flags map)
 
 Both `IACAValidator` and `DocumentSignerValidator` accept config objects that toggle
