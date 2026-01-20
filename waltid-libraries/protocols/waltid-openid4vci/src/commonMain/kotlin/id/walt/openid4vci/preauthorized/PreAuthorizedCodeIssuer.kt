@@ -24,7 +24,7 @@ import org.kotlincrypto.hash.sha2.SHA256
  * The implementation must generate a one-time code, persists it via [PreAuthorizedCodeRepository], and
  * returns the data the wallet needs to redeem the grant at the token endpoint.
  *
- * The token endpoint half still lives as a handler (`PreAuthorizedCodeTokenHandler`) because it
+ * The token endpoint half still lives as a handler (`PreAuthorizedCodeTokenEndpoint`) because it
  * responds to an OAuth request. The issuing step is backend orchestration the caller triggers
  * explicitly. Splitting the responsibilities keeps handler registries focused on inbound traffic
  * while services cover issuer-facing workflows.
@@ -62,7 +62,7 @@ class DefaultPreAuthorizedCodeIssuer(
     }
 
     override suspend fun issue(request: PreAuthorizedCodeIssueRequest): PreAuthorizedCodeIssueResult {
-        val subject = request.session.getSubject()?.takeIf { it.isNotBlank() }
+        val subject = request.session.subject?.takeIf { it.isNotBlank() }
             ?: throw IllegalArgumentException("Session subject is required for pre-authorized code issuance")
 
         if (request.userPinRequired && request.userPin.isNullOrBlank()) {
@@ -71,10 +71,9 @@ class DefaultPreAuthorizedCodeIssuer(
 
         val now = kotlin.time.Clock.System.now()
         val expiresAt = now + codeLifetimeSeconds.seconds
-        val sessionSnapshot = request.session.cloneSession().apply {
-            setSubject(subject)
-            setExpiresAt(TokenType.ACCESS_TOKEN, expiresAt)
-        }
+        val sessionSnapshot = request.session.copy()
+            .withSubject(subject)
+            .withExpiresAt(TokenType.ACCESS_TOKEN, expiresAt)
 
         val hashedPin = request.userPin?.let { hashPin(it) }
         val (code, _) = generateAndSaveUnique { generatedCode ->
