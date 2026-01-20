@@ -85,6 +85,7 @@ dependencies {
     api(project(":waltid-libraries:protocols:waltid-openid4vp"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier-openapi"))
+    implementation(project(":waltid-libraries:protocols:waltid-18013-7-verifier"))
     implementation(project(":waltid-libraries:web:waltid-ktor-notifications"))
 }
 

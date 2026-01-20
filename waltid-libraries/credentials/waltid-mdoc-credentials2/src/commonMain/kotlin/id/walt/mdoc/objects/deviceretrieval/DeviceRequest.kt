@@ -5,7 +5,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Represents the top-level request from an mdoc reader to an mdoc.
+ * Represents the top-level request from a mdoc reader to a mdoc.
  * It encapsulates one or more specific document requests.
  *
  * @see ISO/IEC 18013-5:2021, 8.3.2.1.2.1
