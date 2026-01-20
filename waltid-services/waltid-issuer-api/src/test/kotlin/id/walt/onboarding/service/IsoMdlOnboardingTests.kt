@@ -262,6 +262,14 @@ class IsoMdlOnboardingTests {
                 certificateData = validDSReqData,
                 ecKeyGenRequestParams = KeyGenerationRequestParameters(
                     backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.secp256k1,
+                ),
+            ),
+            DocumentSignerOnboardingRequest(
+                iacaSigner = validIACASigner,
+                certificateData = validDSReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
                     keyType = KeyType.Ed25519,
                 ),
             ),
