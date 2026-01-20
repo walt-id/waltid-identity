@@ -75,7 +75,7 @@ internal suspend fun executeAuthorizationCodeFlow(
         "state" to listOf(state),
     )
 
-    val authorizeRequest = provider.createAuthorizeRequest(authorizeParams)
+    val authorizeRequest = provider.createAuthorizationRequest(authorizeParams)
     require(authorizeRequest is AuthorizeRequestResult.Success)
     val authorizeReqWithIssuer = authorizeRequest.request.withIssuer(issuerId)
 

@@ -54,7 +54,7 @@ class TokenServiceTest {
         val clientId = "client-scope"
         val redirectUri = "https://client.example/callback"
 
-        val authorizeResult = provider.createAuthorizeRequest(
+        val authorizeResult = provider.createAuthorizationRequest(
             mapOf(
                 "response_type" to listOf("code"),
                 "client_id" to listOf(clientId),
@@ -158,7 +158,7 @@ class TokenServiceTest {
         val provider = buildOAuth2Provider(createTestConfig(tokenService = tokenService))
 
         suspend fun runFlow(issuerId: String): String = withContext(currentKey.asContextElement(keysByIssuer.getValue(issuerId))) {
-            val authorizeRequestResult = provider.createAuthorizeRequest(
+            val authorizeRequestResult = provider.createAuthorizationRequest(
                 mapOf(
                     "response_type" to listOf("code"),
                     "client_id" to listOf("client-$issuerId"),

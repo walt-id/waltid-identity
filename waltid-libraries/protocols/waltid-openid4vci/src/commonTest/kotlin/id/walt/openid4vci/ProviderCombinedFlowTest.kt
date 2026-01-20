@@ -31,7 +31,7 @@ class ProviderCombinedFlowTest {
         val provider = buildOAuth2Provider(config)
 
         // Authorization code flow
-        val authorizeRequestResult = provider.createAuthorizeRequest(
+        val authorizeRequestResult = provider.createAuthorizationRequest(
             mapOf(
                 "response_type" to listOf("code"),
                 "client_id" to listOf("demo-client"),
@@ -102,7 +102,7 @@ class ProviderCombinedFlowTest {
         val subject = "user-123"
 
         suspend fun authorizeFor(clientId: String, redirectUri: String, scope: String, state: String): Pair<String, AuthorizationRequest> {
-            val authorizeResult = provider.createAuthorizeRequest(
+            val authorizeResult = provider.createAuthorizationRequest(
                 mapOf(
                     "response_type" to listOf("code"),
                     "client_id" to listOf(clientId),
@@ -233,7 +233,7 @@ class ProviderCombinedFlowTest {
         val subject = "user-parallel"
 
         suspend fun runFlow(clientId: String, redirectUri: String, scope: String, state: String): Pair<String, String> {
-            val authorizeResult = provider.createAuthorizeRequest(
+            val authorizeResult = provider.createAuthorizationRequest(
                 mapOf(
                     "response_type" to listOf("code"),
                     "client_id" to listOf(clientId),

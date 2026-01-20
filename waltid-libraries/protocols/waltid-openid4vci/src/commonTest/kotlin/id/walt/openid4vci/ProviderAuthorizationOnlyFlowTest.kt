@@ -27,7 +27,7 @@ class ProviderAuthorizationOnlyFlowTest {
         )
 
         // 1) Parse the authorize request received from the wallet.
-        val authorizeRequestResult = provider.createAuthorizeRequest(
+        val authorizeRequestResult = provider.createAuthorizationRequest(
             mapOf(
                 "response_type" to listOf("code"),
                 "client_id" to listOf("demo-client"),
@@ -98,7 +98,7 @@ class ProviderAuthorizationOnlyFlowTest {
             includePreAuthorizedCodeDefaultHandlers = false,
         )
 
-        val authorizeRequestResult = provider.createAuthorizeRequest(
+        val authorizeRequestResult = provider.createAuthorizationRequest(
             mapOf(
                 "response_type" to listOf("code"),
                 "client_id" to listOf("demo-client"),
@@ -168,7 +168,7 @@ class ProviderAuthorizationOnlyFlowTest {
             includeAuthorizationCodeDefaultHandlers = false,
             includePreAuthorizedCodeDefaultHandlers = false,
         )
-        val authorizeRequestResult = provider.createAuthorizeRequest(
+        val authorizeRequestResult = provider.createAuthorizationRequest(
             mapOf(
                 "response_type" to listOf("code"),
                 "client_id" to listOf("demo-client"),

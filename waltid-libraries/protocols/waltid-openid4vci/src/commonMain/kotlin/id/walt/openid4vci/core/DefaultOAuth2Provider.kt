@@ -34,7 +34,7 @@ class DefaultOAuth2Provider(
     val config: OAuth2ProviderConfig,
 ) : OAuth2Provider {
 
-    override fun createAuthorizeRequest(parameters: Map<String, List<String>>): AuthorizeRequestResult =
+    override fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizeRequestResult =
         config.authorizeRequestValidator.validate(parameters)
 
     override suspend fun createAuthorizationResponse(
