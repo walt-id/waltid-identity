@@ -5,8 +5,8 @@ import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.defaultAuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.defaultPreAuthorizedCodeRepository
 import id.walt.openid4vci.tokens.AccessTokenService
-import id.walt.openid4vci.handlers.authorization.AuthorizationEndpointHandlers
-import id.walt.openid4vci.handlers.token.TokenEndpointHandlers
+import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
+import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator

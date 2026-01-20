@@ -1,7 +1,5 @@
 package id.walt.openid4vci
 
-import id.walt.openid4vci.core.AccessRequestResult
-import id.walt.openid4vci.core.AuthorizeRequestResult
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.errors.OAuthError
@@ -10,8 +8,8 @@ import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.defaultAuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.defaultPreAuthorizedCodeRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
-import id.walt.openid4vci.handlers.authorization.AuthorizationEndpointHandlers
-import id.walt.openid4vci.handlers.token.TokenEndpointHandlers
+import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
+import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator

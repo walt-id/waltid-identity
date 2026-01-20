@@ -1,7 +1,7 @@
 package id.walt.openid4vci.handlers.granttypes.authorizationcode
 
 import id.walt.openid4vci.GrantType
-import id.walt.openid4vci.handlers.token.TokenEndpointHandler
+import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
 import id.walt.openid4vci.responses.token.AccessResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.errors.OAuthError

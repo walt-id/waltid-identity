@@ -1,7 +1,7 @@
 package id.walt.openid4vci.core
 
-import id.walt.openid4vci.handlers.authorization.AuthorizationEndpointHandlers
-import id.walt.openid4vci.handlers.token.TokenEndpointHandlers
+import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
+import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository

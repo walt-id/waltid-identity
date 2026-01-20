@@ -2,7 +2,7 @@
 
 package id.walt.openid4vci.handlers.granttypes.authorizationcode
 
-import id.walt.openid4vci.handlers.authorization.AuthorizationEndpointHandler
+import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandler
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.errors.OAuthError
@@ -18,7 +18,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Authorize endpoint handler that issues authorization codes. The handler:
+ * Authorization endpoint handler that issues authorization codes. The handler:
  * 1. Grants requested scopes/audience (placeholder until consent is wired).
  * 2. Generates a code and persists the session via [AuthorizationCodeRepository].
  * 3. Returns redirect parameters containing the code and state.

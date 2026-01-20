@@ -10,6 +10,8 @@ import id.walt.openid4vci.core.TOKEN_TYPE_BEARER
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
+import id.walt.openid4vci.requests.authorization.AuthorizeRequestResult
+import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
