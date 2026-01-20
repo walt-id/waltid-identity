@@ -5,7 +5,7 @@ import id.walt.openid4vci.Session
 import kotlin.time.Instant
 
 /**
- * Token endpoint request contract (interface for extensibility).
+ * Access Token request for the Token endpoint (interface for extensibility).
  **/
 
 interface AccessTokenRequest {

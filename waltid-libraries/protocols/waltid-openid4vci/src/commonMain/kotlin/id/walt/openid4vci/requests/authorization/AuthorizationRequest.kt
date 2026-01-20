@@ -5,7 +5,7 @@ import id.walt.openid4vci.ResponseModeType
 import kotlin.time.Instant
 
 /**
- * Authorization request contract (interface for extensibility).
+ * Authorization Request for the Authorization Endpoint (interface for extensibility).
 **/
 
 interface AuthorizationRequest {
