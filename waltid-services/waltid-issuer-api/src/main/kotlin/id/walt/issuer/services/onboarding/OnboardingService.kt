@@ -17,6 +17,9 @@ import kotlin.time.ExperimentalTime
 
 object OnboardingService {
 
+    private val iacaCertificateBuilder = IACACertificateBuilder()
+    private val dsCertificateBuilder = DocumentSignerCertificateBuilder()
+
     suspend fun onboardIACA(
         request: IACAOnboardingRequest,
     ): IACAOnboardingResponse {
@@ -25,7 +28,7 @@ object OnboardingService {
             generationRequest = request.ecKeyGenRequestParams.toKeyGenerationRequest(),
         )
 
-        val certBundle = IACACertificateBuilder().build(
+        val certBundle = iacaCertificateBuilder.build(
             profileData = request.certificateData.toIACACertificateProfileData(),
             signingKey = iacaKey,
         )
@@ -62,7 +65,7 @@ object OnboardingService {
 
         val iacaKey = KeyManager.resolveSerializedKey(request.iacaSigner.iacaKey as JsonObject)
 
-        val certBundle = DocumentSignerCertificateBuilder().build(
+        val certBundle = dsCertificateBuilder.build(
             profileData = request.certificateData.toDocumentSignerCertificateProfileData(),
             publicKey = documentSignerKey.getPublicKey(),
             iacaSignerSpec = IACASignerSpecification(
