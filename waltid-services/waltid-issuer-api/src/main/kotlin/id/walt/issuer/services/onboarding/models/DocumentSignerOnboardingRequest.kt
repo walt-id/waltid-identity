@@ -2,6 +2,7 @@
 
 package id.walt.issuer.services.onboarding.models
 
+import id.walt.crypto.keys.KeyType
 import kotlinx.serialization.Serializable
 import kotlin.time.ExperimentalTime
 
@@ -11,6 +12,7 @@ data class DocumentSignerOnboardingRequest(
     val certificateData: DocumentSignerCertificateRequestData,
     val ecKeyGenRequestParams: KeyGenerationRequestParameters = KeyGenerationRequestParameters(
         backend = "jwk",
+        keyType = KeyType.secp256r1,
         config = null,
     ),
 )
