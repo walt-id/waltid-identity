@@ -38,10 +38,10 @@ class AWSKey(
         }
 
     override val hasPrivateKey: Boolean
-        get() = false
+        get() = true
 
 
-    override fun toString(): String = "[AWS ${keyType.name} key @AWS ${config.region} - $id]"
+    override fun toString(): String = "[AWS ${keyType.name} key @AWS ${config.auth.region} - $id]"
 
     override suspend fun getKeyId(): String = getPublicKey().getKeyId()
 
@@ -81,7 +81,7 @@ class AWSKey(
             messageType = MessageType.Digest // Using digest mode to handle payloads larger than 4096 bytes
         }
 
-        return KmsClient { region = config.region }.use { kmsClient ->
+        return KmsClient { region = config.auth.region }.use { kmsClient ->
             kmsClient.sign(signRequest).signature ?: throw IllegalStateException("Signature not returned")
         }
     }
@@ -89,7 +89,7 @@ class AWSKey(
 
     override suspend fun signJws(
         plaintext: ByteArray,
-        headers: Map<String, JsonElement>
+        headers: Map<String, JsonElement>,
     ): String {
         val appendedHeader = HashMap(headers).apply {
             put("alg", keyType.jwsAlg.toJsonElement())
@@ -125,7 +125,7 @@ class AWSKey(
             messageType = MessageType.Digest
         }
 
-        return KmsClient { region = config.region }.use { kmsClient ->
+        return KmsClient { region = config.auth.region }.use { kmsClient ->
             val response = kmsClient.verify(verifyRequest)
             Result.success(response.signatureValid.toString().decodeFromBase64())
         }
@@ -167,7 +167,7 @@ class AWSKey(
             pendingWindowInDays = 7
         }
 
-        val delete = KmsClient { region = config.region }.use { kmsClient ->
+        val delete = KmsClient { region = config.auth.region }.use { kmsClient ->
             kmsClient.scheduleKeyDeletion(request)
         }
         return delete.keyState?.value == "PendingDeletion"
@@ -178,21 +178,51 @@ class AWSKey(
 
 
         suspend fun generateKey(keyType: KeyType, config: AWSKeyMetadataSDK): AWSKey {
+
+            val awsTags = config.tags
+                ?.map { (key, value) ->
+                    Tag {
+                        tagKey = key
+                        tagValue = value
+                    }
+                }
+                ?.takeIf { it.isNotEmpty() }
+
             val request = CreateKeyRequest {
-                this.description = description
+                description = config.keyName
                 keySpec = KeySpec.fromValue(keyTypeToAwsKeyMapping(keyType))
                 keyUsage = KeyUsageType.SignVerify
-            }
-            val response = KmsClient { region = config.region }.use { kmsClient ->
-                kmsClient.createKey(request)
+                tags = awsTags
             }
 
-            val keyid = response.keyMetadata?.keyId ?: throw IllegalStateException("Key ID not returned")
-            val publicKey = getAwsPublicKey(config, keyid)
+            val response = KmsClient { region = config.auth.region }.use { kms ->
+                kms.createKey(request)
+            }
+
+            val keyId = response.keyMetadata?.keyId
+                ?: throw IllegalStateException("Key ID not returned by AWS KMS")
+
+            config.keyName?.let { keyName ->
+                KmsClient { region = config.auth.region }.use { kms ->
+                    kms.createAlias(
+                        CreateAliasRequest {
+                            aliasName = "alias/$keyName"
+                            targetKeyId = keyId
+                        }
+                    )
+                }
+            }
+
+            val publicKey = getAwsPublicKey(config, keyId)
             val keyType = response.keyMetadata?.keySpec?.value
+            // remove tags from config 
+            val editedConfig = config.copy(tags = null)
+            
+            
+            
             return AWSKey(
-                config = config,
-                id = keyid,
+                config = editedConfig,
+                id = keyId,
                 _publicKey = publicKey.exportJWK(),
                 _keyType = awsKeyToKeyTypeMapping(keyType.toString())
             )
@@ -200,7 +230,7 @@ class AWSKey(
 
 
         suspend fun getAwsPublicKey(config: AWSKeyMetadataSDK, keyId: String): Key {
-            KmsClient { region = config.region }.use { kmsClient ->
+            KmsClient { region = config.auth.region }.use { kmsClient ->
                 val pk = kmsClient.getPublicKey(GetPublicKeyRequest {
                     this.keyId = keyId
                 }).publicKey ?: throw IllegalStateException("Public key not returned")

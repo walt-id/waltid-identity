@@ -71,7 +71,7 @@ class OCIKeyRestApi(
         }
 
     override val hasPrivateKey: Boolean
-        get() = false
+        get() = true
 
     /** returns public key as PEM */
     private suspend fun retrievePublicKey(): Key {
