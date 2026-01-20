@@ -43,14 +43,15 @@ fun Application.onboardingApi() {
                                     "  - `country` must be a valid ISO 3166-1 alpha-2 country code (e.g., `\"US\"`)\n" +
                                     "  - Optional fields (`stateOrProvinceName`, `organizationName`) must not be blank if specified\n" +
                                     "  - `notAfter`, if present, must be greater than `notBefore` & the current time\n" +
+                                    "  - The certificate's validity period cannot exceed 20 years\n" +
                                     "\n" +
                                     "  ### Defaults:\n" +
-                                    "  - A local `secp256r1` signing key will be generated if **no** other backend is specified\n" +
+                                    "  - A local `secp256r1` key will be generated if **no** other backend is specified\n" +
                                     "  - If `notBefore` is not provided, the current system time is used\n" +
-                                    "  - If `notAfter` is not provided, it defaults to 29 years after `notBefore`"
-                        "\n" +
-                                "  ### Notes:\n" +
-                                "  - Supported signing keys: `secp256r1`, `secp384r1` and `secp521r1`"
+                                    "  - If `notAfter` is not provided, it defaults to 20 years after `notBefore`" +
+                                    "\n" +
+                                    "  ### Notes:\n" +
+                                    "  - Supported signing keys: `secp256r1`, `secp384r1` and `secp521r1`"
 
                         request(IACADocs.requestConfig())
 
@@ -87,7 +88,7 @@ fun Application.onboardingApi() {
                                 "  - The certificate's validity period cannot exceed 457 days\n" +
                                 "\n" +
                                 "  ### Defaults:\n" +
-                                "  - A local `secp256r1` signing key will be generated for the document signer if **no** other backend is specified\n" +
+                                "  - A local `secp256r1` key will be generated if **no** other backend is specified\n" +
                                 "  - If `notBefore` is not provided, the current system time is used\n" +
                                 "  - If `notAfter` is not provided, it defaults to 457 days after `notBefore`\n" +
                                 "\n" +
