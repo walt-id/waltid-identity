@@ -1,33 +1,33 @@
 package id.walt.openid4vci
 
 import id.walt.openid4vci.core.AccessRequestResult
-import id.walt.openid4vci.validation.DefaultAccessRequestValidator
+import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DefaultAccessRequestValidatorTest {
 
-    private val validator = DefaultAccessRequestValidator()
+    private val validator = DefaultAccessTokenRequestValidator()
 
     @Test
     fun `validate accepts authorization code grant`() {
         val session = DefaultSession()
         val result = validator.validate(
             mapOf(
-                "grant_type" to GrantType.AuthorizationCode.value,
-                "client_id" to "client-123",
-                "code" to "auth-code",
-                "redirect_uri" to "https://openid4vci.walt.id/callback",
+                "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                "client_id" to listOf("client-123"),
+                "code" to listOf("auth-code"),
+                "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
             ),
             session,
         )
 
         assertTrue(result.isSuccess())
         val request = (result as AccessRequestResult.Success).request
-        assertTrue(request.getGrantTypes().contains(GrantType.AuthorizationCode.value))
-        assertEquals("auth-code", request.getRequestForm().getFirst("code"))
-        assertEquals("client-123", request.getClient().id)
+        assertTrue(request.grantTypes.contains(GrantType.AuthorizationCode.value))
+        assertEquals("auth-code", request.requestForm["code"]?.firstOrNull())
+        assertEquals("client-123", request.client.id)
     }
 
     @Test
@@ -35,27 +35,27 @@ class DefaultAccessRequestValidatorTest {
         val session = DefaultSession()
         val result = validator.validate(
             mapOf(
-                "grant_type" to GrantType.PreAuthorizedCode.value,
-                "pre-authorized_code" to "pre-auth-code",
-                "user_pin" to "1234",
-                "scope" to "openid profile",
+                "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
+                "pre-authorized_code" to listOf("pre-auth-code"),
+                "user_pin" to listOf("1234"),
+                "scope" to listOf("openid profile"),
             ),
             session,
         )
 
         assertTrue(result.isSuccess())
         val request = (result as AccessRequestResult.Success).request
-        assertTrue(request.getGrantTypes().contains(GrantType.PreAuthorizedCode.value))
-        assertEquals("pre-auth-code", request.getRequestForm().getFirst("pre-authorized_code"))
-        assertEquals("1234", request.getRequestForm().getFirst("user_pin"))
-        assertTrue(request.getRequestedScopes().contains("openid"))
+        assertTrue(request.grantTypes.contains(GrantType.PreAuthorizedCode.value))
+        assertEquals("pre-auth-code", request.requestForm["pre-authorized_code"]?.firstOrNull())
+        assertEquals("1234", request.requestForm["user_pin"]?.firstOrNull())
+        assertTrue(request.requestedScopes.contains("openid"))
     }
 
     @Test
     fun `validate rejects pre-authorized code grant missing code`() {
         val result = validator.validate(
             mapOf(
-                "grant_type" to GrantType.PreAuthorizedCode.value,
+                "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
             ),
             DefaultSession(),
         )
@@ -69,7 +69,7 @@ class DefaultAccessRequestValidatorTest {
     fun `validate rejects unsupported grant type`() {
         val result = validator.validate(
             mapOf(
-                "grant_type" to "client_credentials",
+                "grant_type" to listOf("client_credentials"),
             ),
             DefaultSession(),
         )
