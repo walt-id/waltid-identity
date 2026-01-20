@@ -2,7 +2,7 @@ package id.walt.openid4vci.responses.authorization
 
 import id.walt.openid4vci.ResponseModeType
 
-data class AuthorizeResponse(
+data class AuthorizationResponse(
     val redirectUri: String,
     val code: String,
     val state: String? = null,
@@ -12,9 +12,9 @@ data class AuthorizeResponse(
     val headers: Map<String, String> = emptyMap(),
 )
 
-sealed class AuthorizeResponseResult {
-    data class Success(val response: AuthorizeResponse) : AuthorizeResponseResult()
-    data class Failure(val error: id.walt.openid4vci.errors.OAuthError) : AuthorizeResponseResult()
+sealed class AuthorizationResponseResult {
+    data class Success(val response: AuthorizationResponse) : AuthorizationResponseResult()
+    data class Failure(val error: id.walt.openid4vci.errors.OAuthError) : AuthorizationResponseResult()
 
     fun isSuccess(): Boolean = this is Success
 }
