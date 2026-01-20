@@ -4,7 +4,7 @@ metadata:
   name: {{ include "portal.fullname" . }}-config
 data:
   .env: |
-    NEXT_PUBLIC_VC_REPO: {{ .Values.env.NEXT_PUBLIC_VC_REPO }}
-    NEXT_PUBLIC_ISSUER: {{ .Values.env.NEXT_PUBLIC_ISSUER }}
-    NEXT_PUBLIC_VERIFIER: {{ .Values.env.NEXT_PUBLIC_VERIFIER }}
-    NEXT_PUBLIC_WALLET: {{ .Values.env.NEXT_PUBLIC_WALLET }}
+    NEXT_PUBLIC_VC_REPO={{ .Values.env.NEXT_PUBLIC_VC_REPO }}
+    NEXT_PUBLIC_ISSUER={{ .Values.env.NEXT_PUBLIC_ISSUER }}
+    NEXT_PUBLIC_VERIFIER={{ .Values.env.NEXT_PUBLIC_VERIFIER }}
+    NEXT_PUBLIC_WALLET={{ .Values.env.NEXT_PUBLIC_WALLET }}

@@ -8,4 +8,4 @@ spec:
     app: {{ include "wallet-api.fullname" . }}-dev-ui
     {{- include "wallet-api.selectorLabels" . | nindent 4 }}
   ports:
-  {{ .Values.web.ports | toYaml | nindent 4 -}}
+    {{- .Values.web.ports | toYaml | nindent 4 }}

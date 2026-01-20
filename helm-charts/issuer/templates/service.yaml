@@ -8,6 +8,6 @@ spec:
   type: {{ .Values.api.type }}
   selector:
     app: issuer
-  {{- include "issuer.selectorLabels" . | nindent 4 }}
+    {{- include "issuer.selectorLabels" . | nindent 4 }}
   ports:
- 	{{- .Values.api.ports | toYaml | nindent 2 -}}
+    {{- .Values.api.ports | toYaml | nindent 4 }}

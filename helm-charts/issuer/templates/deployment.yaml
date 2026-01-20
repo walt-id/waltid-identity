@@ -9,7 +9,7 @@ spec:
   selector:
     matchLabels:
       app: issuer
-    {{- include "issuer.selectorLabels" . | nindent 6 }}
+      {{- include "issuer.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:

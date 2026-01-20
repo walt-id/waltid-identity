@@ -3,7 +3,7 @@ kind: Ingress
 metadata:
   name: {{ include "issuer.fullname" . }}-ingress
   labels:
-  {{- include "issuer.labels" . | nindent 4 }}
+    {{- include "issuer.labels" . | nindent 4 }}
   {{- if .Values.ingress.clusterIssuer }}
   annotations:
     cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer }}

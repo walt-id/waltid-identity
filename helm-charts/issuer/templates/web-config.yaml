@@ -3,9 +3,13 @@ kind: ConfigMap
 metadata:
   name: {{ include "issuer.fullname" . }}-web-config
   labels:
-  {{- include "issuer.labels" . | nindent 4 }}
+    {{- include "issuer.labels" . | nindent 4 }}
 data:
-  _features.conf: {{ .Values.featConf | toYaml | indent 1 }}
-  web.conf: {{ .Values.webConfig.webConf | toYaml | indent 1 }}
-  issuer-service.conf:  baseUrl = "https://{{ .Values.ingress.host }}"
-  authentication-service.conf: {{ .Values.authServiceConf | toYaml | indent 1 }}
+  _features.conf: |
+    {{ .Values.featConf | nindent 4 }}
+  web.conf: |
+    {{ .Values.webConfig.webConf | nindent 4 }}
+  issuer-service.conf: |
+    baseUrl = "https://{{ .Values.ingress.host }}"
+  authentication-service.conf: |
+    {{ .Values.authServiceConf | nindent 4 }}

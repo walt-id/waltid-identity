@@ -3,7 +3,11 @@ kind: ConfigMap
 metadata:
   name: {{ include "wallet-api.fullname" . }}-wallet-config
 data:
-  _features.conf: {{ .Values.walletConfig.featuresConf | toYaml | indent 1 }}
-  db.conf: {{ .Values.walletConfig.dbConf | toYaml | indent 1 }}
-  web.conf: {{ .Values.walletConfig.webConf | toYaml | indent 1 }}
-  oidc.conf: {{ .Values.walletConfig.oidcConf | toYaml | indent 1 }}
+  _features.conf: |
+    {{ .Values.walletConfig.featuresConf | nindent 4 }}
+  db.conf: |
+    {{ .Values.walletConfig.dbConf | nindent 4 }}
+  web.conf: |
+    {{ .Values.walletConfig.webConf | nindent 4 }}
+  oidc.conf: |
+    {{ .Values.walletConfig.oidcConf | nindent 4 }}

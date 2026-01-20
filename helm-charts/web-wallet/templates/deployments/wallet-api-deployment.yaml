@@ -20,22 +20,6 @@ spec:
         fsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
-      initContainers:
-      - name: init-myservice
-        image: busybox
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-        command: ['sh', '-c', 'chmod 777 /waltid-wallet-api/data/']
-        volumeMounts:
-          - mountPath: "/waltid-wallet-api/data/"
-            name: wallet-data
-        volumes:
-          - name: wallet-data
-            persistentVolumeClaim:
-              claimName: {{ include "wallet-api.fullname" . }}-data-volume-claim
       containers:
       - name: wallet-api
         image: {{ .Values.api.walletApi.image.repository }}:{{ .Values.api.walletApi.image.tag | default .Chart.AppVersion }}
