@@ -60,7 +60,7 @@
         </div>
         <div class="flex flex-none items-center gap-x-4">
           <NuxtLink
-            :to="`/wallet/${currentWallet}/settings/keys/${key.keyId.id}`"
+            :to="`/wallet/${currentWallet}/settings/keys/${encodeURIComponent(key.keyId.id)}`"
             class="hidden rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:block"
           >
             View key
@@ -106,6 +106,18 @@ import {ArrowUturnLeftIcon, CheckIcon, HashtagIcon, InboxArrowDownIcon, KeyIcon}
 
 const currentWallet = useCurrentWallet();
 
+function getKeyLink(keyId) {
+  try {
+    // If it's a full URL, extract only the key name
+    const url = new URL(keyId);
+    const segments = url.pathname.split('/');
+    const keyName = segments[segments.length - 1]; // last segment of the path
+    return `/wallet/${currentWallet}/settings/keys/${keyName}`;
+  } catch (e) {
+    // If it's not a URL, just use it directly
+    return `/wallet/${currentWallet}/settings/keys/${keyId}`;
+  }
+}
 const keys = await useLazyFetch(
   `/wallet-api/wallet/${currentWallet.value}/keys`,
 ).data;
