@@ -2,6 +2,7 @@ package id.walt.x509.iso.documentsigner
 
 import id.walt.x509.iso.IsoSharedTestHarnessValidResources
 import id.walt.x509.iso.documentsigner.builder.IACASignerSpecification
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
@@ -89,14 +90,14 @@ class DocumentSignerBlockingBridgeTest {
         val dsProfileData = IsoSharedTestHarnessValidResources.dsProfileData
         val dsPublicKey = IsoSharedTestHarnessValidResources.dsSecp256r1PublicKey()
 
-        val blockingBuild = async {
+        val blockingBuild = async(Dispatchers.Default) {
             IsoSharedTestHarnessValidResources.dsBuilder.buildBlocking(
                 profileData = dsProfileData,
                 publicKey = dsPublicKey,
                 iacaSignerSpec = iacaSignerSpec,
             )
         }
-        val suspendBuild = async {
+        val suspendBuild = async(Dispatchers.Default) {
             IsoSharedTestHarnessValidResources.dsBuilder.build(
                 profileData = dsProfileData,
                 publicKey = dsPublicKey,
@@ -116,12 +117,12 @@ class DocumentSignerBlockingBridgeTest {
             actual = suspendBundle.decodedCertificate.issuerPrincipalName,
         )
 
-        val parsedBlockingDeferred = async {
+        val parsedBlockingDeferred = async(Dispatchers.Default) {
             IsoSharedTestHarnessValidResources.dsParser.parseBlocking(
                 certificate = blockingBundle.certificateDer,
             )
         }
-        val parsedSuspendDeferred = async {
+        val parsedSuspendDeferred = async(Dispatchers.Default) {
             IsoSharedTestHarnessValidResources.dsParser.parse(
                 certificate = blockingBundle.certificateDer,
             )
@@ -136,13 +137,13 @@ class DocumentSignerBlockingBridgeTest {
         )
 
         awaitAll(
-            async {
+            async(Dispatchers.Default) {
                 IsoSharedTestHarnessValidResources.dsValidator.validateBlocking(
                     dsDecodedCert = parsedBlocking,
                     iacaDecodedCert = iacaBundle.decodedCertificate,
                 )
             },
-            async {
+            async(Dispatchers.Default) {
                 IsoSharedTestHarnessValidResources.dsValidator.validate(
                     dsDecodedCert = parsedSuspend,
                     iacaDecodedCert = iacaBundle.decodedCertificate,
@@ -170,7 +171,7 @@ class DocumentSignerBlockingBridgeTest {
         val dsPublicKey = IsoSharedTestHarnessValidResources.dsSecp256r1PublicKey()
 
         List(12) {
-            async {
+            async(Dispatchers.Default) {
                 val blockingBundle = IsoSharedTestHarnessValidResources.dsBuilder.buildBlocking(
                     profileData = dsProfileData,
                     publicKey = dsPublicKey,

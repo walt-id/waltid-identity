@@ -2,6 +2,7 @@ package id.walt.x509.iso.iaca
 
 import id.walt.x509.iso.IsoSharedTestHarnessValidResources
 import id.walt.x509.iso.assertIACABuilderDataEqualsCertificateData
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
@@ -57,13 +58,13 @@ class IACABlockingBridgeTest {
         val profileData = IsoSharedTestHarnessValidResources.iacaProfileData
         val signingKey = IsoSharedTestHarnessValidResources.iacaSecp256r1SigningKey()
 
-        val blockingBuild = async {
+        val blockingBuild = async(Dispatchers.Default) {
             IsoSharedTestHarnessValidResources.iacaBuilder.buildBlocking(
                 profileData = profileData,
                 signingKey = signingKey,
             )
         }
-        val suspendBuild = async {
+        val suspendBuild = async(Dispatchers.Default) {
             IsoSharedTestHarnessValidResources.iacaBuilder.build(
                 profileData = profileData,
                 signingKey = signingKey,
@@ -81,12 +82,12 @@ class IACABlockingBridgeTest {
             actual = suspendBundle.decodedCertificate.toIACACertificateProfileData(),
         )
 
-        val parsedBlockingDeferred = async {
+        val parsedBlockingDeferred = async(Dispatchers.Default) {
             IsoSharedTestHarnessValidResources.iacaParser.parseBlocking(
                 certificate = blockingBundle.certificateDer,
             )
         }
-        val parsedSuspendDeferred = async {
+        val parsedSuspendDeferred = async(Dispatchers.Default) {
             IsoSharedTestHarnessValidResources.iacaParser.parse(
                 certificate = blockingBundle.certificateDer,
             )
@@ -97,10 +98,10 @@ class IACABlockingBridgeTest {
         assertEquals(parsedBlocking, parsedSuspend)
 
         awaitAll(
-            async {
+            async(Dispatchers.Default) {
                 IsoSharedTestHarnessValidResources.iacaValidator.validateBlocking(parsedBlocking)
             },
-            async {
+            async(Dispatchers.Default) {
                 IsoSharedTestHarnessValidResources.iacaValidator.validate(parsedSuspend)
             },
         )
@@ -113,7 +114,7 @@ class IACABlockingBridgeTest {
         val signingKey = IsoSharedTestHarnessValidResources.iacaSecp256r1SigningKey()
 
         List(12) {
-            async {
+            async(Dispatchers.Default) {
                 val blockingBundle = IsoSharedTestHarnessValidResources.iacaBuilder.buildBlocking(
                     profileData = profileData,
                     signingKey = signingKey,
