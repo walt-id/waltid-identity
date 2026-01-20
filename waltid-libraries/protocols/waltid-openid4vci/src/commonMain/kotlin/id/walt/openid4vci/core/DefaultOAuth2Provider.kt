@@ -5,16 +5,16 @@ import id.walt.openid4vci.ResponseModeType
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.platform.urlEncode
-import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
+import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
-import id.walt.openid4vci.responses.token.AccessHttpResponse
-import id.walt.openid4vci.responses.token.AccessResponseResult
-import id.walt.openid4vci.responses.token.AccessTokenResponse
-import id.walt.openid4vci.responses.authorization.AuthorizeHttpResponse
+import id.walt.openid4vci.responses.authorization.AuthorizationHttpResponse
 import id.walt.openid4vci.responses.authorization.AuthorizationResponse
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
+import id.walt.openid4vci.responses.token.AccessTokenResponse
+import id.walt.openid4vci.responses.token.AccessHttpResponse
+import id.walt.openid4vci.responses.token.AccessResponseResult
 
 /**
  * Default implementation of [OAuth2Provider] that handles validators and handler registries.
@@ -61,7 +61,7 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override fun writeAuthorizationError(authorizationRequest: AuthorizationRequest, error: OAuthError): AuthorizeHttpResponse {
+    override fun writeAuthorizationError(authorizationRequest: AuthorizationRequest, error: OAuthError): AuthorizationHttpResponse {
         val baseRedirect = authorizationRequest.redirectUri
             ?: authorizationRequest.client.redirectUris.firstOrNull()
 
@@ -73,14 +73,14 @@ class DefaultOAuth2Provider(
             }
             val location = appendParams(baseRedirect, parameters)
             val headers = mutableMapOf("Location" to location)
-            AuthorizeHttpResponse(
+            AuthorizationHttpResponse(
                 status = 302,
                 redirectUri = location,
                 parameters = parameters,
                 headers = headers,
             )
         } else {
-            AuthorizeHttpResponse(
+            AuthorizationHttpResponse(
                 status = 400,
                 redirectUri = null,
                 body = error.description ?: error.error,
@@ -91,7 +91,7 @@ class DefaultOAuth2Provider(
     override fun writeAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
         response: AuthorizationResponse
-    ): AuthorizeHttpResponse {
+    ): AuthorizationHttpResponse {
         val params = buildMap {
             put("code", response.code)
             response.state?.let { put("state", it) }
@@ -105,7 +105,7 @@ class DefaultOAuth2Provider(
         }
 
         val headers = response.headers.toMutableMap().apply { this["Location"] = location }
-        return AuthorizeHttpResponse(
+        return AuthorizationHttpResponse(
             status = 302,
             redirectUri = location,
             parameters = params,

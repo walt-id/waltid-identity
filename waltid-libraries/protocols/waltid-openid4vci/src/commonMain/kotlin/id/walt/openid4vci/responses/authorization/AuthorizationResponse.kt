@@ -19,7 +19,7 @@ sealed class AuthorizationResponseResult {
     fun isSuccess(): Boolean = this is Success
 }
 
-data class AuthorizeHttpResponse(
+data class AuthorizationHttpResponse(
     val status: Int,
     val redirectUri: String?,
     val parameters: Map<String, String> = emptyMap(),

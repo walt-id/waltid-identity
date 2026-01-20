@@ -2,16 +2,16 @@ package id.walt.openid4vci.core
 
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.errors.OAuthError
-import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
+import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponse
+import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
+import id.walt.openid4vci.responses.authorization.AuthorizationHttpResponse
+import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessHttpResponse
 import id.walt.openid4vci.responses.token.AccessResponseResult
-import id.walt.openid4vci.responses.token.AccessTokenResponse
-import id.walt.openid4vci.responses.authorization.AuthorizeHttpResponse
-import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 
 /**
  * Minimal OAuth2 provider contract scoped to the authorization-code/pre-authorized code grants.
@@ -29,8 +29,8 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 interface OAuth2Provider {
     fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult
     suspend fun createAuthorizationResponse(authorizationRequest: AuthorizationRequest, session: Session): AuthorizationResponseResult
-    fun writeAuthorizationError(authorizationRequest: AuthorizationRequest, error: OAuthError): AuthorizeHttpResponse
-    fun writeAuthorizationResponse(authorizationRequest: AuthorizationRequest, response: AuthorizationResponse): AuthorizeHttpResponse
+    fun writeAuthorizationError(authorizationRequest: AuthorizationRequest, error: OAuthError): AuthorizationHttpResponse
+    fun writeAuthorizationResponse(authorizationRequest: AuthorizationRequest, response: AuthorizationResponse): AuthorizationHttpResponse
     fun createAccessRequest(parameters: Map<String, List<String>>, session: Session? = null): AccessTokenRequestResult
     suspend fun createAccessResponse(request: AccessTokenRequest): AccessResponseResult
     fun writeAccessError(request: AccessTokenRequest, error: OAuthError): AccessHttpResponse
