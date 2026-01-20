@@ -1,6 +1,6 @@
 package id.walt.openid4vci
 
-import id.walt.openid4vci.responses.token.AccessResponseResult
+import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
@@ -63,7 +63,7 @@ class ProviderAuthorizationOnlyFlowTest {
         // 4) Produce the token response based on the authorization code session.
         val accessResponse = provider.createAccessTokenResponse(accessRequest)
         assertTrue(accessResponse.isSuccess())
-        val tokenResponse = (accessResponse as AccessResponseResult.Success).response
+        val tokenResponse = (accessResponse as AccessTokenResponseResult.Success).response
         assertTrue(tokenResponse.accessToken.isNotBlank())
 
         val preAccessTokenRequestResult = provider.createAccessTokenRequest(
@@ -77,7 +77,7 @@ class ProviderAuthorizationOnlyFlowTest {
             is AccessTokenRequestResult.Success -> {
                 val requestWithIssuer = preAccessTokenRequestResult.request.withIssuer(issuerId)
                 val preAccessResponse = provider.createAccessTokenResponse(requestWithIssuer)
-                val failure = preAccessResponse as? AccessResponseResult.Failure
+                val failure = preAccessResponse as? AccessTokenResponseResult.Failure
                     ?: error("Expected pre-authorized flow to be rejected at token endpoint")
                 assertEquals("unsupported_grant_type", failure.error.error)
             }
@@ -156,7 +156,7 @@ class ProviderAuthorizationOnlyFlowTest {
         )
 
         val response = provider.createAccessTokenResponse(request)
-        assertTrue(response is AccessResponseResult.Failure)
+        assertTrue(response is AccessTokenResponseResult.Failure)
         assertEquals("unsupported_grant_type", response.error.error)
     }
 

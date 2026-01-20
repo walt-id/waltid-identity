@@ -10,8 +10,8 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponse
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponse
-import id.walt.openid4vci.responses.token.AccessResponseResult
-import id.walt.openid4vci.responses.token.AccessHttpResponse
+import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
+import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 
 /**
  * Minimal OAuth2 provider contract scoped to the authorization-code/pre-authorized code grants.
@@ -32,7 +32,7 @@ interface OAuth2Provider {
     fun writeAuthorizationError(authorizationRequest: AuthorizationRequest, error: OAuthError): AuthorizationResponseHttp
     fun writeAuthorizationResponse(authorizationRequest: AuthorizationRequest, response: AuthorizationResponse): AuthorizationResponseHttp
     fun createAccessTokenRequest(parameters: Map<String, List<String>>, session: Session? = null): AccessTokenRequestResult
-    suspend fun createAccessTokenResponse(request: AccessTokenRequest): AccessResponseResult
-    fun writeAccessTokenError(request: AccessTokenRequest, error: OAuthError): AccessHttpResponse
-    fun writeAccessTokenResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessHttpResponse
+    suspend fun createAccessTokenResponse(request: AccessTokenRequest): AccessTokenResponseResult
+    fun writeAccessTokenError(request: AccessTokenRequest, error: OAuthError): AccessTokenResponseHttp
+    fun writeAccessTokenResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessTokenResponseHttp
 }

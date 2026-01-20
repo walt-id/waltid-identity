@@ -4,7 +4,7 @@ import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.StubTokenService
-import id.walt.openid4vci.responses.token.AccessResponseResult
+import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
@@ -46,7 +46,7 @@ class PreAuthorizedCodeGrantHandlerTest {
         val request = createAccessRequestWithGrant(code = code)
 
         val result = handler.handleTokenEndpointRequest(request)
-        assertTrue(result is AccessResponseResult.Success)
+        assertTrue(result is AccessTokenResponseResult.Success)
         val extra = result.response.extra
         assertNotNull(extra["c_nonce"])
         assertTrue((extra["c_nonce_expires_in"] as? Long ?: 0) >= 0)
@@ -70,12 +70,12 @@ class PreAuthorizedCodeGrantHandlerTest {
         val firstAttempt = createAccessRequestWithGrant(code = code, userPin = "0000")
 
         val failure = handler.handleTokenEndpointRequest(firstAttempt)
-        assertTrue(failure is AccessResponseResult.Failure)
+        assertTrue(failure is AccessTokenResponseResult.Failure)
         assertNotNull(repository.get(code))
 
         val secondAttempt = createAccessRequestWithGrant(code = code, userPin = "4321")
         val success = handler.handleTokenEndpointRequest(secondAttempt)
-        assertTrue(success is AccessResponseResult.Success)
+        assertTrue(success is AccessTokenResponseResult.Success)
         assertNull(repository.get(code))
     }
 
@@ -92,11 +92,11 @@ class PreAuthorizedCodeGrantHandlerTest {
         val code = issued.code
 
         val first = createAccessRequestWithGrant(code = code)
-        assertTrue(handler.handleTokenEndpointRequest(first) is AccessResponseResult.Success)
+        assertTrue(handler.handleTokenEndpointRequest(first) is AccessTokenResponseResult.Success)
 
         val second = createAccessRequestWithGrant(code = code)
         val failure = handler.handleTokenEndpointRequest(second)
-        assertTrue(failure is AccessResponseResult.Failure)
+        assertTrue(failure is AccessTokenResponseResult.Failure)
     }
 
         private fun createAccessRequestWithGrant(code: String? = null, userPin: String? = null): AccessTokenRequest =

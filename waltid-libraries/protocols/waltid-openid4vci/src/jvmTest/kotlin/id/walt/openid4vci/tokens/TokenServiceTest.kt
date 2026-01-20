@@ -20,7 +20,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.assertNotNull
 import id.walt.openid4vci.core.buildOAuth2Provider
-import id.walt.openid4vci.responses.token.AccessResponseResult
+import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.DefaultSession
@@ -84,7 +84,7 @@ class TokenServiceTest {
         val accessRequest = AccessTokenRequestResult.request.withIssuer(issuerId)
 
         val accessResponse = provider.createAccessTokenResponse(accessRequest)
-        require(accessResponse is AccessResponseResult.Success)
+        require(accessResponse is AccessTokenResponseResult.Success)
         val token = accessResponse.response.accessToken
 
         val payload = decodePayload(token)
@@ -188,7 +188,7 @@ class TokenServiceTest {
             val accessRequest = AccessTokenRequestResult.request.withIssuer(issuerId)
 
             val accessResponse = provider.createAccessTokenResponse(accessRequest)
-            require(accessResponse is AccessResponseResult.Success)
+            require(accessResponse is AccessTokenResponseResult.Success)
 
             accessResponse.response.accessToken
         }

@@ -13,8 +13,8 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponse
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponse
-import id.walt.openid4vci.responses.token.AccessResponseResult
-import id.walt.openid4vci.responses.token.AccessHttpResponse
+import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
+import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 
 
 /**
@@ -121,7 +121,7 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override suspend fun createAccessTokenResponse(request: AccessTokenRequest): AccessResponseResult {
+    override suspend fun createAccessTokenResponse(request: AccessTokenRequest): AccessTokenResponseResult {
         for (handler in config.tokenEndpointHandlers.toList()) {
             if (!handler.canHandleTokenEndpointRequest(request)) {
                 continue
@@ -131,13 +131,13 @@ class DefaultOAuth2Provider(
         }
 
         val description = request.grantTypes.joinToString(" ").takeIf { it.isNotBlank() }
-        return AccessResponseResult.Failure(
+        return AccessTokenResponseResult.Failure(
             OAuthError("unsupported_grant_type", description),
         )
     }
 
-    override fun writeAccessTokenError(request: AccessTokenRequest, error: OAuthError): AccessHttpResponse =
-        AccessHttpResponse(
+    override fun writeAccessTokenError(request: AccessTokenRequest, error: OAuthError): AccessTokenResponseHttp =
+        AccessTokenResponseHttp(
             status = 400,
             payload = buildMap {
                 put("error", error.error)
@@ -145,8 +145,8 @@ class DefaultOAuth2Provider(
             },
         )
 
-    override fun writeAccessTokenResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessHttpResponse =
-        AccessHttpResponse(
+    override fun writeAccessTokenResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessTokenResponseHttp =
+        AccessTokenResponseHttp(
             status = 200,
             payload = buildMap {
                 put("token_type", response.tokenType)

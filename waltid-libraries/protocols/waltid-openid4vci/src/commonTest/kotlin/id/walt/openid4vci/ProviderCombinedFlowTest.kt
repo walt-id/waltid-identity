@@ -1,6 +1,6 @@
 package id.walt.openid4vci
 
-import id.walt.openid4vci.responses.token.AccessResponseResult
+import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.responses.token.AccessTokenResponse
@@ -61,7 +61,7 @@ class ProviderCombinedFlowTest {
         val accessRequest = (accessResult as AccessTokenRequestResult.Success).request.withIssuer(issClaim)
         val accessResponse = provider.createAccessTokenResponse(accessRequest)
         assertTrue(accessResponse.isSuccess())
-        val tokenResponse = (accessResponse as AccessResponseResult.Success).response
+        val tokenResponse = (accessResponse as AccessTokenResponseResult.Success).response
         assertTrue(tokenResponse.accessToken.isNotBlank())
 
         // Pre-authorized code flow
@@ -87,7 +87,7 @@ class ProviderCombinedFlowTest {
         val preAccessRequest = (preAccessResult as AccessTokenRequestResult.Success).request.withIssuer(issClaim)
         val preAccessResponse = provider.createAccessTokenResponse(preAccessRequest)
         assertTrue(preAccessResponse.isSuccess())
-        val preTokenResponse = (preAccessResponse as AccessResponseResult.Success).response
+        val preTokenResponse = (preAccessResponse as AccessTokenResponseResult.Success).response
         assertEquals("nonce-pre", preTokenResponse.extra["c_nonce"])
         assertNull(config.preAuthorizedCodeRepository.get(preCode))
     }
@@ -169,8 +169,8 @@ class ProviderCombinedFlowTest {
             assertEquals(redirectUri, accessRequest.requestForm["redirect_uri"]?.firstOrNull())
 
             val accessResponse = provider.createAccessTokenResponse(accessRequest)
-            assertTrue(accessResponse is AccessResponseResult.Success, "access response failed for $clientId")
-            val success = accessResponse as AccessResponseResult.Success
+            assertTrue(accessResponse is AccessTokenResponseResult.Success, "access response failed for $clientId")
+            val success = accessResponse as AccessTokenResponseResult.Success
             val tokenResponse = success.response
             val updatedRequest = success.request
 
@@ -265,7 +265,7 @@ class ProviderCombinedFlowTest {
             val accessRequest = accessResult.request.withIssuer(issClaim)
 
             val accessResponse = provider.createAccessTokenResponse(accessRequest)
-            assertTrue(accessResponse is AccessResponseResult.Success, "access response failed for $clientId")
+            assertTrue(accessResponse is AccessTokenResponseResult.Success, "access response failed for $clientId")
             val tokenResponse = (accessResponse).response
 
             return code to tokenResponse.accessToken

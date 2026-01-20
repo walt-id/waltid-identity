@@ -4,7 +4,7 @@ import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
 import id.walt.openid4vci.errors.OAuthError
-import id.walt.openid4vci.responses.token.AccessResponseResult
+import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.preauthorized.hashPin
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
@@ -27,9 +27,9 @@ class PreAuthorizedCodeTokenEndpoint(
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
         request.grantTypes.contains(GrantType.PreAuthorizedCode.value)
 
-    override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): AccessResponseResult {
+    override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): AccessTokenResponseResult {
         if (!canHandleTokenEndpointRequest(request)) {
-            return AccessResponseResult.Failure(
+            return AccessTokenResponseResult.Failure(
                 OAuthError(
                     error = "unsupported_grant_type",
                     description = "${GrantType.PreAuthorizedCode.value} grant not requested",
@@ -38,10 +38,10 @@ class PreAuthorizedCodeTokenEndpoint(
         }
 
         val code = request.requestForm["pre-authorized_code"]?.firstOrNull()
-            ?: return AccessResponseResult.Failure(OAuthError("invalid_request", "Missing pre-authorized_code"))
+            ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "Missing pre-authorized_code"))
 
         val record = codeRepository.get(code)
-            ?: return AccessResponseResult.Failure(
+            ?: return AccessTokenResponseResult.Failure(
                 OAuthError(
                     error = "invalid_grant",
                     description = "Pre-authorized code is invalid or has already been used",
@@ -50,7 +50,7 @@ class PreAuthorizedCodeTokenEndpoint(
 
         val providedPin = request.requestForm["user_pin"]?.firstOrNull()
         if (record.userPinRequired && providedPin.isNullOrBlank()) {
-            return AccessResponseResult.Failure(
+            return AccessTokenResponseResult.Failure(
                 OAuthError(
                     error = "invalid_grant",
                     description = "user_pin is required for this pre-authorized code",
@@ -59,7 +59,7 @@ class PreAuthorizedCodeTokenEndpoint(
         }
 
         if (!record.userPin.isNullOrBlank() && providedPin != null && record.userPin != hashPin(providedPin)) {
-            return AccessResponseResult.Failure(
+            return AccessTokenResponseResult.Failure(
                 OAuthError(
                     error = "invalid_grant",
                     description = "user_pin is invalid",
@@ -68,7 +68,7 @@ class PreAuthorizedCodeTokenEndpoint(
         }
 
         val consumed = codeRepository.consume(code)
-            ?: return AccessResponseResult.Failure(
+            ?: return AccessTokenResponseResult.Failure(
                 OAuthError(
                     error = "invalid_grant",
                     description = "Pre-authorized code is invalid or has already been used",
@@ -100,7 +100,7 @@ class PreAuthorizedCodeTokenEndpoint(
             ?: Clock.System.now()
 
         val subject = session.subject?.takeIf { it.isNotBlank() }
-            ?: return AccessResponseResult.Failure(OAuthError("invalid_request", "subject is required in session"))
+            ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "subject is required in session"))
 
         val claims = defaultAccessTokenClaims(
             subject = subject,
@@ -126,7 +126,7 @@ class PreAuthorizedCodeTokenEndpoint(
             }
         }
 
-        return AccessResponseResult.Success(
+        return AccessTokenResponseResult.Success(
             request = clientRequest,
             AccessTokenResponse(
                 accessToken = accessToken,

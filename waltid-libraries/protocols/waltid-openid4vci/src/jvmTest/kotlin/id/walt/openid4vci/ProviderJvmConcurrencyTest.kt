@@ -11,7 +11,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
-import id.walt.openid4vci.responses.token.AccessResponseResult
+import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -99,7 +99,7 @@ internal suspend fun executeAuthorizationCodeFlow(
     val accessRequestWithIssuer = AccessTokenRequestResult.request.withIssuer(issuerId)
 
     val accessResponse = provider.createAccessTokenResponse(accessRequestWithIssuer)
-    require(accessResponse is AccessResponseResult.Success)
+    require(accessResponse is AccessTokenResponseResult.Success)
 
     val updatedRequest = accessResponse.request
     assertEquals(expectedSubject, updatedRequest.session?.subject)
